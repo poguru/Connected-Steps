@@ -3,10 +3,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Connected Steps — Events & Running Community</title>
+
+  <title>Connected Steps | IT Runs & Fitness Events</title>
+
+  <meta name="description"
+    content="Connected Steps is a Hyderabad-based running and fitness community organizing IT runs, marathons, and wellness events for professionals." />
+
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
+
+  <!-- ================= HEADER ================= -->
   <header class="site-header">
     <div class="wrap header-inner">
       <a class="brand" href="/">
@@ -21,16 +29,20 @@
         <a href="#contact" class="btn-outline">Contact</a>
       </nav>
 
-      <button class="mobile-toggle" aria-label="open menu">☰</button>
+      <button class="mobile-toggle" aria-label="Open Menu">☰</button>
     </div>
   </header>
 
   <main>
-    <!-- HERO -->
+
+    <!-- ================= HERO ================= -->
     <section class="hero">
       <div class="hero-inner wrap">
         <h1>Move. Connect. Celebrate.</h1>
-        <p class="subtitle">Join our runs, competitions and community events — beginners welcome.</p>
+        <p class="subtitle">
+          Tech-inspired running and wellness events for IT professionals and communities.
+        </p>
+
         <div class="hero-cta">
           <a class="btn" href="#events">See Events</a>
           <a class="btn ghost" href="#about">Learn More</a>
@@ -38,18 +50,25 @@
       </div>
     </section>
 
-    <!-- UPCOMING / EVENTS -->
+    <!-- ================= UPCOMING EVENTS ================= -->
     <section id="events" class="wrap section">
       <h2>Upcoming Events</h2>
-      <p class="lead">Community runs, timed events and group training — sign up early.</p>
+      <p class="lead">
+        Community runs, IT-focused fitness events and group training — sign up early.
+      </p>
 
       <div class="grid events-grid">
+
+        <!-- IT RUN – SPRINT 1 -->
         <article class="card">
-          <img src="assets/event1.jpg" alt="">
+          <img src="assets/event1.jpg" alt="IT Run Sprint 1">
           <div class="card-body">
-            <h3>Sunrise 5K</h3>
-            <p class="muted">Sun, 22 Dec • Necklace Road</p>
-            <p>A friendly 5K run open to all. Coffee after the run.</p>
+            <h3>IT Run – Sprint 1</h3>
+            <p class="muted">Sun, 29th March 2026 • Hyderabad</p>
+            <p>
+              A tech-inspired community run designed exclusively for IT professionals
+              to break sedentary routines and kick-start a healthier lifestyle.
+            </p>
             <div class="card-actions">
               <a class="btn small" href="#">Register</a>
               <a href="#" class="muted-link">Details</a>
@@ -57,83 +76,73 @@
           </div>
         </article>
 
-        <article class="card">
-          <img src="assets/event2.jpg" alt="">
-          <div class="card-body">
-            <h3>Trail Challenge 10K</h3>
-            <p class="muted">Sat, 11 Jan • Shamirpet</p>
-            <p>A scenic and fun trail run. Limited slots.</p>
-            <div class="card-actions">
-              <a class="btn small" href="#">Register</a>
-              <a href="#" class="muted-link">Details</a>
-            </div>
-          </div>
-        </article>
-
-        <!-- duplicate card for layout -->
-        <article class="card">
-          <img src="assets/event1.jpg" alt="">
-          <div class="card-body">
-            <h3>Evening Fun Run</h3>
-            <p class="muted">Fri, 31 Jan • Hitech City</p>
-            <p>Group run with paced groups for every level.</p>
-            <div class="card-actions">
-              <a class="btn small" href="#">Register</a>
-              <a href="#" class="muted-link">Details</a>
-            </div>
-          </div>
-        </article>
       </div>
     </section>
 
-    <!-- ABOUT -->
+    <!-- ================= ABOUT ================= -->
     <section id="about" class="wrap section alt">
       <div class="two-col">
         <div>
           <h2>About Connected Steps</h2>
-          <p>We are a community that brings people together through running and outdoor activities. We host weekly group runs, training sessions and charity events. Everyone is welcome — from beginners to competitive runners.</p>
+          <p>
+            Connected Steps is a fitness and running community based in Hyderabad,
+            focused on bringing professionals together through structured runs,
+            wellness initiatives, and community-driven events.
+          </p>
           <ul>
-            <li>Weekly group runs</li>
-            <li>Training & coaching</li>
-            <li>Community & charity events</li>
+            <li>IT-focused community runs</li>
+            <li>Corporate wellness events</li>
+            <li>Training & marathon preparation</li>
           </ul>
         </div>
+
         <div class="card about-card">
-          <h3>Join a community run</h3>
-          <p>Find a meet-up near you and join fellow runners. Follow our socials for regular updates.</p>
+          <h3>Join the Movement</h3>
+          <p>
+            Be part of a growing community that values health, consistency,
+            and meaningful connections beyond work.
+          </p>
           <a class="btn" href="#contact">Join Now</a>
         </div>
       </div>
     </section>
 
-    <!-- GALLERY -->
+    <!-- ================= GALLERY ================= -->
     <section id="gallery" class="wrap section">
       <h2>Gallery</h2>
       <div class="gallery-grid">
-        <img src="assets/gallery1.jpg" alt="">
-        <img src="assets/event1.jpg" alt="">
-        <img src="assets/gallery1.jpg" alt="">
-        <img src="assets/event2.jpg" alt="">
+        <img src="assets/gallery1.jpg" alt="Run photo">
+        <img src="assets/event1.jpg" alt="Event photo">
+        <img src="assets/gallery1.jpg" alt="Community run">
+        <img src="assets/event2.jpg" alt="Group run">
       </div>
     </section>
 
-    <!-- CONTACT -->
+    <!-- ================= CONTACT ================= -->
     <section id="contact" class="wrap section alt">
       <h2>Contact & Join</h2>
+
       <div class="two-col">
-        <form id="contactForm" action="https://formspree.io/f/yourformid" method="POST" class="card contact-card">
+        <form id="contactForm"
+              action="https://formspree.io/f/yourformid"
+              method="POST"
+              class="card contact-card">
+
           <label>
             <span>Name</span>
             <input name="name" required />
           </label>
+
           <label>
             <span>Email</span>
             <input name="email" type="email" required />
           </label>
+
           <label>
             <span>Message</span>
             <textarea name="message" rows="4"></textarea>
           </label>
+
           <div class="form-actions">
             <button class="btn" type="submit">Send</button>
             <button class="btn ghost" type="reset">Reset</button>
@@ -141,19 +150,24 @@
         </form>
 
         <div>
-          <h3>Get involved</h3>
-          <p>Follow us on social media, subscribe to our newsletter, or message us to host a run in your area.</p>
-          <p><strong>Email</strong>: info@connectedsteps.in</p>
-          <p><strong>Phone</strong>: +91-97036-20574</p>
+          <h3>Get Involved</h3>
+          <p>
+            Interested in participating, sponsoring, or hosting a run?
+            Reach out to us anytime.
+          </p>
+          <p><strong>Email:</strong> info@connectedsteps.in</p>
+          <p><strong>Phone:</strong> +91 97036 20570</p>
         </div>
       </div>
     </section>
+
   </main>
 
+  <!-- ================= FOOTER ================= -->
   <footer class="site-footer">
     <div class="wrap">
       <div class="foot-inner">
-        <div>© 2025 Connected Steps</div>
+        <div>© 2026 Connected Steps</div>
         <nav class="footer-nav">
           <a href="#events">Events</a>
           <a href="#about">About</a>
