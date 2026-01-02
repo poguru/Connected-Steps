@@ -1,25 +1,27 @@
 :root{
-  --blue:#0B5ED7;
-  --orange:#F97316;
+  --orange:#F97316;      /* dominant brand color */
+  --orange-dark:#EA580C;
 
   --accent:var(--orange);   /* buttons & highlights */
-  --primary:var(--blue);    /* headers & links */
+  --primary:var(--orange);  /* headers, nav, footer */
 
   --dark:#111827;
   --muted:#6B7280;
-  --bg:#F8FAFC;
+  --bg:#ffffff;             /* pure white background */
 }
+
 
 *{box-sizing:border-box}
 body{font-family:Inter,system-ui,Arial,sans-serif;margin:0;background:var(--bg);color:#222;line-height:1.5}
 .wrap{max-width:1100px;margin:0 auto;padding:0 18px}
-.site-header{
+.site-footer{
   background:var(--primary);
   color:#fff;
-  position:sticky;
-  top:0;
-  z-index:80;
+  padding:18px 0;
+  margin-top:32px;
 }
+
+
 .header-inner{display:flex;align-items:center;justify-content:space-between;padding:12px 0}
 .brand{display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none}
 .brand img{height:42px}
@@ -81,21 +83,32 @@ body{font-family:Inter,system-ui,Arial,sans-serif;margin:0;background:var(--bg);
   .main-nav{display:none}
   .hero h1{font-size:28px}
 }
-.btn:hover{
-  background:#ea580c;
-  transform: translateY(-1px);
-}
 
-.btn.ghost{
-  color:var(--primary);
-  border:1px solid var(--primary);
-}
-
-.btn.ghost:hover{
-  background:var(--primary);
-  color:#fff;
-}
 /* Headings – blue brand color */
+/* Headings – dominant orange */
 h1, h2, h3 {
   color: var(--primary);
 }
+/* Buttons – bold orange CTA */
+.btn{
+  background:var(--orange);
+}
+
+.btn:hover{
+  background:var(--orange-dark);
+  transform: translateY(-1px);
+}
+
+/* Ghost buttons – white + orange */
+.btn.ghost{
+  background:#fff;
+  color:var(--orange);
+  border:2px solid var(--orange);
+}
+
+.btn.ghost:hover{
+  background:var(--orange);
+  color:#fff;
+}
+
+
