@@ -124,36 +124,47 @@ body{
 }
 
 /* =========================
-   HERO SECTION
+   HERO SECTION (IMAGE + ORANGE OVERLAY)
    ========================= */
 .hero{
-  background:linear-gradient(
-    rgba(249,115,22,0.85),
-    rgba(249,115,22,0.65)
-  );
+  background:
+    linear-gradient(
+      rgba(249,115,22,0.85),
+      rgba(249,115,22,0.75)
+    ),
+    url("assets/hero-bg.jpg");
+
+  background-size:cover;
+  background-position:center;
+  background-repeat:no-repeat;
+
   color:#fff;
-  padding:110px 0;
+  padding:130px 0;
 }
 
 .hero-inner{
   text-align:center;
+  max-width:900px;
+  margin:auto;
 }
 
 .hero h1{
-  font-size:42px;
-  margin-bottom:12px;
+  font-size:44px;
+  margin-bottom:14px;
   color:#fff;
+  text-shadow:0 4px 12px rgba(0,0,0,0.25);
 }
 
 .subtitle{
   font-size:18px;
-  margin-bottom:22px;
+  margin-bottom:26px;
   color:#fff;
+  text-shadow:0 2px 8px rgba(0,0,0,0.25);
 }
 
 .hero-cta{
   display:flex;
-  gap:14px;
+  gap:16px;
   justify-content:center;
 }
 
