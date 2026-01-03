@@ -509,27 +509,59 @@ footer a{
   color: #666;
 }
 
-/* ================= MOBILE NAVBAR FIX ================= */
+/* ================= MOBILE NAVBAR FINAL FIX ================= */
 @media (max-width: 768px) {
 
   header {
-    padding: 12px 20px;
+    padding: 10px 16px;
   }
 
   nav {
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
   }
 
+  /* Logo smaller on mobile */
+  .logo-img {
+    height: 42px;
+  }
+
+  /* Menu layout */
   .nav-links {
     flex-wrap: wrap;
     justify-content: center;
-    gap: 12px;
+    gap: 10px 14px;
+    text-align: center;
   }
 
-  /* 🔥 Push hero down so navbar doesn't cover it */
+  .nav-links li a {
+    font-size: 14px;
+  }
+
+  .nav-links .btn {
+    padding: 8px 14px;
+    font-size: 14px;
+  }
+
+  /* Push hero below navbar correctly */
   .hero {
-    padding-top: 140px; /* adjust if needed: 120–160px */
+    padding-top: 155px;
+  }
+
+  /* 🔥 Lock hero logo size (prevents zooming issue) */
+  .hero-logo-top {
+    width: 180px;
+    max-width: 180px;
+    margin-bottom: 16px;
+  }
+
+  /* Heading scaling */
+  .hero h2 {
+    font-size: 1.9rem;
+    line-height: 1.2;
+  }
+
+  .tagline {
+    font-size: 1rem;
   }
 }
-
