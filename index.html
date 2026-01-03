@@ -1,155 +1,190 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <title>Connected Steps | IT Run – Sprint 1</title>
-
-  <meta name="description"
-    content="Connected Steps organizes IT-focused running and wellness events like IT Run – Sprint 1 for professionals in Hyderabad." />
-
-  <link rel="stylesheet" href="/styles.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connected Steps Running Club</title>
+  <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
+  <link rel="stylesheet" href="style.css" />
 </head>
-
 <body>
-
-<!-- ================= HEADER ================= -->
-<header class="site-header">
-  <div class="wrap header-inner">
-    <a class="brand" href="/">
-      <img src="/assets/logo.png" alt="Connected Steps Logo" />
-      <span>Connected Steps</span>
-    </a>
-
-    <nav class="main-nav">
-      <a href="#events">Events</a>
-      <a href="#about">About</a>
-      <a href="#gallery">Gallery</a>
-      <a href="#contact">Contact</a>
-    </nav>
-
-    <button class="mobile-toggle">☰</button>
-  </div>
+<header>
+  <nav>
+    <img src="assets/logo_transparent.png" class="logo-img" alt="Connected Steps Logo">
+    <ul class="nav-links">
+      <li><a href="#home">Home</a></li>
+      <li><a href="#Events">Events</a></li>
+      <li><a href="#about">About</a></li>
+      <li><a href="#training">Training</a></li>
+      <li><a href="#pricing">Pricing</a></li>
+      <li><a href="#coaches">Coaches</a></li>
+      <li><a href="#gallery">Gallery</a></li>
+      <li><a href="#testimonials">Reviews</a></li>
+      <li><a href="#contact" class="btn">Contact</a></li>
+    </ul>
+  </nav>
 </header>
-
-<main>
-
-<!-- ================= HERO ================= -->
-<section class="hero">
-  <div class="hero-inner wrap">
-    <h1>Move. Connect. Celebrate.</h1>
-    <p class="subtitle">
-      Tech-inspired running and wellness events for IT professionals.
-    </p>
-
-    <div class="hero-cta">
-      <a class="btn" href="#events">See Events</a>
-      <a class="btn ghost" href="#about">Learn More</a>
+<section id="home" class="hero">
+  <div class="hero-inner">
+    <img src="assets/logo_transparent.png" class="hero-logo-top" alt="Connected Steps Logo">
+    <h1>Connected Steps Running Club</h1>
+    <p class="tagline">Your Goal, Our Plan. Every Step at a Time.</p>
+    <div class="hero-buttons">
+      <a href="#pricing" class="btn-primary">Become a Member</a>
+      <a href="https://wa.me/919703620570?text=I%20want%20to%20join%20Connected%20Steps" target="_blank" class="btn-whatsapp">WhatsApp Join</a>
+      <a href="https://strava.app.link/RhkRAjViwZb" target="_blank" class="btn-strava">Join us on Strava</a>
     </div>
   </div>
 </section>
+<section id="events" class="section">
+  <h2>The IT Run - Sprint 1</h2>
+  <p>We are celebrationg our first run happening on 29th March 2026</p>
+</section>
+<section id="about" class="section light">
+  <h2>Who We Are</h2>
+  <p>Connected Steps is a community built on discipline, support, and passion.</p>
+</section>
+<section id="training" class="section">
+  <h2>Training Programs</h2>
+  <div class="programs">
+    <div class="program"><h4>Beginner</h4><p>Basics & stamina</p></div>
+    <div class="program"><h4>Intermediate</h4><p>Pace & drills</p></div>
+    <div class="program"><h4>Advanced</h4><p>Race prep & PR focus</p></div>
+  </div>
+</section>
+<section id="pricing" class="section light">
+  <h2>Membership Plans</h2>
+  <div class="programs">
+    <div class="program"><h4>1199</h4><p>Basics & stamina</p></div>
+    <div class="program"><h4>1499</h4><p>Pace & drills</p></div>
+    <div class="program"><h4>1999</h4><p>Race prep & PR focus</p></div>
+  </div>
+</section>
+<section id="coaches" class="section">
+  <h2>Meet Our Coaches</h2>
 
-<!-- ================= EVENTS ================= -->
-<section id="events" class="wrap section">
-  <h2>Upcoming Events</h2>
-  <p class="lead">IT-focused community runs and wellness events.</p>
+  <div class="coach-slider" id="coachSlider">
+    <div class="coach-track" id="coachTrack">
 
-  <div class="events-grid">
+      <div class="coach-card">
+        <img src="assets/coach-ashokan.jpeg" alt="Coach Ashokan">
+        <h4>Coach Ashokan</h4>
+        <p>Head Coach</p>
+      </div>
 
-    <article class="card">
-      <img src="/assets/event1.jpg" alt="IT Run Sprint 1">
-      <div class="card-body">
-        <h3>IT Run – Sprint 1</h3>
-        <p class="muted">15 March 2026 • Hyderabad</p>
-        <p>
-          A community run designed for IT professionals to break sedentary
-          routines and kick-start fitness.
-        </p>
-        <div class="card-actions">
-          <a class="btn small" href="#">Register</a>
-          <a class="muted-link" href="#">Details</a>
+      <div class="coach-card">
+        <img src="assets/coach-achyutha.jpeg" alt="Coach Achyutha">
+        <h4>Coach Achyutha</h4>
+        <p>Strength & Conditioning</p>
+      </div>
+
+      <div class="coach-card">
+        <img src="assets/coach-durga.jpeg" alt="Coach Durga">
+        <h4>Coach Durga</h4>
+        <p>Running Technique & Form</p>
+      </div>
+
+    </div>
+
+    <!-- dots -->
+    <div class="coach-dots" id="coachDots"></div>
+  </div>
+</section>
+
+<section id="gallery" class="section light">
+  <h2>Our Journey</h2>
+
+  <div class="journey-slider" id="journeySlider">
+    <div class="journey-track" id="journeyTrack">
+
+      <div class="journey-slide">
+        <div class="journey-text">
+          <h3>Where It All Began</h3>
+          <p>
+            Connected Steps started as a small group of runners who believed
+            consistency and community can transform lives.
+          </p>
+        </div>
+        <div class="journey-image">
+          <img src="assets/journey-1.jpeg" alt="Journey Start">
         </div>
       </div>
-    </article>
 
-  </div>
-</section>
+      <div class="journey-slide">
+        <div class="journey-text">
+          <h3>Training With Purpose</h3>
+          <p>
+            Structured plans, form correction, and strength training helped
+            runners push their limits safely.
+          </p>
+        </div>
+        <div class="journey-image">
+          <img src="assets/journey-2.jpeg" alt="Training">
+        </div>
+      </div>
 
-<!-- ================= ABOUT ================= -->
-<section id="about" class="wrap section alt">
-  <div class="two-col">
-    <div>
-      <h2>About Connected Steps</h2>
-      <p>
-        Connected Steps is a Hyderabad-based running and wellness community
-        organizing IT runs, corporate wellness events, and marathons.
-      </p>
-      <ul>
-        <li>IT community runs</li>
-        <li>Corporate wellness</li>
-        <li>Marathon preparation</li>
-      </ul>
+      <div class="journey-slide">
+        <div class="journey-text">
+          <h3>Races & Achievements</h3>
+          <p>
+            From first 5Ks to marathons, every milestone was celebrated together.
+          </p>
+        </div>
+        <div class="journey-image">
+          <img src="assets/journey-3.jpeg" alt="Race Day">
+        </div>
+      </div>
+
     </div>
 
-    <div class="card about-card">
-      <h3>Join the Movement</h3>
-      <p>Be part of a growing IT fitness community.</p>
-      <a class="btn" href="#contact">Join Now</a>
-    </div>
+    <!-- dots -->
+    <div class="journey-dots" id="journeyDots"></div>
   </div>
 </section>
 
-<!-- ================= GALLERY ================= -->
-<section id="gallery" class="wrap section">
-  <h2>Gallery</h2>
-  <div class="gallery-grid">
-    <img src="/assets/gallery1.jpg" alt="Run">
-    <img src="/assets/event1.jpg" alt="Event">
-    <img src="/assets/gallery1.jpg" alt="Community">
-    <img src="/assets/event2.jpg" alt="Group Run">
-  </div>
+<section id="testimonials" class="section">
+  <h2>Runner Reviews</h2>
 </section>
-
-<!-- ================= CONTACT ================= -->
-<section id="contact" class="wrap section alt">
-  <h2>Contact</h2>
-
-  <div class="two-col">
-    <form class="card contact-card">
-      <label>Name
-        <input required />
-      </label>
-      <label>Email
-        <input type="email" required />
-      </label>
-      <label>Message
-        <textarea rows="4"></textarea>
-      </label>
-      <button class="btn">Send</button>
-    </form>
-
-    <div>
-      <p><strong>Email:</strong> info@connectedsteps.in</p>
-      <p><strong>Phone:</strong> +91 97036 20574</p>
-    </div>
-  </div>
-</section>
-
-</main>
-
-<!-- ================= FOOTER ================= -->
-<footer class="site-footer">
-  <div class="wrap foot-inner">
-    <div>© 2026 Connected Steps</div>
-    <nav class="footer-nav">
-      <a href="#events">Events</a>
-      <a href="#about">About</a>
-      <a href="#contact">Contact</a>
-    </nav>
-  </div>
+<footer id="contact">
+  <img src="assets/logo_transparent.png" class="footer-logo" alt="">
+  <h3>Contact Us</h3>
+  <p>Email: connectedsteps.club@gmail.com</p>
+  <p>Instagram: <a href="https://www.instagram.com/connected_steps?igsh=c3Q1Mm1vcDAxZjE5">@connected_steps</a></p>
+  <p>WhatsApp: <a href="https://wa.me/919703620570?text=I%20want%20to%20join%20Connected%20Steps">Chat</a></p>
+  <p>Strava: <a href="https://strava.app.link/RhkRAjViwZb">Join</a></p>
 </footer>
+<script src="script.js"></script>
+<!-- RUN EVENT POPUP -->
+<div class="startup-popup show" id="startupPopup">
+  <div class="popup-card event-popup">
+    <button class="popup-close" onclick="closePopup()">×</button>
 
-<script src="/scripts.js"></script>
+    <img src="assets/logo.jpeg" class="popup-logo" alt="Connected Steps"><br>
+
+    <!-- CENTERED BLUE BADGE -->
+    <div class="event-badge">RUN EVENT</div>
+
+    <h3 class="event-title">THE IT RUN – SPRINT 1</h3>
+
+    <p class="event-subtitle">
+      Exclusive community run for <strong>IT Employees</strong>  
+      organised by Connected Steps Running Club
+    </p>
+
+    <div class="event-details">
+      📅 <strong>29th March</strong><br>
+      📍 Gachibowli Stadium, Hyderabad<br>
+      👨‍💻 Only IT professionals<br>
+      🕕 Morning Run
+    </div>
+
+    <a href="https://wa.me/919703620570?text=I%20want%20to%20register%20for%20THE%20IT%20RUN%20SPRINT%201"
+       target="_blank"
+       class="popup-btn">
+       Register on WhatsApp
+    </a>
+  </div>
+</div>
+
 </body>
 </html>
