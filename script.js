@@ -1,138 +1,82 @@
-const track = document.getElementById("coachTrack");
-const cards = document.querySelectorAll(".coach-card");
-const dotsWrap = document.getElementById("coachDots");
-let index = 0;
-let interval;
+document.addEventListener("DOMContentLoaded", () => {
 
-// create dots
-cards.forEach((_, i) => {
-  const d = document.createElement("span");
-  if(i === 0) d.classList.add("active");
-  d.onclick = () => goTo(i);
-  dotsWrap.appendChild(d);
-});
-const dots = dotsWrap.querySelectorAll("span");
+  /* ================= JOURNEY SLIDER ================= */
+  const jTrack = document.getElementById("journeyTrack");
+  const jSlides = document.querySelectorAll(".journey-slide");
+  const jDotsWrap = document.getElementById("journeyDots");
+  const jSlider = document.getElementById("journeySlider");
 
-function update(){
-  track.style.transform = `translateX(-${index * 100}%)`;
-  cards.forEach((c,i)=>c.classList.toggle("active", i===index));
-  dots.forEach((d,i)=>d.classList.toggle("active", i===index));
-}
+  if (jTrack && jSlides.length && jDotsWrap && jSlider) {
+    let jIndex = 0;
+    let jInterval;
 
-function next(){
-  index = (index + 1) % cards.length;
-  update();
-}
+    // Create dots
+    jSlides.forEach((_, i) => {
+      const dot = document.createElement("span");
+      if (i === 0) dot.classList.add("active");
+      dot.onclick = () => goJourney(i);
+      jDotsWrap.appendChild(dot);
+    });
 
-function goTo(i){
-  index = i;
-  update();
-  restart();
-}
+    const jDots = jDotsWrap.querySelectorAll("span");
 
-function start(){
-  interval = setInterval(next, 3500);
-}
+    function updateJourney() {
+      jTrack.style.transform = `translateX(-${jIndex * 100}%)`;
+      jDots.forEach((d, i) => d.classList.toggle("active", i === jIndex));
+    }
 
-function stop(){
-  clearInterval(interval);
-}
+    function nextJourney() {
+      jIndex = (jIndex + 1) % jSlides.length;
+      updateJourney();
+    }
 
-function restart(){
-  stop();
-  start();
-}
+    function goJourney(i) {
+      jIndex = i;
+      updateJourney();
+      restartJourney();
+    }
 
-// pause on hover
-const slider = document.getElementById("coachSlider");
-slider.addEventListener("mouseenter", stop);
-slider.addEventListener("mouseleave", start);
+    function startJourney() {
+      jInterval = setInterval(nextJourney, 4500);
+    }
 
-// swipe support (mobile)
-let startX = 0;
-slider.addEventListener("touchstart", e => startX = e.touches[0].clientX);
-slider.addEventListener("touchend", e => {
-  const diff = e.changedTouches[0].clientX - startX;
-  if(diff > 50) index = (index - 1 + cards.length) % cards.length;
-  if(diff < -50) index = (index + 1) % cards.length;
-  update(); restart();
-});
+    function stopJourney() {
+      clearInterval(jInterval);
+    }
 
-// init
-cards[0].classList.add("active");
-start();
-const jTrack = document.getElementById("journeyTrack");
-const jSlides = document.querySelectorAll(".journey-slide");
-const jDotsWrap = document.getElementById("journeyDots");
+    function restartJourney() {
+      stopJourney();
+      startJourney();
+    }
 
-let jIndex = 0;
-let jInterval;
+    // Pause on hover
+    jSlider.addEventListener("mouseenter", stopJourney);
+    jSlider.addEventListener("mouseleave", startJourney);
 
-// create dots
-jSlides.forEach((_, i) => {
-  const d = document.createElement("span");
-  if(i === 0) d.classList.add("active");
-  d.onclick = () => goJourney(i);
-  jDotsWrap.appendChild(d);
-});
-const jDots = jDotsWrap.querySelectorAll("span");
+    // Swipe support (mobile)
+    let startX = 0;
+    jSlider.addEventListener("touchstart", e => startX = e.touches[0].clientX);
+    jSlider.addEventListener("touchend", e => {
+      const diff = e.changedTouches[0].clientX - startX;
+      if (diff > 50) jIndex = (jIndex - 1 + jSlides.length) % jSlides.length;
+      if (diff < -50) jIndex = (jIndex + 1) % jSlides.length;
+      updateJourney();
+      restartJourney();
+    });
 
-function updateJourney(){
-  jTrack.style.transform = `translateX(-${jIndex * 100}%)`;
-  jDots.forEach((d,i)=>d.classList.toggle("active", i===jIndex));
-}
+    startJourney();
+  }
 
-function nextJourney(){
-  jIndex = (jIndex + 1) % jSlides.length;
-  updateJourney();
-}
+  /* ================= EVENT POPUP ================= */
+  const popup = document.getElementById("startupPopup");
+  if (popup) {
+    setTimeout(() => popup.classList.add("show"), 500);
+  }
 
-function goJourney(i){
-  jIndex = i;
-  updateJourney();
-  restartJourney();
-}
-
-function startJourney(){
-  jInterval = setInterval(nextJourney, 4500);
-}
-
-function stopJourney(){
-  clearInterval(jInterval);
-}
-
-function restartJourney(){
-  stopJourney();
-  startJourney();
-}
-
-// pause on hover
-const jSlider = document.getElementById("journeySlider");
-jSlider.addEventListener("mouseenter", stopJourney);
-jSlider.addEventListener("mouseleave", startJourney);
-
-// swipe mobile
-let jStartX = 0;
-jSlider.addEventListener("touchstart", e => jStartX = e.touches[0].clientX);
-jSlider.addEventListener("touchend", e => {
-  const diff = e.changedTouches[0].clientX - jStartX;
-  if(diff > 50) jIndex = (jIndex - 1 + jSlides.length) % jSlides.length;
-  if(diff < -50) jIndex = (jIndex + 1) % jSlides.length;
-  updateJourney(); restartJourney();
 });
 
-startJourney();
-
-// Event popup – show once per session
-
-window.addEventListener("load", () => {
-  setTimeout(() => {
-    document.getElementById("startupPopup").classList.add("show");
-  }, 500);
-});
-
+/* Close popup */
 function closePopup() {
-  document.getElementById("startupPopup").classList.remove("show");
+  const popup = document.getElementById("startupPopup");
+  if (popup) popup.classList.remove("show");
 }
-
-
