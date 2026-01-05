@@ -451,9 +451,10 @@ footer a{
 }
 
 .popup-logo{
-  width:120px;
-  margin-bottom:14px;
+  width:85px;             
+  margin-bottom:9px;
 }
+
 
 /* CENTERED BLUE BADGE */
 .event-badge{
