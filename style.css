@@ -18,7 +18,7 @@ header{
   background:rgba(255,255,255,0.75);
   backdrop-filter:blur(16px);
   -webkit-backdrop-filter:blur(16px);
-  padding:15px 40px;
+  padding:8px 30px;
   transition:0.3s;
 }
 nav {
@@ -62,7 +62,7 @@ nav {
 /* HERO SECTION - FINAL */
 .hero {
   background: url('assets/hero-bg.jpg') center/cover no-repeat;
-  height: 100vh;
+  height: 120vh;
   display: flex;
   justify-content: center;
   align-items: center;
