@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 
 interface User {
   firstName: string;
@@ -58,7 +58,7 @@ export default function Leaderboard() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await getSupabase()
         .from("leaderboard")
         .select("*")
         .order(tab === "week" ? "week_km" : "total_km", { ascending: false });

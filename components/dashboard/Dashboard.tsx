@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 
 interface User {
   firstName: string;
@@ -143,7 +143,7 @@ export default function Dashboard() {
     const total_runs = acts.filter((a) => a.type === "Run").length;
     const total_km   = acts.reduce((s, a) => s + a.distance, 0) / 1000;
 
-    await supabase.from("leaderboard").upsert({
+    await getSupabase().from("leaderboard").upsert({
       user_email: user.email,
       user_name:  `${user.firstName} ${user.lastName}`,
       location:   user.location,
