@@ -1,0 +1,41 @@
+import type { Metadata } from "next";
+import { Cormorant_Garamond, DM_Sans } from "next/font/google";
+import "./globals.css";
+
+const cormorant = Cormorant_Garamond({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-cormorant",
+  display: "swap",
+});
+
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  weight: ["300", "400", "500"],
+  variable: "--font-dm-sans",
+  display: "swap",
+});
+
+export const metadata: Metadata = {
+  title: "Connected Steps — Your Goal, Our Plan",
+  description:
+    "Premium running training plans, expert coaching, and a community built to help you hit every goal. Whether it's your first 5K or a full marathon — we run with you.",
+  openGraph: {
+    title: "Connected Steps — Your Goal, Our Plan",
+    description: "Premium running training with expert coaches.",
+    type: "website",
+  },
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en" className={`${cormorant.variable} ${dmSans.variable}`}>
+      <body className="antialiased">{children}</body>
+    </html>
+  );
+}

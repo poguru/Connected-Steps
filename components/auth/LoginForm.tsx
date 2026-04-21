@@ -1,0 +1,118 @@
+"use client";
+
+import { useState, FormEvent, ChangeEvent } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+
+interface Props {
+  onSwitchToSignUp: () => void;
+}
+
+export default function LoginForm({ onSwitchToSignUp }: Props) {
+  const router = useRouter();
+  const [form, setForm]       = useState({ email: "", password: "" });
+  const [showPw, setShowPw]   = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState("");
+
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+    setError("");
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!form.email || !form.password) {
+      setError("Please enter your email and password.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await new Promise((r) => setTimeout(r, 1000));
+      router.push("/dashboard");
+    } catch {
+      setError("Invalid email or password.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} noValidate>
+      {/* Email */}
+      <div className="mb-3">
+        <input
+          className="auth-input"
+          name="email"
+          type="email"
+          placeholder="Email address"
+          value={form.email}
+          onChange={handleChange}
+          autoComplete="email"
+        />
+      </div>
+
+      {/* Password */}
+      <div className="mb-4 flex items-center auth-input" style={{ padding: 0 }}>
+        <input
+          name="password"
+          type={showPw ? "text" : "password"}
+          placeholder="Password"
+          value={form.password}
+          onChange={handleChange}
+          autoComplete="current-password"
+          style={{ flex: 1, background: "transparent", border: "none", outline: "none", padding: "11px 14px", color: "var(--cs-white)", fontFamily: "var(--font-body)", fontSize: "14px" }}
+        />
+        <button
+          type="button"
+          onClick={() => setShowPw(!showPw)}
+          style={{ color: "var(--cs-muted)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 500, padding: "0 14px 0 0", whiteSpace: "nowrap" }}
+        >
+          {showPw ? "Hide" : "Show"}
+        </button>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div
+          className="text-xs px-3 py-2 rounded mb-4 text-center"
+          style={{
+            background: "rgba(226,75,74,0.1)",
+            border: "1px solid rgba(226,75,74,0.3)",
+            color: "#f09595",
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      {/* Submit */}
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full py-3 rounded font-medium text-sm tracking-wide mb-4"
+        style={{
+          background: loading ? "rgba(232,98,10,0.6)" : "var(--cs-orange)",
+          color: "var(--cs-black)",
+          border: "none",
+          cursor: loading ? "not-allowed" : "pointer",
+          fontFamily: "var(--font-body)",
+          borderRadius: "4px",
+        }}
+      >
+        {loading ? "Signing in…" : "Sign in"}
+      </button>
+
+      {/* Forgot password */}
+      <div className="text-center">
+        <Link
+          href="/auth/forgot-password"
+          className="text-xs"
+          style={{ color: "var(--cs-muted)" }}
+        >
+          Forgot password?
+        </Link>
+      </div>
+    </form>
+  );
+}
