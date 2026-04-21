@@ -214,9 +214,6 @@ export default function Community() {
                       <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--cs-white)", marginBottom: "2px" }}>{runner.user_name}</div>
                       <div style={{ fontSize: "0.75rem", color: "var(--cs-muted)", marginBottom: "6px" }}>📍 {runner.location}</div>
                       <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                        <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "20px", background: "rgba(232,98,10,0.15)", color: "var(--cs-orange)", border: "1px solid rgba(232,98,10,0.3)" }}>
-                          {goalLabel[runner.goal] ?? runner.goal}
-                        </span>
                         <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "20px", background: "rgba(255,255,255,0.05)", color: "var(--cs-muted)" }}>
                           {runner.total_km.toFixed(1)} km total
                         </span>
@@ -244,7 +241,7 @@ export default function Community() {
                       transition: "all 0.2s",
                     }}
                   >
-                    {followLoading === runner.user_email ? "..." : isFollowing ? "Following ✓" : "Follow"}
+                    {followLoading === runner.user_email ? "..." : isFollowing ? "Unfollow" : "Follow"}
                   </button>
                 </div>
               );
