@@ -172,11 +172,15 @@ export default function Dashboard() {
       const data: Activity[] = await res.json();
       setActivities(data);
 
-      // Sync weekly summary to Supabase for leaderboard
-      const stored = localStorage.getItem("cs_user");
-      if (stored) {
-        const u: User = JSON.parse(stored);
-        await syncToLeaderboard(u, data);
+      // Sync to leaderboard — non-critical, don't let failure block activities
+      try {
+        const stored = localStorage.getItem("cs_user");
+        if (stored) {
+          const u: User = JSON.parse(stored);
+          await syncToLeaderboard(u, data);
+        }
+      } catch (syncErr) {
+        console.error("Leaderboard sync failed:", syncErr);
       }
     } catch (e: unknown) {
       setStravaMsg("Could not load activities: " + (e instanceof Error ? e.message : String(e)));
