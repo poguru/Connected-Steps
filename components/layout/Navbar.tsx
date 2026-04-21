@@ -4,6 +4,12 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
+interface StoredUser {
+  firstName: string;
+  lastName:  string;
+  photo:     string | null;
+}
+
 const navLinks = [
   { label: "Training",     href: "#training" },
   { label: "Coaches",      href: "#coaches" },
@@ -13,12 +19,17 @@ const navLinks = [
 ];
 
 export default function Navbar() {
-  const [scrolled, setScrolled] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled,     setScrolled]     = useState(false);
+  const [menuOpen,     setMenuOpen]     = useState(false);
+  const [loggedInUser, setLoggedInUser] = useState<StoredUser | null>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
     window.addEventListener("scroll", onScroll, { passive: true });
+
+    const stored = localStorage.getItem("cs_user");
+    if (stored) setLoggedInUser(JSON.parse(stored));
+
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
@@ -58,8 +69,27 @@ export default function Navbar() {
           </ul>
 
           <div className="hidden md:flex items-center gap-3">
-            <Link href="/auth" className="btn-outline" style={{ padding: "10px 22px", fontSize: "12px" }}>Sign in</Link>
-            <Link href="/auth" className="btn-primary" style={{ padding: "10px 22px", fontSize: "12px" }}>Join free</Link>
+            {loggedInUser ? (
+              <>
+                <Link href="/dashboard" className="btn-outline" style={{ padding: "10px 22px", fontSize: "12px" }}>
+                  Dashboard
+                </Link>
+                <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: "0.5rem", textDecoration: "none" }}>
+                  {loggedInUser.photo ? (
+                    <img src={loggedInUser.photo} alt="Profile" style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", border: "2px solid var(--cs-orange)" }} />
+                  ) : (
+                    <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem", fontWeight: 700, color: "var(--cs-white)" }}>
+                      {loggedInUser.firstName[0]}{loggedInUser.lastName[0]}
+                    </div>
+                  )}
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link href="/auth" className="btn-outline" style={{ padding: "10px 22px", fontSize: "12px" }}>Sign in</Link>
+                <Link href="/auth" className="btn-primary" style={{ padding: "10px 22px", fontSize: "12px" }}>Join free</Link>
+              </>
+            )}
           </div>
 
           <button className="md:hidden flex flex-col gap-1.5 p-2" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu">
@@ -83,8 +113,14 @@ export default function Navbar() {
               ))}
             </ul>
             <div className="flex flex-col gap-3">
-              <Link href="/auth" className="btn-outline text-center justify-center">Sign in</Link>
-              <Link href="/auth" className="btn-primary text-center justify-center">Join free</Link>
+              {loggedInUser ? (
+                <Link href="/dashboard" className="btn-primary text-center justify-center" onClick={() => setMenuOpen(false)}>Go to Dashboard</Link>
+              ) : (
+                <>
+                  <Link href="/auth" className="btn-outline text-center justify-center">Sign in</Link>
+                  <Link href="/auth" className="btn-primary text-center justify-center">Join free</Link>
+                </>
+              )}
             </div>
           </div>
         )}

@@ -17,6 +17,7 @@ interface User {
 
 interface LeaderboardEntry {
   id:             string;
+  user_email:     string;
   user_name:      string;
   location:       string;
   goal:           string;
@@ -47,12 +48,20 @@ export default function Leaderboard() {
   const [user,    setUser]    = useState<User | null>(null);
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab,     setTab]     = useState<"week" | "total">("week");
+  const [tab,       setTab]       = useState<"week" | "total">("week");
+  const [following, setFollowing] = useState<string[]>([]);
+  const [followLoading, setFollowLoading] = useState<string | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem("cs_user");
     if (!stored) { router.push("/auth"); return; }
-    setUser(JSON.parse(stored));
+    const u: User = JSON.parse(stored);
+    setUser(u);
+
+    // Load who this user is following
+    const res = await fetch(`/api/follow?email=${encodeURIComponent(u.email)}&type=following`);
+    const data = await res.json();
+    if (data.users) setFollowing(data.users);
   }, [router]);
 
   useEffect(() => {
@@ -60,13 +69,33 @@ export default function Leaderboard() {
       setLoading(true);
       const { data, error } = await getSupabase()
         .from("leaderboard")
-        .select("*")
+        .select("id, user_email, user_name, location, goal, week_runs, week_km, week_time_secs, total_runs, total_km, updated_at")
         .order(tab === "week" ? "week_km" : "total_km", { ascending: false });
       if (!error && data) setEntries(data);
       setLoading(false);
     }
     load();
   }, [tab]);
+
+  const toggleFollow = async (targetEmail: string) => {
+    if (!user) return;
+    setFollowLoading(targetEmail);
+    try {
+      const res = await fetch("/api/follow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ follower_email: user.email, following_email: targetEmail }),
+      });
+      const data = await res.json();
+      if (data.action === "followed") {
+        setFollowing((prev) => [...prev, targetEmail]);
+      } else {
+        setFollowing((prev) => prev.filter((e) => e !== targetEmail));
+      }
+    } finally {
+      setFollowLoading(null);
+    }
+  };
 
   if (!user) return null;
 
@@ -213,8 +242,29 @@ export default function Leaderboard() {
                   {tab === "week" ? `${h}h ${m}m` : "—"}
                 </div>
 
-                <div style={{ fontSize: "11px", padding: "3px 8px", borderRadius: "20px", background: "rgba(232,98,10,0.15)", color: "var(--cs-orange)", border: "1px solid rgba(232,98,10,0.3)", width: "fit-content" }}>
-                  {goalLabel[entry.goal] ?? entry.goal}
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                  <div style={{ fontSize: "11px", padding: "3px 8px", borderRadius: "20px", background: "rgba(232,98,10,0.15)", color: "var(--cs-orange)", border: "1px solid rgba(232,98,10,0.3)", width: "fit-content" }}>
+                    {goalLabel[entry.goal] ?? entry.goal}
+                  </div>
+                  {!isMe && (
+                    <button
+                      onClick={() => toggleFollow(entry.user_email)}
+                      disabled={followLoading === entry.user_email}
+                      style={{
+                        fontSize: "11px",
+                        padding: "3px 10px",
+                        borderRadius: "20px",
+                        border: following.includes(entry.user_email) ? "1px solid rgba(255,255,255,0.2)" : "1px solid var(--cs-orange)",
+                        background: following.includes(entry.user_email) ? "rgba(255,255,255,0.06)" : "var(--cs-orange)",
+                        color: following.includes(entry.user_email) ? "var(--cs-muted)" : "var(--cs-white)",
+                        cursor: followLoading === entry.user_email ? "not-allowed" : "pointer",
+                        fontFamily: "var(--font-body)",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {followLoading === entry.user_email ? "..." : following.includes(entry.user_email) ? "Following" : "Follow"}
+                    </button>
+                  )}
                 </div>
               </div>
             );

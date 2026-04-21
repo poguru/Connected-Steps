@@ -6,6 +6,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { getSupabase } from "@/lib/supabase";
 
+type ModalType = "followers" | "following" | null;
+
 interface User {
   firstName: string;
   lastName:  string;
@@ -95,6 +97,9 @@ export default function Dashboard() {
   const [loading,    setLoading]    = useState(false);
   const [stravaMsg,  setStravaMsg]  = useState("");
   const [consent,    setConsent]    = useState(false);
+  const [followers,  setFollowers]  = useState<string[]>([]);
+  const [following,  setFollowing]  = useState<string[]>([]);
+  const [modal,      setModal]      = useState<ModalType>(null);
 
   // Load user
   useEffect(() => {
@@ -104,6 +109,17 @@ export default function Dashboard() {
 
     const storedStrava = localStorage.getItem("cs_strava");
     if (storedStrava) setStrava(JSON.parse(storedStrava));
+
+    // Load followers/following
+    const u: User = JSON.parse(stored);
+    const [fwersRes, fwingRes] = await Promise.all([
+      fetch(`/api/follow?email=${encodeURIComponent(u.email)}&type=followers`),
+      fetch(`/api/follow?email=${encodeURIComponent(u.email)}&type=following`),
+    ]);
+    const fwers = await fwersRes.json();
+    const fwing = await fwingRes.json();
+    if (fwers.users) setFollowers(fwers.users);
+    if (fwing.users) setFollowing(fwing.users);
   }, [router]);
 
   // Handle OAuth callback params
@@ -271,9 +287,17 @@ export default function Dashboard() {
             <div style={{ fontSize: "0.75rem", color: "var(--cs-orange)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.25rem" }}>{goalLabel[user.goal] ?? user.goal}</div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem", marginBottom: "1.25rem" }}>
-              {[{ num: "0", label: "Following" }, { num: "0", label: "Followers" }, { num: String(activities.length), label: "Activities" }].map((s) => (
-                <div key={s.label} style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--cs-white)" }}>{s.num}</div>
+              {[
+                { num: String(following.length),  label: "Following",   type: "following"  as ModalType },
+                { num: String(followers.length),  label: "Followers",   type: "followers"  as ModalType },
+                { num: String(activities.length), label: "Activities",  type: null },
+              ].map((s) => (
+                <div
+                  key={s.label}
+                  style={{ textAlign: "center", cursor: s.type ? "pointer" : "default" }}
+                  onClick={() => s.type && setModal(s.type)}
+                >
+                  <div style={{ fontSize: "1.1rem", fontWeight: 700, color: s.type ? "var(--cs-orange)" : "var(--cs-white)" }}>{s.num}</div>
                   <div style={{ fontSize: "10px", color: "var(--cs-muted)", marginTop: "2px" }}>{s.label}</div>
                 </div>
               ))}
@@ -421,6 +445,46 @@ export default function Dashboard() {
           </div>
         </aside>
       </div>
+
+      {/* Followers / Following modal */}
+      {modal && (
+        <div
+          onClick={() => setModal(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", padding: "1.5rem", width: "360px", maxHeight: "80vh", overflowY: "auto" }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
+              <div className="font-display" style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--cs-white)", textTransform: "capitalize" }}>{modal}</div>
+              <button onClick={() => setModal(null)} style={{ background: "none", border: "none", color: "var(--cs-muted)", cursor: "pointer", fontSize: "1.2rem" }}>✕</button>
+            </div>
+
+            {(modal === "followers" ? followers : following).length === 0 ? (
+              <div style={{ textAlign: "center", padding: "2rem 0", color: "var(--cs-muted)", fontSize: "0.875rem" }}>
+                {modal === "followers" ? "No followers yet." : "Not following anyone yet."}
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                {(modal === "followers" ? followers : following).map((email) => {
+                  const name = email.split("@")[0];
+                  return (
+                    <div key={email} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.5rem 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                        <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem", fontWeight: 700 }}>
+                          {name[0].toUpperCase()}
+                        </div>
+                        <span style={{ fontSize: "0.875rem", color: "var(--cs-white)" }}>{email}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
