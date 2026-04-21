@@ -26,13 +26,20 @@ interface StravaTokens {
 }
 
 interface Activity {
-  id:             number;
-  name:           string;
-  type:           string;
+  id:               number;
+  name:             string;
+  type:             string;
   start_date_local: string;
-  distance:       number;
-  moving_time:    number;
-  average_speed:  number;
+  distance:         number;
+  moving_time:      number;
+  average_speed:    number;
+}
+
+interface PersonalBests {
+  longestRun:   number;   // metres
+  fastestPace:  number;   // m/s (best avg speed on a run >= 3km)
+  totalRuns:    number;
+  totalKm:      number;
 }
 
 const goalLabel: Record<string, string> = {
@@ -96,10 +103,13 @@ export default function Dashboard() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading,    setLoading]    = useState(false);
   const [stravaMsg,  setStravaMsg]  = useState("");
-  const [consent,    setConsent]    = useState(false);
-  const [followers,  setFollowers]  = useState<string[]>([]);
-  const [following,  setFollowing]  = useState<string[]>([]);
-  const [modal,      setModal]      = useState<ModalType>(null);
+  const [consent,      setConsent]      = useState(false);
+  const [followers,    setFollowers]    = useState<string[]>([]);
+  const [following,    setFollowing]    = useState<string[]>([]);
+  const [modal,        setModal]        = useState<ModalType>(null);
+  const [editingGoal,  setEditingGoal]  = useState(false);
+  const [goalSaving,   setGoalSaving]   = useState(false);
+  const [pbs,          setPbs]          = useState<PersonalBests | null>(null);
 
   // Load user
   useEffect(() => {
@@ -186,6 +196,17 @@ export default function Dashboard() {
       }
       const data: Activity[] = await res.json();
       setActivities(data);
+
+      // Compute personal bests from activities
+      const runs = data.filter((a) => a.type === "Run" && a.distance > 0);
+      if (runs.length > 0) {
+        const longestRun  = Math.max(...runs.map((a) => a.distance));
+        const qualifyingRuns = runs.filter((a) => a.distance >= 3000 && a.average_speed > 0);
+        const fastestPace = qualifyingRuns.length > 0 ? Math.max(...qualifyingRuns.map((a) => a.average_speed)) : 0;
+        const totalRuns   = runs.length;
+        const totalKm     = runs.reduce((s, a) => s + a.distance, 0) / 1000;
+        setPbs({ longestRun, fastestPace, totalRuns, totalKm });
+      }
 
       // Sync to leaderboard — non-critical, don't let failure block activities
       try {
@@ -413,10 +434,95 @@ export default function Dashboard() {
         {/* ── Right sidebar ── */}
         <aside>
           <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem", marginBottom: "1rem" }}>
-            <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1rem" }}>Your Goal</div>
-            <div style={{ fontSize: "1rem", fontWeight: 600, color: "var(--cs-orange)" }}>{goalLabel[user.goal] ?? user.goal}</div>
-            <div style={{ fontSize: "0.8rem", color: "var(--cs-muted)", marginTop: "4px" }}>Keep going — your coach will reach out soon.</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+              <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Your Goal</div>
+              <button
+                onClick={() => setEditingGoal(!editingGoal)}
+                style={{ fontSize: "11px", color: "var(--cs-orange)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)" }}
+              >
+                {editingGoal ? "Cancel" : "Change"}
+              </button>
+            </div>
+
+            {editingGoal ? (
+              <div>
+                <select
+                  defaultValue={user.goal}
+                  onChange={async (e) => {
+                    const newGoal = e.target.value;
+                    setGoalSaving(true);
+                    try {
+                      await fetch("/api/user/goal", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ email: user.email, goal: newGoal }),
+                      });
+                      const updated = { ...user, goal: newGoal };
+                      localStorage.setItem("cs_user", JSON.stringify(updated));
+                      setUser(updated);
+                      setEditingGoal(false);
+                    } finally {
+                      setGoalSaving(false);
+                    }
+                  }}
+                  style={{ width: "100%", padding: "8px", background: "var(--cs-charcoal)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", color: "var(--cs-white)", fontFamily: "var(--font-body)", fontSize: "0.875rem", cursor: "pointer", colorScheme: "dark" }}
+                >
+                  {[
+                    { id: "5k",   label: "First 5K"      },
+                    { id: "10k",  label: "10K"           },
+                    { id: "half", label: "Half Marathon"  },
+                    { id: "full", label: "Full Marathon"  },
+                  ].map((g) => (
+                    <option key={g.id} value={g.id}>{g.label}</option>
+                  ))}
+                </select>
+                {goalSaving && <div style={{ fontSize: "11px", color: "var(--cs-muted)", marginTop: "6px" }}>Saving…</div>}
+              </div>
+            ) : (
+              <div style={{ fontSize: "1rem", fontWeight: 600, color: "var(--cs-orange)" }}>{goalLabel[user.goal] ?? user.goal}</div>
+            )}
           </div>
+
+          {/* Personal Bests */}
+          {pbs && (
+            <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem", marginBottom: "1rem" }}>
+              <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1rem" }}>Personal Bests</div>
+              {[
+                { label: "Longest Run",  value: `${(pbs.longestRun / 1000).toFixed(2)} km` },
+                { label: "Best Pace",    value: pbs.fastestPace > 0 ? fmtPace(pbs.fastestPace) : "—" },
+                { label: "Total Runs",   value: String(pbs.totalRuns) },
+                { label: "Total Distance", value: `${pbs.totalKm.toFixed(1)} km` },
+              ].map((s) => (
+                <div key={s.label} style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.6rem", alignItems: "center" }}>
+                  <span style={{ fontSize: "0.8rem", color: "var(--cs-muted)" }}>{s.label}</span>
+                  <span style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--cs-orange)" }}>{s.value}</span>
+                </div>
+              ))}
+
+              {/* Next milestone */}
+              <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "0.75rem", marginTop: "0.5rem" }}>
+                <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.5rem" }}>Next Milestone</div>
+                {(() => {
+                  const next: Record<string, string> = { "5k": "10K", "10k": "Half Marathon (21.1 km)", "half": "Full Marathon (42.2 km)", "full": "Ultra Marathon 🏆" };
+                  const dist: Record<string, number> = { "5k": 5000, "10k": 10000, "half": 21097, "full": 42195 };
+                  const nextGoal = next[user.goal] ?? "Keep running!";
+                  const target   = dist[user.goal] ?? 0;
+                  const progress = target > 0 ? Math.min((pbs.longestRun / target) * 100, 100) : 100;
+                  return (
+                    <div>
+                      <div style={{ fontSize: "0.8rem", color: "var(--cs-white)", fontWeight: 600, marginBottom: "6px" }}>{nextGoal}</div>
+                      <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: "4px", height: "6px", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${progress}%`, background: "var(--cs-orange)", borderRadius: "4px", transition: "width 0.5s" }} />
+                      </div>
+                      <div style={{ fontSize: "10px", color: "var(--cs-muted)", marginTop: "4px" }}>
+                        Longest run: {(pbs.longestRun / 1000).toFixed(2)} km / {(target / 1000).toFixed(1)} km
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
 
           <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem", marginBottom: "1rem" }}>
             <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1rem" }}>Weekly Summary</div>
