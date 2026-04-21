@@ -181,6 +181,7 @@ export default function Dashboard() {
         }
       } catch (syncErr) {
         console.error("Leaderboard sync failed:", syncErr);
+        setStravaMsg("Activities loaded! (Leaderboard sync failed: " + (syncErr instanceof Error ? syncErr.message : String(syncErr)) + ")");
       }
     } catch (e: unknown) {
       setStravaMsg("Could not load activities: " + (e instanceof Error ? e.message : String(e)));
