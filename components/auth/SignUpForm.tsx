@@ -89,8 +89,8 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
       // Keep photo in localStorage only (not stored in DB)
       localStorage.setItem("cs_pending_photo", photo ?? "");
       router.push("/auth?tab=login&registered=true");
-    } catch {
-      setError("Something went wrong. Please try again.");
+    } catch (e: unknown) {
+      setError("Network error: " + (e instanceof Error ? e.message : String(e)));
     } finally {
       setLoading(false);
     }
