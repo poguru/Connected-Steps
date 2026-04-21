@@ -105,21 +105,20 @@ export default function Dashboard() {
   useEffect(() => {
     const stored = localStorage.getItem("cs_user");
     if (!stored) { router.push("/auth"); return; }
-    setUser(JSON.parse(stored));
+    const u: User = JSON.parse(stored);
+    setUser(u);
 
     const storedStrava = localStorage.getItem("cs_strava");
     if (storedStrava) setStrava(JSON.parse(storedStrava));
 
     // Load followers/following
-    const u: User = JSON.parse(stored);
-    const [fwersRes, fwingRes] = await Promise.all([
-      fetch(`/api/follow?email=${encodeURIComponent(u.email)}&type=followers`),
-      fetch(`/api/follow?email=${encodeURIComponent(u.email)}&type=following`),
-    ]);
-    const fwers = await fwersRes.json();
-    const fwing = await fwingRes.json();
-    if (fwers.users) setFollowers(fwers.users);
-    if (fwing.users) setFollowing(fwing.users);
+    Promise.all([
+      fetch(`/api/follow?email=${encodeURIComponent(u.email)}&type=followers`).then((r) => r.json()),
+      fetch(`/api/follow?email=${encodeURIComponent(u.email)}&type=following`).then((r) => r.json()),
+    ]).then(([fwers, fwing]) => {
+      if (fwers.users) setFollowers(fwers.users);
+      if (fwing.users) setFollowing(fwing.users);
+    });
   }, [router]);
 
   // Handle OAuth callback params
@@ -248,7 +247,7 @@ export default function Dashboard() {
             {[
               { label: "Dashboard",    href: "/dashboard" },
               { label: "Leaderboard", href: "/leaderboard" },
-              { label: "Community",   href: "#" },
+              { label: "Community",   href: "/community" },
               { label: "Achievements",href: "#" },
             ].map((item) => (
               <Link key={item.label} href={item.href} style={{ fontSize: "0.875rem", color: item.label === "Dashboard" ? "var(--cs-orange)" : "var(--cs-muted)", textDecoration: "none" }}>

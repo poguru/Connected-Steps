@@ -59,9 +59,9 @@ export default function Leaderboard() {
     setUser(u);
 
     // Load who this user is following
-    const res = await fetch(`/api/follow?email=${encodeURIComponent(u.email)}&type=following`);
-    const data = await res.json();
-    if (data.users) setFollowing(data.users);
+    fetch(`/api/follow?email=${encodeURIComponent(u.email)}&type=following`)
+      .then((r) => r.json())
+      .then((data) => { if (data.users) setFollowing(data.users); });
   }, [router]);
 
   useEffect(() => {
@@ -116,7 +116,7 @@ export default function Leaderboard() {
             {[
               { label: "Dashboard",    href: "/dashboard" },
               { label: "Leaderboard", href: "/leaderboard" },
-              { label: "Community",   href: "#" },
+              { label: "Community",   href: "/community" },
               { label: "Achievements",href: "#" },
             ].map((item) => (
               <Link key={item.label} href={item.href} style={{ fontSize: "0.875rem", color: item.label === "Leaderboard" ? "var(--cs-orange)" : "var(--cs-muted)", textDecoration: "none" }}>
