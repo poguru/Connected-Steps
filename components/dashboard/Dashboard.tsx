@@ -165,7 +165,10 @@ export default function Dashboard() {
         "https://www.strava.com/api/v3/athlete/activities?per_page=100",
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      if (!res.ok) throw new Error("Failed to fetch");
+      if (!res.ok) {
+        const errBody = await res.text();
+        throw new Error(`Strava ${res.status}: ${errBody}`);
+      }
       const data: Activity[] = await res.json();
       setActivities(data);
 
@@ -175,8 +178,8 @@ export default function Dashboard() {
         const u: User = JSON.parse(stored);
         await syncToLeaderboard(u, data);
       }
-    } catch {
-      setStravaMsg("Could not load activities. Please reconnect Strava.");
+    } catch (e: unknown) {
+      setStravaMsg("Could not load activities: " + (e instanceof Error ? e.message : String(e)));
     } finally {
       setLoading(false);
     }
