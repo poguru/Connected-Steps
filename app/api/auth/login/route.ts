@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { supabaseServer } from "@/lib/supabase-server";
+import { getSupabaseServer } from "@/lib/supabase-server";
 
 export async function POST(req: NextRequest) {
   const { email, password } = await req.json();
@@ -8,6 +8,8 @@ export async function POST(req: NextRequest) {
   if (!email || !password) {
     return NextResponse.json({ error: "Please enter your email and password." }, { status: 400 });
   }
+
+  const supabaseServer = getSupabaseServer();
 
   const { data: user, error } = await supabaseServer
     .from("users")

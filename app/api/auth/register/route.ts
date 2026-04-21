@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { supabaseServer } from "@/lib/supabase-server";
+import { getSupabaseServer } from "@/lib/supabase-server";
 
 export async function POST(req: NextRequest) {
   const { firstName, lastName, email, phone, goal, location, password } = await req.json();
@@ -8,6 +8,8 @@ export async function POST(req: NextRequest) {
   if (!email || !password || !firstName || !lastName) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
   }
+
+  const supabaseServer = getSupabaseServer();
 
   // Check if email already registered
   const { data: existing, error: checkError } = await supabaseServer
