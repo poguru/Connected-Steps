@@ -28,10 +28,21 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
     }
     setLoading(true);
     try {
-      await new Promise((r) => setTimeout(r, 1000));
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: form.email, password: form.password }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error); return; }
+
+      // Restore photo from pending registration if available
+      const photo = localStorage.getItem("cs_pending_photo") ?? null;
+      localStorage.setItem("cs_user", JSON.stringify({ ...data.user, photo: photo || null }));
+      localStorage.removeItem("cs_pending_photo");
       router.push("/dashboard");
     } catch {
-      setError("Invalid email or password.");
+      setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }

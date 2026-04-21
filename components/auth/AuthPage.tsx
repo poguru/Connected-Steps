@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import SignUpForm from "./SignUpForm";
@@ -8,49 +9,58 @@ import LoginForm from "./LoginForm";
 
 type Tab = "signup" | "login";
 
-
 export default function AuthPage() {
+  const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>("signup");
+  const [justRegistered, setJustRegistered] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("tab") === "login") setTab("login");
+    if (searchParams.get("registered") === "true") setJustRegistered(true);
+  }, [searchParams]);
 
   return (
     <div className="auth-layout">
 
       {/* ── Left brand panel ── */}
-      <div className="auth-left" style={{ gap: "3rem" }}>
+      <div className="auth-left">
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", maxWidth: "400px", width: "100%" }}>
 
-        {/* Logo — top center */}
-        <Link href="/" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", textDecoration: "none", width: "100%" }}>
-          <Image
-            src="/logo.png"
-            alt="Connected Steps"
-            width={110}
-            height={110}
-            className="rounded-full"
-            style={{ border: "2px solid rgba(232,98,10,0.35)" }}
-          />
-          <div style={{ textAlign: "center" }}>
-            <div className="font-display" style={{ fontSize: "1.75rem", fontWeight: 600, color: "var(--cs-white)" }}>
-              Connected Steps
-            </div>
-            <div style={{ fontSize: "11px", letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--cs-orange)", marginTop: "4px" }}>
-              Your Goal, Our Plan
-            </div>
+          {/* Logo */}
+          <Link href="/" style={{ textDecoration: "none" }}>
+            <Image
+              src="/logo.png"
+              alt="Connected Steps"
+              width={120}
+              height={120}
+              className="rounded-full"
+              style={{ border: "2px solid rgba(232,98,10,0.4)", display: "block" }}
+            />
+          </Link>
+
+          {/* Brand name */}
+          <div className="font-display" style={{ fontSize: "1.9rem", fontWeight: 600, color: "var(--cs-white)", marginTop: "1.25rem" }}>
+            Connected Steps
           </div>
-        </Link>
+          <div style={{ fontSize: "11px", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--cs-orange)", marginTop: "6px" }}>
+            Your Goal, Our Plan
+          </div>
 
-        {/* Pitch — center */}
-        <div style={{ maxWidth: "380px", width: "100%" }}>
+          {/* Divider */}
+          <div style={{ width: "40px", height: "1px", background: "var(--cs-orange)", margin: "1.75rem auto", opacity: 0.5 }} />
+
+          {/* Pitch */}
           <div style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--cs-orange)", marginBottom: "1rem", fontFamily: "var(--font-body)" }}>
             Every journey starts with a step
           </div>
           <h2
             className="font-display"
-            style={{ fontSize: "clamp(2rem, 3vw, 2.8rem)", fontWeight: 300, lineHeight: 1.15, marginBottom: "1.25rem" }}
+            style={{ fontSize: "clamp(1.8rem, 2.5vw, 2.5rem)", fontWeight: 300, lineHeight: 1.2, marginBottom: "1.25rem" }}
           >
             <span style={{ color: "var(--cs-white)" }}>Train smarter.</span><br />
             <span style={{ color: "var(--cs-orange)" }}>Live better.</span>
           </h2>
-          <p style={{ fontSize: "0.9rem", lineHeight: 1.75, color: "var(--cs-muted)" }}>
+          <p style={{ fontSize: "0.875rem", lineHeight: 1.8, color: "var(--cs-muted)" }}>
             Connected Steps is a community-driven fitness movement built on real transformations.
             We pair you with National-level athletes and elite coaches to help you break through
             your limits. Whether you're looking to lose weight, run your first marathon, or simply
@@ -81,6 +91,13 @@ export default function AuthPage() {
                 : "Sign in to continue your training."}
             </p>
           </div>
+
+          {/* Registration success banner */}
+          {justRegistered && (
+            <div style={{ background: "rgba(232,98,10,0.12)", border: "1px solid rgba(232,98,10,0.4)", borderRadius: "4px", padding: "10px 14px", marginBottom: "1.25rem", fontSize: "0.8rem", color: "var(--cs-orange)" }}>
+              ✓ Account created! Please sign in to continue.
+            </div>
+          )}
 
           {/* Tab switcher */}
           <div

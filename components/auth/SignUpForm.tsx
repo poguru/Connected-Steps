@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 
 const GOALS = [
-  { id: "5k",   label: "First 5K",      sub: "8 weeks"  },
-  { id: "10k",  label: "10K",           sub: "10 weeks" },
-  { id: "half", label: "Half Marathon", sub: "14 weeks" },
-  { id: "full", label: "Full Marathon", sub: "20 weeks" },
+  { id: "5k",   label: "First 5K"      },
+  { id: "10k",  label: "10K"           },
+  { id: "half", label: "Half Marathon" },
+  { id: "full", label: "Full Marathon" },
 ];
 
 interface Props {
@@ -69,8 +69,26 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
     if (err) { setError(err); return; }
     setLoading(true);
     try {
-      await new Promise((r) => setTimeout(r, 1200));
-      router.push("/welcome");
+      const finalLocation = location === "Others" ? customLoc : location;
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName: form.firstName,
+          lastName:  form.lastName,
+          email:     form.email,
+          phone:     form.phone,
+          password:  form.password,
+          goal,
+          location:  finalLocation,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error); return; }
+
+      // Keep photo in localStorage only (not stored in DB)
+      localStorage.setItem("cs_pending_photo", photo ?? "");
+      router.push("/auth?tab=login&registered=true");
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -115,6 +133,28 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
         <span className="text-xs mt-0.5" style={{ color: "var(--cs-muted)" }}>Profile photo (optional)</span>
       </div>
 
+      {/* Full name row */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
+        <input
+          className="auth-input"
+          name="firstName"
+          type="text"
+          placeholder="First name"
+          value={form.firstName}
+          onChange={handleChange}
+          autoComplete="given-name"
+        />
+        <input
+          className="auth-input"
+          name="lastName"
+          type="text"
+          placeholder="Last name"
+          value={form.lastName}
+          onChange={handleChange}
+          autoComplete="family-name"
+        />
+      </div>
+
       {/* Mobile number or email */}
       <div className="mb-3">
         <input
@@ -138,6 +178,19 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
           value={form.phone}
           onChange={handleChange}
           autoComplete="tel"
+        />
+      </div>
+
+      {/* Date of birth */}
+      <div className="mb-3">
+        <input
+          className="auth-input"
+          name="dob"
+          type="date"
+          placeholder="Date of birth"
+          value={form.dob}
+          onChange={handleChange}
+          style={{ colorScheme: "dark" }}
         />
       </div>
 
@@ -179,41 +232,6 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
         />
       </div>
 
-      {/* Date of birth */}
-      <div className="mb-3">
-        <input
-          className="auth-input"
-          name="dob"
-          type="date"
-          placeholder="Date of birth"
-          value={form.dob}
-          onChange={handleChange}
-          style={{ colorScheme: "dark" }}
-        />
-      </div>
-
-      {/* Full name row */}
-      <div className="grid grid-cols-2 gap-3 mb-3">
-        <input
-          className="auth-input"
-          name="firstName"
-          type="text"
-          placeholder="First name"
-          value={form.firstName}
-          onChange={handleChange}
-          autoComplete="given-name"
-        />
-        <input
-          className="auth-input"
-          name="lastName"
-          type="text"
-          placeholder="Last name"
-          value={form.lastName}
-          onChange={handleChange}
-          autoComplete="family-name"
-        />
-      </div>
-
       {/* Running goal */}
       <div className="mb-3">
         <label style={{ display: "block", fontSize: "11px", color: "var(--cs-muted)", marginBottom: "6px", fontFamily: "var(--font-body)", letterSpacing: "0.05em" }}>
@@ -226,7 +244,7 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
           style={{ cursor: "pointer", colorScheme: "dark" }}
         >
           {GOALS.map((g) => (
-            <option key={g.id} value={g.id}>{g.label} — {g.sub}</option>
+            <option key={g.id} value={g.id}>{g.label}</option>
           ))}
         </select>
       </div>

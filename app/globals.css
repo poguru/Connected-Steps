@@ -292,12 +292,13 @@ select.auth-input option {
   .auth-left {
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
     align-items: center;
     flex: 1;
-    padding: 3.5rem 4rem;
+    padding: 4rem 4rem;
     background: var(--cs-dark);
     border-right: 1px solid rgba(255,255,255,0.06);
+    overflow-y: auto;
   }
 
   .auth-right {
