@@ -285,60 +285,27 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Strava connect */}
-          <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem", marginTop: "1rem" }}>
-            <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Strava</div>
-            {strava ? (
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
-                  <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#fc4c02", display: "inline-block" }} />
-                  <span style={{ fontSize: "0.8rem", color: "var(--cs-white)", fontWeight: 600 }}>Connected</span>
-                </div>
-                <button
-                  onClick={() => { localStorage.removeItem("cs_strava"); setStrava(null); setActivities([]); }}
-                  style={{ fontSize: "11px", color: "var(--cs-muted)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+          {/* Strava connect — only show if not yet connected */}
+          {!strava && (
+            <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem", marginTop: "1rem" }}>
+              <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Connect Strava</div>
+              <p style={{ fontSize: "11px", color: "var(--cs-muted)", lineHeight: 1.6, marginBottom: "0.75rem" }}>
+                Pull your real activities and appear on the leaderboard. We store weekly totals only — no GPS data.
+              </p>
+              <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", cursor: "pointer", marginBottom: "0.75rem" }}>
+                <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: "2px", accentColor: "var(--cs-orange)" }} />
+                <span style={{ fontSize: "11px", color: "var(--cs-muted)" }}>I agree to share my activity summaries for the leaderboard.</span>
+              </label>
+              {consent && (
+                <a
+                  href={stravaAuthUrl}
+                  style={{ display: "block", textAlign: "center", padding: "8px", background: "#fc4c02", color: "#fff", borderRadius: "4px", fontSize: "0.8rem", fontWeight: 600, textDecoration: "none" }}
                 >
-                  Disconnect
-                </button>
-              </div>
-            ) : (
-              <div>
-                {!consent ? (
-                  <div>
-                    <p style={{ fontSize: "11px", color: "var(--cs-muted)", lineHeight: 1.6, marginBottom: "0.75rem" }}>
-                      Connect Strava to pull your real activities. We'll store weekly totals only (not GPS routes) to power community leaderboards.
-                    </p>
-                    <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", cursor: "pointer", marginBottom: "0.75rem" }}>
-                      <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: "2px", accentColor: "var(--cs-orange)" }} />
-                      <span style={{ fontSize: "11px", color: "var(--cs-muted)" }}>I agree to share my activity summaries for the leaderboard.</span>
-                    </label>
-                  </div>
-                ) : (
-                  <div>
-                    <p style={{ fontSize: "11px", color: "var(--cs-muted)", lineHeight: 1.6, marginBottom: "0.75rem" }}>
-                      Weekly totals only (no GPS data) will be used for community leaderboards.
-                    </p>
-                    <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", cursor: "pointer", marginBottom: "0.75rem" }}>
-                      <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: "2px", accentColor: "var(--cs-orange)" }} />
-                      <span style={{ fontSize: "11px", color: "var(--cs-orange)" }}>✓ Consent given</span>
-                    </label>
-                    <a
-                      href={stravaAuthUrl}
-                      style={{ display: "block", textAlign: "center", padding: "8px", background: "#fc4c02", color: "#fff", borderRadius: "4px", fontSize: "0.8rem", fontWeight: 600, textDecoration: "none" }}
-                    >
-                      Connect with Strava
-                    </a>
-                  </div>
-                )}
-                {!consent && (
-                  <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", cursor: "pointer" }}>
-                    <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: "2px", accentColor: "var(--cs-orange)" }} />
-                    <span style={{ fontSize: "11px", color: "var(--cs-muted)" }}>I agree to share my activity summaries for the leaderboard.</span>
-                  </label>
-                )}
-              </div>
-            )}
-          </div>
+                  Connect with Strava
+                </a>
+              )}
+            </div>
+          )}
 
           {/* Latest activity */}
           {activities.length > 0 && (
