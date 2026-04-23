@@ -38,6 +38,7 @@ export default function Community() {
   const [following,     setFollowing]     = useState<string[]>([]);
   const [loading,       setLoading]       = useState(false);
   const [followLoading, setFollowLoading] = useState<string | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem("cs_user");
@@ -98,14 +99,14 @@ export default function Community() {
     <div style={{ minHeight: "100vh", background: "var(--cs-black)", color: "var(--cs-white)" }}>
 
       {/* Navbar */}
-      <header style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 50, background: "rgba(10,10,10,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-        <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 2rem", display: "flex", alignItems: "center", justifyContent: "space-between", height: "64px" }}>
+      <header className="cs-app-nav">
+        <div className="cs-app-nav-inner">
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none" }}>
             <Image src="/logo.png" alt="Connected Steps" width={36} height={36} className="rounded-full" />
             <span className="font-display" style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--cs-white)" }}>Connected Steps</span>
           </Link>
 
-          <nav style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
+          <nav className="cs-app-nav-links">
             {[
               { label: "Dashboard",    href: "/dashboard" },
               { label: "Leaderboard", href: "/leaderboard" },
@@ -118,7 +119,7 @@ export default function Community() {
             ))}
           </nav>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <div className="cs-app-nav-user">
             {user.photo ? (
               <img src={user.photo} alt={fullName} style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", border: "2px solid var(--cs-orange)" }} />
             ) : (
@@ -127,8 +128,25 @@ export default function Community() {
               </div>
             )}
             <span style={{ fontSize: "0.875rem" }}>{fullName}</span>
+            <button className="cs-mobile-nav-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Toggle menu">
+              <span /><span /><span />
+            </button>
           </div>
         </div>
+        {mobileMenuOpen && (
+          <div className="cs-mobile-menu">
+            {[
+              { label: "Dashboard",    href: "/dashboard" },
+              { label: "Leaderboard", href: "/leaderboard" },
+              { label: "Community",   href: "/community" },
+              { label: "Achievements",href: "#" },
+            ].map((item) => (
+              <Link key={item.label} href={item.href} onClick={() => setMobileMenuOpen(false)} style={{ fontSize: "0.95rem", color: item.label === "Community" ? "var(--cs-orange)" : "var(--cs-muted)", textDecoration: "none" }}>
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        )}
       </header>
 
       {/* Body */}
@@ -204,7 +222,7 @@ export default function Community() {
               return (
                 <div
                   key={runner.user_email}
-                  style={{ background: "var(--cs-dark)", border: `1px solid ${isFollowing ? "rgba(232,98,10,0.3)" : "rgba(255,255,255,0.06)"}`, borderRadius: "8px", padding: "1.25rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}
+                  style={{ background: "var(--cs-dark)", border: `1px solid ${isFollowing ? "rgba(232,98,10,0.3)" : "rgba(255,255,255,0.06)"}`, borderRadius: "8px", padding: "1.25rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
                     <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem", fontWeight: 700, color: "var(--cs-white)", flexShrink: 0 }}>
