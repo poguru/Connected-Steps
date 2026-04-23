@@ -14,7 +14,7 @@ export default function Hero() {
           backgroundSize: "80px 80px",
         }} />
 
-      <div className="container relative z-10 pt-32 pb-20">
+      <div className="container relative z-10" style={{ paddingTop: "8rem", paddingBottom: "5rem" }}>
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           <div>
             <div className="section-label animate-fade-up">Connected Steps</div>
