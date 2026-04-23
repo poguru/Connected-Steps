@@ -17,7 +17,7 @@ export default function Hero() {
       <div className="container relative z-10 pt-32 pb-20">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           <div>
-            <div className="section-label animate-fade-up">Premium Running Training</div>
+            <div className="section-label animate-fade-up">Connected Steps</div>
             <h1 className="font-display animate-fade-up-1 mb-6"
               style={{ fontSize: "clamp(3rem, 6vw, 5.5rem)", fontWeight: 300, color: "var(--cs-white)", lineHeight: 1.05 }}>
               Every step,{" "}

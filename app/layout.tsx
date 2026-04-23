@@ -20,10 +20,10 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "Connected Steps — Your Goal, Our Plan",
   description:
-    "Premium running training plans, expert coaching, and a community built to help you hit every goal. Whether it's your first 5K or a full marathon — we run with you.",
+    "Expert coaching, personalised training plans, and a community built to help you hit every goal. Whether it's your first 5K or a full marathon — we run with you.",
   openGraph: {
     title: "Connected Steps — Your Goal, Our Plan",
-    description: "Premium running training with expert coaches.",
+    description: "Expert coaching and a community built around your running goals.",
     type: "website",
   },
 };

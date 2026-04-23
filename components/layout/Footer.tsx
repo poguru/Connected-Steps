@@ -37,7 +37,7 @@ export default function Footer() {
               </div>
             </Link>
             <p className="text-sm leading-relaxed mb-6 max-w-xs" style={{ color: "var(--cs-muted)" }}>
-              A premium running training community built around expert coaches, personalised plans,
+              A running community built around expert coaches, personalised plans,
               and runners who show up for each other.
             </p>
             <div className="flex gap-3">
