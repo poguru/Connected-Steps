@@ -260,6 +260,33 @@ select.auth-input option {
   .container { padding: 0 1.25rem; }
 }
 
+/* ─── Home Navbar ────────────────────────────────────── */
+.cs-home-nav-links { display: flex; align-items: center; gap: 2rem; }
+.cs-home-nav-cta   { display: flex; align-items: center; gap: 0.75rem; }
+.cs-home-nav-burger { display: none; flex-direction: column; gap: 6px; background: none; border: none; cursor: pointer; padding: 4px; }
+.cs-home-nav-burger span { display: block; width: 24px; height: 2px; background: var(--cs-white); border-radius: 2px; transition: all 0.3s; }
+.cs-home-mobile-menu { display: none; }
+
+@media (max-width: 767px) {
+  .cs-home-nav-links  { display: none; }
+  .cs-home-nav-cta    { display: none; }
+  .cs-home-nav-burger { display: flex; }
+  .cs-home-mobile-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 1.25rem 1.5rem 1.75rem;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    background: rgba(10,10,10,0.98);
+  }
+  .cs-home-mobile-menu a {
+    font-size: 0.95rem;
+    color: var(--cs-muted);
+    text-decoration: none;
+    padding: 0.2rem 0;
+  }
+}
+
 /* ─── App pages (Dashboard / Leaderboard / Community) ── */
 .cs-app-nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 50;

@@ -55,11 +55,11 @@ export default function Navbar() {
             </div>
           </Link>
 
-          <ul className="hidden md:flex items-center gap-8">
+          <ul className="cs-home-nav-links" style={{ listStyle: "none", margin: 0, padding: 0 }}>
             {navLinks.map((link) => (
               <li key={link.label}>
-                <Link href={link.href} className="text-sm tracking-wide transition-colors duration-200"
-                  style={{ color: "var(--cs-muted)" }}
+                <Link href={link.href} className="text-sm tracking-wide"
+                  style={{ color: "var(--cs-muted)", textDecoration: "none" }}
                   onMouseEnter={(e) => (e.currentTarget.style.color = "var(--cs-white)")}
                   onMouseLeave={(e) => (e.currentTarget.style.color = "var(--cs-muted)")}>
                   {link.label}
@@ -68,7 +68,7 @@ export default function Navbar() {
             ))}
           </ul>
 
-          <div className="hidden md:flex items-center gap-3">
+          <div className="cs-home-nav-cta">
             {loggedInUser ? (
               <>
                 <Link href="/dashboard" className="btn-outline" style={{ padding: "10px 22px", fontSize: "12px" }}>
@@ -92,33 +92,28 @@ export default function Navbar() {
             )}
           </div>
 
-          <button className="md:hidden flex flex-col gap-1.5 p-2" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu">
-            <span className="block w-6 h-px transition-all duration-300"
-              style={{ background: "var(--cs-white)", transform: menuOpen ? "rotate(45deg) translate(3px, 3px)" : "none" }} />
-            <span className="block w-6 h-px transition-all duration-300"
-              style={{ background: "var(--cs-white)", opacity: menuOpen ? 0 : 1 }} />
-            <span className="block w-6 h-px transition-all duration-300"
-              style={{ background: "var(--cs-white)", transform: menuOpen ? "rotate(-45deg) translate(3px, -3px)" : "none" }} />
+          <button className="cs-home-nav-burger" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu">
+            <span style={{ transform: menuOpen ? "rotate(45deg) translate(4px, 4px)" : "none" }} />
+            <span style={{ opacity: menuOpen ? 0 : 1 }} />
+            <span style={{ transform: menuOpen ? "rotate(-45deg) translate(4px, -4px)" : "none" }} />
           </button>
         </nav>
 
         {menuOpen && (
-          <div className="md:hidden py-6 border-t" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
-            <ul className="flex flex-col gap-5 mb-6">
-              {navLinks.map((link) => (
-                <li key={link.label}>
-                  <Link href={link.href} className="text-sm tracking-wide" style={{ color: "var(--cs-muted)" }}
-                    onClick={() => setMenuOpen(false)}>{link.label}</Link>
-                </li>
-              ))}
-            </ul>
-            <div className="flex flex-col gap-3">
+          <div className="cs-home-mobile-menu">
+            {navLinks.map((link) => (
+              <Link key={link.label} href={link.href} onClick={() => setMenuOpen(false)}
+                style={{ fontSize: "0.95rem", color: "var(--cs-muted)", textDecoration: "none" }}>
+                {link.label}
+              </Link>
+            ))}
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginTop: "0.5rem", paddingTop: "1rem", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
               {loggedInUser ? (
-                <Link href="/dashboard" className="btn-primary text-center justify-center" onClick={() => setMenuOpen(false)}>Go to Dashboard</Link>
+                <Link href="/dashboard" className="btn-primary" style={{ textAlign: "center", justifyContent: "center" }} onClick={() => setMenuOpen(false)}>Go to Dashboard</Link>
               ) : (
                 <>
-                  <Link href="/auth" className="btn-outline text-center justify-center">Sign in</Link>
-                  <Link href="/auth" className="btn-primary text-center justify-center">Join free</Link>
+                  <Link href="/auth" className="btn-outline" style={{ textAlign: "center", justifyContent: "center" }}>Sign in</Link>
+                  <Link href="/auth" className="btn-primary" style={{ textAlign: "center", justifyContent: "center" }}>Join free</Link>
                 </>
               )}
             </div>
