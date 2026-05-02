@@ -183,7 +183,11 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
 
       {/* Date of birth */}
       <div className="mb-3">
+        <label htmlFor="dob" style={{ display: "block", fontSize: "12px", color: "var(--cs-muted)", marginBottom: "6px", letterSpacing: "0.04em" }}>
+          Date of Birth
+        </label>
         <input
+          id="dob"
           className="auth-input"
           name="dob"
           type="date"
