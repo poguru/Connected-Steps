@@ -11,15 +11,14 @@ export async function POST(req: NextRequest) {
 
   const supabaseServer = getSupabaseServer();
 
-  const isPhone = /^\+?[\d\s\-()]{7,15}$/.test(identifier.trim());
+  const val = identifier.trim();
 
-  const { data: user, error } = await supabaseServer
-    .from("users")
-    .select("*")
-    .eq(isPhone ? "phone" : "email", isPhone ? identifier.trim() : identifier.toLowerCase())
-    .single();
+  // Try email first, then phone — use limit(1) to handle any duplicate rows gracefully
+  const byEmail = await supabaseServer.from("users").select("*").eq("email", val.toLowerCase()).limit(1);
+  const byPhone = await supabaseServer.from("users").select("*").eq("phone", val).limit(1);
+  const user = byEmail.data?.[0] ?? byPhone.data?.[0] ?? null;
 
-  if (error || !user) {
+  if (!user) {
     return NextResponse.json({ error: "Invalid credentials. Please check and try again." }, { status: 401 });
   }
 

@@ -4,11 +4,15 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import UserMenu, { MenuUser } from "@/components/ui/UserMenu";
 
 interface User {
   firstName: string;
   lastName:  string;
   email:     string;
+  phone:     string;
+  goal:      string;
+  location:  string;
   photo:     string | null;
 }
 
@@ -111,7 +115,7 @@ export default function Community() {
               { label: "Dashboard",    href: "/dashboard" },
               { label: "Leaderboard", href: "/leaderboard" },
               { label: "Community",   href: "/community" },
-              { label: "Achievements",href: "#" },
+              { label: "Achievements",href: "/achievements" },
             ].map((item) => (
               <Link key={item.label} href={item.href} style={{ fontSize: "0.875rem", color: item.label === "Community" ? "var(--cs-orange)" : "var(--cs-muted)", textDecoration: "none" }}>
                 {item.label}
@@ -120,14 +124,7 @@ export default function Community() {
           </nav>
 
           <div className="cs-app-nav-user">
-            {user.photo ? (
-              <img src={user.photo} alt={fullName} style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", border: "2px solid var(--cs-orange)" }} />
-            ) : (
-              <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.875rem", fontWeight: 700 }}>
-                {user.firstName[0]}{user.lastName[0]}
-              </div>
-            )}
-            <span style={{ fontSize: "0.875rem" }}>{fullName}</span>
+            <UserMenu user={user as MenuUser} onUserUpdate={(u) => { setUser(u as User); localStorage.setItem("cs_user", JSON.stringify(u)); }} />
             <button className="cs-mobile-nav-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Toggle menu">
               <span /><span /><span />
             </button>
@@ -139,7 +136,7 @@ export default function Community() {
               { label: "Dashboard",    href: "/dashboard" },
               { label: "Leaderboard", href: "/leaderboard" },
               { label: "Community",   href: "/community" },
-              { label: "Achievements",href: "#" },
+              { label: "Achievements",href: "/achievements" },
             ].map((item) => (
               <Link key={item.label} href={item.href} onClick={() => setMobileMenuOpen(false)} style={{ fontSize: "0.95rem", color: item.label === "Community" ? "var(--cs-orange)" : "var(--cs-muted)", textDecoration: "none" }}>
                 {item.label}

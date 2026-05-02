@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { getSupabase } from "@/lib/supabase";
+import UserMenu, { MenuUser } from "@/components/ui/UserMenu";
 
 type ModalType = "followers" | "following" | null;
 
@@ -48,6 +48,24 @@ const goalLabel: Record<string, string> = {
   "half":"Half Marathon",
   "full":"Full Marathon",
 };
+
+function calcActivityPoints(type: string, distanceM: number, movingTimeSecs: number): number {
+  if (type === "Run") {
+    const km = distanceM / 1000;
+    let points = km; // 1 pt per km
+    if (km > 42.2)       points += 20;
+    else if (km >= 21.2) points += 15;
+    else if (km >= 15)   points += 10;
+    else if (km >= 10)   points += 7;
+    else if (km >= 5)    points += 5;
+    return Math.round(points);
+  } else {
+    const mins = movingTimeSecs / 60;
+    let points = Math.floor(mins / 15) * 3;
+    if (mins > 30) points += Math.floor((mins - 30) / 30) * 3;
+    return points;
+  }
+}
 
 function fmtDistance(m: number) {
   return `${(m / 1000).toFixed(1)} km`;
@@ -119,8 +137,14 @@ export default function Dashboard() {
     const u: User = JSON.parse(stored);
     setUser(u);
 
-    const storedStrava = localStorage.getItem("cs_strava");
-    if (storedStrava) setStrava(JSON.parse(storedStrava));
+    // Restore strava: prefer active key, fall back to user-specific backup
+    const storedStrava = localStorage.getItem("cs_strava")
+      || localStorage.getItem(`cs_strava_${u.email}`);
+    if (storedStrava) {
+      localStorage.setItem("cs_strava", storedStrava);
+      localStorage.setItem(`cs_strava_${u.email}`, storedStrava);
+      setStrava(JSON.parse(storedStrava));
+    }
 
     // Load followers/following
     Promise.all([
@@ -145,6 +169,12 @@ export default function Dashboard() {
         athlete_id:    Number(searchParams.get("athlete_id")),
       };
       localStorage.setItem("cs_strava", JSON.stringify(tokens));
+      // Persist under user-specific key so it survives logout
+      const currentUser = localStorage.getItem("cs_user");
+      if (currentUser) {
+        const email = JSON.parse(currentUser).email;
+        localStorage.setItem(`cs_strava_${email}`, JSON.stringify(tokens));
+      }
       setStrava(tokens);
       setStravaMsg("Strava connected successfully!");
       router.replace("/dashboard");
@@ -166,21 +196,32 @@ export default function Dashboard() {
     const week_runs = weekActs.filter((a) => a.type === "Run").length;
     const week_km   = weekActs.reduce((s, a) => s + a.distance, 0) / 1000;
     const week_time_secs = weekActs.reduce((s, a) => s + a.moving_time, 0);
-    const total_runs = acts.filter((a) => a.type === "Run").length;
-    const total_km   = acts.reduce((s, a) => s + a.distance, 0) / 1000;
+    const total_runs      = acts.filter((a) => a.type === "Run").length;
+    const total_km        = acts.reduce((s, a) => s + a.distance, 0) / 1000;
+    const total_time_secs = acts.reduce((s, a) => s + a.moving_time, 0);
+    const week_points     = weekActs.reduce((s, a) => s + calcActivityPoints(a.type, a.distance, a.moving_time), 0);
+    const total_points    = acts.reduce((s, a) => s + calcActivityPoints(a.type, a.distance, a.moving_time), 0);
 
-    await getSupabase().from("leaderboard").upsert({
-      user_email: user.email,
-      user_name:  `${user.firstName} ${user.lastName}`,
-      location:   user.location,
-      goal:       user.goal,
-      week_runs,
-      week_km:    parseFloat(week_km.toFixed(2)),
-      week_time_secs,
-      total_runs,
-      total_km:   parseFloat(total_km.toFixed(2)),
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "user_email" });
+    const res = await fetch("/api/leaderboard/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_email:     user.email,
+        user_name:      `${user.firstName} ${user.lastName}`,
+        location:       user.location,
+        goal:           user.goal,
+        week_runs,
+        week_km:        parseFloat(week_km.toFixed(2)),
+        week_time_secs,
+        total_runs,
+        total_km:       parseFloat(total_km.toFixed(2)),
+        total_time_secs,
+        week_points,
+        total_points,
+      }),
+    });
+    const syncData = await res.json();
+    if (!res.ok) throw new Error(syncData.error ?? "Sync failed");
   }, []);
 
   const fetchActivities = useCallback(async (tokens: StravaTokens) => {
@@ -270,7 +311,7 @@ export default function Dashboard() {
               { label: "Dashboard",    href: "/dashboard" },
               { label: "Leaderboard", href: "/leaderboard" },
               { label: "Community",   href: "/community" },
-              { label: "Achievements",href: "#" },
+              { label: "Achievements",href: "/achievements" },
             ].map((item) => (
               <Link key={item.label} href={item.href} style={{ fontSize: "0.875rem", color: item.label === "Dashboard" ? "var(--cs-orange)" : "var(--cs-muted)", textDecoration: "none" }}>
                 {item.label}
@@ -279,14 +320,7 @@ export default function Dashboard() {
           </nav>
 
           <div className="cs-app-nav-user">
-            {user.photo ? (
-              <img src={user.photo} alt={fullName} style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", border: "2px solid var(--cs-orange)" }} />
-            ) : (
-              <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.875rem", fontWeight: 700, color: "var(--cs-white)" }}>
-                {user.firstName[0]}{user.lastName[0]}
-              </div>
-            )}
-            <span style={{ fontSize: "0.875rem", color: "var(--cs-white)" }}>{fullName}</span>
+            <UserMenu user={user as MenuUser} onUserUpdate={(u) => { setUser(u as User); localStorage.setItem("cs_user", JSON.stringify(u)); }} />
             <button className="cs-mobile-nav-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Toggle menu">
               <span /><span /><span />
             </button>
@@ -298,7 +332,7 @@ export default function Dashboard() {
               { label: "Dashboard",    href: "/dashboard" },
               { label: "Leaderboard", href: "/leaderboard" },
               { label: "Community",   href: "/community" },
-              { label: "Achievements",href: "#" },
+              { label: "Achievements",href: "/achievements" },
             ].map((item) => (
               <Link key={item.label} href={item.href} onClick={() => setMobileMenuOpen(false)} style={{ fontSize: "0.95rem", color: item.label === "Dashboard" ? "var(--cs-orange)" : "var(--cs-muted)", textDecoration: "none" }}>
                 {item.label}
@@ -451,56 +485,6 @@ export default function Dashboard() {
 
         {/* ── Right sidebar ── */}
         <aside>
-          <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem", marginBottom: "1rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-              <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Your Goal</div>
-              <button
-                onClick={() => setEditingGoal(!editingGoal)}
-                style={{ fontSize: "11px", color: "var(--cs-orange)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)" }}
-              >
-                {editingGoal ? "Cancel" : "Change"}
-              </button>
-            </div>
-
-            {editingGoal ? (
-              <div>
-                <select
-                  defaultValue={user.goal}
-                  onChange={async (e) => {
-                    const newGoal = e.target.value;
-                    setGoalSaving(true);
-                    try {
-                      await fetch("/api/user/goal", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ email: user.email, goal: newGoal }),
-                      });
-                      const updated = { ...user, goal: newGoal };
-                      localStorage.setItem("cs_user", JSON.stringify(updated));
-                      setUser(updated);
-                      setEditingGoal(false);
-                    } finally {
-                      setGoalSaving(false);
-                    }
-                  }}
-                  style={{ width: "100%", padding: "8px", background: "var(--cs-charcoal)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", color: "var(--cs-white)", fontFamily: "var(--font-body)", fontSize: "0.875rem", cursor: "pointer", colorScheme: "dark" }}
-                >
-                  {[
-                    { id: "5k",   label: "First 5K"      },
-                    { id: "10k",  label: "10K"           },
-                    { id: "half", label: "Half Marathon"  },
-                    { id: "full", label: "Full Marathon"  },
-                  ].map((g) => (
-                    <option key={g.id} value={g.id}>{g.label}</option>
-                  ))}
-                </select>
-                {goalSaving && <div style={{ fontSize: "11px", color: "var(--cs-muted)", marginTop: "6px" }}>Saving…</div>}
-              </div>
-            ) : (
-              <div style={{ fontSize: "1rem", fontWeight: 600, color: "var(--cs-orange)" }}>{goalLabel[user.goal] ?? user.goal}</div>
-            )}
-          </div>
-
           {/* Personal Bests */}
           {pbs && (
             <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem", marginBottom: "1rem" }}>
@@ -517,28 +501,6 @@ export default function Dashboard() {
                 </div>
               ))}
 
-              {/* Next milestone */}
-              <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "0.75rem", marginTop: "0.5rem" }}>
-                <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.5rem" }}>Next Milestone</div>
-                {(() => {
-                  const next: Record<string, string> = { "5k": "10K", "10k": "Half Marathon (21.1 km)", "half": "Full Marathon (42.2 km)", "full": "Ultra Marathon 🏆" };
-                  const dist: Record<string, number> = { "5k": 5000, "10k": 10000, "half": 21097, "full": 42195 };
-                  const nextGoal = next[user.goal] ?? "Keep running!";
-                  const target   = dist[user.goal] ?? 0;
-                  const progress = target > 0 ? Math.min((pbs.longestRun / target) * 100, 100) : 100;
-                  return (
-                    <div>
-                      <div style={{ fontSize: "0.8rem", color: "var(--cs-white)", fontWeight: 600, marginBottom: "6px" }}>{nextGoal}</div>
-                      <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: "4px", height: "6px", overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${progress}%`, background: "var(--cs-orange)", borderRadius: "4px", transition: "width 0.5s" }} />
-                      </div>
-                      <div style={{ fontSize: "10px", color: "var(--cs-muted)", marginTop: "4px" }}>
-                        Longest run: {(pbs.longestRun / 1000).toFixed(2)} km / {(target / 1000).toFixed(1)} km
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
             </div>
           )}
 
