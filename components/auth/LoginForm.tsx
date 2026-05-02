@@ -10,7 +10,7 @@ interface Props {
 
 export default function LoginForm({ onSwitchToSignUp }: Props) {
   const router = useRouter();
-  const [form, setForm]       = useState({ email: "", password: "" });
+  const [form, setForm]       = useState({ identifier: "", password: "" });
   const [showPw, setShowPw]   = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
@@ -22,8 +22,8 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!form.email || !form.password) {
-      setError("Please enter your email and password.");
+    if (!form.identifier || !form.password) {
+      setError("Please enter your email or phone number and password.");
       return;
     }
     setLoading(true);
@@ -31,7 +31,7 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: form.email, password: form.password }),
+        body: JSON.stringify({ identifier: form.identifier, password: form.password }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error); return; }
@@ -50,16 +50,16 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
 
   return (
     <form onSubmit={handleSubmit} noValidate>
-      {/* Email */}
+      {/* Email or phone */}
       <div className="mb-3">
         <input
           className="auth-input"
-          name="email"
-          type="email"
-          placeholder="Email address"
-          value={form.email}
+          name="identifier"
+          type="text"
+          placeholder="Email address or phone number"
+          value={form.identifier}
           onChange={handleChange}
-          autoComplete="email"
+          autoComplete="username"
         />
       </div>
 
