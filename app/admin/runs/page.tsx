@@ -112,7 +112,7 @@ export default function AdminRunsPage() {
       "Member",
     ];
     const rows = filtered.map((r) => [
-      new Date(r.created_at).toLocaleString("en-IN"),
+      r.created_at ? new Date(r.created_at).toLocaleString("en-IN") : "",
       r.event_name,
       r.event_date,
       r.event_location,
@@ -289,7 +289,7 @@ export default function AdminRunsPage() {
                           : <span style={{ color: "#666", fontSize: "0.75rem" }}>Guest</span>}
                       </td>
                       <td style={{ ...td, color: "#666", fontSize: "0.75rem" }}>
-                        {new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                        {r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
                       </td>
                     </tr>
                   ))
