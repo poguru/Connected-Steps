@@ -12,8 +12,7 @@ export async function POST(req: NextRequest) {
     // Check user exists
     const { data: users } = await db.from("users").select("email").eq("email", email.toLowerCase().trim()).limit(1);
     if (!users || users.length === 0) {
-      // Return success anyway to avoid email enumeration
-      return NextResponse.json({ success: true });
+      return NextResponse.json({ error: "No account found with this email address." }, { status: 404 });
     }
 
     // Generate token
