@@ -10,6 +10,12 @@ const plans = [
     color: "var(--cs-orange)",
   },
   {
+    tier: "Intermediate", distance: "10K", duration: "10 weeks",
+    desc: "Push past the 5K. Build speed, endurance, and race-day confidence for 10K.",
+    features: ["4 runs per week", "Interval & tempo runs", "Weekly coach check-in", "Race strategy"],
+    color: "var(--cs-white)",
+  },
+  {
     tier: "Builder", distance: "Half Marathon", duration: "14 weeks",
     desc: "Take the leap to 21K. Structured tempo runs, long runs, and race strategy.",
     features: ["5 runs per week", "Tempo & interval sessions", "Bi-weekly coach call", "Race day plan"],
@@ -37,7 +43,7 @@ export default function TrainingPlans() {
           </h2>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-4 gap-6">
           {plans.map((plan) => (
             <div key={plan.tier} className="relative flex flex-col"
               style={{
