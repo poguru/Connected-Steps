@@ -47,30 +47,34 @@ export default function AdminRunsPage() {
   const [authError,   setAuthError]   = useState("");
   const [loading,     setLoading]     = useState(false);
   const [data,        setData]        = useState<Registration[]>([]);
-  const [fetchError,  setFetchError]  = useState("");
   const [eventFilter, setEventFilter] = useState("all");
 
-  const login = async (e: React.FormEvent) => {
+  const login = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setLoading(true);
     setAuthError("");
-    const res = await fetch("/api/admin/runs", {
-      headers: { "x-admin-password": password },
-    });
-    if (res.status === 401) {
-      setAuthError("Incorrect password.");
+    try {
+      const res = await fetch("/api/admin/runs", {
+        headers: { "x-admin-password": password },
+      });
+      if (res.status === 401) {
+        setAuthError("Incorrect password.");
+        setLoading(false);
+        return;
+      }
+      const json = await res.json();
+      if (!res.ok) {
+        setAuthError(json.error ?? "Server error. Please try again.");
+        setLoading(false);
+        return;
+      }
+      setData(json.data ?? []);
+      setAuthed(true);
+    } catch {
+      setAuthError("Network error. Check your connection and try again.");
+    } finally {
       setLoading(false);
-      return;
     }
-    const json = await res.json();
-    if (!res.ok) {
-      setFetchError(json.error ?? "Failed to load data.");
-      setLoading(false);
-      return;
-    }
-    setData(json.data ?? []);
-    setAuthed(true);
-    setLoading(false);
   };
 
   const eventDates = useMemo(() => {
@@ -204,12 +208,6 @@ export default function AdminRunsPage() {
       </header>
 
       <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "2rem 1.5rem" }}>
-
-        {fetchError && (
-          <div style={{ background: "rgba(226,75,74,0.1)", border: "1px solid rgba(226,75,74,0.3)", borderRadius: "6px", padding: "10px 14px", marginBottom: "1.5rem", fontSize: "0.825rem", color: "#f09595" }}>
-            {fetchError}
-          </div>
-        )}
 
         {/* Event filter */}
         <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.75rem", flexWrap: "wrap" }}>
