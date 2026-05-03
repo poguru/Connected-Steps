@@ -2,9 +2,11 @@
 
 import Navbar               from "@/components/layout/Navbar";
 import Footer               from "@/components/layout/Footer";
+import FloatingContact      from "@/components/layout/FloatingContact";
 import Hero                 from "@/components/home/Hero";
 import MarqueeBanner        from "@/components/home/MarqueeBanner";
 import TrainingPlans        from "@/components/home/TrainingPlans";
+import Coaches              from "@/components/home/Coaches";
 import Features             from "@/components/home/Features";
 import StatsAndTestimonials from "@/components/home/StatsAndTestimonials";
 import CallToAction         from "@/components/home/CallToAction";
@@ -16,10 +18,12 @@ export default function HomePage() {
       <Hero />
       <MarqueeBanner />
       <TrainingPlans />
+      <Coaches />
       <Features />
       <StatsAndTestimonials />
       <CallToAction />
       <Footer />
+      <FloatingContact />
     </>
   );
 }

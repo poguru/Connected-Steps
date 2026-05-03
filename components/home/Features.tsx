@@ -2,7 +2,7 @@
 
 const features = [
   {
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M17 12l-5 5-5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M12 7v10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
+    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c-1.66 0-3-4.03-3-9s1.34-9 3-9m0 18c1.66 0 3-4.03 3-9s-1.34-9-3-9m-9 9a9 9 0 019-9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M16 7l2-2m0 0l2 2m-2-2v5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
     title: "Adaptive training plans",
     desc: "Your plan adjusts every week based on your performance, recovery, and life.",
   },

@@ -11,11 +11,12 @@ interface StoredUser {
 }
 
 const navLinks = [
-  { label: "Training",     href: "#training" },
-  { label: "Coaches",      href: "#coaches" },
-  { label: "Community",    href: "#community" },
-  { label: "Achievements", href: "/achievements" },
-  { label: "Pricing",      href: "/pricing" },
+  { label: "Training",        href: "#training" },
+  { label: "Coaches",         href: "#coaches" },
+  { label: "Community",       href: "#community" },
+  { label: "Achievements",    href: "/achievements" },
+  { label: "Upcoming Events", href: "/weekend-run", highlight: true },
+  { label: "Pricing",         href: "/pricing" },
 ];
 
 export default function Navbar() {
@@ -58,12 +59,22 @@ export default function Navbar() {
           <ul className="cs-home-nav-links" style={{ listStyle: "none", margin: 0, padding: 0 }}>
             {navLinks.map((link) => (
               <li key={link.label}>
-                <Link href={link.href} className="text-sm tracking-wide"
-                  style={{ color: "var(--cs-muted)", textDecoration: "none" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--cs-white)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = "var(--cs-muted)")}>
-                  {link.label}
-                </Link>
+                {link.highlight ? (
+                  <Link href={link.href} className="text-sm tracking-wide"
+                    style={{ color: "var(--cs-orange)", textDecoration: "none", display: "flex", alignItems: "center", gap: "5px", fontWeight: 600 }}
+                    onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.8")}
+                    onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}>
+                    <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--cs-orange)", display: "inline-block", animation: "navDot 1.8s ease-in-out infinite" }} />
+                    {link.label}
+                  </Link>
+                ) : (
+                  <Link href={link.href} className="text-sm tracking-wide"
+                    style={{ color: "var(--cs-muted)", textDecoration: "none" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = "var(--cs-white)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = "var(--cs-muted)")}>
+                    {link.label}
+                  </Link>
+                )}
               </li>
             ))}
           </ul>
@@ -103,7 +114,8 @@ export default function Navbar() {
           <div className="cs-home-mobile-menu">
             {navLinks.map((link) => (
               <Link key={link.label} href={link.href} onClick={() => setMenuOpen(false)}
-                style={{ fontSize: "0.95rem", color: "var(--cs-muted)", textDecoration: "none" }}>
+                style={{ fontSize: "0.95rem", color: link.highlight ? "var(--cs-orange)" : "var(--cs-muted)", fontWeight: link.highlight ? 600 : undefined, textDecoration: "none", display: "flex", alignItems: "center", gap: "6px" }}>
+                {link.highlight && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--cs-orange)", display: "inline-block" }} />}
                 {link.label}
               </Link>
             ))}
