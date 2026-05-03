@@ -1,0 +1,355 @@
+"use client";
+
+import { useState, useCallback } from "react";
+import Link from "next/link";
+import Image from "next/image";
+
+interface Session { id: string; title: string; date: string; location: string; }
+interface Attendee {
+  email: string; name: string; location: string;
+  attended: boolean; bonus_points: number; bonus_reason: string; points_synced: boolean;
+}
+
+const inp: React.CSSProperties = {
+  width: "100%", padding: "9px 12px",
+  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+  borderRadius: "6px", color: "#fff", fontSize: "0.825rem", outline: "none", boxSizing: "border-box",
+};
+const label: React.CSSProperties = {
+  display: "block", fontSize: "10px", color: "#888",
+  letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "5px",
+};
+const btn = (accent = false): React.CSSProperties => ({
+  padding: "9px 20px", borderRadius: "6px", border: "none", cursor: "pointer",
+  fontSize: "0.8rem", fontWeight: 700,
+  background: accent ? "#e8620a" : "rgba(255,255,255,0.08)", color: "#fff",
+});
+
+export default function AdminSessionsPage() {
+  const [password,   setPassword]   = useState("");
+  const [authed,     setAuthed]     = useState(false);
+  const [authErr,    setAuthErr]    = useState("");
+  const [authLoad,   setAuthLoad]   = useState(false);
+
+  const [sessions,   setSessions]   = useState<Session[]>([]);
+  const [selected,   setSelected]   = useState<Session | null>(null);
+  const [attendees,  setAttendees]  = useState<Attendee[]>([]);
+  const [sessionLoad, setSessionLoad] = useState(false);
+  const [attendLoad,  setAttendLoad]  = useState(false);
+  const [saveMsg,     setSaveMsg]     = useState("");
+  const [syncMsg,     setSyncMsg]     = useState("");
+  const [syncing,     setSyncing]     = useState(false);
+  const [saving,      setSaving]      = useState(false);
+
+  // New session form
+  const [newTitle,    setNewTitle]    = useState("");
+  const [newDate,     setNewDate]     = useState("");
+  const [newLocation, setNewLocation] = useState("");
+  const [creating,    setCreating]    = useState(false);
+
+  const headers = { "Content-Type": "application/json", "x-admin-password": password };
+
+  /* ── Auth ── */
+  const login = async (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    setAuthLoad(true); setAuthErr("");
+    try {
+      const res  = await fetch("/api/admin/sessions", { headers: { "x-admin-password": password } });
+      const json = await res.json();
+      if (res.status === 401) { setAuthErr("Incorrect password."); return; }
+      if (!res.ok)            { setAuthErr(json.error ?? "Server error."); return; }
+      setSessions(json.data ?? []);
+      setAuthed(true);
+    } catch { setAuthErr("Network error."); }
+    finally  { setAuthLoad(false); }
+  };
+
+  /* ── Load sessions ── */
+  const loadSessions = useCallback(async () => {
+    const res  = await fetch("/api/admin/sessions", { headers: { "x-admin-password": password } });
+    const json = await res.json();
+    setSessions(json.data ?? []);
+  }, [password]);
+
+  /* ── Create session ── */
+  const createSession = async (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    setCreating(true);
+    const res  = await fetch("/api/admin/sessions", { method: "POST", headers, body: JSON.stringify({ title: newTitle, date: newDate, location: newLocation }) });
+    const json = await res.json();
+    if (res.ok) {
+      setNewTitle(""); setNewDate(""); setNewLocation("");
+      await loadSessions();
+    } else {
+      alert(json.error);
+    }
+    setCreating(false);
+  };
+
+  /* ── Select session → load users ── */
+  const openSession = async (s: Session) => {
+    setSelected(s); setAttendees([]); setSaveMsg(""); setSyncMsg("");
+    setSessionLoad(true);
+    const res  = await fetch(`/api/admin/sessions/${s.id}/attendance`, { headers: { "x-admin-password": password } });
+    const json = await res.json();
+    setAttendees(json.users ?? []);
+    setSessionLoad(false);
+  };
+
+  /* ── Toggle attendance ── */
+  const toggleAttend = (email: string) =>
+    setAttendees((prev) => prev.map((a) => a.email === email ? { ...a, attended: !a.attended } : a));
+
+  const setBonus = (email: string, pts: number) =>
+    setAttendees((prev) => prev.map((a) => a.email === email ? { ...a, bonus_points: pts } : a));
+
+  const setReason = (email: string, reason: string) =>
+    setAttendees((prev) => prev.map((a) => a.email === email ? { ...a, bonus_reason: reason } : a));
+
+  /* ── Save attendance ── */
+  const saveAttendance = async () => {
+    if (!selected) return;
+    setSaving(true); setSaveMsg("");
+    const res  = await fetch(`/api/admin/sessions/${selected.id}/attendance`, {
+      method: "POST", headers,
+      body: JSON.stringify({ users: attendees.map((a) => ({ email: a.email, name: a.name, attended: a.attended, bonus_points: a.bonus_points, bonus_reason: a.bonus_reason })) }),
+    });
+    const json = await res.json();
+    setSaveMsg(res.ok ? "Attendance saved." : json.error);
+    setSaving(false);
+  };
+
+  /* ── Sync points ── */
+  const syncPoints = async () => {
+    if (!selected) return;
+    setSyncing(true); setSyncMsg("");
+    const res  = await fetch(`/api/admin/sessions/${selected.id}/sync`, { method: "POST", headers });
+    const json = await res.json();
+    setSyncMsg(json.message ?? (res.ok ? "Done." : json.error));
+    // Reload to show synced status
+    await openSession(selected);
+    setSyncing(false);
+  };
+
+  const attendCount  = attendees.filter((a) => a.attended).length;
+  const syncedCount  = attendees.filter((a) => a.points_synced).length;
+  const allSynced    = attendees.length > 0 && syncedCount === attendees.length;
+
+  /* ── Password gate ── */
+  if (!authed) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center", padding: "1.5rem" }}>
+        <div style={{ width: "100%", maxWidth: "380px" }}>
+          <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none", marginBottom: "2.5rem", justifyContent: "center" }}>
+            <Image src="/logo.png" alt="Connected Steps" width={36} height={36} className="rounded-full" />
+            <span style={{ fontSize: "1.1rem", fontWeight: 600, color: "#fff" }}>Connected Steps</span>
+          </Link>
+          <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", padding: "2rem" }}>
+            <div style={{ fontSize: "10px", color: "#e8620a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.5rem", fontWeight: 600 }}>Admin Access</div>
+            <h1 style={{ fontSize: "1.4rem", fontWeight: 300, color: "#fff", marginBottom: "1.75rem" }}>Training Sessions</h1>
+            <form onSubmit={login}>
+              <label style={label}>Password</label>
+              <input type="password" value={password} onChange={(e) => { setPassword(e.target.value); setAuthErr(""); }}
+                placeholder="Enter admin password" autoFocus style={{ ...inp, marginBottom: "1rem" }} />
+              {authErr && <div style={{ background: "rgba(226,75,74,0.1)", border: "1px solid rgba(226,75,74,0.3)", borderRadius: "6px", padding: "9px 12px", marginBottom: "1rem", fontSize: "0.8rem", color: "#f09595" }}>{authErr}</div>}
+              <button type="submit" disabled={authLoad} style={{ ...btn(true), width: "100%", padding: "12px" }}>
+                {authLoad ? "Verifying…" : "Access Dashboard"}
+              </button>
+            </form>
+          </div>
+          <p style={{ textAlign: "center", marginTop: "1rem" }}>
+            <Link href="/admin/runs" style={{ fontSize: "0.8rem", color: "#888", textDecoration: "none" }}>→ Run Registrations admin</Link>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Dashboard ── */
+  return (
+    <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", display: "flex", flexDirection: "column" }}>
+
+      {/* Header */}
+      <header style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(10,10,10,0.97)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 1.5rem", height: "56px", display: "flex", alignItems: "center", gap: "1rem" }}>
+        <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.5rem", textDecoration: "none" }}>
+          <Image src="/logo.png" alt="" width={28} height={28} className="rounded-full" />
+        </Link>
+        <span style={{ color: "#444", fontSize: "0.8rem" }}>/</span>
+        <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>Training Sessions</span>
+        <div style={{ marginLeft: "auto", display: "flex", gap: "0.75rem" }}>
+          <Link href="/admin/runs" style={{ fontSize: "0.75rem", color: "#888", textDecoration: "none", padding: "6px 14px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px" }}>Run Registrations</Link>
+        </div>
+      </header>
+
+      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+
+        {/* Left — sessions list */}
+        <div style={{ width: "300px", flexShrink: 0, borderRight: "1px solid rgba(255,255,255,0.07)", padding: "1.25rem", overflowY: "auto", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+
+          {/* Create new session */}
+          <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "1.25rem" }}>
+            <div style={{ fontSize: "10px", color: "#e8620a", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "1rem" }}>New Session</div>
+            <form onSubmit={createSession} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              <div>
+                <label style={label}>Title</label>
+                <input style={inp} value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="e.g. Morning Run" required />
+              </div>
+              <div>
+                <label style={label}>Date</label>
+                <input style={inp} type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} required />
+              </div>
+              <div>
+                <label style={label}>Location</label>
+                <input style={inp} value={newLocation} onChange={(e) => setNewLocation(e.target.value)} placeholder="e.g. Kondapur" required />
+              </div>
+              <button type="submit" disabled={creating} style={{ ...btn(true), width: "100%" }}>
+                {creating ? "Creating…" : "Create Session"}
+              </button>
+            </form>
+          </div>
+
+          {/* Sessions list */}
+          <div>
+            <div style={{ fontSize: "10px", color: "#888", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Sessions ({sessions.length})</div>
+            {sessions.length === 0 ? (
+              <div style={{ fontSize: "0.8rem", color: "#555" }}>No sessions yet.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                {sessions.map((s) => (
+                  <button key={s.id} onClick={() => openSession(s)}
+                    style={{ textAlign: "left", padding: "10px 12px", borderRadius: "6px", border: "1px solid", cursor: "pointer", background: selected?.id === s.id ? "rgba(232,98,10,0.1)" : "transparent", borderColor: selected?.id === s.id ? "rgba(232,98,10,0.4)" : "rgba(255,255,255,0.07)", transition: "all 0.15s" }}>
+                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#fff", marginBottom: "2px" }}>{s.title}</div>
+                    <div style={{ fontSize: "0.72rem", color: "#888" }}>{s.date} · {s.location}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right — session detail */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "1.5rem" }}>
+          {!selected ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#444", fontSize: "0.9rem" }}>
+              ← Select or create a session
+            </div>
+          ) : sessionLoad ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#666" }}>Loading…</div>
+          ) : (
+            <>
+              {/* Session header */}
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem", marginBottom: "1.5rem" }}>
+                <div>
+                  <h2 style={{ fontSize: "1.3rem", fontWeight: 300, color: "#fff", marginBottom: "4px" }}>{selected.title}</h2>
+                  <div style={{ fontSize: "0.8rem", color: "#888" }}>{selected.date} · 📍 {selected.location}</div>
+                </div>
+                <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+                  <button onClick={saveAttendance} disabled={saving} style={btn(false)}>
+                    {saving ? "Saving…" : "Save Attendance"}
+                  </button>
+                  <button onClick={syncPoints} disabled={syncing || allSynced} style={btn(true)}
+                    title={allSynced ? "All points already synced" : "Award points to leaderboard"}>
+                    {syncing ? "Syncing…" : allSynced ? "Points Synced ✓" : "Sync Points to Leaderboard"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Messages */}
+              {saveMsg && <div style={{ background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.25)", borderRadius: "6px", padding: "9px 14px", marginBottom: "1rem", fontSize: "0.8rem", color: "#4ade80" }}>{saveMsg}</div>}
+              {syncMsg && <div style={{ background: "rgba(232,98,10,0.08)", border: "1px solid rgba(232,98,10,0.25)", borderRadius: "6px", padding: "9px 14px", marginBottom: "1rem", fontSize: "0.8rem", color: "#e8620a" }}>{syncMsg}</div>}
+
+              {/* Stats row */}
+              <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
+                {[
+                  { label: "Registered users at location", value: attendees.length },
+                  { label: "Attended",   value: attendCount },
+                  { label: "Points synced", value: syncedCount },
+                ].map((s) => (
+                  <div key={s.label} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", padding: "0.75rem 1.25rem", minWidth: "130px" }}>
+                    <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#e8620a" }}>{s.value}</div>
+                    <div style={{ fontSize: "10px", color: "#666", textTransform: "uppercase", letterSpacing: "0.06em" }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Attendance table */}
+              {attendees.length === 0 ? (
+                <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", padding: "3rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>
+                  No registered users found at <strong style={{ color: "#888" }}>{selected.location}</strong>.<br />
+                  <span style={{ fontSize: "0.75rem" }}>Make sure the session location matches the location users registered with.</span>
+                </div>
+              ) : (
+                <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", overflow: "hidden" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ background: "rgba(255,255,255,0.02)" }}>
+                        <th style={{ padding: "10px 16px", fontSize: "10px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#888", textAlign: "left", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>Attended</th>
+                        <th style={{ padding: "10px 16px", fontSize: "10px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#888", textAlign: "left", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>Name</th>
+                        <th style={{ padding: "10px 16px", fontSize: "10px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#888", textAlign: "left", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>Email</th>
+                        <th style={{ padding: "10px 16px", fontSize: "10px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#888", textAlign: "center", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>Pts (attend)</th>
+                        <th style={{ padding: "10px 16px", fontSize: "10px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#888", textAlign: "center", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>Bonus pts</th>
+                        <th style={{ padding: "10px 16px", fontSize: "10px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#888", textAlign: "left", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>Bonus reason</th>
+                        <th style={{ padding: "10px 16px", fontSize: "10px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#888", textAlign: "center", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {attendees.map((a, i) => (
+                        <tr key={a.email} style={{ background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)" }}>
+
+                          {/* Attendance checkbox */}
+                          <td style={{ padding: "10px 16px", borderBottom: "1px solid rgba(255,255,255,0.04)", textAlign: "center" }}>
+                            <input type="checkbox" checked={a.attended} onChange={() => toggleAttend(a.email)}
+                              disabled={a.points_synced}
+                              style={{ width: "18px", height: "18px", cursor: a.points_synced ? "not-allowed" : "pointer", accentColor: "#e8620a" }} />
+                          </td>
+
+                          {/* Name */}
+                          <td style={{ padding: "10px 16px", borderBottom: "1px solid rgba(255,255,255,0.04)", fontSize: "0.82rem", fontWeight: 600, color: "#fff", whiteSpace: "nowrap" }}>{a.name}</td>
+
+                          {/* Email */}
+                          <td style={{ padding: "10px 16px", borderBottom: "1px solid rgba(255,255,255,0.04)", fontSize: "0.78rem", color: "#888" }}>{a.email}</td>
+
+                          {/* Attendance points */}
+                          <td style={{ padding: "10px 16px", borderBottom: "1px solid rgba(255,255,255,0.04)", textAlign: "center" }}>
+                            <span style={{ fontSize: "0.82rem", color: a.attended ? "#4ade80" : "#444", fontWeight: 600 }}>{a.attended ? "+5" : "—"}</span>
+                          </td>
+
+                          {/* Bonus points input */}
+                          <td style={{ padding: "8px 16px", borderBottom: "1px solid rgba(255,255,255,0.04)", textAlign: "center" }}>
+                            <input type="number" min={0} value={a.bonus_points || ""} placeholder="0"
+                              disabled={a.points_synced}
+                              onChange={(e) => setBonus(a.email, parseInt(e.target.value) || 0)}
+                              style={{ ...inp, width: "70px", textAlign: "center", padding: "5px 8px", opacity: a.points_synced ? 0.4 : 1 }} />
+                          </td>
+
+                          {/* Bonus reason */}
+                          <td style={{ padding: "8px 16px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                            <input value={a.bonus_reason} placeholder="e.g. 1st place sprint"
+                              disabled={a.points_synced}
+                              onChange={(e) => setReason(a.email, e.target.value)}
+                              style={{ ...inp, width: "100%", minWidth: "160px", padding: "5px 8px", opacity: a.points_synced ? 0.4 : 1 }} />
+                          </td>
+
+                          {/* Sync status */}
+                          <td style={{ padding: "10px 16px", borderBottom: "1px solid rgba(255,255,255,0.04)", textAlign: "center" }}>
+                            {a.points_synced
+                              ? <span style={{ fontSize: "0.72rem", color: "#4ade80", fontWeight: 600 }}>✓ Synced</span>
+                              : <span style={{ fontSize: "0.72rem", color: "#555" }}>Pending</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <p style={{ fontSize: "11px", color: "#444", marginTop: "1rem" }}>
+                Attendance = 5 pts per person. Save first, then click <strong style={{ color: "#888" }}>Sync Points</strong> to push to leaderboard. Points sync only once per session.
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
