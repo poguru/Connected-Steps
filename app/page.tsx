@@ -6,6 +6,7 @@ import FloatingContact      from "@/components/layout/FloatingContact";
 import Hero                 from "@/components/home/Hero";
 import MarqueeBanner        from "@/components/home/MarqueeBanner";
 import TrainingPlans        from "@/components/home/TrainingPlans";
+import UpcomingSessions     from "@/components/home/UpcomingSessions";
 import Coaches              from "@/components/home/Coaches";
 import Features             from "@/components/home/Features";
 import StatsAndTestimonials from "@/components/home/StatsAndTestimonials";
@@ -18,6 +19,7 @@ export default function HomePage() {
       <Hero />
       <MarqueeBanner />
       <TrainingPlans />
+      <UpcomingSessions />
       <Coaches />
       <Features />
       <StatsAndTestimonials />
