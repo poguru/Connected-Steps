@@ -1,9 +1,26 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
 export default function Hero() {
+  const [members, setMembers]   = useState<number | null>(null);
+  const [runs,    setRuns]      = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch("/api/stats")
+      .then((r) => r.json())
+      .then((d) => {
+        setMembers(d.members);
+        setRuns(d.runRegistrations);
+      })
+      .catch(() => {});
+  }, []);
+
+  const fmt = (n: number | null) =>
+    n === null ? "—" : n >= 1000 ? `${(n / 1000).toFixed(1)}K+` : `${n}`;
+
   return (
     <section className="relative min-h-screen flex items-center noise" style={{ background: "var(--cs-black)" }}>
       <div className="absolute inset-0 pointer-events-none"
@@ -41,9 +58,9 @@ export default function Hero() {
             <div className="flex items-center gap-6 mt-12 animate-fade-up-4 pt-10"
               style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
               {[
-                { num: "12K+", label: "Active runners" },
-                { num: "94%",  label: "Goal completion" },
-                { num: "4.9★", label: "Coach rating" },
+                { num: fmt(members), label: "Members" },
+                { num: fmt(runs),    label: "Run registrations" },
+                { num: "4.9★",       label: "Coach rating" },
               ].map((s) => (
                 <div key={s.label}>
                   <div className="font-display text-2xl font-light" style={{ color: "var(--cs-white)" }}>{s.num}</div>
