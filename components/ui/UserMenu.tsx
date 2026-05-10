@@ -67,7 +67,6 @@ export default function UserMenu({ user, onUserUpdate }: Props) {
 
   const logout = () => {
     localStorage.removeItem("cs_user");
-    localStorage.removeItem("cs_strava"); // clear active session only; cs_strava_<email> stays for next login
     router.push("/auth");
   };
 

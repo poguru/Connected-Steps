@@ -41,10 +41,6 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
       localStorage.setItem("cs_user", JSON.stringify({ ...data.user, photo: photo || null }));
       localStorage.removeItem("cs_pending_photo");
 
-      // Restore Strava connection if user previously connected
-      const savedStrava = localStorage.getItem(`cs_strava_${data.user.email}`);
-      if (savedStrava) localStorage.setItem("cs_strava", savedStrava);
-
       router.push("/dashboard");
     } catch {
       setError("Something went wrong. Please try again.");
