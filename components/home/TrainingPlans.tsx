@@ -43,7 +43,7 @@ export default function TrainingPlans() {
           </h2>
         </div>
 
-        <div className="grid md:grid-cols-4 gap-6">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {plans.map((plan) => (
             <div key={plan.tier} className="relative flex flex-col"
               style={{

@@ -102,24 +102,25 @@ export default function Coaches() {
           {coaches.map((coach) => (
             <div
               key={coach.name}
+              className="coach-row"
               style={{
                 display: "flex",
                 flexDirection: coach.imageRight ? "row-reverse" : "row",
                 alignItems: "center",
                 gap: "4rem",
-                flexWrap: "wrap",
               }}
             >
               {/* Photo / Avatar */}
-              <div style={{ flex: "0 0 auto", display: "flex", justifyContent: "center" }}>
+              <div className="coach-photo-wrap" style={{ flex: "0 0 auto", display: "flex", justifyContent: "center" }}>
                 {coach.photo ? (
                   <img
                     src={coach.photo}
                     alt={coach.name}
+                    className="coach-photo-img"
                     style={{ width: "280px", height: "340px", objectFit: "cover", borderRadius: "8px", border: "2px solid rgba(232,98,10,0.3)" }}
                   />
                 ) : (
-                  <div style={{
+                  <div className="coach-photo-img" style={{
                     width: "280px", height: "340px", borderRadius: "8px",
                     background: "var(--cs-dark)", border: "2px dashed rgba(232,98,10,0.25)",
                     display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1rem",
@@ -139,7 +140,7 @@ export default function Coaches() {
               </div>
 
               {/* Details */}
-              <div style={{ flex: 1, minWidth: "280px" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 {/* Name & role */}
                 <div style={{ fontSize: "11px", color: "var(--cs-orange)", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
                   {coach.role}

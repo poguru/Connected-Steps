@@ -82,7 +82,7 @@ export default function PricingPage() {
         </div>
 
         {/* Pricing cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: "1.25rem", alignItems: "start" }}>
+        <div className="pricing-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 230px), 1fr))", gap: "1.25rem", alignItems: "start" }}>
           {plans.map((plan) => {
             const total      = Math.round(plan.payFor * MONTHLY_RATE);
             const perMonth   = Math.round(total / plan.months);

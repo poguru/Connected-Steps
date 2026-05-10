@@ -55,14 +55,14 @@ export default function Hero() {
               </Link>
               <Link href="#training" className="btn-outline">See training plans</Link>
             </div>
-            <div className="flex items-center gap-6 mt-12 animate-fade-up-4 pt-10"
+            <div className="flex flex-wrap items-center gap-6 mt-12 animate-fade-up-4 pt-10"
               style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
               {[
                 { num: fmt(members), label: "Members" },
                 { num: fmt(runs),    label: "Run registrations" },
                 { num: "4.9★",       label: "Coach rating" },
               ].map((s) => (
-                <div key={s.label}>
+                <div key={s.label} style={{ minWidth: "80px" }}>
                   <div className="font-display text-2xl font-light" style={{ color: "var(--cs-white)" }}>{s.num}</div>
                   <div className="text-xs tracking-wide uppercase mt-0.5" style={{ color: "var(--cs-muted)" }}>{s.label}</div>
                 </div>

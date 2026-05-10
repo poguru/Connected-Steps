@@ -468,3 +468,39 @@ select.auth-input option {
   0%, 100% { opacity: 1; transform: scale(1); }
   50%       { opacity: 0.4; transform: scale(0.6); }
 }
+
+/* ─── Coaches responsive ─────────────────────────────── */
+@media (max-width: 767px) {
+  .coach-row {
+    flex-direction: column !important;
+    gap: 2rem !important;
+  }
+
+  .coach-photo-wrap {
+    width: 100% !important;
+    flex: none !important;
+  }
+
+  .coach-photo-img {
+    width: 100% !important;
+    height: 220px !important;
+  }
+}
+
+/* ─── Pricing page mobile ────────────────────────────── */
+@media (max-width: 640px) {
+  .pricing-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ─── General mobile polish ──────────────────────────── */
+@media (max-width: 480px) {
+  .btn-primary,
+  .btn-outline {
+    padding: 12px 20px;
+    font-size: 13px;
+  }
+
+  .section { padding: 3rem 0; }
+}
