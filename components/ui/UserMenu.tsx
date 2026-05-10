@@ -67,6 +67,7 @@ export default function UserMenu({ user, onUserUpdate }: Props) {
 
   const logout = () => {
     localStorage.removeItem("cs_user");
+    localStorage.removeItem("cs_strava");
     router.push("/auth");
   };
 
