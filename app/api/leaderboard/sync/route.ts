@@ -4,7 +4,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { user_email, user_name, location, goal, week_runs, week_km, week_time_secs, total_runs, total_km, total_time_secs, week_points, total_points } = body;
+    const { user_email, user_name, location, goal, month_runs, month_km, month_time_secs, total_runs, total_km, total_time_secs, month_points, total_points, points_month } = body;
 
     if (!user_email) return NextResponse.json({ error: "Missing user_email" }, { status: 400 });
 
@@ -14,14 +14,15 @@ export async function POST(req: NextRequest) {
       user_name,
       location,
       goal,
-      week_runs,
-      week_km,
-      week_time_secs,
+      month_runs,
+      month_km,
+      month_time_secs,
       total_runs,
       total_km,
       total_time_secs,
-      week_points,
+      month_points,
       total_points,
+      points_month,
       updated_at: new Date().toISOString(),
     }, { onConflict: "user_email" });
 

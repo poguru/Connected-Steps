@@ -18,20 +18,20 @@ interface User {
 }
 
 interface LeaderboardEntry {
-  id:             string;
-  user_email:     string;
-  user_name:      string;
-  location:       string;
-  goal:           string;
-  week_runs:      number;
-  week_km:        number;
-  week_time_secs: number;
-  week_points:    number;
-  total_runs:     number;
-  total_km:       number;
-  total_time_secs:number;
-  total_points:   number;
-  updated_at:     string;
+  id:              string;
+  user_email:      string;
+  user_name:       string;
+  location:        string;
+  goal:            string;
+  month_runs:      number;
+  month_km:        number;
+  month_time_secs: number;
+  month_points:    number;
+  total_runs:      number;
+  total_km:        number;
+  total_time_secs: number;
+  total_points:    number;
+  updated_at:      string;
 }
 
 const goalLabel: Record<string, string> = {
@@ -53,7 +53,7 @@ export default function Leaderboard() {
   const [user,    setUser]    = useState<User | null>(null);
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab,       setTab]       = useState<"week" | "total">("week");
+  const [tab,       setTab]       = useState<"month" | "total">("month");
   const [following, setFollowing] = useState<string[]>([]);
   const [followLoading, setFollowLoading] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -75,8 +75,8 @@ export default function Leaderboard() {
       setLoading(true);
       const { data, error } = await getSupabase()
         .from("leaderboard")
-        .select("id, user_email, user_name, location, goal, week_runs, week_km, week_time_secs, week_points, total_runs, total_km, total_time_secs, total_points, updated_at")
-        .order(tab === "week" ? "week_points" : "total_points", { ascending: false });
+        .select("id, user_email, user_name, location, goal, month_runs, month_km, month_time_secs, month_points, total_runs, total_km, total_time_secs, total_points, updated_at")
+        .order(tab === "month" ? "month_points" : "total_points", { ascending: false });
       if (!error && data) setEntries(data);
       setLoading(false);
     }
@@ -161,12 +161,12 @@ export default function Leaderboard() {
         <div style={{ marginBottom: "2rem" }}>
           <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.5rem" }}>Connected Steps</div>
           <h1 className="font-display" style={{ fontSize: "2rem", fontWeight: 300, color: "var(--cs-white)", marginBottom: "0.5rem" }}>Community Leaderboard</h1>
-          <p style={{ fontSize: "0.875rem", color: "var(--cs-muted)" }}>Ranked by distance. Connect Strava from your dashboard to appear here.</p>
+          <p style={{ fontSize: "0.875rem", color: "var(--cs-muted)" }}>Top 3 this month win prizes. Earn points by attending sessions and connecting Strava.</p>
         </div>
 
         {/* Tab switcher */}
         <div style={{ display: "flex", gap: "4px", padding: "4px", marginBottom: "1.5rem", borderRadius: "6px", background: "rgba(255,255,255,0.05)", width: "fit-content" }}>
-          {(["week", "total"] as const).map((t) => (
+          {(["month", "total"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -183,7 +183,7 @@ export default function Leaderboard() {
                 transition: "background 0.2s",
               }}
             >
-              {t === "week" ? "This Week" : "All Time"}
+              {t === "month" ? "This Month" : "All Time"}
             </button>
           ))}
         </div>
@@ -194,7 +194,7 @@ export default function Leaderboard() {
           <div className="cs-lb-header">
             <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Rank</div>
             <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Athlete</div>
-            <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase" }}>{tab === "week" ? "This Week km" : "Total km"}</div>
+            <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase" }}>{tab === "month" ? "This Month km" : "Total km"}</div>
             <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Runs</div>
             <div className="cs-lb-hide-mobile" style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Time</div>
             <div className="cs-lb-hide-mobile" style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Points</div>
@@ -216,9 +216,9 @@ export default function Leaderboard() {
 
           {entries.map((entry, i) => {
             const isMe = entry.user_name === fullName;
-            const km   = tab === "week" ? entry.week_km : entry.total_km;
-            const runs = tab === "week" ? entry.week_runs : entry.total_runs;
-            const secs = tab === "week" ? entry.week_time_secs : (entry.total_time_secs ?? 0);
+            const km   = tab === "month" ? entry.month_km : entry.total_km;
+            const runs = tab === "month" ? entry.month_runs : entry.total_runs;
+            const secs = tab === "month" ? entry.month_time_secs : (entry.total_time_secs ?? 0);
             const h    = Math.floor(secs / 3600);
             const m    = Math.floor((secs % 3600) / 60);
 
@@ -259,7 +259,7 @@ export default function Leaderboard() {
 
                 <div className="cs-lb-hide-mobile" style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
                   <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--cs-orange)", minWidth: "48px" }}>
-                    {(tab === "week" ? entry.week_points : entry.total_points) ?? 0}
+                    {(tab === "month" ? entry.month_points : entry.total_points) ?? 0}
                     <span style={{ fontSize: "10px", fontWeight: 400, color: "var(--cs-muted)", marginLeft: "3px" }}>pts</span>
                   </div>
                   {!isMe && (
@@ -288,7 +288,7 @@ export default function Leaderboard() {
         </div>
 
         <div style={{ marginTop: "1rem", fontSize: "11px", color: "var(--cs-muted)", textAlign: "center" }}>
-          Stats sync when you visit your dashboard with Strava connected. Updated daily.
+          Monthly points reset at the start of each month. Top 3 performers receive a gift from Connected Steps.
         </div>
       </div>
     </div>

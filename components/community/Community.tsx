@@ -17,14 +17,14 @@ interface User {
 }
 
 interface Runner {
-  user_email: string;
-  user_name:  string;
-  location:   string;
-  goal:       string;
-  week_km:    number;
-  total_km:   number;
-  week_runs:  number;
-  total_runs: number;
+  user_email:  string;
+  user_name:   string;
+  location:    string;
+  goal:        string;
+  month_km:    number;
+  total_km:    number;
+  month_runs:  number;
+  total_runs:  number;
 }
 
 const goalLabel: Record<string, string> = {
@@ -233,7 +233,7 @@ export default function Community() {
                           {runner.total_km.toFixed(1)} km total
                         </span>
                         <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "20px", background: "rgba(255,255,255,0.05)", color: "var(--cs-muted)" }}>
-                          {runner.week_km.toFixed(1)} km this week
+                          {runner.month_km.toFixed(1)} km this month
                         </span>
                       </div>
                     </div>

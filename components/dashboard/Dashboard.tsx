@@ -113,7 +113,7 @@ export default function Dashboard() {
   const [modal,          setModal]          = useState<ModalType>(null);
   const [pbs,            setPbs]            = useState<PersonalBests | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [points,         setPoints]         = useState<{ week_points: number; total_points: number } | null>(null);
+  const [points,         setPoints]         = useState<{ month_points: number; total_points: number } | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem("cs_user");
@@ -138,7 +138,7 @@ export default function Dashboard() {
 
     fetch(`/api/leaderboard/user?email=${encodeURIComponent(u.email)}`)
       .then((r) => r.json())
-      .then((d) => { if (d.week_points !== undefined) setPoints(d); })
+      .then((d) => { if (d.month_points !== undefined) setPoints(d); })
       .catch(() => {});
   }, [router]);
 
@@ -171,23 +171,24 @@ export default function Dashboard() {
   }, [searchParams, router]);
 
   const syncToLeaderboard = useCallback(async (user: User, acts: Activity[]) => {
-    const now = new Date();
-    const weekAgo = new Date(now);
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    const weekActs       = acts.filter((a) => new Date(a.start_date_local) >= weekAgo);
-    const week_runs      = weekActs.filter((a) => a.type === "Run").length;
-    const week_km        = weekActs.reduce((s, a) => s + a.distance, 0) / 1000;
-    const week_time_secs = weekActs.reduce((s, a) => s + a.moving_time, 0);
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+    const points_month   = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, "0")}`;
+    const monthActs      = acts.filter((a) => new Date(a.start_date_local) >= monthStart);
+    const month_runs      = monthActs.filter((a) => a.type === "Run").length;
+    const month_km        = monthActs.reduce((s, a) => s + a.distance, 0) / 1000;
+    const month_time_secs = monthActs.reduce((s, a) => s + a.moving_time, 0);
     const total_runs      = acts.filter((a) => a.type === "Run").length;
     const total_km        = acts.reduce((s, a) => s + a.distance, 0) / 1000;
     const total_time_secs = acts.reduce((s, a) => s + a.moving_time, 0);
-    const week_points     = weekActs.reduce((s, a) => s + calcActivityPoints(a.type, a.distance, a.moving_time), 0);
+    const month_points    = monthActs.reduce((s, a) => s + calcActivityPoints(a.type, a.distance, a.moving_time), 0);
     const total_points    = acts.reduce((s, a) => s + calcActivityPoints(a.type, a.distance, a.moving_time), 0);
 
     await fetch("/api/leaderboard/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_email: user.email, user_name: `${user.firstName} ${user.lastName}`, location: user.location, goal: user.goal, week_runs, week_km: parseFloat(week_km.toFixed(2)), week_time_secs, total_runs, total_km: parseFloat(total_km.toFixed(2)), total_time_secs, week_points, total_points }),
+      body: JSON.stringify({ user_email: user.email, user_name: `${user.firstName} ${user.lastName}`, location: user.location, goal: user.goal, month_runs, month_km: parseFloat(month_km.toFixed(2)), month_time_secs, total_runs, total_km: parseFloat(total_km.toFixed(2)), total_time_secs, month_points, total_points, points_month }),
     });
   }, []);
 
@@ -229,12 +230,13 @@ export default function Dashboard() {
     typeof window !== "undefined" ? `${window.location.origin}/api/strava/callback` : "http://localhost:3000/api/strava/callback"
   )}&response_type=code&approval_prompt=auto&scope=activity:read_all`;
 
-  const weekActivities  = activities.filter((a) => { const d = new Date(a.start_date_local); const w = new Date(); w.setDate(w.getDate() - 7); return d >= w; });
-  const weekRuns        = weekActivities.filter((a) => a.type === "Run").length;
-  const weekKm          = weekActivities.reduce((s, a) => s + a.distance, 0) / 1000;
-  const weekTimeSecs    = weekActivities.reduce((s, a) => s + a.moving_time, 0);
-  const weekH           = Math.floor(weekTimeSecs / 3600);
-  const weekM           = Math.floor((weekTimeSecs % 3600) / 60);
+  const monthStart      = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+  const monthActivities = activities.filter((a) => new Date(a.start_date_local) >= monthStart);
+  const monthRuns       = monthActivities.filter((a) => a.type === "Run").length;
+  const monthKm         = monthActivities.reduce((s, a) => s + a.distance, 0) / 1000;
+  const monthTimeSecs   = monthActivities.reduce((s, a) => s + a.moving_time, 0);
+  const monthH          = Math.floor(monthTimeSecs / 3600);
+  const monthM          = Math.floor((monthTimeSecs % 3600) / 60);
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--cs-black)", color: "var(--cs-white)" }}>
@@ -367,7 +369,7 @@ export default function Dashboard() {
             <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1rem" }}>Your Points</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
               {[
-                { label: "This week", value: points?.week_points  ?? "—" },
+                { label: "This month", value: points?.month_points ?? "—" },
                 { label: "All time",  value: points?.total_points ?? "—" },
               ].map((s) => (
                 <div key={s.label} style={{ background: "rgba(232,98,10,0.07)", borderRadius: "6px", padding: "0.75rem", textAlign: "center" }}>
@@ -398,18 +400,18 @@ export default function Dashboard() {
 
           {/* Weekly Summary */}
           <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem", marginBottom: "1rem" }}>
-            <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1rem" }}>Weekly Summary</div>
+            <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1rem" }}>Monthly Summary</div>
             {[
-              { label: "Runs",     value: strava ? String(weekRuns) : "—" },
-              { label: "Distance", value: strava ? `${weekKm.toFixed(1)} km` : "—" },
-              { label: "Time",     value: strava ? `${weekH}h ${weekM}m` : "—" },
+              { label: "Runs",     value: strava ? String(monthRuns) : "—" },
+              { label: "Distance", value: strava ? `${monthKm.toFixed(1)} km` : "—" },
+              { label: "Time",     value: strava ? `${monthH}h ${monthM}m` : "—" },
             ].map((s) => (
               <div key={s.label} style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.6rem" }}>
                 <span style={{ fontSize: "0.875rem", color: "var(--cs-muted)" }}>{s.label}</span>
                 <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--cs-white)" }}>{s.value}</span>
               </div>
             ))}
-            {!strava && <div style={{ fontSize: "11px", color: "var(--cs-muted)", marginTop: "0.5rem" }}>Connect Strava to see real stats.</div>}
+            {!strava && <div style={{ fontSize: "11px", color: "var(--cs-muted)", marginTop: "0.5rem" }}>Connect Strava to see this month's stats.</div>}
           </div>
 
           {/* Community */}
