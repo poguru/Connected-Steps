@@ -42,15 +42,46 @@ export default function Footer() {
             </p>
             <div className="flex gap-3">
               {[
-                { label: "Instagram", href: "https://www.instagram.com/connected_steps/" },
-                { label: "Strava",    href: "https://www.strava.com/clubs/1693553" },
-                { label: "YouTube",   href: "https://www.youtube.com/@ConnectedSteps" },
+                {
+                  label: "Instagram",
+                  href: "https://www.instagram.com/connected_steps/",
+                  icon: (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                      <circle cx="12" cy="12" r="4"/>
+                      <circle cx="17.5" cy="6.5" r="0.8" fill="currentColor" stroke="none"/>
+                    </svg>
+                  ),
+                },
+                {
+                  label: "Strava",
+                  href: "https://www.strava.com/clubs/1693553",
+                  icon: (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/>
+                    </svg>
+                  ),
+                },
+                {
+                  label: "YouTube",
+                  href: "https://www.youtube.com/@ConnectedSteps",
+                  icon: (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                    </svg>
+                  ),
+                },
               ].map((s) => (
                 <a key={s.label} href={s.href}
-                  target={s.href !== "#" ? "_blank" : undefined}
-                  rel={s.href !== "#" ? "noopener noreferrer" : undefined}
-                  className="text-xs tracking-widest uppercase px-3 py-2 border rounded transition-colors duration-200"
-                  style={{ color: "var(--cs-muted)", borderColor: "rgba(255,255,255,0.1)", textDecoration: "none" }}
+                  target="_blank" rel="noopener noreferrer"
+                  title={s.label}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    width: "38px", height: "38px",
+                    border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px",
+                    color: "var(--cs-muted)", textDecoration: "none",
+                    transition: "color 0.2s, border-color 0.2s",
+                  }}
                   onMouseEnter={(e) => {
                     (e.currentTarget as HTMLAnchorElement).style.color = "var(--cs-orange)";
                     (e.currentTarget as HTMLAnchorElement).style.borderColor = "var(--cs-orange)";
@@ -59,7 +90,7 @@ export default function Footer() {
                     (e.currentTarget as HTMLAnchorElement).style.color = "var(--cs-muted)";
                     (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(255,255,255,0.1)";
                   }}>
-                  {s.label}
+                  {s.icon}
                 </a>
               ))}
             </div>
