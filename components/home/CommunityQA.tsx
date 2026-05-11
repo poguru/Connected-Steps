@@ -11,6 +11,7 @@ const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
 };
 
 const ALL_CATS = ["All", "Recovery", "Shoes & Gear", "Races & Marathons", "Running Tips", "General"];
+const POST_CATS = ["General", "Recovery", "Shoes & Gear", "Races & Marathons", "Running Tips"];
 
 interface Post {
   id: number;
@@ -52,18 +53,173 @@ function PostCard({ post }: { post: Post }) {
   );
 }
 
+interface AskModalProps {
+  onClose: () => void;
+  onPosted: () => void;
+}
+
+function AskModal({ onClose, onPosted }: AskModalProps) {
+  const [form, setForm] = useState({ category: "General", title: "", body: "" });
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  async function submit() {
+    if (!form.title.trim() || !form.body.trim()) {
+      setMsg("Please fill in both the title and description.");
+      return;
+    }
+    setSaving(true); setMsg("");
+    try {
+      const raw = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
+      const user = raw ? JSON.parse(raw) : null;
+      if (!user?.email) { setMsg("Please log in to post."); return; }
+
+      const res = await fetch("/api/community/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_email: user.email,
+          user_name: user.name || user.email.split("@")[0],
+          category: form.category,
+          title: form.title.trim(),
+          body: form.body.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setMsg(data.error ?? "Something went wrong."); return; }
+      setMsg("✓ Posted! It will appear after admin review.");
+      setTimeout(() => { onPosted(); onClose(); }, 2000);
+    } catch {
+      setMsg("Something went wrong. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 1000,
+      background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem",
+    }} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={{
+        background: "#111", border: "1px solid rgba(255,255,255,0.1)",
+        borderRadius: "14px", padding: "2rem", width: "100%", maxWidth: "500px",
+        display: "flex", flexDirection: "column", gap: "1.25rem",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ fontSize: "1rem", fontWeight: 700, color: "#fff" }}>Ask the Community</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#888", fontSize: "1.25rem", cursor: "pointer", lineHeight: 1 }}>×</button>
+        </div>
+
+        {/* Category */}
+        <div>
+          <div style={{ fontSize: "11px", color: "#888", marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.07em" }}>Category</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+            {POST_CATS.map((cat) => {
+              const c = CATEGORY_COLORS[cat];
+              const active = form.category === cat;
+              return (
+                <button key={cat} onClick={() => setForm((f) => ({ ...f, category: cat }))}
+                  style={{
+                    padding: "5px 14px", borderRadius: "20px", fontSize: "0.78rem", fontWeight: 500,
+                    cursor: "pointer", fontFamily: "inherit", border: "none",
+                    background: active ? c.bg : "rgba(255,255,255,0.05)",
+                    color: active ? c.color : "#888",
+                    outline: active ? `1px solid ${c.color}40` : "none",
+                    transition: "all 0.15s",
+                  }}>
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Title */}
+        <div>
+          <div style={{ fontSize: "11px", color: "#888", marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.07em" }}>Title / Question</div>
+          <input
+            value={form.title}
+            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value.slice(0, 120) }))}
+            placeholder="e.g. Best recovery drink after a long run?"
+            maxLength={120}
+            style={{
+              width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px",
+              color: "#fff", fontSize: "0.875rem", outline: "none",
+              boxSizing: "border-box", fontFamily: "inherit",
+            }}
+          />
+          <div style={{ fontSize: "10px", color: "#555", textAlign: "right", marginTop: "3px" }}>{form.title.length}/120</div>
+        </div>
+
+        {/* Body */}
+        <div>
+          <div style={{ fontSize: "11px", color: "#888", marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.07em" }}>Details</div>
+          <textarea
+            value={form.body}
+            onChange={(e) => setForm((f) => ({ ...f, body: e.target.value.slice(0, 600) }))}
+            placeholder="Share your question, tip, or experience in detail…"
+            maxLength={600}
+            rows={5}
+            style={{
+              width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px",
+              color: "#fff", fontSize: "0.875rem", outline: "none", resize: "vertical",
+              boxSizing: "border-box", fontFamily: "inherit", lineHeight: 1.6,
+            }}
+          />
+          <div style={{ fontSize: "10px", color: "#555", textAlign: "right", marginTop: "3px" }}>{form.body.length}/600</div>
+        </div>
+
+        {msg && (
+          <div style={{ fontSize: "0.82rem", color: msg.startsWith("✓") ? "#4ade80" : "#f09595", textAlign: "center" }}>{msg}</div>
+        )}
+
+        <button onClick={submit} disabled={saving}
+          style={{
+            padding: "12px", background: "#e8620a", color: "#fff", border: "none",
+            borderRadius: "8px", fontSize: "0.9rem", fontWeight: 700, cursor: saving ? "not-allowed" : "pointer",
+            opacity: saving ? 0.7 : 1, fontFamily: "inherit",
+          }}>
+          {saving ? "Posting…" : "Post to Community"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function CommunityQA() {
-  const [posts,      setPosts]      = useState<Post[]>([]);
-  const [activecat,  setActiveCat]  = useState("All");
-  const [loading,    setLoading]    = useState(true);
+  const [posts,     setPosts]     = useState<Post[]>([]);
+  const [activecat, setActiveCat] = useState("All");
+  const [loading,   setLoading]   = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
+    const raw = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
+    setIsLoggedIn(!!raw);
+  }, []);
+
+  function loadPosts() {
+    setLoading(true);
     fetch("/api/community/posts")
       .then((r) => r.json())
       .then((d) => { if (d.posts) setPosts(d.posts); })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }
+
+  useEffect(() => { loadPosts(); }, []);
+
+  function handleAskClick() {
+    if (!isLoggedIn) {
+      window.location.href = "/auth";
+      return;
+    }
+    setModalOpen(true);
+  }
 
   const filtered = activecat === "All" ? posts : posts.filter((p) => p.category === activecat);
 
@@ -84,9 +240,15 @@ export default function CommunityQA() {
               Recovery tips, shoe advice, race info — answered by our community.
             </p>
           </div>
-          <a href="/dashboard" style={{ padding: "10px 20px", background: "var(--cs-orange)", color: "var(--cs-white)", borderRadius: "6px", textDecoration: "none", fontSize: "0.85rem", fontWeight: 600, whiteSpace: "nowrap" }}>
+          <button
+            onClick={handleAskClick}
+            style={{
+              padding: "10px 22px", background: "var(--cs-orange)", color: "#fff",
+              border: "none", borderRadius: "6px", fontSize: "0.85rem", fontWeight: 600,
+              cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+            }}>
             Ask a question →
-          </a>
+          </button>
         </div>
 
         {/* Category filter */}
@@ -115,9 +277,11 @@ export default function CommunityQA() {
             <div style={{ fontSize: "0.82rem", color: "var(--cs-muted)", marginBottom: "1.25rem" }}>
               Be the first to ask a question or share a tip.
             </div>
-            <a href="/dashboard" style={{ padding: "9px 20px", background: "var(--cs-orange)", color: "#fff", borderRadius: "6px", textDecoration: "none", fontSize: "0.82rem", fontWeight: 600 }}>
+            <button
+              onClick={handleAskClick}
+              style={{ padding: "9px 20px", background: "var(--cs-orange)", color: "#fff", border: "none", borderRadius: "6px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
               Ask the community →
-            </a>
+            </button>
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "1rem" }}>
@@ -126,6 +290,10 @@ export default function CommunityQA() {
         )}
 
       </div>
+
+      {modalOpen && (
+        <AskModal onClose={() => setModalOpen(false)} onPosted={loadPosts} />
+      )}
     </section>
   );
 }
