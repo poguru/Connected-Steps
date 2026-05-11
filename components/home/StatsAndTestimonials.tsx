@@ -2,13 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-const STATIC_STATS = [
-  { key: "runners",  num: "12,000+", label: "Active runners worldwide" },
-  { key: "goal",     num: "94%",     label: "Runners reach their goal" },
-  { key: "coaches",  num: "48",      label: "Expert coaches on the platform" },
-  { key: "rating",   num: "4.9 / 5", label: "Average coach rating" },
-];
-
 const FALLBACK = [
   { id: -1, user_name: "Priya M.",  achievement: "Hyderabad — Half Marathon finisher", quote: "I went from barely running 2km to completing my first half marathon in 14 weeks. My coach adjusted the plan when life got busy and I never felt alone.", rating: 5 },
   { id: -2, user_name: "James O.",  achievement: "London — Full Marathon, 3:41",       quote: "The analytics alone are worth it. Seeing my pace improve week-on-week kept me coming back. The community pushes you on days you don't want to lace up.", rating: 5 },
@@ -16,6 +9,11 @@ const FALLBACK = [
 ];
 
 interface Story { id: number; user_name: string; achievement: string; quote: string; rating: number | null; }
+
+function fmt(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}k+`;
+  return String(n);
+}
 
 function Stars({ rating }: { rating: number | null }) {
   const r = rating ?? 5;
@@ -53,8 +51,11 @@ function StoryCard({ story }: { story: Story }) {
 }
 
 export default function StatsAndTestimonials() {
-  const [stories,    setStories]    = useState<Story[]>([]);
-  const [avgRating,  setAvgRating]  = useState<number | null>(null);
+  const [stories,          setStories]          = useState<Story[]>([]);
+  const [avgRating,        setAvgRating]        = useState<number | null>(null);
+  const [totalRunners,     setTotalRunners]     = useState<number | null>(null);
+  const [activeMembers,    setActiveMembers]    = useState<number | null>(null);
+  const [sessionsAttended, setSessionsAttended] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/stories")
@@ -64,13 +65,36 @@ export default function StatsAndTestimonials() {
         if (d.avg_rating != null) setAvgRating(d.avg_rating);
       })
       .catch(() => {});
+
+    fetch("/api/stats")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.totalRunners    != null) setTotalRunners(d.totalRunners);
+        if (d.activeMembers   != null) setActiveMembers(d.activeMembers);
+        if (d.sessionsAttended != null) setSessionsAttended(d.sessionsAttended);
+        if (d.avgRating       != null) setAvgRating(d.avgRating);
+      })
+      .catch(() => {});
   }, []);
 
-  const stats = STATIC_STATS.map((s) =>
-    s.key === "rating" && avgRating != null
-      ? { ...s, num: `${avgRating} / 5` }
-      : s
-  );
+  const stats = [
+    {
+      num:   totalRunners != null ? fmt(totalRunners) : "—",
+      label: "Registered runners",
+    },
+    {
+      num:   activeMembers != null ? fmt(activeMembers) : "—",
+      label: "Active members",
+    },
+    {
+      num:   sessionsAttended != null ? fmt(sessionsAttended) : "—",
+      label: "Sessions attended",
+    },
+    {
+      num:   avgRating != null ? `${avgRating} / 5` : "—",
+      label: "Community rating",
+    },
+  ];
 
   const display  = stories.length ? stories : FALLBACK;
   const doubled  = display.length < 4 ? [...display, ...display, ...display] : [...display, ...display];
