@@ -133,6 +133,10 @@ export default function Dashboard() {
   const [sessionsLoading,setSessLoading]    = useState(true);
   const [pushEnabled,    setPushEnabled]    = useState(false);
   const [pushSupported,  setPushSupported]  = useState(false);
+  const [storyOpen,      setStoryOpen]      = useState(false);
+  const [storyForm,      setStoryForm]      = useState({ quote: "", achievement: "" });
+  const [storySaving,    setStorySaving]    = useState(false);
+  const [storyMsg,       setStoryMsg]       = useState("");
 
   useEffect(() => {
     const stored = localStorage.getItem("cs_user");
@@ -577,13 +581,75 @@ export default function Dashboard() {
 
           <TrainingPlan goal={user.goal} />
 
-          {/* Community */}
+          {/* Share Your Story */}
           <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem" }}>
-            <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1rem" }}>Community</div>
-            <div style={{ fontSize: "0.875rem", color: "var(--cs-off-white)", lineHeight: 1.6 }}>You're now part of the Connected Steps community. Join a group run near {user.location || "you"}!</div>
-            <button style={{ marginTop: "1rem", width: "100%", padding: "10px", background: "var(--cs-orange)", color: "var(--cs-white)", border: "none", borderRadius: "4px", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)" }}>
-              Find Group Runs
-            </button>
+            <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Share Your Story</div>
+            {storyMsg ? (
+              <div style={{ fontSize: "0.82rem", color: "#4ade80", lineHeight: 1.5 }}>{storyMsg}</div>
+            ) : !storyOpen ? (
+              <>
+                <div style={{ fontSize: "0.82rem", color: "var(--cs-muted)", lineHeight: 1.5, marginBottom: "0.75rem" }}>
+                  Inspire fellow runners — share your journey and it may appear on the homepage.
+                </div>
+                <button
+                  onClick={() => setStoryOpen(true)}
+                  style={{ width: "100%", padding: "10px", background: "var(--cs-orange)", color: "var(--cs-white)", border: "none", borderRadius: "4px", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)" }}
+                >
+                  Write a story
+                </button>
+              </>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                <textarea
+                  placeholder="Share your running journey… (max 400 characters)"
+                  maxLength={400}
+                  value={storyForm.quote}
+                  onChange={(e) => setStoryForm((p) => ({ ...p, quote: e.target.value }))}
+                  rows={4}
+                  style={{ width: "100%", padding: "10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "var(--cs-white)", fontSize: "0.82rem", fontFamily: "var(--font-body)", outline: "none", resize: "vertical", boxSizing: "border-box" }}
+                />
+                <input
+                  placeholder="Your achievement (e.g. Hyderabad — First 10K)"
+                  value={storyForm.achievement}
+                  onChange={(e) => setStoryForm((p) => ({ ...p, achievement: e.target.value }))}
+                  style={{ width: "100%", padding: "9px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "var(--cs-white)", fontSize: "0.82rem", fontFamily: "var(--font-body)", outline: "none", boxSizing: "border-box" }}
+                />
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <button
+                    disabled={storySaving || !storyForm.quote.trim() || !storyForm.achievement.trim()}
+                    onClick={async () => {
+                      setStorySaving(true);
+                      try {
+                        const res = await fetch("/api/stories", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            user_email: user.email,
+                            user_name: `${user.firstName} ${user.lastName}`.trim(),
+                            quote: storyForm.quote,
+                            achievement: storyForm.achievement,
+                          }),
+                        });
+                        const data = await res.json();
+                        if (!res.ok) { setStoryMsg(data.error || "Failed to submit."); }
+                        else { setStoryMsg("Story submitted! It will appear on the homepage once approved."); }
+                        setStoryOpen(false);
+                      } catch { setStoryMsg("Something went wrong."); }
+                      finally { setStorySaving(false); }
+                    }}
+                    style={{ flex: 1, padding: "9px", background: storySaving ? "rgba(232,98,10,0.5)" : "var(--cs-orange)", color: "var(--cs-white)", border: "none", borderRadius: "4px", fontSize: "0.8rem", fontWeight: 600, cursor: storySaving ? "not-allowed" : "pointer", fontFamily: "var(--font-body)" }}
+                  >
+                    {storySaving ? "Submitting…" : "Submit"}
+                  </button>
+                  <button
+                    onClick={() => setStoryOpen(false)}
+                    style={{ padding: "9px 14px", background: "transparent", color: "var(--cs-muted)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", fontSize: "0.8rem", cursor: "pointer", fontFamily: "var(--font-body)" }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </aside>
       </div>

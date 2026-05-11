@@ -34,6 +34,12 @@ const cards = [
     desc:  "View every registered user with their goal, location, Strava stats, sessions and membership status.",
     icon:  "👥",
   },
+  {
+    href:  "/admin/stories",
+    title: "Runner Stories",
+    desc:  "Review and approve user-submitted stories shown on the homepage carousel.",
+    icon:  "✍️",
+  },
 ];
 
 export default function AdminHub() {
