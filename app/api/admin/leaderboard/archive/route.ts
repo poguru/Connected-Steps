@@ -6,19 +6,25 @@ function auth(req: NextRequest) {
   return pw && pw === process.env.ADMIN_PASSWORD;
 }
 
-// GET — list all archived months (most recent first)
+// GET — live leaderboard + all archived months
 export async function GET(req: NextRequest) {
   if (!auth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const db = getSupabaseServer();
 
-  const { data, error } = await db
-    .from("monthly_leaderboard_archive")
-    .select("*")
-    .order("month", { ascending: false })
-    .order("rank",  { ascending: true });
+  const [liveRes, archiveRes] = await Promise.all([
+    db.from("leaderboard")
+      .select("user_email, user_name, location, goal, month_points, total_points")
+      .order("month_points", { ascending: false }),
+    db.from("monthly_leaderboard_archive")
+      .select("*")
+      .order("month", { ascending: false })
+      .order("rank",  { ascending: true }),
+  ]);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ archives: data ?? [] });
+  if (liveRes.error)    return NextResponse.json({ error: liveRes.error.message },    { status: 500 });
+  if (archiveRes.error) return NextResponse.json({ error: archiveRes.error.message }, { status: 500 });
+
+  return NextResponse.json({ live: liveRes.data ?? [], archives: archiveRes.data ?? [] });
 }
 
 // POST — snapshot current month's leaderboard into the archive

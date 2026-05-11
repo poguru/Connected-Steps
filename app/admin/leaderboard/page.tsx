@@ -4,6 +4,15 @@ import { useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
+interface LiveEntry {
+  user_email:   string;
+  user_name:    string;
+  location:     string;
+  goal:         string;
+  month_points: number;
+  total_points: number;
+}
+
 interface ArchiveEntry {
   id:           number;
   month:        string;
@@ -41,12 +50,15 @@ const inp: React.CSSProperties = {
   borderRadius: "6px", color: "#fff", fontSize: "0.825rem", outline: "none", boxSizing: "border-box",
 };
 
+const colGrid = "48px 1fr 130px 90px 90px";
+
 export default function AdminLeaderboardPage() {
   const [password, setPassword] = useState("");
   const [authed,   setAuthed]   = useState(false);
   const [authErr,  setAuthErr]  = useState("");
   const [authLoad, setAuthLoad] = useState(false);
 
+  const [live,        setLive]        = useState<LiveEntry[]>([]);
   const [archives,    setArchives]    = useState<ArchiveEntry[]>([]);
   const [archiving,   setArchiving]   = useState(false);
   const [archiveMsg,  setArchiveMsg]  = useState("");
@@ -62,6 +74,7 @@ export default function AdminLeaderboardPage() {
       const json = await res.json();
       if (res.status === 401) { setAuthErr("Incorrect password."); return; }
       if (!res.ok) { setAuthErr(json.error ?? "Server error."); return; }
+      setLive(json.live ?? []);
       setArchives(json.archives ?? []);
       setAuthed(true);
       if (json.archives?.length > 0) setExpanded(json.archives[0].month);
@@ -72,9 +85,10 @@ export default function AdminLeaderboardPage() {
     }
   };
 
-  const loadArchives = useCallback(async () => {
+  const reload = useCallback(async () => {
     const res  = await fetch("/api/admin/leaderboard/archive", { headers });
     const json = await res.json();
+    if (json.live)     setLive(json.live);
     if (json.archives) setArchives(json.archives);
   }, [password]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -90,7 +104,7 @@ export default function AdminLeaderboardPage() {
       const json = await res.json();
       if (!res.ok) { setArchiveMsg(`Error: ${json.error}`); return; }
       setArchiveMsg(`Saved ${json.saved} entries for ${monthLabel(json.month)}.`);
-      await loadArchives();
+      await reload();
       setExpanded(currentMonth);
     } catch {
       setArchiveMsg("Network error. Try again.");
@@ -99,7 +113,6 @@ export default function AdminLeaderboardPage() {
     }
   };
 
-  // Group archives by month
   const months = [...new Set(archives.map((a) => a.month))];
 
   /* ── Password gate ── */
@@ -127,8 +140,9 @@ export default function AdminLeaderboardPage() {
   }
 
   /* ── Dashboard ── */
-  const currentMonth     = new Date().toISOString().slice(0, 7);
-  const alreadyArchived  = months.includes(currentMonth);
+  const currentMonth    = new Date().toISOString().slice(0, 7);
+  const alreadyArchived = months.includes(currentMonth);
+  const liveWithPoints  = live.filter((e) => (e.month_points ?? 0) > 0);
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff" }}>
@@ -140,67 +154,110 @@ export default function AdminLeaderboardPage() {
             <div style={{ fontSize: "10px", color: "#e8620a", textTransform: "uppercase", letterSpacing: "0.08em" }}>Leaderboard Archive</div>
           </div>
         </Link>
+        <button onClick={reload} style={{ fontSize: "11px", color: "#888", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", padding: "6px 14px", cursor: "pointer" }}>
+          Refresh
+        </button>
       </header>
 
-      <div style={{ maxWidth: "860px", margin: "0 auto", padding: "2rem" }}>
+      <div style={{ maxWidth: "920px", margin: "0 auto", padding: "2rem" }}>
 
-        {/* Archive current month */}
-        <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", padding: "1.5rem", marginBottom: "2rem" }}>
-          <div style={{ fontSize: "11px", color: "#888", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
-            Current Period
-          </div>
-          <div style={{ fontSize: "1.1rem", fontWeight: 600, color: "#fff", marginBottom: "0.25rem" }}>
-            {monthLabel(currentMonth)}
-          </div>
-          <div style={{ fontSize: "0.8rem", color: "#888", marginBottom: "1.25rem" }}>
-            Save a snapshot of this month's top performers before the month ends. You can re-save to update it.
+        {/* ── Live leaderboard ── */}
+        <div style={{ marginBottom: "2.5rem" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem", flexWrap: "wrap", gap: "0.75rem" }}>
+            <div>
+              <div style={{ fontSize: "11px", color: "#888", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "2px" }}>Live Standings</div>
+              <div style={{ fontSize: "1.2rem", fontWeight: 600, color: "#fff" }}>{monthLabel(currentMonth)}</div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+              {archiveMsg && (
+                <div style={{ fontSize: "0.8rem", color: archiveMsg.startsWith("Error") ? "#f09595" : "#4ade80" }}>
+                  {archiveMsg}
+                </div>
+              )}
+              <button
+                onClick={archiveNow}
+                disabled={archiving}
+                style={{ padding: "9px 20px", background: archiving ? "rgba(232,98,10,0.5)" : "#e8620a", color: "#fff", border: "none", borderRadius: "6px", fontWeight: 700, cursor: archiving ? "not-allowed" : "pointer", fontSize: "0.825rem", whiteSpace: "nowrap" }}
+              >
+                {archiving ? "Saving…" : alreadyArchived ? "Re-save Snapshot" : "Save Snapshot"}
+              </button>
+            </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
-            <button
-              onClick={archiveNow}
-              disabled={archiving}
-              style={{ padding: "10px 24px", background: archiving ? "rgba(232,98,10,0.5)" : "#e8620a", color: "#fff", border: "none", borderRadius: "6px", fontWeight: 700, cursor: archiving ? "not-allowed" : "pointer", fontSize: "0.875rem" }}
-            >
-              {archiving ? "Saving…" : alreadyArchived ? `Re-save ${monthLabel(currentMonth)}` : `Save ${monthLabel(currentMonth)} Leaderboard`}
-            </button>
-            {archiveMsg && (
-              <div style={{ fontSize: "0.8rem", color: archiveMsg.startsWith("Error") ? "#f09595" : "#4ade80" }}>
-                {archiveMsg}
+          <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", overflow: "hidden" }}>
+            {/* Header */}
+            <div style={{ display: "grid", gridTemplateColumns: colGrid, gap: "0.5rem", padding: "0.65rem 1.5rem", background: "rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+              {["Rank","Athlete","Location","This Month","All Time"].map((h) => (
+                <div key={h} style={{ fontSize: "10px", color: "#555", letterSpacing: "0.08em", textTransform: "uppercase" }}>{h}</div>
+              ))}
+            </div>
+
+            {liveWithPoints.length === 0 ? (
+              <div style={{ padding: "3rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>
+                No participants with points yet this month. Points are earned by attending sessions or connecting Strava.
               </div>
+            ) : (
+              liveWithPoints.map((entry, i) => (
+                <div
+                  key={entry.user_email}
+                  style={{
+                    display: "grid", gridTemplateColumns: colGrid, gap: "0.5rem",
+                    padding: "0.85rem 1.5rem", borderTop: "1px solid rgba(255,255,255,0.04)",
+                    background: i < 3 ? "rgba(232,98,10,0.05)" : "transparent",
+                  }}
+                >
+                  <div style={{ fontSize: i < 3 ? "1.1rem" : "0.875rem", fontWeight: 700, color: i < 3 ? "#e8620a" : "#555" }}>
+                    {medal(i + 1)}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "#fff" }}>{entry.user_name}</div>
+                    <div style={{ fontSize: "11px", color: "#555" }}>{entry.user_email}</div>
+                  </div>
+                  <div style={{ fontSize: "0.825rem", color: "#888", alignSelf: "center" }}>📍 {entry.location || "—"}</div>
+                  <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "#e8620a", alignSelf: "center" }}>
+                    {entry.month_points ?? 0}
+                    <span style={{ fontSize: "10px", color: "#555", fontWeight: 400, marginLeft: "3px" }}>pts</span>
+                  </div>
+                  <div style={{ fontSize: "0.875rem", color: "#888", alignSelf: "center" }}>
+                    {entry.total_points ?? 0}
+                    <span style={{ fontSize: "10px", color: "#555", fontWeight: 400, marginLeft: "3px" }}>pts</span>
+                  </div>
+                </div>
+              ))
             )}
           </div>
+
+          {liveWithPoints.length > 0 && (
+            <div style={{ marginTop: "0.5rem", fontSize: "11px", color: "#555", textAlign: "right" }}>
+              {live.length - liveWithPoints.length > 0 && `+${live.length - liveWithPoints.length} members with 0 points hidden · `}
+              {liveWithPoints.length} participant{liveWithPoints.length !== 1 ? "s" : ""} ranked
+            </div>
+          )}
         </div>
 
-        {/* Past archives */}
+        {/* ── Saved archives ── */}
         <div style={{ fontSize: "11px", color: "#888", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1rem" }}>
           Saved Monthly Results
         </div>
 
         {months.length === 0 ? (
           <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "10px", padding: "3rem", textAlign: "center", color: "#555" }}>
-            No archived months yet. Save the current month to create the first record.
+            No archived months yet. Click "Save Snapshot" above to lock in this month's standings.
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             {months.map((month) => {
-              const rows = archives.filter((a) => a.month === month);
+              const rows   = archives.filter((a) => a.month === month);
               const isOpen = expanded === month;
               return (
                 <div key={month} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", overflow: "hidden" }}>
-                  {/* Month header */}
                   <button
                     onClick={() => setExpanded(isOpen ? null : month)}
                     style={{ width: "100%", padding: "1rem 1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", background: "none", border: "none", color: "#fff", cursor: "pointer", textAlign: "left" }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
                       <div style={{ fontSize: "1rem", fontWeight: 600 }}>{monthLabel(month)}</div>
-                      {rows[0] && (
-                        <div style={{ fontSize: "10px", color: "#888" }}>
-                          {rows.length} participant{rows.length !== 1 ? "s" : ""}
-                        </div>
-                      )}
-                      {/* Top 3 preview */}
+                      <div style={{ fontSize: "10px", color: "#888" }}>{rows.length} participant{rows.length !== 1 ? "s" : ""}</div>
                       <div style={{ display: "flex", gap: "0.4rem" }}>
                         {rows.slice(0, 3).map((r) => (
                           <span key={r.rank} style={{ fontSize: "11px", background: "rgba(232,98,10,0.15)", border: "1px solid rgba(232,98,10,0.3)", borderRadius: "4px", padding: "2px 8px", color: "#e8620a" }}>
@@ -209,15 +266,13 @@ export default function AdminLeaderboardPage() {
                         ))}
                       </div>
                     </div>
-                    <span style={{ color: "#555", fontSize: "1rem" }}>{isOpen ? "▲" : "▼"}</span>
+                    <span style={{ color: "#555", fontSize: "1rem", flexShrink: 0 }}>{isOpen ? "▲" : "▼"}</span>
                   </button>
 
-                  {/* Rows */}
                   {isOpen && (
                     <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                      {/* Table header */}
-                      <div style={{ display: "grid", gridTemplateColumns: "48px 1fr 100px 100px", gap: "0.5rem", padding: "0.6rem 1.5rem", background: "rgba(255,255,255,0.02)" }}>
-                        {["Rank","Athlete","Location","Points"].map((h) => (
+                      <div style={{ display: "grid", gridTemplateColumns: colGrid, gap: "0.5rem", padding: "0.6rem 1.5rem", background: "rgba(255,255,255,0.02)" }}>
+                        {["Rank","Athlete","Location","Month Pts","All Time"].map((h) => (
                           <div key={h} style={{ fontSize: "10px", color: "#555", letterSpacing: "0.08em", textTransform: "uppercase" }}>{h}</div>
                         ))}
                       </div>
@@ -225,7 +280,7 @@ export default function AdminLeaderboardPage() {
                         <div
                           key={r.id}
                           style={{
-                            display: "grid", gridTemplateColumns: "48px 1fr 100px 100px", gap: "0.5rem",
+                            display: "grid", gridTemplateColumns: colGrid, gap: "0.5rem",
                             padding: "0.75rem 1.5rem", borderTop: "1px solid rgba(255,255,255,0.04)",
                             background: r.rank <= 3 ? "rgba(232,98,10,0.04)" : "transparent",
                           }}
@@ -240,6 +295,9 @@ export default function AdminLeaderboardPage() {
                           <div style={{ fontSize: "0.825rem", color: "#888", alignSelf: "center" }}>📍 {r.location || "—"}</div>
                           <div style={{ fontSize: "1rem", fontWeight: 700, color: "#e8620a", alignSelf: "center" }}>
                             {r.month_points} <span style={{ fontSize: "10px", color: "#555", fontWeight: 400 }}>pts</span>
+                          </div>
+                          <div style={{ fontSize: "0.875rem", color: "#888", alignSelf: "center" }}>
+                            {r.total_points} <span style={{ fontSize: "10px", color: "#555", fontWeight: 400 }}>pts</span>
                           </div>
                         </div>
                       ))}
