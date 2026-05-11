@@ -257,6 +257,44 @@ export function paymentEmailHTML(
 </body></html>`;
 }
 
+/** Membership expiry reminder HTML email */
+export function expiryReminderEmailHTML(name: string, plan: string, expiresAt: string, daysLeft: number): string {
+  const expiry = new Date(expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+  const urgent = daysLeft <= 3;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>Membership Expiring Soon – Connected Steps</title></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+      <tr><td style="background:#0a0a0a;padding:28px 40px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:#fff;">Connected Steps</div>
+        <div style="font-size:11px;color:#e8620a;letter-spacing:0.12em;text-transform:uppercase;margin-top:4px;">Your Goal, Our Plan</div>
+      </td></tr>
+      <tr><td style="height:4px;background:${urgent ? "#f09595" : "#fbbf24"};"></td></tr>
+      <tr><td style="padding:40px 40px 32px;">
+        <p style="margin:0 0 8px;font-size:15px;color:#555;">Hi <strong>${name}</strong>,</p>
+        <p style="margin:0 0 28px;font-size:15px;color:#555;line-height:1.6;">
+          Your <strong>${plan}</strong> membership expires in <strong style="color:${urgent ? "#e8620a" : "#d97706"};">${daysLeft} day${daysLeft === 1 ? "" : "s"}</strong> on <strong>${expiry}</strong>.<br/>
+          Renew now to keep your streak, leaderboard points, and training access going.
+        </p>
+        <table cellpadding="0" cellspacing="0" style="margin:0 auto 32px;">
+          <tr><td style="background:#e8620a;border-radius:6px;">
+            <a href="https://www.connectedsteps.in/dashboard" style="display:block;padding:14px 36px;font-size:15px;font-weight:700;color:#fff;text-decoration:none;">Renew Membership →</a>
+          </td></tr>
+        </table>
+        <p style="margin:0;font-size:14px;color:#888;line-height:1.6;text-align:center;">Questions? <a href="https://wa.me/9703620570" style="color:#e8620a;text-decoration:none;">WhatsApp us</a></p>
+      </td></tr>
+      <tr><td style="background:#f9f9f9;border-top:1px solid #e5e5e5;padding:20px 40px;text-align:center;">
+        <p style="margin:0;font-size:12px;color:#aaa;">Connected Steps · Hyderabad, India</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
+}
+
 /** Branded HTML email */
 export function sessionEmailHTML(
   name: string, title: string, date: string, location: string
