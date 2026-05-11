@@ -34,10 +34,19 @@ export interface NotifyResult {
 // Template name is set via MSG91_WHATSAPP_TEMPLATE.
 //
 // Create this template in MSG91 → WhatsApp → Templates:
-//   Name:    session_alert
-//   Body:    Hi {{1}}, new *Connected Steps* session *{{2}}* on {{3}} at {{4}}.
-//            Register: https://www.connectedsteps.in/weekend-run
-//            — Connected Steps Team
+//   Name:     session_alert
+//   Category: Utility
+//   Body:
+//     Hi {{1}}, a new *Connected Steps* Weekend Special Long Run has been scheduled!
+//
+//     📅 *Date:* {{2}}
+//     📍 *Location:* {{3}}
+//     🏃 *Run:* {{4}}
+//
+//     Lace up and join us for the long run! 💪
+//     Register: https://www.connectedsteps.in/weekend-run
+//
+//     — Connected Steps Team
 
 export async function sendWhatsApp(
   phone: string,
