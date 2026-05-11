@@ -28,6 +28,12 @@ const cards = [
     desc:  "View all paid members, active/expired status, revenue summary and expiring soon alerts.",
     icon:  "💳",
   },
+  {
+    href:  "/admin/users",
+    title: "All Users",
+    desc:  "View every registered user with their goal, location, Strava stats, sessions and membership status.",
+    icon:  "👥",
+  },
 ];
 
 export default function AdminHub() {

@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import UserMenu, { MenuUser } from "@/components/ui/UserMenu";
 import MembershipCard from "@/components/ui/MembershipCard";
+import TrainingPlan from "@/components/dashboard/TrainingPlan";
 
 type ModalType = "followers" | "following" | null;
 
@@ -573,6 +574,8 @@ export default function Dashboard() {
             ))}
             {!strava && <div style={{ fontSize: "11px", color: "var(--cs-muted)", marginTop: "0.5rem" }}>Connect Strava to see this month's stats.</div>}
           </div>
+
+          <TrainingPlan goal={user.goal} />
 
           {/* Community */}
           <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem" }}>
