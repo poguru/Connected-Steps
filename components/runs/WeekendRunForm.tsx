@@ -3,7 +3,6 @@
 import { useState, useEffect, FormEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import MembershipCard from "@/components/ui/MembershipCard";
 
 declare global {
   interface Window {
@@ -44,11 +43,12 @@ const labelStyle: React.CSSProperties = {
 };
 
 export default function WeekendRunForm() {
-  const [isMember,   setIsMember]   = useState(false);
-  const [memberName, setMemberName] = useState("");
-  const [submitted,  setSubmitted]  = useState(false);
-  const [loading,    setLoading]    = useState(false);
-  const [error,      setError]      = useState("");
+  const [isMember,       setIsMember]       = useState(false);
+  const [isActiveMember, setIsActiveMember] = useState(false);
+  const [memberName,     setMemberName]     = useState("");
+  const [submitted,      setSubmitted]      = useState(false);
+  const [loading,        setLoading]        = useState(false);
+  const [error,          setError]          = useState("");
 
   const [form, setForm] = useState({
     first_name: "", last_name: "", email: "", phone: "",
@@ -69,9 +69,14 @@ export default function WeekendRunForm() {
         email:      u.email     ?? "",
         phone:      u.phone     ?? "",
       }));
+
+      // Check if active membership
+      fetch(`/api/membership?email=${encodeURIComponent(u.email)}`)
+        .then((r) => r.json())
+        .then((d) => { if (d.membership?.isActive) setIsActiveMember(true); })
+        .catch(() => {});
     }
 
-    // Load Razorpay checkout script
     if (!document.getElementById("razorpay-script")) {
       const s = document.createElement("script");
       s.id  = "razorpay-script";
@@ -85,30 +90,57 @@ export default function WeekendRunForm() {
     setError("");
   };
 
+  const validate = () => {
+    if (!form.first_name || !form.last_name || !form.email || !form.phone)
+      return "Please fill in all personal details.";
+    if (!form.blood_group) return "Please select your blood group.";
+    if (!form.distance)    return "Please select a distance.";
+    if (!form.emergency_contact_name || !form.emergency_contact_phone)
+      return "Please fill in the emergency contact details.";
+    return null;
+  };
+
+  // Free registration for active members
+  const submitFree = async () => {
+    const res = await fetch("/api/runs/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...form,
+        event_name:     UPCOMING_EVENT.name,
+        event_date:     UPCOMING_EVENT.date,
+        event_location: UPCOMING_EVENT.location,
+        is_member:      true,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Registration failed.");
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!form.blood_group)    { setError("Please select your blood group."); return; }
-    if (!form.distance)       { setError("Please select a distance."); return; }
-    if (!form.first_name || !form.last_name || !form.email || !form.phone) {
-      setError("Please fill in all required fields."); return;
-    }
-    if (!form.emergency_contact_name || !form.emergency_contact_phone) {
-      setError("Please fill in the emergency contact details."); return;
-    }
+    const err = validate();
+    if (err) { setError(err); return; }
 
     setLoading(true); setError("");
 
     try {
-      // Step 1: Create Razorpay order
+      if (isActiveMember) {
+        // Free — skip payment
+        await submitFree();
+        setSubmitted(true);
+        return;
+      }
+
+      // Paid flow — create Razorpay order
       const orderRes = await fetch("/api/payment/run-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: form.email, event_date: UPCOMING_EVENT.date }),
       });
       const orderData = await orderRes.json();
-      if (!orderRes.ok) { setError(orderData.error || "Could not initiate payment."); setLoading(false); return; }
+      if (!orderRes.ok) { setError(orderData.error || "Could not initiate payment."); return; }
 
-      // Step 2: Open Razorpay modal
       const rzp = new window.Razorpay({
         key:         process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
         order_id:    orderData.orderId,
@@ -117,14 +149,13 @@ export default function WeekendRunForm() {
         name:        "Connected Steps",
         description: `${UPCOMING_EVENT.name} — ${UPCOMING_EVENT.displayDate}`,
         prefill: {
-          name:  `${form.first_name} ${form.last_name}`,
-          email: form.email,
+          name:    `${form.first_name} ${form.last_name}`,
+          email:   form.email,
           contact: form.phone,
         },
-        theme: { color: "#e8620a" },
-        modal: { ondismiss: () => setLoading(false) },
+        theme:  { color: "#e8620a" },
+        modal:  { ondismiss: () => setLoading(false) },
         handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
-          // Step 3: Verify + register
           const regRes = await fetch("/api/runs/pay-and-register", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -138,15 +169,17 @@ export default function WeekendRunForm() {
             }),
           });
           const regData = await regRes.json();
-          if (!regRes.ok) { setError(regData.error || "Registration failed after payment."); }
-          else { setSubmitted(true); }
+          if (!regRes.ok) setError(regData.error || "Registration failed after payment.");
+          else setSubmitted(true);
           setLoading(false);
         },
       });
       rzp.open();
-    } catch {
-      setError("Something went wrong. Please try again.");
-      setLoading(false);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Something went wrong.");
+    } finally {
+      // only clear loading for free flow (paid flow clears in handler/ondismiss)
+      if (isActiveMember) setLoading(false);
     }
   };
 
@@ -175,19 +208,27 @@ export default function WeekendRunForm() {
         </div>
 
         {/* Fee notice */}
-        <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "0.9rem 1.25rem", marginBottom: "1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{
+          background: isActiveMember ? "rgba(74,222,128,0.06)" : "rgba(255,255,255,0.03)",
+          border: `1px solid ${isActiveMember ? "rgba(74,222,128,0.2)" : "rgba(255,255,255,0.08)"}`,
+          borderRadius: "8px", padding: "0.9rem 1.25rem", marginBottom: "2rem",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-            <span style={{ fontSize: "1.1rem" }}>🎟️</span>
+            <span style={{ fontSize: "1.1rem" }}>{isActiveMember ? "🎁" : "🎟️"}</span>
             <div>
-              <div style={{ fontSize: "0.82rem", color: "var(--cs-white)", fontWeight: 600 }}>Registration Fee</div>
-              <div style={{ fontSize: "11px", color: "var(--cs-muted)" }}>Paid via Razorpay · Secure checkout</div>
+              <div style={{ fontSize: "0.82rem", color: "var(--cs-white)", fontWeight: 600 }}>
+                {isActiveMember ? "Member Benefit — Free Entry" : "Registration Fee"}
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--cs-muted)" }}>
+                {isActiveMember ? "Your active membership covers the entry fee" : "Paid via Razorpay · Secure checkout"}
+              </div>
             </div>
           </div>
-          <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--cs-orange)" }}>₹{RUN_FEE}</div>
+          <div style={{ fontSize: "1.4rem", fontWeight: 700, color: isActiveMember ? "#4ade80" : "var(--cs-orange)" }}>
+            {isActiveMember ? "FREE" : `₹${RUN_FEE}`}
+          </div>
         </div>
-
-        {/* Membership */}
-        {form.email && <MembershipCard email={form.email} name={memberName} />}
 
         {/* Header */}
         <div style={{ marginBottom: "2rem" }}>
@@ -213,7 +254,7 @@ export default function WeekendRunForm() {
           <form onSubmit={handleSubmit} noValidate>
 
             {isMember && (
-              <div style={{ background: "rgba(232,98,10,0.08)", border: "1px solid rgba(232,98,10,0.2)", borderRadius: "6px", padding: "10px 14px", marginBottom: "1.5rem", fontSize: "0.825rem", color: "var(--cs-orange)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <div style={{ background: "rgba(232,98,10,0.08)", border: "1px solid rgba(232,98,10,0.2)", borderRadius: "6px", padding: "10px 14px", marginBottom: "1.5rem", fontSize: "0.825rem", color: "var(--cs-orange)" }}>
                 ✓ Welcome back, <strong>{memberName}</strong>! We've pre-filled your details.
               </div>
             )}
@@ -281,7 +322,6 @@ export default function WeekendRunForm() {
               </div>
             )}
 
-            {/* Pay button */}
             <button type="submit" disabled={loading} style={{
               width: "100%", padding: "16px",
               background: loading ? "rgba(232,98,10,0.6)" : "var(--cs-orange)",
@@ -289,15 +329,19 @@ export default function WeekendRunForm() {
               fontSize: "1rem", fontWeight: 700, cursor: loading ? "not-allowed" : "pointer",
               fontFamily: "var(--font-body)", letterSpacing: "0.04em", transition: "background 0.2s",
             }}>
-              {loading ? "Opening payment…" : `Pay ₹${RUN_FEE} & Register 🏃`}
+              {loading
+                ? (isActiveMember ? "Registering…" : "Opening payment…")
+                : (isActiveMember ? "Register for the Run 🏃" : `Pay ₹${RUN_FEE} & Register 🏃`)}
             </button>
 
             <p style={{ textAlign: "center", fontSize: "11px", color: "var(--cs-muted)", marginTop: "1rem" }}>
-              Powered by Razorpay · 100% secure · Amount: ₹{RUN_FEE}
+              {isActiveMember
+                ? "Your active membership includes free entry to weekend runs."
+                : "Powered by Razorpay · 100% secure · Amount: ₹" + RUN_FEE}
             </p>
             <p style={{ textAlign: "center", fontSize: "11px", color: "var(--cs-muted)", marginTop: "4px" }}>
-              {isMember ? "Already a Connected Steps member." : (
-                <>Not a member yet? <Link href="/auth" style={{ color: "var(--cs-orange)" }}>Join the community</Link></>
+              {isMember ? "" : (
+                <>Not a member? <Link href="/auth" style={{ color: "var(--cs-orange)" }}>Join the community</Link></>
               )}
             </p>
           </form>
