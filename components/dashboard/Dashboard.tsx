@@ -5,8 +5,22 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import UserMenu, { MenuUser } from "@/components/ui/UserMenu";
+import MembershipCard from "@/components/ui/MembershipCard";
 
 type ModalType = "followers" | "following" | null;
+
+interface SessionRecord {
+  attended:      boolean;
+  bonus_points:  number | null;
+  bonus_reason:  string | null;
+  points_synced: boolean;
+  sessions: {
+    id:       number;
+    title:    string;
+    date:     string;
+    location: string;
+  } | null;
+}
 
 interface User {
   firstName: string;
@@ -114,6 +128,10 @@ export default function Dashboard() {
   const [pbs,            setPbs]            = useState<PersonalBests | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [points,         setPoints]         = useState<{ month_points: number; total_points: number } | null>(null);
+  const [sessions,       setSessions]       = useState<SessionRecord[]>([]);
+  const [sessionsLoading,setSessLoading]    = useState(true);
+  const [pushEnabled,    setPushEnabled]    = useState(false);
+  const [pushSupported,  setPushSupported]  = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem("cs_user");
@@ -140,6 +158,21 @@ export default function Dashboard() {
       .then((r) => r.json())
       .then((d) => { if (d.month_points !== undefined) setPoints(d); })
       .catch(() => {});
+
+    fetch(`/api/user/sessions?email=${encodeURIComponent(u.email)}`)
+      .then((r) => r.json())
+      .then((d) => { setSessions(d.sessions ?? []); })
+      .catch(() => {})
+      .finally(() => setSessLoading(false));
+
+    if (typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window) {
+      setPushSupported(true);
+      navigator.serviceWorker.getRegistration("/sw.js").then((reg) => {
+        reg?.pushManager.getSubscription().then((sub) => {
+          if (sub) setPushEnabled(true);
+        });
+      });
+    }
   }, [router]);
 
   useEffect(() => {
@@ -221,6 +254,44 @@ export default function Dashboard() {
   useEffect(() => {
     if (strava) fetchActivities(strava);
   }, [strava, fetchActivities]);
+
+  function urlBase64ToUint8Array(base64String: string) {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64  = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = window.atob(base64);
+    return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+  }
+
+  async function handlePushToggle() {
+    if (!user) return;
+    if (pushEnabled) {
+      const reg = await navigator.serviceWorker.getRegistration("/sw.js");
+      const sub = await reg?.pushManager.getSubscription();
+      await sub?.unsubscribe();
+      await fetch("/api/push/subscribe", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email }),
+      });
+      setPushEnabled(false);
+    } else {
+      try {
+        const reg        = await navigator.serviceWorker.register("/sw.js");
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") return;
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly:      true,
+          applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!),
+        });
+        await fetch("/api/push/subscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: user.email, subscription: sub }),
+        });
+        setPushEnabled(true);
+      } catch (e) { console.error("Push subscribe failed:", e); }
+    }
+  }
 
   if (!user) return null;
 
@@ -381,9 +452,9 @@ export default function Dashboard() {
             Training Sessions
           </div>
 
-          {loading ? (
+          {sessionsLoading ? (
             <div style={{ textAlign: "center", padding: "3rem", color: "var(--cs-muted)", fontSize: "0.875rem" }}>Loading…</div>
-          ) : (
+          ) : sessions.length === 0 ? (
             <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "3rem", textAlign: "center" }}>
               <div style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>🏃</div>
               <div style={{ fontSize: "1rem", fontWeight: 600, color: "var(--cs-white)", marginBottom: "0.5rem" }}>
@@ -395,6 +466,40 @@ export default function Dashboard() {
               <Link href="/weekend-run" style={{ display: "inline-block", padding: "10px 24px", background: "var(--cs-orange)", color: "#fff", borderRadius: "4px", textDecoration: "none", fontSize: "0.85rem", fontWeight: 600 }}>
                 Register for the next run →
               </Link>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {sessions.map((rec, i) => {
+                const s = rec.sessions;
+                if (!s) return null;
+                const d = new Date(s.date);
+                const dateStr = d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+                const totalPts = (rec.bonus_points ?? 0);
+                return (
+                  <div key={i} style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1rem 1.25rem", display: "flex", alignItems: "center", gap: "1rem" }}>
+                    <div style={{ width: "44px", height: "44px", borderRadius: "8px", background: rec.attended ? "rgba(232,98,10,0.12)" : "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.3rem", flexShrink: 0 }}>
+                      {rec.attended ? "✅" : "❌"}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--cs-white)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
+                      <div style={{ fontSize: "0.78rem", color: "var(--cs-muted)", marginTop: "2px" }}>
+                        {dateStr} · 📍 {s.location}
+                      </div>
+                      {rec.bonus_reason && (
+                        <div style={{ fontSize: "0.75rem", color: "var(--cs-orange)", marginTop: "2px" }}>{rec.bonus_reason}</div>
+                      )}
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div style={{ fontSize: "0.8rem", color: rec.attended ? "var(--cs-orange)" : "var(--cs-muted)", fontWeight: 700 }}>
+                        {rec.attended ? (totalPts > 0 ? `+${totalPts} pts` : "Attended") : "Not attended"}
+                      </div>
+                      <div style={{ fontSize: "10px", color: "var(--cs-muted)", marginTop: "2px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                        {rec.attended ? (totalPts > 0 ? "Bonus points" : "No bonus") : "—"}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </main>
@@ -416,6 +521,24 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
+
+          <MembershipCard email={user.email} name={`${user.firstName} ${user.lastName}`.trim()} />
+
+          {/* Push notifications */}
+          {pushSupported && (
+            <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem", marginBottom: "1rem" }}>
+              <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Session Alerts</div>
+              <p style={{ fontSize: "0.78rem", color: "var(--cs-muted)", lineHeight: 1.6, marginBottom: "0.75rem" }}>
+                Get a browser notification whenever a new training session is posted.
+              </p>
+              <button
+                onClick={handlePushToggle}
+                style={{ width: "100%", padding: "9px", background: pushEnabled ? "rgba(255,255,255,0.06)" : "var(--cs-orange)", color: pushEnabled ? "var(--cs-muted)" : "#fff", border: pushEnabled ? "1px solid rgba(255,255,255,0.1)" : "none", borderRadius: "4px", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)" }}
+              >
+                {pushEnabled ? "Disable Notifications" : "Enable Notifications"}
+              </button>
+            </div>
+          )}
 
           {/* Personal Bests */}
           {pbs && (

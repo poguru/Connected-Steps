@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, FormEvent, ChangeEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 interface Props {
@@ -9,7 +9,8 @@ interface Props {
 }
 
 export default function LoginForm({ onSwitchToSignUp }: Props) {
-  const router = useRouter();
+  const router       = useRouter();
+  const searchParams = useSearchParams();
   const [form, setForm]       = useState({ identifier: "", password: "" });
   const [showPw, setShowPw]   = useState(false);
   const [loading, setLoading] = useState(false);
@@ -45,7 +46,8 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
       const savedStrava = localStorage.getItem(`cs_strava_${data.user.email}`);
       if (savedStrava) localStorage.setItem("cs_strava", savedStrava);
 
-      router.push("/dashboard");
+      const redirect = searchParams.get("redirect") ?? "/dashboard";
+      router.push(redirect);
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {

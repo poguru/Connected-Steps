@@ -15,7 +15,7 @@ export default function AuthPage() {
   const [justRegistered, setJustRegistered] = useState(false);
 
   useEffect(() => {
-    if (searchParams.get("tab") === "login") setTab("login");
+    if (searchParams.get("tab") === "login" || searchParams.get("redirect")) setTab("login");
     if (searchParams.get("registered") === "true") setJustRegistered(true);
   }, [searchParams]);
 

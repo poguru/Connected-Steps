@@ -3,6 +3,7 @@
 import { useState, useEffect, FormEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import MembershipCard from "@/components/ui/MembershipCard";
 
 interface Event {
   name: string;
@@ -133,6 +134,11 @@ export default function WeekendRunForm() {
             Open
           </div>
         </div>
+
+        {/* Membership */}
+        {form.email && (
+          <MembershipCard email={form.email} name={memberName} />
+        )}
 
         {/* Header */}
         <div style={{ marginBottom: "2rem" }}>

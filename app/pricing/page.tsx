@@ -1,44 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+
+declare global {
+  interface Window {
+    Razorpay: new (options: Record<string, unknown>) => { open(): void };
+  }
+}
 
 const MONTHLY_RATE = 1200;
 
 const plans = [
-  {
-    id:       "monthly",
-    label:    "Monthly",
-    months:   1,
-    payFor:   1,
-    badge:    null,
-    popular:  false,
-  },
-  {
-    id:       "quarterly",
-    label:    "3 Months",
-    months:   3,
-    payFor:   2.5,
-    badge:    "Save ₹600",
-    popular:  false,
-  },
-  {
-    id:       "biannual",
-    label:    "6 Months",
-    months:   6,
-    payFor:   5,
-    badge:    "Save ₹1,200",
-    popular:  true,
-  },
-  {
-    id:       "annual",
-    label:    "12 Months",
-    months:   12,
-    payFor:   9,
-    badge:    "Best Value",
-    popular:  false,
-  },
+  { id: "monthly",   label: "Monthly",   months: 1,  payFor: 1,   badge: null,        popular: false },
+  { id: "quarterly", label: "3 Months",  months: 3,  payFor: 2.5, badge: "Save ₹600", popular: false },
+  { id: "biannual",  label: "6 Months",  months: 6,  payFor: 5,   badge: "Save ₹1,200", popular: true },
+  { id: "annual",    label: "12 Months", months: 12, payFor: 9,   badge: "Best Value", popular: false },
 ];
 
 const features = [
@@ -52,7 +31,92 @@ const features = [
 ];
 
 export default function PricingPage() {
-  const [hovered, setHovered] = useState<string | null>(null);
+  const router = useRouter();
+  const [hovered,   setHovered]   = useState<string | null>(null);
+  const [paying,    setPaying]    = useState<string | null>(null);
+  const [success,   setSuccess]   = useState<string | null>(null);
+  const [errorMsg,  setErrorMsg]  = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userName,  setUserName]  = useState<string>("");
+
+  useEffect(() => {
+    const stored = localStorage.getItem("cs_user");
+    if (stored) {
+      const u = JSON.parse(stored);
+      setUserEmail(u.email);
+      setUserName(`${u.firstName} ${u.lastName}`.trim());
+    }
+
+    // Load Razorpay checkout script
+    if (!document.getElementById("razorpay-script")) {
+      const script = document.createElement("script");
+      script.id  = "razorpay-script";
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      document.body.appendChild(script);
+    }
+  }, []);
+
+  async function handleBuy(planId: string) {
+    setErrorMsg(null);
+
+    if (!userEmail) {
+      router.push(`/auth?redirect=/pricing`);
+      return;
+    }
+
+    setPaying(planId);
+    try {
+      const orderRes = await fetch("/api/payment/create-order", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ plan: planId, email: userEmail }),
+      });
+      const order = await orderRes.json();
+      if (!orderRes.ok) throw new Error(order.error ?? "Order creation failed");
+
+      const rzp = new window.Razorpay({
+        key:         process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        amount:      order.amount,
+        currency:    "INR",
+        name:        "Connected Steps",
+        description: `${plans.find((p) => p.id === planId)?.label} Membership`,
+        order_id:    order.orderId,
+        prefill:     { email: userEmail, name: userName },
+        theme:       { color: "#e8620a" },
+        modal:       { ondismiss: () => setPaying(null) },
+        handler: async (response: {
+          razorpay_order_id:   string;
+          razorpay_payment_id: string;
+          razorpay_signature:  string;
+        }) => {
+          const verifyRes = await fetch("/api/payment/verify", {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({
+              ...response,
+              plan:   planId,
+              email:  userEmail,
+              name:   userName,
+              amount: order.amount,
+            }),
+          });
+          const result = await verifyRes.json();
+          if (!verifyRes.ok) throw new Error(result.error ?? "Verification failed");
+
+          const expiry = new Date(result.expiresAt).toLocaleDateString("en-IN", {
+            day: "numeric", month: "long", year: "numeric",
+          });
+          setSuccess(`Payment successful! Your membership is active until ${expiry}. A confirmation email has been sent to ${userEmail}.`);
+          setPaying(null);
+        },
+      });
+
+      rzp.open();
+    } catch (e: unknown) {
+      setErrorMsg(e instanceof Error ? e.message : "Something went wrong. Please try again.");
+      setPaying(null);
+    }
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--cs-black)", color: "var(--cs-white)" }}>
@@ -81,14 +145,30 @@ export default function PricingPage() {
           </p>
         </div>
 
+        {/* Success / Error banners */}
+        {success && (
+          <div style={{ background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.3)", borderRadius: "8px", padding: "1rem 1.25rem", marginBottom: "2rem", fontSize: "0.875rem", color: "#4ade80", lineHeight: 1.6 }}>
+            ✅ {success}
+            <div style={{ marginTop: "0.75rem" }}>
+              <Link href="/dashboard" style={{ color: "#4ade80", fontWeight: 700, textDecoration: "underline" }}>Go to Dashboard →</Link>
+            </div>
+          </div>
+        )}
+        {errorMsg && (
+          <div style={{ background: "rgba(226,75,74,0.08)", border: "1px solid rgba(226,75,74,0.3)", borderRadius: "8px", padding: "1rem 1.25rem", marginBottom: "2rem", fontSize: "0.875rem", color: "#f09595" }}>
+            ⚠️ {errorMsg}
+          </div>
+        )}
+
         {/* Pricing cards */}
-        <div className="pricing-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 230px), 1fr))", gap: "1.25rem", alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 230px), 1fr))", gap: "1.25rem", alignItems: "start" }}>
           {plans.map((plan) => {
-            const total      = Math.round(plan.payFor * MONTHLY_RATE);
-            const perMonth   = Math.round(total / plan.months);
-            const saving     = Math.round((plan.months - plan.payFor) * MONTHLY_RATE);
-            const isHovered  = hovered === plan.id;
-            const isPopular  = plan.popular;
+            const total     = Math.round(plan.payFor * MONTHLY_RATE);
+            const perMonth  = Math.round(total / plan.months);
+            const saving    = Math.round((plan.months - plan.payFor) * MONTHLY_RATE);
+            const isHovered = hovered === plan.id;
+            const isPopular = plan.popular;
+            const isBuying  = paying === plan.id;
 
             return (
               <div
@@ -96,43 +176,26 @@ export default function PricingPage() {
                 onMouseEnter={() => setHovered(plan.id)}
                 onMouseLeave={() => setHovered(null)}
                 style={{
-                  position: "relative",
+                  position:   "relative",
                   background: isPopular ? "rgba(232,98,10,0.07)" : "var(--cs-dark)",
-                  border: `1px solid ${isPopular || isHovered ? "rgba(232,98,10,0.5)" : "rgba(255,255,255,0.07)"}`,
+                  border:     `1px solid ${isPopular || isHovered ? "rgba(232,98,10,0.5)" : "rgba(255,255,255,0.07)"}`,
                   borderRadius: "12px",
-                  padding: "2rem 1.75rem",
+                  padding:    "2rem 1.75rem",
                   transition: "border-color 0.2s, transform 0.2s",
-                  transform: isPopular ? "scale(1.03)" : isHovered ? "translateY(-4px)" : "none",
-                  cursor: "default",
+                  transform:  isPopular ? "scale(1.03)" : isHovered ? "translateY(-4px)" : "none",
                 }}
               >
                 {/* Badge */}
                 {plan.badge && (
-                  <div style={{
-                    position: "absolute",
-                    top: "-12px",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    background: "var(--cs-orange)",
-                    color: "#fff",
-                    fontSize: "10px",
-                    fontWeight: 700,
-                    letterSpacing: "0.08em",
-                    textTransform: "uppercase",
-                    padding: "4px 14px",
-                    borderRadius: "20px",
-                    whiteSpace: "nowrap",
-                  }}>
+                  <div style={{ position: "absolute", top: "-12px", left: "50%", transform: "translateX(-50%)", background: "var(--cs-orange)", color: "#fff", fontSize: "10px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", padding: "4px 14px", borderRadius: "20px", whiteSpace: "nowrap" }}>
                     {plan.badge}
                   </div>
                 )}
 
-                {/* Plan label */}
                 <div style={{ fontSize: "11px", color: isPopular ? "var(--cs-orange)" : "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "1.25rem" }}>
                   {plan.label}
                 </div>
 
-                {/* Price */}
                 <div style={{ marginBottom: "0.5rem" }}>
                   <span style={{ fontFamily: "var(--font-display)", fontSize: "2.8rem", fontWeight: 300, color: "var(--cs-white)", lineHeight: 1 }}>
                     ₹{perMonth.toLocaleString("en-IN")}
@@ -140,22 +203,18 @@ export default function PricingPage() {
                   <span style={{ fontSize: "0.8rem", color: "var(--cs-muted)", marginLeft: "4px" }}>/mo</span>
                 </div>
 
-                {/* Total billed */}
                 <div style={{ fontSize: "0.8rem", color: "var(--cs-muted)", marginBottom: saving > 0 ? "0.4rem" : "1.75rem" }}>
                   ₹{total.toLocaleString("en-IN")} billed {plan.months === 1 ? "monthly" : `every ${plan.months} months`}
                 </div>
 
-                {/* Saving line */}
                 {saving > 0 && (
                   <div style={{ fontSize: "0.78rem", color: "#4ade80", fontWeight: 600, marginBottom: "1.75rem" }}>
-                    You save ₹{saving.toLocaleString("en-IN")} ({plan.months - plan.payFor} {plan.months - plan.payFor === 1 ? "month" : `months`} free)
+                    You save ₹{saving.toLocaleString("en-IN")} ({plan.months - plan.payFor} {plan.months - plan.payFor === 1 ? "month" : "months"} free)
                   </div>
                 )}
 
-                {/* Divider */}
                 <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", marginBottom: "1.5rem" }} />
 
-                {/* Features */}
                 <ul style={{ listStyle: "none", padding: 0, margin: "0 0 2rem", display: "flex", flexDirection: "column", gap: "0.65rem" }}>
                   {features.map((f) => (
                     <li key={f} style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "0.8rem", color: "var(--cs-muted)", lineHeight: 1.4 }}>
@@ -168,45 +227,40 @@ export default function PricingPage() {
                 </ul>
 
                 {/* CTA */}
-                <Link
-                  href="/auth"
+                <button
+                  onClick={() => handleBuy(plan.id)}
+                  disabled={!!paying || !!success}
                   style={{
-                    display: "block",
-                    textAlign: "center",
-                    padding: "12px",
+                    display:    "block",
+                    width:      "100%",
+                    textAlign:  "center",
+                    padding:    "12px",
                     borderRadius: "6px",
-                    fontSize: "0.85rem",
+                    fontSize:   "0.85rem",
                     fontWeight: 700,
-                    textDecoration: "none",
                     letterSpacing: "0.04em",
+                    cursor:     paying || success ? "not-allowed" : "pointer",
+                    opacity:    paying && !isBuying ? 0.5 : 1,
                     background: isPopular ? "var(--cs-orange)" : "transparent",
-                    color: isPopular ? "#fff" : "var(--cs-white)",
-                    border: isPopular ? "none" : "1px solid rgba(255,255,255,0.2)",
-                    transition: "background 0.2s, border-color 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isPopular) {
-                      e.currentTarget.style.background = "rgba(232,98,10,0.15)";
-                      e.currentTarget.style.borderColor = "var(--cs-orange)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isPopular) {
-                      e.currentTarget.style.background = "transparent";
-                      e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
-                    }
+                    color:      isPopular ? "#fff" : "var(--cs-white)",
+                    border:     isPopular ? "none" : "1px solid rgba(255,255,255,0.2)",
+                    fontFamily: "var(--font-body)",
+                    transition: "background 0.2s, opacity 0.2s",
                   }}
                 >
-                  Get started
-                </Link>
+                  {isBuying ? "Opening checkout…" : success ? "Purchased" : userEmail ? "Get started" : "Sign in to buy"}
+                </button>
               </div>
             );
           })}
         </div>
 
-        {/* Footer note */}
         <p style={{ textAlign: "center", fontSize: "12px", color: "var(--cs-muted)", marginTop: "3rem", lineHeight: 1.7 }}>
-          Not sure which plan to pick? <Link href="https://wa.me/9703620570" target="_blank" style={{ color: "var(--cs-orange)", textDecoration: "none" }}>Chat with us on WhatsApp</Link> — we'll help you choose.
+          Not sure which plan to pick?{" "}
+          <Link href="https://wa.me/9703620570" target="_blank" style={{ color: "var(--cs-orange)", textDecoration: "none" }}>
+            Chat with us on WhatsApp
+          </Link>{" "}
+          — we'll help you choose.
         </p>
       </div>
     </div>
