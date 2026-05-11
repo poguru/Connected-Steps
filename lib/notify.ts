@@ -1,75 +1,287 @@
-import twilio from "twilio";
+/**
+ * MSG91 notification helper — WhatsApp, SMS, Email
+ *
+ * Required env vars:
+ *   MSG91_AUTH_KEY            – API auth key from MSG91 dashboard
+ *   MSG91_SENDER_ID           – 6-char SMS sender ID  e.g. CRSTPS
+ *   MSG91_WHATSAPP_NUMBER     – Integrated WhatsApp number  e.g. 919XXXXXXXXX
+ *   MSG91_WHATSAPP_TEMPLATE   – Approved template name  e.g. session_alert
+ *   MSG91_FROM_EMAIL          – Verified sender email  e.g. noreply@connectedsteps.in
+ *   MSG91_FROM_NAME           – Sender display name  e.g. Connected Steps
+ */
 
-const accountSid = process.env.TWILIO_ACCOUNT_SID;
-const authToken  = process.env.TWILIO_AUTH_TOKEN;
-const fromWA     = process.env.TWILIO_WHATSAPP_FROM; // e.g. "whatsapp:+14155238886"
-const fromSMS    = process.env.TWILIO_SMS_FROM;      // e.g. "+14155238886" (optional)
+// ── Phone normalisation (Indian numbers → 91XXXXXXXXXX, no +) ────────────────
 
-function getClient() {
-  if (!accountSid || !authToken) throw new Error("Twilio credentials not configured.");
-  return twilio(accountSid, authToken);
-}
-
-// Normalise Indian phone numbers → +91XXXXXXXXXX
 function normalisePhone(phone: string): string {
   const digits = phone.replace(/\D/g, "");
-  if (digits.length === 10) return `+91${digits}`;
-  if (digits.length === 12 && digits.startsWith("91")) return `+${digits}`;
-  if (digits.startsWith("+")) return phone;
-  return `+${digits}`;
+  if (digits.length === 10)                              return `91${digits}`;
+  if (digits.length === 12 && digits.startsWith("91"))   return digits;
+  if (digits.length === 13 && digits.startsWith("091"))  return digits.slice(1);
+  return digits;
 }
 
+// ── Result type ───────────────────────────────────────────────────────────────
+
 export interface NotifyResult {
-  phone:   string;
-  channel: "whatsapp" | "sms";
+  to:      string;
+  channel: "whatsapp" | "sms" | "email";
   ok:      boolean;
   error?:  string;
 }
 
-export async function sendWhatsApp(phone: string, message: string): Promise<NotifyResult> {
-  const to = `whatsapp:${normalisePhone(phone)}`;
+// ── WhatsApp ──────────────────────────────────────────────────────────────────
+// MSG91 WhatsApp outbound — requires a pre-approved template in MSG91 dashboard.
+// Template name is set via MSG91_WHATSAPP_TEMPLATE.
+//
+// Create this template in MSG91 → WhatsApp → Templates:
+//   Name:    session_alert
+//   Body:    Hi {{1}}, new *Connected Steps* session *{{2}}* on {{3}} at {{4}}.
+//            Register: https://www.connectedsteps.in/weekend-run
+//            — Connected Steps Team
+
+export async function sendWhatsApp(
+  phone: string,
+  params: [string, string, string, string]  // [name, title, date, location]
+): Promise<NotifyResult> {
+  const authKey      = process.env.MSG91_AUTH_KEY;
+  const fromNumber   = process.env.MSG91_WHATSAPP_NUMBER;
+  const templateName = process.env.MSG91_WHATSAPP_TEMPLATE ?? "session_alert";
+
+  if (!authKey || !fromNumber) {
+    return { to: phone, channel: "whatsapp", ok: false, error: "MSG91 WhatsApp not configured." };
+  }
+
+  const to = normalisePhone(phone);
+
+  const body = {
+    integrated_number: fromNumber,
+    content_type: "template",
+    payload: {
+      to,
+      type: "template",
+      template: {
+        name: templateName,
+        language: { code: "en" },
+        components: [
+          {
+            type: "body",
+            parameters: params.map((text) => ({ type: "text", text })),
+          },
+        ],
+      },
+    },
+  };
+
   try {
-    await getClient().messages.create({ from: fromWA!, to, body: message });
-    return { phone, channel: "whatsapp", ok: true };
+    const res = await fetch(
+      "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/",
+      {
+        method: "POST",
+        headers: { authkey: authKey, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.type === "error") {
+      return { to: phone, channel: "whatsapp", ok: false, error: data.message ?? String(res.status) };
+    }
+    return { to: phone, channel: "whatsapp", ok: true };
   } catch (e: unknown) {
-    return { phone, channel: "whatsapp", ok: false, error: String(e) };
+    return { to: phone, channel: "whatsapp", ok: false, error: String(e) };
   }
 }
+
+// ── SMS ───────────────────────────────────────────────────────────────────────
+// MSG91 transactional SMS (route 4).
+// Note: In India, SMS requires DLT-registered sender ID and template.
+// Register at trai.gov.in or through MSG91's DLT portal.
 
 export async function sendSMS(phone: string, message: string): Promise<NotifyResult> {
-  if (!fromSMS) return { phone, channel: "sms", ok: false, error: "SMS not configured." };
+  const authKey  = process.env.MSG91_AUTH_KEY;
+  const senderId = process.env.MSG91_SENDER_ID;
+
+  if (!authKey || !senderId) {
+    return { to: phone, channel: "sms", ok: false, error: "MSG91 SMS not configured." };
+  }
+
   const to = normalisePhone(phone);
+
+  const body = {
+    sender:  senderId,
+    route:   "4",           // 4 = Transactional
+    country: "91",
+    sms: [{ message, to: [to] }],
+  };
+
   try {
-    await getClient().messages.create({ from: fromSMS, to, body: message });
-    return { phone, channel: "sms", ok: true };
+    const res = await fetch("https://api.msg91.com/api/v5/sms", {
+      method: "POST",
+      headers: { authkey: authKey, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.type === "error") {
+      return { to: phone, channel: "sms", ok: false, error: data.message ?? String(res.status) };
+    }
+    return { to: phone, channel: "sms", ok: true };
   } catch (e: unknown) {
-    return { phone, channel: "sms", ok: false, error: String(e) };
+    return { to: phone, channel: "sms", ok: false, error: String(e) };
   }
 }
 
-export function sessionMessage(
-  name: string,
-  title: string,
-  date: string,
-  location: string
-): string {
-  const d = new Date(date);
-  const formatted = d.toLocaleDateString("en-IN", {
+// ── Email ─────────────────────────────────────────────────────────────────────
+
+export async function sendEmail(
+  to: string,
+  toName: string,
+  subject: string,
+  html: string
+): Promise<NotifyResult> {
+  const authKey   = process.env.MSG91_AUTH_KEY;
+  const fromEmail = process.env.MSG91_FROM_EMAIL ?? "noreply@connectedsteps.in";
+  const fromName  = process.env.MSG91_FROM_NAME  ?? "Connected Steps";
+
+  if (!authKey) {
+    return { to, channel: "email", ok: false, error: "MSG91 not configured." };
+  }
+
+  const body = {
+    from:    { name: fromName, email: fromEmail },
+    to:      [{ name: toName, email: to }],
+    subject,
+    html,
+  };
+
+  try {
+    const res = await fetch("https://api.msg91.com/api/v5/email/send", {
+      method: "POST",
+      headers: { authkey: authKey, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.type === "error") {
+      return { to, channel: "email", ok: false, error: data.message ?? String(res.status) };
+    }
+    return { to, channel: "email", ok: true };
+  } catch (e: unknown) {
+    return { to, channel: "email", ok: false, error: String(e) };
+  }
+}
+
+// ── Message builders ──────────────────────────────────────────────────────────
+
+function formatDate(date: string): string {
+  return new Date(date).toLocaleDateString("en-IN", {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
   });
+}
 
-  return [
-    `Hi ${name}! 🏃`,
-    ``,
-    `A new *Connected Steps* training session has been scheduled:`,
-    ``,
-    `📅 *Date:* ${formatted}`,
-    `📍 *Location:* ${location}`,
-    `🎯 *Session:* ${title}`,
-    ``,
-    `Join us and keep the streak going! 💪`,
-    `👉 https://www.connectedsteps.in/weekend-run`,
-    ``,
-    `— Connected Steps Team`,
-  ].join("\n");
+/** Returns the 4 WhatsApp template parameters */
+export function sessionWAParams(
+  name: string, title: string, date: string, location: string
+): [string, string, string, string] {
+  return [name, title, formatDate(date), location];
+}
+
+/** Short SMS text (DLT-registered template content) */
+export function sessionSMSText(
+  name: string, title: string, date: string, location: string
+): string {
+  return `Hi ${name}, Connected Steps session "${title}" scheduled on ${formatDate(date)} at ${location}. Register: connectedsteps.in/weekend-run`;
+}
+
+/** Branded HTML email */
+export function sessionEmailHTML(
+  name: string, title: string, date: string, location: string
+): string {
+  const d = formatDate(date);
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>New Training Session – Connected Steps</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+
+      <!-- Header -->
+      <tr>
+        <td style="background:#0a0a0a;padding:28px 40px;text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:#fff;letter-spacing:-0.3px;">Connected Steps</div>
+          <div style="font-size:11px;color:#e8620a;letter-spacing:0.12em;text-transform:uppercase;margin-top:4px;">Your Goal, Our Plan</div>
+        </td>
+      </tr>
+      <tr><td style="height:4px;background:#e8620a;"></td></tr>
+
+      <!-- Body -->
+      <tr>
+        <td style="padding:40px 40px 32px;">
+          <p style="margin:0 0 8px;font-size:15px;color:#555;">Hi <strong>${name}</strong>,</p>
+          <p style="margin:0 0 28px;font-size:15px;color:#555;line-height:1.6;">
+            A new training session has been scheduled. Lace up and join us!
+          </p>
+
+          <!-- Session card -->
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border:1px solid #e5e5e5;border-radius:10px;overflow:hidden;margin-bottom:32px;">
+            <tr>
+              <td style="padding:20px 24px;border-bottom:1px solid #e5e5e5;">
+                <div style="font-size:11px;color:#e8620a;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">Session</div>
+                <div style="font-size:20px;font-weight:700;color:#0a0a0a;">${title}</div>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="padding:16px 24px;border-right:1px solid #e5e5e5;width:50%;">
+                      <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">📅 Date</div>
+                      <div style="font-size:14px;font-weight:600;color:#0a0a0a;">${d}</div>
+                    </td>
+                    <td style="padding:16px 24px;width:50%;">
+                      <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">📍 Location</div>
+                      <div style="font-size:14px;font-weight:600;color:#0a0a0a;">${location}</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+
+          <!-- CTA -->
+          <table cellpadding="0" cellspacing="0" style="margin:0 auto 32px;">
+            <tr>
+              <td style="background:#e8620a;border-radius:6px;">
+                <a href="https://www.connectedsteps.in/weekend-run"
+                   style="display:block;padding:14px 36px;font-size:15px;font-weight:700;color:#fff;text-decoration:none;">
+                  Register Now →
+                </a>
+              </td>
+            </tr>
+          </table>
+
+          <p style="margin:0;font-size:14px;color:#888;line-height:1.6;text-align:center;">
+            See you on the track! Keep running, keep growing. 🏅
+          </p>
+        </td>
+      </tr>
+
+      <!-- Footer -->
+      <tr>
+        <td style="background:#f9f9f9;border-top:1px solid #e5e5e5;padding:20px 40px;text-align:center;">
+          <p style="margin:0 0 6px;font-size:12px;color:#aaa;">Connected Steps · Hyderabad, India</p>
+          <p style="margin:0;font-size:11px;color:#ccc;">
+            You received this because you are a registered member. ·
+            <a href="https://www.connectedsteps.in" style="color:#e8620a;text-decoration:none;">connectedsteps.in</a>
+          </p>
+        </td>
+      </tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
 }

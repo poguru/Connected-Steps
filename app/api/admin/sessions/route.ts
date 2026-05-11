@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { sendWhatsApp, sessionMessage } from "@/lib/notify";
+import {
+  sendWhatsApp, sendSMS, sendEmail,
+  sessionWAParams, sessionSMSText, sessionEmailHTML,
+} from "@/lib/notify";
 
 function auth(req: NextRequest) {
   const pw = req.headers.get("x-admin-password");
@@ -24,17 +27,17 @@ export async function POST(req: NextRequest) {
   if (!title || !date || !location) {
     return NextResponse.json({ error: "title, date and location are required." }, { status: 400 });
   }
-  const db = getSupabaseServer();
 
-  // Create the session
+  const db = getSupabaseServer();
   const { data, error } = await db
     .from("sessions")
     .insert({ title, date, location })
     .select()
     .single();
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Notify users at this location (fire-and-forget — don't block the response)
+  // Fire notifications after responding — don't block the admin UI
   notifyUsers(db, title, date, location).catch((e) =>
     console.error("Session notification error:", e)
   );
@@ -48,26 +51,62 @@ async function notifyUsers(
   date: string,
   location: string
 ) {
-  // Fetch users at this training location who have a phone number
+  // Fetch users at this training location
   const { data: users } = await db
     .from("users")
-    .select("first_name, last_name, phone")
-    .ilike("location", `%${location}%`)
-    .not("phone", "is", null);
+    .select("first_name, last_name, email, phone")
+    .ilike("location", `%${location}%`);
 
-  if (!users || users.length === 0) return;
+  if (!users || users.length === 0) {
+    console.log(`No users found for location: ${location}`);
+    return;
+  }
 
-  const results = await Promise.allSettled(
-    users
-      .filter((u) => u.phone?.trim())
-      .map((u) => {
-        const name = `${u.first_name} ${u.last_name}`.trim() || "there";
-        const msg  = sessionMessage(name, title, date, location);
-        return sendWhatsApp(u.phone!, msg);
-      })
-  );
+  const tasks: Promise<{ to: string; channel: string; ok: boolean; error?: string }>[] = [];
 
-  const sent   = results.filter((r) => r.status === "fulfilled" && (r.value as { ok: boolean }).ok).length;
-  const failed = results.length - sent;
-  console.log(`Session notifications: ${sent} sent, ${failed} failed`);
+  for (const u of users) {
+    const name = `${u.first_name} ${u.last_name}`.trim() || "there";
+
+    // WhatsApp — if phone exists
+    if (u.phone?.trim()) {
+      tasks.push(sendWhatsApp(u.phone, sessionWAParams(name, title, date, location)));
+    }
+
+    // SMS — if phone exists
+    if (u.phone?.trim()) {
+      tasks.push(sendSMS(u.phone, sessionSMSText(name, title, date, location)));
+    }
+
+    // Email — if email exists
+    if (u.email?.trim()) {
+      tasks.push(
+        sendEmail(
+          u.email,
+          name,
+          `New Training Session: ${title}`,
+          sessionEmailHTML(name, title, date, location)
+        )
+      );
+    }
+  }
+
+  const results = await Promise.allSettled(tasks);
+
+  let wa = 0, sms = 0, email = 0, failed = 0;
+  for (const r of results) {
+    if (r.status === "fulfilled") {
+      if (r.value.ok) {
+        if (r.value.channel === "whatsapp") wa++;
+        else if (r.value.channel === "sms")  sms++;
+        else                                  email++;
+      } else {
+        failed++;
+        console.warn(`Notify failed [${r.value.channel}] → ${r.value.to}: ${r.value.error}`);
+      }
+    } else {
+      failed++;
+    }
+  }
+
+  console.log(`Notifications sent — WhatsApp: ${wa}, SMS: ${sms}, Email: ${email}, Failed: ${failed}`);
 }
