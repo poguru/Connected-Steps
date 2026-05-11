@@ -51,11 +51,13 @@ function StoryCard({ story }: { story: Story }) {
 }
 
 export default function StatsAndTestimonials() {
-  const [stories,          setStories]          = useState<Story[]>([]);
-  const [avgRating,        setAvgRating]        = useState<number | null>(null);
-  const [totalRunners,     setTotalRunners]     = useState<number | null>(null);
-  const [activeMembers,    setActiveMembers]    = useState<number | null>(null);
-  const [sessionsAttended, setSessionsAttended] = useState<number | null>(null);
+  const [stories,             setStories]             = useState<Story[]>([]);
+  const [avgRating,           setAvgRating]           = useState<number | null>(null);
+  const [totalRunners,        setTotalRunners]        = useState<number | null>(null);
+  const [activeMembers,       setActiveMembers]       = useState<number | null>(null);
+  const [sessionsAttended,    setSessionsAttended]    = useState<number | null>(null);
+  const [trainingsConducted,  setTrainingsConducted]  = useState<number | null>(null);
+  const [weekendRuns,         setWeekendRuns]         = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/stories")
@@ -69,31 +71,23 @@ export default function StatsAndTestimonials() {
     fetch("/api/stats")
       .then((r) => r.json())
       .then((d) => {
-        if (d.totalRunners    != null) setTotalRunners(d.totalRunners);
-        if (d.activeMembers   != null) setActiveMembers(d.activeMembers);
-        if (d.sessionsAttended != null) setSessionsAttended(d.sessionsAttended);
-        if (d.avgRating       != null) setAvgRating(d.avgRating);
+        if (d.totalRunners        != null) setTotalRunners(d.totalRunners);
+        if (d.activeMembers       != null) setActiveMembers(d.activeMembers);
+        if (d.sessionsAttended    != null) setSessionsAttended(d.sessionsAttended);
+        if (d.avgRating           != null) setAvgRating(d.avgRating);
+        if (d.trainingsConducted  != null) setTrainingsConducted(d.trainingsConducted);
+        if (d.weekendRuns         != null) setWeekendRuns(d.weekendRuns);
       })
       .catch(() => {});
   }, []);
 
   const stats = [
-    {
-      num:   totalRunners != null ? fmt(totalRunners) : "—",
-      label: "Registered runners",
-    },
-    {
-      num:   activeMembers != null ? fmt(activeMembers) : "—",
-      label: "Active members",
-    },
-    {
-      num:   sessionsAttended != null ? fmt(sessionsAttended) : "—",
-      label: "Sessions attended",
-    },
-    {
-      num:   avgRating != null ? `${avgRating} / 5` : "—",
-      label: "Community rating",
-    },
+    { num: totalRunners        != null ? fmt(totalRunners)       : "—", label: "Registered runners"      },
+    { num: activeMembers       != null ? fmt(activeMembers)      : "—", label: "Active members"          },
+    { num: trainingsConducted  != null ? fmt(trainingsConducted) : "—", label: "Training sessions held"  },
+    { num: weekendRuns         != null ? fmt(weekendRuns)        : "—", label: "Weekend run registrations" },
+    { num: sessionsAttended    != null ? fmt(sessionsAttended)   : "—", label: "Total sessions attended"  },
+    { num: avgRating           != null ? `${avgRating} / 5`      : "—", label: "Community rating"        },
   ];
 
   const display  = stories.length ? stories : FALLBACK;
@@ -104,7 +98,7 @@ export default function StatsAndTestimonials() {
     <>
       <section className="section" style={{ background: "var(--cs-charcoal)" }}>
         <div className="container">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8 md:gap-4">
             {stats.map((s, i) => (
               <div key={s.label} className="text-center"
                 style={{ borderRight: i < stats.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
