@@ -302,34 +302,71 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Strava connect */}
-          {!strava && (
-            <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem", marginTop: "1rem" }}>
-              <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Connect Strava</div>
-              <p style={{ fontSize: "11px", color: "var(--cs-muted)", lineHeight: 1.6, marginBottom: "0.75rem" }}>
-                Pull your real activities and appear on the leaderboard. We store weekly totals only — no GPS data.
-              </p>
-              <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", cursor: "pointer", marginBottom: "0.75rem" }}>
-                <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: "2px", accentColor: "var(--cs-orange)" }} />
-                <span style={{ fontSize: "11px", color: "var(--cs-muted)" }}>I agree to share my activity summaries for the leaderboard.</span>
-              </label>
-              {consent && (
-                <a href={stravaAuthUrl} style={{ display: "block", textAlign: "center", padding: "8px", background: "#fc4c02", color: "#fff", borderRadius: "4px", fontSize: "0.8rem", fontWeight: 600, textDecoration: "none" }}>
-                  Connect with Strava
+          {/* Strava — connect or connected state */}
+          <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem", marginTop: "1rem" }}>
+            {strava ? (
+              <>
+                {/* Connected state */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.6rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    {/* Powered by Strava badge */}
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="#fc4c02" aria-label="Strava"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
+                    <span style={{ fontSize: "11px", color: "#fc4c02", fontWeight: 700, letterSpacing: "0.06em" }}>CONNECTED</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      localStorage.removeItem("cs_strava");
+                      if (user) localStorage.removeItem(`cs_strava_${user.email}`);
+                      setStrava(null);
+                      setActivities([]);
+                      setPbs(null);
+                    }}
+                    style={{ fontSize: "11px", color: "var(--cs-muted)", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", padding: "3px 10px", cursor: "pointer" }}
+                  >
+                    Disconnect
+                  </button>
+                </div>
+                <p style={{ fontSize: "11px", color: "var(--cs-muted)", lineHeight: 1.5 }}>
+                  Your monthly activities are syncing to the leaderboard. No GPS data is stored.
+                </p>
+                {/* Latest activity */}
+                {activities.length > 0 && (
+                  <div style={{ marginTop: "0.75rem", paddingTop: "0.75rem", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                    <div style={{ fontSize: "10px", color: "var(--cs-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "4px" }}>Latest Activity</div>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--cs-white)" }}>{activities[0].name}</div>
+                    <div style={{ fontSize: "0.75rem", color: "var(--cs-muted)", marginTop: "2px" }}>{fmtDate(activities[0].start_date_local)}</div>
+                    <div style={{ fontSize: "0.875rem", color: "var(--cs-orange)", marginTop: "2px" }}>{(activities[0].distance / 1000).toFixed(1)} km</div>
+                  </div>
+                )}
+                {/* Powered by Strava */}
+                <a href="https://www.strava.com" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "0.75rem", textDecoration: "none", opacity: 0.5 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#fc4c02"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
+                  <span style={{ fontSize: "10px", color: "#fc4c02", letterSpacing: "0.05em" }}>Powered by Strava</span>
                 </a>
-              )}
-            </div>
-          )}
-
-          {/* Latest activity */}
-          {activities.length > 0 && (
-            <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem", marginTop: "1rem" }}>
-              <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Latest Activity</div>
-              <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--cs-white)" }}>{activities[0].name}</div>
-              <div style={{ fontSize: "0.75rem", color: "var(--cs-muted)", marginTop: "2px" }}>{fmtDate(activities[0].start_date_local)}</div>
-              <div style={{ fontSize: "0.875rem", color: "var(--cs-orange)", marginTop: "4px" }}>{(activities[0].distance / 1000).toFixed(1)} km</div>
-            </div>
-          )}
+              </>
+            ) : (
+              <>
+                {/* Disconnected state */}
+                <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Connect Strava</div>
+                <p style={{ fontSize: "11px", color: "var(--cs-muted)", lineHeight: 1.6, marginBottom: "0.75rem" }}>
+                  Sync your runs and appear on the monthly leaderboard. We access only activity summaries — no GPS routes, no private data. You can disconnect anytime.
+                </p>
+                <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", cursor: "pointer", marginBottom: "0.75rem" }}>
+                  <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: "2px", accentColor: "#fc4c02" }} />
+                  <span style={{ fontSize: "11px", color: "var(--cs-muted)" }}>
+                    I agree to share my Strava activity summaries with Connected Steps for leaderboard purposes. I have read the{" "}
+                    <a href="/privacy" target="_blank" style={{ color: "#fc4c02" }}>Privacy Policy</a>.
+                  </span>
+                </label>
+                {consent && (
+                  <a href={stravaAuthUrl} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", padding: "8px", background: "#fc4c02", color: "#fff", borderRadius: "4px", fontSize: "0.8rem", fontWeight: 700, textDecoration: "none" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
+                    Connect with Strava
+                  </a>
+                )}
+              </>
+            )}
+          </div>
         </aside>
 
         {/* ── Main feed — activity cards removed, show session placeholder ── */}
