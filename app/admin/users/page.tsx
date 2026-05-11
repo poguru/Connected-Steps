@@ -140,9 +140,9 @@ export default function AdminUsersPage() {
             ))}
           </div>
           <select value={goalFilter} onChange={(e) => setGoalFilter(e.target.value)}
-            style={{ padding: "7px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "#fff", fontSize: "0.82rem", outline: "none", fontFamily: "inherit", cursor: "pointer" }}>
-            <option value="all">All Goals</option>
-            {Object.entries(GOAL_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            style={{ padding: "7px 12px", background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "#fff", fontSize: "0.82rem", outline: "none", fontFamily: "inherit", cursor: "pointer", colorScheme: "dark" }}>
+            <option value="all" style={{ background: "#1a1a1a", color: "#fff" }}>All Goals</option>
+            {Object.entries(GOAL_LABELS).map(([k, v]) => <option key={k} value={k} style={{ background: "#1a1a1a", color: "#fff" }}>{v}</option>)}
           </select>
           <input placeholder="Search name, email, phone, location…" value={search} onChange={(e) => setSearch(e.target.value)}
             style={{ flex: 1, minWidth: "220px", padding: "7px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "#fff", fontSize: "0.85rem", outline: "none", fontFamily: "inherit" }} />
