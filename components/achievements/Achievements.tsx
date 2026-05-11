@@ -33,6 +33,12 @@ interface Activity {
   average_speed:    number;
 }
 
+interface ServerData {
+  sessionCount:    number;
+  leaderboardRank: number | null;
+  hasMembership:   boolean;
+}
+
 interface PRs {
   longestRunDist: number;   // metres
   longestRunTime: number;   // seconds
@@ -110,18 +116,33 @@ function computePRs(activities: Activity[]): PRs {
   return { longestRunDist, longestRunTime, fastestPace, best5KSecs, best10KSecs, bestHalfSecs, bestFullSecs, totalRuns, totalKm, totalTimeSecs };
 }
 
-const MILESTONES = [
-  { id: "first_run",    label: "First Step",       desc: "Completed your first run",         icon: "👟", check: (a: Activity[]) => a.filter(r => r.type === "Run").length >= 1 },
-  { id: "runs_10",      label: "10 Runs",           desc: "Logged 10 running activities",     icon: "🔟", check: (a: Activity[]) => a.filter(r => r.type === "Run").length >= 10 },
-  { id: "runs_50",      label: "50 Runs",           desc: "Logged 50 running activities",     icon: "🏃", check: (a: Activity[]) => a.filter(r => r.type === "Run").length >= 50 },
-  { id: "runs_100",     label: "Century Club",      desc: "Logged 100 running activities",    icon: "💯", check: (a: Activity[]) => a.filter(r => r.type === "Run").length >= 100 },
-  { id: "first_5k",     label: "First 5K",          desc: "Ran 5 kilometres in one go",       icon: "5️⃣", check: (a: Activity[]) => a.some(r => r.type === "Run" && r.distance >= 5000) },
-  { id: "first_10k",    label: "First 10K",         desc: "Ran 10 kilometres in one go",      icon: "🔥", check: (a: Activity[]) => a.some(r => r.type === "Run" && r.distance >= 10000) },
-  { id: "first_half",   label: "Half Marathon",     desc: "Ran 21.1 kilometres in one go",    icon: "🥈", check: (a: Activity[]) => a.some(r => r.type === "Run" && r.distance >= 21097) },
-  { id: "first_full",   label: "Full Marathon",     desc: "Ran 42.2 kilometres in one go",    icon: "🏅", check: (a: Activity[]) => a.some(r => r.type === "Run" && r.distance >= 42195) },
-  { id: "km_100",       label: "100 km Club",       desc: "Total distance exceeded 100 km",   icon: "📍", check: (a: Activity[]) => a.filter(r => r.type === "Run").reduce((s, r) => s + r.distance, 0) >= 100000 },
-  { id: "km_500",       label: "500 km Warrior",    desc: "Total distance exceeded 500 km",   icon: "⚡", check: (a: Activity[]) => a.filter(r => r.type === "Run").reduce((s, r) => s + r.distance, 0) >= 500000 },
-  { id: "km_1000",      label: "1000 km Legend",    desc: "Total distance exceeded 1000 km",  icon: "🏆", check: (a: Activity[]) => a.filter(r => r.type === "Run").reduce((s, r) => s + r.distance, 0) >= 1000000 },
+interface BadgeData { activities: Activity[]; sd: ServerData; }
+
+const MILESTONES: { id: string; label: string; desc: string; icon: string; category: string; check: (d: BadgeData) => boolean }[] = [
+  // ── Strava run count ──
+  { id: "first_run",  label: "First Step",      desc: "Completed your first run",        icon: "👟", category: "Running",  check: ({ activities: a }) => a.filter(r => r.type === "Run").length >= 1 },
+  { id: "runs_10",    label: "10 Runs",          desc: "Logged 10 running activities",    icon: "🔟", category: "Running",  check: ({ activities: a }) => a.filter(r => r.type === "Run").length >= 10 },
+  { id: "runs_50",    label: "50 Runs",          desc: "Logged 50 running activities",    icon: "🏃", category: "Running",  check: ({ activities: a }) => a.filter(r => r.type === "Run").length >= 50 },
+  { id: "runs_100",   label: "Century Club",     desc: "Logged 100 running activities",   icon: "💯", category: "Running",  check: ({ activities: a }) => a.filter(r => r.type === "Run").length >= 100 },
+  // ── Distance ──
+  { id: "first_5k",   label: "First 5K",         desc: "Ran 5 km in one go",              icon: "5️⃣", category: "Distance", check: ({ activities: a }) => a.some(r => r.type === "Run" && r.distance >= 5000) },
+  { id: "first_10k",  label: "First 10K",        desc: "Ran 10 km in one go",             icon: "🔥", category: "Distance", check: ({ activities: a }) => a.some(r => r.type === "Run" && r.distance >= 10000) },
+  { id: "first_half", label: "Half Marathon",    desc: "Ran 21.1 km in one go",           icon: "🥈", category: "Distance", check: ({ activities: a }) => a.some(r => r.type === "Run" && r.distance >= 21097) },
+  { id: "first_full", label: "Full Marathon",    desc: "Ran 42.2 km in one go",           icon: "🏅", category: "Distance", check: ({ activities: a }) => a.some(r => r.type === "Run" && r.distance >= 42195) },
+  { id: "km_100",     label: "100 km Club",      desc: "Total distance exceeded 100 km",  icon: "📍", category: "Distance", check: ({ activities: a }) => a.filter(r => r.type === "Run").reduce((s, r) => s + r.distance, 0) >= 100000 },
+  { id: "km_500",     label: "500 km Warrior",   desc: "Total distance exceeded 500 km",  icon: "⚡", category: "Distance", check: ({ activities: a }) => a.filter(r => r.type === "Run").reduce((s, r) => s + r.distance, 0) >= 500000 },
+  { id: "km_1000",    label: "1000 km Legend",   desc: "Total distance exceeded 1000 km", icon: "🏆", category: "Distance", check: ({ activities: a }) => a.filter(r => r.type === "Run").reduce((s, r) => s + r.distance, 0) >= 1000000 },
+  // ── Sessions ──
+  { id: "session_1",  label: "First Session",    desc: "Attended your first CS session",  icon: "🎯", category: "Sessions", check: ({ sd }) => sd.sessionCount >= 1 },
+  { id: "session_5",  label: "5 Sessions",       desc: "Attended 5 training sessions",    icon: "🌟", category: "Sessions", check: ({ sd }) => sd.sessionCount >= 5 },
+  { id: "session_10", label: "10 Sessions",      desc: "Attended 10 training sessions",   icon: "💪", category: "Sessions", check: ({ sd }) => sd.sessionCount >= 10 },
+  { id: "session_25", label: "25 Sessions",      desc: "Attended 25 training sessions",   icon: "🔑", category: "Sessions", check: ({ sd }) => sd.sessionCount >= 25 },
+  // ── Leaderboard ──
+  { id: "top_10",     label: "Top 10",           desc: "Ranked top 10 on monthly board",  icon: "📊", category: "Leaderboard", check: ({ sd }) => sd.leaderboardRank !== null && sd.leaderboardRank <= 10 },
+  { id: "top_3",      label: "Podium Finish",    desc: "Ranked top 3 on monthly board",   icon: "🥉", category: "Leaderboard", check: ({ sd }) => sd.leaderboardRank !== null && sd.leaderboardRank <= 3 },
+  { id: "rank_1",     label: "Champion",         desc: "Ranked #1 on monthly board",      icon: "👑", category: "Leaderboard", check: ({ sd }) => sd.leaderboardRank === 1 },
+  // ── Membership ──
+  { id: "member",     label: "Active Member",    desc: "Subscribed to Connected Steps",   icon: "💳", category: "Membership", check: ({ sd }) => sd.hasMembership },
 ];
 
 export default function Achievements() {
@@ -129,9 +150,10 @@ export default function Achievements() {
   const [user,       setUser]       = useState<User | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [prs,        setPrs]        = useState<PRs | null>(null);
-  const [loading,    setLoading]    = useState(false);
-  const [noStrava,   setNoStrava]   = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [loading,        setLoading]       = useState(false);
+  const [noStrava,       setNoStrava]      = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen]= useState(false);
+  const [serverData,     setServerData]    = useState<ServerData>({ sessionCount: 0, leaderboardRank: null, hasMembership: false });
 
   const fetchActivities = useCallback(async (tokens: StravaTokens) => {
     setLoading(true);
@@ -157,6 +179,11 @@ export default function Achievements() {
     const u: User = JSON.parse(stored);
     setUser(u);
 
+    fetch(`/api/user/achievements?email=${encodeURIComponent(u.email)}`)
+      .then((r) => r.json())
+      .then((d) => setServerData(d))
+      .catch(() => {});
+
     const stravaRaw = localStorage.getItem("cs_strava")
       || localStorage.getItem(`cs_strava_${u.email}`);
     if (stravaRaw) {
@@ -168,9 +195,9 @@ export default function Achievements() {
 
   if (!user) return null;
 
-  const fullName  = `${user.firstName} ${user.lastName}`;
-  const unlocked  = activities.length > 0 ? MILESTONES.filter((m) => m.check(activities)) : [];
-  const locked    = MILESTONES.filter((m) => !unlocked.find((u) => u.id === m.id));
+  const badgeData: BadgeData = { activities, sd: serverData };
+  const unlocked = MILESTONES.filter((m) => m.check(badgeData));
+  const locked   = MILESTONES.filter((m) => !unlocked.find((u) => u.id === m.id));
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--cs-black)", color: "var(--cs-white)" }}>
