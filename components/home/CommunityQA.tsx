@@ -187,19 +187,28 @@ function PostCard({ post, isLoggedIn, onLoginRedirect }: { post: Post; isLoggedI
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                {replies.map((r) => (
+                {replies.map((r) => {
+                  const parts    = r.user_name.trim().split(/\s+/);
+                  const initials = parts.length >= 2
+                    ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+                    : r.user_name[0].toUpperCase();
+                  const displayName = parts.length >= 2
+                    ? parts[0] + " " + parts[parts.length - 1]
+                    : r.user_name;
+                  return (
                   <div key={r.id} style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start" }}>
-                    <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "rgba(232,98,10,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", color: "var(--cs-orange)", fontWeight: 700, flexShrink: 0 }}>
-                      {r.user_name[0].toUpperCase()}
+                    <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "rgba(232,98,10,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", color: "var(--cs-orange)", fontWeight: 700, flexShrink: 0, letterSpacing: "0.02em" }}>
+                      {initials}
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: "11px", color: "var(--cs-muted)", marginBottom: "3px" }}>
-                        <span style={{ color: "var(--cs-white)", fontWeight: 600 }}>{r.user_name}</span> · {fmtDate(r.created_at)}
+                        <span style={{ color: "var(--cs-white)", fontWeight: 600 }}>{displayName}</span> · {fmtDate(r.created_at)}
                       </div>
                       <div style={{ fontSize: "0.85rem", color: "#ccc", lineHeight: 1.6 }}>{r.body}</div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
