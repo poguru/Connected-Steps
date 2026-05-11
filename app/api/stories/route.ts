@@ -28,8 +28,8 @@ export async function POST(req: NextRequest) {
     const { user_email, user_name, quote, achievement, rating } = await req.json();
     if (!user_email || !user_name || !quote?.trim() || !achievement?.trim())
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
-    if (quote.length > 400)
-      return NextResponse.json({ error: "Story must be under 400 characters" }, { status: 400 });
+    if (quote.length > 1000)
+      return NextResponse.json({ error: "Story must be under 1000 characters" }, { status: 400 });
     if (rating != null && (rating < 1 || rating > 5))
       return NextResponse.json({ error: "Rating must be 1–5" }, { status: 400 });
 

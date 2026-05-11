@@ -625,8 +625,8 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <textarea
-                  placeholder="Share your running journey… (max 400 characters)"
-                  maxLength={400}
+                  placeholder="Share your running journey… (max 1000 characters)"
+                  maxLength={1000}
                   value={storyForm.quote}
                   onChange={(e) => setStoryForm((p) => ({ ...p, quote: e.target.value }))}
                   rows={4}
