@@ -10,17 +10,42 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
     }
 
-    const supabaseServer = getSupabaseServer();
+    const db = getSupabaseServer();
+
+    // Require verified email OTP
+    const { data: emailOtp } = await db
+      .from("otp_verifications")
+      .select("id")
+      .eq("identifier", email.toLowerCase())
+      .eq("type", "email")
+      .eq("verified", true)
+      .single();
+
+    if (!emailOtp) {
+      return NextResponse.json({ error: "Email not verified. Please complete OTP verification." }, { status: 400 });
+    }
+
+    // Require verified mobile OTP
+    const { data: mobileOtp } = await db
+      .from("otp_verifications")
+      .select("id")
+      .eq("identifier", phone)
+      .eq("type", "mobile")
+      .eq("verified", true)
+      .single();
+
+    if (!mobileOtp) {
+      return NextResponse.json({ error: "Mobile not verified. Please complete OTP verification." }, { status: 400 });
+    }
 
     // Check if email already registered
-    const { data: existing, error: checkError } = await supabaseServer
+    const { data: existing, error: checkError } = await db
       .from("users")
       .select("id")
       .eq("email", email.toLowerCase())
       .single();
 
     if (checkError && checkError.code !== "PGRST116") {
-      console.error("Supabase check error:", checkError);
       return NextResponse.json({ error: "DB check failed: " + checkError.message }, { status: 500 });
     }
 
@@ -30,7 +55,7 @@ export async function POST(req: NextRequest) {
 
     const hashed = await bcrypt.hash(password, 12);
 
-    const { error } = await supabaseServer.from("users").insert({
+    const { error } = await db.from("users").insert({
       first_name: firstName,
       last_name:  lastName,
       email:      email.toLowerCase(),
@@ -41,13 +66,16 @@ export async function POST(req: NextRequest) {
     });
 
     if (error) {
-      console.error("Supabase insert error:", error);
       return NextResponse.json({ error: "Insert failed: " + error.message }, { status: 500 });
     }
 
+    // Clean up used OTPs
+    await db.from("otp_verifications")
+      .delete()
+      .in("id", [emailOtp.id, mobileOtp.id]);
+
     return NextResponse.json({ success: true });
   } catch (e: unknown) {
-    console.error("Register route crashed:", e);
     return NextResponse.json({ error: "Server error: " + (e instanceof Error ? e.message : String(e)) }, { status: 500 });
   }
 }
