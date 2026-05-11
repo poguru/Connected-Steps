@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import {
-  sendWhatsApp, sendSMS, sendEmail,
-  sessionWAParams, sessionSMSText, sessionEmailHTML,
-} from "@/lib/notify";
+import { sendWhatsApp, sessionWAParams } from "@/lib/notify";
 
 function auth(req: NextRequest) {
   const pw = req.headers.get("x-admin-password");
@@ -62,51 +59,16 @@ async function notifyUsers(
     return;
   }
 
-  const tasks: Promise<{ to: string; channel: string; ok: boolean; error?: string }>[] = [];
-
-  for (const u of users) {
-    const name = `${u.first_name} ${u.last_name}`.trim() || "there";
-
-    // WhatsApp — if phone exists
-    if (u.phone?.trim()) {
-      tasks.push(sendWhatsApp(u.phone, sessionWAParams(name, title, date, location)));
-    }
-
-    // SMS — if phone exists
-    if (u.phone?.trim()) {
-      tasks.push(sendSMS(u.phone, sessionSMSText(name, title, date, location)));
-    }
-
-    // Email — if email exists
-    if (u.email?.trim()) {
-      tasks.push(
-        sendEmail(
-          u.email,
-          name,
-          `New Training Session: ${title}`,
-          sessionEmailHTML(name, title, date, location)
-        )
-      );
-    }
-  }
+  const tasks = users
+    .filter((u) => u.phone?.trim())
+    .map((u) => {
+      const name = `${u.first_name} ${u.last_name}`.trim() || "there";
+      return sendWhatsApp(u.phone!, sessionWAParams(name, title, date, location));
+    });
 
   const results = await Promise.allSettled(tasks);
+  const sent   = results.filter((r) => r.status === "fulfilled" && r.value.ok).length;
+  const failed = results.length - sent;
 
-  let wa = 0, sms = 0, email = 0, failed = 0;
-  for (const r of results) {
-    if (r.status === "fulfilled") {
-      if (r.value.ok) {
-        if (r.value.channel === "whatsapp") wa++;
-        else if (r.value.channel === "sms")  sms++;
-        else                                  email++;
-      } else {
-        failed++;
-        console.warn(`Notify failed [${r.value.channel}] → ${r.value.to}: ${r.value.error}`);
-      }
-    } else {
-      failed++;
-    }
-  }
-
-  console.log(`Notifications sent — WhatsApp: ${wa}, SMS: ${sms}, Email: ${email}, Failed: ${failed}`);
+  console.log(`WhatsApp notifications: ${sent} sent, ${failed} failed`);
 }
