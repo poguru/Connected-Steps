@@ -50,7 +50,8 @@ const inp: React.CSSProperties = {
   borderRadius: "6px", color: "#fff", fontSize: "0.825rem", outline: "none", boxSizing: "border-box",
 };
 
-const colGrid = "48px 1fr 130px 90px 90px";
+const colGrid      = "48px 1fr 130px 90px 90px";
+const colGridNoLoc = "48px 1fr 90px 90px";
 
 export default function AdminLeaderboardPage() {
   const [password, setPassword] = useState("");
@@ -58,11 +59,12 @@ export default function AdminLeaderboardPage() {
   const [authErr,  setAuthErr]  = useState("");
   const [authLoad, setAuthLoad] = useState(false);
 
-  const [live,        setLive]        = useState<LiveEntry[]>([]);
-  const [archives,    setArchives]    = useState<ArchiveEntry[]>([]);
-  const [archiving,   setArchiving]   = useState(false);
-  const [archiveMsg,  setArchiveMsg]  = useState("");
-  const [expanded,    setExpanded]    = useState<string | null>(null);
+  const [live,       setLive]       = useState<LiveEntry[]>([]);
+  const [archives,   setArchives]   = useState<ArchiveEntry[]>([]);
+  const [archiving,  setArchiving]  = useState(false);
+  const [archiveMsg, setArchiveMsg] = useState("");
+  const [expanded,   setExpanded]   = useState<string | null>(null);
+  const [view,       setView]       = useState<"overall" | "location">("overall");
 
   const headers = { "Content-Type": "application/json", "x-admin-password": password };
 
@@ -139,10 +141,58 @@ export default function AdminLeaderboardPage() {
     );
   }
 
-  /* ── Dashboard ── */
+  /* ── Dashboard data ── */
   const currentMonth    = new Date().toISOString().slice(0, 7);
   const alreadyArchived = months.includes(currentMonth);
   const liveWithPoints  = live.filter((e) => (e.month_points ?? 0) > 0);
+
+  // Group by location (sorted by location total pts desc)
+  const locationMap = new Map<string, LiveEntry[]>();
+  for (const e of liveWithPoints) {
+    const loc = (e.location || "Unknown").trim();
+    if (!locationMap.has(loc)) locationMap.set(loc, []);
+    locationMap.get(loc)!.push(e);
+  }
+  const locationGroups = [...locationMap.entries()]
+    .map(([loc, entries]) => ({
+      loc,
+      entries: entries.sort((a, b) => (b.month_points ?? 0) - (a.month_points ?? 0)),
+      total:   entries.reduce((s, e) => s + (e.month_points ?? 0), 0),
+    }))
+    .sort((a, b) => b.total - a.total);
+
+  /* ── Athlete row ── */
+  function AthleteRow({ entry, rank, showLocation = true }: { entry: LiveEntry; rank: number; showLocation?: boolean }) {
+    return (
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: showLocation ? colGrid : colGridNoLoc,
+        gap: "0.5rem",
+        padding: "0.85rem 1.5rem",
+        borderTop: "1px solid rgba(255,255,255,0.04)",
+        background: rank <= 3 ? "rgba(232,98,10,0.05)" : "transparent",
+      }}>
+        <div style={{ fontSize: rank <= 3 ? "1.1rem" : "0.875rem", fontWeight: 700, color: rank <= 3 ? "#e8620a" : "#555" }}>
+          {medal(rank)}
+        </div>
+        <div>
+          <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "#fff" }}>{entry.user_name}</div>
+          <div style={{ fontSize: "11px", color: "#555" }}>{entry.user_email}</div>
+        </div>
+        {showLocation && (
+          <div style={{ fontSize: "0.825rem", color: "#888", alignSelf: "center" }}>📍 {entry.location || "—"}</div>
+        )}
+        <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "#e8620a", alignSelf: "center" }}>
+          {entry.month_points ?? 0}
+          <span style={{ fontSize: "10px", color: "#555", fontWeight: 400, marginLeft: "3px" }}>pts</span>
+        </div>
+        <div style={{ fontSize: "0.875rem", color: "#888", alignSelf: "center" }}>
+          {entry.total_points ?? 0}
+          <span style={{ fontSize: "10px", color: "#555", fontWeight: 400, marginLeft: "3px" }}>pts</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff" }}>
@@ -159,10 +209,12 @@ export default function AdminLeaderboardPage() {
         </button>
       </header>
 
-      <div style={{ maxWidth: "920px", margin: "0 auto", padding: "2rem" }}>
+      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "2rem" }}>
 
         {/* ── Live leaderboard ── */}
         <div style={{ marginBottom: "2.5rem" }}>
+
+          {/* Title row */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem", flexWrap: "wrap", gap: "0.75rem" }}>
             <div>
               <div style={{ fontSize: "11px", color: "#888", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "2px" }}>Live Standings</div>
@@ -184,48 +236,85 @@ export default function AdminLeaderboardPage() {
             </div>
           </div>
 
-          <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", overflow: "hidden" }}>
-            {/* Header */}
-            <div style={{ display: "grid", gridTemplateColumns: colGrid, gap: "0.5rem", padding: "0.65rem 1.5rem", background: "rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-              {["Rank","Athlete","Location","This Month","All Time"].map((h) => (
-                <div key={h} style={{ fontSize: "10px", color: "#555", letterSpacing: "0.08em", textTransform: "uppercase" }}>{h}</div>
-              ))}
-            </div>
-
-            {liveWithPoints.length === 0 ? (
-              <div style={{ padding: "3rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>
-                No participants with points yet this month. Points are earned by attending sessions or connecting Strava.
-              </div>
-            ) : (
-              liveWithPoints.map((entry, i) => (
-                <div
-                  key={entry.user_email}
-                  style={{
-                    display: "grid", gridTemplateColumns: colGrid, gap: "0.5rem",
-                    padding: "0.85rem 1.5rem", borderTop: "1px solid rgba(255,255,255,0.04)",
-                    background: i < 3 ? "rgba(232,98,10,0.05)" : "transparent",
-                  }}
-                >
-                  <div style={{ fontSize: i < 3 ? "1.1rem" : "0.875rem", fontWeight: 700, color: i < 3 ? "#e8620a" : "#555" }}>
-                    {medal(i + 1)}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "#fff" }}>{entry.user_name}</div>
-                    <div style={{ fontSize: "11px", color: "#555" }}>{entry.user_email}</div>
-                  </div>
-                  <div style={{ fontSize: "0.825rem", color: "#888", alignSelf: "center" }}>📍 {entry.location || "—"}</div>
-                  <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "#e8620a", alignSelf: "center" }}>
-                    {entry.month_points ?? 0}
-                    <span style={{ fontSize: "10px", color: "#555", fontWeight: 400, marginLeft: "3px" }}>pts</span>
-                  </div>
-                  <div style={{ fontSize: "0.875rem", color: "#888", alignSelf: "center" }}>
-                    {entry.total_points ?? 0}
-                    <span style={{ fontSize: "10px", color: "#555", fontWeight: 400, marginLeft: "3px" }}>pts</span>
-                  </div>
-                </div>
-              ))
-            )}
+          {/* View toggle */}
+          <div style={{ display: "flex", gap: "4px", padding: "4px", marginBottom: "1rem", borderRadius: "6px", background: "rgba(255,255,255,0.04)", width: "fit-content" }}>
+            {(["overall", "location"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                style={{
+                  padding: "7px 18px", borderRadius: "4px", fontSize: "0.825rem", fontWeight: 600,
+                  background: view === v ? "#e8620a" : "transparent",
+                  color: view === v ? "#fff" : "#888",
+                  border: "none", cursor: "pointer", fontFamily: "inherit",
+                }}
+              >
+                {v === "overall" ? "Overall" : "By Location"}
+              </button>
+            ))}
           </div>
+
+          {/* ── Overall view ── */}
+          {view === "overall" && (
+            <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", overflow: "hidden" }}>
+              <div style={{ display: "grid", gridTemplateColumns: colGrid, gap: "0.5rem", padding: "0.65rem 1.5rem", background: "rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                {["Rank","Athlete","Location","This Month","All Time"].map((h) => (
+                  <div key={h} style={{ fontSize: "10px", color: "#555", letterSpacing: "0.08em", textTransform: "uppercase" }}>{h}</div>
+                ))}
+              </div>
+              {liveWithPoints.length === 0 ? (
+                <div style={{ padding: "3rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>
+                  No participants with points yet this month.
+                </div>
+              ) : (
+                liveWithPoints.map((entry, i) => (
+                  <AthleteRow key={entry.user_email} entry={entry} rank={i + 1} />
+                ))
+              )}
+            </div>
+          )}
+
+          {/* ── By Location view ── */}
+          {view === "location" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              {locationGroups.length === 0 ? (
+                <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", padding: "3rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>
+                  No participants with points yet this month.
+                </div>
+              ) : (
+                locationGroups.map(({ loc, entries, total }) => (
+                  <div key={loc} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", overflow: "hidden" }}>
+                    {/* Location header */}
+                    <div style={{ padding: "0.85rem 1.5rem", background: "rgba(232,98,10,0.06)", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                        <span style={{ fontSize: "1rem" }}>📍</span>
+                        <div>
+                          <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#fff" }}>{loc}</div>
+                          <div style={{ fontSize: "11px", color: "#888" }}>{entries.length} athlete{entries.length !== 1 ? "s" : ""}</div>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.06em" }}>Group Total</div>
+                        <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#e8620a" }}>{total} <span style={{ fontSize: "11px", color: "#555", fontWeight: 400 }}>pts</span></div>
+                      </div>
+                    </div>
+
+                    {/* Column header */}
+                    <div style={{ display: "grid", gridTemplateColumns: colGridNoLoc, gap: "0.5rem", padding: "0.55rem 1.5rem", background: "rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                      {["Rank","Athlete","This Month","All Time"].map((h) => (
+                        <div key={h} style={{ fontSize: "10px", color: "#555", letterSpacing: "0.08em", textTransform: "uppercase" }}>{h}</div>
+                      ))}
+                    </div>
+
+                    {/* Athletes */}
+                    {entries.map((entry, i) => (
+                      <AthleteRow key={entry.user_email} entry={entry} rank={i + 1} showLocation={false} />
+                    ))}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
 
           {liveWithPoints.length > 0 && (
             <div style={{ marginTop: "0.5rem", fontSize: "11px", color: "#555", textAlign: "right" }}>
@@ -279,11 +368,7 @@ export default function AdminLeaderboardPage() {
                       {rows.map((r) => (
                         <div
                           key={r.id}
-                          style={{
-                            display: "grid", gridTemplateColumns: colGrid, gap: "0.5rem",
-                            padding: "0.75rem 1.5rem", borderTop: "1px solid rgba(255,255,255,0.04)",
-                            background: r.rank <= 3 ? "rgba(232,98,10,0.04)" : "transparent",
-                          }}
+                          style={{ display: "grid", gridTemplateColumns: colGrid, gap: "0.5rem", padding: "0.75rem 1.5rem", borderTop: "1px solid rgba(255,255,255,0.04)", background: r.rank <= 3 ? "rgba(232,98,10,0.04)" : "transparent" }}
                         >
                           <div style={{ fontSize: r.rank <= 3 ? "1.1rem" : "0.875rem", fontWeight: 700, color: r.rank <= 3 ? "#e8620a" : "#555" }}>
                             {medal(r.rank)}
