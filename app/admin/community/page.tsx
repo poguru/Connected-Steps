@@ -15,6 +15,17 @@ interface Post {
   created_at: string;
 }
 
+interface Reply {
+  id: number;
+  post_id: number;
+  user_email: string;
+  user_name: string;
+  body: string;
+  approved: boolean;
+  created_at: string;
+  community_posts: { title: string; category: string } | null;
+}
+
 const CATEGORY_COLORS: Record<string, string> = {
   "Recovery": "#4ade80", "Shoes & Gear": "#60a5fa",
   "Races & Marathons": "#e8620a", "Running Tips": "#fbbf24", "General": "#888",
@@ -25,27 +36,35 @@ function fmtDate(iso: string) {
 }
 
 export default function AdminCommunityPage() {
-  const [pw,     setPw]     = useState("");
-  const [authed, setAuthed] = useState(false);
-  const [posts,  setPosts]  = useState<Post[]>([]);
-  const [loading,setLoading]= useState(false);
-  const [error,  setError]  = useState("");
-  const [acting, setActing] = useState<number | null>(null);
+  const [pw,      setPw]      = useState("");
+  const [authed,  setAuthed]  = useState(false);
+  const [posts,   setPosts]   = useState<Post[]>([]);
+  const [replies, setReplies] = useState<Reply[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState("");
+  const [actingPost,  setActingPost]  = useState<number | null>(null);
+  const [actingReply, setActingReply] = useState<number | null>(null);
 
   async function load(password: string) {
     setLoading(true); setError("");
     try {
-      const res  = await fetch("/api/admin/community", { headers: { "x-admin-password": password } });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Failed"); return; }
-      setPosts(data.posts);
+      const [postsRes, repliesRes] = await Promise.all([
+        fetch("/api/admin/community",         { headers: { "x-admin-password": password } }),
+        fetch("/api/admin/community/replies", { headers: { "x-admin-password": password } }),
+      ]);
+      const postsData   = await postsRes.json();
+      const repliesData = await repliesRes.json();
+      if (!postsRes.ok)   { setError(postsData.error ?? "Failed"); return; }
+      if (!repliesRes.ok) { setError(repliesData.error ?? "Failed"); return; }
+      setPosts(postsData.posts);
+      setReplies(repliesData.replies);
       setAuthed(true);
     } catch { setError("Something went wrong."); }
     finally { setLoading(false); }
   }
 
-  async function act(id: number, action: "approve" | "reject") {
-    setActing(id);
+  async function actPost(id: number, action: "approve" | "reject") {
+    setActingPost(id);
     try {
       await fetch("/api/admin/community", {
         method: "PATCH",
@@ -57,7 +76,23 @@ export default function AdminCommunityPage() {
           ? prev.filter((p) => p.id !== id)
           : prev.map((p) => p.id === id ? { ...p, approved: true } : p)
       );
-    } finally { setActing(null); }
+    } finally { setActingPost(null); }
+  }
+
+  async function actReply(id: number, action: "approve" | "reject") {
+    setActingReply(id);
+    try {
+      await fetch("/api/admin/community/replies", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-admin-password": pw },
+        body: JSON.stringify({ id, action }),
+      });
+      setReplies((prev) =>
+        action === "reject"
+          ? prev.filter((r) => r.id !== id)
+          : prev.map((r) => r.id === id ? { ...r, approved: true } : r)
+      );
+    } finally { setActingReply(null); }
   }
 
   if (!authed) {
@@ -79,8 +114,10 @@ export default function AdminCommunityPage() {
     );
   }
 
-  const pending  = posts.filter((p) => !p.approved);
-  const approved = posts.filter((p) => p.approved);
+  const pendingPosts    = posts.filter((p) => !p.approved);
+  const approvedPosts   = posts.filter((p) => p.approved);
+  const pendingReplies  = replies.filter((r) => !r.approved);
+  const approvedReplies = replies.filter((r) => r.approved);
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff" }}>
@@ -90,21 +127,23 @@ export default function AdminCommunityPage() {
           <span style={{ fontSize: "0.95rem", fontWeight: 600 }}>Community Q&A</span>
         </div>
         <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-          <span style={{ fontSize: "0.78rem", color: "#555" }}>{pending.length} pending · {approved.length} live</span>
+          <span style={{ fontSize: "0.78rem", color: "#555" }}>
+            {pendingPosts.length} posts · {pendingReplies.length} replies pending
+          </span>
           <button onClick={() => load(pw)} style={{ fontSize: "0.75rem", color: "#888", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", padding: "4px 12px", cursor: "pointer", fontFamily: "inherit" }}>Refresh</button>
         </div>
       </header>
 
-      <div style={{ maxWidth: "860px", margin: "0 auto", padding: "2rem 1.5rem", display: "flex", flexDirection: "column", gap: "2rem" }}>
+      <div style={{ maxWidth: "860px", margin: "0 auto", padding: "2rem 1.5rem", display: "flex", flexDirection: "column", gap: "2.5rem" }}>
 
-        {/* Pending */}
+        {/* Pending Posts */}
         <section>
-          <div style={{ fontSize: "11px", color: "#555", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1rem" }}>Pending Review ({pending.length})</div>
-          {pending.length === 0 ? (
-            <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", padding: "2rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>No posts pending review.</div>
+          <div style={{ fontSize: "11px", color: "#555", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1rem" }}>Pending Posts ({pendingPosts.length})</div>
+          {pendingPosts.length === 0 ? (
+            <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", padding: "1.5rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>No posts pending.</div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              {pending.map((p) => (
+              {pendingPosts.map((p) => (
                 <div key={p.id} style={{ background: "#111", border: "1px solid rgba(232,98,10,0.2)", borderRadius: "8px", padding: "1.25rem" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
                     <div style={{ flex: 1 }}>
@@ -117,13 +156,13 @@ export default function AdminCommunityPage() {
                       <div style={{ fontSize: "11px", color: "#555", marginTop: "0.5rem" }}>{p.user_email}</div>
                     </div>
                     <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
-                      <button onClick={() => act(p.id, "approve")} disabled={acting === p.id}
+                      <button onClick={() => actPost(p.id, "approve")} disabled={actingPost === p.id}
                         style={{ padding: "7px 16px", background: "#4ade80", color: "#000", border: "none", borderRadius: "6px", fontSize: "0.8rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                        {acting === p.id ? "…" : "Approve"}
+                        {actingPost === p.id ? "…" : "Approve"}
                       </button>
-                      <button onClick={() => act(p.id, "reject")} disabled={acting === p.id}
+                      <button onClick={() => actPost(p.id, "reject")} disabled={actingPost === p.id}
                         style={{ padding: "7px 16px", background: "transparent", color: "#f09595", border: "1px solid rgba(240,149,149,0.3)", borderRadius: "6px", fontSize: "0.8rem", cursor: "pointer", fontFamily: "inherit" }}>
-                        {acting === p.id ? "…" : "Reject"}
+                        {actingPost === p.id ? "…" : "Reject"}
                       </button>
                     </div>
                   </div>
@@ -133,29 +172,82 @@ export default function AdminCommunityPage() {
           )}
         </section>
 
-        {/* Approved */}
+        {/* Pending Replies */}
         <section>
-          <div style={{ fontSize: "11px", color: "#555", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1rem" }}>Live on Homepage ({approved.length})</div>
-          {approved.length === 0 ? (
-            <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", padding: "2rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>No approved posts yet.</div>
+          <div style={{ fontSize: "11px", color: "#555", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1rem" }}>Pending Replies ({pendingReplies.length})</div>
+          {pendingReplies.length === 0 ? (
+            <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", padding: "1.5rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>No replies pending.</div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              {approved.map((p) => (
-                <div key={p.id} style={{ background: "#111", border: "1px solid rgba(74,222,128,0.15)", borderRadius: "8px", padding: "1.25rem", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.5rem" }}>
-                      <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "20px", background: "rgba(74,222,128,0.1)", color: CATEGORY_COLORS[p.category] ?? "#888" }}>{p.category}</span>
-                      <span style={{ fontSize: "11px", color: "#555" }}>{p.user_name} · {fmtDate(p.created_at)}</span>
+              {pendingReplies.map((r) => (
+                <div key={r.id} style={{ background: "#111", border: "1px solid rgba(96,165,250,0.2)", borderRadius: "8px", padding: "1.25rem" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
+                    <div style={{ flex: 1 }}>
+                      {r.community_posts && (
+                        <div style={{ fontSize: "11px", color: "#555", marginBottom: "0.4rem" }}>
+                          Reply to: <span style={{ color: CATEGORY_COLORS[r.community_posts.category] ?? "#888" }}>{r.community_posts.title}</span>
+                        </div>
+                      )}
+                      <p style={{ fontSize: "0.875rem", color: "#ccc", lineHeight: 1.6 }}>{r.body}</p>
+                      <div style={{ fontSize: "11px", color: "#555", marginTop: "0.4rem" }}>{r.user_name} · {r.user_email} · {fmtDate(r.created_at)}</div>
                     </div>
-                    <div style={{ fontWeight: 600, color: "#fff", marginBottom: "0.5rem" }}>{p.title}</div>
-                    <p style={{ fontSize: "0.875rem", color: "#ccc", lineHeight: 1.6 }}>{p.body}</p>
+                    <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
+                      <button onClick={() => actReply(r.id, "approve")} disabled={actingReply === r.id}
+                        style={{ padding: "7px 16px", background: "#4ade80", color: "#000", border: "none", borderRadius: "6px", fontSize: "0.8rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                        {actingReply === r.id ? "…" : "Approve"}
+                      </button>
+                      <button onClick={() => actReply(r.id, "reject")} disabled={actingReply === r.id}
+                        style={{ padding: "7px 16px", background: "transparent", color: "#f09595", border: "1px solid rgba(240,149,149,0.3)", borderRadius: "6px", fontSize: "0.8rem", cursor: "pointer", fontFamily: "inherit" }}>
+                        {actingReply === r.id ? "…" : "Reject"}
+                      </button>
+                    </div>
                   </div>
-                  <button onClick={() => act(p.id, "reject")} disabled={acting === p.id}
-                    style={{ padding: "6px 14px", background: "transparent", color: "#555", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", fontSize: "0.78rem", cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
-                    Remove
-                  </button>
                 </div>
               ))}
+            </div>
+          )}
+        </section>
+
+        {/* Live Posts */}
+        <section>
+          <div style={{ fontSize: "11px", color: "#555", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1rem" }}>Live Posts ({approvedPosts.length})</div>
+          {approvedPosts.length === 0 ? (
+            <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", padding: "1.5rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>No approved posts yet.</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {approvedPosts.map((p) => {
+                const postReplies = approvedReplies.filter((r) => r.post_id === p.id);
+                return (
+                  <div key={p.id} style={{ background: "#111", border: "1px solid rgba(74,222,128,0.15)", borderRadius: "8px", padding: "1.25rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.5rem" }}>
+                          <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "20px", background: "rgba(74,222,128,0.1)", color: CATEGORY_COLORS[p.category] ?? "#888" }}>{p.category}</span>
+                          <span style={{ fontSize: "11px", color: "#555" }}>{p.user_name} · {fmtDate(p.created_at)}</span>
+                          {postReplies.length > 0 && (
+                            <span style={{ fontSize: "11px", color: "#60a5fa" }}>{postReplies.length} answer{postReplies.length !== 1 ? "s" : ""}</span>
+                          )}
+                        </div>
+                        <div style={{ fontWeight: 600, color: "#fff", marginBottom: "0.4rem" }}>{p.title}</div>
+                        <p style={{ fontSize: "0.82rem", color: "#aaa", lineHeight: 1.6 }}>{p.body}</p>
+                        {postReplies.length > 0 && (
+                          <div style={{ marginTop: "0.75rem", paddingTop: "0.75rem", borderTop: "1px solid rgba(255,255,255,0.05)", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                            {postReplies.map((r) => (
+                              <div key={r.id} style={{ fontSize: "0.82rem", color: "#ccc", lineHeight: 1.5 }}>
+                                <span style={{ color: "#888", marginRight: "0.5rem" }}>↳ {r.user_name}:</span>{r.body}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <button onClick={() => actPost(p.id, "reject")} disabled={actingPost === p.id}
+                        style={{ padding: "6px 14px", background: "transparent", color: "#555", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", fontSize: "0.78rem", cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>
