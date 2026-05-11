@@ -16,6 +16,12 @@ const cards = [
     desc:  "View and download registrations for weekend special runs.",
     icon:  "📋",
   },
+  {
+    href:  "/admin/leaderboard",
+    title: "Monthly Leaderboard",
+    desc:  "Save end-of-month standings. View all-time archives and top 3 winners per month.",
+    icon:  "🏆",
+  },
 ];
 
 export default function AdminHub() {
