@@ -54,7 +54,6 @@ export default function StatsAndTestimonials() {
   const [stories,             setStories]             = useState<Story[]>([]);
   const [avgRating,           setAvgRating]           = useState<number | null>(null);
   const [totalRunners,        setTotalRunners]        = useState<number | null>(null);
-  const [activeMembers,       setActiveMembers]       = useState<number | null>(null);
   const [sessionsAttended,    setSessionsAttended]    = useState<number | null>(null);
   const [trainingsConducted,  setTrainingsConducted]  = useState<number | null>(null);
   const [weekendRuns,         setWeekendRuns]         = useState<number | null>(null);
@@ -72,7 +71,6 @@ export default function StatsAndTestimonials() {
       .then((r) => r.json())
       .then((d) => {
         if (d.totalRunners        != null) setTotalRunners(d.totalRunners);
-        if (d.activeMembers       != null) setActiveMembers(d.activeMembers);
         if (d.sessionsAttended    != null) setSessionsAttended(d.sessionsAttended);
         if (d.avgRating           != null) setAvgRating(d.avgRating);
         if (d.trainingsConducted  != null) setTrainingsConducted(d.trainingsConducted);
@@ -82,12 +80,11 @@ export default function StatsAndTestimonials() {
   }, []);
 
   const stats = [
-    { num: totalRunners        != null ? fmt(totalRunners)       : "—", label: "Registered runners"      },
-    { num: activeMembers       != null ? fmt(activeMembers)      : "—", label: "Active members"          },
-    { num: trainingsConducted  != null ? fmt(trainingsConducted) : "—", label: "Training sessions held"  },
-    { num: weekendRuns         != null ? fmt(weekendRuns)        : "—", label: "Weekend run registrations" },
-    { num: sessionsAttended    != null ? fmt(sessionsAttended)   : "—", label: "Total sessions attended"  },
-    { num: avgRating           != null ? `${avgRating} / 5`      : "—", label: "Community rating"        },
+    { num: totalRunners       != null ? fmt(totalRunners)       : "—", label: "Registered runners"              },
+    { num: trainingsConducted != null ? fmt(trainingsConducted) : "—", label: "Training sessions held"          },
+    { num: weekendRuns        != null ? fmt(weekendRuns)        : "—", label: "Weekend run registrations"       },
+    { num: sessionsAttended   != null ? fmt(sessionsAttended)   : "—", label: "Total training sessions conducted" },
+    { num: avgRating          != null ? `${avgRating} / 5`      : "—", label: "Community rating"                },
   ];
 
   const display  = stories.length ? stories : FALLBACK;
