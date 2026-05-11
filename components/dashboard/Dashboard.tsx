@@ -134,7 +134,7 @@ export default function Dashboard() {
   const [pushEnabled,    setPushEnabled]    = useState(false);
   const [pushSupported,  setPushSupported]  = useState(false);
   const [storyOpen,      setStoryOpen]      = useState(false);
-  const [storyForm,      setStoryForm]      = useState({ quote: "", achievement: "" });
+  const [storyForm,      setStoryForm]      = useState({ quote: "", achievement: "", rating: 5 });
   const [storySaving,    setStorySaving]    = useState(false);
   const [storyMsg,       setStoryMsg]       = useState("");
 
@@ -600,6 +600,26 @@ export default function Dashboard() {
               </>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                {/* Star rating picker */}
+                <div>
+                  <div style={{ fontSize: "11px", color: "var(--cs-muted)", marginBottom: "6px" }}>Your rating</div>
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setStoryForm((p) => ({ ...p, rating: star }))}
+                        style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1 }}
+                      >
+                        <svg width="22" height="22" viewBox="0 0 14 14"
+                          fill={star <= storyForm.rating ? "var(--cs-orange)" : "rgba(255,255,255,0.15)"}
+                          style={{ transition: "fill 0.1s" }}>
+                          <path d="M7 1l1.55 3.14L12 4.85l-2.5 2.43.59 3.44L7 9.1 4.91 10.72l.59-3.44L3 4.85l3.45-.71L7 1z" />
+                        </svg>
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <textarea
                   placeholder="Share your running journey… (max 400 characters)"
                   maxLength={400}
@@ -628,6 +648,7 @@ export default function Dashboard() {
                             user_name: `${user.firstName} ${user.lastName}`.trim(),
                             quote: storyForm.quote,
                             achievement: storyForm.achievement,
+                            rating: storyForm.rating,
                           }),
                         });
                         const data = await res.json();
