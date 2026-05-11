@@ -22,6 +22,12 @@ const cards = [
     desc:  "Save end-of-month standings. View all-time archives and top 3 winners per month.",
     icon:  "🏆",
   },
+  {
+    href:  "/admin/membership",
+    title: "Memberships",
+    desc:  "View all paid members, active/expired status, revenue summary and expiring soon alerts.",
+    icon:  "💳",
+  },
 ];
 
 export default function AdminHub() {
