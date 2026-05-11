@@ -43,7 +43,7 @@ export default function Footer() {
             <div className="flex gap-3">
               {[
                 { label: "Instagram", href: "https://www.instagram.com/connected_steps/" },
-                { label: "Strava",    href: "#" },
+                { label: "Strava",    href: "https://www.strava.com/clubs/1693553" },
                 { label: "YouTube",   href: "https://www.youtube.com/@ConnectedSteps" },
               ].map((s) => (
                 <a key={s.label} href={s.href}
