@@ -41,10 +41,16 @@ export default function Footer() {
               and runners who show up for each other.
             </p>
             <div className="flex gap-3">
-              {["Instagram", "Strava", "YouTube"].map((s) => (
-                <a key={s} href="#"
+              {[
+                { label: "Instagram", href: "https://www.instagram.com/connected_steps/" },
+                { label: "Strava",    href: "#" },
+                { label: "YouTube",   href: "https://www.youtube.com/@ConnectedSteps" },
+              ].map((s) => (
+                <a key={s.label} href={s.href}
+                  target={s.href !== "#" ? "_blank" : undefined}
+                  rel={s.href !== "#" ? "noopener noreferrer" : undefined}
                   className="text-xs tracking-widest uppercase px-3 py-2 border rounded transition-colors duration-200"
-                  style={{ color: "var(--cs-muted)", borderColor: "rgba(255,255,255,0.1)" }}
+                  style={{ color: "var(--cs-muted)", borderColor: "rgba(255,255,255,0.1)", textDecoration: "none" }}
                   onMouseEnter={(e) => {
                     (e.currentTarget as HTMLAnchorElement).style.color = "var(--cs-orange)";
                     (e.currentTarget as HTMLAnchorElement).style.borderColor = "var(--cs-orange)";
@@ -53,7 +59,7 @@ export default function Footer() {
                     (e.currentTarget as HTMLAnchorElement).style.color = "var(--cs-muted)";
                     (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(255,255,255,0.1)";
                   }}>
-                  {s}
+                  {s.label}
                 </a>
               ))}
             </div>
