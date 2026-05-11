@@ -10,6 +10,7 @@ import UpcomingSessions     from "@/components/home/UpcomingSessions";
 import Coaches              from "@/components/home/Coaches";
 import Features             from "@/components/home/Features";
 import StatsAndTestimonials from "@/components/home/StatsAndTestimonials";
+import CommunityQA         from "@/components/home/CommunityQA";
 import CallToAction         from "@/components/home/CallToAction";
 
 export default function HomePage() {
@@ -23,6 +24,7 @@ export default function HomePage() {
       <Coaches />
       <Features />
       <StatsAndTestimonials />
+      <CommunityQA />
       <CallToAction />
       <Footer />
       <FloatingContact />

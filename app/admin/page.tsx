@@ -40,6 +40,12 @@ const cards = [
     desc:  "Review and approve user-submitted stories shown on the homepage carousel.",
     icon:  "✍️",
   },
+  {
+    href:  "/admin/community",
+    title: "Community Q&A",
+    desc:  "Review and approve questions, tips, and discussions posted by community members.",
+    icon:  "💬",
+  },
 ];
 
 export default function AdminHub() {

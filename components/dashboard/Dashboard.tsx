@@ -137,6 +137,10 @@ export default function Dashboard() {
   const [storyForm,      setStoryForm]      = useState({ quote: "", achievement: "", rating: 5 });
   const [storySaving,    setStorySaving]    = useState(false);
   const [storyMsg,       setStoryMsg]       = useState("");
+  const [qaOpen,         setQaOpen]         = useState(false);
+  const [qaForm,         setQaForm]         = useState({ category: "General", title: "", body: "" });
+  const [qaSaving,       setQaSaving]       = useState(false);
+  const [qaMsg,          setQaMsg]          = useState("");
 
   useEffect(() => {
     const stored = localStorage.getItem("cs_user");
@@ -672,6 +676,89 @@ export default function Dashboard() {
               </div>
             )}
           </div>
+
+          {/* Ask the Community */}
+          <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem" }}>
+            <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Ask the Community</div>
+            {qaMsg ? (
+              <div style={{ fontSize: "0.82rem", color: "#4ade80", lineHeight: 1.5 }}>{qaMsg}</div>
+            ) : !qaOpen ? (
+              <>
+                <div style={{ fontSize: "0.82rem", color: "var(--cs-muted)", lineHeight: 1.5, marginBottom: "0.75rem" }}>
+                  Recovery tips, shoe advice, race info — ask the community.
+                </div>
+                <button
+                  onClick={() => setQaOpen(true)}
+                  style={{ width: "100%", padding: "10px", background: "rgba(255,255,255,0.07)", color: "var(--cs-white)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "4px", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)" }}
+                >
+                  Ask a question
+                </button>
+              </>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                <select
+                  value={qaForm.category}
+                  onChange={(e) => setQaForm((p) => ({ ...p, category: e.target.value }))}
+                  style={{ width: "100%", padding: "9px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "var(--cs-white)", fontSize: "0.82rem", fontFamily: "var(--font-body)", outline: "none", colorScheme: "dark" }}
+                >
+                  {["General", "Recovery", "Shoes & Gear", "Races & Marathons", "Running Tips"].map((c) => (
+                    <option key={c} value={c} style={{ background: "#1a1a1a" }}>{c}</option>
+                  ))}
+                </select>
+                <input
+                  placeholder="Your question or topic (max 120 chars)"
+                  maxLength={120}
+                  value={qaForm.title}
+                  onChange={(e) => setQaForm((p) => ({ ...p, title: e.target.value }))}
+                  style={{ width: "100%", padding: "9px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "var(--cs-white)", fontSize: "0.82rem", fontFamily: "var(--font-body)", outline: "none", boxSizing: "border-box" }}
+                />
+                <textarea
+                  placeholder="Add more details… (max 600 characters)"
+                  maxLength={600}
+                  value={qaForm.body}
+                  onChange={(e) => setQaForm((p) => ({ ...p, body: e.target.value }))}
+                  rows={3}
+                  style={{ width: "100%", padding: "10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "var(--cs-white)", fontSize: "0.82rem", fontFamily: "var(--font-body)", outline: "none", resize: "vertical", boxSizing: "border-box" }}
+                />
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <button
+                    disabled={qaSaving || !qaForm.title.trim() || !qaForm.body.trim()}
+                    onClick={async () => {
+                      setQaSaving(true);
+                      try {
+                        const res = await fetch("/api/community/posts", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            user_email: user.email,
+                            user_name: `${user.firstName} ${user.lastName}`.trim(),
+                            category: qaForm.category,
+                            title: qaForm.title,
+                            body: qaForm.body,
+                          }),
+                        });
+                        const data = await res.json();
+                        if (!res.ok) setQaMsg(data.error || "Failed to submit.");
+                        else setQaMsg("Post submitted! It will appear on the homepage once approved.");
+                        setQaOpen(false);
+                      } catch { setQaMsg("Something went wrong."); }
+                      finally { setQaSaving(false); }
+                    }}
+                    style={{ flex: 1, padding: "9px", background: qaSaving ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.1)", color: "var(--cs-white)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "4px", fontSize: "0.8rem", fontWeight: 600, cursor: qaSaving ? "not-allowed" : "pointer", fontFamily: "var(--font-body)" }}
+                  >
+                    {qaSaving ? "Submitting…" : "Submit"}
+                  </button>
+                  <button
+                    onClick={() => setQaOpen(false)}
+                    style={{ padding: "9px 14px", background: "transparent", color: "var(--cs-muted)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", fontSize: "0.8rem", cursor: "pointer", fontFamily: "var(--font-body)" }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
         </aside>
       </div>
 
