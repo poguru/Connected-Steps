@@ -10,36 +10,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
     }
 
-    const db = getSupabaseServer();
-
-    // Require verified email OTP
-    const { data: emailOtp } = await db
-      .from("otp_verifications")
-      .select("id")
-      .eq("identifier", email.toLowerCase())
-      .eq("type", "email")
-      .eq("verified", true)
-      .single();
-
-    if (!emailOtp) {
-      return NextResponse.json({ error: "Email not verified. Please complete OTP verification." }, { status: 400 });
-    }
-
-    // Require verified mobile OTP
-    const { data: mobileOtp } = await db
-      .from("otp_verifications")
-      .select("id")
-      .eq("identifier", phone)
-      .eq("type", "mobile")
-      .eq("verified", true)
-      .single();
-
-    if (!mobileOtp) {
-      return NextResponse.json({ error: "Mobile not verified. Please complete OTP verification." }, { status: 400 });
-    }
+    const supabaseServer = getSupabaseServer();
 
     // Check if email already registered
-    const { data: existing, error: checkError } = await db
+    const { data: existing, error: checkError } = await supabaseServer
       .from("users")
       .select("id")
       .eq("email", email.toLowerCase())
@@ -55,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     const hashed = await bcrypt.hash(password, 12);
 
-    const { error } = await db.from("users").insert({
+    const { error } = await supabaseServer.from("users").insert({
       first_name: firstName,
       last_name:  lastName,
       email:      email.toLowerCase(),
@@ -68,11 +42,6 @@ export async function POST(req: NextRequest) {
     if (error) {
       return NextResponse.json({ error: "Insert failed: " + error.message }, { status: 500 });
     }
-
-    // Clean up used OTPs
-    await db.from("otp_verifications")
-      .delete()
-      .in("id", [emailOtp.id, mobileOtp.id]);
 
     return NextResponse.json({ success: true });
   } catch (e: unknown) {
