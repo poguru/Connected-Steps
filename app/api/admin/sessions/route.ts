@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   if (!auth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const { title, date, location } = await req.json();
+  const { title, date, time, location } = await req.json();
   if (!title || !date || !location) {
     return NextResponse.json({ error: "title, date and location are required." }, { status: 400 });
   }
@@ -35,14 +35,14 @@ export async function POST(req: NextRequest) {
   const db = getSupabaseServer();
   const { data, error } = await db
     .from("sessions")
-    .insert({ title, date, location })
+    .insert({ title, date, time: time || null, location })
     .select()
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Await notifications so Vercel doesn't terminate the Lambda before they fire
-  await notifyUsers(db, title, date, location).catch((e) =>
+  await notifyUsers(db, title, date, time || null, location).catch((e) =>
     console.error("Notification error:", e)
   );
 
@@ -53,6 +53,7 @@ async function notifyUsers(
   db: ReturnType<typeof import("@/lib/supabase-server").getSupabaseServer>,
   title: string,
   date: string,
+  time: string | null,
   location: string
 ) {
   // Fetch users at this location
@@ -72,7 +73,7 @@ async function notifyUsers(
       .filter((u) => u.phone?.trim())
       .map((u) => {
         const name = `${u.first_name} ${u.last_name}`.trim() || "there";
-        return sendWhatsApp(u.phone!, sessionWAParams(name, title, date, location));
+        return sendWhatsApp(u.phone!, sessionWAParams(name, title, date, time, location));
       })
   );
   const waSent = waResults.filter((r) => r.status === "fulfilled" && r.value.ok).length;

@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
-interface Session { id: string; title: string; date: string; location: string; }
+interface Session { id: string; title: string; date: string; time: string; location: string; }
 interface Attendee {
   email: string; name: string; location: string;
   attended: boolean; bonus_points: number; bonus_reason: string; points_synced: boolean;
@@ -43,6 +43,7 @@ export default function AdminSessionsPage() {
   // New session form
   const [newTitle,    setNewTitle]    = useState("");
   const [newDate,     setNewDate]     = useState("");
+  const [newTime,     setNewTime]     = useState("");
   const [newLocation, setNewLocation] = useState("");
   const [creating,    setCreating]    = useState(false);
 
@@ -74,10 +75,10 @@ export default function AdminSessionsPage() {
   const createSession = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setCreating(true);
-    const res  = await fetch("/api/admin/sessions", { method: "POST", headers, body: JSON.stringify({ title: newTitle, date: newDate, location: newLocation }) });
+    const res  = await fetch("/api/admin/sessions", { method: "POST", headers, body: JSON.stringify({ title: newTitle, date: newDate, time: newTime, location: newLocation }) });
     const json = await res.json();
     if (res.ok) {
-      setNewTitle(""); setNewDate(""); setNewLocation("");
+      setNewTitle(""); setNewDate(""); setNewTime(""); setNewLocation("");
       await loadSessions();
     } else {
       alert(json.error);
@@ -212,6 +213,10 @@ export default function AdminSessionsPage() {
                 <input style={inp} type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} required />
               </div>
               <div>
+                <label style={label}>Time</label>
+                <input style={inp} type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} />
+              </div>
+              <div>
                 <label style={label}>Location</label>
                 <input style={inp} value={newLocation} onChange={(e) => setNewLocation(e.target.value)} placeholder="e.g. Kondapur" required />
               </div>
@@ -232,7 +237,7 @@ export default function AdminSessionsPage() {
                   <button key={s.id} onClick={() => openSession(s)}
                     style={{ textAlign: "left", padding: "10px 12px", borderRadius: "6px", border: "1px solid", cursor: "pointer", background: selected?.id === s.id ? "rgba(232,98,10,0.1)" : "transparent", borderColor: selected?.id === s.id ? "rgba(232,98,10,0.4)" : "rgba(255,255,255,0.07)", transition: "all 0.15s" }}>
                     <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#fff", marginBottom: "2px" }}>{s.title}</div>
-                    <div style={{ fontSize: "0.72rem", color: "#888" }}>{s.date} · {s.location}</div>
+                    <div style={{ fontSize: "0.72rem", color: "#888" }}>{s.date}{s.time ? ` ${s.time}` : ""} · {s.location}</div>
                   </button>
                 ))}
               </div>
@@ -254,7 +259,7 @@ export default function AdminSessionsPage() {
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem", marginBottom: "1.5rem" }}>
                 <div>
                   <h2 style={{ fontSize: "1.3rem", fontWeight: 300, color: "#fff", marginBottom: "4px" }}>{selected.title}</h2>
-                  <div style={{ fontSize: "0.8rem", color: "#888" }}>{selected.date} · 📍 {selected.location}</div>
+                  <div style={{ fontSize: "0.8rem", color: "#888" }}>{selected.date}{selected.time ? ` at ${selected.time}` : ""} · 📍 {selected.location}</div>
                 </div>
                 <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
                   <button onClick={saveAttendance} disabled={saving} style={btn(true)}>

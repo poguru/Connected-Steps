@@ -193,9 +193,10 @@ function formatDate(date: string): string {
 
 /** WhatsApp params for session_alert template */
 export function sessionWAParams(
-  name: string, title: string, date: string, location: string
+  name: string, title: string, date: string, time: string | null, location: string
 ): string[] {
-  return [name, title, formatDate(date), location];
+  const dateStr = time ? `${formatDate(date)} at ${time}` : formatDate(date);
+  return [name, title, dateStr, location];
 }
 
 /** WhatsApp params for run_registration template
