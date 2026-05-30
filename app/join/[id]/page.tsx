@@ -51,8 +51,7 @@ export default function JoinSessionPage() {
     } catch { /* ignore */ }
   }, [id]);
 
-  const handleJoin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleJoin = async () => {
     setSubmitting(true); setError("");
     try {
       const res  = await fetch(`/api/sessions/${id}/join`, {
@@ -139,31 +138,13 @@ export default function JoinSessionPage() {
               <div>📍 {session?.venue || session?.location}</div>
             </div>
 
-            <form onSubmit={handleJoin} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <div>
-                <label style={{ display: "block", fontSize: "10px", color: "#888", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "6px" }}>Your Email</label>
-                <input
-                  type="email" required
-                  value={email} onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "#fff", fontSize: "0.875rem", outline: "none", boxSizing: "border-box" }}
-                />
-                <div style={{ fontSize: "11px", color: "#555", marginTop: "5px" }}>Use the email you registered with on connectedsteps.in</div>
-              </div>
+            {error && (
+              <div style={{ background: "rgba(226,75,74,0.1)", border: "1px solid rgba(226,75,74,0.3)", borderRadius: "6px", padding: "9px 12px", fontSize: "0.8rem", color: "#f09595", marginBottom: "1rem" }}>{error}</div>
+            )}
 
-              {error && (
-                <div style={{ background: "rgba(226,75,74,0.1)", border: "1px solid rgba(226,75,74,0.3)", borderRadius: "6px", padding: "9px 12px", fontSize: "0.8rem", color: "#f09595" }}>{error}</div>
-              )}
-
-              <button type="submit" disabled={submitting} style={{ padding: "12px", background: "var(--cs-orange)", color: "#fff", border: "none", borderRadius: "6px", fontSize: "0.875rem", fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.7 : 1 }}>
-                {submitting ? "Registering…" : "Confirm — I'm joining 🏃"}
-              </button>
-            </form>
-
-            <p style={{ marginTop: "1rem", fontSize: "11px", color: "#555", textAlign: "center" }}>
-              Don&apos;t have an account?{" "}
-              <Link href="/signup" style={{ color: "var(--cs-orange)", textDecoration: "none" }}>Sign up here</Link>
-            </p>
+            <button onClick={handleJoin} disabled={submitting} style={{ width: "100%", padding: "13px", background: "var(--cs-orange)", color: "#fff", border: "none", borderRadius: "6px", fontSize: "0.9rem", fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.7 : 1 }}>
+              {submitting ? "Registering…" : "Confirm — I'm joining 🏃"}
+            </button>
           </div>
         )}
       </div>
