@@ -9,7 +9,7 @@ export async function GET() {
 
   const { data, error } = await db
     .from("sessions")
-    .select("id, title, date, location")
+    .select("id, title, date, time, venue, location")
     .gte("date", today)
     .order("date", { ascending: true })
     .limit(6);

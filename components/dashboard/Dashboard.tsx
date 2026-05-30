@@ -195,8 +195,9 @@ export default function Dashboard() {
   const [pbs,            setPbs]            = useState<PersonalBests | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [points,         setPoints]         = useState<{ month_points: number; total_points: number } | null>(null);
-  const [sessions,       setSessions]       = useState<SessionRecord[]>([]);
-  const [sessionsLoading,setSessLoading]    = useState(true);
+  const [sessions,          setSessions]          = useState<SessionRecord[]>([]);
+  const [sessionsLoading,   setSessLoading]        = useState(true);
+  const [upcomingSessions,  setUpcomingSessions]   = useState<{ id: string; title: string; date: string; time: string | null; venue: string | null; location: string }[]>([]);
   const [pushEnabled,    setPushEnabled]    = useState(false);
   const [pushSupported,  setPushSupported]  = useState(false);
   const [storyOpen,      setStoryOpen]      = useState(false);
@@ -232,6 +233,11 @@ export default function Dashboard() {
     fetch(`/api/leaderboard/user?email=${encodeURIComponent(u.email)}`)
       .then((r) => r.json())
       .then((d) => { if (d.month_points !== undefined) setPoints(d); })
+      .catch(() => {});
+
+    fetch("/api/sessions")
+      .then((r) => r.json())
+      .then((d) => setUpcomingSessions(d.data ?? []))
       .catch(() => {});
 
     fetch(`/api/user/sessions?email=${encodeURIComponent(u.email)}`)
@@ -454,6 +460,48 @@ export default function Dashboard() {
           {stravaMsg && (
             <div style={{ background: stravaMsg.includes("success") ? "rgba(232,98,10,0.12)" : "rgba(226,75,74,0.1)", border: `1px solid ${stravaMsg.includes("success") ? "rgba(232,98,10,0.4)" : "rgba(226,75,74,0.3)"}`, borderRadius: "6px", padding: "10px 14px", marginBottom: "1rem", fontSize: "0.8rem", color: stravaMsg.includes("success") ? "var(--cs-orange)" : "#f09595" }}>
               {stravaMsg}
+            </div>
+          )}
+
+          {/* Upcoming Sessions */}
+          {upcomingSessions.length > 0 && (
+            <div style={{ marginBottom: "2rem" }}>
+              <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1rem" }}>
+                Upcoming Sessions
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                {upcomingSessions.map((s) => {
+                  const today = new Date(); today.setHours(0,0,0,0);
+                  const sessionDate = new Date(s.date + "T00:00:00");
+                  const diff = Math.round((sessionDate.getTime() - today.getTime()) / 86400000);
+                  const badge = diff === 0 ? "Today" : diff === 1 ? "Tomorrow" : `In ${diff} days`;
+                  const isUrgent = diff <= 1;
+                  const dateStr = sessionDate.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+                  return (
+                    <div key={s.id}
+                      onClick={() => router.push(`/join/${s.id}`)}
+                      style={{ background: "var(--cs-dark)", border: `1px solid ${isUrgent ? "rgba(232,98,10,0.3)" : "rgba(255,255,255,0.06)"}`, borderRadius: "8px", padding: "1rem 1.25rem", display: "flex", alignItems: "center", gap: "1rem", cursor: "pointer", transition: "border-color 0.15s" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.borderColor = "rgba(232,98,10,0.5)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.borderColor = isUrgent ? "rgba(232,98,10,0.3)" : "rgba(255,255,255,0.06)")}>
+                      <div style={{ width: "44px", height: "44px", borderRadius: "8px", background: "rgba(232,98,10,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.3rem", flexShrink: 0 }}>
+                        🏃
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--cs-white)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
+                        <div style={{ fontSize: "0.78rem", color: "var(--cs-muted)", marginTop: "2px" }}>
+                          {dateStr}{s.time ? ` at ${s.time}` : ""} · 📍 {s.venue || s.location}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+                        <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "20px", background: isUrgent ? "var(--cs-orange)" : "rgba(255,255,255,0.07)", color: isUrgent ? "#fff" : "var(--cs-muted)" }}>
+                          {badge}
+                        </span>
+                        <span style={{ fontSize: "0.72rem", color: "var(--cs-orange)", fontWeight: 600 }}>Join →</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
