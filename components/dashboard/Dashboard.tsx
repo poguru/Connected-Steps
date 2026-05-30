@@ -184,6 +184,153 @@ function RateCoachWidget({ userEmail, hasAttended }: { userEmail: string; hasAtt
   );
 }
 
+interface FeedbackItem { id: number; user_name: string; rating: number; comment: string; created_at: string; }
+
+function SessionCard({ rec, userEmail }: { rec: SessionRecord; userEmail: string }) {
+  const s = rec.sessions;
+  const [feedback,    setFeedback]    = useState<FeedbackItem[]>([]);
+  const [fbLoading,   setFbLoading]   = useState(true);
+  const [showFb,      setShowFb]      = useState(false);
+  const [myRating,    setMyRating]    = useState(0);
+  const [myComment,   setMyComment]   = useState("");
+  const [submitting,  setSubmitting]  = useState(false);
+  const [submitted,   setSubmitted]   = useState(false);
+  const [fbMsg,       setFbMsg]       = useState("");
+
+  useEffect(() => {
+    if (!s) return;
+    fetch(`/api/sessions/${s.id}/feedback`)
+      .then((r) => r.json())
+      .then((d) => {
+        setFeedback(d.feedback ?? []);
+        const mine = (d.feedback ?? []).find((f: FeedbackItem) => f.user_name && userEmail);
+        if (mine) { setSubmitted(true); setMyRating(mine.rating); }
+      })
+      .finally(() => setFbLoading(false));
+  }, [s, userEmail]);
+
+  if (!s) return null;
+  const dateStr = new Date(s.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  const totalPts = rec.bonus_points ?? 0;
+
+  async function submitFeedback() {
+    if (!myRating) return;
+    setSubmitting(true); setFbMsg("");
+    const res  = await fetch(`/api/sessions/${s!.id}/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: userEmail, rating: myRating, comment: myComment }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setSubmitted(true);
+      setFbMsg("Thanks for your feedback!");
+      const r2 = await fetch(`/api/sessions/${s!.id}/feedback`);
+      const d2 = await r2.json();
+      setFeedback(d2.feedback ?? []);
+    } else {
+      setFbMsg(data.error ?? "Something went wrong.");
+    }
+    setSubmitting(false);
+  }
+
+  const Stars = ({ value, interactive }: { value: number; interactive?: boolean }) => (
+    <div style={{ display: "flex", gap: "3px" }}>
+      {[1,2,3,4,5].map((star) => (
+        <svg key={star} width="16" height="16" viewBox="0 0 24 24"
+          onClick={interactive ? () => setMyRating(star) : undefined}
+          style={{ cursor: interactive ? "pointer" : "default" }}>
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+            fill={star <= value ? "var(--cs-orange)" : "rgba(255,255,255,0.15)"}
+            stroke={star <= value ? "var(--cs-orange)" : "rgba(255,255,255,0.2)"} strokeWidth="1" />
+        </svg>
+      ))}
+    </div>
+  );
+
+  return (
+    <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", overflow: "hidden" }}>
+      {s.photo_url && (
+        <img src={s.photo_url} alt={`${s.title} group photo`} style={{ width: "100%", maxHeight: "220px", objectFit: "cover", display: "block" }} />
+      )}
+      <div style={{ padding: "1rem 1.25rem", display: "flex", alignItems: "center", gap: "1rem" }}>
+        <div style={{ width: "44px", height: "44px", borderRadius: "8px", background: rec.attended ? "rgba(232,98,10,0.12)" : "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.3rem", flexShrink: 0 }}>
+          {rec.attended ? "✅" : "❌"}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--cs-white)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
+          <div style={{ fontSize: "0.78rem", color: "var(--cs-muted)", marginTop: "2px" }}>{dateStr} · 📍 {s.venue || s.location}</div>
+          {rec.bonus_reason && <div style={{ fontSize: "0.75rem", color: "var(--cs-orange)", marginTop: "2px" }}>{rec.bonus_reason}</div>}
+        </div>
+        <div style={{ textAlign: "right", flexShrink: 0 }}>
+          <div style={{ fontSize: "0.8rem", color: rec.attended ? "var(--cs-orange)" : "var(--cs-muted)", fontWeight: 700 }}>
+            {rec.attended ? (totalPts > 0 ? `+${totalPts} pts` : "Attended") : "Not attended"}
+          </div>
+          <div style={{ fontSize: "10px", color: "var(--cs-muted)", marginTop: "2px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            {rec.attended ? (totalPts > 0 ? "Bonus points" : "No bonus") : "—"}
+          </div>
+        </div>
+      </div>
+
+      {/* Feedback section */}
+      {rec.attended && (
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "0.875rem 1.25rem" }}>
+          {/* Rate prompt / submitted state */}
+          {!submitted ? (
+            <div>
+              <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: "0.5rem" }}>Rate this session</div>
+              <Stars value={myRating} interactive />
+              {myRating > 0 && (
+                <div style={{ marginTop: "0.6rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  <textarea
+                    placeholder="Share your experience (optional)"
+                    value={myComment} onChange={(e) => setMyComment(e.target.value)}
+                    rows={2} maxLength={300}
+                    style={{ width: "100%", padding: "8px 10px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "var(--cs-white)", fontSize: "0.8rem", fontFamily: "var(--font-body)", outline: "none", resize: "none", boxSizing: "border-box" }}
+                  />
+                  <button onClick={submitFeedback} disabled={submitting}
+                    style={{ alignSelf: "flex-start", padding: "7px 16px", background: "var(--cs-orange)", color: "#fff", border: "none", borderRadius: "4px", fontSize: "0.78rem", fontWeight: 600, cursor: submitting ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", opacity: submitting ? 0.7 : 1 }}>
+                    {submitting ? "Submitting…" : "Submit"}
+                  </button>
+                </div>
+              )}
+              {fbMsg && <div style={{ fontSize: "0.75rem", color: fbMsg.startsWith("Thanks") ? "#4ade80" : "#f09595", marginTop: "0.4rem" }}>{fbMsg}</div>}
+            </div>
+          ) : (
+            <div style={{ fontSize: "0.78rem", color: "var(--cs-muted)" }}>
+              Your rating: <Stars value={myRating} />
+              {fbMsg && <span style={{ color: "#4ade80", marginLeft: "8px" }}>{fbMsg}</span>}
+            </div>
+          )}
+
+          {/* All feedback */}
+          {!fbLoading && feedback.length > 0 && (
+            <div style={{ marginTop: "0.75rem" }}>
+              <button onClick={() => setShowFb((p) => !p)}
+                style={{ fontSize: "11px", color: "var(--cs-orange)", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "var(--font-body)", letterSpacing: "0.05em" }}>
+                {showFb ? "▲ Hide" : `▼ See ${feedback.length} review${feedback.length !== 1 ? "s" : ""}`}
+              </button>
+              {showFb && (
+                <div style={{ marginTop: "0.6rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                  {feedback.map((f) => (
+                    <div key={f.id} style={{ background: "rgba(255,255,255,0.03)", borderRadius: "6px", padding: "0.6rem 0.75rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                        <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--cs-white)" }}>{f.user_name}</span>
+                        <Stars value={f.rating} />
+                      </div>
+                      {f.comment && <div style={{ fontSize: "0.78rem", color: "var(--cs-muted)", lineHeight: 1.5 }}>{f.comment}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const router       = useRouter();
   const searchParams = useSearchParams();
@@ -500,44 +647,9 @@ export default function Dashboard() {
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              {sessions.map((rec, i) => {
-                const s = rec.sessions;
-                if (!s) return null;
-                const d = new Date(s.date);
-                const dateStr = d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-                const totalPts = (rec.bonus_points ?? 0);
-                return (
-                  <div key={i} style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", overflow: "hidden" }}>
-                    {/* Session photo */}
-                    {s.photo_url && (
-                      <img src={s.photo_url} alt={`${s.title} group photo`}
-                        style={{ width: "100%", maxHeight: "220px", objectFit: "cover", display: "block" }} />
-                    )}
-                    <div style={{ padding: "1rem 1.25rem", display: "flex", alignItems: "center", gap: "1rem" }}>
-                      <div style={{ width: "44px", height: "44px", borderRadius: "8px", background: rec.attended ? "rgba(232,98,10,0.12)" : "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.3rem", flexShrink: 0 }}>
-                        {rec.attended ? "✅" : "❌"}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--cs-white)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
-                        <div style={{ fontSize: "0.78rem", color: "var(--cs-muted)", marginTop: "2px" }}>
-                          {dateStr} · 📍 {s.venue || s.location}
-                        </div>
-                        {rec.bonus_reason && (
-                          <div style={{ fontSize: "0.75rem", color: "var(--cs-orange)", marginTop: "2px" }}>{rec.bonus_reason}</div>
-                        )}
-                      </div>
-                      <div style={{ textAlign: "right", flexShrink: 0 }}>
-                        <div style={{ fontSize: "0.8rem", color: rec.attended ? "var(--cs-orange)" : "var(--cs-muted)", fontWeight: 700 }}>
-                          {rec.attended ? (totalPts > 0 ? `+${totalPts} pts` : "Attended") : "Not attended"}
-                        </div>
-                        <div style={{ fontSize: "10px", color: "var(--cs-muted)", marginTop: "2px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                          {rec.attended ? (totalPts > 0 ? "Bonus points" : "No bonus") : "—"}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              {sessions.map((rec, i) => (
+                <SessionCard key={i} rec={rec} userEmail={user.email} />
+              ))}
             </div>
           )}
         </main>

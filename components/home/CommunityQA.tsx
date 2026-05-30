@@ -416,7 +416,7 @@ export default function CommunityQA() {
       {/* Floating Ask button */}
       <button
         onClick={handleAskClick}
-        style={{ position: "fixed", bottom: "2rem", right: "2rem", zIndex: 50, display: "flex", alignItems: "center", gap: "8px", padding: "13px 22px", background: "var(--cs-orange)", color: "#fff", border: "none", borderRadius: "50px", fontSize: "0.875rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 20px rgba(232,98,10,0.45)", transition: "transform 0.15s, box-shadow 0.15s" }}
+        style={{ position: "fixed", bottom: "2rem", left: "2rem", zIndex: 50, display: "flex", alignItems: "center", gap: "8px", padding: "13px 22px", background: "var(--cs-orange)", color: "#fff", border: "none", borderRadius: "50px", fontSize: "0.875rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 20px rgba(232,98,10,0.45)", transition: "transform 0.15s, box-shadow 0.15s" }}
         onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 6px 28px rgba(232,98,10,0.55)"; }}
         onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(232,98,10,0.45)"; }}
       >
