@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AskCommunityFab from "@/components/ui/AskCommunityFab";
 
 const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
   "Recovery":           { bg: "rgba(74,222,128,0.1)",   color: "#4ade80" },
@@ -413,18 +414,8 @@ export default function CommunityQA() {
 
       </div>
 
-      {/* Floating Ask button */}
-      <button
-        onClick={handleAskClick}
-        style={{ position: "fixed", bottom: "2rem", left: "2rem", zIndex: 50, display: "flex", alignItems: "center", gap: "8px", padding: "13px 22px", background: "var(--cs-orange)", color: "#fff", border: "none", borderRadius: "50px", fontSize: "0.875rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 20px rgba(232,98,10,0.45)", transition: "transform 0.15s, box-shadow 0.15s" }}
-        onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 6px 28px rgba(232,98,10,0.55)"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(232,98,10,0.45)"; }}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Ask a question
-      </button>
-
       {modalOpen && <AskModal onClose={() => setModalOpen(false)} onPosted={loadPosts} />}
+      <AskCommunityFab />
     </section>
   );
 }

@@ -7,6 +7,7 @@ import Link from "next/link";
 import UserMenu, { MenuUser } from "@/components/ui/UserMenu";
 import MembershipCard from "@/components/ui/MembershipCard";
 import TrainingPlan from "@/components/dashboard/TrainingPlan";
+import AskCommunityFab from "@/components/ui/AskCommunityFab";
 
 type ModalType = "followers" | "following" | null;
 
@@ -85,13 +86,6 @@ function calcActivityPoints(type: string, distanceM: number, movingTimeSecs: num
   }
 }
 
-function fmtPace(mps: number) {
-  if (!mps) return "—";
-  const secPerKm = 1000 / mps;
-  const min = Math.floor(secPerKm / 60);
-  const sec = Math.round(secPerKm % 60);
-  return `${min}:${sec.toString().padStart(2, "0")} /km`;
-}
 
 
 async function getValidToken(tokens: StravaTokens): Promise<string> {
@@ -917,6 +911,8 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      <AskCommunityFab />
     </div>
   );
 }
