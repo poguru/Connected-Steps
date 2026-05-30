@@ -30,7 +30,7 @@ export async function GET() {
         ? Math.round((fb.reduce((sum, f) => sum + f.rating, 0) / fb.length) * 10) / 10
         : null;
 
-      return { ...s, avgRating, reviewCount: fb.length, feedback: fb.slice(0, 3) };
+      return { ...s, avgRating, reviewCount: fb.length, feedback: fb };
     })
   );
 
