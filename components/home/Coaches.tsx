@@ -1,5 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
+interface CoachRating { coach_name: string; avg: number; count: number; }
+
 const coaches = [
   {
     name: "Ashokan K",
@@ -79,6 +83,19 @@ const coaches = [
 ];
 
 export default function Coaches() {
+  const [ratings, setRatings] = useState<CoachRating[]>([]);
+
+  useEffect(() => {
+    fetch("/api/coach-rating")
+      .then((r) => r.json())
+      .then((d) => { if (d.ratings) setRatings(d.ratings); })
+      .catch(() => {});
+  }, []);
+
+  function getRating(name: string) {
+    return ratings.find((r) => r.coach_name === name);
+  }
+
   return (
     <section id="coaches" className="section" style={{ background: "var(--cs-black)" }}>
       <div className="container">
@@ -145,10 +162,16 @@ export default function Coaches() {
                 <div style={{ fontSize: "11px", color: "var(--cs-orange)", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
                   {coach.role}
                 </div>
-                <h3 className="font-display" style={{ fontSize: "clamp(1.8rem, 3vw, 2.5rem)", fontWeight: 300, color: "var(--cs-white)", marginBottom: "0.4rem" }}>
-                  {coach.name}
-                </h3>
-                <div style={{ fontSize: "0.8rem", color: "var(--cs-muted)", marginBottom: "1.25rem" }}>📍 {coach.location}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap", marginBottom: "0.4rem" }}>
+                  <h3 className="font-display" style={{ fontSize: "clamp(1.8rem, 3vw, 2.5rem)", fontWeight: 300, color: "var(--cs-white)", margin: 0 }}>
+                    {coach.name}
+                  </h3>
+                  {(() => { const r = getRating(coach.name); return r ? (
+                    <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "#fbbf24", background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.25)", borderRadius: "20px", padding: "3px 10px", whiteSpace: "nowrap" }}>
+                      ★ {r.avg} <span style={{ color: "var(--cs-muted)", fontWeight: 400 }}>({r.count} {r.count === 1 ? "review" : "reviews"})</span>
+                    </span>
+                  ) : null; })()}
+                </div>
 
                 {/* Bio */}
                 <p style={{ fontSize: "0.9rem", color: "var(--cs-muted)", lineHeight: 1.8, marginBottom: "1.5rem" }}>

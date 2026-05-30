@@ -192,7 +192,7 @@ export default function WeekendRunForm() {
           <Image src="/logo.png" alt="Connected Steps" width={36} height={36} className="rounded-full" />
           <span className="font-display" style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--cs-white)" }}>Connected Steps</span>
         </Link>
-        <Link href="/" style={{ fontSize: "0.8rem", color: "var(--cs-muted)", textDecoration: "none" }}>← Back to home</Link>
+        <Link href="/dashboard" style={{ fontSize: "0.8rem", color: "var(--cs-muted)", textDecoration: "none" }}>← Back to dashboard</Link>
       </header>
 
       <div style={{ maxWidth: "680px", margin: "0 auto", padding: "6rem 1.5rem 4rem" }}>
@@ -204,7 +204,12 @@ export default function WeekendRunForm() {
             <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--cs-white)" }}>{UPCOMING_EVENT.name}</div>
             <div style={{ fontSize: "0.8rem", color: "var(--cs-muted)", marginTop: "2px" }}>📅 {UPCOMING_EVENT.displayDate} &nbsp;·&nbsp; 📍 {UPCOMING_EVENT.location}</div>
           </div>
-          <div style={{ fontSize: "11px", padding: "4px 12px", borderRadius: "20px", background: "var(--cs-orange)", color: "var(--cs-white)", fontWeight: 600 }}>Open</div>
+          <button
+            type="button"
+            onClick={() => document.getElementById("run-form")?.scrollIntoView({ behavior: "smooth" })}
+            style={{ fontSize: "11px", padding: "4px 12px", borderRadius: "20px", background: "var(--cs-orange)", color: "var(--cs-white)", fontWeight: 600, border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+            Open
+          </button>
         </div>
 
         {/* Fee notice */}
@@ -251,7 +256,7 @@ export default function WeekendRunForm() {
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} noValidate>
+          <form id="run-form" onSubmit={handleSubmit} noValidate>
 
             {isMember && (
               <div style={{ background: "rgba(232,98,10,0.08)", border: "1px solid rgba(232,98,10,0.2)", borderRadius: "6px", padding: "10px 14px", marginBottom: "1.5rem", fontSize: "0.825rem", color: "var(--cs-orange)" }}>

@@ -5,15 +5,17 @@ import Link from "next/link";
 import Image from "next/image";
 
 export default function Hero() {
-  const [members, setMembers]   = useState<number | null>(null);
-  const [runs,    setRuns]      = useState<number | null>(null);
+  const [members,   setMembers]   = useState<number | null>(null);
+  const [runs,      setRuns]      = useState<number | null>(null);
+  const [avgRating, setAvgRating] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/stats")
       .then((r) => r.json())
       .then((d) => {
-        setMembers(d.members);
-        setRuns(d.runRegistrations);
+        setMembers(d.totalRunners);
+        setRuns(d.weekendRuns);
+        setAvgRating(d.avgRating);
       })
       .catch(() => {});
   }, []);
@@ -60,7 +62,7 @@ export default function Hero() {
               {[
                 { num: fmt(members), label: "Members" },
                 { num: fmt(runs),    label: "Run registrations" },
-                { num: "4.9★",       label: "Coach rating" },
+                { num: avgRating ? `${avgRating}★` : "—", label: "Community rating" },
               ].map((s) => (
                 <div key={s.label} style={{ minWidth: "80px" }}>
                   <div className="font-display text-2xl font-light" style={{ color: "var(--cs-white)" }}>{s.num}</div>

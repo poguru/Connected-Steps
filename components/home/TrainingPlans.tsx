@@ -4,28 +4,40 @@ import Link from "next/link";
 
 const plans = [
   {
-    tier: "Starter", distance: "5K", duration: "8 weeks",
+    tier: "Starter", title: "5K", duration: "8 weeks",
     desc: "Perfect for first-timers. Build your base, run your first 5K with confidence.",
     features: ["3 runs per week", "Walk-run intervals", "Weekly coach check-in", "Nutrition basics"],
     color: "var(--cs-orange)",
   },
   {
-    tier: "Intermediate", distance: "10K", duration: "10 weeks",
+    tier: "Intermediate", title: "10K", duration: "10 weeks",
     desc: "Push past the 5K. Build speed, endurance, and race-day confidence for 10K.",
     features: ["4 runs per week", "Interval & tempo runs", "Weekly coach check-in", "Race strategy"],
     color: "var(--cs-white)",
   },
   {
-    tier: "Builder", distance: "Half Marathon", duration: "14 weeks",
+    tier: "Builder", title: "Half Marathon", duration: "14 weeks",
     desc: "Take the leap to 21K. Structured tempo runs, long runs, and race strategy.",
     features: ["5 runs per week", "Tempo & interval sessions", "Bi-weekly coach call", "Race day plan"],
     color: "var(--cs-white)", featured: true,
   },
   {
-    tier: "Elite", distance: "Full Marathon", duration: "20 weeks",
+    tier: "Elite", title: "Full Marathon", duration: "20 weeks",
     desc: "26.2 miles of purpose. For runners ready to go the full distance.",
     features: ["6 runs per week", "Strength & mobility", "Weekly 1-on-1 coaching", "GPS pace targets"],
     color: "rgba(232,98,10,0.6)",
+  },
+  {
+    tier: "Wellness", title: "Weight Loss", duration: "8 weeks",
+    desc: "Structured cardio and nutrition guidance to burn fat, build stamina, and feel confident.",
+    features: ["3 sessions per week", "Cardio & fat-burn focus", "Nutrition guidance", "Progress tracking"],
+    color: "var(--cs-white)",
+  },
+  {
+    tier: "Power", title: "Strength", duration: "10 weeks",
+    desc: "Build a stronger body with structured conditioning designed for runners and athletes.",
+    features: ["3–4 sessions per week", "Progressive overload", "Core & stability", "Injury prevention"],
+    color: "var(--cs-white)",
   },
 ];
 
@@ -35,15 +47,16 @@ export default function TrainingPlans() {
       <div className="container">
         <div className="text-center mb-16">
           <span className="gold-line mx-auto" />
-          <div className="section-label">Training plans</div>
-          <h2 className="font-display mt-2"
-            style={{ fontSize: "clamp(2.2rem, 4vw, 3.5rem)", fontWeight: 300, color: "var(--cs-white)" }}>
-            Your distance. Your pace.
-            <br /><em className="not-italic" style={{ color: "var(--cs-orange)" }}>Our expertise.</em>
+          <h2 className="font-display mt-4"
+            style={{ fontSize: "clamp(2.8rem, 5vw, 4.5rem)", fontWeight: 300, color: "var(--cs-white)", letterSpacing: "-0.01em" }}>
+            Training Plans
           </h2>
+          <p style={{ marginTop: "1rem", fontSize: "1rem", color: "var(--cs-muted)", maxWidth: "480px", margin: "1rem auto 0" }}>
+            Goal-specific programmes built by national-level coaches — for every runner, every goal.
+          </p>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {plans.map((plan) => (
             <div key={plan.tier} className="relative flex flex-col"
               style={{
@@ -61,8 +74,8 @@ export default function TrainingPlans() {
               )}
               <div className="mb-6">
                 <div className="text-xs tracking-widest uppercase mb-2" style={{ color: plan.color }}>{plan.tier}</div>
-                <div className="font-display mb-1" style={{ fontSize: "3rem", fontWeight: 300, color: "var(--cs-white)", lineHeight: 1 }}>
-                  {plan.distance}
+                <div className="font-display mb-1" style={{ fontSize: "clamp(2rem, 3vw, 2.8rem)", fontWeight: 300, color: "var(--cs-white)", lineHeight: 1.1 }}>
+                  {plan.title}
                 </div>
                 <div className="text-xs tracking-wide uppercase" style={{ color: "var(--cs-muted)" }}>{plan.duration} programme</div>
               </div>

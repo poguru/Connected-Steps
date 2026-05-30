@@ -24,7 +24,7 @@ const features = [
   "Personalised training plan",
   "Weekly coach check-in",
   "Real-time analytics dashboard",
-  "Strava & Garmin sync",
+  "Session attendance tracking",
   "Community & group challenges",
   "Weekend special run access",
   "WhatsApp coach support",

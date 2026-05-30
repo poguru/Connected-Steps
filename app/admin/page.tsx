@@ -46,6 +46,12 @@ const cards = [
     desc:  "Review and approve questions, tips, and discussions posted by community members.",
     icon:  "💬",
   },
+  {
+    href:  "/admin/coach-ratings",
+    title: "Coach Ratings",
+    desc:  "View all coach ratings and feedback submitted by members.",
+    icon:  "⭐",
+  },
 ];
 
 export default function AdminHub() {

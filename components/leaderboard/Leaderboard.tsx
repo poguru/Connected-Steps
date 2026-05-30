@@ -18,20 +18,14 @@ interface User {
 }
 
 interface LeaderboardEntry {
-  id:              string;
-  user_email:      string;
-  user_name:       string;
-  location:        string;
-  goal:            string;
-  month_runs:      number;
-  month_km:        number;
-  month_time_secs: number;
-  month_points:    number;
-  total_runs:      number;
-  total_km:        number;
-  total_time_secs: number;
-  total_points:    number;
-  updated_at:      string;
+  id:           string;
+  user_email:   string;
+  user_name:    string;
+  location:     string;
+  goal:         string;
+  month_points: number;
+  total_points: number;
+  updated_at:   string;
 }
 
 const goalLabel: Record<string, string> = {
@@ -75,7 +69,7 @@ export default function Leaderboard() {
       setLoading(true);
       const { data, error } = await getSupabase()
         .from("leaderboard")
-        .select("id, user_email, user_name, location, goal, month_runs, month_km, month_time_secs, month_points, total_runs, total_km, total_time_secs, total_points, updated_at")
+        .select("id, user_email, user_name, location, goal, month_points, total_points, updated_at")
         .order(tab === "month" ? "month_points" : "total_points", { ascending: false });
       if (!error && data) setEntries(data);
       setLoading(false);
@@ -161,7 +155,7 @@ export default function Leaderboard() {
         <div style={{ marginBottom: "2rem" }}>
           <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.5rem" }}>Connected Steps</div>
           <h1 className="font-display" style={{ fontSize: "2rem", fontWeight: 300, color: "var(--cs-white)", marginBottom: "0.5rem" }}>Community Leaderboard</h1>
-          <p style={{ fontSize: "0.875rem", color: "var(--cs-muted)" }}>Top 3 this month win prizes. Earn points by attending sessions and connecting Strava.</p>
+          <p style={{ fontSize: "0.875rem", color: "var(--cs-muted)" }}>Top 3 this month win prizes. Earn points by attending training sessions.</p>
         </div>
 
         {/* Tab switcher */}
@@ -194,10 +188,7 @@ export default function Leaderboard() {
           <div className="cs-lb-header">
             <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Rank</div>
             <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Athlete</div>
-            <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase" }}>{tab === "month" ? "This Month km" : "Total km"}</div>
-            <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Runs</div>
-            <div className="cs-lb-hide-mobile" style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Time</div>
-            <div className="cs-lb-hide-mobile" style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Points</div>
+            <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Points</div>
           </div>
 
           {loading && (
@@ -210,17 +201,13 @@ export default function Leaderboard() {
             <div style={{ padding: "3rem", textAlign: "center" }}>
               <div style={{ fontSize: "2rem", marginBottom: "1rem" }}>🏃</div>
               <div style={{ fontSize: "1rem", fontWeight: 600, color: "var(--cs-white)", marginBottom: "0.5rem" }}>No entries yet</div>
-              <div style={{ fontSize: "0.875rem", color: "var(--cs-muted)" }}>Be the first! Connect your Strava from the dashboard.</div>
+              <div style={{ fontSize: "0.875rem", color: "var(--cs-muted)" }}>Attend a training session to earn your first points.</div>
             </div>
           )}
 
           {entries.map((entry, i) => {
-            const isMe = entry.user_name === fullName;
-            const km   = tab === "month" ? entry.month_km : entry.total_km;
-            const runs = tab === "month" ? entry.month_runs : entry.total_runs;
-            const secs = tab === "month" ? entry.month_time_secs : (entry.total_time_secs ?? 0);
-            const h    = Math.floor(secs / 3600);
-            const m    = Math.floor((secs % 3600) / 60);
+            const isMe  = entry.user_name === fullName;
+            const pts   = (tab === "month" ? entry.month_points : entry.total_points) ?? 0;
 
             return (
               <div
@@ -247,19 +234,9 @@ export default function Leaderboard() {
                   </div>
                 </div>
 
-                <div style={{ fontSize: "1rem", fontWeight: 700, color: "var(--cs-white)" }}>
-                  {km.toFixed(1)} <span style={{ fontSize: "11px", color: "var(--cs-muted)", fontWeight: 400 }}>km</span>
-                </div>
-
-                <div style={{ fontSize: "0.875rem", color: "var(--cs-white)" }}>{runs}</div>
-
-                <div className="cs-lb-hide-mobile" style={{ fontSize: "0.875rem", color: "var(--cs-white)" }}>
-                  {`${h}h ${m}m`}
-                </div>
-
-                <div className="cs-lb-hide-mobile" style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
                   <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--cs-orange)", minWidth: "48px" }}>
-                    {(tab === "month" ? entry.month_points : entry.total_points) ?? 0}
+                    {pts}
                     <span style={{ fontSize: "10px", fontWeight: 400, color: "var(--cs-muted)", marginLeft: "3px" }}>pts</span>
                   </div>
                   {!isMe && (

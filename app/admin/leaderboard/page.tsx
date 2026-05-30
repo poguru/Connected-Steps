@@ -61,10 +61,12 @@ export default function AdminLeaderboardPage() {
 
   const [live,       setLive]       = useState<LiveEntry[]>([]);
   const [archives,   setArchives]   = useState<ArchiveEntry[]>([]);
-  const [archiving,  setArchiving]  = useState(false);
-  const [archiveMsg, setArchiveMsg] = useState("");
-  const [expanded,   setExpanded]   = useState<string | null>(null);
-  const [view,       setView]       = useState<"overall" | "location">("overall");
+  const [archiving,    setArchiving]    = useState(false);
+  const [archiveMsg,   setArchiveMsg]   = useState("");
+  const [expanded,     setExpanded]     = useState<string | null>(null);
+  const [view,         setView]         = useState<"overall" | "location">("overall");
+  const [recalculating,setRecalculating]= useState(false);
+  const [recalcMsg,    setRecalcMsg]    = useState("");
 
   const headers = { "Content-Type": "application/json", "x-admin-password": password };
 
@@ -93,6 +95,26 @@ export default function AdminLeaderboardPage() {
     if (json.live)     setLive(json.live);
     if (json.archives) setArchives(json.archives);
   }, [password]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const recalculate = async () => {
+    setRecalculating(true); setRecalcMsg("");
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    try {
+      const res  = await fetch("/api/admin/leaderboard/recalculate", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ month: currentMonth }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setRecalcMsg(`Error: ${json.error}`); return; }
+      setRecalcMsg(json.message ?? "Done.");
+      await reload();
+    } catch {
+      setRecalcMsg("Network error. Try again.");
+    } finally {
+      setRecalculating(false);
+    }
+  };
 
   const archiveNow = async () => {
     setArchiving(true); setArchiveMsg("");
@@ -221,11 +243,23 @@ export default function AdminLeaderboardPage() {
               <div style={{ fontSize: "1.2rem", fontWeight: 600, color: "#fff" }}>{monthLabel(currentMonth)}</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+              {recalcMsg && (
+                <div style={{ fontSize: "0.8rem", color: recalcMsg.startsWith("Error") ? "#f09595" : "#4ade80" }}>
+                  {recalcMsg}
+                </div>
+              )}
               {archiveMsg && (
                 <div style={{ fontSize: "0.8rem", color: archiveMsg.startsWith("Error") ? "#f09595" : "#4ade80" }}>
                   {archiveMsg}
                 </div>
               )}
+              <button
+                onClick={recalculate}
+                disabled={recalculating}
+                style={{ padding: "9px 20px", background: recalculating ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.08)", color: recalculating ? "#555" : "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "6px", fontWeight: 700, cursor: recalculating ? "not-allowed" : "pointer", fontSize: "0.825rem", whiteSpace: "nowrap" }}
+              >
+                {recalculating ? "Recalculating…" : "Recalculate Points"}
+              </button>
               <button
                 onClick={archiveNow}
                 disabled={archiving}

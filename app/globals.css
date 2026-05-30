@@ -330,7 +330,7 @@ select.auth-input option {
 /* Leaderboard row grid */
 .cs-lb-header {
   display: grid;
-  grid-template-columns: 60px 1fr 120px 100px 100px 160px;
+  grid-template-columns: 60px 1fr 160px;
   gap: 1rem;
   padding: 0.75rem 1.5rem;
   border-bottom: 1px solid rgba(255,255,255,0.06);
@@ -339,7 +339,7 @@ select.auth-input option {
 
 .cs-lb-row {
   display: grid;
-  grid-template-columns: 60px 1fr 120px 100px 100px 160px;
+  grid-template-columns: 60px 1fr 160px;
   gap: 1rem;
   padding: 1rem 1.5rem;
   border-bottom: 1px solid rgba(255,255,255,0.04);
@@ -398,18 +398,16 @@ select.auth-input option {
 
 @media (max-width: 768px) {
   .cs-lb-header {
-    grid-template-columns: 40px 1fr 80px 80px;
+    grid-template-columns: 40px 1fr 100px;
     padding: 0.75rem 1rem;
     gap: 0.5rem;
   }
 
   .cs-lb-row {
-    grid-template-columns: 40px 1fr 80px 80px;
+    grid-template-columns: 40px 1fr 100px;
     padding: 0.75rem 1rem;
     gap: 0.5rem;
   }
-
-  .cs-lb-hide-mobile { display: none; }
 }
 
 /* ─── Auth split layout ──────────────────────────────── */

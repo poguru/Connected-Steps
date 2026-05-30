@@ -37,9 +37,8 @@ export default function AdminSessionsPage() {
   const [sessionLoad, setSessionLoad] = useState(false);
   const [attendLoad,  setAttendLoad]  = useState(false);
   const [saveMsg,     setSaveMsg]     = useState("");
-  const [syncMsg,     setSyncMsg]     = useState("");
-  const [syncing,     setSyncing]     = useState(false);
   const [saving,      setSaving]      = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
 
   // New session form
   const [newTitle,    setNewTitle]    = useState("");
@@ -88,7 +87,7 @@ export default function AdminSessionsPage() {
 
   /* ── Select session → load users ── */
   const openSession = async (s: Session) => {
-    setSelected(s); setAttendees([]); setSaveMsg(""); setSyncMsg("");
+    setSelected(s); setAttendees([]); setSaveMsg(""); setSyncMsg(""); setLastSavedAt(null);
     setSessionLoad(true);
     const res  = await fetch(`/api/admin/sessions/${s.id}/attendance`, { headers: { "x-admin-password": password } });
     const json = await res.json();
@@ -106,34 +105,48 @@ export default function AdminSessionsPage() {
   const setReason = (email: string, reason: string) =>
     setAttendees((prev) => prev.map((a) => a.email === email ? { ...a, bonus_reason: reason } : a));
 
-  /* ── Save attendance ── */
+  /* ── Save attendance + auto-update leaderboard ── */
   const saveAttendance = async () => {
     if (!selected) return;
     setSaving(true); setSaveMsg("");
-    const res  = await fetch(`/api/admin/sessions/${selected.id}/attendance`, {
+
+    // Step 1: save attendance records
+    const saveRes  = await fetch(`/api/admin/sessions/${selected.id}/attendance`, {
       method: "POST", headers,
       body: JSON.stringify({ users: attendees.map((a) => ({ email: a.email, name: a.name, attended: a.attended, bonus_points: a.bonus_points, bonus_reason: a.bonus_reason })) }),
     });
-    const json = await res.json();
-    setSaveMsg(res.ok ? "Attendance saved." : json.error);
+    const saveJson = await saveRes.json();
+
+    if (!saveRes.ok) {
+      setSaveMsg(`Error saving attendance: ${saveJson.error}`);
+      setSaving(false);
+      return;
+    }
+
+    // Step 2: recalculate leaderboard for this session's month
+    const month = selected.date.slice(0, 7); // "YYYY-MM"
+    const calcRes  = await fetch("/api/admin/leaderboard/recalculate", {
+      method: "POST", headers,
+      body: JSON.stringify({ month }),
+    });
+    const calcJson = await calcRes.json();
+
+    const parts: string[] = [];
+    if (saveJson.saved   > 0) parts.push(`${saveJson.saved} row${saveJson.saved !== 1 ? "s" : ""} saved`);
+    if (saveJson.skipped > 0) parts.push(`${saveJson.skipped} skipped (already synced)`);
+    if (calcRes.ok) parts.push(`leaderboard updated (${calcJson.updated ?? 0} users)`);
+    else            parts.push(`leaderboard update failed: ${calcJson.error}`);
+
+    setSaveMsg(parts.join(" · "));
+    setLastSavedAt(new Date().toLocaleTimeString());
+
+    // Reload attendance to reflect new synced status
+    await openSession(selected);
     setSaving(false);
   };
 
-  /* ── Sync points ── */
-  const syncPoints = async () => {
-    if (!selected) return;
-    setSyncing(true); setSyncMsg("");
-    const res  = await fetch(`/api/admin/sessions/${selected.id}/sync`, { method: "POST", headers });
-    const json = await res.json();
-    setSyncMsg(json.message ?? (res.ok ? "Done." : json.error));
-    // Reload to show synced status
-    await openSession(selected);
-    setSyncing(false);
-  };
-
-  const attendCount  = attendees.filter((a) => a.attended).length;
-  const syncedCount  = attendees.filter((a) => a.points_synced).length;
-  const allSynced    = attendees.length > 0 && syncedCount === attendees.length;
+  const attendCount = attendees.filter((a) => a.attended).length;
+  const syncedCount = attendees.filter((a) => a.points_synced).length;
 
   /* ── Password gate ── */
   if (!authed) {
@@ -244,19 +257,19 @@ export default function AdminSessionsPage() {
                   <div style={{ fontSize: "0.8rem", color: "#888" }}>{selected.date} · 📍 {selected.location}</div>
                 </div>
                 <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-                  <button onClick={saveAttendance} disabled={saving} style={btn(false)}>
-                    {saving ? "Saving…" : "Save Attendance"}
-                  </button>
-                  <button onClick={syncPoints} disabled={syncing || allSynced} style={btn(true)}
-                    title={allSynced ? "All points already synced" : "Award points to leaderboard"}>
-                    {syncing ? "Syncing…" : allSynced ? "Points Synced ✓" : "Sync Points to Leaderboard"}
+                  <button onClick={saveAttendance} disabled={saving} style={btn(true)}>
+                    {saving ? "Saving & updating leaderboard…" : "Save Attendance"}
                   </button>
                 </div>
               </div>
 
               {/* Messages */}
-              {saveMsg && <div style={{ background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.25)", borderRadius: "6px", padding: "9px 14px", marginBottom: "1rem", fontSize: "0.8rem", color: "#4ade80" }}>{saveMsg}</div>}
-              {syncMsg && <div style={{ background: "rgba(232,98,10,0.08)", border: "1px solid rgba(232,98,10,0.25)", borderRadius: "6px", padding: "9px 14px", marginBottom: "1rem", fontSize: "0.8rem", color: "#e8620a" }}>{syncMsg}</div>}
+              {saveMsg && (
+                <div style={{ background: saveMsg.includes("failed") ? "rgba(226,75,74,0.08)" : "rgba(74,222,128,0.08)", border: `1px solid ${saveMsg.includes("failed") ? "rgba(226,75,74,0.3)" : "rgba(74,222,128,0.25)"}`, borderRadius: "6px", padding: "9px 14px", marginBottom: "1rem", fontSize: "0.8rem", color: saveMsg.includes("failed") ? "#f09595" : "#4ade80", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>{saveMsg}</span>
+                  {lastSavedAt && <span style={{ fontSize: "10px", color: "#666", flexShrink: 0, marginLeft: "1rem" }}>at {lastSavedAt}</span>}
+                </div>
+              )}
 
               {/* Stats row */}
               <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
@@ -344,7 +357,7 @@ export default function AdminSessionsPage() {
               )}
 
               <p style={{ fontSize: "11px", color: "#444", marginTop: "1rem" }}>
-                Attendance = 5 pts per person. Save first, then click <strong style={{ color: "#888" }}>Sync Points</strong> to push to leaderboard. Points sync only once per session.
+                Attendance = 5 pts per person. Click <strong style={{ color: "#888" }}>Save Attendance</strong> — leaderboard updates automatically. Already-synced rows are locked.
               </p>
             </>
           )}

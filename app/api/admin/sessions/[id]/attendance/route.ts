@@ -22,13 +22,11 @@ export async function GET(
     .single();
   if (sessionErr) return NextResponse.json({ error: sessionErr.message }, { status: 500 });
 
-  // All registered users at this location (case-insensitive)
   const { data: users } = await db
     .from("users")
     .select("email, first_name, last_name, location")
     .ilike("location", `%${session.location}%`);
 
-  // Existing attendance records for this session
   const { data: attendance } = await db
     .from("session_attendance")
     .select("*")
@@ -57,7 +55,7 @@ export async function GET(
   return NextResponse.json({ session, users: merged });
 }
 
-// POST — save attendance + bonus points (does NOT sync to leaderboard yet)
+// POST — save attendance + bonus points, preserving already-synced rows
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -70,20 +68,39 @@ export async function POST(
 
   const db = getSupabaseServer();
 
-  const records = users.map((u) => ({
-    session_id:    id,
-    user_email:    u.email,
-    user_name:     u.name,
-    attended:      u.attended,
-    bonus_points:  u.bonus_points  ?? 0,
-    bonus_reason:  u.bonus_reason  ?? "",
-    points_synced: false,
-  }));
-
-  const { error } = await db
+  // Fetch existing records to preserve points_synced status
+  const { data: existing } = await db
     .from("session_attendance")
-    .upsert(records, { onConflict: "session_id,user_email", ignoreDuplicates: false });
+    .select("user_email, points_synced")
+    .eq("session_id", id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ success: true });
+  const syncedEmails = new Set(
+    (existing ?? []).filter((r) => r.points_synced).map((r) => r.user_email)
+  );
+
+  // Only upsert rows that are not already synced
+  const toUpsert = users
+    .filter((u) => !syncedEmails.has(u.email))
+    .map((u) => ({
+      session_id:    id,
+      user_email:    u.email,
+      user_name:     u.name,
+      attended:      u.attended,
+      bonus_points:  u.bonus_points  ?? 0,
+      bonus_reason:  u.bonus_reason  ?? "",
+      points_synced: false,
+    }));
+
+  if (toUpsert.length) {
+    const { error } = await db
+      .from("session_attendance")
+      .upsert(toUpsert, { onConflict: "session_id,user_email", ignoreDuplicates: false });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    success: true,
+    saved:   toUpsert.length,
+    skipped: syncedEmails.size,
+  });
 }

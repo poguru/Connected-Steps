@@ -90,15 +90,6 @@ function fmtPace(mps: number) {
   return `${min}:${sec.toString().padStart(2, "0")} /km`;
 }
 
-function fmtDate(iso: string) {
-  const d = new Date(iso);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (d.toDateString() === today.toDateString()) return "Today";
-  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
-  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-}
 
 async function getValidToken(tokens: StravaTokens): Promise<string> {
   if (Date.now() / 1000 < tokens.expires_at - 60) return tokens.access_token;
@@ -114,6 +105,82 @@ async function getValidToken(tokens: StravaTokens): Promise<string> {
   return data.access_token;
 }
 
+const COACHES = ["Ashokan K", "Vana Durga Rao", "Kolli Achyuta Kumari"];
+
+function RateCoachWidget({ userEmail, hasAttended }: { userEmail: string; hasAttended: boolean | null }) {
+  const [coach,   setCoach]   = useState(COACHES[0]);
+  const [rating,  setRating]  = useState(5);
+  const [feedback,setFeedback]= useState("");
+  const [saving,  setSaving]  = useState(false);
+  const [msg,     setMsg]     = useState("");
+
+  async function submit() {
+    setSaving(true); setMsg("");
+    try {
+      const res  = await fetch("/api/coach-rating", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_email: userEmail, coach_name: coach, rating, feedback }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setMsg(data.error ?? "Something went wrong."); return; }
+      setMsg("✓ Thank you! Your rating has been submitted.");
+      setFeedback("");
+    } catch { setMsg("Something went wrong."); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem" }}>
+      <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Rate Your Coach</div>
+      {hasAttended === null ? (
+        <div style={{ fontSize: "0.82rem", color: "var(--cs-muted)" }}>Loading…</div>
+      ) : !hasAttended ? (
+        <div style={{ fontSize: "0.82rem", color: "var(--cs-muted)", lineHeight: 1.6 }}>
+          Attend a Connected Steps training session to rate your coach.
+        </div>
+      ) : msg ? (
+        <div style={{ fontSize: "0.82rem", color: msg.startsWith("✓") ? "#4ade80" : "#f09595", lineHeight: 1.5 }}>
+          {msg}
+          <button onClick={() => setMsg("")} style={{ display: "block", marginTop: "0.5rem", fontSize: "11px", color: "var(--cs-muted)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", padding: 0 }}>Rate again</button>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+          <select value={coach} onChange={(e) => setCoach(e.target.value)}
+            style={{ width: "100%", padding: "9px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "var(--cs-white)", fontSize: "0.82rem", fontFamily: "var(--font-body)", outline: "none", colorScheme: "dark" }}>
+            {COACHES.map((c) => <option key={c} value={c} style={{ background: "#1a1a1a" }}>{c}</option>)}
+          </select>
+          <div>
+            <div style={{ fontSize: "11px", color: "var(--cs-muted)", marginBottom: "6px" }}>Your rating</div>
+            <div style={{ display: "flex", gap: "6px" }}>
+              {[1,2,3,4,5].map((star) => (
+                <button key={star} type="button" onClick={() => setRating(star)}
+                  style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+                      fill={star <= rating ? "var(--cs-orange)" : "rgba(255,255,255,0.15)"}
+                      stroke={star <= rating ? "var(--cs-orange)" : "rgba(255,255,255,0.2)"} strokeWidth="1" />
+                  </svg>
+                </button>
+              ))}
+            </div>
+          </div>
+          <textarea
+            placeholder="Share your experience (optional)"
+            rows={3} maxLength={300} value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            style={{ width: "100%", padding: "9px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "var(--cs-white)", fontSize: "0.82rem", fontFamily: "var(--font-body)", outline: "none", resize: "vertical", boxSizing: "border-box" }}
+          />
+          <button onClick={submit} disabled={saving}
+            style={{ width: "100%", padding: "9px", background: "var(--cs-orange)", color: "var(--cs-white)", border: "none", borderRadius: "4px", fontSize: "0.8rem", fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", opacity: saving ? 0.7 : 1 }}>
+            {saving ? "Submitting…" : "Submit Rating"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const router       = useRouter();
   const searchParams = useSearchParams();
@@ -122,7 +189,6 @@ export default function Dashboard() {
   const [activities,     setActivities]     = useState<Activity[]>([]);
   const [loading,        setLoading]        = useState(false);
   const [stravaMsg,      setStravaMsg]      = useState("");
-  const [consent,        setConsent]        = useState(false);
   const [followers,      setFollowers]      = useState<string[]>([]);
   const [following,      setFollowing]      = useState<string[]>([]);
   const [modal,          setModal]          = useState<ModalType>(null);
@@ -183,6 +249,15 @@ export default function Dashboard() {
       });
     }
   }, [router]);
+
+  useEffect(() => {
+    if (searchParams.get("share") === "story") {
+      setStoryOpen(true);
+      setTimeout(() => {
+        document.getElementById("share-story")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 300);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const status = searchParams.get("strava");
@@ -306,17 +381,7 @@ export default function Dashboard() {
 
   const fullName = `${user.firstName} ${user.lastName}`;
 
-  const stravaAuthUrl = `https://www.strava.com/oauth/authorize?client_id=${process.env.NEXT_PUBLIC_STRAVA_CLIENT_ID}&redirect_uri=${encodeURIComponent(
-    typeof window !== "undefined" ? `${window.location.origin}/api/strava/callback` : "http://localhost:3000/api/strava/callback"
-  )}&response_type=code&approval_prompt=auto&scope=activity:read_all`;
 
-  const monthStart      = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
-  const monthActivities = activities.filter((a) => new Date(a.start_date_local) >= monthStart);
-  const monthRuns       = monthActivities.filter((a) => a.type === "Run").length;
-  const monthKm         = monthActivities.reduce((s, a) => s + a.distance, 0) / 1000;
-  const monthTimeSecs   = monthActivities.reduce((s, a) => s + a.moving_time, 0);
-  const monthH          = Math.floor(monthTimeSecs / 3600);
-  const monthM          = Math.floor((monthTimeSecs % 3600) / 60);
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--cs-black)", color: "var(--cs-white)" }}>
@@ -382,71 +447,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Strava — connect or connected state */}
-          <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem", marginTop: "1rem" }}>
-            {strava ? (
-              <>
-                {/* Connected state */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.6rem" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    {/* Powered by Strava badge */}
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="#fc4c02" aria-label="Strava"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
-                    <span style={{ fontSize: "11px", color: "#fc4c02", fontWeight: 700, letterSpacing: "0.06em" }}>CONNECTED</span>
-                  </div>
-                  <button
-                    onClick={() => {
-                      localStorage.removeItem("cs_strava");
-                      if (user) localStorage.removeItem(`cs_strava_${user.email}`);
-                      setStrava(null);
-                      setActivities([]);
-                      setPbs(null);
-                    }}
-                    style={{ fontSize: "11px", color: "var(--cs-muted)", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", padding: "3px 10px", cursor: "pointer" }}
-                  >
-                    Disconnect
-                  </button>
-                </div>
-                <p style={{ fontSize: "11px", color: "var(--cs-muted)", lineHeight: 1.5 }}>
-                  Your monthly activities are syncing to the leaderboard. No GPS data is stored.
-                </p>
-                {/* Latest activity */}
-                {activities.length > 0 && (
-                  <div style={{ marginTop: "0.75rem", paddingTop: "0.75rem", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                    <div style={{ fontSize: "10px", color: "var(--cs-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "4px" }}>Latest Activity</div>
-                    <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--cs-white)" }}>{activities[0].name}</div>
-                    <div style={{ fontSize: "0.75rem", color: "var(--cs-muted)", marginTop: "2px" }}>{fmtDate(activities[0].start_date_local)}</div>
-                    <div style={{ fontSize: "0.875rem", color: "var(--cs-orange)", marginTop: "2px" }}>{(activities[0].distance / 1000).toFixed(1)} km</div>
-                  </div>
-                )}
-                {/* Powered by Strava */}
-                <a href="https://www.strava.com" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "0.75rem", textDecoration: "none", opacity: 0.5 }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#fc4c02"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
-                  <span style={{ fontSize: "10px", color: "#fc4c02", letterSpacing: "0.05em" }}>Powered by Strava</span>
-                </a>
-              </>
-            ) : (
-              <>
-                {/* Disconnected state */}
-                <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Connect Strava</div>
-                <p style={{ fontSize: "11px", color: "var(--cs-muted)", lineHeight: 1.6, marginBottom: "0.75rem" }}>
-                  Sync your runs and appear on the monthly leaderboard. We access only activity summaries — no GPS routes, no private data. You can disconnect anytime.
-                </p>
-                <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", cursor: "pointer", marginBottom: "0.75rem" }}>
-                  <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: "2px", accentColor: "#fc4c02" }} />
-                  <span style={{ fontSize: "11px", color: "var(--cs-muted)" }}>
-                    I agree to share my Strava activity summaries with Connected Steps for leaderboard purposes. I have read the{" "}
-                    <a href="/privacy" target="_blank" style={{ color: "#fc4c02" }}>Privacy Policy</a>.
-                  </span>
-                </label>
-                {consent && (
-                  <a href={stravaAuthUrl} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", padding: "8px", background: "#fc4c02", color: "#fff", borderRadius: "4px", fontSize: "0.8rem", fontWeight: 700, textDecoration: "none" }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
-                    Connect with Strava
-                  </a>
-                )}
-              </>
-            )}
-          </div>
         </aside>
 
         {/* ── Main feed — activity cards removed, show session placeholder ── */}
@@ -567,26 +567,10 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Weekly Summary */}
-          <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem", marginBottom: "1rem" }}>
-            <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1rem" }}>Monthly Summary</div>
-            {[
-              { label: "Runs",     value: strava ? String(monthRuns) : "—" },
-              { label: "Distance", value: strava ? `${monthKm.toFixed(1)} km` : "—" },
-              { label: "Time",     value: strava ? `${monthH}h ${monthM}m` : "—" },
-            ].map((s) => (
-              <div key={s.label} style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.6rem" }}>
-                <span style={{ fontSize: "0.875rem", color: "var(--cs-muted)" }}>{s.label}</span>
-                <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--cs-white)" }}>{s.value}</span>
-              </div>
-            ))}
-            {!strava && <div style={{ fontSize: "11px", color: "var(--cs-muted)", marginTop: "0.5rem" }}>Connect Strava to see this month's stats.</div>}
-          </div>
-
           <TrainingPlan goal={user.goal} />
 
           {/* Share Your Story */}
-          <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem" }}>
+          <div id="share-story" style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem" }}>
             <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Share Your Story</div>
             {storyMsg ? (
               <div style={{ fontSize: "0.82rem", color: "#4ade80", lineHeight: 1.5 }}>{storyMsg}</div>
@@ -758,6 +742,12 @@ export default function Dashboard() {
               </div>
             )}
           </div>
+
+          {/* Rate Your Coach */}
+          <RateCoachWidget
+            userEmail={user.email}
+            hasAttended={sessionsLoading ? null : sessions.some((r) => r.attended)}
+          />
 
         </aside>
       </div>
