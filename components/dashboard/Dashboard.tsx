@@ -544,7 +544,7 @@ export default function Dashboard() {
             <span className="font-display" style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--cs-white)" }}>Connected Steps</span>
           </Link>
           <nav className="cs-app-nav-links">
-            {[{ label: "Dashboard", href: "/dashboard" }, { label: "Leaderboard", href: "/leaderboard" }, { label: "Community", href: "/community" }, { label: "Achievements", href: "/achievements" }].map((item) => (
+            {[{ label: "Home", href: "/" }, { label: "Dashboard", href: "/dashboard" }, { label: "Leaderboard", href: "/leaderboard" }, { label: "Community", href: "/community" }, { label: "Achievements", href: "/achievements" }].map((item) => (
               <Link key={item.label} href={item.href} style={{ fontSize: "0.875rem", color: item.label === "Dashboard" ? "var(--cs-orange)" : "var(--cs-muted)", textDecoration: "none" }}>{item.label}</Link>
             ))}
           </nav>
@@ -555,7 +555,7 @@ export default function Dashboard() {
         </div>
         {mobileMenuOpen && (
           <div className="cs-mobile-menu">
-            {[{ label: "Dashboard", href: "/dashboard" }, { label: "Leaderboard", href: "/leaderboard" }, { label: "Community", href: "/community" }, { label: "Achievements", href: "/achievements" }].map((item) => (
+            {[{ label: "Home", href: "/" }, { label: "Dashboard", href: "/dashboard" }, { label: "Leaderboard", href: "/leaderboard" }, { label: "Community", href: "/community" }, { label: "Achievements", href: "/achievements" }].map((item) => (
               <Link key={item.label} href={item.href} onClick={() => setMobileMenuOpen(false)} style={{ fontSize: "0.95rem", color: item.label === "Dashboard" ? "var(--cs-orange)" : "var(--cs-muted)", textDecoration: "none" }}>{item.label}</Link>
             ))}
           </div>
