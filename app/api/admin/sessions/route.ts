@@ -76,7 +76,12 @@ async function notifyUsers(
       })
   );
   const waSent = waResults.filter((r) => r.status === "fulfilled" && r.value.ok).length;
+  const waErrors = waResults
+    .filter((r) => r.status === "fulfilled" && !r.value.ok)
+    .map((r) => (r as PromiseFulfilledResult<{ ok: boolean; error?: string; to: string }>).value)
+    .map((v) => `${v.to}: ${v.error}`);
   console.log(`WhatsApp: ${waSent}/${waResults.length} sent`);
+  if (waErrors.length) console.error("WhatsApp errors:", waErrors.join(" | "));
 
   // ── Push notifications ──
   const emails = users.map((u) => u.email?.toLowerCase()).filter(Boolean);
