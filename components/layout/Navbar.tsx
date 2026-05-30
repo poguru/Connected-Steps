@@ -61,11 +61,11 @@ export default function Navbar() {
         borderBottom: scrolled ? "1px solid rgba(255,255,255,0.06)" : "none",
       }}>
       <div className="container">
-        <nav className="flex items-center justify-between h-20">
+        <nav className="flex items-center justify-between h-24">
 
           {/* Brand */}
           <Link href="/" className="group" style={{ flexShrink: 0 }}>
-            <Image src="/logo.png" alt="Connected Steps logo" width={44} height={44}
+            <Image src="/logo.png" alt="Connected Steps logo" width={58} height={58}
               className="rounded-full transition-transform duration-300 group-hover:scale-105" />
           </Link>
 
@@ -76,7 +76,7 @@ export default function Navbar() {
             {beforeSessionLinks.map((link) => (
               <li key={link.label}>
                 <Link href={link.href}
-                  style={{ color: "var(--cs-muted)", textDecoration: "none", fontSize: "0.8rem", letterSpacing: "0.03em" }}
+                  style={{ color: "var(--cs-muted)", textDecoration: "none", fontSize: "0.925rem", letterSpacing: "0.02em" }}
                   onMouseEnter={(e) => (e.currentTarget.style.color = "var(--cs-white)")}
                   onMouseLeave={(e) => (e.currentTarget.style.color = "var(--cs-muted)")}>
                   {link.label}
@@ -88,7 +88,7 @@ export default function Navbar() {
             <li ref={dropdownRef} style={{ position: "relative" }}>
               <button
                 onClick={() => setSessionsOpen((o) => !o)}
-                style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px", padding: 0, fontFamily: "var(--font-body)", fontSize: "0.8rem", letterSpacing: "0.03em", color: sessionsOpen ? "var(--cs-white)" : "var(--cs-muted)", transition: "color 0.2s" }}
+                style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px", padding: 0, fontFamily: "var(--font-body)", fontSize: "0.925rem", letterSpacing: "0.02em", color: sessionsOpen ? "var(--cs-white)" : "var(--cs-muted)", transition: "color 0.2s" }}
                 onMouseEnter={(e) => (e.currentTarget.style.color = "var(--cs-white)")}
                 onMouseLeave={(e) => { if (!sessionsOpen) e.currentTarget.style.color = "var(--cs-muted)"; }}
               >
@@ -126,7 +126,7 @@ export default function Navbar() {
               <li key={link.label}>
                 {link.highlight ? (
                   <Link href={link.href}
-                    style={{ color: "var(--cs-orange)", textDecoration: "none", display: "flex", alignItems: "center", gap: "5px", fontWeight: 600, fontSize: "0.8rem", letterSpacing: "0.03em" }}
+                    style={{ color: "var(--cs-orange)", textDecoration: "none", display: "flex", alignItems: "center", gap: "5px", fontWeight: 600, fontSize: "0.925rem", letterSpacing: "0.02em" }}
                     onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.8")}
                     onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}>
                     <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--cs-orange)", display: "inline-block", animation: "navDot 1.8s ease-in-out infinite" }} />
@@ -134,7 +134,7 @@ export default function Navbar() {
                   </Link>
                 ) : (
                   <Link href={link.href}
-                    style={{ color: "var(--cs-muted)", textDecoration: "none", fontSize: "0.8rem", letterSpacing: "0.03em" }}
+                    style={{ color: "var(--cs-muted)", textDecoration: "none", fontSize: "0.925rem", letterSpacing: "0.02em" }}
                     onMouseEnter={(e) => (e.currentTarget.style.color = "var(--cs-white)")}
                     onMouseLeave={(e) => (e.currentTarget.style.color = "var(--cs-muted)")}>
                     {link.label}
@@ -148,7 +148,7 @@ export default function Navbar() {
           <div className="cs-home-nav-cta">
             {loggedInUser ? (
               <>
-                <Link href="/dashboard" className="btn-outline" style={{ padding: "9px 18px", fontSize: "12px" }}>
+                <Link href="/dashboard" className="btn-outline" style={{ padding: "10px 22px", fontSize: "13px" }}>
                   Dashboard
                 </Link>
                 <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: "0.5rem", textDecoration: "none" }}>
@@ -163,8 +163,8 @@ export default function Navbar() {
               </>
             ) : (
               <>
-                <Link href="/auth" className="btn-outline" style={{ padding: "9px 18px", fontSize: "12px" }}>Sign in</Link>
-                <Link href="/auth" className="btn-primary" style={{ padding: "9px 18px", fontSize: "12px" }}>Join free</Link>
+                <Link href="/auth" className="btn-outline" style={{ padding: "10px 22px", fontSize: "13px" }}>Sign in</Link>
+                <Link href="/auth" className="btn-primary" style={{ padding: "10px 22px", fontSize: "13px" }}>Join free</Link>
               </>
             )}
           </div>
