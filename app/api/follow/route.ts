@@ -51,35 +51,29 @@ export async function GET(req: NextRequest) {
 
     const db = getSupabaseServer();
 
-    type UserRow = { first_name: string; last_name: string };
-    const getName = (u: unknown, fallback: string) => {
-      const row = (Array.isArray(u) ? u[0] : u) as UserRow | null | undefined;
-      return `${row?.first_name ?? ""} ${row?.last_name ?? ""}`.trim() || fallback;
-    };
-
+    // Step 1: get emails
+    let emails: string[] = [];
     if (type === "followers") {
-      const { data } = await db
-        .from("follows")
-        .select("follower_email, users!follows_follower_email_fkey(first_name, last_name)")
-        .eq("following_email", email);
-      return NextResponse.json({
-        users: (data || []).map((r) => ({
-          email: r.follower_email,
-          name: getName(r.users, r.follower_email),
-        })),
-      });
+      const { data } = await db.from("follows").select("follower_email").eq("following_email", email);
+      emails = (data || []).map((r) => r.follower_email);
     } else {
-      const { data } = await db
-        .from("follows")
-        .select("following_email, users!follows_following_email_fkey(first_name, last_name)")
-        .eq("follower_email", email);
-      return NextResponse.json({
-        users: (data || []).map((r) => ({
-          email: r.following_email,
-          name: getName(r.users, r.following_email),
-        })),
-      });
+      const { data } = await db.from("follows").select("following_email").eq("follower_email", email);
+      emails = (data || []).map((r) => r.following_email);
     }
+
+    if (emails.length === 0) return NextResponse.json({ users: [] });
+
+    // Step 2: look up names
+    const { data: userRows } = await db
+      .from("users")
+      .select("email, first_name, last_name")
+      .in("email", emails);
+
+    const nameMap = new Map((userRows || []).map((u) => [u.email, `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim()]));
+
+    return NextResponse.json({
+      users: emails.map((e) => ({ email: e, name: nameMap.get(e) || e })),
+    });
   } catch (e: unknown) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
