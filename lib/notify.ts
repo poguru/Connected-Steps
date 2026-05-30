@@ -191,12 +191,15 @@ function formatDate(date: string): string {
   });
 }
 
-/** WhatsApp params for session_alert template */
+/** WhatsApp params for session_alert template
+ *  Template variables: {{1}}=name {{2}}=title {{3}}=date+time {{4}}=location {{5}}=join URL
+ */
 export function sessionWAParams(
-  name: string, title: string, date: string, time: string | null, location: string
+  name: string, title: string, date: string, time: string | null, location: string, sessionId: string
 ): string[] {
   const dateStr = time ? `${formatDate(date)} at ${time}` : formatDate(date);
-  return [name, title, dateStr, location];
+  const joinUrl = `https://www.connectedsteps.in/join/${sessionId}`;
+  return [name, title, dateStr, location, joinUrl];
 }
 
 /** WhatsApp params for run_registration template

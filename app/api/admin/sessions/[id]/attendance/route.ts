@@ -6,7 +6,7 @@ function auth(req: NextRequest) {
   return pw && pw === process.env.ADMIN_PASSWORD;
 }
 
-// GET — session info + users at that location + their attendance records
+// GET — session info + users who joined via link + their attendance status
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -22,35 +22,34 @@ export async function GET(
     .single();
   if (sessionErr) return NextResponse.json({ error: sessionErr.message }, { status: 500 });
 
+  // Only show users who registered via the join link
+  const { data: attendance } = await db
+    .from("session_attendance")
+    .select("user_email, user_name, attended, bonus_points, bonus_reason, points_synced")
+    .eq("session_id", id);
+
+  if (!attendance?.length) return NextResponse.json({ session, users: [] });
+
+  const emails = attendance.map((a) => a.user_email);
   const { data: users } = await db
     .from("users")
     .select("email, first_name, last_name, location")
-    .ilike("location", `%${session.location}%`);
+    .in("email", emails);
 
-  const { data: attendance } = await db
-    .from("session_attendance")
-    .select("*")
-    .eq("session_id", id);
+  const userMap = Object.fromEntries((users ?? []).map((u) => [u.email, u]));
 
-  const attendanceMap: Record<string, { attended: boolean; bonus_points: number; bonus_reason: string; points_synced: boolean }> = {};
-  (attendance ?? []).forEach((a) => {
-    attendanceMap[a.user_email] = {
+  const merged = attendance.map((a) => {
+    const u = userMap[a.user_email];
+    return {
+      email:         a.user_email,
+      name:          u ? `${u.first_name} ${u.last_name}` : a.user_name,
+      location:      u?.location ?? "",
       attended:      a.attended,
-      bonus_points:  a.bonus_points,
-      bonus_reason:  a.bonus_reason,
-      points_synced: a.points_synced,
+      bonus_points:  a.bonus_points  ?? 0,
+      bonus_reason:  a.bonus_reason  ?? "",
+      points_synced: a.points_synced ?? false,
     };
   });
-
-  const merged = (users ?? []).map((u) => ({
-    email:         u.email,
-    name:          `${u.first_name} ${u.last_name}`,
-    location:      u.location,
-    attended:      attendanceMap[u.email]?.attended      ?? false,
-    bonus_points:  attendanceMap[u.email]?.bonus_points  ?? 0,
-    bonus_reason:  attendanceMap[u.email]?.bonus_reason  ?? "",
-    points_synced: attendanceMap[u.email]?.points_synced ?? false,
-  }));
 
   return NextResponse.json({ session, users: merged });
 }

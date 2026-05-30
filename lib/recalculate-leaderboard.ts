@@ -56,7 +56,10 @@ export async function recalculateMonth(month: string): Promise<{ message: string
     .in("user_email", emails);
   const lbMap = new Map((existing ?? []).map((e) => [e.user_email, e]));
 
-  const userAttMap  = new Map<string, { session_id: number; attended: boolean; bonus_points: number }[]>();
+  // Build session date lookup
+  const sessionDateMap = new Map(sessions.map((s) => [s.id, s.date]));
+
+  const userAttMap  = new Map<string, { session_id: string; attended: boolean; bonus_points: number }[]>();
   const attIdsByUser = new Map<string, number[]>();
 
   for (const att of allAtt) {
@@ -79,41 +82,25 @@ export async function recalculateMonth(month: string): Promise<{ message: string
     if (!user) continue;
 
     const userAtt = userAttMap.get(email) ?? [];
-    const attById = new Map(userAtt.map((a) => [a.session_id, a]));
-    const userLoc = (user.location ?? "").trim().toLowerCase();
 
-    const locSessions = sessions.filter(
-      (s) => (s.location ?? "").trim().toLowerCase() === userLoc
-    );
-    if (!locSessions.length) continue;
-
+    // Base points: 5 per attended session (any location) + manual bonus_points
     let basePoints = 0;
-    for (const sess of locSessions) {
-      const att = attById.get(sess.id);
-      if (att?.attended) basePoints += 5 + (att.bonus_points ?? 0);
+    for (const att of userAtt) {
+      if (att.attended) basePoints += 5 + (att.bonus_points ?? 0);
     }
 
-    const weekMap = new Map<string, typeof locSessions>();
-    for (const sess of locSessions) {
-      const wk = mondayKey(sess.date);
-      if (!weekMap.has(wk)) weekMap.set(wk, []);
-      weekMap.get(wk)!.push(sess);
+    // Weekly bonus: +10 for any week where user attended 4+ sessions
+    const weekAttCount = new Map<string, number>();
+    for (const att of userAtt) {
+      if (!att.attended) continue;
+      const date = sessionDateMap.get(att.session_id);
+      if (!date) continue;
+      const wk = mondayKey(date);
+      weekAttCount.set(wk, (weekAttCount.get(wk) ?? 0) + 1);
     }
-    const weeks = [...weekMap.entries()].sort(([a], [b]) => a.localeCompare(b));
-
     let weeklyBonus = 0;
-    let streak      = 0;
-
-    for (const [, weekSessions] of weeks) {
-      const allAttended = weekSessions.every((s) => attById.get(s.id)?.attended === true);
-      if (allAttended) {
-        weeklyBonus += 5;
-        streak++;
-        if (streak === 1)    weeklyBonus += 5;
-        else if (streak >= 2) weeklyBonus += 10;
-      } else {
-        streak = 0;
-      }
+    for (const count of weekAttCount.values()) {
+      if (count >= 4) weeklyBonus += 10;
     }
 
     const newMonthPts = basePoints + weeklyBonus;

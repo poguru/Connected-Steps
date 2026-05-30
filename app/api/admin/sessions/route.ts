@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Await notifications so Vercel doesn't terminate the Lambda before they fire
-  await notifyUsers(db, title, date, time || null, venue || location, location).catch((e) =>
+  await notifyUsers(db, data.id, title, date, time || null, venue || location, location).catch((e) =>
     console.error("Notification error:", e)
   );
 
@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
 
 async function notifyUsers(
   db: ReturnType<typeof import("@/lib/supabase-server").getSupabaseServer>,
+  sessionId: string,
   title: string,
   date: string,
   time: string | null,
@@ -64,7 +65,7 @@ async function notifyUsers(
     .ilike("location", `%${filterLocation}%`);
 
   if (!users || users.length === 0) {
-    console.log(`No users found for location: ${location}`);
+    console.log(`No users found for location: ${filterLocation}`);
     return;
   }
 
@@ -74,7 +75,7 @@ async function notifyUsers(
       .filter((u) => u.phone?.trim())
       .map((u) => {
         const name = `${u.first_name} ${u.last_name}`.trim() || "there";
-        return sendWhatsApp(u.phone!, sessionWAParams(name, title, date, time, displayLocation));
+        return sendWhatsApp(u.phone!, sessionWAParams(name, title, date, time, displayLocation, sessionId));
       })
   );
   const waSent = waResults.filter((r) => r.status === "fulfilled" && r.value.ok).length;
@@ -96,9 +97,9 @@ async function notifyUsers(
     if (subs && subs.length > 0) {
       const payload = JSON.stringify({
         title: "New Session – Connected Steps",
-        body:  `${title} at ${location}. Tap to register.`,
+        body:  `${title} at ${displayLocation}. Tap to join.`,
         icon:  "/logo.png",
-        url:   "/weekend-run",
+        url:   `/join/${sessionId}`,
       });
 
       const pushResults = await Promise.allSettled(
