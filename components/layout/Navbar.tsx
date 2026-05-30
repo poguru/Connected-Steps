@@ -10,12 +10,15 @@ interface StoredUser {
   photo:     string | null;
 }
 
-const navLinks = [
-  { label: "Training",        href: "#training" },
-  { label: "Coaches",         href: "#coaches" },
-  { label: "Community",       href: "#community" },
+const beforeSessionLinks = [
+  { label: "Training", href: "#training" },
+  { label: "Coaches",  href: "#coaches"  },
+];
+
+const afterSessionLinks = [
+  { label: "Community",       href: "#community"    },
+  { label: "Pricing",         href: "/pricing"      },
   { label: "Upcoming Events", href: "/weekend-run", highlight: true },
-  { label: "Pricing",         href: "/pricing" },
 ];
 
 const sessionDropdown = [
@@ -69,6 +72,18 @@ export default function Navbar() {
           {/* Desktop nav */}
           <ul className="cs-home-nav-links" style={{ listStyle: "none", margin: 0, padding: 0 }}>
 
+            {/* Before-sessions links */}
+            {beforeSessionLinks.map((link) => (
+              <li key={link.label}>
+                <Link href={link.href}
+                  style={{ color: "var(--cs-muted)", textDecoration: "none", fontSize: "0.8rem", letterSpacing: "0.03em" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--cs-white)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "var(--cs-muted)")}>
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+
             {/* Sessions dropdown */}
             <li ref={dropdownRef} style={{ position: "relative" }}>
               <button
@@ -106,7 +121,8 @@ export default function Navbar() {
               )}
             </li>
 
-            {navLinks.map((link) => (
+            {/* After-sessions links */}
+            {afterSessionLinks.map((link) => (
               <li key={link.label}>
                 {link.highlight ? (
                   <Link href={link.href}
@@ -173,10 +189,10 @@ export default function Navbar() {
               </Link>
             ))}
             <div style={{ height: "1px", background: "rgba(255,255,255,0.06)", margin: "8px 0" }} />
-            {navLinks.map((link) => (
+            {[...beforeSessionLinks, ...afterSessionLinks].map((link) => (
               <Link key={link.label} href={link.href} onClick={() => setMenuOpen(false)}
-                style={{ fontSize: "0.95rem", color: link.highlight ? "var(--cs-orange)" : "var(--cs-muted)", fontWeight: link.highlight ? 600 : undefined, textDecoration: "none", display: "flex", alignItems: "center", gap: "6px" }}>
-                {link.highlight && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--cs-orange)", display: "inline-block" }} />}
+                style={{ fontSize: "0.95rem", color: (link as {highlight?: boolean}).highlight ? "var(--cs-orange)" : "var(--cs-muted)", fontWeight: (link as {highlight?: boolean}).highlight ? 600 : undefined, textDecoration: "none", display: "flex", alignItems: "center", gap: "6px" }}>
+                {(link as {highlight?: boolean}).highlight && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--cs-orange)", display: "inline-block" }} />}
                 {link.label}
               </Link>
             ))}
