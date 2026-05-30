@@ -16,10 +16,15 @@ interface AppUser {
 }
 
 const GOAL_OPTIONS = [
-  { value: "5k",   label: "First 5K" },
-  { value: "10k",  label: "10K" },
-  { value: "half", label: "Half Marathon" },
-  { value: "full", label: "Full Marathon" },
+  { value: "5k",       label: "First 5K"            },
+  { value: "10k",      label: "10K"                 },
+  { value: "half",     label: "Half Marathon"        },
+  { value: "full",     label: "Full Marathon"        },
+  { value: "ultra",    label: "Ultra Marathon"       },
+  { value: "fitness",  label: "General Fitness"      },
+  { value: "speed",    label: "Improve Speed/Pace"   },
+  { value: "weight",   label: "Weight Loss"          },
+  { value: "strength", label: "Strength & Endurance" },
 ];
 
 const inputStyle: React.CSSProperties = {
