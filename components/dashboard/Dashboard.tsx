@@ -398,7 +398,7 @@ export default function Dashboard() {
       {/* ── Navbar ── */}
       <header className="cs-app-nav">
         <div className="cs-app-nav-inner">
-          <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none" }}>
+          <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none" }}>
             <Image src="/logo.png" alt="Connected Steps" width={36} height={36} className="rounded-full" />
             <span className="font-display" style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--cs-white)" }}>Connected Steps</span>
           </Link>
