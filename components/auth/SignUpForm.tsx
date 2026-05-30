@@ -5,10 +5,15 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 
 const GOALS = [
-  { id: "5k",   label: "First 5K"      },
-  { id: "10k",  label: "10K"           },
-  { id: "half", label: "Half Marathon" },
-  { id: "full", label: "Full Marathon" },
+  { id: "5k",       label: "First 5K"            },
+  { id: "10k",      label: "10K"                 },
+  { id: "half",     label: "Half Marathon"        },
+  { id: "full",     label: "Full Marathon"        },
+  { id: "ultra",    label: "Ultra Marathon"       },
+  { id: "fitness",  label: "General Fitness"      },
+  { id: "speed",    label: "Improve Speed/Pace"   },
+  { id: "weight",   label: "Weight Loss"          },
+  { id: "strength", label: "Strength & Endurance" },
 ];
 
 interface Props {
@@ -164,9 +169,9 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
         <input className="auth-input" name="confirm" type={showPw ? "text" : "password"} placeholder="Confirm password" value={form.confirm} onChange={handleChange} autoComplete="new-password" />
       </div>
 
-      {/* Running goal */}
+      {/* Goal */}
       <div className="mb-3">
-        <label style={{ display: "block", fontSize: "11px", color: "var(--cs-muted)", marginBottom: "6px", fontFamily: "var(--font-body)", letterSpacing: "0.05em" }}>Running goal</label>
+        <label style={{ display: "block", fontSize: "11px", color: "var(--cs-muted)", marginBottom: "6px", fontFamily: "var(--font-body)", letterSpacing: "0.05em" }}>Goal</label>
         <select value={goal} onChange={(e) => setGoal(e.target.value)} className="auth-input" style={{ cursor: "pointer", colorScheme: "dark" }}>
           {GOALS.map((g) => <option key={g.id} value={g.id}>{g.label}</option>)}
         </select>

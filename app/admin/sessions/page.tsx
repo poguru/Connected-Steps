@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
-interface Session { id: string; title: string; date: string; time: string; location: string; venue: string; }
+interface Session { id: string; title: string; date: string; time: string; location: string; venue: string; photo_url?: string | null; }
 interface Attendee {
   email: string; name: string; location: string;
   attended: boolean; bonus_points: number; bonus_reason: string; points_synced: boolean;
@@ -38,7 +38,10 @@ export default function AdminSessionsPage() {
   const [attendLoad,  setAttendLoad]  = useState(false);
   const [saveMsg,     setSaveMsg]     = useState("");
   const [saving,      setSaving]      = useState(false);
-  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [lastSavedAt,   setLastSavedAt]   = useState<string | null>(null);
+  const [photoFile,     setPhotoFile]     = useState<File | null>(null);
+  const [photoUploading,setPhotoUploading]= useState(false);
+  const [photoMsg,      setPhotoMsg]      = useState("");
 
   // New session form
   const [newTitle,    setNewTitle]    = useState("");
@@ -145,6 +148,24 @@ export default function AdminSessionsPage() {
     // Reload attendance to reflect new synced status
     await openSession(selected);
     setSaving(false);
+  };
+
+  const uploadPhoto = async () => {
+    if (!selected || !photoFile) return;
+    setPhotoUploading(true); setPhotoMsg("");
+    const form = new FormData();
+    form.append("photo", photoFile);
+    const res  = await fetch(`/api/admin/sessions/${selected.id}/photo`, { method: "POST", headers: { "x-admin-password": password }, body: form });
+    const json = await res.json();
+    if (res.ok) {
+      setPhotoMsg("Photo uploaded!");
+      setPhotoFile(null);
+      setSelected((prev) => prev ? { ...prev, photo_url: json.photo_url } : prev);
+      await loadSessions();
+    } else {
+      setPhotoMsg(`Error: ${json.error}`);
+    }
+    setPhotoUploading(false);
   };
 
   const attendCount = attendees.filter((a) => a.attended).length;
@@ -266,6 +287,25 @@ export default function AdminSessionsPage() {
                   <h2 style={{ fontSize: "1.3rem", fontWeight: 300, color: "#fff", marginBottom: "4px" }}>{selected.title}</h2>
                   <div style={{ fontSize: "0.8rem", color: "#888" }}>{selected.date}{selected.time ? ` at ${selected.time}` : ""} · 📍 {selected.venue || selected.location}</div>
                 </div>
+                {/* Photo upload */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", minWidth: "200px" }}>
+                  {selected.photo_url && (
+                    <img src={selected.photo_url} alt="Session photo" style={{ width: "120px", height: "80px", objectFit: "cover", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.1)" }} />
+                  )}
+                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+                    <label style={{ padding: "7px 14px", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "6px", fontSize: "0.78rem", color: "#fff", cursor: "pointer", whiteSpace: "nowrap" }}>
+                      {photoFile ? photoFile.name.slice(0, 18) + "…" : "📷 Choose photo"}
+                      <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { setPhotoFile(e.target.files?.[0] ?? null); setPhotoMsg(""); }} />
+                    </label>
+                    {photoFile && (
+                      <button onClick={uploadPhoto} disabled={photoUploading} style={{ ...btn(true), padding: "7px 14px", fontSize: "0.78rem" }}>
+                        {photoUploading ? "Uploading…" : "Upload"}
+                      </button>
+                    )}
+                  </div>
+                  {photoMsg && <div style={{ fontSize: "0.75rem", color: photoMsg.startsWith("Error") ? "#f09595" : "#4ade80" }}>{photoMsg}</div>}
+                </div>
+
                 <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
                   <button onClick={saveAttendance} disabled={saving} style={btn(true)}>
                     {saving ? "Saving & updating leaderboard…" : "Save Attendance"}
