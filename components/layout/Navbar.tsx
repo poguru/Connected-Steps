@@ -15,6 +15,7 @@ const navLinks = [
   { label: "Coaches",         href: "#coaches" },
   { label: "Community",       href: "#community" },
   { label: "Upcoming Events", href: "/weekend-run", highlight: true },
+  { label: "Pricing",         href: "/pricing" },
 ];
 
 const sessionDropdown = [
