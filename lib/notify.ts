@@ -50,11 +50,12 @@ export interface NotifyResult {
 
 export async function sendWhatsApp(
   phone: string,
-  params: [string, string, string, string]  // [name, title, date, location]
+  params: string[],
+  templateName?: string
 ): Promise<NotifyResult> {
-  const authKey      = process.env.MSG91_AUTH_KEY;
-  const fromNumber   = process.env.MSG91_WHATSAPP_NUMBER;
-  const templateName = process.env.MSG91_WHATSAPP_TEMPLATE ?? "session_alert";
+  const authKey    = process.env.MSG91_AUTH_KEY;
+  const fromNumber = process.env.MSG91_WHATSAPP_NUMBER;
+  const template   = templateName ?? process.env.MSG91_WHATSAPP_TEMPLATE ?? "session_alert";
 
   if (!authKey || !fromNumber) {
     return { to: phone, channel: "whatsapp", ok: false, error: "MSG91 WhatsApp not configured." };
@@ -69,7 +70,7 @@ export async function sendWhatsApp(
       to,
       type: "template",
       template: {
-        name: templateName,
+        name: template,
         language: { code: "en" },
         components: [
           {
@@ -185,11 +186,40 @@ function formatDate(date: string): string {
   });
 }
 
-/** Returns the 4 WhatsApp template parameters */
+/** WhatsApp params for session_alert template */
 export function sessionWAParams(
   name: string, title: string, date: string, location: string
-): [string, string, string, string] {
+): string[] {
   return [name, title, formatDate(date), location];
+}
+
+/** WhatsApp params for run_registration template
+ *  MSG91 template body (create in MSG91 → WhatsApp → Templates):
+ *    Name: run_registration | Category: Utility
+ *    Hi {{1}}, you're registered for *{{2}}*! 🏃
+ *    📅 Date: {{3}}
+ *    📍 Location: {{4}}
+ *    See you on the track! — Connected Steps
+ */
+export function runRegistrationWAParams(
+  name: string, eventName: string, date: string, location: string
+): string[] {
+  return [name, eventName, formatDate(date), location];
+}
+
+/** WhatsApp params for membership_confirmation template
+ *  MSG91 template body (create in MSG91 → WhatsApp → Templates):
+ *    Name: membership_confirmation | Category: Utility
+ *    Hi {{1}}, your *Connected Steps* {{2}} membership is confirmed! ✅
+ *    💳 Amount paid: ₹{{3}}
+ *    📅 Valid until: {{4}}
+ *    Dashboard: https://www.connectedsteps.in/dashboard
+ */
+export function membershipWAParams(
+  name: string, plan: string, amountINR: number, expiresAt: string
+): string[] {
+  const expiry = new Date(expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+  return [name, plan, amountINR.toLocaleString("en-IN"), expiry];
 }
 
 /** Short SMS text (DLT-registered template content) */
@@ -288,6 +318,67 @@ export function expiryReminderEmailHTML(name: string, plan: string, expiresAt: s
       </td></tr>
       <tr><td style="background:#f9f9f9;border-top:1px solid #e5e5e5;padding:20px 40px;text-align:center;">
         <p style="margin:0;font-size:12px;color:#aaa;">Connected Steps · Hyderabad, India</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
+}
+
+/** Run registration confirmation HTML email */
+export function runRegistrationEmailHTML(
+  name: string, eventName: string, date: string, location: string, distance: string
+): string {
+  const d = formatDate(date);
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>Registration Confirmed – Connected Steps</title></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+      <tr><td style="background:#0a0a0a;padding:28px 40px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:#fff;letter-spacing:-0.3px;">Connected Steps</div>
+        <div style="font-size:11px;color:#e8620a;letter-spacing:0.12em;text-transform:uppercase;margin-top:4px;">Your Goal, Our Plan</div>
+      </td></tr>
+      <tr><td style="height:4px;background:#e8620a;"></td></tr>
+      <tr><td style="padding:40px 40px 32px;">
+        <p style="margin:0 0 8px;font-size:15px;color:#555;">Hi <strong>${name}</strong>,</p>
+        <p style="margin:0 0 28px;font-size:15px;color:#555;line-height:1.6;">You're registered for our upcoming run. We can't wait to see you on the track! 🏃</p>
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border:1px solid #e5e5e5;border-radius:10px;overflow:hidden;margin-bottom:32px;">
+          <tr><td style="padding:20px 24px;border-bottom:1px solid #e5e5e5;">
+            <div style="font-size:11px;color:#e8620a;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">Event</div>
+            <div style="font-size:20px;font-weight:700;color:#0a0a0a;">${eventName}</div>
+          </td></tr>
+          <tr><td>
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding:16px 24px;border-right:1px solid #e5e5e5;width:33%;">
+                  <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">📅 Date</div>
+                  <div style="font-size:13px;font-weight:600;color:#0a0a0a;">${d}</div>
+                </td>
+                <td style="padding:16px 24px;border-right:1px solid #e5e5e5;width:33%;">
+                  <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">📍 Location</div>
+                  <div style="font-size:13px;font-weight:600;color:#0a0a0a;">${location}</div>
+                </td>
+                <td style="padding:16px 24px;width:33%;">
+                  <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">🏅 Distance</div>
+                  <div style="font-size:13px;font-weight:600;color:#0a0a0a;">${distance}</div>
+                </td>
+              </tr>
+            </table>
+          </td></tr>
+        </table>
+        <p style="margin:0 0 24px;font-size:13px;color:#888;line-height:1.6;text-align:center;">Carry a valid ID and arrive 15 minutes early for warm-up. Stay hydrated! 💧</p>
+        <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+          <tr><td style="background:#e8620a;border-radius:6px;">
+            <a href="https://www.connectedsteps.in/weekend-run" style="display:block;padding:14px 36px;font-size:15px;font-weight:700;color:#fff;text-decoration:none;">View Event Details →</a>
+          </td></tr>
+        </table>
+      </td></tr>
+      <tr><td style="background:#f9f9f9;border-top:1px solid #e5e5e5;padding:20px 40px;text-align:center;">
+        <p style="margin:0 0 6px;font-size:12px;color:#aaa;">Connected Steps · Hyderabad, India</p>
+        <p style="margin:0;font-size:11px;color:#ccc;">Questions? <a href="https://wa.me/9703620570" style="color:#e8620a;text-decoration:none;">WhatsApp us</a></p>
       </td></tr>
     </table>
   </td></tr>

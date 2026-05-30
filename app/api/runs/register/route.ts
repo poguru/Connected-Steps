@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { sendEmail, sendWhatsApp, runRegistrationEmailHTML, runRegistrationWAParams } from "@/lib/notify";
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,7 +19,6 @@ export async function POST(req: NextRequest) {
 
     const db = getSupabaseServer();
 
-    // Check if already registered for this event
     const { data: existing } = await db
       .from("run_registrations")
       .select("id")
@@ -35,17 +35,35 @@ export async function POST(req: NextRequest) {
       event_date,
       event_location,
       first_name: first_name.trim(),
-      last_name: last_name.trim(),
-      email: email.toLowerCase().trim(),
-      phone: phone.trim(),
+      last_name:  last_name.trim(),
+      email:      email.toLowerCase().trim(),
+      phone:      phone.trim(),
       blood_group,
       distance,
-      emergency_contact_name: emergency_contact_name.trim(),
+      emergency_contact_name:  emergency_contact_name.trim(),
       emergency_contact_phone: emergency_contact_phone.trim(),
       is_member: is_member ?? false,
     });
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // Fire-and-forget confirmation: email + WhatsApp
+    const name = `${first_name.trim()} ${last_name.trim()}`;
+    sendEmail(
+      email.toLowerCase().trim(),
+      name,
+      `You're registered for ${event_name} – Connected Steps`,
+      runRegistrationEmailHTML(name, event_name, event_date, event_location, distance)
+    ).catch(console.error);
+
+    if (phone?.trim()) {
+      sendWhatsApp(
+        phone.trim(),
+        runRegistrationWAParams(name, event_name, event_date, event_location),
+        "run_registration"
+      ).catch(console.error);
+    }
+
     return NextResponse.json({ success: true });
   } catch (e: unknown) {
     return NextResponse.json({ error: String(e) }, { status: 500 });

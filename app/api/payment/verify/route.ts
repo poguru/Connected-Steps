@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { sendEmail, paymentEmailHTML } from "@/lib/notify";
+import { sendEmail, sendWhatsApp, paymentEmailHTML, membershipWAParams } from "@/lib/notify";
 
 const PLAN_MONTHS: Record<string, number> = {
   monthly:  1,
@@ -60,13 +60,30 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Fire-and-forget confirmation email
+  // Fetch user phone for WhatsApp
+  const { data: userRow } = await db.from("users").select("phone").eq("email", email.toLowerCase()).single();
+  const phone = userRow?.phone ?? null;
+
+  const displayName  = name || "Member";
+  const planLabel    = PLAN_LABELS[plan] ?? plan;
+  const amountINR    = amount / 100;
+  const expiryISO    = expiresAt.toISOString();
+
+  // Fire-and-forget: email + WhatsApp
   sendEmail(
     email.toLowerCase(),
-    name || "Member",
+    displayName,
     "Membership Confirmed – Connected Steps",
-    paymentEmailHTML(name || "there", PLAN_LABELS[plan] ?? plan, amount / 100, expiresAt.toISOString())
+    paymentEmailHTML(displayName, planLabel, amountINR, expiryISO)
   ).catch(console.error);
 
-  return NextResponse.json({ success: true, expiresAt: expiresAt.toISOString() });
+  if (phone) {
+    sendWhatsApp(
+      phone,
+      membershipWAParams(displayName, planLabel, amountINR, expiryISO),
+      "membership_confirmation"
+    ).catch(console.error);
+  }
+
+  return NextResponse.json({ success: true, expiresAt: expiryISO });
 }
