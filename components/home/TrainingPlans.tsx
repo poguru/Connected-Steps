@@ -7,7 +7,7 @@ const plans = [
     tier: "Starter", title: "5K", duration: "8 weeks",
     desc: "Perfect for first-timers. Build your base, run your first 5K with confidence.",
     features: ["3 runs per week", "Walk-run intervals", "Weekly coach check-in", "Nutrition basics"],
-    color: "var(--cs-orange)",
+    color: "var(--cs-white)",
   },
   {
     tier: "Intermediate", title: "10K", duration: "10 weeks",
@@ -25,7 +25,7 @@ const plans = [
     tier: "Elite", title: "Full Marathon", duration: "20 weeks",
     desc: "26.2 miles of purpose. For runners ready to go the full distance.",
     features: ["6 runs per week", "Strength & mobility", "Weekly 1-on-1 coaching", "GPS pace targets"],
-    color: "rgba(232,98,10,0.6)",
+    color: "var(--cs-white)",
   },
   {
     tier: "Wellness", title: "Weight Loss", duration: "8 weeks",
