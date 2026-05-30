@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
           planLabel,
           new Date(m.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }),
           String(daysAhead),
-        ]);
+        ], "membership_expiry_alert");
         if (waResult.ok) sent.push("whatsapp");
       }
 
