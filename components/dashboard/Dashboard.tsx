@@ -192,8 +192,8 @@ export default function Dashboard() {
   const [activities,     setActivities]     = useState<Activity[]>([]);
   const [loading,        setLoading]        = useState(false);
   const [stravaMsg,      setStravaMsg]      = useState("");
-  const [followers,      setFollowers]      = useState<string[]>([]);
-  const [following,      setFollowing]      = useState<string[]>([]);
+  const [followers,      setFollowers]      = useState<{ email: string; name: string }[]>([]);
+  const [following,      setFollowing]      = useState<{ email: string; name: string }[]>([]);
   const [modal,          setModal]          = useState<ModalType>(null);
   const [pbs,            setPbs]            = useState<PersonalBests | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -824,12 +824,12 @@ export default function Dashboard() {
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                {(modal === "followers" ? followers : following).map((email) => (
-                  <div key={email} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.5rem 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                {(modal === "followers" ? followers : following).map((u) => (
+                  <div key={u.email} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.5rem 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
                     <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem", fontWeight: 700 }}>
-                      {email[0].toUpperCase()}
+                      {u.name[0].toUpperCase()}
                     </div>
-                    <span style={{ fontSize: "0.875rem", color: "var(--cs-white)" }}>{email}</span>
+                    <span style={{ fontSize: "0.875rem", color: "var(--cs-white)" }}>{u.name}</span>
                   </div>
                 ))}
               </div>

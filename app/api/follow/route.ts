@@ -54,15 +54,25 @@ export async function GET(req: NextRequest) {
     if (type === "followers") {
       const { data } = await db
         .from("follows")
-        .select("follower_email")
+        .select("follower_email, users!follows_follower_email_fkey(first_name, last_name)")
         .eq("following_email", email);
-      return NextResponse.json({ users: (data || []).map((r) => r.follower_email) });
+      return NextResponse.json({
+        users: (data || []).map((r) => ({
+          email: r.follower_email,
+          name: `${(r.users as { first_name: string; last_name: string } | null)?.first_name ?? ""} ${(r.users as { first_name: string; last_name: string } | null)?.last_name ?? ""}`.trim() || r.follower_email,
+        })),
+      });
     } else {
       const { data } = await db
         .from("follows")
-        .select("following_email")
+        .select("following_email, users!follows_following_email_fkey(first_name, last_name)")
         .eq("follower_email", email);
-      return NextResponse.json({ users: (data || []).map((r) => r.following_email) });
+      return NextResponse.json({
+        users: (data || []).map((r) => ({
+          email: r.following_email,
+          name: `${(r.users as { first_name: string; last_name: string } | null)?.first_name ?? ""} ${(r.users as { first_name: string; last_name: string } | null)?.last_name ?? ""}`.trim() || r.following_email,
+        })),
+      });
     }
   } catch (e: unknown) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
