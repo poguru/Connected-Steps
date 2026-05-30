@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 
 const FALLBACK = [
   { id: -1, user_name: "Priya M.",  achievement: "Hyderabad — Half Marathon finisher", quote: "I went from barely running 2km to completing my first half marathon in 14 weeks. My coach adjusted the plan when life got busy and I never felt alone.", rating: 5 },
@@ -32,11 +32,11 @@ function Stars({ rating }: { rating: number | null }) {
 function StoryCard({ story }: { story: Story }) {
   return (
     <div style={{
-      flexShrink: 0, width: "320px",
       background: "var(--cs-charcoal)",
       border: "1px solid rgba(255,255,255,0.08)",
       borderRadius: "12px", padding: "1.5rem",
       display: "flex", flexDirection: "column", gap: "1rem",
+      height: "100%", boxSizing: "border-box",
     }}>
       <Stars rating={story.rating} />
       <p style={{ fontFamily: "var(--font-display)", fontSize: "1rem", fontWeight: 300, fontStyle: "italic", color: "var(--cs-white)", lineHeight: 1.6, flex: 1 }}>
@@ -45,6 +45,87 @@ function StoryCard({ story }: { story: Story }) {
       <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "0.75rem" }}>
         <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--cs-white)" }}>{story.user_name}</div>
         <div style={{ fontSize: "11px", color: "var(--cs-muted)", marginTop: "2px" }}>{story.achievement}</div>
+      </div>
+    </div>
+  );
+}
+
+function StoriesCarousel({ stories }: { stories: Story[] }) {
+  const [current, setCurrent] = useState(0);
+  const [paused,  setPaused]  = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const total    = stories.length;
+  const perPage  = 3;
+  const pages    = Math.ceil(total / perPage);
+
+  const next = useCallback(() => setCurrent((c) => (c + 1) % pages), [pages]);
+  const prev = useCallback(() => setCurrent((c) => (c - 1 + pages) % pages), [pages]);
+
+  useEffect(() => {
+    if (paused || pages <= 1) return;
+    timerRef.current = setInterval(next, 4000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [paused, pages, next]);
+
+  const visible = stories.slice(current * perPage, current * perPage + perPage);
+
+  return (
+    <div>
+      {/* Cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1.25rem", alignItems: "stretch" }}>
+        {visible.map((story) => (
+          <StoryCard key={story.id} story={story} />
+        ))}
+      </div>
+
+      {/* Controls */}
+      {pages > 1 && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "1rem", marginTop: "2rem" }}>
+          {/* Prev */}
+          <button onClick={prev} aria-label="Previous"
+            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "50%", width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--cs-white)" }}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M9 2L5 7l4 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+
+          {/* Dots */}
+          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+            {Array.from({ length: pages }).map((_, i) => (
+              <button key={i} onClick={() => setCurrent(i)} aria-label={`Go to page ${i + 1}`}
+                style={{ width: i === current ? "20px" : "8px", height: "8px", borderRadius: "4px", background: i === current ? "var(--cs-orange)" : "rgba(255,255,255,0.2)", border: "none", cursor: "pointer", transition: "all 0.25s", padding: 0 }} />
+            ))}
+          </div>
+
+          {/* Next */}
+          <button onClick={next} aria-label="Next"
+            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "50%", width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--cs-white)" }}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M5 2l4 5-4 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+
+          {/* Pause / Play */}
+          <button onClick={() => setPaused((p) => !p)} aria-label={paused ? "Play" : "Pause"}
+            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "50%", width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: paused ? "var(--cs-orange)" : "var(--cs-muted)", transition: "color 0.2s" }}>
+            {paused ? (
+              <svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor">
+                <path d="M2 1l10 6-10 6V1z"/>
+              </svg>
+            ) : (
+              <svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor">
+                <rect x="1" y="1" width="4" height="12" rx="1"/>
+                <rect x="7" y="1" width="4" height="12" rx="1"/>
+              </svg>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Page count */}
+      <div style={{ textAlign: "center", marginTop: "0.75rem", fontSize: "11px", color: "var(--cs-muted)" }}>
+        {current * perPage + 1}–{Math.min(current * perPage + perPage, total)} of {total} stories
       </div>
     </div>
   );
@@ -82,9 +163,7 @@ export default function StatsAndTestimonials() {
     { num: avgRating        != null ? `${avgRating}★`       : "30+", label: avgRating != null ? "Community rating" : "Years coach experience" },
   ];
 
-  const display  = stories.length ? stories : FALLBACK;
-  const doubled  = display.length < 4 ? [...display, ...display, ...display] : [...display, ...display];
-  const duration = `${Math.max(20, doubled.length * 5)}s`;
+  const display = stories.length ? stories : FALLBACK;
 
   return (
     <>
@@ -103,40 +182,29 @@ export default function StatsAndTestimonials() {
       </section>
 
       <section id="community" className="section" style={{ background: "var(--cs-dark)" }}>
-        <div style={{ textAlign: "center", marginBottom: "3rem" }}>
-          <span className="gold-line mx-auto" />
-          <div className="section-label">Runner stories</div>
-          <h2 className="font-display mt-2"
-            style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 300, color: "var(--cs-white)" }}>
-            Real runners.{" "}
-            <em className="not-italic" style={{ color: "var(--cs-orange)" }}>Real results.</em>
-          </h2>
-          {avgRating != null && (
-            <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", marginTop: "0.75rem", background: "rgba(232,98,10,0.08)", border: "1px solid rgba(232,98,10,0.2)", borderRadius: "20px", padding: "4px 14px" }}>
-              <Stars rating={Math.round(avgRating)} />
-              <span style={{ fontSize: "0.82rem", color: "var(--cs-orange)", fontWeight: 600 }}>{avgRating} / 5</span>
-              <span style={{ fontSize: "0.75rem", color: "var(--cs-muted)" }}>from {stories.length} runner{stories.length !== 1 ? "s" : ""}</span>
-            </div>
-          )}
-          <p style={{ fontSize: "0.875rem", color: "var(--cs-muted)", marginTop: "0.75rem" }}>
-            Stories shared by our community.{" "}
-            <a href="/dashboard?share=story" style={{ color: "var(--cs-orange)", textDecoration: "none" }}>Share yours →</a>
-          </p>
-        </div>
-
-        {/* Scrolling carousel */}
-        <div style={{ overflow: "hidden", position: "relative" }}>
-          <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "80px", background: "linear-gradient(to right, var(--cs-dark), transparent)", zIndex: 2, pointerEvents: "none" }} />
-          <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: "80px", background: "linear-gradient(to left, var(--cs-dark), transparent)", zIndex: 2, pointerEvents: "none" }} />
-          <div
-            style={{ display: "flex", gap: "1.25rem", alignItems: "stretch", animation: `marquee ${duration} linear infinite`, width: "max-content" }}
-            onMouseEnter={(e) => (e.currentTarget.style.animationPlayState = "paused")}
-            onMouseLeave={(e) => (e.currentTarget.style.animationPlayState = "running")}
-          >
-            {doubled.map((story, i) => (
-              <StoryCard key={`${story.id}-${i}`} story={story} />
-            ))}
+        <div className="container">
+          <div style={{ textAlign: "center", marginBottom: "3rem" }}>
+            <span className="gold-line mx-auto" />
+            <div className="section-label">Runner stories</div>
+            <h2 className="font-display mt-2"
+              style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 300, color: "var(--cs-white)" }}>
+              Real runners.{" "}
+              <em className="not-italic" style={{ color: "var(--cs-orange)" }}>Real results.</em>
+            </h2>
+            {avgRating != null && (
+              <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", marginTop: "0.75rem", background: "rgba(232,98,10,0.08)", border: "1px solid rgba(232,98,10,0.2)", borderRadius: "20px", padding: "4px 14px" }}>
+                <Stars rating={Math.round(avgRating)} />
+                <span style={{ fontSize: "0.82rem", color: "var(--cs-orange)", fontWeight: 600 }}>{avgRating} / 5</span>
+                <span style={{ fontSize: "0.75rem", color: "var(--cs-muted)" }}>from {stories.length} runner{stories.length !== 1 ? "s" : ""}</span>
+              </div>
+            )}
+            <p style={{ fontSize: "0.875rem", color: "var(--cs-muted)", marginTop: "0.75rem" }}>
+              Stories shared by our community.{" "}
+              <a href="/dashboard?share=story" style={{ color: "var(--cs-orange)", textDecoration: "none" }}>Share yours →</a>
+            </p>
           </div>
+
+          <StoriesCarousel stories={display} />
         </div>
       </section>
     </>
