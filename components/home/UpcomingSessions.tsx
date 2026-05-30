@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { getSupabase } from "@/lib/supabase";
 
 interface Session {
   id:       string;
@@ -39,13 +37,9 @@ export default function UpcomingSessions() {
       .finally(() => setLoading(false));
   }, []);
 
-  async function handleJoin(sessionId: string) {
-    const { data: { session } } = await getSupabase().auth.getSession();
-    if (session) {
-      router.push(`/join/${sessionId}`);
-    } else {
-      router.push(`/auth?redirect=/join/${sessionId}`);
-    }
+  function handleJoin(sessionId: string) {
+    const user = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
+    router.push(user ? `/join/${sessionId}` : `/auth?redirect=/join/${sessionId}`);
   }
 
   if (!loading && sessions.length === 0) return null;
@@ -55,19 +49,14 @@ export default function UpcomingSessions() {
       <div className="container">
 
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem", marginBottom: "2.5rem" }}>
-          <div>
-            <span className="gold-line" />
-            <div className="section-label">Training Calendar</div>
-            <h2 className="font-display mt-2"
-              style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 300, color: "var(--cs-cream)" }}>
-              Upcoming{" "}
-              <em className="not-italic" style={{ color: "var(--cs-orange)" }}>sessions</em>
-            </h2>
-          </div>
-          <Link href="/auth" style={{ fontSize: "0.82rem", color: "var(--cs-muted)", textDecoration: "none", borderBottom: "1px solid rgba(255,255,255,0.15)", paddingBottom: "2px", whiteSpace: "nowrap" }}>
-            Join to attend →
-          </Link>
+        <div style={{ marginBottom: "2.5rem" }}>
+          <span className="gold-line" />
+          <div className="section-label">Training Calendar</div>
+          <h2 className="font-display mt-2"
+            style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 300, color: "var(--cs-cream)" }}>
+            Upcoming{" "}
+            <em className="not-italic" style={{ color: "var(--cs-orange)" }}>sessions</em>
+          </h2>
         </div>
 
         {/* Cards */}
