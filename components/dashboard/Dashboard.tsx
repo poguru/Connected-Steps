@@ -682,6 +682,12 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* Rate Your Coach */}
+          <RateCoachWidget
+            userEmail={user.email}
+            hasAttended={sessionsLoading ? null : sessions.some((r) => r.attended)}
+          />
+
           <TrainingPlan goal={user.goal} />
 
           {/* Push notifications */}
@@ -874,12 +880,6 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-
-          {/* Rate Your Coach */}
-          <RateCoachWidget
-            userEmail={user.email}
-            hasAttended={sessionsLoading ? null : sessions.some((r) => r.attended)}
-          />
 
         </aside>
       </div>
