@@ -55,31 +55,32 @@ export async function sendWhatsApp(
 ): Promise<NotifyResult> {
   const authKey    = process.env.MSG91_AUTH_KEY;
   const fromNumber = process.env.MSG91_WHATSAPP_NUMBER;
+  const namespace  = process.env.MSG91_NAMESPACE;
   const template   = templateName ?? process.env.MSG91_WHATSAPP_TEMPLATE ?? "session_alert";
 
   if (!authKey || !fromNumber) {
-    console.error("MSG91 not configured — AUTH_KEY set:", !!authKey, "| WA_NUMBER set:", !!fromNumber);
     return { to: phone, channel: "whatsapp", ok: false, error: "MSG91 WhatsApp not configured." };
   }
 
-  console.log("MSG91 WA config — number:", fromNumber, "| authKey length:", authKey.length, "| template:", template);
   const to = normalisePhone(phone);
+
+  // Build body_1, body_2, ... from params array
+  const components: Record<string, { type: string; value: string }> = {};
+  params.forEach((value, i) => {
+    components[`body_${i + 1}`] = { type: "text", value };
+  });
 
   const body = {
     integrated_number: fromNumber,
     content_type: "template",
     payload: {
-      to,
+      messaging_product: "whatsapp",
       type: "template",
       template: {
         name: template,
-        language: { code: "en" },
-        components: [
-          {
-            type: "body",
-            parameters: params.map((text) => ({ type: "text", text })),
-          },
-        ],
+        language: { code: "en", policy: "deterministic" },
+        ...(namespace ? { namespace } : {}),
+        to_and_components: [{ to: [to], components }],
       },
     },
   };
@@ -94,9 +95,9 @@ export async function sendWhatsApp(
       }
     );
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.type === "error") {
-      const errMsg = data.message ?? JSON.stringify(data) ?? String(res.status);
-      console.error("MSG91 WA error response:", JSON.stringify(data));
+    if (!res.ok || data.hasError) {
+      const errMsg = data.message ?? data.errors ?? JSON.stringify(data) ?? String(res.status);
+      console.error("MSG91 WA error:", errMsg);
       return { to: phone, channel: "whatsapp", ok: false, error: errMsg };
     }
     return { to: phone, channel: "whatsapp", ok: true };
