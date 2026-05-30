@@ -28,7 +28,7 @@ export default function JoinSessionPage() {
 
   const [email,   setEmail]   = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [result,  setResult]  = useState<"joined" | "already" | null>(null);
+  const [result,  setResult]  = useState<"joined" | "already" | "closed" | null>(null);
   const [error,   setError]   = useState("");
 
   useEffect(() => {
@@ -61,6 +61,7 @@ export default function JoinSessionPage() {
         body: JSON.stringify({ email: email.trim() }),
       });
       const data = await res.json();
+      if (res.status === 410) { setResult("closed"); return; }
       if (!res.ok) { setError(data.error ?? "Something went wrong."); return; }
       setResult(data.already ? "already" : "joined");
     } catch {
@@ -93,6 +94,17 @@ export default function JoinSessionPage() {
             <h1 style={{ fontSize: "1.2rem", fontWeight: 600, marginBottom: "0.5rem" }}>Session not found</h1>
             <p style={{ fontSize: "0.85rem", color: "var(--cs-muted)", marginBottom: "1.5rem" }}>This session link may have expired or been removed.</p>
             <Link href="/dashboard" style={{ fontSize: "0.85rem", color: "var(--cs-orange)", textDecoration: "none" }}>← Go to Dashboard</Link>
+          </div>
+        ) : result === "closed" ? (
+          <div style={card}>
+            <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>🔒</div>
+            <h1 style={{ fontSize: "1.3rem", fontWeight: 600, marginBottom: "0.4rem" }}>Registration Closed</h1>
+            <p style={{ fontSize: "0.875rem", color: "var(--cs-muted)", marginBottom: "1.5rem", lineHeight: 1.6 }}>
+              Registration for <strong style={{ color: "var(--cs-white)" }}>{session?.title}</strong> has closed. You can join up to 2 hours after the session starts.
+            </p>
+            <Link href="/dashboard" style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", padding: "10px 22px", background: "var(--cs-orange)", color: "#fff", borderRadius: "6px", fontSize: "0.85rem", fontWeight: 700, textDecoration: "none" }}>
+              Go to Dashboard →
+            </Link>
           </div>
         ) : result ? (
           <div style={card}>

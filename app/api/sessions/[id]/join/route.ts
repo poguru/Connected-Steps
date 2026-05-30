@@ -33,6 +33,15 @@ export async function POST(
     .single();
   if (!session) return NextResponse.json({ error: "Session not found." }, { status: 404 });
 
+  // Block joining if session was more than 2 hours ago
+  const sessionTime = session.time ?? "00:00";
+  const [hours, minutes] = sessionTime.split(":").map(Number);
+  const sessionStart = new Date(`${session.date}T${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00+05:30`);
+  const deadline = new Date(sessionStart.getTime() + 2 * 60 * 60 * 1000);
+  if (new Date() > deadline) {
+    return NextResponse.json({ error: "Registration is closed. You can only join up to 2 hours after the session starts." }, { status: 410 });
+  }
+
   const { data: user } = await db
     .from("users")
     .select("email, first_name, last_name")
