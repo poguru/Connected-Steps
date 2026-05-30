@@ -51,6 +51,12 @@ export async function GET(req: NextRequest) {
 
     const db = getSupabaseServer();
 
+    type UserRow = { first_name: string; last_name: string };
+    const getName = (u: unknown, fallback: string) => {
+      const row = (Array.isArray(u) ? u[0] : u) as UserRow | null | undefined;
+      return `${row?.first_name ?? ""} ${row?.last_name ?? ""}`.trim() || fallback;
+    };
+
     if (type === "followers") {
       const { data } = await db
         .from("follows")
@@ -59,7 +65,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         users: (data || []).map((r) => ({
           email: r.follower_email,
-          name: `${(r.users as { first_name: string; last_name: string } | null)?.first_name ?? ""} ${(r.users as { first_name: string; last_name: string } | null)?.last_name ?? ""}`.trim() || r.follower_email,
+          name: getName(r.users, r.follower_email),
         })),
       });
     } else {
@@ -70,7 +76,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         users: (data || []).map((r) => ({
           email: r.following_email,
-          name: `${(r.users as { first_name: string; last_name: string } | null)?.first_name ?? ""} ${(r.users as { first_name: string; last_name: string } | null)?.last_name ?? ""}`.trim() || r.following_email,
+          name: getName(r.users, r.following_email),
         })),
       });
     }
