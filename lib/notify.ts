@@ -93,7 +93,9 @@ export async function sendWhatsApp(
     );
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.type === "error") {
-      return { to: phone, channel: "whatsapp", ok: false, error: data.message ?? String(res.status) };
+      const errMsg = data.message ?? JSON.stringify(data) ?? String(res.status);
+      console.error("MSG91 WA error response:", JSON.stringify(data));
+      return { to: phone, channel: "whatsapp", ok: false, error: errMsg };
     }
     return { to: phone, channel: "whatsapp", ok: true };
   } catch (e: unknown) {
