@@ -84,7 +84,7 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
         <button
           type="button"
           onClick={() => setShowPw(!showPw)}
-          style={{ color: "var(--cs-muted)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 500, padding: "0 14px 0 0", whiteSpace: "nowrap" }}
+          style={{ color: "var(--cs-muted)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 500, padding: "0 14px 0 0", whiteSpace: "nowrap", marginLeft: "auto" }}
         >
           {showPw ? "Hide" : "Show"}
         </button>

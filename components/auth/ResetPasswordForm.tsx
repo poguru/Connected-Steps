@@ -103,7 +103,7 @@ export default function ResetPasswordForm() {
                   style={{ flex: 1, background: "transparent", border: "none", outline: "none", padding: "11px 14px", color: "var(--cs-white)", fontFamily: "var(--font-body)", fontSize: "14px" }}
                 />
                 <button type="button" onClick={() => setShowPw(!showPw)}
-                  style={{ color: "var(--cs-muted)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 500, padding: "0 14px 0 0", whiteSpace: "nowrap" }}>
+                  style={{ color: "var(--cs-muted)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 500, padding: "0 14px 0 0", whiteSpace: "nowrap", marginLeft: "auto" }}>
                   {showPw ? "Hide" : "Show"}
                 </button>
               </div>
