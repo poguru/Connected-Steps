@@ -11,12 +11,10 @@ interface StoredUser {
 }
 
 const navLinks = [
-  { label: "Training",      href: "#training" },
-  { label: "Coaches",       href: "#coaches" },
-  { label: "Community",     href: "#community" },
-  { label: "Achievements",  href: "/achievements" },
+  { label: "Training",        href: "#training" },
+  { label: "Coaches",         href: "#coaches" },
+  { label: "Community",       href: "#community" },
   { label: "Upcoming Events", href: "/weekend-run", highlight: true },
-  { label: "Pricing",       href: "/pricing" },
 ];
 
 const sessionDropdown = [
