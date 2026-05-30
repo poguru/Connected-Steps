@@ -173,7 +173,7 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
       <div className="mb-3">
         <label style={{ display: "block", fontSize: "11px", color: "var(--cs-muted)", marginBottom: "6px", fontFamily: "var(--font-body)", letterSpacing: "0.05em" }}>Goal</label>
         <select value={goal} onChange={(e) => setGoal(e.target.value)} className="auth-input" style={{ cursor: "pointer", colorScheme: "dark" }}>
-          {GOALS.map((g) => <option key={g.id} value={g.id}>{g.label}</option>)}
+          {GOALS.map((g) => <option key={g.id} value={g.id} style={{ background: "#1a1a1a", color: "#fff" }}>{g.label}</option>)}
         </select>
       </div>
 

@@ -202,7 +202,7 @@ export default function ProfilePage() {
             <div>
               <label style={{ display: "block", fontSize: "11px", color: "#666", marginBottom: "5px" }}>Goal</label>
               <select value={info.goal} onChange={(e) => setInfo((p) => ({ ...p, goal: e.target.value }))} style={{ ...inputStyle, colorScheme: "dark" }}>
-                {GOAL_OPTIONS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+                {GOAL_OPTIONS.map((g) => <option key={g.value} value={g.value} style={{ background: "#1a1a1a", color: "#fff" }}>{g.label}</option>)}
               </select>
             </div>
 
