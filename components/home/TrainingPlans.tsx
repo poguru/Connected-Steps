@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 const plans = [
   {
@@ -42,6 +42,13 @@ const plans = [
 ];
 
 export default function TrainingPlans() {
+  const router = useRouter();
+
+  const handleGetStarted = () => {
+    const user = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
+    router.push(user ? "/dashboard" : "/auth");
+  };
+
   return (
     <section id="training" className="section" style={{ background: "var(--cs-dark)" }}>
       <div className="container">
@@ -93,14 +100,16 @@ export default function TrainingPlans() {
                   </li>
                 ))}
               </ul>
-              <Link href="/auth" className="btn-primary text-center justify-center"
+              <button onClick={handleGetStarted} className="btn-primary text-center justify-center"
                 style={{
                   background: plan.featured ? plan.color : "transparent",
                   border: `1px solid ${plan.color}`,
                   color: plan.featured ? "var(--cs-black)" : plan.color,
+                  cursor: "pointer",
+                  width: "100%",
                 }}>
                 Get started
-              </Link>
+              </button>
             </div>
           ))}
         </div>
