@@ -16,10 +16,13 @@ interface SessionRecord {
   bonus_reason:  string | null;
   points_synced: boolean;
   sessions: {
-    id:       number;
-    title:    string;
-    date:     string;
-    location: string;
+    id:        number;
+    title:     string;
+    date:      string;
+    time:      string | null;
+    venue:     string | null;
+    location:  string;
+    photo_url: string | null;
   } | null;
 }
 
@@ -533,25 +536,32 @@ export default function Dashboard() {
                 const dateStr = d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
                 const totalPts = (rec.bonus_points ?? 0);
                 return (
-                  <div key={i} style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1rem 1.25rem", display: "flex", alignItems: "center", gap: "1rem" }}>
-                    <div style={{ width: "44px", height: "44px", borderRadius: "8px", background: rec.attended ? "rgba(232,98,10,0.12)" : "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.3rem", flexShrink: 0 }}>
-                      {rec.attended ? "✅" : "❌"}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--cs-white)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
-                      <div style={{ fontSize: "0.78rem", color: "var(--cs-muted)", marginTop: "2px" }}>
-                        {dateStr} · 📍 {s.location}
+                  <div key={i} style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", overflow: "hidden" }}>
+                    {/* Session photo */}
+                    {s.photo_url && (
+                      <img src={s.photo_url} alt={`${s.title} group photo`}
+                        style={{ width: "100%", maxHeight: "220px", objectFit: "cover", display: "block" }} />
+                    )}
+                    <div style={{ padding: "1rem 1.25rem", display: "flex", alignItems: "center", gap: "1rem" }}>
+                      <div style={{ width: "44px", height: "44px", borderRadius: "8px", background: rec.attended ? "rgba(232,98,10,0.12)" : "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.3rem", flexShrink: 0 }}>
+                        {rec.attended ? "✅" : "❌"}
                       </div>
-                      {rec.bonus_reason && (
-                        <div style={{ fontSize: "0.75rem", color: "var(--cs-orange)", marginTop: "2px" }}>{rec.bonus_reason}</div>
-                      )}
-                    </div>
-                    <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{ fontSize: "0.8rem", color: rec.attended ? "var(--cs-orange)" : "var(--cs-muted)", fontWeight: 700 }}>
-                        {rec.attended ? (totalPts > 0 ? `+${totalPts} pts` : "Attended") : "Not attended"}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--cs-white)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
+                        <div style={{ fontSize: "0.78rem", color: "var(--cs-muted)", marginTop: "2px" }}>
+                          {dateStr} · 📍 {s.venue || s.location}
+                        </div>
+                        {rec.bonus_reason && (
+                          <div style={{ fontSize: "0.75rem", color: "var(--cs-orange)", marginTop: "2px" }}>{rec.bonus_reason}</div>
+                        )}
                       </div>
-                      <div style={{ fontSize: "10px", color: "var(--cs-muted)", marginTop: "2px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                        {rec.attended ? (totalPts > 0 ? "Bonus points" : "No bonus") : "—"}
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontSize: "0.8rem", color: rec.attended ? "var(--cs-orange)" : "var(--cs-muted)", fontWeight: 700 }}>
+                          {rec.attended ? (totalPts > 0 ? `+${totalPts} pts` : "Attended") : "Not attended"}
+                        </div>
+                        <div style={{ fontSize: "10px", color: "var(--cs-muted)", marginTop: "2px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                          {rec.attended ? (totalPts > 0 ? "Bonus points" : "No bonus") : "—"}
+                        </div>
                       </div>
                     </div>
                   </div>

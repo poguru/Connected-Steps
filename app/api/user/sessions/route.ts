@@ -18,7 +18,10 @@ export async function GET(req: NextRequest) {
         id,
         title,
         date,
-        location
+        time,
+        venue,
+        location,
+        photo_url
       )
     `)
     .eq("user_email", email.toLowerCase())
