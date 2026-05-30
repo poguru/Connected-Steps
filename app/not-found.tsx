@@ -3,10 +3,6 @@
 import Link from "next/link";
 import Image from "next/image";
 
-export const metadata = {
-  title: "Page Not Found – Connected Steps",
-};
-
 export default function NotFound() {
   return (
     <div style={{ minHeight: "100vh", background: "var(--cs-black)", color: "var(--cs-white)", display: "flex", flexDirection: "column" }}>
