@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
-interface Session { id: string; title: string; date: string; time: string; location: string; }
+interface Session { id: string; title: string; date: string; time: string; location: string; venue: string; }
 interface Attendee {
   email: string; name: string; location: string;
   attended: boolean; bonus_points: number; bonus_reason: string; points_synced: boolean;
@@ -45,6 +45,7 @@ export default function AdminSessionsPage() {
   const [newDate,     setNewDate]     = useState("");
   const [newTime,     setNewTime]     = useState("");
   const [newLocation, setNewLocation] = useState("");
+  const [newVenue,    setNewVenue]    = useState("");
   const [creating,    setCreating]    = useState(false);
 
   const headers = { "Content-Type": "application/json", "x-admin-password": password };
@@ -75,10 +76,10 @@ export default function AdminSessionsPage() {
   const createSession = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setCreating(true);
-    const res  = await fetch("/api/admin/sessions", { method: "POST", headers, body: JSON.stringify({ title: newTitle, date: newDate, time: newTime, location: newLocation }) });
+    const res  = await fetch("/api/admin/sessions", { method: "POST", headers, body: JSON.stringify({ title: newTitle, date: newDate, time: newTime, location: newLocation, venue: newVenue }) });
     const json = await res.json();
     if (res.ok) {
-      setNewTitle(""); setNewDate(""); setNewTime(""); setNewLocation("");
+      setNewTitle(""); setNewDate(""); setNewTime(""); setNewLocation(""); setNewVenue("");
       await loadSessions();
     } else {
       alert(json.error);
@@ -217,8 +218,12 @@ export default function AdminSessionsPage() {
                 <input style={inp} type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} />
               </div>
               <div>
-                <label style={label}>Location</label>
+                <label style={label}>Location (area — used to filter users)</label>
                 <input style={inp} value={newLocation} onChange={(e) => setNewLocation(e.target.value)} placeholder="e.g. Kondapur" required />
+              </div>
+              <div>
+                <label style={label}>Venue / Meeting Point (shown in alert)</label>
+                <input style={inp} value={newVenue} onChange={(e) => setNewVenue(e.target.value)} placeholder="e.g. Botanical Garden, Kondapur" />
               </div>
               <button type="submit" disabled={creating} style={{ ...btn(true), width: "100%" }}>
                 {creating ? "Creating…" : "Create Session"}
@@ -259,7 +264,7 @@ export default function AdminSessionsPage() {
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem", marginBottom: "1.5rem" }}>
                 <div>
                   <h2 style={{ fontSize: "1.3rem", fontWeight: 300, color: "#fff", marginBottom: "4px" }}>{selected.title}</h2>
-                  <div style={{ fontSize: "0.8rem", color: "#888" }}>{selected.date}{selected.time ? ` at ${selected.time}` : ""} · 📍 {selected.location}</div>
+                  <div style={{ fontSize: "0.8rem", color: "#888" }}>{selected.date}{selected.time ? ` at ${selected.time}` : ""} · 📍 {selected.venue || selected.location}</div>
                 </div>
                 <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
                   <button onClick={saveAttendance} disabled={saving} style={btn(true)}>

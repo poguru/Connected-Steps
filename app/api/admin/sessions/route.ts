@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   if (!auth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const { title, date, time, location } = await req.json();
+  const { title, date, time, location, venue } = await req.json();
   if (!title || !date || !location) {
     return NextResponse.json({ error: "title, date and location are required." }, { status: 400 });
   }
@@ -35,14 +35,14 @@ export async function POST(req: NextRequest) {
   const db = getSupabaseServer();
   const { data, error } = await db
     .from("sessions")
-    .insert({ title, date, time: time || null, location })
+    .insert({ title, date, time: time || null, location, venue: venue || null })
     .select()
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Await notifications so Vercel doesn't terminate the Lambda before they fire
-  await notifyUsers(db, title, date, time || null, location).catch((e) =>
+  await notifyUsers(db, title, date, time || null, venue || location, location).catch((e) =>
     console.error("Notification error:", e)
   );
 
@@ -54,13 +54,14 @@ async function notifyUsers(
   title: string,
   date: string,
   time: string | null,
-  location: string
+  displayLocation: string,
+  filterLocation: string
 ) {
   // Fetch users at this location
   const { data: users } = await db
     .from("users")
     .select("first_name, last_name, email, phone")
-    .ilike("location", `%${location}%`);
+    .ilike("location", `%${filterLocation}%`);
 
   if (!users || users.length === 0) {
     console.log(`No users found for location: ${location}`);
@@ -73,7 +74,7 @@ async function notifyUsers(
       .filter((u) => u.phone?.trim())
       .map((u) => {
         const name = `${u.first_name} ${u.last_name}`.trim() || "there";
-        return sendWhatsApp(u.phone!, sessionWAParams(name, title, date, time, location));
+        return sendWhatsApp(u.phone!, sessionWAParams(name, title, date, time, displayLocation));
       })
   );
   const waSent = waResults.filter((r) => r.status === "fulfilled" && r.value.ok).length;
