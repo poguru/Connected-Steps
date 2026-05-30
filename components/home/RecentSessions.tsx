@@ -39,7 +39,7 @@ export default function RecentSessions() {
   if (loading || sessions.length === 0) return null;
 
   return (
-    <section className="section" style={{ background: "var(--cs-black)" }}>
+    <section id="recent-sessions" className="section" style={{ background: "var(--cs-black)" }}>
       <div className="container">
         <span className="gold-line" />
         <div className="section-label" style={{ marginTop: "0.5rem" }}>Community</div>

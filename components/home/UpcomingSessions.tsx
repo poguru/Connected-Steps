@@ -51,7 +51,7 @@ export default function UpcomingSessions() {
   if (!loading && sessions.length === 0) return null;
 
   return (
-    <section className="section" style={{ background: "var(--cs-dark)" }}>
+    <section id="upcoming-sessions" className="section" style={{ background: "var(--cs-dark)" }}>
       <div className="container">
 
         {/* Header */}

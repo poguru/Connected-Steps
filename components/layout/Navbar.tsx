@@ -11,12 +11,14 @@ interface StoredUser {
 }
 
 const navLinks = [
-  { label: "Training",        href: "#training" },
-  { label: "Coaches",         href: "#coaches" },
-  { label: "Community",       href: "#community" },
-  { label: "Achievements",    href: "/achievements" },
-  { label: "Upcoming Events", href: "/weekend-run", highlight: true },
-  { label: "Pricing",         href: "/pricing" },
+  { label: "Training",          href: "#training" },
+  { label: "Coaches",           href: "#coaches" },
+  { label: "Recent Sessions",   href: "#recent-sessions" },
+  { label: "Upcoming Sessions", href: "#upcoming-sessions" },
+  { label: "Community",         href: "#community" },
+  { label: "Achievements",      href: "/achievements" },
+  { label: "Upcoming Events",   href: "/weekend-run", highlight: true },
+  { label: "Pricing",           href: "/pricing" },
 ];
 
 export default function Navbar() {
