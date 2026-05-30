@@ -261,7 +261,7 @@ select.auth-input option {
 }
 
 /* ─── Home Navbar ────────────────────────────────────── */
-.cs-home-nav-links { display: flex; align-items: center; gap: 2rem; }
+.cs-home-nav-links { display: flex; align-items: center; gap: 1.4rem; }
 .cs-home-nav-cta   { display: flex; align-items: center; gap: 0.75rem; }
 .cs-home-nav-burger { display: none; flex-direction: column; gap: 6px; background: none; border: none; cursor: pointer; padding: 4px; }
 .cs-home-nav-burger span { display: block; width: 24px; height: 2px; background: var(--cs-white); border-radius: 2px; transition: all 0.3s; }
