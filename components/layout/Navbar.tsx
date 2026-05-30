@@ -62,17 +62,9 @@ export default function Navbar() {
         <nav className="flex items-center justify-between h-20">
 
           {/* Brand */}
-          <Link href="/" className="flex items-center gap-3 group" style={{ flexShrink: 0 }}>
+          <Link href="/" className="group" style={{ flexShrink: 0 }}>
             <Image src="/logo.png" alt="Connected Steps logo" width={44} height={44}
               className="rounded-full transition-transform duration-300 group-hover:scale-105" />
-            <div>
-              <div className="font-display font-semibold leading-tight" style={{ color: "var(--cs-white)", fontSize: "1rem" }}>
-                Connected Steps
-              </div>
-              <div className="tracking-widest uppercase" style={{ color: "var(--cs-orange)", fontSize: "9px" }}>
-                Your Goal, Our Plan
-              </div>
-            </div>
           </Link>
 
           {/* Desktop nav */}
