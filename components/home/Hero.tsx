@@ -80,14 +80,6 @@ export default function Hero() {
                 style={{ background: "var(--cs-charcoal)", border: "1px solid rgba(232,98,10,0.2)" }}>
                 <Image src="/logo.png" alt="Connected Steps" width={220} height={220} className="rounded-full" priority />
               </div>
-              <div className="absolute -left-8 top-1/4 px-4 py-2 rounded text-sm"
-                style={{ background: "var(--cs-charcoal)", border: "1px solid rgba(232,98,10,0.3)", color: "var(--cs-white)"}}>
-                ↑ 14% faster this month
-              </div>
-              <div className="absolute -right-4 bottom-1/4 px-4 py-2 rounded text-sm"
-                style={{ background: "var(--cs-charcoal)", border: "1px solid rgba(232,98,10,0.3)", color: "var(--cs-orange)" }}>
-                🏅 Marathon ready
-              </div>
             </div>
           </div>
         </div>
