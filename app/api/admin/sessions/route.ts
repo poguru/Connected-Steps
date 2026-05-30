@@ -41,8 +41,8 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Fire all notifications — don't block the admin UI
-  notifyUsers(db, title, date, location).catch((e) =>
+  // Await notifications so Vercel doesn't terminate the Lambda before they fire
+  await notifyUsers(db, title, date, location).catch((e) =>
     console.error("Notification error:", e)
   );
 
