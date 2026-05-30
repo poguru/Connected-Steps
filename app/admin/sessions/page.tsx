@@ -236,7 +236,7 @@ export default function AdminSessionsPage() {
               </div>
               <div>
                 <label style={label}>Time</label>
-                <input style={inp} type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} />
+                <input style={inp} type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} required />
               </div>
               <div>
                 <label style={label}>Location (area — used to filter users)</label>
@@ -244,7 +244,7 @@ export default function AdminSessionsPage() {
               </div>
               <div>
                 <label style={label}>Venue / Meeting Point (shown in alert)</label>
-                <input style={inp} value={newVenue} onChange={(e) => setNewVenue(e.target.value)} placeholder="e.g. Botanical Garden, Kondapur" />
+                <input style={inp} value={newVenue} onChange={(e) => setNewVenue(e.target.value)} placeholder="e.g. Botanical Garden, Kondapur" required />
               </div>
               <button type="submit" disabled={creating} style={{ ...btn(true), width: "100%" }}>
                 {creating ? "Creating…" : "Create Session"}
