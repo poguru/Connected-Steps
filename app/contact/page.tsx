@@ -1,10 +1,7 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
-
-export const metadata = {
-  title: "Contact – Connected Steps",
-  description: "Get in touch with the Connected Steps team — coaching enquiries, support, and general questions.",
-};
 
 export default function ContactPage() {
   return (
