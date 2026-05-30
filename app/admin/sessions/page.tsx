@@ -87,7 +87,7 @@ export default function AdminSessionsPage() {
 
   /* ── Select session → load users ── */
   const openSession = async (s: Session) => {
-    setSelected(s); setAttendees([]); setSaveMsg(""); setSyncMsg(""); setLastSavedAt(null);
+    setSelected(s); setAttendees([]); setSaveMsg(""); setLastSavedAt(null);
     setSessionLoad(true);
     const res  = await fetch(`/api/admin/sessions/${s.id}/attendance`, { headers: { "x-admin-password": password } });
     const json = await res.json();
