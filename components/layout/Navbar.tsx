@@ -56,9 +56,9 @@ export default function Navbar() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
       style={{
-        background: scrolled ? "rgba(10, 10, 10, 0.95)" : "transparent",
+        background: scrolled ? "rgba(8,28,45,0.97)" : "transparent",
         backdropFilter: scrolled ? "blur(12px)" : "none",
-        borderBottom: scrolled ? "1px solid rgba(255,255,255,0.06)" : "none",
+        borderBottom: scrolled ? "1px solid rgba(56,189,248,0.08)" : "none",
       }}>
       <div className="container">
         <nav className="flex items-center justify-between h-24">
@@ -101,7 +101,7 @@ export default function Navbar() {
               {sessionsOpen && (
                 <div style={{
                   position: "absolute", top: "calc(100% + 12px)", left: "50%", transform: "translateX(-50%)",
-                  background: "rgba(18,18,18,0.98)", border: "1px solid rgba(255,255,255,0.1)",
+                  background: "rgba(8,28,45,0.99)", border: "1px solid rgba(56,189,248,0.12)",
                   borderRadius: "10px", padding: "6px", minWidth: "200px",
                   backdropFilter: "blur(16px)", boxShadow: "0 16px 40px rgba(0,0,0,0.5)",
                   zIndex: 100,
