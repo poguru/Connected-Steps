@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 
 const POST_CATS = ["General", "Recovery", "Shoes & Gear", "Races & Marathons", "Running Tips"];
 const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
@@ -98,6 +99,9 @@ function AskModal({ onClose }: { onClose: () => void }) {
 
 export default function AskCommunityFab() {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+
+  if (pathname !== "/" && pathname !== "/dashboard") return null;
 
   function handleClick() {
     const raw = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
