@@ -22,8 +22,8 @@ const afterSessionLinks = [
 ];
 
 const sessionDropdown = [
-  { label: "Recent Sessions",   href: "#recent-sessions",   icon: "📸" },
-  { label: "Upcoming Sessions", href: "#upcoming-sessions", icon: "📅" },
+  { label: "Recent Sessions",   href: "/#recent-sessions",   icon: "📸" },
+  { label: "Upcoming Sessions", href: "/#upcoming-sessions", icon: "📅" },
 ];
 
 export default function Navbar() {
