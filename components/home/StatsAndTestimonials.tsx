@@ -133,9 +133,9 @@ function StoriesCarousel({ stories }: { stories: Story[] }) {
 
 export default function StatsAndTestimonials() {
   const [stories,          setStories]          = useState<Story[]>([]);
-  const [avgRating,        setAvgRating]        = useState<number | null>(null);
-  const [totalRunners,     setTotalRunners]     = useState<number | null>(null);
-  const [sessionsAttended, setSessionsAttended] = useState<number | null>(null);
+  const [avgRating,           setAvgRating]           = useState<number | null>(null);
+  const [totalRunners,        setTotalRunners]        = useState<number | null>(null);
+  const [sessionsConducted,   setSessionsConducted]   = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/stories")
@@ -149,18 +149,18 @@ export default function StatsAndTestimonials() {
     fetch("/api/stats")
       .then((r) => r.json())
       .then((d) => {
-        if (d.totalRunners     != null) setTotalRunners(d.totalRunners);
-        if (d.sessionsAttended != null) setSessionsAttended(d.sessionsAttended);
-        if (d.avgRating        != null) setAvgRating(d.avgRating);
+        if (d.totalRunners        != null) setTotalRunners(d.totalRunners);
+        if (d.trainingsConducted  != null) setSessionsConducted(d.trainingsConducted);
+        if (d.avgRating           != null) setAvgRating(d.avgRating);
       })
       .catch(() => {});
   }, []);
 
   const stats = [
-    { num: totalRunners     != null ? fmt(totalRunners)     : "—",   label: "Members & growing"          },
-    { num: "3",                                                        label: "Expert coaches"             },
-    { num: sessionsAttended != null ? fmt(sessionsAttended) : "—",   label: "Sessions attended"          },
-    { num: avgRating        != null ? `${avgRating}★`       : "30+", label: avgRating != null ? "Community rating" : "Years coach experience" },
+    { num: totalRunners       != null ? fmt(totalRunners)       : "—",   label: "Members & growing"   },
+    { num: "3",                                                            label: "Expert coaches"      },
+    { num: sessionsConducted  != null ? fmt(sessionsConducted)  : "—",   label: "Sessions conducted"  },
+    { num: avgRating          != null ? `${avgRating}★`         : "30+", label: avgRating != null ? "Coach rating" : "Years coach experience" },
   ];
 
   const display = stories.length ? stories : FALLBACK;

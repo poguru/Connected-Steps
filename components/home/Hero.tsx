@@ -62,7 +62,7 @@ export default function Hero() {
               {[
                 { num: fmt(members), label: "Members" },
                 { num: fmt(runs),    label: "Run registrations" },
-                { num: avgRating ? `${avgRating}★` : "—", label: "Community rating" },
+                { num: avgRating ? `${avgRating}★` : "—", label: "Coach rating" },
               ].map((s) => (
                 <div key={s.label} style={{ minWidth: "80px" }}>
                   <div className="font-display text-2xl font-light" style={{ color: "var(--cs-white)" }}>{s.num}</div>
