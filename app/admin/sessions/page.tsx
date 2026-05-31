@@ -179,6 +179,16 @@ export default function AdminSessionsPage() {
     setPhotoUploading(false);
   };
 
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  function copyJoinLink(sessionId: string) {
+    const url = `${window.location.origin}/join/${sessionId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedId(sessionId);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  }
+
   const attendCount = attendees.filter((a) => a.attended).length;
   const syncedCount = attendees.filter((a) => a.points_synced).length;
 
@@ -271,11 +281,19 @@ export default function AdminSessionsPage() {
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 {sessions.map((s) => (
-                  <button key={s.id} onClick={() => openSession(s)}
-                    style={{ textAlign: "left", padding: "10px 12px", borderRadius: "6px", border: "1px solid", cursor: "pointer", background: selected?.id === s.id ? "rgba(232,98,10,0.1)" : "transparent", borderColor: selected?.id === s.id ? "rgba(232,98,10,0.4)" : "rgba(255,255,255,0.07)", transition: "all 0.15s" }}>
-                    <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#fff", marginBottom: "2px" }}>{s.title}</div>
-                    <div style={{ fontSize: "0.72rem", color: "#888" }}>{s.date}{s.time ? ` ${s.time}` : ""} · {s.location}</div>
-                  </button>
+                  <div key={s.id} style={{ position: "relative" }}>
+                    <button onClick={() => openSession(s)}
+                      style={{ width: "100%", textAlign: "left", padding: "10px 12px", paddingRight: "44px", borderRadius: "6px", border: "1px solid", cursor: "pointer", background: selected?.id === s.id ? "rgba(232,98,10,0.1)" : "transparent", borderColor: selected?.id === s.id ? "rgba(232,98,10,0.4)" : "rgba(255,255,255,0.07)", transition: "all 0.15s" }}>
+                      <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#fff", marginBottom: "2px" }}>{s.title}</div>
+                      <div style={{ fontSize: "0.72rem", color: "#888" }}>{s.date}{s.time ? ` ${s.time}` : ""} · {s.location}</div>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); copyJoinLink(s.id); }}
+                      title="Copy join link"
+                      style={{ position: "absolute", right: "6px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: "4px 6px", color: copiedId === s.id ? "#4ade80" : "#555", fontSize: "0.75rem", fontWeight: 600, fontFamily: "inherit", transition: "color 0.15s" }}>
+                      {copiedId === s.id ? "✓" : "🔗"}
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -317,7 +335,12 @@ export default function AdminSessionsPage() {
                   {photoMsg && <div style={{ fontSize: "0.75rem", color: photoMsg.startsWith("Error") ? "#f09595" : "#4ade80" }}>{photoMsg}</div>}
                 </div>
 
-                <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
+                  <button
+                    onClick={() => copyJoinLink(selected.id)}
+                    style={{ ...btn(false), display: "flex", alignItems: "center", gap: "6px", color: copiedId === selected.id ? "#4ade80" : "#fff", borderColor: copiedId === selected.id ? "rgba(74,222,128,0.4)" : undefined }}>
+                    {copiedId === selected.id ? "✓ Copied!" : "🔗 Copy join link"}
+                  </button>
                   <button onClick={saveAttendance} disabled={saving} style={btn(true)}>
                     {saving ? "Saving & updating leaderboard…" : "Save Attendance"}
                   </button>
