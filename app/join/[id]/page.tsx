@@ -32,23 +32,31 @@ export default function JoinSessionPage() {
   const [error,   setError]   = useState("");
 
   useEffect(() => {
-    fetch(`/api/sessions/${id}/join`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.session) setSession(d.session);
-        else setNotFound(true);
-      })
-      .catch(() => setNotFound(true))
-      .finally(() => setLoading(false));
-
-    // Pre-fill email from localStorage if user is logged in
+    let userEmail = "";
     try {
       const stored = localStorage.getItem("cs_user");
       if (stored) {
         const u = JSON.parse(stored);
-        if (u.email) setEmail(u.email);
+        if (u.email) { userEmail = u.email; setEmail(u.email); }
       }
     } catch { /* ignore */ }
+
+    const url = userEmail
+      ? `/api/sessions/${id}/join?email=${encodeURIComponent(userEmail)}`
+      : `/api/sessions/${id}/join`;
+
+    fetch(url)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.session) {
+          setSession(d.session);
+          if (d.already_joined) setResult("already");
+        } else {
+          setNotFound(true);
+        }
+      })
+      .catch(() => setNotFound(true))
+      .finally(() => setLoading(false));
   }, [id]);
 
   const handleJoin = async () => {

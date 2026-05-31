@@ -2,18 +2,32 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const email = req.nextUrl.searchParams.get("email");
   const db = getSupabaseServer();
+
   const { data: session } = await db
     .from("sessions")
     .select("id, title, date, time, venue, location")
     .eq("id", id)
     .single();
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
-  return NextResponse.json({ session });
+
+  let already_joined = false;
+  if (email) {
+    const { data: existing } = await db
+      .from("session_attendance")
+      .select("id")
+      .eq("session_id", id)
+      .eq("user_email", email.toLowerCase().trim())
+      .single();
+    already_joined = !!existing;
+  }
+
+  return NextResponse.json({ session, already_joined });
 }
 
 export async function POST(
