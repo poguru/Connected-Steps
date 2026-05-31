@@ -49,6 +49,7 @@ export default function AdminEventsPage() {
     if (res.status === 401) { setAuthErr("Incorrect password."); setLoading(false); return; }
     const json = await res.json();
     setEvents(json.data ?? []);
+    localStorage.setItem("cs_admin_pw", password);
     setAuthed(true); setLoading(false);
     loadCoupons();
   }
@@ -62,7 +63,23 @@ export default function AdminEventsPage() {
     const json = await res.json(); setCoupons(json.data ?? []);
   }
 
-  useEffect(() => { if (authed && tab === "coupons") loadCoupons(); }, [tab]);
+  useEffect(() => { if (authed && tab === "coupons") loadCoupons(); }, [tab]); // eslint-disable-line
+
+  useEffect(() => {
+    const s = localStorage.getItem("cs_admin_pw");
+    if (!s) return;
+    setPassword(s);
+    fetch("/api/admin/events", { headers: { "x-admin-password": s } })
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.data) {
+          setEvents(j.data); setAuthed(true);
+          fetch("/api/admin/coupons", { headers: { "Content-Type": "application/json", "x-admin-password": s } })
+            .then((r) => r.json()).then((c) => setCoupons(c.data ?? []));
+        } else localStorage.removeItem("cs_admin_pw");
+      })
+      .catch(() => localStorage.removeItem("cs_admin_pw"));
+  }, []); // eslint-disable-line
 
   async function createEvent(e: React.SyntheticEvent) {
     e.preventDefault(); setLoading(true); setMsg("");

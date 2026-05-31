@@ -67,6 +67,7 @@ export default function AdminMembershipPage() {
       if (!res.ok) { setError(data.error ?? "Failed to load"); return; }
       setMembers(data.memberships);
       setStats(data.stats);
+      localStorage.setItem("cs_admin_pw", password);
       setAuthed(true);
     } catch {
       setError("Something went wrong.");
@@ -74,6 +75,9 @@ export default function AdminMembershipPage() {
       setLoading(false);
     }
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { const s = localStorage.getItem("cs_admin_pw"); if (s) load(s); }, []);
 
   const filtered = useMemo(() => {
     let list = members;

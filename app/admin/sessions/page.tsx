@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -63,10 +63,21 @@ export default function AdminSessionsPage() {
       if (res.status === 401) { setAuthErr("Incorrect password."); return; }
       if (!res.ok)            { setAuthErr(json.error ?? "Server error."); return; }
       setSessions(json.data ?? []);
+      localStorage.setItem("cs_admin_pw", password);
       setAuthed(true);
     } catch { setAuthErr("Network error."); }
     finally  { setAuthLoad(false); }
   };
+
+  useEffect(() => {
+    const s = localStorage.getItem("cs_admin_pw");
+    if (!s) return;
+    setPassword(s);
+    fetch("/api/admin/sessions", { headers: { "x-admin-password": s } })
+      .then((r) => r.json())
+      .then((j) => { if (j.data) { setSessions(j.data); setAuthed(true); } else localStorage.removeItem("cs_admin_pw"); })
+      .catch(() => localStorage.removeItem("cs_admin_pw"));
+  }, []); // eslint-disable-line
 
   /* ── Load sessions ── */
   const loadSessions = useCallback(async () => {

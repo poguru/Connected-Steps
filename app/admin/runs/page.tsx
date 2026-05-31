@@ -69,6 +69,7 @@ export default function AdminRunsPage() {
         return;
       }
       setData(json.data ?? []);
+      localStorage.setItem("cs_admin_pw", password);
       setAuthed(true);
     } catch {
       setAuthError("Network error. Check your connection and try again.");
@@ -76,6 +77,16 @@ export default function AdminRunsPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const s = localStorage.getItem("cs_admin_pw");
+    if (!s) return;
+    setPassword(s);
+    fetch("/api/admin/runs", { headers: { "x-admin-password": s } })
+      .then((r) => r.json())
+      .then((j) => { if (j.data) { setData(j.data); setAuthed(true); } else localStorage.removeItem("cs_admin_pw"); })
+      .catch(() => localStorage.removeItem("cs_admin_pw"));
+  }, []); // eslint-disable-line
 
   const eventDates = useMemo(() => {
     const dates = [...new Set(data.map((r) => r.event_date))].sort((a, b) =>

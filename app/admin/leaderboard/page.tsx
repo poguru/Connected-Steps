@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -80,6 +80,7 @@ export default function AdminLeaderboardPage() {
       if (!res.ok) { setAuthErr(json.error ?? "Server error."); return; }
       setLive(json.live ?? []);
       setArchives(json.archives ?? []);
+      localStorage.setItem("cs_admin_pw", password);
       setAuthed(true);
       if (json.archives?.length > 0) setExpanded(json.archives[0].month);
     } catch {
@@ -88,6 +89,22 @@ export default function AdminLeaderboardPage() {
       setAuthLoad(false);
     }
   };
+
+  useEffect(() => {
+    const s = localStorage.getItem("cs_admin_pw");
+    if (!s) return;
+    setPassword(s);
+    fetch("/api/admin/leaderboard/archive", { headers: { "x-admin-password": s } })
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.live) {
+          setLive(j.live); setArchives(j.archives ?? []);
+          if (j.archives?.length > 0) setExpanded(j.archives[0].month);
+          setAuthed(true);
+        } else localStorage.removeItem("cs_admin_pw");
+      })
+      .catch(() => localStorage.removeItem("cs_admin_pw"));
+  }, []); // eslint-disable-line
 
   const reload = useCallback(async () => {
     const res  = await fetch("/api/admin/leaderboard/archive", { headers });

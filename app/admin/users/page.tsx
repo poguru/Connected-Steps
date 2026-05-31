@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -60,10 +60,14 @@ export default function AdminUsersPage() {
       if (!res.ok) { setError(data.error ?? "Failed"); return; }
       setUsers(data.users);
       setStats(data.stats);
+      localStorage.setItem("cs_admin_pw", password);
       setAuthed(true);
     } catch { setError("Something went wrong."); }
     finally { setLoading(false); }
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { const s = localStorage.getItem("cs_admin_pw"); if (s) load(s); }, []);
 
   const filtered = useMemo(() => {
     let list = users;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -58,10 +58,14 @@ export default function AdminCommunityPage() {
       if (!repliesRes.ok) { setError(repliesData.error ?? "Failed"); return; }
       setPosts(postsData.posts);
       setReplies(repliesData.replies);
+      localStorage.setItem("cs_admin_pw", password);
       setAuthed(true);
     } catch { setError("Something went wrong."); }
     finally { setLoading(false); }
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { const s = localStorage.getItem("cs_admin_pw"); if (s) load(s); }, []);
 
   async function actPost(id: number, action: "approve" | "reject") {
     setActingPost(id);

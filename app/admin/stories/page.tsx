@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -33,10 +33,14 @@ export default function AdminStoriesPage() {
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Failed"); return; }
       setStories(data.stories);
+      localStorage.setItem("cs_admin_pw", password);
       setAuthed(true);
     } catch { setError("Something went wrong."); }
     finally { setLoading(false); }
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { const s = localStorage.getItem("cs_admin_pw"); if (s) load(s); }, []);
 
   async function act(id: number, action: "approve" | "reject", password: string) {
     setActing(id);
