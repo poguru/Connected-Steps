@@ -218,7 +218,7 @@ export default function Coaches() {
           </div>
 
           {/* Prev — absolute left of photo */}
-          <button onClick={prev} aria-label="Previous coach"
+          <button onClick={prev} aria-label="Previous coach" className="coach-prev-btn"
             style={{ position: "absolute", left: "-28px", top: "50%", transform: "translateY(-50%)", width: "44px", height: "44px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.15)", background: "rgba(8,28,45,0.8)", color: "var(--cs-white)", cursor: "pointer", fontSize: "1.1rem", display: "flex", alignItems: "center", justifyContent: "center", transition: "border-color 0.15s, background 0.15s", zIndex: 10 }}
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(232,98,10,0.6)"; e.currentTarget.style.background = "rgba(232,98,10,0.12)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; e.currentTarget.style.background = "rgba(8,28,45,0.8)"; }}>
@@ -226,7 +226,7 @@ export default function Coaches() {
           </button>
 
           {/* Next — absolute right of content */}
-          <button onClick={next} aria-label="Next coach"
+          <button onClick={next} aria-label="Next coach" className="coach-next-btn"
             style={{ position: "absolute", right: "-28px", top: "50%", transform: "translateY(-50%)", width: "44px", height: "44px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.15)", background: "rgba(8,28,45,0.8)", color: "var(--cs-white)", cursor: "pointer", fontSize: "1.1rem", display: "flex", alignItems: "center", justifyContent: "center", transition: "border-color 0.15s, background 0.15s", zIndex: 10 }}
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(232,98,10,0.6)"; e.currentTarget.style.background = "rgba(232,98,10,0.12)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; e.currentTarget.style.background = "rgba(8,28,45,0.8)"; }}>

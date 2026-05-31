@@ -41,7 +41,7 @@ export default function Hero() {
           <div>
             <div className="section-label animate-fade-up">Connected Steps</div>
             <h1 className="font-display animate-fade-up-1 mb-6"
-              style={{ fontSize: "clamp(3rem, 6vw, 5.5rem)", fontWeight: 300, color: "var(--cs-white)", lineHeight: 1.05 }}>
+              style={{ fontSize: "clamp(2rem, 7vw, 5.5rem)", fontWeight: 300, color: "var(--cs-white)", lineHeight: 1.1 }}>
               Every step,{" "}
               <em className="not-italic" style={{ color: "var(--cs-orange)" }}>a plan</em>
               <br />behind it.
@@ -51,7 +51,7 @@ export default function Hero() {
               Connected Steps pairs you with elite coaches and a training community that keeps you
               accountable — from your first kilometre to your finish-line moment.
             </p>
-            <div className="flex flex-wrap gap-4 animate-fade-up-3">
+            <div className="animate-fade-up-3 hero-cta">
               <Link href={loggedIn ? "/dashboard" : "/auth"} className="btn-primary">
                 {loggedIn ? "Go to Dashboard" : "Start training free"}
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -60,7 +60,7 @@ export default function Hero() {
               </Link>
               <Link href="#training" className="btn-outline">See training plans</Link>
             </div>
-            <div className="flex flex-wrap items-center gap-6 mt-12 animate-fade-up-4 pt-10"
+            <div className="flex flex-wrap items-center gap-4 mt-8 animate-fade-up-4 pt-8"
               style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
               {[
                 { num: fmt(members), label: "Members" },

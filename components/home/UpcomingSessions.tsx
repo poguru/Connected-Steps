@@ -59,7 +59,7 @@ export default function UpcomingSessions() {
 
         {/* Cards */}
         {loading ? (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 260px), 1fr))", gap: "1rem" }}>
+          <div className="upcoming-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 280px), 1fr))", gap: "1rem" }}>
             {[1, 2, 3].map((i) => (
               <div key={i} style={{ background: "var(--cs-charcoal)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "10px", padding: "1.5rem", opacity: 0.4, height: "140px", animation: "pulse 1.5s ease-in-out infinite" }} />
             ))}
@@ -71,7 +71,7 @@ export default function UpcomingSessions() {
             <div style={{ fontSize: "0.82rem" }}>Check back soon — new training sessions will be announced here.</div>
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 260px), 1fr))", gap: "1rem" }}>
+          <div className="upcoming-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 280px), 1fr))", gap: "1rem" }}>
             {sessions.map((s, i) => {
               const countdown = daysUntil(s.date);
               const isToday   = countdown === "Today";

@@ -73,7 +73,7 @@ function StoriesCarousel({ stories }: { stories: Story[] }) {
   return (
     <div>
       {/* Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1.25rem", alignItems: "stretch" }}>
+      <div className="stories-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1.25rem", alignItems: "stretch" }}>
         {visible.map((story) => (
           <StoryCard key={story.id} story={story} />
         ))}

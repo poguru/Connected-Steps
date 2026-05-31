@@ -30,14 +30,14 @@ export default function CallToAction() {
             style={{ color: "var(--cs-muted)", maxWidth: "480px", margin: "0 auto 2.5rem" }}>
             Start free today. No credit card needed. Your first training week is on us.
           </p>
-          <div className="flex flex-wrap gap-4 justify-center">
-            <Link href={loggedIn ? "/dashboard" : "/auth"} className="btn-primary" style={{ fontSize: "15px", padding: "16px 40px" }}>
+          <div className="hero-cta" style={{ justifyContent: "center" }}>
+            <Link href={loggedIn ? "/dashboard" : "/auth"} className="btn-primary">
               {loggedIn ? "Go to Dashboard" : "Start training free"}
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </Link>
-            <Link href="/pricing" className="btn-outline" style={{ fontSize: "15px", padding: "16px 40px" }}>View pricing</Link>
+            <Link href="/pricing" className="btn-outline">View pricing</Link>
           </div>
           <p className="mt-6 text-xs tracking-wide" style={{ color: "rgba(154,128,112,0.6)" }}>
             Free plan available · No commitment · Cancel anytime
