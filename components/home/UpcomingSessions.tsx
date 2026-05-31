@@ -42,8 +42,6 @@ export default function UpcomingSessions() {
     router.push(user ? `/join/${sessionId}` : `/auth?redirect=/join/${sessionId}`);
   }
 
-  if (!loading && sessions.length === 0) return null;
-
   return (
     <section id="upcoming-sessions" className="section" style={{ background: "var(--cs-dark)" }}>
       <div className="container">
@@ -65,6 +63,12 @@ export default function UpcomingSessions() {
             {[1, 2, 3].map((i) => (
               <div key={i} style={{ background: "var(--cs-charcoal)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "10px", padding: "1.5rem", opacity: 0.4, height: "140px", animation: "pulse 1.5s ease-in-out infinite" }} />
             ))}
+          </div>
+        ) : sessions.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "3rem 1rem", color: "var(--cs-muted)", fontSize: "0.9rem" }}>
+            <div style={{ fontSize: "2rem", marginBottom: "0.75rem", opacity: 0.4 }}>📅</div>
+            <div style={{ fontWeight: 600, color: "var(--cs-cream)", marginBottom: "0.4rem" }}>No sessions scheduled yet</div>
+            <div style={{ fontSize: "0.82rem" }}>Check back soon — new training sessions will be announced here.</div>
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 260px), 1fr))", gap: "1rem" }}>
