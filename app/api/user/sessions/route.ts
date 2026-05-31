@@ -7,6 +7,8 @@ export async function GET(req: NextRequest) {
 
   const db = getSupabaseServer();
 
+  const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+
   const { data, error } = await db
     .from("session_attendance")
     .select(`
@@ -14,7 +16,7 @@ export async function GET(req: NextRequest) {
       bonus_points,
       bonus_reason,
       points_synced,
-      sessions (
+      sessions!inner (
         id,
         title,
         date,
@@ -25,6 +27,7 @@ export async function GET(req: NextRequest) {
       )
     `)
     .eq("user_email", email.toLowerCase())
+    .lte("sessions.date", today)
     .order("sessions(date)", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
