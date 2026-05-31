@@ -79,53 +79,55 @@ function StoriesCarousel({ stories }: { stories: Story[] }) {
         ))}
       </div>
 
-      {/* Controls */}
-      {pages > 1 && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "1rem", marginTop: "2rem" }}>
-          {/* Prev */}
+      {/* Bottom navigation bar */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "1.25rem", marginTop: "2.5rem", paddingTop: "1.5rem", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+
+        {/* Prev */}
+        {pages > 1 && (
           <button onClick={prev} aria-label="Previous"
-            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "50%", width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--cs-white)" }}>
+            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "6px", padding: "6px 14px", display: "flex", alignItems: "center", cursor: "pointer", color: "var(--cs-white)" }}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M9 2L5 7l4 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
+        )}
 
-          {/* Dots */}
+        {/* Dots */}
+        {pages > 1 && (
           <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
             {Array.from({ length: pages }).map((_, i) => (
               <button key={i} onClick={() => setCurrent(i)} aria-label={`Go to page ${i + 1}`}
                 style={{ width: i === current ? "20px" : "8px", height: "8px", borderRadius: "4px", background: i === current ? "var(--cs-orange)" : "rgba(255,255,255,0.2)", border: "none", cursor: "pointer", transition: "all 0.25s", padding: 0 }} />
             ))}
           </div>
+        )}
 
-          {/* Next */}
+        {/* Page count */}
+        <span style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.06em" }}>
+          {current * perPage + 1}–{Math.min(current * perPage + perPage, total)} of {total}
+        </span>
+
+        {/* Next */}
+        {pages > 1 && (
           <button onClick={next} aria-label="Next"
-            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "50%", width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--cs-white)" }}>
+            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "6px", padding: "6px 14px", display: "flex", alignItems: "center", cursor: "pointer", color: "var(--cs-white)" }}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M5 2l4 5-4 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
+        )}
 
-          {/* Pause / Play */}
+        {/* Pause / Play */}
+        {pages > 1 && (
           <button onClick={() => setPaused((p) => !p)} aria-label={paused ? "Play" : "Pause"}
-            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "50%", width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: paused ? "var(--cs-orange)" : "var(--cs-muted)", transition: "color 0.2s" }}>
+            style={{ background: "none", border: "none", cursor: "pointer", color: paused ? "var(--cs-orange)" : "var(--cs-muted)", padding: "4px", display: "flex", alignItems: "center", transition: "color 0.2s" }}>
             {paused ? (
-              <svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor">
-                <path d="M2 1l10 6-10 6V1z"/>
-              </svg>
+              <svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor"><path d="M2 1l10 6-10 6V1z"/></svg>
             ) : (
-              <svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor">
-                <rect x="1" y="1" width="4" height="12" rx="1"/>
-                <rect x="7" y="1" width="4" height="12" rx="1"/>
-              </svg>
+              <svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor"><rect x="1" y="1" width="4" height="12" rx="1"/><rect x="7" y="1" width="4" height="12" rx="1"/></svg>
             )}
           </button>
-        </div>
-      )}
-
-      {/* Page count */}
-      <div style={{ textAlign: "center", marginTop: "0.75rem", fontSize: "11px", color: "var(--cs-muted)" }}>
-        {current * perPage + 1}–{Math.min(current * perPage + perPage, total)} of {total} stories
+        )}
       </div>
     </div>
   );

@@ -1,14 +1,9 @@
 /**
  * MSG91 notification helper — WhatsApp, SMS, Email
- *
- * Required env vars:
- *   MSG91_AUTH_KEY            – API auth key from MSG91 dashboard
- *   MSG91_SENDER_ID           – 6-char SMS sender ID  e.g. CRSTPS
- *   MSG91_WHATSAPP_NUMBER     – Integrated WhatsApp number  e.g. 919XXXXXXXXX
- *   MSG91_WHATSAPP_TEMPLATE   – Approved template name  e.g. session_alert
- *   MSG91_FROM_EMAIL          – Verified sender email  e.g. noreply@connectedsteps.in
- *   MSG91_FROM_NAME           – Sender display name  e.g. Connected Steps
+ * NOTIFICATIONS_PAUSED = true disables all outbound alerts temporarily.
+ * Set to false when MSG91 templates are approved and ready to go live.
  */
+const NOTIFICATIONS_PAUSED = true;
 
 // ── Phone normalisation (Indian numbers → 91XXXXXXXXXX, no +) ────────────────
 
@@ -53,6 +48,7 @@ export async function sendWhatsApp(
   params: string[],
   templateName?: string
 ): Promise<NotifyResult> {
+  if (NOTIFICATIONS_PAUSED) return { to: phone, channel: "whatsapp", ok: true };
   const authKey    = process.env.MSG91_AUTH_KEY;
   const fromNumber = process.env.MSG91_WHATSAPP_NUMBER;
   const namespace  = process.env.MSG91_NAMESPACE;
@@ -112,6 +108,7 @@ export async function sendWhatsApp(
 // Register at trai.gov.in or through MSG91's DLT portal.
 
 export async function sendSMS(phone: string, message: string): Promise<NotifyResult> {
+  if (NOTIFICATIONS_PAUSED) return { to: phone, channel: "sms", ok: true };
   const authKey  = process.env.MSG91_AUTH_KEY;
   const senderId = process.env.MSG91_SENDER_ID;
 
@@ -152,6 +149,7 @@ export async function sendEmail(
   subject: string,
   html: string
 ): Promise<NotifyResult> {
+  if (NOTIFICATIONS_PAUSED) return { to, channel: "email", ok: true };
   const authKey   = process.env.MSG91_AUTH_KEY;
   const fromEmail = process.env.MSG91_FROM_EMAIL ?? "noreply@connectedsteps.in";
   const fromName  = process.env.MSG91_FROM_NAME  ?? "Connected Steps";

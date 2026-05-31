@@ -41,10 +41,8 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Await notifications so Vercel doesn't terminate the Lambda before they fire
-  await notifyUsers(db, data.id, title, date, time || null, venue || location, location).catch((e) =>
-    console.error("Notification error:", e)
-  );
+  // Notifications paused — enable when MSG91 templates are approved
+  // await notifyUsers(db, data.id, title, date, time || null, venue || location, location).catch(console.error);
 
   return NextResponse.json({ data });
 }
