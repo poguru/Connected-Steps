@@ -25,7 +25,7 @@ const coaches = [
       { icon: "🏅", text: "Coached CWG Bronze medallist Harminder Singh (20km Race Walk, 2010)" },
     ],
     initials: "AK",
-    photo: null as string | null,
+    photo: "/coaches/ashokan-k.jpg" as string | null,
   },
   {
     name: "Vana Durga Rao",
