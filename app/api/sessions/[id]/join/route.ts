@@ -85,3 +85,49 @@ export async function POST(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true, already: false, session });
 }
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const { email } = await req.json();
+  if (!email) return NextResponse.json({ error: "Email is required." }, { status: 400 });
+
+  const db = getSupabaseServer();
+
+  const { data: session } = await db
+    .from("sessions")
+    .select("id, date, time")
+    .eq("id", id)
+    .single();
+  if (!session) return NextResponse.json({ error: "Session not found." }, { status: 404 });
+
+  // Block leaving if session has already started
+  const sessionTime = session.time ?? "00:00";
+  const [hours, minutes] = sessionTime.split(":").map(Number);
+  const sessionStart = new Date(`${session.date}T${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00+05:30`);
+  if (new Date() >= sessionStart) {
+    return NextResponse.json({ error: "You cannot leave a session that has already started." }, { status: 400 });
+  }
+
+  // Check if points have been synced — don't allow leaving after that
+  const { data: attendance } = await db
+    .from("session_attendance")
+    .select("id, points_synced")
+    .eq("session_id", id)
+    .eq("user_email", email.toLowerCase().trim())
+    .single();
+
+  if (!attendance) return NextResponse.json({ error: "You are not registered for this session." }, { status: 404 });
+  if (attendance.points_synced) return NextResponse.json({ error: "Your attendance has already been recorded and points synced. Please contact the admin." }, { status: 400 });
+
+  const { error } = await db
+    .from("session_attendance")
+    .delete()
+    .eq("session_id", id)
+    .eq("user_email", email.toLowerCase().trim());
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ success: true });
+}

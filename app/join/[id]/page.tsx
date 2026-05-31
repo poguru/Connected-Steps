@@ -26,10 +26,12 @@ export default function JoinSessionPage() {
   const [loading, setLoading]   = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  const [email,   setEmail]   = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [result,  setResult]  = useState<"joined" | "already" | "closed" | null>(null);
-  const [error,   setError]   = useState("");
+  const [email,        setEmail]        = useState("");
+  const [submitting,   setSubmitting]   = useState(false);
+  const [result,       setResult]       = useState<"joined" | "already" | "closed" | "left" | null>(null);
+  const [error,        setError]        = useState("");
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [leaving,      setLeaving]      = useState(false);
 
   useEffect(() => {
     let userEmail = "";
@@ -78,6 +80,26 @@ export default function JoinSessionPage() {
     }
   };
 
+  const handleLeave = async () => {
+    setLeaving(true); setError("");
+    try {
+      const res  = await fetch(`/api/sessions/${id}/join`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? "Something went wrong."); setConfirmLeave(false); return; }
+      setResult("left");
+      setConfirmLeave(false);
+    } catch {
+      setError("Network error. Please try again.");
+      setConfirmLeave(false);
+    } finally {
+      setLeaving(false);
+    }
+  };
+
   const card: React.CSSProperties = {
     background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.08)",
     borderRadius: "12px", padding: "2rem", maxWidth: "440px", width: "100%",
@@ -113,6 +135,22 @@ export default function JoinSessionPage() {
               Go to Dashboard →
             </Link>
           </div>
+        ) : result === "left" ? (
+          <div style={card}>
+            <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>👋</div>
+            <h1 style={{ fontSize: "1.3rem", fontWeight: 600, marginBottom: "0.4rem" }}>You've left the session</h1>
+            <p style={{ fontSize: "0.875rem", color: "var(--cs-muted)", marginBottom: "1.5rem", lineHeight: 1.6 }}>
+              You've been removed from <strong style={{ color: "var(--cs-white)" }}>{session?.title}</strong>. You can rejoin anytime before it starts.
+            </p>
+            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+              <button onClick={() => { setResult(null); setError(""); }} style={{ padding: "10px 22px", background: "var(--cs-orange)", color: "#fff", border: "none", borderRadius: "6px", fontSize: "0.85rem", fontWeight: 700, cursor: "pointer" }}>
+                Rejoin session
+              </button>
+              <Link href="/dashboard" style={{ display: "inline-flex", alignItems: "center", padding: "10px 22px", background: "rgba(255,255,255,0.06)", color: "var(--cs-muted)", borderRadius: "6px", fontSize: "0.85rem", textDecoration: "none" }}>
+                Dashboard
+              </Link>
+            </div>
+          </div>
         ) : result ? (
           <div style={card}>
             <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>{result === "joined" ? "✅" : "👍"}</div>
@@ -122,16 +160,37 @@ export default function JoinSessionPage() {
             <p style={{ fontSize: "0.875rem", color: "var(--cs-muted)", marginBottom: "1.5rem", lineHeight: 1.6 }}>
               {result === "joined"
                 ? `You've been registered for ${session?.title}. See you on the track! 🏃`
-                : `You're already registered for ${session?.title}. See you there!`}
+                : `You're registered for ${session?.title}. See you there!`}
             </p>
             <div style={{ background: "rgba(232,98,10,0.08)", border: "1px solid rgba(232,98,10,0.2)", borderRadius: "8px", padding: "1rem 1.25rem", marginBottom: "1.5rem", fontSize: "0.83rem", color: "var(--cs-muted)", lineHeight: 1.7 }}>
               <div>📋 <strong style={{ color: "var(--cs-white)" }}>{session?.title}</strong></div>
               <div>📅 {formatDate(session!.date)}{session?.time ? ` at ${session.time}` : ""}</div>
               <div>📍 {session?.venue || session?.location}</div>
             </div>
-            <Link href="/dashboard" style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", padding: "10px 22px", background: "var(--cs-orange)", color: "#fff", borderRadius: "6px", fontSize: "0.85rem", fontWeight: 700, textDecoration: "none" }}>
-              Go to Dashboard →
-            </Link>
+            {error && <div style={{ fontSize: "0.8rem", color: "#f09595", marginBottom: "0.75rem" }}>{error}</div>}
+            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
+              <Link href="/dashboard" style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", padding: "10px 22px", background: "var(--cs-orange)", color: "#fff", borderRadius: "6px", fontSize: "0.85rem", fontWeight: 700, textDecoration: "none" }}>
+                Go to Dashboard →
+              </Link>
+              {!confirmLeave ? (
+                <button onClick={() => setConfirmLeave(true)}
+                  style={{ padding: "10px 18px", background: "transparent", color: "var(--cs-muted)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "6px", fontSize: "0.82rem", cursor: "pointer", fontFamily: "inherit" }}>
+                  Can't attend? Leave
+                </button>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "0.8rem", color: "var(--cs-muted)" }}>Sure you want to leave?</span>
+                  <button onClick={handleLeave} disabled={leaving}
+                    style={{ padding: "8px 16px", background: "rgba(226,75,74,0.15)", color: "#f09595", border: "1px solid rgba(226,75,74,0.3)", borderRadius: "6px", fontSize: "0.8rem", fontWeight: 600, cursor: leaving ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: leaving ? 0.7 : 1 }}>
+                    {leaving ? "Leaving…" : "Yes, leave"}
+                  </button>
+                  <button onClick={() => { setConfirmLeave(false); setError(""); }}
+                    style={{ padding: "8px 14px", background: "transparent", color: "var(--cs-muted)", border: "none", fontSize: "0.8rem", cursor: "pointer", fontFamily: "inherit" }}>
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <div style={card}>
