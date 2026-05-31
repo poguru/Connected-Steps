@@ -342,6 +342,7 @@ export default function Dashboard() {
   const [sessions,          setSessions]          = useState<SessionRecord[]>([]);
   const [sessionsLoading,   setSessLoading]        = useState(true);
   const [upcomingSessions,  setUpcomingSessions]   = useState<{ id: string; title: string; date: string; time: string | null; venue: string | null; location: string }[]>([]);
+  const [joinedSessionIds,  setJoinedSessionIds]   = useState<Set<string>>(new Set());
   const [pushEnabled,    setPushEnabled]    = useState(false);
   const [pushSupported,  setPushSupported]  = useState(false);
   const [storyOpen,      setStoryOpen]      = useState(false);
@@ -382,6 +383,11 @@ export default function Dashboard() {
     fetch("/api/sessions")
       .then((r) => r.json())
       .then((d) => setUpcomingSessions(d.data ?? []))
+      .catch(() => {});
+
+    fetch(`/api/user/joined-sessions?email=${encodeURIComponent(u.email)}`)
+      .then((r) => r.json())
+      .then((d) => { if (d.session_ids) setJoinedSessionIds(new Set(d.session_ids)); })
       .catch(() => {});
 
     fetch(`/api/user/sessions?email=${encodeURIComponent(u.email)}`)
@@ -662,18 +668,21 @@ export default function Dashboard() {
                   const badge = diff === 0 ? "Today" : diff === 1 ? "Tomorrow" : `In ${diff}d`;
                   const isUrgent = diff <= 1;
                   const dateStr = sessionDate.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+                  const joined = joinedSessionIds.has(s.id);
                   return (
-                    <div key={s.id} onClick={() => router.push(`/join/${s.id}`)}
-                      style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.6rem 0.75rem", borderRadius: "6px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", cursor: "pointer", transition: "border-color 0.15s" }}
-                      onMouseEnter={(e) => (e.currentTarget.style.borderColor = "rgba(232,98,10,0.4)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)")}>
+                    <div key={s.id} onClick={() => !joined && router.push(`/join/${s.id}`)}
+                      style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.6rem 0.75rem", borderRadius: "6px", background: "rgba(255,255,255,0.03)", border: `1px solid ${joined ? "rgba(74,222,128,0.2)" : "rgba(255,255,255,0.06)"}`, cursor: joined ? "default" : "pointer", transition: "border-color 0.15s" }}
+                      onMouseEnter={(e) => { if (!joined) e.currentTarget.style.borderColor = "rgba(232,98,10,0.4)"; }}
+                      onMouseLeave={(e) => { if (!joined) e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--cs-white)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
                         <div style={{ fontSize: "0.72rem", color: "var(--cs-muted)", marginTop: "1px" }}>{dateStr}{s.time ? ` · ${s.time}` : ""}</div>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px", flexShrink: 0 }}>
                         <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "20px", background: isUrgent ? "var(--cs-orange)" : "rgba(255,255,255,0.07)", color: isUrgent ? "#fff" : "var(--cs-muted)" }}>{badge}</span>
-                        <span style={{ fontSize: "0.7rem", color: "var(--cs-orange)", fontWeight: 600 }}>Join →</span>
+                        {joined
+                          ? <span style={{ fontSize: "0.7rem", color: "#4ade80", fontWeight: 600 }}>✓ Joined</span>
+                          : <span style={{ fontSize: "0.7rem", color: "var(--cs-orange)", fontWeight: 600 }}>Join →</span>}
                       </div>
                     </div>
                   );
