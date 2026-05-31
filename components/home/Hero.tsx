@@ -8,8 +8,11 @@ export default function Hero() {
   const [members,   setMembers]   = useState<number | null>(null);
   const [runs,      setRuns]      = useState<number | null>(null);
   const [avgRating, setAvgRating] = useState<number | null>(null);
+  const [loggedIn,  setLoggedIn]  = useState(false);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && localStorage.getItem("cs_user")) setLoggedIn(true);
+
     fetch("/api/stats")
       .then((r) => r.json())
       .then((d) => {
@@ -49,8 +52,8 @@ export default function Hero() {
               accountable — from your first kilometre to your finish-line moment.
             </p>
             <div className="flex flex-wrap gap-4 animate-fade-up-3">
-              <Link href="/auth" className="btn-primary">
-                Start training free
+              <Link href={loggedIn ? "/dashboard" : "/auth"} className="btn-primary">
+                {loggedIn ? "Go to Dashboard" : "Start training free"}
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>

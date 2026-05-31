@@ -1,9 +1,16 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
 export default function CallToAction() {
+  const [loggedIn, setLoggedIn] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && localStorage.getItem("cs_user")) setLoggedIn(true);
+  }, []);
+
   return (
     <section className="section relative overflow-hidden noise" style={{ background: "var(--cs-black)" }}>
       <div className="absolute inset-0 pointer-events-none"
@@ -24,8 +31,8 @@ export default function CallToAction() {
             Start free today. No credit card needed. Your first training week is on us.
           </p>
           <div className="flex flex-wrap gap-4 justify-center">
-            <Link href="/auth" className="btn-primary" style={{ fontSize: "15px", padding: "16px 40px" }}>
-              Start training free
+            <Link href={loggedIn ? "/dashboard" : "/auth"} className="btn-primary" style={{ fontSize: "15px", padding: "16px 40px" }}>
+              {loggedIn ? "Go to Dashboard" : "Start training free"}
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
