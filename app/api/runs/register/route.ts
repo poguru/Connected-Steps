@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
       first_name, last_name, email, phone,
       blood_group, distance,
       emergency_contact_name, emergency_contact_phone,
-      is_member,
+      is_member, coupon_id,
     } = body;
 
     if (!first_name || !last_name || !email || !phone || !blood_group || !distance || !emergency_contact_name || !emergency_contact_phone) {
@@ -46,6 +46,12 @@ export async function POST(req: NextRequest) {
     });
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // Record coupon usage
+    if (coupon_id && email) {
+      await db.from("coupon_uses").insert({ coupon_id, used_by_email: email.toLowerCase().trim() });
+      await db.rpc("increment_coupon_use_count", { coupon_id_arg: coupon_id });
+    }
 
     // Fire-and-forget confirmation: email + WhatsApp
     const name = `${first_name.trim()} ${last_name.trim()}`;

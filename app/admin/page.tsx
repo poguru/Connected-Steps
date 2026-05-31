@@ -52,6 +52,12 @@ const cards = [
     desc:  "View all coach ratings and feedback submitted by members.",
     icon:  "⭐",
   },
+  {
+    href:  "/admin/events",
+    title: "Events & Coupons",
+    desc:  "Create and publish weekend run events, manage promo codes and member discount coupons.",
+    icon:  "🎟️",
+  },
 ];
 
 export default function AdminHub() {

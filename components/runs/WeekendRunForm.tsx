@@ -10,23 +10,31 @@ declare global {
   }
 }
 
-interface Event {
+interface LiveEvent {
+  id: string;
   name: string;
   date: string;
+  time?: string;
   location: string;
-  displayDate: string;
+  description?: string;
+  price: number;
 }
 
-const UPCOMING_EVENT: Event = {
-  name: "Weekend Special Run",
-  date: "2026-06-29",
-  displayDate: "Sunday, 29 June 2026",
-  location: "Kondapur, Hyderabad",
-};
+interface CouponResult {
+  valid: true;
+  coupon_id: string;
+  discount_type: "percentage" | "fixed";
+  discount_value: number;
+  description: string;
+}
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const DISTANCES    = ["5K", "10K", "16K", "21.1K"];
-const RUN_FEE      = 199;
+
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+}
 
 const inputStyle: React.CSSProperties = {
   width: "100%", padding: "11px 14px",
@@ -50,6 +58,14 @@ export default function WeekendRunForm() {
   const [loading,        setLoading]        = useState(false);
   const [error,          setError]          = useState("");
 
+  const [event,        setEvent]        = useState<LiveEvent | null>(null);
+  const [eventLoading, setEventLoading] = useState(true);
+
+  const [couponCode,    setCouponCode]    = useState("");
+  const [couponApplied, setCouponApplied] = useState<CouponResult | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError,   setCouponError]   = useState("");
+
   const [form, setForm] = useState({
     first_name: "", last_name: "", email: "", phone: "",
     blood_group: "", distance: "",
@@ -57,6 +73,12 @@ export default function WeekendRunForm() {
   });
 
   useEffect(() => {
+    fetch("/api/events/live")
+      .then((r) => r.json())
+      .then((d) => setEvent(d.event ?? null))
+      .catch(() => {})
+      .finally(() => setEventLoading(false));
+
     const stored = localStorage.getItem("cs_user");
     if (stored) {
       const u = JSON.parse(stored);
@@ -70,7 +92,6 @@ export default function WeekendRunForm() {
         phone:      u.phone     ?? "",
       }));
 
-      // Check if active membership
       fetch(`/api/membership?email=${encodeURIComponent(u.email)}`)
         .then((r) => r.json())
         .then((d) => { if (d.membership?.isActive) setIsActiveMember(true); })
@@ -85,9 +106,43 @@ export default function WeekendRunForm() {
     }
   }, []);
 
+  const basePrice  = event?.price ?? 0;
+  const discount   = couponApplied
+    ? couponApplied.discount_type === "percentage"
+      ? Math.round(basePrice * couponApplied.discount_value / 100)
+      : Math.min(couponApplied.discount_value, basePrice)
+    : 0;
+  const finalPrice = Math.max(0, basePrice - discount);
+
   const set = (field: string, value: string) => {
     setForm((f) => ({ ...f, [field]: value }));
     setError("");
+  };
+
+  const applyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setCouponLoading(true);
+    setCouponError("");
+    try {
+      const res = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: couponCode, email: form.email || undefined, event_id: event?.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setCouponError(data.error || "Invalid coupon."); return; }
+      setCouponApplied(data as CouponResult);
+    } catch {
+      setCouponError("Failed to validate coupon.");
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setCouponApplied(null);
+    setCouponCode("");
+    setCouponError("");
   };
 
   const validate = () => {
@@ -100,17 +155,17 @@ export default function WeekendRunForm() {
     return null;
   };
 
-  // Free registration for active members
   const submitFree = async () => {
     const res = await fetch("/api/runs/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
-        event_name:     UPCOMING_EVENT.name,
-        event_date:     UPCOMING_EVENT.date,
-        event_location: UPCOMING_EVENT.location,
+        event_name:     event!.name,
+        event_date:     event!.date,
+        event_location: event!.location,
         is_member:      true,
+        coupon_id:      couponApplied?.coupon_id ?? null,
       }),
     });
     const data = await res.json();
@@ -121,22 +176,25 @@ export default function WeekendRunForm() {
     e.preventDefault();
     const err = validate();
     if (err) { setError(err); return; }
+    if (!event) { setError("No upcoming event found."); return; }
 
     setLoading(true); setError("");
 
     try {
-      if (isActiveMember) {
-        // Free — skip payment
+      if (isActiveMember || finalPrice === 0) {
         await submitFree();
         setSubmitted(true);
         return;
       }
 
-      // Paid flow — create Razorpay order
       const orderRes = await fetch("/api/payment/run-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: form.email, event_date: UPCOMING_EVENT.date }),
+        body: JSON.stringify({
+          email:        form.email,
+          event_date:   event.date,
+          amount_paise: finalPrice * 100,
+        }),
       });
       const orderData = await orderRes.json();
       if (!orderRes.ok) { setError(orderData.error || "Could not initiate payment."); return; }
@@ -147,13 +205,13 @@ export default function WeekendRunForm() {
         amount:      orderData.amount,
         currency:    "INR",
         name:        "Connected Steps",
-        description: `${UPCOMING_EVENT.name} — ${UPCOMING_EVENT.displayDate}`,
+        description: `${event.name} — ${formatDate(event.date)}`,
         prefill: {
           name:    `${form.first_name} ${form.last_name}`,
           email:   form.email,
           contact: form.phone,
         },
-        theme:  { color: "#e8620a" },
+        theme:  { color: "#ff7a00" },
         modal:  { ondismiss: () => setLoading(false) },
         handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
           const regRes = await fetch("/api/runs/pay-and-register", {
@@ -162,10 +220,12 @@ export default function WeekendRunForm() {
             body: JSON.stringify({
               ...response,
               ...form,
-              event_name:     UPCOMING_EVENT.name,
-              event_date:     UPCOMING_EVENT.date,
-              event_location: UPCOMING_EVENT.location,
+              event_name:     event.name,
+              event_date:     event.date,
+              event_location: event.location,
               is_member:      isMember,
+              coupon_id:      couponApplied?.coupon_id ?? null,
+              amount_paid:    finalPrice,
             }),
           });
           const regData = await regRes.json();
@@ -178,16 +238,45 @@ export default function WeekendRunForm() {
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
-      // only clear loading for free flow (paid flow clears in handler/ondismiss)
-      if (isActiveMember) setLoading(false);
+      if (isActiveMember || finalPrice === 0) setLoading(false);
     }
   };
+
+  // Loading state
+  if (eventLoading) {
+    return (
+      <div style={{ minHeight: "100vh", background: "var(--cs-black)", color: "var(--cs-white)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ fontSize: "0.875rem", color: "var(--cs-muted)" }}>Loading event details…</div>
+      </div>
+    );
+  }
+
+  // No live event
+  if (!event) {
+    return (
+      <div style={{ minHeight: "100vh", background: "var(--cs-black)", color: "var(--cs-white)" }}>
+        <header style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 50, background: "rgba(8,28,45,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0 2rem", height: "64px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none" }}>
+            <Image src="/logo.png" alt="Connected Steps" width={36} height={36} className="rounded-full" />
+            <span className="font-display" style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--cs-white)" }}>Connected Steps</span>
+          </Link>
+          <Link href="/" style={{ fontSize: "0.8rem", color: "var(--cs-muted)", textDecoration: "none" }}>← Back</Link>
+        </header>
+        <div style={{ maxWidth: "480px", margin: "0 auto", padding: "10rem 1.5rem 4rem", textAlign: "center" }}>
+          <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>📅</div>
+          <h1 className="font-display" style={{ fontSize: "1.75rem", fontWeight: 300, marginBottom: "0.75rem" }}>No Upcoming Event</h1>
+          <p style={{ fontSize: "0.875rem", color: "var(--cs-muted)", marginBottom: "2rem" }}>There's no weekend run scheduled right now. Check back soon!</p>
+          <Link href="/" style={{ padding: "10px 24px", background: "var(--cs-orange)", color: "var(--cs-white)", borderRadius: "4px", textDecoration: "none", fontSize: "0.875rem", fontWeight: 600 }}>Back to Home</Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--cs-black)", color: "var(--cs-white)" }}>
 
       {/* Navbar */}
-      <header style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 50, background: "rgba(10,10,10,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0 2rem", height: "64px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <header style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 50, background: "rgba(8,28,45,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0 2rem", height: "64px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none" }}>
           <Image src="/logo.png" alt="Connected Steps" width={36} height={36} className="rounded-full" />
           <span className="font-display" style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--cs-white)" }}>Connected Steps</span>
@@ -198,17 +287,24 @@ export default function WeekendRunForm() {
       <div style={{ maxWidth: "680px", margin: "0 auto", padding: "6rem 1.5rem 4rem" }}>
 
         {/* Event banner */}
-        <div style={{ background: "rgba(232,98,10,0.08)", border: "1px solid rgba(232,98,10,0.25)", borderRadius: "8px", padding: "1.25rem 1.5rem", marginBottom: "1.25rem", display: "flex", flexWrap: "wrap", gap: "1rem", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ background: "rgba(255,122,0,0.08)", border: "1px solid rgba(255,122,0,0.25)", borderRadius: "8px", padding: "1.25rem 1.5rem", marginBottom: "1.25rem", display: "flex", flexWrap: "wrap", gap: "1rem", alignItems: "center", justifyContent: "space-between" }}>
           <div>
             <div style={{ fontSize: "10px", color: "var(--cs-orange)", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "4px" }}>Upcoming Event</div>
-            <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--cs-white)" }}>{UPCOMING_EVENT.name}</div>
-            <div style={{ fontSize: "0.8rem", color: "var(--cs-muted)", marginTop: "2px" }}>📅 {UPCOMING_EVENT.displayDate} &nbsp;·&nbsp; 📍 {UPCOMING_EVENT.location}</div>
+            <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--cs-white)" }}>{event.name}</div>
+            <div style={{ fontSize: "0.8rem", color: "var(--cs-muted)", marginTop: "2px" }}>
+              📅 {formatDate(event.date)}
+              {event.time && <> &nbsp;·&nbsp; 🕐 {event.time}</>}
+              &nbsp;·&nbsp; 📍 {event.location}
+            </div>
+            {event.description && (
+              <div style={{ fontSize: "0.78rem", color: "var(--cs-muted)", marginTop: "4px" }}>{event.description}</div>
+            )}
           </div>
           <button
             type="button"
             onClick={() => document.getElementById("run-form")?.scrollIntoView({ behavior: "smooth" })}
             style={{ fontSize: "11px", padding: "4px 12px", borderRadius: "20px", background: "var(--cs-orange)", color: "var(--cs-white)", fontWeight: 600, border: "none", cursor: "pointer", fontFamily: "inherit" }}>
-            Open
+            Register
           </button>
         </div>
 
@@ -230,8 +326,16 @@ export default function WeekendRunForm() {
               </div>
             </div>
           </div>
-          <div style={{ fontSize: "1.4rem", fontWeight: 700, color: isActiveMember ? "#4ade80" : "var(--cs-orange)" }}>
-            {isActiveMember ? "FREE" : `₹${RUN_FEE}`}
+          <div style={{ textAlign: "right" }}>
+            {!isActiveMember && couponApplied && (
+              <div style={{ fontSize: "11px", color: "var(--cs-muted)", textDecoration: "line-through", marginBottom: "2px" }}>₹{basePrice}</div>
+            )}
+            <div style={{ fontSize: "1.4rem", fontWeight: 700, color: isActiveMember ? "#4ade80" : (couponApplied ? "#4ade80" : "var(--cs-orange)") }}>
+              {isActiveMember ? "FREE" : (finalPrice === 0 ? "FREE" : `₹${finalPrice}`)}
+            </div>
+            {!isActiveMember && couponApplied && (
+              <div style={{ fontSize: "11px", color: "#4ade80" }}>−₹{discount} saved</div>
+            )}
           </div>
         </div>
 
@@ -243,13 +347,13 @@ export default function WeekendRunForm() {
         </div>
 
         {submitted ? (
-          <div style={{ background: "rgba(232,98,10,0.08)", border: "1px solid rgba(232,98,10,0.3)", borderRadius: "10px", padding: "3rem", textAlign: "center" }}>
+          <div style={{ background: "rgba(255,122,0,0.08)", border: "1px solid rgba(255,122,0,0.3)", borderRadius: "10px", padding: "3rem", textAlign: "center" }}>
             <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🎉</div>
             <h2 className="font-display" style={{ fontSize: "1.5rem", fontWeight: 300, color: "var(--cs-white)", marginBottom: "0.75rem" }}>You're registered!</h2>
             <p style={{ fontSize: "0.875rem", color: "var(--cs-muted)", marginBottom: "0.5rem" }}>
-              See you on <strong style={{ color: "var(--cs-white)" }}>{UPCOMING_EVENT.displayDate}</strong> at {UPCOMING_EVENT.location}.
+              See you on <strong style={{ color: "var(--cs-white)" }}>{formatDate(event.date)}</strong> at {event.location}.
             </p>
-            <p style={{ fontSize: "0.8rem", color: "var(--cs-muted)" }}>Stay tuned on WhatsApp & Instagram for updates.</p>
+            <p style={{ fontSize: "0.8rem", color: "var(--cs-muted)" }}>Stay tuned on WhatsApp &amp; Instagram for updates.</p>
             <div style={{ display: "flex", gap: "1rem", justifyContent: "center", marginTop: "2rem", flexWrap: "wrap" }}>
               <Link href="/" style={{ padding: "10px 24px", background: "var(--cs-orange)", color: "var(--cs-white)", borderRadius: "4px", textDecoration: "none", fontSize: "0.85rem", fontWeight: 600 }}>Back to home</Link>
               <Link href="/dashboard" style={{ padding: "10px 24px", border: "1px solid rgba(255,255,255,0.15)", color: "var(--cs-white)", borderRadius: "4px", textDecoration: "none", fontSize: "0.85rem" }}>Go to dashboard</Link>
@@ -259,7 +363,7 @@ export default function WeekendRunForm() {
           <form id="run-form" onSubmit={handleSubmit} noValidate>
 
             {isMember && (
-              <div style={{ background: "rgba(232,98,10,0.08)", border: "1px solid rgba(232,98,10,0.2)", borderRadius: "6px", padding: "10px 14px", marginBottom: "1.5rem", fontSize: "0.825rem", color: "var(--cs-orange)" }}>
+              <div style={{ background: "rgba(255,122,0,0.08)", border: "1px solid rgba(255,122,0,0.2)", borderRadius: "6px", padding: "10px 14px", marginBottom: "1.5rem", fontSize: "0.825rem", color: "var(--cs-orange)" }}>
                 ✓ Welcome back, <strong>{memberName}</strong>! We've pre-filled your details.
               </div>
             )}
@@ -306,7 +410,7 @@ export default function WeekendRunForm() {
             </div>
 
             {/* Emergency contact */}
-            <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.5rem", marginBottom: "1.5rem" }}>
+            <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.5rem", marginBottom: "1.25rem" }}>
               <div style={{ fontSize: "11px", color: "var(--cs-orange)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "6px", fontWeight: 600 }}>Emergency Contact</div>
               <p style={{ fontSize: "11px", color: "var(--cs-muted)", marginBottom: "1.25rem" }}>In case of emergency during the run, we will contact this person.</p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
@@ -321,6 +425,54 @@ export default function WeekendRunForm() {
               </div>
             </div>
 
+            {/* Promo code — only for non-active-members with a paid event */}
+            {!isActiveMember && basePrice > 0 && (
+              <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem 1.5rem", marginBottom: "1.25rem" }}>
+                <div style={{ fontSize: "11px", color: "var(--cs-orange)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1rem", fontWeight: 600 }}>Promo Code</div>
+
+                {couponApplied ? (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.25)", borderRadius: "6px", padding: "10px 14px" }}>
+                    <div>
+                      <div style={{ fontSize: "0.825rem", color: "#4ade80", fontWeight: 600 }}>
+                        ✓ {couponApplied.description || "Coupon applied"}
+                      </div>
+                      <div style={{ fontSize: "11px", color: "var(--cs-muted)", marginTop: "2px" }}>
+                        {couponApplied.discount_type === "percentage"
+                          ? `${couponApplied.discount_value}% off`
+                          : `₹${couponApplied.discount_value} off`}
+                        {" "}— you save ₹{discount}
+                      </div>
+                    </div>
+                    <button type="button" onClick={removeCoupon} style={{ fontSize: "11px", color: "var(--cs-muted)", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>Remove</button>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <input
+                        style={{ ...inputStyle, flex: 1, textTransform: "uppercase" }}
+                        value={couponCode}
+                        onChange={(e) => { setCouponCode(e.target.value); setCouponError(""); }}
+                        onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), applyCoupon())}
+                        placeholder="Enter promo code"
+                        onFocus={(e) => e.target.style.borderColor = "var(--cs-orange)"}
+                        onBlur={(e) => e.target.style.borderColor = "rgba(255,255,255,0.1)"}
+                      />
+                      <button
+                        type="button"
+                        onClick={applyCoupon}
+                        disabled={couponLoading || !couponCode.trim()}
+                        style={{ padding: "11px 18px", background: couponLoading ? "rgba(255,122,0,0.5)" : "var(--cs-orange)", color: "var(--cs-white)", border: "none", borderRadius: "6px", fontSize: "0.825rem", fontWeight: 600, cursor: couponLoading ? "not-allowed" : "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                        {couponLoading ? "…" : "Apply"}
+                      </button>
+                    </div>
+                    {couponError && (
+                      <div style={{ fontSize: "11px", color: "#f09595", marginTop: "6px" }}>{couponError}</div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
             {error && (
               <div style={{ background: "rgba(226,75,74,0.1)", border: "1px solid rgba(226,75,74,0.3)", borderRadius: "6px", padding: "10px 14px", marginBottom: "1.25rem", fontSize: "0.825rem", color: "#f09595" }}>
                 {error}
@@ -329,20 +481,22 @@ export default function WeekendRunForm() {
 
             <button type="submit" disabled={loading} style={{
               width: "100%", padding: "16px",
-              background: loading ? "rgba(232,98,10,0.6)" : "var(--cs-orange)",
+              background: loading ? "rgba(255,122,0,0.6)" : "var(--cs-orange)",
               color: "var(--cs-white)", border: "none", borderRadius: "6px",
               fontSize: "1rem", fontWeight: 700, cursor: loading ? "not-allowed" : "pointer",
               fontFamily: "var(--font-body)", letterSpacing: "0.04em", transition: "background 0.2s",
             }}>
               {loading
-                ? (isActiveMember ? "Registering…" : "Opening payment…")
-                : (isActiveMember ? "Register for the Run 🏃" : `Pay ₹${RUN_FEE} & Register 🏃`)}
+                ? (isActiveMember || finalPrice === 0 ? "Registering…" : "Opening payment…")
+                : (isActiveMember ? "Register for the Run 🏃" : (finalPrice === 0 ? "Register for Free 🏃" : `Pay ₹${finalPrice} & Register 🏃`))}
             </button>
 
             <p style={{ textAlign: "center", fontSize: "11px", color: "var(--cs-muted)", marginTop: "1rem" }}>
               {isActiveMember
                 ? "Your active membership includes free entry to weekend runs."
-                : "Powered by Razorpay · 100% secure · Amount: ₹" + RUN_FEE}
+                : finalPrice === 0
+                ? "Your coupon covers the full registration fee."
+                : `Powered by Razorpay · 100% secure · Amount: ₹${finalPrice}`}
             </p>
             <p style={{ textAlign: "center", fontSize: "11px", color: "var(--cs-muted)", marginTop: "4px" }}>
               {isMember ? "" : (
