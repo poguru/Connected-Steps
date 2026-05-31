@@ -43,7 +43,7 @@ export default function UserMenu({ user }: Props) {
   const logout = () => {
     localStorage.removeItem("cs_user");
     localStorage.removeItem("cs_strava");
-    router.push("/auth");
+    router.push("/auth?tab=signin");
   };
 
   const fullName = `${user.firstName} ${user.lastName}`;
