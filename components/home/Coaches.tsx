@@ -217,10 +217,10 @@ export default function Coaches() {
             </div>
           </div>
 
-          {/* Navigation */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "1.5rem", marginTop: "3rem" }}>
+          {/* Navigation — prev left, dots + counter centre, next right */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "3rem" }}>
 
-            {/* Prev */}
+            {/* Prev — far left */}
             <button onClick={prev} aria-label="Previous coach"
               style={{ width: "44px", height: "44px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.15)", background: "transparent", color: "var(--cs-white)", cursor: "pointer", fontSize: "1.1rem", display: "flex", alignItems: "center", justifyContent: "center", transition: "border-color 0.15s, background 0.15s" }}
               onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(232,98,10,0.6)"; e.currentTarget.style.background = "rgba(232,98,10,0.08)"; }}
@@ -228,26 +228,24 @@ export default function Coaches() {
               ←
             </button>
 
-            {/* Dots */}
-            <div style={{ display: "flex", gap: "0.5rem" }}>
-              {coaches.map((_, i) => (
-                <button key={i} onClick={() => goTo(i)} aria-label={`Go to coach ${i + 1}`}
-                  style={{ width: i === current ? "24px" : "8px", height: "8px", borderRadius: "4px", border: "none", cursor: "pointer", background: i === current ? "var(--cs-orange)" : "rgba(255,255,255,0.2)", transition: "all 0.3s ease", padding: 0 }} />
-              ))}
+            {/* Dots + counter — centre */}
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                {coaches.map((_, i) => (
+                  <button key={i} onClick={() => goTo(i)} aria-label={`Go to coach ${i + 1}`}
+                    style={{ width: i === current ? "24px" : "8px", height: "8px", borderRadius: "4px", border: "none", cursor: "pointer", background: i === current ? "var(--cs-orange)" : "rgba(255,255,255,0.2)", transition: "all 0.3s ease", padding: 0 }} />
+                ))}
+              </div>
+              <span style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em" }}>{current + 1} / {coaches.length}</span>
             </div>
 
-            {/* Next */}
+            {/* Next — far right */}
             <button onClick={next} aria-label="Next coach"
               style={{ width: "44px", height: "44px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.15)", background: "transparent", color: "var(--cs-white)", cursor: "pointer", fontSize: "1.1rem", display: "flex", alignItems: "center", justifyContent: "center", transition: "border-color 0.15s, background 0.15s" }}
               onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(232,98,10,0.6)"; e.currentTarget.style.background = "rgba(232,98,10,0.08)"; }}
               onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; e.currentTarget.style.background = "transparent"; }}>
               →
             </button>
-          </div>
-
-          {/* Coach counter */}
-          <div style={{ textAlign: "center", marginTop: "1rem", fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em" }}>
-            {current + 1} / {coaches.length}
           </div>
         </div>
       </div>
