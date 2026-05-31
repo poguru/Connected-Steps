@@ -33,7 +33,7 @@ export default function CoachRatingsPage() {
   const [error,   setError]   = useState("");
   const [filter,  setFilter]  = useState("All");
 
-  const COACHES = ["All", "Ashokan K", "Vana Durga Rao", "Kolli Achyuta Kumari"];
+  const COACHES = ["All", "Ashokan K", "Durga Rao Vana", "Achyuta Kumari Kolli"];
 
   async function load(password: string) {
     setLoading(true); setError("");

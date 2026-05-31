@@ -102,7 +102,7 @@ async function getValidToken(tokens: StravaTokens): Promise<string> {
   return data.access_token;
 }
 
-const COACHES = ["Ashokan K", "Vana Durga Rao", "Kolli Achyuta Kumari"];
+const COACHES = ["Ashokan K", "Durga Rao Vana", "Achyuta Kumari Kolli"];
 
 function RateCoachWidget({ userEmail, hasAttended }: { userEmail: string; hasAttended: boolean | null }) {
   const [coach,   setCoach]   = useState(COACHES[0]);

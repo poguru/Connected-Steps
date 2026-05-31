@@ -28,7 +28,7 @@ const coaches = [
     photo: "/coaches/ashokan-k.jpg" as string | null,
   },
   {
-    name: "Vana Durga Rao",
+    name: "Durga Rao Vana",
     role: "Marathon Coach & Personal Trainer",
     location: "Hyderabad",
     bio: "Professional athlete and certified marathon coach with 4 years of experience. Certified by Netaji Subash NIS Bangalore and trained at Sports Authority of India (SAI) Gachibowli. Currently coaching at Connected Steps and TCS Hyderabad. National Games 2022 participant in 1600m at Gujarat.",
@@ -49,12 +49,12 @@ const coaches = [
       { icon: "🥉", text: "Youth Nationals Bronze – Medley Relay (2019)" },
       { icon: "🏅", text: "National Games 2022 Participant – 1600m, Gujarat" },
     ],
-    initials: "VD",
-    photo: null as string | null,
+    initials: "DV",
+    photo: "/coaches/durga.png" as string | null,
     instagram: "@trainer_durga",
   },
   {
-    name: "Kolli Achyuta Kumari",
+    name: "Achyuta Kumari Kolli",
     role: "Sprint & Strength Coach",
     location: "Hyderabad",
     bio: "National medalist and professional athlete with a PG Diploma in Strength & Conditioning from Indira Gandhi University. Represented Telangana and Andhra Pradesh in 100m and Long Jump at national level. Currently coaching at TCS Striders Miles and Skechers Running Club.",
@@ -74,8 +74,8 @@ const coaches = [
       { icon: "🥈", text: "4 Silver Medals – National Athletics Championships" },
       { icon: "🥉", text: "5 Bronze Medals – National Athletics Championships" },
     ],
-    initials: "KA",
-    photo: null as string | null,
+    initials: "AK",
+    photo: "/coaches/acthutha.jpg" as string | null,
   },
 ];
 
