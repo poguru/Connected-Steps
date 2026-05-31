@@ -2,14 +2,17 @@
 
 /* ─── Design Tokens ─────────────────────────────────── */
 :root {
-  --cs-black:        #0a0a0a;
-  --cs-dark:         #111111;
-  --cs-charcoal:     #1a1a1a;
-  --cs-orange:       #e8620a;
-  --cs-orange-light: #ff7a24;
+  --cs-black:        #081c2d;
+  --cs-dark:         #0d2540;
+  --cs-charcoal:     #122e50;
+  --cs-orange:       #ff7a00;
+  --cs-orange-light: #ff9e3d;
+  --cs-blue:         #38bdf8;
+  --cs-blue-dim:     rgba(56,189,248,0.12);
   --cs-white:        #ffffff;
-  --cs-off-white:    #f0f0f0;
-  --cs-muted:        #888888;
+  --cs-off-white:    #e8f4ff;
+  --cs-cream:        #bde0f8;
+  --cs-muted:        #94a3b8;
 
   /* Typography */
   --font-display: var(--font-cormorant);
@@ -128,7 +131,7 @@ h1, h2, h3 {
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  border: 1px solid rgba(255,255,255,0.25);
+  border: 1px solid rgba(255,255,255,0.2);
   border-radius: 2px;
   cursor: pointer;
   text-decoration: none;
@@ -136,8 +139,8 @@ h1, h2, h3 {
 }
 
 .btn-outline:hover {
-  border-color: var(--cs-orange);
-  color: var(--cs-orange);
+  border-color: var(--cs-blue);
+  color: var(--cs-blue);
 }
 
 /* ─── Layout ─────────────────────────────────────────── */
@@ -153,8 +156,8 @@ h1, h2, h3 {
 .gold-line {
   display: block;
   width: 48px;
-  height: 1px;
-  background-color: var(--cs-orange);
+  height: 2px;
+  background: linear-gradient(90deg, var(--cs-blue), var(--cs-orange));
   margin-bottom: 1.5rem;
 }
 
@@ -165,21 +168,22 @@ h1, h2, h3 {
   font-weight: 500;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: var(--cs-orange);
+  color: var(--cs-blue);
   margin-bottom: 1rem;
 }
 
 /* ─── Cards ──────────────────────────────────────────── */
 .card-dark {
   background: var(--cs-charcoal);
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgba(56,189,248,0.1);
   border-radius: 4px;
   padding: 2rem;
   transition: border-color 0.2s, transform 0.2s;
 }
 
 .card-dark:hover {
-  border-color: rgba(232, 98, 10, 0.3);
+  border-color: rgba(56,189,248,0.4);
+  box-shadow: 0 4px 24px rgba(56,189,248,0.1);
   transform: translateY(-4px);
 }
 
@@ -213,7 +217,7 @@ h1, h2, h3 {
 /* ─── Testimonial ────────────────────────────────────── */
 .testimonial-card {
   background: var(--cs-charcoal);
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgba(56,189,248,0.1);
   border-top: 2px solid var(--cs-orange);
   border-radius: 4px;
   padding: 2rem;
