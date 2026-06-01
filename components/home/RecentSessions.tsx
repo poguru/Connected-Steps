@@ -29,9 +29,9 @@ export default function RecentSessions() {
   const [sessions, setSessions] = useState<RecentSession[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [current,  setCurrent]  = useState(0);
-  const [visible,  setVisible]  = useState(true);
   const [paused,   setPaused]   = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const touchX   = useRef<number | null>(null);
 
   useEffect(() => {
     fetch("/api/sessions/recent")
@@ -40,22 +40,23 @@ export default function RecentSessions() {
       .finally(() => setLoading(false));
   }, []);
 
-  const goTo = useCallback((idx: number) => {
-    setVisible(false);
-    setTimeout(() => {
-      setCurrent(idx);
-      setVisible(true);
-    }, 320);
-  }, []);
-
-  const next = useCallback(() => goTo((current + 1) % sessions.length), [current, sessions.length, goTo]);
-  const prev = useCallback(() => goTo((current - 1 + sessions.length) % sessions.length), [current, sessions.length, goTo]);
+  const goTo = useCallback((idx: number) => setCurrent(idx), []);
+  const next = useCallback(() => setCurrent((c) => (c + 1) % sessions.length), [sessions.length]);
+  const prev = useCallback(() => setCurrent((c) => (c - 1 + sessions.length) % sessions.length), [sessions.length]);
 
   useEffect(() => {
     if (paused || sessions.length <= 1) return;
-    timerRef.current = setInterval(next, 5000);
+    timerRef.current = setInterval(next, 6000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [paused, sessions.length, next]);
+
+  const onTouchStart = (e: React.TouchEvent) => { touchX.current = e.touches[0].clientX; setPaused(true); };
+  const onTouchEnd   = (e: React.TouchEvent) => {
+    if (touchX.current === null) return;
+    const delta = e.changedTouches[0].clientX - touchX.current;
+    if (Math.abs(delta) > 50) delta < 0 ? next() : prev();
+    touchX.current = null; setPaused(false);
+  };
 
   if (loading || sessions.length === 0) return null;
 
@@ -63,10 +64,11 @@ export default function RecentSessions() {
   const dateStr = new Date(s.date + "T12:00:00Z").toLocaleDateString("en-IN", {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
   });
-  const topReview = s.feedback.find((f) => f.comment);
 
   return (
-    <section id="recent-sessions" className="section" style={{ background: "var(--cs-black)", padding: "5rem 0" }}>
+    <section id="recent-sessions" style={{ background: "var(--cs-black)", padding: "5rem 0" }}
+      onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}
+      onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <div className="container">
 
         {/* Header */}
@@ -79,98 +81,87 @@ export default function RecentSessions() {
             <em className="not-italic" style={{ color: "var(--cs-orange)" }}>Sessions</em>
           </h2>
           <p style={{ fontSize: "0.875rem", color: "var(--cs-muted)", marginTop: "0.5rem" }}>
-            See what our community has been up to.
+            What our community has been running — straight from the field.
           </p>
         </div>
 
-        {/* Carousel */}
-        <div style={{ maxWidth: "860px", margin: "0 auto", position: "relative" }}
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}>
-
-          {/* Card */}
+        {/* Card */}
+        <div style={{ maxWidth: "720px", margin: "0 auto", position: "relative" }}>
           <div style={{
             background: "var(--cs-dark)",
             border: "1px solid rgba(255,255,255,0.08)",
             borderRadius: "16px",
             overflow: "hidden",
-            opacity: visible ? 1 : 0,
-            transform: visible ? "translateY(0)" : "translateY(10px)",
-            transition: "opacity 0.32s ease, transform 0.32s ease",
           }}>
 
             {/* Photo */}
             {s.photo_url && (
-              <div style={{ position: "relative", width: "100%", height: "clamp(220px, 45vw, 400px)", overflow: "hidden" }}>
-                <img
-                  src={s.photo_url} alt={s.title}
-                  style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top", display: "block" }}
-                />
-                {/* Gradient overlay at bottom */}
-                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "50%",
-                  background: "linear-gradient(to top, rgba(13,37,64,0.95), transparent)" }} />
-
-                {/* Session counter badge */}
+              <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", overflow: "hidden" }}>
+                <img src={s.photo_url} alt={s.title}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 30%", display: "block" }} />
+                {/* Counter badge */}
                 <div style={{ position: "absolute", top: "1rem", right: "1rem",
                   background: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)",
                   border: "1px solid rgba(255,255,255,0.12)", borderRadius: "20px",
-                  padding: "4px 12px", fontSize: "11px", color: "rgba(255,255,255,0.7)", letterSpacing: "0.06em" }}>
+                  padding: "4px 12px", fontSize: "11px", color: "rgba(255,255,255,0.8)", letterSpacing: "0.06em" }}>
                   {current + 1} / {sessions.length}
-                </div>
-
-                {/* Title overlaid on photo */}
-                <div style={{ position: "absolute", bottom: "1.25rem", left: "1.5rem", right: "1.5rem" }}>
-                  <div style={{ fontSize: "clamp(1.1rem, 3vw, 1.5rem)", fontWeight: 700, color: "#fff",
-                    fontFamily: "var(--font-display)", lineHeight: 1.2 }}>{s.title}</div>
-                  <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.65)", marginTop: "4px" }}>
-                    📅 {dateStr}{s.time ? ` · ${s.time}` : ""}
-                  </div>
                 </div>
               </div>
             )}
 
-            {/* Info strip */}
-            <div style={{ padding: "1.25rem 1.5rem", display: "flex", flexWrap: "wrap", gap: "1rem", alignItems: "flex-start", justifyContent: "space-between" }}>
-
-              {/* Location + rating */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                <div style={{ fontSize: "0.82rem", color: "var(--cs-muted)" }}>
-                  📍 {s.venue || s.location}
-                </div>
-                {s.avgRating !== null && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <Stars rating={s.avgRating} />
-                    <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--cs-orange)" }}>{s.avgRating.toFixed(1)}</span>
-                    <span style={{ fontSize: "0.75rem", color: "var(--cs-muted)" }}>({s.reviewCount} review{s.reviewCount !== 1 ? "s" : ""})</span>
-                  </div>
-                )}
+            {/* Session info */}
+            <div style={{ padding: "1.5rem" }}>
+              <div style={{ fontSize: "11px", color: "var(--cs-orange)", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.4rem" }}>
+                Community · Recent Session
+              </div>
+              <h3 className="font-display" style={{ fontSize: "clamp(1.4rem, 3vw, 2rem)", fontWeight: 300, color: "var(--cs-white)", lineHeight: 1.2, marginBottom: "0.6rem" }}>
+                {s.title}
+              </h3>
+              <div style={{ fontSize: "0.85rem", color: "var(--cs-muted)", marginBottom: "1rem" }}>
+                📅 {dateStr}{s.time ? ` · ${s.time}` : ""}
+                &nbsp;&nbsp;📍 {s.venue || s.location}
               </div>
 
-              {/* Top review quote */}
-              {topReview && (
-                <div style={{
-                  flex: "1 1 240px",
-                  background: "rgba(232,98,10,0.06)",
-                  border: "1px solid rgba(232,98,10,0.15)",
-                  borderRadius: "8px",
-                  padding: "0.75rem 1rem",
-                }}>
-                  <div style={{ fontSize: "0.78rem", color: "var(--cs-muted)", lineHeight: 1.6, fontStyle: "italic" }}>
-                    &ldquo;{topReview.comment}&rdquo;
-                  </div>
-                  <div style={{ fontSize: "0.72rem", color: "var(--cs-orange)", marginTop: "4px", fontWeight: 600 }}>
-                    — {topReview.user_name}
-                  </div>
+              {/* Rating summary */}
+              {s.avgRating !== null && (
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "1.25rem", paddingBottom: "1.25rem", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+                  <Stars rating={s.avgRating} />
+                  <span style={{ fontSize: "1rem", fontWeight: 700, color: "var(--cs-orange)" }}>{s.avgRating.toFixed(1)}</span>
+                  <span style={{ fontSize: "0.82rem", color: "var(--cs-muted)" }}>
+                    {s.reviewCount} review{s.reviewCount !== 1 ? "s" : ""}
+                  </span>
+                </div>
+              )}
+
+              {/* All reviews */}
+              {s.feedback && s.feedback.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                  {s.feedback.filter((f) => f.comment).map((f, i) => (
+                    <div key={i} style={{
+                      background: "rgba(255,255,255,0.03)",
+                      border: "1px solid rgba(255,255,255,0.06)",
+                      borderRadius: "8px",
+                      padding: "0.75rem 1rem",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                        <span style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--cs-white)" }}>{f.user_name}</span>
+                        <Stars rating={f.rating} />
+                      </div>
+                      <p style={{ fontSize: "0.82rem", color: "var(--cs-muted)", lineHeight: 1.6, margin: 0, fontStyle: "italic" }}>
+                        &ldquo;{f.comment}&rdquo;
+                      </p>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
           </div>
 
-          {/* Prev / Next arrows */}
+          {/* Prev / Next arrows — hidden on mobile (swipe instead) */}
           {sessions.length > 1 && (
             <>
-              <button onClick={prev} aria-label="Previous session"
-                style={{ position: "absolute", left: "-20px", top: "40%", transform: "translateY(-50%)",
+              <button onClick={prev} aria-label="Previous" className="hero-slider-arrow"
+                style={{ position: "absolute", left: "-20px", top: "30%", transform: "translateY(-50%)",
                   width: "40px", height: "40px", borderRadius: "50%",
                   background: "rgba(13,37,64,0.9)", border: "1px solid rgba(255,255,255,0.15)",
                   color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
@@ -179,8 +170,8 @@ export default function RecentSessions() {
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; e.currentTarget.style.background = "rgba(13,37,64,0.9)"; }}>
                 ←
               </button>
-              <button onClick={next} aria-label="Next session"
-                style={{ position: "absolute", right: "-20px", top: "40%", transform: "translateY(-50%)",
+              <button onClick={next} aria-label="Next" className="hero-slider-arrow"
+                style={{ position: "absolute", right: "-20px", top: "30%", transform: "translateY(-50%)",
                   width: "40px", height: "40px", borderRadius: "50%",
                   background: "rgba(13,37,64,0.9)", border: "1px solid rgba(255,255,255,0.15)",
                   color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",

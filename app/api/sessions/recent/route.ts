@@ -12,7 +12,7 @@ export async function GET() {
     .select("id, title, date, time, venue, location, photo_url")
     .not("photo_url", "is", null)
     .order("date", { ascending: false })
-    .limit(7);
+    .limit(10);
 
   if (!sessions || sessions.length === 0) return NextResponse.json({ sessions: [] });
 

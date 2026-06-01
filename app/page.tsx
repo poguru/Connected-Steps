@@ -2,7 +2,8 @@
 
 import Navbar               from "@/components/layout/Navbar";
 import Footer               from "@/components/layout/Footer";
-import HeroSlider           from "@/components/home/HeroSlider";
+import Hero                 from "@/components/home/Hero";
+import RecentSessions       from "@/components/home/RecentSessions";
 import MarqueeBanner        from "@/components/home/MarqueeBanner";
 import TrainingPlans        from "@/components/home/TrainingPlans";
 import UpcomingSessions     from "@/components/home/UpcomingSessions";
@@ -16,7 +17,8 @@ export default function HomePage() {
   return (
     <>
       <Navbar />
-      <HeroSlider />
+      <Hero />
+      <RecentSessions />
       <MarqueeBanner />
       <TrainingPlans />
       <UpcomingSessions />
