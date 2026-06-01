@@ -53,6 +53,12 @@ export default function Navbar() {
     };
   }, []);
 
+  // Lock body scroll when mobile menu is open
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [menuOpen]);
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
       style={{
@@ -179,7 +185,7 @@ export default function Navbar() {
 
         {/* Mobile menu */}
         {menuOpen && (
-          <div className="cs-home-mobile-menu">
+          <div className="cs-home-mobile-menu" style={{ maxHeight: "calc(100vh - 6rem)", overflowY: "auto" }}>
             {/* Sessions group */}
             <div style={{ fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)", marginBottom: "4px" }}>Sessions</div>
             {sessionDropdown.map((item) => (
