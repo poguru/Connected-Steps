@@ -336,6 +336,15 @@ export default function CommunityQA() {
   useEffect(() => {
     const raw = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
     setIsLoggedIn(!!raw);
+    if (raw && typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("ask") === "1") {
+        setModalOpen(true);
+        const url = new URL(window.location.href);
+        url.searchParams.delete("ask");
+        window.history.replaceState({}, "", url.toString());
+      }
+    }
   }, []);
 
   function loadPosts() {
@@ -350,14 +359,17 @@ export default function CommunityQA() {
   useEffect(() => { loadPosts(); }, []);
 
   function handleAskClick() {
-    if (!isLoggedIn) { window.location.href = "/auth"; return; }
+    if (!isLoggedIn) {
+      window.location.href = `/auth?redirect=${encodeURIComponent("/?ask=1#community")}`;
+      return;
+    }
     setModalOpen(true);
   }
 
   const filtered = activecat === "All" ? posts : posts.filter((p) => p.category === activecat);
 
   return (
-    <section className="section" style={{ background: "var(--cs-black)" }}>
+    <section id="community" className="section" style={{ background: "var(--cs-black)" }}>
       <div className="container">
 
         {/* Header */}
@@ -405,7 +417,7 @@ export default function CommunityQA() {
                 key={post.id}
                 post={post}
                 isLoggedIn={isLoggedIn}
-                onLoginRedirect={() => { window.location.href = "/auth"; }}
+                onLoginRedirect={() => { window.location.href = `/auth?redirect=${encodeURIComponent("/#community")}`; }}
               />
             ))}
           </div>
