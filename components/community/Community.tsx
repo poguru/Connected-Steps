@@ -17,14 +17,12 @@ interface User {
 }
 
 interface Runner {
-  user_email:  string;
-  user_name:   string;
-  location:    string;
-  goal:        string;
-  month_km:    number;
-  total_km:    number;
-  month_runs:  number;
-  total_runs:  number;
+  user_email:   string;
+  user_name:    string;
+  location:     string;
+  goal:         string;
+  total_points: number;
+  month_points: number;
 }
 
 const goalLabel: Record<string, string> = {
@@ -204,10 +202,10 @@ export default function Community() {
                     <div style={{ fontSize: "0.75rem", color: "var(--cs-muted)", marginBottom: "6px" }}>📍 {runner.location}</div>
                     <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                       <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "20px", background: "rgba(255,255,255,0.05)", color: "var(--cs-muted)" }}>
-                        {runner.total_km.toFixed(1)} km total
+                        🎯 {goalLabel[runner.goal] ?? runner.goal}
                       </span>
-                      <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "20px", background: "rgba(255,255,255,0.05)", color: "var(--cs-muted)" }}>
-                        {runner.month_km.toFixed(1)} km this month
+                      <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "20px", background: "rgba(232,98,10,0.1)", color: "var(--cs-orange)" }}>
+                        {runner.total_points ?? 0} pts
                       </span>
                     </div>
                   </div>

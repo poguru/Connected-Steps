@@ -10,8 +10,8 @@ export async function GET(req: NextRequest) {
 
     let query = db
       .from("leaderboard")
-      .select("user_email, user_name, location, goal, month_km, total_km, month_runs, total_runs")
-      .order("total_km", { ascending: false })
+      .select("user_email, user_name, location, goal, total_points, month_points")
+      .order("total_points", { ascending: false })
       .limit(20);
 
     if (q) {
