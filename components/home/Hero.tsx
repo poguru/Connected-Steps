@@ -5,26 +5,11 @@ import Link from "next/link";
 import Image from "next/image";
 
 export default function Hero() {
-  const [members,   setMembers]   = useState<number | null>(null);
-  const [runs,      setRuns]      = useState<number | null>(null);
-  const [avgRating, setAvgRating] = useState<number | null>(null);
-  const [loggedIn,  setLoggedIn]  = useState(false);
+  const [loggedIn, setLoggedIn] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined" && localStorage.getItem("cs_user")) setLoggedIn(true);
-
-    fetch("/api/stats")
-      .then((r) => r.json())
-      .then((d) => {
-        setMembers(d.totalRunners);
-        setRuns(d.weekendRuns);
-        setAvgRating(d.avgRating);
-      })
-      .catch(() => {});
   }, []);
-
-  const fmt = (n: number | null) =>
-    n === null ? "—" : n >= 1000 ? `${(n / 1000).toFixed(1)}K+` : `${n}`;
 
   return (
     <section className="relative min-h-screen flex items-center noise" style={{ background: "var(--cs-black)" }}>
@@ -59,19 +44,6 @@ export default function Hero() {
                 </svg>
               </Link>
               <Link href="#training" className="btn-outline">See training plans</Link>
-            </div>
-            <div className="flex flex-wrap items-center gap-4 mt-8 animate-fade-up-4 pt-8"
-              style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-              {[
-                { num: fmt(members), label: "Members" },
-                { num: fmt(runs),    label: "Run registrations" },
-                { num: avgRating ? `${avgRating}★` : "—", label: "Coach rating" },
-              ].map((s) => (
-                <div key={s.label} style={{ minWidth: "80px" }}>
-                  <div className="font-display text-2xl font-light" style={{ color: "var(--cs-white)" }}>{s.num}</div>
-                  <div className="text-xs tracking-wide uppercase mt-0.5" style={{ color: "var(--cs-muted)" }}>{s.label}</div>
-                </div>
-              ))}
             </div>
           </div>
 
