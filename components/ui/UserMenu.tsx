@@ -81,18 +81,25 @@ export default function UserMenu({ user }: Props) {
       {open && (
         <div style={{ position: "fixed", top: dropPos.top, right: dropPos.right, background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", width: "260px", zIndex: 9999, boxShadow: "0 12px 40px rgba(0,0,0,0.5)" }}>
 
-          {/* Profile header */}
-          <div style={{ padding: "1rem 1.25rem", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            {user.photo ? (
-              <img src={user.photo} alt={fullName} style={{ width: "40px", height: "40px", borderRadius: "50%", objectFit: "cover", border: "2px solid var(--cs-orange)", flexShrink: 0 }} />
-            ) : (
-              <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: "var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.875rem", fontWeight: 700, color: "var(--cs-white)", flexShrink: 0 }}>
-                {initials}
+          {/* Profile snapshot */}
+          <div style={{ padding: "1.25rem", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem" }}>
+              {user.photo ? (
+                <img src={user.photo} alt={fullName} style={{ width: "48px", height: "48px", borderRadius: "50%", objectFit: "cover", border: "2px solid var(--cs-orange)", flexShrink: 0 }} />
+              ) : (
+                <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem", fontWeight: 700, color: "var(--cs-white)", flexShrink: 0 }}>
+                  {initials}
+                </div>
+              )}
+              <div>
+                <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--cs-white)", marginBottom: "2px" }}>{fullName}</div>
+                <div style={{ fontSize: "11px", color: "var(--cs-orange)", letterSpacing: "0.06em", textTransform: "uppercase" }}>{goalLabel[user.goal] ?? user.goal}</div>
               </div>
-            )}
-            <div>
-              <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--cs-white)", marginBottom: "2px" }}>{fullName}</div>
-              <div style={{ fontSize: "10px", color: "var(--cs-orange)", letterSpacing: "0.06em", textTransform: "uppercase" }}>{goalLabel[user.goal] ?? user.goal}</div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              <div style={{ fontSize: "0.78rem", color: "var(--cs-muted)" }}>✉️&nbsp; {user.email}</div>
+              {user.phone    && <div style={{ fontSize: "0.78rem", color: "var(--cs-muted)" }}>📱&nbsp; {user.phone}</div>}
+              {user.location && <div style={{ fontSize: "0.78rem", color: "var(--cs-muted)" }}>📍&nbsp; {user.location}</div>}
             </div>
           </div>
 
