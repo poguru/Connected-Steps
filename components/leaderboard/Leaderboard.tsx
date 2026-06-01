@@ -80,15 +80,10 @@ export default function Leaderboard() {
       {/* Navbar */}
       <header className="cs-app-nav">
         <div className="cs-app-nav-inner">
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none" }}>
-              <Image src="/logo.png" alt="Connected Steps" width={36} height={36} className="rounded-full" />
-              <span className="font-display" style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--cs-white)", whiteSpace: "nowrap" }}>Connected Steps</span>
-            </Link>
-            <button onClick={() => router.push("/dashboard")} style={{ background: "none", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "6px", cursor: "pointer", color: "var(--cs-muted)", fontSize: "0.78rem", padding: "4px 12px", fontFamily: "inherit", whiteSpace: "nowrap" }}>
-              ← Dashboard
-            </button>
-          </div>
+          <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none" }}>
+            <Image src="/logo.png" alt="Connected Steps" width={36} height={36} className="rounded-full" />
+            <span className="font-display" style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--cs-white)", whiteSpace: "nowrap" }}>Connected Steps</span>
+          </Link>
 
           <nav className="cs-app-nav-links">
             {[
@@ -121,28 +116,33 @@ export default function Leaderboard() {
           <p style={{ fontSize: "0.875rem", color: "var(--cs-muted)" }}>Top 3 this month win prizes. Earn points by attending training sessions.</p>
         </div>
 
-        {/* Tab switcher */}
-        <div style={{ display: "flex", gap: "4px", padding: "4px", marginBottom: "1.5rem", borderRadius: "6px", background: "rgba(255,255,255,0.05)", width: "fit-content" }}>
-          {(["month", "total"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              style={{
-                padding: "8px 20px",
-                borderRadius: "4px",
-                fontSize: "0.875rem",
-                fontWeight: 500,
-                background: tab === t ? "var(--cs-orange)" : "transparent",
-                color: tab === t ? "var(--cs-white)" : "var(--cs-muted)",
-                border: "none",
-                cursor: "pointer",
-                fontFamily: "var(--font-body)",
-                transition: "background 0.2s",
-              }}
-            >
-              {t === "month" ? "This Month" : "All Time"}
-            </button>
-          ))}
+        {/* Tab switcher + back */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "4px", padding: "4px", borderRadius: "6px", background: "rgba(255,255,255,0.05)" }}>
+            {(["month", "total"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                style={{
+                  padding: "8px 20px",
+                  borderRadius: "4px",
+                  fontSize: "0.875rem",
+                  fontWeight: 500,
+                  background: tab === t ? "var(--cs-orange)" : "transparent",
+                  color: tab === t ? "var(--cs-white)" : "var(--cs-muted)",
+                  border: "none",
+                  cursor: "pointer",
+                  fontFamily: "var(--font-body)",
+                  transition: "background 0.2s",
+                }}
+              >
+                {t === "month" ? "This Month" : "All Time"}
+              </button>
+            ))}
+          </div>
+          <button onClick={() => router.push("/dashboard")} style={{ background: "none", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "6px", cursor: "pointer", color: "var(--cs-muted)", fontSize: "0.8rem", padding: "8px 16px", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+            ← Dashboard
+          </button>
         </div>
 
         {/* Table */}
