@@ -265,6 +265,30 @@ select.auth-input option {
   .hero-cta > * { width: 100%; justify-content: center; }
 }
 
+/* ─── Training Plans carousel ───────────────────────── */
+.tp-desktop-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+.tp-mobile-carousel { display: none; }
+
+@media (max-width: 900px) {
+  .tp-desktop-grid  { display: none; }
+  .tp-mobile-carousel { display: block; }
+  .tp-track {
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.5rem;
+    /* hide scrollbar */
+    scrollbar-width: none;
+  }
+  .tp-track::-webkit-scrollbar { display: none; }
+}
+
 /* ─── Responsive ─────────────────────────────────────── */
 @media (max-width: 768px) {
   :root { --section-pad: 4rem; }

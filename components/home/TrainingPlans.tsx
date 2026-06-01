@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { useRouter } from "next/navigation";
 
 const plans = [
@@ -42,11 +43,19 @@ const plans = [
 ];
 
 export default function TrainingPlans() {
-  const router = useRouter();
+  const router  = useRouter();
+  const trackRef = useRef<HTMLDivElement>(null);
 
   const handleGetStarted = () => {
     const user = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
     router.push(user ? "/dashboard" : "/auth");
+  };
+
+  const scroll = (dir: "prev" | "next") => {
+    const el = trackRef.current;
+    if (!el) return;
+    const cardW = el.firstElementChild ? (el.firstElementChild as HTMLElement).offsetWidth + 16 : 280;
+    el.scrollBy({ left: dir === "next" ? cardW : -cardW, behavior: "smooth" });
   };
 
   return (
@@ -63,57 +72,86 @@ export default function TrainingPlans() {
           </p>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Desktop: grid | Mobile: horizontal scroll carousel */}
+        <div className="tp-desktop-grid">
           {plans.map((plan) => (
-            <div key={plan.tier} className="relative flex flex-col"
-              style={{
-                background: "var(--cs-charcoal)",
-                border: plan.featured ? `1px solid ${plan.color}` : "1px solid rgba(255,255,255,0.06)",
-                borderRadius: "4px", padding: "2rem", transition: "transform 0.2s",
-              }}
-              onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.transform = "translateY(-6px)")}
-              onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.transform = "translateY(0)")}>
-              {plan.featured && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 text-xs font-medium tracking-widest uppercase rounded-sm"
-                  style={{ background: plan.color, color: "var(--cs-black)" }}>
-                  Most popular
-                </div>
-              )}
-              <div className="mb-6">
-                <div className="text-xs tracking-widest uppercase mb-2" style={{ color: plan.color }}>{plan.tier}</div>
-                <div className="font-display mb-1" style={{ fontSize: "clamp(2rem, 3vw, 2.8rem)", fontWeight: 300, color: "var(--cs-white)", lineHeight: 1.1 }}>
-                  {plan.title}
-                </div>
-                <div className="text-xs tracking-wide uppercase" style={{ color: "var(--cs-muted)" }}>{plan.duration} programme</div>
-              </div>
-              <p className="text-sm leading-relaxed mb-6" style={{ color: "var(--cs-muted)" }}>{plan.desc}</p>
-              <ul className="flex flex-col gap-3 mb-8 flex-1">
-                {plan.features.map((f) => (
-                  <li key={f} className="flex items-center gap-3 text-sm" style={{ color: "var(--cs-white)" }}>
-                    <span className="w-4 h-4 flex-shrink-0 rounded-full flex items-center justify-center"
-                      style={{ background: `${plan.color}22`, border: `1px solid ${plan.color}` }}>
-                      <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                        <path d="M1.5 4L3.5 6L6.5 2" stroke={plan.color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </span>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <button onClick={handleGetStarted} className="btn-primary text-center justify-center"
-                style={{
-                  background: plan.featured ? plan.color : "transparent",
-                  border: `1px solid ${plan.color}`,
-                  color: plan.featured ? "var(--cs-black)" : plan.color,
-                  cursor: "pointer",
-                  width: "100%",
-                }}>
-                Get started
-              </button>
-            </div>
+            <PlanCard key={plan.tier} plan={plan} onGetStarted={handleGetStarted} />
           ))}
+        </div>
+
+        <div className="tp-mobile-carousel">
+          <div ref={trackRef} className="tp-track">
+            {plans.map((plan) => (
+              <PlanCard key={plan.tier} plan={plan} onGetStarted={handleGetStarted} mobile />
+            ))}
+          </div>
+          {/* Arrows */}
+          <div style={{ display: "flex", justifyContent: "center", gap: "12px", marginTop: "1.25rem" }}>
+            <button onClick={() => scroll("prev")} aria-label="Previous"
+              style={{ width: "38px", height: "38px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.05)", color: "#fff", cursor: "pointer", fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              ←
+            </button>
+            <button onClick={() => scroll("next")} aria-label="Next"
+              style={{ width: "38px", height: "38px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.05)", color: "#fff", cursor: "pointer", fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              →
+            </button>
+          </div>
         </div>
       </div>
     </section>
+  );
+}
+
+function PlanCard({ plan, onGetStarted, mobile }: { plan: typeof plans[0]; onGetStarted: () => void; mobile?: boolean }) {
+  return (
+    <div className="relative flex flex-col"
+      style={{
+        background: "var(--cs-charcoal)",
+        border: plan.featured ? `1px solid ${plan.color}` : "1px solid rgba(255,255,255,0.06)",
+        borderRadius: "4px",
+        padding: "2rem",
+        transition: "transform 0.2s",
+        ...(mobile ? { minWidth: "78vw", maxWidth: "78vw", scrollSnapAlign: "start", flexShrink: 0 } : {}),
+      }}
+      onMouseEnter={(e) => { if (!mobile) (e.currentTarget as HTMLDivElement).style.transform = "translateY(-6px)"; }}
+      onMouseLeave={(e) => { if (!mobile) (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)"; }}>
+      {plan.featured && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 text-xs font-medium tracking-widest uppercase rounded-sm"
+          style={{ background: plan.color, color: "var(--cs-black)" }}>
+          Most popular
+        </div>
+      )}
+      <div className="mb-6">
+        <div className="text-xs tracking-widest uppercase mb-2" style={{ color: plan.color }}>{plan.tier}</div>
+        <div className="font-display mb-1" style={{ fontSize: "clamp(2rem, 3vw, 2.8rem)", fontWeight: 300, color: "var(--cs-white)", lineHeight: 1.1 }}>
+          {plan.title}
+        </div>
+        <div className="text-xs tracking-wide uppercase" style={{ color: "var(--cs-muted)" }}>{plan.duration} programme</div>
+      </div>
+      <p className="text-sm leading-relaxed mb-6" style={{ color: "var(--cs-muted)" }}>{plan.desc}</p>
+      <ul className="flex flex-col gap-3 mb-8 flex-1">
+        {plan.features.map((f) => (
+          <li key={f} className="flex items-center gap-3 text-sm" style={{ color: "var(--cs-white)" }}>
+            <span className="w-4 h-4 flex-shrink-0 rounded-full flex items-center justify-center"
+              style={{ background: `${plan.color}22`, border: `1px solid ${plan.color}` }}>
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                <path d="M1.5 4L3.5 6L6.5 2" stroke={plan.color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </span>
+            {f}
+          </li>
+        ))}
+      </ul>
+      <button onClick={onGetStarted} className="btn-primary text-center justify-center"
+        style={{
+          background: plan.featured ? plan.color : "transparent",
+          border: `1px solid ${plan.color}`,
+          color: plan.featured ? "var(--cs-black)" : plan.color,
+          cursor: "pointer",
+          width: "100%",
+        }}>
+        Get started
+      </button>
+    </div>
   );
 }
