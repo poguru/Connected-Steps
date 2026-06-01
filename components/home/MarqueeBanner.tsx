@@ -29,7 +29,7 @@ export default function MarqueeBanner() {
     `${stats ? `${stats.sessionsAttended}+` : "—"} Total Participations`,
     "Community First",
     "Real-time Coaching",
-    ...(stats?.avgRating ? [`${stats.avgRating}★ Coach Rating`] : []),
+    ...(stats?.avgRating ? [`${stats.avgRating}★ Average Coach Rating`] : []),
   ];
 
   const doubled = [...items, ...items];
