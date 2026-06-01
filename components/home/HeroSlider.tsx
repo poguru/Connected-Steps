@@ -33,7 +33,8 @@ export default function HeroSlider() {
   const [sessions,  setSessions]  = useState<RecentSession[]>([]);
   const [current,   setCurrent]   = useState(0);
   const [paused,    setPaused]    = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const touchX    = useRef<number | null>(null);
 
   const total = 1 + sessions.length; // slide 0 = Hero, rest = sessions
 
@@ -58,12 +59,26 @@ export default function HeroSlider() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [paused, total, next]);
 
+  const onTouchStart = (e: React.TouchEvent) => {
+    touchX.current = e.touches[0].clientX;
+    setPaused(true);
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (touchX.current === null) return;
+    const delta = e.changedTouches[0].clientX - touchX.current;
+    if (Math.abs(delta) > 50) delta < 0 ? next() : prev();
+    touchX.current = null;
+    setPaused(false);
+  };
+
   return (
     <section
       className="relative noise"
       style={{ minHeight: "100vh", overflow: "hidden", background: "var(--cs-black)" }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
     >
       {/* ── Sliding track ── */}
       <div style={{
@@ -187,10 +202,10 @@ export default function HeroSlider() {
         })}
       </div>
 
-      {/* ── Prev / Next arrows ── */}
+      {/* ── Prev / Next arrows (hidden on mobile — swipe instead) ── */}
       {total > 1 && (
         <>
-          <button onClick={prev} aria-label="Previous"
+          <button onClick={prev} aria-label="Previous" className="hero-slider-arrow"
             style={{ position: "absolute", left: "1.5rem", top: "50%", transform: "translateY(-50%)", zIndex: 20,
               width: "44px", height: "44px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.2)",
               background: "rgba(8,28,45,0.7)", color: "#fff", cursor: "pointer", fontSize: "1.1rem",
@@ -200,7 +215,7 @@ export default function HeroSlider() {
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; e.currentTarget.style.background = "rgba(8,28,45,0.7)"; }}>
             ←
           </button>
-          <button onClick={next} aria-label="Next"
+          <button onClick={next} aria-label="Next" className="hero-slider-arrow"
             style={{ position: "absolute", right: "1.5rem", top: "50%", transform: "translateY(-50%)", zIndex: 20,
               width: "44px", height: "44px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.2)",
               background: "rgba(8,28,45,0.7)", color: "#fff", cursor: "pointer", fontSize: "1.1rem",

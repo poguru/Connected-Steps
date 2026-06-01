@@ -450,6 +450,9 @@ select.auth-input option {
 }
 
 @media (max-width: 768px) {
+  /* HeroSlider: hide arrows on mobile, use swipe instead */
+  .hero-slider-arrow { display: none !important; }
+
   /* Admin sessions 2-panel → stacked */
   .admin-sessions-wrap  { flex-direction: column; overflow: visible; height: auto; }
   .admin-sessions-left  { width: 100%; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.07); overflow-y: visible; }
