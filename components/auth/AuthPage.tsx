@@ -72,12 +72,12 @@ export default function AuthPage() {
       {/* ── Right form panel ── */}
       <div className="auth-right">
         {/* Mobile logo */}
-        <div className="auth-mobile-logo">
+        <Link href="/" className="auth-mobile-logo" style={{ textDecoration: "none" }}>
           <Image src="/logo.png" alt="Connected Steps" width={40} height={40} className="rounded-full" />
           <div className="font-display" style={{ fontSize: "1rem", fontWeight: 600, color: "var(--cs-white)" }}>
             Connected Steps
           </div>
-        </div>
+        </Link>
 
         <div style={{ width: "100%", maxWidth: "360px", margin: "0 auto" }}>
           {/* Heading */}
