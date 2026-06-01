@@ -265,6 +265,29 @@ select.auth-input option {
   .hero-cta > * { width: 100%; justify-content: center; }
 }
 
+/* ─── Upcoming Sessions carousel ────────────────────── */
+.us-desktop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 1rem;
+}
+.us-mobile-carousel { display: none; }
+
+@media (max-width: 900px) {
+  .us-desktop-grid   { display: none; }
+  .us-mobile-carousel { display: block; }
+  .us-track {
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.5rem;
+    scrollbar-width: none;
+  }
+  .us-track::-webkit-scrollbar { display: none; }
+}
+
 /* ─── Training Plans carousel ───────────────────────── */
 .tp-desktop-grid {
   display: grid;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 interface Session {
@@ -25,9 +25,17 @@ function daysUntil(dateStr: string) {
 }
 
 export default function UpcomingSessions() {
-  const router = useRouter();
+  const router   = useRouter();
+  const trackRef = useRef<HTMLDivElement>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading,  setLoading]  = useState(true);
+
+  const scroll = (dir: "prev" | "next") => {
+    const el = trackRef.current;
+    if (!el) return;
+    const cardW = el.firstElementChild ? (el.firstElementChild as HTMLElement).offsetWidth + 16 : 300;
+    el.scrollBy({ left: dir === "next" ? cardW : -cardW, behavior: "smooth" });
+  };
 
   useEffect(() => {
     fetch("/api/sessions")
@@ -57,11 +65,11 @@ export default function UpcomingSessions() {
           </h2>
         </div>
 
-        {/* Cards */}
+        {/* Empty / loading states */}
         {loading ? (
-          <div className="upcoming-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 280px), 1fr))", gap: "1rem" }}>
+          <div style={{ display: "flex", gap: "1rem", overflow: "hidden" }}>
             {[1, 2, 3].map((i) => (
-              <div key={i} style={{ background: "var(--cs-charcoal)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "10px", padding: "1.5rem", opacity: 0.4, height: "140px", animation: "pulse 1.5s ease-in-out infinite" }} />
+              <div key={i} style={{ background: "var(--cs-charcoal)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "10px", padding: "1.5rem", opacity: 0.4, height: "180px", minWidth: "260px", flex: "1" }} />
             ))}
           </div>
         ) : sessions.length === 0 ? (
@@ -71,80 +79,72 @@ export default function UpcomingSessions() {
             <div style={{ fontSize: "0.82rem" }}>Check back soon — new training sessions will be announced here.</div>
           </div>
         ) : (
-          <div className="upcoming-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 280px), 1fr))", gap: "1rem" }}>
-            {sessions.map((s, i) => {
-              const countdown = daysUntil(s.date);
-              const isToday   = countdown === "Today";
-              const isTomorrow = countdown === "Tomorrow";
-              const isUrgent  = isToday || isTomorrow;
-              return (
-                <div key={s.id}
-                  onClick={() => handleJoin(s.id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => e.key === "Enter" && handleJoin(s.id)}
-                  style={{
-                    background: "var(--cs-charcoal)",
-                    border: `1px solid ${isUrgent ? "rgba(232,98,10,0.35)" : "rgba(255,255,255,0.06)"}`,
-                    borderRadius: "10px",
-                    padding: "1.5rem",
-                    position: "relative",
-                    overflow: "hidden",
-                    transition: "border-color 0.2s, transform 0.2s",
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(232,98,10,0.45)"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(-3px)"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = isUrgent ? "rgba(232,98,10,0.35)" : "rgba(255,255,255,0.06)"; (e.currentTarget as HTMLDivElement).style.transform = "none"; }}
-                >
-                  {/* Countdown badge */}
-                  <div style={{ position: "absolute", top: "1rem", right: "1rem" }}>
-                    <span style={{
-                      fontSize: "10px", fontWeight: 700, letterSpacing: "0.06em",
-                      padding: "3px 10px", borderRadius: "20px",
-                      background: isUrgent ? "var(--cs-orange)" : "rgba(255,255,255,0.07)",
-                      color: isUrgent ? "#fff" : "var(--cs-muted)",
-                    }}>
-                      {countdown}
-                    </span>
-                  </div>
+          <>
+            {/* Desktop grid */}
+            <div className="us-desktop-grid">
+              {sessions.map((s, i) => <SessionCard key={s.id} s={s} i={i} onJoin={handleJoin} />)}
+            </div>
 
-                  {/* Number */}
-                  <div style={{ fontSize: "11px", color: "var(--cs-muted)", marginBottom: "0.75rem", fontWeight: 600 }}>
-                    SESSION {String(i + 1).padStart(2, "0")}
-                  </div>
-
-                  {/* Title */}
-                  <div style={{ fontSize: "1.05rem", fontWeight: 600, color: "var(--cs-white)", marginBottom: "0.75rem", lineHeight: 1.3 }}>
-                    {s.title}
-                  </div>
-
-                  {/* Date & location */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "1rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.8rem", color: "var(--cs-muted)" }}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                      </svg>
-                      {formatDate(s.date)}
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.8rem", color: "var(--cs-muted)" }}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
-                      </svg>
-                      {s.location}
-                    </div>
-                  </div>
-
-                  {/* Join CTA */}
-                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--cs-orange)", letterSpacing: "0.04em" }}>
-                    Join session →
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+            {/* Mobile carousel */}
+            <div className="us-mobile-carousel">
+              <div ref={trackRef} className="us-track">
+                {sessions.map((s, i) => <SessionCard key={s.id} s={s} i={i} onJoin={handleJoin} mobile />)}
+              </div>
+              <div style={{ display: "flex", justifyContent: "center", gap: "12px", marginTop: "1.25rem" }}>
+                <button onClick={() => scroll("prev")} aria-label="Previous"
+                  style={{ width: "38px", height: "38px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.05)", color: "#fff", cursor: "pointer", fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center" }}>←</button>
+                <button onClick={() => scroll("next")} aria-label="Next"
+                  style={{ width: "38px", height: "38px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.05)", color: "#fff", cursor: "pointer", fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center" }}>→</button>
+              </div>
+            </div>
+          </>
         )}
 
       </div>
     </section>
+  );
+}
+
+function SessionCard({ s, i, onJoin, mobile }: { s: Session; i: number; onJoin: (id: string) => void; mobile?: boolean }) {
+  const countdown  = daysUntil(s.date);
+  const isUrgent   = countdown === "Today" || countdown === "Tomorrow";
+  return (
+    <div onClick={() => onJoin(s.id)} role="button" tabIndex={0}
+      onKeyDown={(e) => e.key === "Enter" && onJoin(s.id)}
+      style={{
+        background: "var(--cs-charcoal)",
+        border: `1px solid ${isUrgent ? "rgba(232,98,10,0.35)" : "rgba(255,255,255,0.06)"}`,
+        borderRadius: "10px", padding: "1.5rem", position: "relative",
+        overflow: "hidden", cursor: "pointer",
+        transition: "border-color 0.2s, transform 0.2s",
+        ...(mobile ? { minWidth: "78vw", maxWidth: "78vw", scrollSnapAlign: "start", flexShrink: 0 } : {}),
+      }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(232,98,10,0.45)"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(-3px)"; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = isUrgent ? "rgba(232,98,10,0.35)" : "rgba(255,255,255,0.06)"; (e.currentTarget as HTMLDivElement).style.transform = "none"; }}>
+
+      <div style={{ position: "absolute", top: "1rem", right: "1rem" }}>
+        <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.06em", padding: "3px 10px", borderRadius: "20px",
+          background: isUrgent ? "var(--cs-orange)" : "rgba(255,255,255,0.07)", color: isUrgent ? "#fff" : "var(--cs-muted)" }}>
+          {countdown}
+        </span>
+      </div>
+      <div style={{ fontSize: "11px", color: "var(--cs-muted)", marginBottom: "0.75rem", fontWeight: 600 }}>SESSION {String(i + 1).padStart(2, "0")}</div>
+      <div style={{ fontSize: "1.05rem", fontWeight: 600, color: "var(--cs-white)", marginBottom: "0.75rem", lineHeight: 1.3 }}>{s.title}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "1rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.8rem", color: "var(--cs-muted)" }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          {formatDate(s.date)}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.8rem", color: "var(--cs-muted)" }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
+          </svg>
+          {s.location}
+        </div>
+      </div>
+      <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--cs-orange)", letterSpacing: "0.04em" }}>Join session →</div>
+    </div>
   );
 }
