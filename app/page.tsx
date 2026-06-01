@@ -19,8 +19,8 @@ export default function HomePage() {
     <>
       <Navbar />
       <Hero />
-      <MarqueeBanner />
       <RecentSessions />
+      <MarqueeBanner />
       <TrainingPlans />
       <UpcomingSessions />
       <Coaches />
