@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const { answer } = await req.json();
     if (!answer?.trim()) {
       return NextResponse.json({ error: "Answer cannot be empty." }, { status: 400 });
@@ -12,7 +13,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const { data, error } = await db
       .from("coach_questions")
       .update({ answer: answer.trim(), answered_at: new Date().toISOString(), status: "answered" })
-      .eq("id", params.id)
+      .eq("id", id)
       .select()
       .single();
 
