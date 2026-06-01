@@ -1,16 +1,6 @@
-"use client";
-
-import { useState, useEffect } from "react";
-import Link from "next/link";
 import Image from "next/image";
 
 export default function Hero() {
-  const [loggedIn, setLoggedIn] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && localStorage.getItem("cs_user")) setLoggedIn(true);
-  }, []);
-
   return (
     <section className="relative min-h-screen flex items-center noise" style={{ background: "var(--cs-black)" }}>
       <div className="absolute inset-0 pointer-events-none"
@@ -31,20 +21,17 @@ export default function Hero() {
               <em className="not-italic" style={{ color: "var(--cs-orange)" }}>a plan</em>
               <br />behind it.
             </h1>
-            <p className="text-base leading-relaxed mb-10 max-w-md animate-fade-up-2"
+            <p className="text-base leading-relaxed mb-6 max-w-md animate-fade-up-2"
               style={{ color: "var(--cs-muted)", fontSize: "1.05rem" }}>
               Connected Steps pairs you with elite coaches and a training community that keeps you
               accountable — from your first kilometre to your finish-line moment.
             </p>
-            <div className="animate-fade-up-3 hero-cta">
-              <Link href={loggedIn ? "/dashboard" : "/auth"} className="btn-primary">
-                {loggedIn ? "Go to Dashboard" : "Start training free"}
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </Link>
-              <Link href="#training" className="btn-outline">See training plans</Link>
-            </div>
+            <p className="text-base leading-relaxed max-w-md animate-fade-up-2"
+              style={{ color: "var(--cs-muted)", fontSize: "0.95rem", borderLeft: "3px solid var(--cs-orange)", paddingLeft: "1rem" }}>
+              We are a Hyderabad-based running club founded on one belief: every runner deserves a
+              real coach, a real plan, and a community that shows up. Whether you&rsquo;re lacing up
+              for the first time or chasing a marathon PB — Connected Steps is built for you.
+            </p>
           </div>
 
           <div className="hidden lg:flex items-center justify-center">
@@ -61,7 +48,6 @@ export default function Hero() {
           </div>
         </div>
       </div>
-
     </section>
   );
 }
