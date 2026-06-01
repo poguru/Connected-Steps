@@ -238,9 +238,13 @@ function AskModal({ onClose, onPosted }: { onClose: () => void; onPosted: () => 
   const [form,   setForm]   = useState({ category: "General", title: "", body: "" });
   const [saving, setSaving] = useState(false);
   const [msg,    setMsg]    = useState("");
+  const [errors, setErrors] = useState({ title: false, body: false });
 
   async function submit() {
-    if (!form.title.trim() || !form.body.trim()) { setMsg("Please fill in both the title and description."); return; }
+    const titleErr = !form.title.trim();
+    const bodyErr  = !form.body.trim();
+    if (titleErr || bodyErr) { setErrors({ title: titleErr, body: bodyErr }); setMsg("Please fill in all required fields."); return; }
+    setErrors({ title: false, body: false });
     setSaving(true); setMsg("");
     try {
       const raw  = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
@@ -286,11 +290,10 @@ function AskModal({ onClose, onPosted }: { onClose: () => void; onPosted: () => 
           <div style={{ fontSize: "11px", color: "#888", marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.07em" }}>Category</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
             {POST_CATS.map((cat) => {
-              const c = CATEGORY_COLORS[cat];
               const active = form.category === cat;
               return (
                 <button key={cat} onClick={() => setForm((f) => ({ ...f, category: cat }))}
-                  style={{ padding: "5px 14px", borderRadius: "20px", fontSize: "0.78rem", fontWeight: 500, cursor: "pointer", fontFamily: "inherit", border: "none", background: active ? c.bg : "rgba(255,255,255,0.05)", color: active ? c.color : "#888", outline: active ? `1px solid ${c.color}40` : "none", transition: "all 0.15s" }}>
+                  style={{ padding: "5px 14px", borderRadius: "20px", fontSize: "0.78rem", fontWeight: 500, cursor: "pointer", fontFamily: "inherit", border: "none", background: active ? "rgba(232,98,10,0.15)" : "rgba(255,255,255,0.05)", color: active ? "var(--cs-orange)" : "#888", outline: active ? "1px solid rgba(232,98,10,0.4)" : "none", transition: "all 0.15s" }}>
                   {cat}
                 </button>
               );
@@ -300,17 +303,17 @@ function AskModal({ onClose, onPosted }: { onClose: () => void; onPosted: () => 
 
         <div>
           <div style={{ fontSize: "11px", color: "#888", marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.07em" }}>Title / Question</div>
-          <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value.slice(0, 120) }))}
+          <input value={form.title} onChange={(e) => { setForm((f) => ({ ...f, title: e.target.value.slice(0, 120) })); setErrors((er) => ({ ...er, title: false })); }}
             placeholder="e.g. Best recovery drink after a long run?" maxLength={120}
-            style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#fff", fontSize: "0.875rem", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
+            style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: `1px solid ${errors.title ? "#f09595" : "rgba(255,255,255,0.1)"}`, borderRadius: "8px", color: "#fff", fontSize: "0.875rem", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
           <div style={{ fontSize: "10px", color: "#555", textAlign: "right", marginTop: "3px" }}>{form.title.length}/120</div>
         </div>
 
         <div>
           <div style={{ fontSize: "11px", color: "#888", marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.07em" }}>Details</div>
-          <textarea value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value.slice(0, 600) }))}
+          <textarea value={form.body} onChange={(e) => { setForm((f) => ({ ...f, body: e.target.value.slice(0, 600) })); setErrors((er) => ({ ...er, body: false })); }}
             placeholder="Share your question, tip, or experience in detail…" maxLength={600} rows={5}
-            style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#fff", fontSize: "0.875rem", outline: "none", resize: "vertical", boxSizing: "border-box", fontFamily: "inherit", lineHeight: 1.6 }} />
+            style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: `1px solid ${errors.body ? "#f09595" : "rgba(255,255,255,0.1)"}`, borderRadius: "8px", color: "#fff", fontSize: "0.875rem", outline: "none", resize: "vertical", boxSizing: "border-box", fontFamily: "inherit", lineHeight: 1.6 }} />
           <div style={{ fontSize: "10px", color: "#555", textAlign: "right", marginTop: "3px" }}>{form.body.length}/600</div>
         </div>
 
