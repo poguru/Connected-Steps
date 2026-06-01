@@ -2,6 +2,7 @@
 
 import Navbar               from "@/components/layout/Navbar";
 import Footer               from "@/components/layout/Footer";
+import FloatingContact      from "@/components/layout/FloatingContact";
 import Hero                 from "@/components/home/Hero";
 import RecentSessions       from "@/components/home/RecentSessions";
 import MarqueeBanner        from "@/components/home/MarqueeBanner";
@@ -28,6 +29,7 @@ export default function HomePage() {
       <CommunityQA />
       <CallToAction />
       <Footer />
+      <FloatingContact />
     </>
   );
 }

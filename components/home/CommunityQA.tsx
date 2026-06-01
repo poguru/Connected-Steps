@@ -340,6 +340,13 @@ export default function CommunityQA() {
     const raw = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
     setIsLoggedIn(!!raw);
     if (raw && typeof window !== "undefined") {
+      // Floating button sets sessionStorage signal
+      if (sessionStorage.getItem("cs_open_ask") === "1") {
+        sessionStorage.removeItem("cs_open_ask");
+        setModalOpen(true);
+        return;
+      }
+      // Auth redirect back with ?ask=1
       const params = new URLSearchParams(window.location.search);
       if (params.get("ask") === "1") {
         setModalOpen(true);
