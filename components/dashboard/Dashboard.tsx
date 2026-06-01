@@ -678,6 +678,8 @@ export default function Dashboard() {
 
         {/* ── Right sidebar ── */}
         <aside className="cs-db-right">
+          <TrainingPlan goal={user.goal} />
+
           {/* Upcoming Sessions */}
           {upcomingSessions.length > 0 && (
             <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem", marginBottom: "1rem" }}>
@@ -751,8 +753,6 @@ export default function Dashboard() {
             userEmail={user.email}
             hasAttended={sessionsLoading ? null : sessions.some((r) => r.attended)}
           />
-
-          <TrainingPlan goal={user.goal} />
 
           {/* Push notifications */}
           {pushSupported && (
