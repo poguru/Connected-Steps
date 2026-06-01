@@ -80,10 +80,15 @@ export default function Leaderboard() {
       {/* Navbar */}
       <header className="cs-app-nav">
         <div className="cs-app-nav-inner">
-          <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none" }}>
-            <Image src="/logo.png" alt="Connected Steps" width={36} height={36} className="rounded-full" />
-            <span className="font-display" style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--cs-white)", whiteSpace: "nowrap" }}>Connected Steps</span>
-          </Link>
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none" }}>
+              <Image src="/logo.png" alt="Connected Steps" width={36} height={36} className="rounded-full" />
+              <span className="font-display" style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--cs-white)", whiteSpace: "nowrap" }}>Connected Steps</span>
+            </Link>
+            <button onClick={() => router.push("/dashboard")} style={{ background: "none", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "6px", cursor: "pointer", color: "var(--cs-muted)", fontSize: "0.78rem", padding: "4px 12px", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+              ← Dashboard
+            </button>
+          </div>
 
           <nav className="cs-app-nav-links">
             {[

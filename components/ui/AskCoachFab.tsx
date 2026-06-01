@@ -75,7 +75,7 @@ export default function AskCoachFab() {
       <button
         onClick={() => setOpen(true)}
         style={{
-          position: "fixed", bottom: "28px", left: "20px", zIndex: 50,
+          position: "fixed", bottom: "28px", right: "20px", zIndex: 50,
           display: "flex", alignItems: "center", gap: "8px",
           padding: "12px 20px", background: "var(--cs-dark)",
           border: "1px solid rgba(232,98,10,0.4)",

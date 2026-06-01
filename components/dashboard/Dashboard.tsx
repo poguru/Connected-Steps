@@ -601,25 +601,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Points */}
-          <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(232,98,10,0.2)", borderRadius: "8px", padding: "1.25rem" }}>
-            <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1rem" }}>Your Points</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-              {[
-                { label: "This month", value: points?.month_points ?? "—" },
-                { label: "All time",   value: points?.total_points ?? "—" },
-              ].map((s) => (
-                <div key={s.label} style={{ background: "rgba(232,98,10,0.07)", borderRadius: "6px", padding: "0.75rem", textAlign: "center" }}>
-                  <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--cs-orange)" }}>{s.value}</div>
-                  <div style={{ fontSize: "10px", color: "var(--cs-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginTop: "2px" }}>{s.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Membership */}
-          <MembershipCard email={user.email} name={`${user.firstName} ${user.lastName}`.trim()} />
-
         </aside>
 
         {/* ── Main feed ── */}
@@ -658,96 +639,15 @@ export default function Dashboard() {
             <TrainingPlan goal={user.goal} email={user.email} />
           </div>
 
-          {/* Upcoming Sessions */}
-          {upcomingSessions.length > 0 && (
-            <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem", marginBottom: "1rem" }}>
-              <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Upcoming Sessions</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-                {upcomingSessions.map((s) => {
-                  const today = new Date(); today.setHours(0,0,0,0);
-                  const sessionDate = new Date(s.date + "T00:00:00");
-                  const diff = Math.round((sessionDate.getTime() - today.getTime()) / 86400000);
-                  const badge = diff === 0 ? "Today" : diff === 1 ? "Tomorrow" : `In ${diff}d`;
-                  const isUrgent = diff <= 1;
-                  const dateStr = sessionDate.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
-                  const joined = joinedSessionIds.has(s.id);
-                  const confirmingLeave = leaveConfirmId === s.id;
-                  const isLeaving = leavingId === s.id;
-                  return (
-                    <div key={s.id}
-                      style={{ borderRadius: "6px", background: "rgba(255,255,255,0.03)", border: `1px solid ${joined ? "rgba(74,222,128,0.2)" : "rgba(255,255,255,0.06)"}`, overflow: "hidden" }}>
-                      <div
-                        onClick={() => !joined && router.push(`/join/${s.id}`)}
-                        style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.6rem 0.75rem", cursor: joined ? "default" : "pointer", transition: "border-color 0.15s" }}
-                        onMouseEnter={(e) => { if (!joined) e.currentTarget.style.opacity = "0.85"; }}
-                        onMouseLeave={(e) => { if (!joined) e.currentTarget.style.opacity = "1"; }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--cs-white)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
-                          <div style={{ fontSize: "0.72rem", color: "var(--cs-muted)", marginTop: "1px" }}>{dateStr}{s.time ? ` · ${s.time}` : ""}</div>
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px", flexShrink: 0 }}>
-                          <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "20px", background: isUrgent ? "var(--cs-orange)" : "rgba(255,255,255,0.07)", color: isUrgent ? "#fff" : "var(--cs-muted)" }}>{badge}</span>
-                          {joined
-                            ? <span style={{ fontSize: "0.7rem", color: "#4ade80", fontWeight: 600 }}>✓ Joined</span>
-                            : <span style={{ fontSize: "0.7rem", color: "var(--cs-orange)", fontWeight: 600 }}>Join →</span>}
-                        </div>
-                      </div>
-
-                      {/* Leave row — only for joined sessions */}
-                      {joined && (
-                        <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", padding: "0.4rem 0.75rem", display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-                          {!confirmingLeave ? (
-                            <button onClick={() => { setLeaveConfirmId(s.id); setLeaveError(""); }}
-                              style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.7rem", color: "var(--cs-muted)", fontFamily: "inherit", padding: 0 }}>
-                              Can't attend? Leave
-                            </button>
-                          ) : (
-                            <>
-                              <span style={{ fontSize: "0.7rem", color: "var(--cs-muted)" }}>Sure?</span>
-                              <button onClick={() => handleLeaveSession(s.id, user!.email)} disabled={isLeaving}
-                                style={{ background: "rgba(226,75,74,0.15)", border: "1px solid rgba(226,75,74,0.3)", borderRadius: "4px", cursor: isLeaving ? "not-allowed" : "pointer", fontSize: "0.7rem", color: "#f09595", fontWeight: 600, fontFamily: "inherit", padding: "2px 10px", opacity: isLeaving ? 0.6 : 1 }}>
-                                {isLeaving ? "Leaving…" : "Yes, leave"}
-                              </button>
-                              <button onClick={() => { setLeaveConfirmId(null); setLeaveError(""); }}
-                                style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.7rem", color: "var(--cs-muted)", fontFamily: "inherit", padding: 0 }}>
-                                Cancel
-                              </button>
-                            </>
-                          )}
-                          {leaveError && leaveConfirmId === s.id && (
-                            <span style={{ fontSize: "0.7rem", color: "#f09595" }}>{leaveError}</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+          {/* Leaderboard link */}
+          <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1rem 1.25rem", marginBottom: "1rem", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}
+            onClick={() => router.push("/leaderboard")}>
+            <div>
+              <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "2px" }}>Leaderboard</div>
+              <div style={{ fontSize: "0.85rem", color: "var(--cs-white)", fontWeight: 500 }}>View community rankings</div>
             </div>
-          )}
-
-          {/* Rate Your Coach */}
-          <RateCoachWidget
-            userEmail={user.email}
-            hasAttended={sessionsLoading ? null : sessions.some((r) => r.attended)}
-          />
-
-          {/* Push notifications */}
-          {pushSupported && (
-            <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem", marginBottom: "1rem" }}>
-              <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Session Alerts</div>
-              <p style={{ fontSize: "0.78rem", color: "var(--cs-muted)", lineHeight: 1.6, marginBottom: "0.75rem" }}>
-                Get a browser notification whenever a new training session is posted.
-              </p>
-              <button
-                onClick={handlePushToggle}
-                style={{ width: "100%", padding: "9px", background: pushEnabled ? "rgba(255,255,255,0.06)" : "var(--cs-orange)", color: pushEnabled ? "var(--cs-muted)" : "#fff", border: pushEnabled ? "1px solid rgba(255,255,255,0.1)" : "none", borderRadius: "4px", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)" }}
-              >
-                {pushEnabled ? "Disable Notifications" : "Enable Notifications"}
-              </button>
-            </div>
-          )}
-
+            <span style={{ fontSize: "1.2rem" }}>🏆</span>
+          </div>
 
           {/* Share Your Story */}
           <div id="share-story" style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem" }}>
@@ -842,7 +742,7 @@ export default function Dashboard() {
           </div>
 
           {/* Ask the Community */}
-          <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem" }}>
+          <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem", marginBottom: "1rem" }}>
             <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Ask the Community</div>
             {qaMsg ? (
               <div style={{ fontSize: "0.82rem", color: "#4ade80", lineHeight: 1.5 }}>{qaMsg}</div>
@@ -922,6 +822,15 @@ export default function Dashboard() {
               </div>
             )}
           </div>
+
+          {/* Rate Your Coach */}
+          <RateCoachWidget
+            userEmail={user.email}
+            hasAttended={sessionsLoading ? null : sessions.some((r) => r.attended)}
+          />
+
+          {/* Membership */}
+          <MembershipCard email={user.email} name={`${user.firstName} ${user.lastName}`.trim()} />
 
         </aside>
       </div>

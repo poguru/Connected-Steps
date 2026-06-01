@@ -481,10 +481,10 @@ select.auth-input option {
 
   .cs-app-nav-inner { padding: 0 1rem; }
 
-  /* Reorder dashboard columns: upcoming → feed → profile */
-  .cs-db-right { order: 1; }
-  .cs-db-main  { order: 2; }
-  .cs-db-left  { order: 3; }
+  /* Reorder dashboard columns: sessions → rest (profile hidden on mobile) */
+  .cs-db-left  { display: none; }
+  .cs-db-main  { order: 1; }
+  .cs-db-right { order: 2; }
 }
 
 @media (max-width: 768px) {
