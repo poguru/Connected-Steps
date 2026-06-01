@@ -22,6 +22,22 @@ const TYPE_PRESETS: Record<string, string> = {
   "Custom":         "📝",
 };
 
+const TYPE_PLACEHOLDERS: Record<string, string> = {
+  "Rest":           "Recovery day",
+  "Easy Run":       "e.g. 5 km at easy conversational pace",
+  "Long Run":       "e.g. 14 km at steady comfortable pace",
+  "Tempo Run":      "e.g. 6 km at threshold pace (comfortably hard)",
+  "Intervals":      "e.g. 6 × 400m with 90s rest between",
+  "Cross Train":    "e.g. 30 min cycling or yoga",
+  "Strength":       "e.g. Core + leg strength, 45 min",
+  "Medium Run":     "e.g. 8 km at comfortable effort",
+  "Hill Run":       "e.g. 6 × 200m hill repeats",
+  "Speed Work":     "e.g. 8 × 200m at 5K race pace",
+  "Recovery Run":   "e.g. 3 km very easy, heart rate low",
+  "Race / Event":   "e.g. 5K race — full effort",
+  "Custom":         "Describe the session in detail",
+};
+
 interface DayEntry { type: string; detail: string; emoji: string; }
 interface User { email: string; first_name: string; last_name: string; goal: string; location: string; }
 interface Plan { id: string; user_email: string; title: string; coach_name: string; active: boolean; created_at: string; }
@@ -67,6 +83,7 @@ export default function TrainingPlansAdmin() {
   const [days,          setDays]         = useState<DayEntry[]>(emptyPlan());
   const [saving,        setSaving]       = useState(false);
   const [saveMsg,       setSaveMsg]      = useState("");
+  const [errors,        setErrors]       = useState<boolean[]>(Array(7).fill(false));
 
   const headers = { "x-admin-password": password, "Content-Type": "application/json" };
 
@@ -95,6 +112,7 @@ export default function TrainingPlansAdmin() {
   const selectUser = (u: User) => {
     setSelectedUser(u);
     setSaveMsg("");
+    setErrors(Array(7).fill(false));
     fetch(`/api/user/training-plan?email=${encodeURIComponent(u.email)}`)
       .then((r) => r.json())
       .then((d) => {
@@ -113,13 +131,30 @@ export default function TrainingPlansAdmin() {
     setDays((prev) => {
       const next = [...prev];
       next[i] = { ...next[i], [field]: value };
-      if (field === "type") next[i].emoji = TYPE_PRESETS[value] ?? "📝";
+      if (field === "type") {
+        next[i].emoji  = TYPE_PRESETS[value] ?? "📝";
+        // Auto-fill Rest detail; clear detail for all other types so admin must write specifics
+        next[i].detail = value === "Rest" ? "Recovery day" : "";
+      }
       return next;
     });
+    // Clear error for this row when admin edits it
+    if (field === "detail" || field === "type") {
+      setErrors((prev) => { const e = [...prev]; e[i] = false; return e; });
+    }
   };
 
   const savePlan = async () => {
     if (!selectedUser) return;
+
+    // Validate: all non-Rest days must have a detail description
+    const newErrors = days.map((d) => d.type !== "Rest" && !d.detail.trim());
+    if (newErrors.some(Boolean)) {
+      setErrors(newErrors);
+      setSaveMsg("Fill in the session details for all highlighted days before saving.");
+      return;
+    }
+    setErrors(Array(7).fill(false));
     setSaving(true); setSaveMsg("");
     const title = weekTitle(monday);
     try {
@@ -246,21 +281,35 @@ export default function TrainingPlansAdmin() {
               <div style={{ marginBottom: "1.5rem" }}>
                 <div style={{ fontSize: "10px", color: "#888", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Daily schedule (Mon → Sun)</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-                  {DAYS.map((day, i) => (
-                    <div key={day} style={{ display: "grid", gridTemplateColumns: "40px 160px 60px 1fr", gap: "0.5rem", alignItems: "center" }}>
-                      <div style={{ fontSize: "11px", color: "#e8620a", fontWeight: 700, letterSpacing: "0.06em" }}>{day}</div>
+                  {DAYS.map((day, i) => {
+                    const hasError = errors[i];
+                    return (
+                      <div key={day} style={{ display: "grid", gridTemplateColumns: "40px 160px 60px 1fr", gap: "0.5rem", alignItems: "center" }}>
+                        <div style={{ fontSize: "11px", color: hasError ? "#f09595" : "#e8620a", fontWeight: 700, letterSpacing: "0.06em" }}>{day}</div>
 
-                      <select value={days[i].type} onChange={(e) => updateDay(i, "type", e.target.value)} style={sel}>
-                        {Object.keys(TYPE_PRESETS).map((t) => <option key={t} value={t}>{t}</option>)}
-                      </select>
+                        <select value={days[i].type} onChange={(e) => updateDay(i, "type", e.target.value)} style={sel}>
+                          {Object.keys(TYPE_PRESETS).map((t) => <option key={t} value={t}>{t}</option>)}
+                        </select>
 
-                      <input value={days[i].emoji} onChange={(e) => updateDay(i, "emoji", e.target.value)}
-                        style={{ ...inp, textAlign: "center", fontSize: "1.1rem" }} maxLength={4} />
+                        <input value={days[i].emoji} onChange={(e) => updateDay(i, "emoji", e.target.value)}
+                          style={{ ...inp, textAlign: "center", fontSize: "1.1rem" }} maxLength={4} />
 
-                      <input value={days[i].detail} onChange={(e) => updateDay(i, "detail", e.target.value)}
-                        placeholder="e.g. 5 km easy pace" style={inp} />
-                    </div>
-                  ))}
+                        <input
+                          value={days[i].detail}
+                          onChange={(e) => updateDay(i, "detail", e.target.value)}
+                          placeholder={TYPE_PLACEHOLDERS[days[i].type] ?? "Describe the session"}
+                          disabled={days[i].type === "Rest"}
+                          style={{
+                            ...inp,
+                            borderColor: hasError ? "rgba(240,149,149,0.6)" : "rgba(255,255,255,0.1)",
+                            background:  days[i].type === "Rest" ? "rgba(255,255,255,0.03)" : "#1a1a1a",
+                            color:       days[i].type === "Rest" ? "#555" : "#fff",
+                            cursor:      days[i].type === "Rest" ? "not-allowed" : "text",
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
                 <div style={{ fontSize: "10px", color: "#444", marginTop: "0.5rem" }}>Columns: Day · Type · Emoji · Detail</div>
               </div>
