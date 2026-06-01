@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -21,17 +21,11 @@ const afterSessionLinks = [
   { label: "Upcoming Events", href: "/weekend-run", highlight: true },
 ];
 
-const sessionDropdown = [
-  { label: "Recent Sessions",   href: "/#recent-sessions",   icon: "📸" },
-  { label: "Upcoming Sessions", href: "/#upcoming-sessions", icon: "📅" },
-];
 
 export default function Navbar() {
   const [scrolled,     setScrolled]     = useState(false);
   const [menuOpen,     setMenuOpen]     = useState(false);
-  const [sessionsOpen, setSessionsOpen] = useState(false);
   const [loggedInUser, setLoggedInUser] = useState<StoredUser | null>(null);
-  const dropdownRef = useRef<HTMLLIElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -40,16 +34,8 @@ export default function Navbar() {
     const stored = localStorage.getItem("cs_user");
     if (stored) setLoggedInUser(JSON.parse(stored));
 
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setSessionsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-
     return () => {
       window.removeEventListener("scroll", onScroll);
-      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
@@ -89,43 +75,6 @@ export default function Navbar() {
                 </Link>
               </li>
             ))}
-
-            {/* Sessions dropdown */}
-            <li ref={dropdownRef} style={{ position: "relative" }}>
-              <button
-                onClick={() => setSessionsOpen((o) => !o)}
-                style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px", padding: 0, fontFamily: "var(--font-body)", fontSize: "0.925rem", letterSpacing: "0.02em", color: sessionsOpen ? "var(--cs-white)" : "var(--cs-muted)", transition: "color 0.2s" }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = "var(--cs-white)")}
-                onMouseLeave={(e) => { if (!sessionsOpen) e.currentTarget.style.color = "var(--cs-muted)"; }}
-              >
-                Sessions
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ transition: "transform 0.2s", transform: sessionsOpen ? "rotate(180deg)" : "none" }}>
-                  <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </button>
-
-              {sessionsOpen && (
-                <div style={{
-                  position: "absolute", top: "calc(100% + 12px)", left: "50%", transform: "translateX(-50%)",
-                  background: "rgba(8,28,45,0.99)", border: "1px solid rgba(56,189,248,0.12)",
-                  borderRadius: "10px", padding: "6px", minWidth: "200px",
-                  backdropFilter: "blur(16px)", boxShadow: "0 16px 40px rgba(0,0,0,0.5)",
-                  zIndex: 100,
-                }}>
-                  {sessionDropdown.map((item) => (
-                    <Link key={item.label} href={item.href}
-                      onClick={() => setSessionsOpen(false)}
-                      style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 14px", borderRadius: "7px", textDecoration: "none", color: "var(--cs-muted)", fontSize: "0.82rem", transition: "background 0.15s, color 0.15s" }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "rgba(232,98,10,0.1)"; (e.currentTarget as HTMLAnchorElement).style.color = "var(--cs-white)"; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "transparent"; (e.currentTarget as HTMLAnchorElement).style.color = "var(--cs-muted)"; }}
-                    >
-                      <span style={{ fontSize: "14px" }}>{item.icon}</span>
-                      {item.label}
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </li>
 
             {/* After-sessions links */}
             {afterSessionLinks.map((link) => (
@@ -186,15 +135,6 @@ export default function Navbar() {
         {/* Mobile menu */}
         {menuOpen && (
           <div className="cs-home-mobile-menu" style={{ maxHeight: "calc(100vh - 6rem)", overflowY: "auto" }}>
-            {/* Sessions group */}
-            <div style={{ fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)", marginBottom: "4px" }}>Sessions</div>
-            {sessionDropdown.map((item) => (
-              <Link key={item.label} href={item.href} onClick={() => setMenuOpen(false)}
-                style={{ fontSize: "0.95rem", color: "var(--cs-muted)", textDecoration: "none", display: "flex", alignItems: "center", gap: "8px", paddingLeft: "8px" }}>
-                <span>{item.icon}</span>{item.label}
-              </Link>
-            ))}
-            <div style={{ height: "1px", background: "rgba(255,255,255,0.06)", margin: "8px 0" }} />
             {[...beforeSessionLinks, ...afterSessionLinks].map((link) => (
               <Link key={link.label} href={link.href} onClick={() => setMenuOpen(false)}
                 style={{ fontSize: "0.95rem", color: (link as {highlight?: boolean}).highlight ? "var(--cs-orange)" : "var(--cs-muted)", fontWeight: (link as {highlight?: boolean}).highlight ? 600 : undefined, textDecoration: "none", display: "flex", alignItems: "center", gap: "6px" }}>
