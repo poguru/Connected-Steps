@@ -117,7 +117,7 @@ export default function Leaderboard() {
         </div>
 
         {/* Tab switcher + back */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.5rem" }}>
           <div style={{ display: "flex", gap: "4px", padding: "4px", borderRadius: "6px", background: "rgba(255,255,255,0.05)" }}>
             {(["month", "total"] as const).map((t) => (
               <button
