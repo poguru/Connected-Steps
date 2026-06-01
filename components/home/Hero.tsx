@@ -42,7 +42,7 @@ export default function Hero() {
                 style={{ border: "1px solid rgba(232,98,10,0.1)", transform: "scale(1.5)" }} />
               <div className="relative w-72 h-72 rounded-full flex items-center justify-center"
                 style={{ background: "var(--cs-charcoal)", border: "1px solid rgba(232,98,10,0.2)" }}>
-                <Image src="/logo.png" alt="Connected Steps" width={220} height={220} className="rounded-full" priority />
+                <Image src="/logo.png" alt="Connected Steps" width={220} height={220} className="rounded-full" />
               </div>
             </div>
           </div>
