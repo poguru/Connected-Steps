@@ -556,6 +556,11 @@ select.auth-input option {
   .coach-next-btn { right: 4px !important; }
 }
 
+/* ─── Recent sessions carousel — arrows inside on mobile ── */
+@media (max-width: 900px) {
+  #recent-sessions .container { padding-left: 2.5rem; padding-right: 2.5rem; }
+}
+
 /* ─── Upcoming sessions grid — 1 col on phones ────────── */
 @media (max-width: 500px) {
   .upcoming-grid { grid-template-columns: 1fr !important; }

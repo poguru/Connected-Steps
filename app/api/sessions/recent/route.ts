@@ -6,13 +6,13 @@ export const revalidate = 120;
 export async function GET() {
   const db = getSupabaseServer();
 
-  // Last 3 sessions that have a photo
+  // Last 7 sessions that have a photo
   const { data: sessions } = await db
     .from("sessions")
     .select("id, title, date, time, venue, location, photo_url")
     .not("photo_url", "is", null)
     .order("date", { ascending: false })
-    .limit(3);
+    .limit(7);
 
   if (!sessions || sessions.length === 0) return NextResponse.json({ sessions: [] });
 
