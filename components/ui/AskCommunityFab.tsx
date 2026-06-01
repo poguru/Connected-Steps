@@ -101,7 +101,7 @@ export default function AskCommunityFab() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
-  if (pathname !== "/" && pathname !== "/dashboard") return null;
+  if (pathname !== "/dashboard") return null;
 
   function handleClick() {
     const raw = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
