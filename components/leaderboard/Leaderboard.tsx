@@ -48,7 +48,6 @@ export default function Leaderboard() {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab,       setTab]       = useState<"month" | "total">("month");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem("cs_user");
@@ -103,27 +102,8 @@ export default function Leaderboard() {
 
           <div className="cs-app-nav-user">
             <UserMenu user={user as MenuUser} onUserUpdate={(u) => { setUser(u as User); localStorage.setItem("cs_user", JSON.stringify(u)); }} />
-            <button className="cs-mobile-nav-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Toggle menu">
-              <span /><span /><span />
-            </button>
           </div>
         </div>
-        {mobileMenuOpen && (
-          <div className="cs-mobile-menu">
-            {[
-              { label: "Dashboard",    href: "/dashboard" },
-              { label: "Weekend Run",  href: "/weekend-run" },
-              { label: "Leaderboard", href: "/leaderboard" },
-              { label: "Community",   href: "/community" },
-              { label: "Achievements",href: "/achievements" },
-              { label: "Pricing",     href: "/pricing" },
-            ].map((item) => (
-              <Link key={item.label} href={item.href} onClick={() => setMobileMenuOpen(false)} style={{ fontSize: "0.95rem", color: item.label === "Leaderboard" ? "var(--cs-orange)" : "var(--cs-muted)", textDecoration: "none" }}>
-                {item.label}
-              </Link>
-            ))}
-          </div>
-        )}
       </header>
 
       {/* Body */}

@@ -332,7 +332,6 @@ export default function Dashboard() {
   const [loading,        setLoading]        = useState(false); // eslint-disable-line @typescript-eslint/no-unused-vars
   const [stravaMsg,      setStravaMsg]      = useState(""); // eslint-disable-line @typescript-eslint/no-unused-vars
   const [pbs,            setPbs]            = useState<PersonalBests | null>(null); // eslint-disable-line @typescript-eslint/no-unused-vars
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [points,         setPoints]         = useState<{ month_points: number; total_points: number } | null>(null);
   const [sessions,          setSessions]          = useState<SessionRecord[]>([]);
   const [sessionsLoading,   setSessLoading]        = useState(true);
@@ -565,16 +564,8 @@ export default function Dashboard() {
           </nav>
           <div className="cs-app-nav-user">
             <UserMenu user={user as MenuUser} onUserUpdate={(u) => { setUser(u as User); localStorage.setItem("cs_user", JSON.stringify(u)); }} />
-            <button className="cs-mobile-nav-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Toggle menu"><span /><span /><span /></button>
           </div>
         </div>
-        {mobileMenuOpen && (
-          <div className="cs-mobile-menu">
-            {[{ label: "Home", href: "/" }, { label: "Dashboard", href: "/dashboard" }, { label: "Weekend Run", href: "/weekend-run" }, { label: "Leaderboard", href: "/leaderboard" }, { label: "Community", href: "/community" }, { label: "Achievements", href: "/achievements" }, { label: "Pricing", href: "/pricing" }].map((item) => (
-              <Link key={item.label} href={item.href} onClick={() => setMobileMenuOpen(false)} style={{ fontSize: "0.95rem", color: item.label === "Dashboard" ? "var(--cs-orange)" : "var(--cs-muted)", textDecoration: "none" }}>{item.label}</Link>
-            ))}
-          </div>
-        )}
       </header>
 
       {/* ── Body ── */}
