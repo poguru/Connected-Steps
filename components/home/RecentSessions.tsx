@@ -117,9 +117,9 @@ export default function RecentSessions() {
               <h3 className="font-display" style={{ fontSize: "clamp(1.4rem, 3vw, 2rem)", fontWeight: 300, color: "var(--cs-white)", lineHeight: 1.2, marginBottom: "0.6rem" }}>
                 {s.title}
               </h3>
-              <div style={{ fontSize: "0.85rem", color: "var(--cs-muted)", marginBottom: "1rem" }}>
-                📅 {dateStr}{s.time ? ` · ${s.time}` : ""}
-                &nbsp;&nbsp;📍 {s.venue || s.location}
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: "0.85rem", color: "var(--cs-muted)", marginBottom: "1rem" }}>
+                <span>📅 {dateStr}{s.time ? ` · ${s.time}` : ""}</span>
+                <span>📍 {s.venue || s.location}</span>
               </div>
 
               {/* Rating summary */}
