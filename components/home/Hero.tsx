@@ -90,10 +90,6 @@ export default function Hero() {
         </div>
       </div>
 
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2" style={{ color: "var(--cs-muted)" }}>
-        <span className="text-xs tracking-widest uppercase">Scroll</span>
-        <div className="w-px h-8" style={{ background: "var(--cs-muted)", opacity: 0.4 }} />
-      </div>
     </section>
   );
 }
