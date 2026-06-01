@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 
 interface Stats {
-  totalRunners:     number;
-  activeMembers:    number;
-  sessionsAttended: number;
-  weekendRuns:      number;
-  avgRating:        number | null;
+  totalRunners:       number;
+  activeMembers:      number;
+  sessionsAttended:   number;
+  trainingsConducted: number;
+  avgRating:          number | null;
 }
 
 export default function MarqueeBanner() {
@@ -24,7 +24,7 @@ export default function MarqueeBanner() {
     `${stats ? `${stats.totalRunners}+` : "—"} Runners`,
     "Expert Coaches",
     "5K to Marathon",
-    `${stats ? `${stats.weekendRuns}+` : "—"} Run Registrations`,
+    `${stats ? `${stats.trainingsConducted}+` : "—"} Sessions Conducted`,
     "Personalised Plans",
     `${stats ? `${stats.sessionsAttended}+` : "—"} Total Participations`,
     "Community First",
