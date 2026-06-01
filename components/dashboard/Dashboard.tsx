@@ -9,8 +9,6 @@ import MembershipCard from "@/components/ui/MembershipCard";
 import TrainingPlan from "@/components/dashboard/TrainingPlan";
 import AskCommunityFab from "@/components/ui/AskCommunityFab";
 
-type ModalType = "followers" | "following" | null;
-
 interface SessionRecord {
   attended:      boolean;
   bonus_points:  number | null;
@@ -333,9 +331,6 @@ export default function Dashboard() {
   const [activities,     setActivities]     = useState<Activity[]>([]);
   const [loading,        setLoading]        = useState(false); // eslint-disable-line @typescript-eslint/no-unused-vars
   const [stravaMsg,      setStravaMsg]      = useState(""); // eslint-disable-line @typescript-eslint/no-unused-vars
-  const [followers,      setFollowers]      = useState<{ email: string; name: string }[]>([]);
-  const [following,      setFollowing]      = useState<{ email: string; name: string }[]>([]);
-  const [modal,          setModal]          = useState<ModalType>(null);
   const [pbs,            setPbs]            = useState<PersonalBests | null>(null); // eslint-disable-line @typescript-eslint/no-unused-vars
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [points,         setPoints]         = useState<{ month_points: number; total_points: number } | null>(null);
@@ -369,14 +364,6 @@ export default function Dashboard() {
       localStorage.setItem(`cs_strava_${u.email}`, storedStrava);
       setStrava(JSON.parse(storedStrava));
     }
-
-    Promise.all([
-      fetch(`/api/follow?email=${encodeURIComponent(u.email)}&type=followers`).then((r) => r.json()),
-      fetch(`/api/follow?email=${encodeURIComponent(u.email)}&type=following`).then((r) => r.json()),
-    ]).then(([fwers, fwing]) => {
-      if (fwers.users) setFollowers(fwers.users);
-      if (fwing.users) setFollowing(fwing.users);
-    });
 
     fetch(`/api/leaderboard/user?email=${encodeURIComponent(u.email)}`)
       .then((r) => r.json())
@@ -606,17 +593,15 @@ export default function Dashboard() {
             <div className="font-display" style={{ fontSize: "1.2rem", fontWeight: 600, color: "var(--cs-white)", marginBottom: "0.25rem" }}>{fullName}</div>
             <div style={{ fontSize: "0.75rem", color: "var(--cs-orange)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.25rem" }}>{goalLabel[user.goal] ?? user.goal}</div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem", marginBottom: "1.25rem" }}>
-              {[
-                { num: String(following.length),  label: "Following", type: "following" as ModalType },
-                { num: String(followers.length),  label: "Followers", type: "followers" as ModalType },
-                { num: String(activities.length), label: "Activities", type: null },
-              ].map((s) => (
-                <div key={s.label} style={{ textAlign: "center", cursor: s.type ? "pointer" : "default" }} onClick={() => s.type && setModal(s.type)}>
-                  <div style={{ fontSize: "1.1rem", fontWeight: 700, color: s.type ? "var(--cs-orange)" : "var(--cs-white)" }}>{s.num}</div>
-                  <div style={{ fontSize: "10px", color: "var(--cs-muted)", marginTop: "2px" }}>{s.label}</div>
-                </div>
-              ))}
+            <div style={{ display: "flex", justifyContent: "center", gap: "2rem", marginBottom: "1.25rem" }}>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--cs-white)" }}>{activities.length}</div>
+                <div style={{ fontSize: "10px", color: "var(--cs-muted)", marginTop: "2px" }}>Activities</div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--cs-white)" }}>{points?.total_points ?? 0}</div>
+                <div style={{ fontSize: "10px", color: "var(--cs-muted)", marginTop: "2px" }}>Total Points</div>
+              </div>
             </div>
 
             <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "1rem", textAlign: "left" }}>
@@ -947,34 +932,6 @@ export default function Dashboard() {
 
         </aside>
       </div>
-
-      {/* Followers / Following modal */}
-      {modal && (
-        <div onClick={() => setModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", padding: "1.5rem", width: "360px", maxHeight: "80vh", overflowY: "auto" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
-              <div className="font-display" style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--cs-white)", textTransform: "capitalize" }}>{modal}</div>
-              <button onClick={() => setModal(null)} style={{ background: "none", border: "none", color: "var(--cs-muted)", cursor: "pointer", fontSize: "1.2rem" }}>✕</button>
-            </div>
-            {(modal === "followers" ? followers : following).length === 0 ? (
-              <div style={{ textAlign: "center", padding: "2rem 0", color: "var(--cs-muted)", fontSize: "0.875rem" }}>
-                {modal === "followers" ? "No followers yet." : "Not following anyone yet."}
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                {(modal === "followers" ? followers : following).map((u) => (
-                  <div key={u.email} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.5rem 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                    <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem", fontWeight: 700 }}>
-                      {u.name[0].toUpperCase()}
-                    </div>
-                    <span style={{ fontSize: "0.875rem", color: "var(--cs-white)" }}>{u.name}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       <AskCommunityFab />
     </div>

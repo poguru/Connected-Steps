@@ -61,7 +61,7 @@ export default function Navbar() {
         <nav className="flex items-center justify-between h-24">
 
           {/* Brand */}
-          <Link href="/" className="group" style={{ flexShrink: 0 }}>
+          <Link href="/" className="group" style={{ flexShrink: 0 }} onClick={() => setMenuOpen(false)}>
             <Image src="/logo.png" alt="Connected Steps logo" width={58} height={58}
               className="rounded-full transition-transform duration-300 group-hover:scale-105" />
           </Link>

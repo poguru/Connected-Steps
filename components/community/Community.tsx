@@ -39,9 +39,7 @@ export default function Community() {
   const [user,          setUser]          = useState<User | null>(null);
   const [query,         setQuery]         = useState("");
   const [runners,       setRunners]       = useState<Runner[]>([]);
-  const [following,     setFollowing]     = useState<string[]>([]);
   const [loading,       setLoading]       = useState(false);
-  const [followLoading, setFollowLoading] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -49,11 +47,6 @@ export default function Community() {
     if (!stored) { router.push("/auth"); return; }
     const u: User = JSON.parse(stored);
     setUser(u);
-
-    // Load following list
-    fetch(`/api/follow?email=${encodeURIComponent(u.email)}&type=following`)
-      .then((r) => r.json())
-      .then((d) => { if (d.users) setFollowing(d.users); });
 
     // Load all runners initially
     search("");
@@ -74,26 +67,6 @@ export default function Community() {
     const timer = setTimeout(() => search(query), 300);
     return () => clearTimeout(timer);
   }, [query, search]);
-
-  const toggleFollow = async (targetEmail: string) => {
-    if (!user) return;
-    setFollowLoading(targetEmail);
-    try {
-      const res = await fetch("/api/follow", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ follower_email: user.email, following_email: targetEmail }),
-      });
-      const data = await res.json();
-      if (data.action === "followed") {
-        setFollowing((prev) => [...prev, targetEmail]);
-      } else {
-        setFollowing((prev) => prev.filter((e) => e !== targetEmail));
-      }
-    } finally {
-      setFollowLoading(null);
-    }
-  };
 
   if (!user) return null;
 
@@ -217,51 +190,27 @@ export default function Community() {
           {runners
             .filter((r) => r.user_email !== user.email)
             .map((runner) => {
-              const isFollowing = following.includes(runner.user_email);
-              const initials    = runner.user_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
-
+              const initials = runner.user_name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
               return (
                 <div
                   key={runner.user_email}
-                  style={{ background: "var(--cs-dark)", border: `1px solid ${isFollowing ? "rgba(232,98,10,0.3)" : "rgba(255,255,255,0.06)"}`, borderRadius: "8px", padding: "1.25rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}
+                  style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem", display: "flex", alignItems: "center", gap: "1rem" }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                    <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem", fontWeight: 700, color: "var(--cs-white)", flexShrink: 0 }}>
-                      {initials}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--cs-white)", marginBottom: "2px" }}>{runner.user_name}</div>
-                      <div style={{ fontSize: "0.75rem", color: "var(--cs-muted)", marginBottom: "6px" }}>📍 {runner.location}</div>
-                      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                        <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "20px", background: "rgba(255,255,255,0.05)", color: "var(--cs-muted)" }}>
-                          {runner.total_km.toFixed(1)} km total
-                        </span>
-                        <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "20px", background: "rgba(255,255,255,0.05)", color: "var(--cs-muted)" }}>
-                          {runner.month_km.toFixed(1)} km this month
-                        </span>
-                      </div>
+                  <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem", fontWeight: 700, color: "var(--cs-white)", flexShrink: 0 }}>
+                    {initials}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--cs-white)", marginBottom: "2px" }}>{runner.user_name}</div>
+                    <div style={{ fontSize: "0.75rem", color: "var(--cs-muted)", marginBottom: "6px" }}>📍 {runner.location}</div>
+                    <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                      <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "20px", background: "rgba(255,255,255,0.05)", color: "var(--cs-muted)" }}>
+                        {runner.total_km.toFixed(1)} km total
+                      </span>
+                      <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "20px", background: "rgba(255,255,255,0.05)", color: "var(--cs-muted)" }}>
+                        {runner.month_km.toFixed(1)} km this month
+                      </span>
                     </div>
                   </div>
-
-                  <button
-                    onClick={() => toggleFollow(runner.user_email)}
-                    disabled={followLoading === runner.user_email}
-                    style={{
-                      padding: "8px 20px",
-                      borderRadius: "20px",
-                      fontSize: "0.8rem",
-                      fontWeight: 600,
-                      fontFamily: "var(--font-body)",
-                      border: isFollowing ? "1px solid rgba(255,255,255,0.15)" : "1px solid var(--cs-orange)",
-                      background: isFollowing ? "transparent" : "var(--cs-orange)",
-                      color: isFollowing ? "var(--cs-muted)" : "var(--cs-white)",
-                      cursor: followLoading === runner.user_email ? "not-allowed" : "pointer",
-                      flexShrink: 0,
-                      transition: "all 0.2s",
-                    }}
-                  >
-                    {followLoading === runner.user_email ? "..." : isFollowing ? "Unfollow" : "Follow"}
-                  </button>
                 </div>
               );
             })}

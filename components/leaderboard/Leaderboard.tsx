@@ -48,8 +48,6 @@ export default function Leaderboard() {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab,       setTab]       = useState<"month" | "total">("month");
-  const [following, setFollowing] = useState<string[]>([]);
-  const [followLoading, setFollowLoading] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -58,10 +56,6 @@ export default function Leaderboard() {
     const u: User = JSON.parse(stored);
     setUser(u);
 
-    // Load who this user is following
-    fetch(`/api/follow?email=${encodeURIComponent(u.email)}&type=following`)
-      .then((r) => r.json())
-      .then((data) => { if (data.users) setFollowing(data.users); });
   }, [router]);
 
   useEffect(() => {
@@ -76,26 +70,6 @@ export default function Leaderboard() {
     }
     load();
   }, [tab]);
-
-  const toggleFollow = async (targetEmail: string) => {
-    if (!user) return;
-    setFollowLoading(targetEmail);
-    try {
-      const res = await fetch("/api/follow", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ follower_email: user.email, following_email: targetEmail }),
-      });
-      const data = await res.json();
-      if (data.action === "followed") {
-        setFollowing((prev) => [...prev, targetEmail]);
-      } else {
-        setFollowing((prev) => prev.filter((e) => e !== targetEmail));
-      }
-    } finally {
-      setFollowLoading(null);
-    }
-  };
 
   if (!user) return null;
 
@@ -238,30 +212,9 @@ export default function Leaderboard() {
                   </div>
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--cs-orange)", minWidth: "48px" }}>
-                    {pts}
-                    <span style={{ fontSize: "10px", fontWeight: 400, color: "var(--cs-muted)", marginLeft: "3px" }}>pts</span>
-                  </div>
-                  {!isMe && (
-                    <button
-                      onClick={() => toggleFollow(entry.user_email)}
-                      disabled={followLoading === entry.user_email}
-                      style={{
-                        fontSize: "11px",
-                        padding: "3px 10px",
-                        borderRadius: "20px",
-                        border: following.includes(entry.user_email) ? "1px solid rgba(255,255,255,0.2)" : "1px solid var(--cs-orange)",
-                        background: following.includes(entry.user_email) ? "rgba(255,255,255,0.06)" : "var(--cs-orange)",
-                        color: following.includes(entry.user_email) ? "var(--cs-muted)" : "var(--cs-white)",
-                        cursor: followLoading === entry.user_email ? "not-allowed" : "pointer",
-                        fontFamily: "var(--font-body)",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {followLoading === entry.user_email ? "..." : following.includes(entry.user_email) ? "Following" : "Follow"}
-                    </button>
-                  )}
+                <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--cs-orange)" }}>
+                  {pts}
+                  <span style={{ fontSize: "10px", fontWeight: 400, color: "var(--cs-muted)", marginLeft: "3px" }}>pts</span>
                 </div>
               </div>
             );

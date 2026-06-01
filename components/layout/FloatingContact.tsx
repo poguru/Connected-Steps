@@ -44,7 +44,7 @@ export default function FloatingContact() {
         flexDirection: "column",
         alignItems: "flex-end",
         gap: "10px",
-        zIndex: 1000,
+        zIndex: 49,
       }}>
 
         {/* Ask the community */}
