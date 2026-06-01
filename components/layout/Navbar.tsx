@@ -47,12 +47,17 @@ export default function Navbar() {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
-      style={{
+      style={menuOpen ? {
+        bottom: 0,
+        background: "rgba(8,28,45,0.99)",
+        display: "flex",
+        flexDirection: "column",
+      } : {
         background: scrolled ? "rgba(8,28,45,0.97)" : "transparent",
         backdropFilter: scrolled ? "blur(12px)" : "none",
         borderBottom: scrolled ? "1px solid rgba(56,189,248,0.08)" : "none",
       }}>
-      <div className="container">
+      <div className="container" style={{ flexShrink: 0 }}>
         <nav className="flex items-center justify-between h-24">
 
           {/* Brand */}
@@ -132,29 +137,30 @@ export default function Navbar() {
           </button>
         </nav>
 
-        {/* Mobile menu */}
+      </div>
+
+        {/* Mobile menu — outside container so it covers full width */}
         {menuOpen && (
-          <div className="cs-home-mobile-menu" style={{ maxHeight: "calc(100vh - 6rem)", overflowY: "auto" }}>
+          <div className="cs-home-mobile-menu" style={{ flex: 1, overflowY: "auto" }}>
             {[...beforeSessionLinks, ...afterSessionLinks].map((link) => (
               <Link key={link.label} href={link.href} onClick={() => setMenuOpen(false)}
-                style={{ fontSize: "0.95rem", color: (link as {highlight?: boolean}).highlight ? "var(--cs-orange)" : "var(--cs-muted)", fontWeight: (link as {highlight?: boolean}).highlight ? 600 : undefined, textDecoration: "none", display: "flex", alignItems: "center", gap: "6px" }}>
+                style={{ fontSize: "1rem", color: (link as {highlight?: boolean}).highlight ? "var(--cs-orange)" : "var(--cs-muted)", fontWeight: (link as {highlight?: boolean}).highlight ? 600 : undefined, textDecoration: "none", display: "flex", alignItems: "center", gap: "8px", padding: "0.75rem 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                 {(link as {highlight?: boolean}).highlight && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--cs-orange)", display: "inline-block" }} />}
                 {link.label}
               </Link>
             ))}
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginTop: "0.5rem", paddingTop: "1rem", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginTop: "1rem", paddingTop: "1rem" }}>
               {loggedInUser ? (
-                <Link href="/dashboard" className="btn-primary" style={{ textAlign: "center", justifyContent: "center" }} onClick={() => setMenuOpen(false)}>Go to Dashboard</Link>
+                <Link href="/dashboard" className="btn-primary" style={{ textAlign: "center", justifyContent: "center", padding: "14px", fontSize: "0.95rem" }} onClick={() => setMenuOpen(false)}>Go to Dashboard</Link>
               ) : (
                 <>
-                  <Link href="/auth" className="btn-outline" style={{ textAlign: "center", justifyContent: "center" }}>Sign in</Link>
-                  <Link href="/auth" className="btn-primary" style={{ textAlign: "center", justifyContent: "center" }}>Join free</Link>
+                  <Link href="/auth" className="btn-outline" style={{ textAlign: "center", justifyContent: "center", padding: "14px", fontSize: "0.95rem" }} onClick={() => setMenuOpen(false)}>Sign in</Link>
+                  <Link href="/auth" className="btn-primary" style={{ textAlign: "center", justifyContent: "center", padding: "14px", fontSize: "0.95rem" }} onClick={() => setMenuOpen(false)}>Join free</Link>
                 </>
               )}
             </div>
           </div>
         )}
-      </div>
     </header>
   );
 }

@@ -316,9 +316,7 @@ select.auth-input option {
 @media (max-width: 768px) {
   :root { --section-pad: 4rem; }
   .container { padding: 0 1.25rem; }
-  /* Navy mobile menus to match brand */
-  .cs-home-mobile-menu { background: rgba(8,28,45,0.99) !important; }
-  .cs-mobile-menu      { background: rgba(8,28,45,0.99) !important; }
+  .cs-mobile-menu { background: rgba(8,28,45,0.99) !important; }
 }
 
 @media (max-width: 480px) {
@@ -357,17 +355,10 @@ select.auth-input option {
   .cs-home-mobile-menu {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
-    padding: 1.25rem 1.5rem 1.75rem;
+    gap: 0;
+    padding: 0.5rem 1.5rem 2rem;
     border-top: 1px solid rgba(255,255,255,0.08);
-    background: rgba(10,10,10,0.98);
-  }
-  .cs-home-mobile-menu a {
-    font-size: 1rem;
-    color: var(--cs-muted);
-    text-decoration: none;
-    padding: 0.65rem 0;
-    display: block;
+    /* background comes from header inline style when open */
   }
 }
 
