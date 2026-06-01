@@ -53,6 +53,12 @@ const cards = [
     icon:  "⭐",
   },
   {
+    href:  "/admin/training-plans",
+    title: "Training Plans",
+    desc:  "Write personalised weekly training schedules for individual members. Updated every Sunday.",
+    icon:  "📋",
+  },
+  {
     href:  "/admin/events",
     title: "Events & Coupons",
     desc:  "Create and publish weekend run events, manage promo codes and member discount coupons.",

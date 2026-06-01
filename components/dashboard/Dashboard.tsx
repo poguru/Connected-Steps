@@ -331,12 +331,12 @@ export default function Dashboard() {
   const [user,           setUser]           = useState<User | null>(null);
   const [strava,         setStrava]         = useState<StravaTokens | null>(null);
   const [activities,     setActivities]     = useState<Activity[]>([]);
-  const [loading,        setLoading]        = useState(false);
-  const [stravaMsg,      setStravaMsg]      = useState("");
+  const [loading,        setLoading]        = useState(false); // eslint-disable-line @typescript-eslint/no-unused-vars
+  const [stravaMsg,      setStravaMsg]      = useState(""); // eslint-disable-line @typescript-eslint/no-unused-vars
   const [followers,      setFollowers]      = useState<{ email: string; name: string }[]>([]);
   const [following,      setFollowing]      = useState<{ email: string; name: string }[]>([]);
   const [modal,          setModal]          = useState<ModalType>(null);
-  const [pbs,            setPbs]            = useState<PersonalBests | null>(null);
+  const [pbs,            setPbs]            = useState<PersonalBests | null>(null); // eslint-disable-line @typescript-eslint/no-unused-vars
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [points,         setPoints]         = useState<{ month_points: number; total_points: number } | null>(null);
   const [sessions,          setSessions]          = useState<SessionRecord[]>([]);
@@ -678,7 +678,7 @@ export default function Dashboard() {
 
         {/* ── Right sidebar ── */}
         <aside className="cs-db-right">
-          <TrainingPlan goal={user.goal} />
+          <TrainingPlan goal={user.goal} email={user.email} />
 
           {/* Upcoming Sessions */}
           {upcomingSessions.length > 0 && (
