@@ -161,7 +161,7 @@ export default function HeroSlider() {
               {/* Full-bleed photo */}
               {s.photo_url && (
                 <img src={s.photo_url} alt={s.title}
-                  style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }} />
+                  style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", objectPosition: "center center", background: "#050f1a" }} />
               )}
               {/* Gradient overlay */}
               <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(8,28,45,0.97) 0%, rgba(8,28,45,0.55) 50%, rgba(8,28,45,0.2) 100%)" }} />
