@@ -506,7 +506,7 @@ export default function Dashboard() {
       }
       try {
         const stored = localStorage.getItem("cs_user");
-        if (stored) await syncToLeaderboard(JSON.parse(stored), data);
+        if (stored && data.length > 0) await syncToLeaderboard(JSON.parse(stored), data);
       } catch (e) { console.error("Leaderboard sync failed:", e); }
     } catch (e: unknown) {
       setStravaMsg("Could not load Strava activities: " + (e instanceof Error ? e.message : String(e)));

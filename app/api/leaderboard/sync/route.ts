@@ -8,6 +8,11 @@ export async function POST(req: NextRequest) {
 
     if (!user_email) return NextResponse.json({ error: "Missing user_email" }, { status: 400 });
 
+    // Don't overwrite existing points with zeros (guards against empty Strava sync)
+    if ((month_points ?? 0) === 0 && (total_points ?? 0) === 0) {
+      return NextResponse.json({ success: true, skipped: true });
+    }
+
     const db = getSupabaseServer();
     const { error } = await db.from("leaderboard").upsert({
       user_email,
