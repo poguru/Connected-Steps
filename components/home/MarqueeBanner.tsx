@@ -26,7 +26,7 @@ export default function MarqueeBanner() {
     "5K to Marathon",
     `${stats ? `${stats.weekendRuns}+` : "—"} Run Registrations`,
     "Personalised Plans",
-    `${stats ? `${stats.sessionsAttended}+` : "—"} Sessions Attended`,
+    `${stats ? `${stats.sessionsAttended}+` : "—"} Total Participations`,
     "Community First",
     "Real-time Coaching",
     ...(stats?.avgRating ? [`${stats.avgRating}★ Coach Rating`] : []),
