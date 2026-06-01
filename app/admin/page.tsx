@@ -59,6 +59,12 @@ const cards = [
     icon:  "📋",
   },
   {
+    href:  "/admin/coach-questions",
+    title: "Coach Questions",
+    desc:  "Answer injury, training, and recovery questions submitted by members from their dashboard.",
+    icon:  "🩺",
+  },
+  {
     href:  "/admin/events",
     title: "Events & Coupons",
     desc:  "Create and publish weekend run events, manage promo codes and member discount coupons.",

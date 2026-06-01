@@ -7,7 +7,7 @@ import Link from "next/link";
 import UserMenu, { MenuUser } from "@/components/ui/UserMenu";
 import MembershipCard from "@/components/ui/MembershipCard";
 import TrainingPlan from "@/components/dashboard/TrainingPlan";
-import AskCommunityFab from "@/components/ui/AskCommunityFab";
+import AskCoachFab from "@/components/ui/AskCoachFab";
 
 interface SessionRecord {
   attended:      boolean;
@@ -654,7 +654,9 @@ export default function Dashboard() {
 
         {/* ── Right sidebar ── */}
         <aside className="cs-db-right">
-          <TrainingPlan goal={user.goal} email={user.email} />
+          <div id="training-plan">
+            <TrainingPlan goal={user.goal} email={user.email} />
+          </div>
 
           {/* Upcoming Sessions */}
           {upcomingSessions.length > 0 && (
@@ -924,7 +926,7 @@ export default function Dashboard() {
         </aside>
       </div>
 
-      <AskCommunityFab />
+      <AskCoachFab />
     </div>
   );
 }

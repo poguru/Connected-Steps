@@ -105,14 +105,20 @@ export default function UserMenu({ user }: Props) {
 
           {/* Actions */}
           <div style={{ padding: "0.5rem" }}>
-            <button
-              onClick={() => { setOpen(false); router.push("/profile"); }}
-              style={{ width: "100%", padding: "0.65rem 1rem", display: "flex", alignItems: "center", gap: "0.6rem", background: "none", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "0.875rem", color: "var(--cs-white)", fontFamily: "var(--font-body)", textAlign: "left" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
-            >
-              ✏️&nbsp; Edit Profile
-            </button>
+            {[
+              { label: "🏆  Leaderboard",      href: "/leaderboard" },
+              { label: "📋  My Training Plan",  href: "/dashboard#training-plan" },
+              { label: "✏️  Edit Profile",       href: "/profile" },
+            ].map((item) => (
+              <button key={item.label}
+                onClick={() => { setOpen(false); router.push(item.href); }}
+                style={{ width: "100%", padding: "0.65rem 1rem", display: "flex", alignItems: "center", gap: "0.6rem", background: "none", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "0.875rem", color: "var(--cs-white)", fontFamily: "var(--font-body)", textAlign: "left" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+              >
+                {item.label}
+              </button>
+            ))}
             <div style={{ height: "1px", background: "rgba(255,255,255,0.06)", margin: "0.2rem 0.5rem" }} />
             <button
               onClick={logout}
