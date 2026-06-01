@@ -26,11 +26,6 @@ const features = [
     title: "Achievements & milestones",
     desc: "Earn badges for streaks, personal bests, and distances.",
   },
-  {
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="5" y="2" width="14" height="20" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M9 7h6M9 11h6M9 15h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
-    title: "Strava & Garmin sync",
-    desc: "Connects with the apps you already use. Your data flows in automatically.",
-  },
 ];
 
 export default function Features() {

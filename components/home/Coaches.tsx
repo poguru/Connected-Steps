@@ -144,7 +144,7 @@ export default function Coaches() {
             <div className="coach-photo-wrap" style={{ flex: "0 0 auto", display: "flex", justifyContent: "center" }}>
               {coach.photo ? (
                 <img src={coach.photo} alt={coach.name} className="coach-photo-img"
-                  style={{ width: "280px", height: "340px", objectFit: "cover", borderRadius: "8px", border: "2px solid rgba(232,98,10,0.3)" }} />
+                  style={{ width: "280px", height: "340px", objectFit: "cover", objectPosition: "top center", borderRadius: "8px", border: "2px solid rgba(232,98,10,0.3)" }} />
               ) : (
                 <div className="coach-photo-img" style={{
                   width: "280px", height: "340px", borderRadius: "8px",

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import AskCommunityFab from "@/components/ui/AskCommunityFab";
 
 const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
   "Recovery":           { bg: "rgba(74,222,128,0.1)",   color: "#4ade80" },
@@ -415,7 +414,6 @@ export default function CommunityQA() {
       </div>
 
       {modalOpen && <AskModal onClose={() => setModalOpen(false)} onPosted={loadPosts} />}
-      <AskCommunityFab />
     </section>
   );
 }
