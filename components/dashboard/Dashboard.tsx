@@ -193,12 +193,11 @@ function SessionCard({ rec, userEmail }: { rec: SessionRecord; userEmail: string
 
   useEffect(() => {
     if (!s) return;
-    fetch(`/api/sessions/${s.id}/feedback`)
+    fetch(`/api/sessions/${s.id}/feedback?email=${encodeURIComponent(userEmail)}`)
       .then((r) => r.json())
       .then((d) => {
         setFeedback(d.feedback ?? []);
-        const mine = (d.feedback ?? []).find((f: FeedbackItem) => f.user_name && userEmail);
-        if (mine) { setSubmitted(true); setMyRating(mine.rating); }
+        if (d.myFeedback) { setSubmitted(true); setMyRating(d.myFeedback.rating); setMyComment(d.myFeedback.comment ?? ""); }
       })
       .finally(() => setFbLoading(false));
   }, [s, userEmail]);
@@ -209,6 +208,7 @@ function SessionCard({ rec, userEmail }: { rec: SessionRecord; userEmail: string
 
   async function submitFeedback() {
     if (!myRating) return;
+    if (!myComment.trim()) { setFbMsg("Please write a review before submitting."); return; }
     setSubmitting(true); setFbMsg("");
     const res  = await fetch(`/api/sessions/${s!.id}/feedback`, {
       method: "POST",
@@ -277,10 +277,10 @@ function SessionCard({ rec, userEmail }: { rec: SessionRecord; userEmail: string
               {myRating > 0 && (
                 <div style={{ marginTop: "0.6rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                   <textarea
-                    placeholder="Share your experience (optional)"
+                    placeholder="Share your experience (required)"
                     value={myComment} onChange={(e) => setMyComment(e.target.value)}
                     rows={2} maxLength={300}
-                    style={{ width: "100%", padding: "8px 10px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "var(--cs-white)", fontSize: "0.8rem", fontFamily: "var(--font-body)", outline: "none", resize: "none", boxSizing: "border-box" }}
+                    style={{ width: "100%", padding: "8px 10px", background: "rgba(255,255,255,0.04)", border: `1px solid ${!myComment.trim() ? "rgba(240,149,149,0.4)" : "rgba(255,255,255,0.1)"}`, borderRadius: "6px", color: "var(--cs-white)", fontSize: "0.8rem", fontFamily: "var(--font-body)", outline: "none", resize: "none", boxSizing: "border-box" }}
                   />
                   <button onClick={submitFeedback} disabled={submitting}
                     style={{ alignSelf: "flex-start", padding: "7px 16px", background: "var(--cs-orange)", color: "#fff", border: "none", borderRadius: "4px", fontSize: "0.78rem", fontWeight: 600, cursor: submitting ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", opacity: submitting ? 0.7 : 1 }}>

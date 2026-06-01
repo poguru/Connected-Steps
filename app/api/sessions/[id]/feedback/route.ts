@@ -2,18 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const email = req.nextUrl.searchParams.get("email")?.toLowerCase() ?? null;
   const db = getSupabaseServer();
   const { data, error } = await db
     .from("session_feedback")
-    .select("id, user_name, rating, comment, created_at")
+    .select("id, user_name, user_email, rating, comment, created_at")
     .eq("session_id", id)
     .order("created_at", { ascending: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ feedback: data ?? [] });
+  const all = data ?? [];
+  const myFeedback = email ? (all.find((f) => f.user_email === email) ?? null) : null;
+  // strip emails from public list
+  const feedback = all.map(({ user_email: _, ...rest }) => rest);
+  return NextResponse.json({ feedback, myFeedback });
 }
 
 export async function POST(
@@ -23,6 +28,7 @@ export async function POST(
   const { id } = await params;
   const { email, rating, comment } = await req.json();
   if (!email || !rating) return NextResponse.json({ error: "email and rating required" }, { status: 400 });
+  if (!comment?.trim()) return NextResponse.json({ error: "Please write a review before submitting." }, { status: 400 });
   if (rating < 1 || rating > 5) return NextResponse.json({ error: "rating must be 1-5" }, { status: 400 });
 
   const db = getSupabaseServer();
