@@ -238,10 +238,10 @@ export default function AdminSessionsPage() {
         </div>
       </header>
 
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+      <div className="admin-sessions-wrap">
 
         {/* Left — sessions list */}
-        <div style={{ width: "300px", flexShrink: 0, borderRight: "1px solid rgba(255,255,255,0.07)", padding: "1.25rem", overflowY: "auto", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        <div className="admin-sessions-left">
 
           {/* Create new session */}
           <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "1.25rem" }}>
@@ -301,7 +301,7 @@ export default function AdminSessionsPage() {
         </div>
 
         {/* Right — session detail */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "1.5rem" }}>
+        <div className="admin-sessions-right">
           {!selected ? (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#444", fontSize: "0.9rem" }}>
               ← Select or create a session

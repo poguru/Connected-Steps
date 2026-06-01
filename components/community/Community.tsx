@@ -113,9 +113,11 @@ export default function Community() {
           <nav className="cs-app-nav-links">
             {[
               { label: "Dashboard",    href: "/dashboard" },
+              { label: "Weekend Run",  href: "/weekend-run" },
               { label: "Leaderboard", href: "/leaderboard" },
               { label: "Community",   href: "/community" },
               { label: "Achievements",href: "/achievements" },
+              { label: "Pricing",     href: "/pricing" },
             ].map((item) => (
               <Link key={item.label} href={item.href} style={{ fontSize: "0.875rem", color: item.label === "Community" ? "var(--cs-orange)" : "var(--cs-muted)", textDecoration: "none" }}>
                 {item.label}
@@ -134,9 +136,11 @@ export default function Community() {
           <div className="cs-mobile-menu">
             {[
               { label: "Dashboard",    href: "/dashboard" },
+              { label: "Weekend Run",  href: "/weekend-run" },
               { label: "Leaderboard", href: "/leaderboard" },
               { label: "Community",   href: "/community" },
               { label: "Achievements",href: "/achievements" },
+              { label: "Pricing",     href: "/pricing" },
             ].map((item) => (
               <Link key={item.label} href={item.href} onClick={() => setMobileMenuOpen(false)} style={{ fontSize: "0.95rem", color: item.label === "Community" ? "var(--cs-orange)" : "var(--cs-muted)", textDecoration: "none" }}>
                 {item.label}

@@ -70,7 +70,7 @@ export default function AdminHub() {
           <div style={{ fontSize: "10px", color: "#e8620a", letterSpacing: "0.1em", textTransform: "uppercase" }}>Admin</div>
         </div>
       </Link>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1.25rem", width: "100%", maxWidth: "640px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: "1.25rem", width: "100%", maxWidth: "640px" }}>
         {cards.map((c) => (
           <Link key={c.href} href={c.href} style={{ textDecoration: "none" }}>
             <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", padding: "1.75rem", transition: "border-color 0.2s, transform 0.2s", cursor: "pointer" }}

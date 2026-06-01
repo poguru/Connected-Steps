@@ -572,7 +572,7 @@ export default function Dashboard() {
             <span className="font-display" style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--cs-white)" }}>Connected Steps</span>
           </Link>
           <nav className="cs-app-nav-links">
-            {[{ label: "Home", href: "/" }, { label: "Dashboard", href: "/dashboard" }, { label: "Leaderboard", href: "/leaderboard" }, { label: "Community", href: "/community" }, { label: "Achievements", href: "/achievements" }].map((item) => (
+            {[{ label: "Home", href: "/" }, { label: "Dashboard", href: "/dashboard" }, { label: "Weekend Run", href: "/weekend-run" }, { label: "Leaderboard", href: "/leaderboard" }, { label: "Community", href: "/community" }, { label: "Achievements", href: "/achievements" }, { label: "Pricing", href: "/pricing" }].map((item) => (
               <Link key={item.label} href={item.href} style={{ fontSize: "0.875rem", color: item.label === "Dashboard" ? "var(--cs-orange)" : "var(--cs-muted)", textDecoration: "none" }}>{item.label}</Link>
             ))}
           </nav>
@@ -583,7 +583,7 @@ export default function Dashboard() {
         </div>
         {mobileMenuOpen && (
           <div className="cs-mobile-menu">
-            {[{ label: "Home", href: "/" }, { label: "Dashboard", href: "/dashboard" }, { label: "Leaderboard", href: "/leaderboard" }, { label: "Community", href: "/community" }, { label: "Achievements", href: "/achievements" }].map((item) => (
+            {[{ label: "Home", href: "/" }, { label: "Dashboard", href: "/dashboard" }, { label: "Weekend Run", href: "/weekend-run" }, { label: "Leaderboard", href: "/leaderboard" }, { label: "Community", href: "/community" }, { label: "Achievements", href: "/achievements" }, { label: "Pricing", href: "/pricing" }].map((item) => (
               <Link key={item.label} href={item.href} onClick={() => setMobileMenuOpen(false)} style={{ fontSize: "0.95rem", color: item.label === "Dashboard" ? "var(--cs-orange)" : "var(--cs-muted)", textDecoration: "none" }}>{item.label}</Link>
             ))}
           </div>
@@ -594,7 +594,7 @@ export default function Dashboard() {
       <div className="cs-dashboard-body">
 
         {/* ── Left sidebar ── */}
-        <aside>
+        <aside className="cs-db-left">
           <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.75rem", textAlign: "center" }}>
             {user.photo ? (
               <img src={user.photo} alt={fullName} style={{ width: "80px", height: "80px", borderRadius: "50%", objectFit: "cover", border: "3px solid var(--cs-orange)", margin: "0 auto 1rem" }} />
@@ -647,7 +647,7 @@ export default function Dashboard() {
         </aside>
 
         {/* ── Main feed ── */}
-        <main>
+        <main className="cs-db-main">
           <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1rem" }}>
             Recent Sessions
           </div>
@@ -677,7 +677,7 @@ export default function Dashboard() {
         </main>
 
         {/* ── Right sidebar ── */}
-        <aside>
+        <aside className="cs-db-right">
           {/* Upcoming Sessions */}
           {upcomingSessions.length > 0 && (
             <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem", marginBottom: "1rem" }}>
