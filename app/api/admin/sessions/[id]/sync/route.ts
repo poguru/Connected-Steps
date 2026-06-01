@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { recalculateMonth } from "@/lib/recalculate-leaderboard";
 
 function auth(req: NextRequest) {
   const pw = req.headers.get("x-admin-password");
@@ -67,6 +68,10 @@ export async function POST(
   const { id } = await params;
   const db = getSupabaseServer();
 
+  // Fetch session date to determine the month for recalculation
+  const { data: session } = await db.from("sessions").select("date").eq("id", id).single();
+  const sessionMonth = session?.date ? (session.date as string).slice(0, 7) : new Date().toISOString().slice(0, 7);
+
   const { data: records, error } = await db
     .from("session_attendance")
     .select("*")
@@ -85,12 +90,14 @@ export async function POST(
       await addPoints(db, rec.user_email, pts);
       synced++;
     }
-    // Mark as synced regardless (even 0 pts, so we don't re-process)
     await db
       .from("session_attendance")
       .update({ points_synced: true })
       .eq("id", rec.id);
   }
+
+  // Recalculate month_points for all users in this month — keeps totals accurate
+  try { await recalculateMonth(sessionMonth); } catch { /* non-fatal */ }
 
   return NextResponse.json({ synced, message: `Synced points for ${synced} participant(s).` });
 }
