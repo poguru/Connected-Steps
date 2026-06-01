@@ -18,8 +18,8 @@ export default function HomePage() {
   return (
     <>
       <Navbar />
-      <Hero />
       <RecentSessions />
+      <Hero />
       <MarqueeBanner />
       <TrainingPlans />
       <UpcomingSessions />
