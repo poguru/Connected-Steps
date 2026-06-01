@@ -20,12 +20,12 @@ export default function HomePage() {
       <Navbar />
       <Hero />
       <MarqueeBanner />
+      <RecentSessions />
       <TrainingPlans />
       <UpcomingSessions />
       <Coaches />
       <Features />
       <StatsAndTestimonials />
-      <RecentSessions />
       <CommunityQA />
       <CallToAction />
       <Footer />
