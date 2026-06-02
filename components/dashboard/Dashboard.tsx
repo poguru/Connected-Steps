@@ -609,6 +609,67 @@ export default function Dashboard() {
             Recent Sessions
           </div>
 
+          {/* Upcoming Sessions */}
+          {upcomingSessions.length > 0 && (
+            <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(74,222,128,0.15)", borderRadius: "8px", padding: "1.25rem", marginBottom: "1.25rem" }}>
+              <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Upcoming Sessions</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                {upcomingSessions.map((s) => {
+                  const today = new Date(); today.setHours(0,0,0,0);
+                  const sessionDate = new Date(s.date + "T00:00:00");
+                  const diff = Math.round((sessionDate.getTime() - today.getTime()) / 86400000);
+                  const badge = diff === 0 ? "Today" : diff === 1 ? "Tomorrow" : `In ${diff}d`;
+                  const isUrgent = diff <= 1;
+                  const dateStr = sessionDate.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+                  const joined = joinedSessionIds.has(s.id);
+                  const confirmingLeave = leaveConfirmId === s.id;
+                  const isLeaving = leavingId === s.id;
+                  return (
+                    <div key={s.id} style={{ borderRadius: "6px", background: "rgba(255,255,255,0.03)", border: `1px solid ${joined ? "rgba(74,222,128,0.2)" : "rgba(255,255,255,0.06)"}`, overflow: "hidden" }}>
+                      <div onClick={() => !joined && router.push(`/join/${s.id}`)}
+                        style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.6rem 0.75rem", cursor: joined ? "default" : "pointer" }}
+                        onMouseEnter={(e) => { if (!joined) e.currentTarget.style.opacity = "0.85"; }}
+                        onMouseLeave={(e) => { if (!joined) e.currentTarget.style.opacity = "1"; }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--cs-white)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
+                          <div style={{ fontSize: "0.72rem", color: "var(--cs-muted)", marginTop: "1px" }}>{dateStr}{s.time ? ` · ${s.time}` : ""}</div>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px", flexShrink: 0 }}>
+                          <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "20px", background: isUrgent ? "var(--cs-orange)" : "rgba(255,255,255,0.07)", color: isUrgent ? "#fff" : "var(--cs-muted)" }}>{badge}</span>
+                          {joined ? <span style={{ fontSize: "0.7rem", color: "#4ade80", fontWeight: 600 }}>✓ Joined</span>
+                                  : <span style={{ fontSize: "0.7rem", color: "var(--cs-orange)", fontWeight: 600 }}>Join →</span>}
+                        </div>
+                      </div>
+                      {joined && (
+                        <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", padding: "0.4rem 0.75rem", display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                          {!confirmingLeave ? (
+                            <button onClick={() => { setLeaveConfirmId(s.id); setLeaveError(""); }}
+                              style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.7rem", color: "var(--cs-muted)", fontFamily: "inherit", padding: 0 }}>
+                              Can't attend? Leave
+                            </button>
+                          ) : (
+                            <>
+                              <span style={{ fontSize: "0.7rem", color: "var(--cs-muted)" }}>Sure?</span>
+                              <button onClick={() => handleLeaveSession(s.id, user!.email)} disabled={isLeaving}
+                                style={{ background: "rgba(226,75,74,0.15)", border: "1px solid rgba(226,75,74,0.3)", borderRadius: "4px", cursor: isLeaving ? "not-allowed" : "pointer", fontSize: "0.7rem", color: "#f09595", fontWeight: 600, fontFamily: "inherit", padding: "2px 10px", opacity: isLeaving ? 0.6 : 1 }}>
+                                {isLeaving ? "Leaving…" : "Yes, leave"}
+                              </button>
+                              <button onClick={() => { setLeaveConfirmId(null); setLeaveError(""); }}
+                                style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.7rem", color: "var(--cs-muted)", fontFamily: "inherit", padding: 0 }}>
+                                Cancel
+                              </button>
+                            </>
+                          )}
+                          {leaveError && leaveConfirmId === s.id && <span style={{ fontSize: "0.7rem", color: "#f09595" }}>{leaveError}</span>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {sessionsLoading ? (
             <div style={{ textAlign: "center", padding: "3rem", color: "var(--cs-muted)", fontSize: "0.875rem" }}>Loading…</div>
           ) : sessions.length === 0 ? (
