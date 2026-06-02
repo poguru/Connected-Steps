@@ -102,7 +102,7 @@ export default function PaymentHistoryPage() {
 
         <p style={{ fontSize: "11px", color: "#444", marginTop: "2rem", textAlign: "center" }}>
           For billing queries, reach us at{" "}
-          <a href="mailto:connected.steps2106@gmail.com" style={{ color: "var(--cs-orange)", textDecoration: "none" }}>connected.steps2106@gmail.com</a>
+          <a href="mailto:info@connectedsteps.in" style={{ color: "var(--cs-orange)", textDecoration: "none" }}>info@connectedsteps.in</a>
         </p>
       </div>
     </div>
