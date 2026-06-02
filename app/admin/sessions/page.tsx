@@ -51,6 +51,12 @@ export default function AdminSessionsPage() {
   const [newVenue,    setNewVenue]    = useState("");
   const [creating,    setCreating]    = useState(false);
 
+  // Edit session
+  const [editingId,   setEditingId]   = useState<string | null>(null);
+  const [editFields,  setEditFields]  = useState({ title: "", date: "", time: "", location: "", venue: "" });
+  const [editSaving,  setEditSaving]  = useState(false);
+  const [editMsg,     setEditMsg]     = useState("");
+
   const headers = { "Content-Type": "application/json", "x-admin-password": password };
 
   /* ── Auth ── */
@@ -99,6 +105,31 @@ export default function AdminSessionsPage() {
       alert(json.error);
     }
     setCreating(false);
+  };
+
+  /* ── Edit session ── */
+  const startEdit = (s: Session) => {
+    setEditingId(s.id);
+    setEditFields({ title: s.title, date: s.date, time: s.time ?? "", location: s.location, venue: s.venue ?? "" });
+    setEditMsg("");
+  };
+
+  const saveEdit = async (id: string) => {
+    setEditSaving(true); setEditMsg("");
+    const res  = await fetch(`/api/admin/sessions/${id}`, {
+      method: "PATCH", headers,
+      body: JSON.stringify(editFields),
+    });
+    const json = await res.json();
+    if (res.ok) {
+      setEditMsg("Saved!");
+      await loadSessions();
+      if (selected?.id === id) setSelected((prev) => prev ? { ...prev, ...editFields } : prev);
+      setTimeout(() => { setEditingId(null); setEditMsg(""); }, 800);
+    } else {
+      setEditMsg(json.error ?? "Save failed.");
+    }
+    setEditSaving(false);
   };
 
   /* ── Select session → load users ── */
@@ -281,18 +312,50 @@ export default function AdminSessionsPage() {
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 {sessions.map((s) => (
-                  <div key={s.id} style={{ position: "relative" }}>
-                    <button onClick={() => openSession(s)}
-                      style={{ width: "100%", textAlign: "left", padding: "10px 12px", paddingRight: "44px", borderRadius: "6px", border: "1px solid", cursor: "pointer", background: selected?.id === s.id ? "rgba(232,98,10,0.1)" : "transparent", borderColor: selected?.id === s.id ? "rgba(232,98,10,0.4)" : "rgba(255,255,255,0.07)", transition: "all 0.15s" }}>
-                      <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#fff", marginBottom: "2px" }}>{s.title}</div>
-                      <div style={{ fontSize: "0.72rem", color: "#888" }}>{s.date}{s.time ? ` ${s.time}` : ""} · {s.location}</div>
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); copyJoinLink(s.id); }}
-                      title="Copy join link"
-                      style={{ position: "absolute", right: "6px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: "4px 6px", color: copiedId === s.id ? "#4ade80" : "#555", fontSize: "0.75rem", fontWeight: 600, fontFamily: "inherit", transition: "color 0.15s" }}>
-                      {copiedId === s.id ? "✓" : "🔗"}
-                    </button>
+                  <div key={s.id} style={{ borderRadius: "6px", border: "1px solid", borderColor: selected?.id === s.id ? "rgba(232,98,10,0.4)" : "rgba(255,255,255,0.07)", overflow: "hidden" }}>
+
+                    {/* Session row */}
+                    <div style={{ display: "flex", alignItems: "center", position: "relative" }}>
+                      <button onClick={() => { if (editingId !== s.id) openSession(s); }}
+                        style={{ flex: 1, textAlign: "left", padding: "10px 12px", border: "none", cursor: "pointer", background: selected?.id === s.id ? "rgba(232,98,10,0.1)" : "transparent" }}>
+                        <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#fff", marginBottom: "2px" }}>{s.title}</div>
+                        <div style={{ fontSize: "0.72rem", color: "#888" }}>{s.date}{s.time ? ` ${s.time}` : ""} · {s.location}</div>
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); editingId === s.id ? setEditingId(null) : startEdit(s); }}
+                        title="Edit session"
+                        style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 6px", color: editingId === s.id ? "#e8620a" : "#555", fontSize: "0.8rem", flexShrink: 0 }}>
+                        ✏️
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); copyJoinLink(s.id); }}
+                        title="Copy join link"
+                        style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 8px", color: copiedId === s.id ? "#4ade80" : "#555", fontSize: "0.75rem", fontWeight: 600, fontFamily: "inherit", flexShrink: 0 }}>
+                        {copiedId === s.id ? "✓" : "🔗"}
+                      </button>
+                    </div>
+
+                    {/* Inline edit form */}
+                    {editingId === s.id && (
+                      <div style={{ padding: "10px 12px", borderTop: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)", display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <input style={inp} value={editFields.title} onChange={(e) => setEditFields((p) => ({ ...p, title: e.target.value }))} placeholder="Title" />
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+                          <input style={inp} type="date" value={editFields.date} onChange={(e) => setEditFields((p) => ({ ...p, date: e.target.value }))} />
+                          <input style={inp} type="time" value={editFields.time} onChange={(e) => setEditFields((p) => ({ ...p, time: e.target.value }))} />
+                        </div>
+                        <input style={inp} value={editFields.location} onChange={(e) => setEditFields((p) => ({ ...p, location: e.target.value }))} placeholder="Location" />
+                        <input style={inp} value={editFields.venue} onChange={(e) => setEditFields((p) => ({ ...p, venue: e.target.value }))} placeholder="Venue" />
+                        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                          <button onClick={() => saveEdit(s.id)} disabled={editSaving}
+                            style={{ ...btn(true), padding: "6px 16px", fontSize: "0.75rem" }}>
+                            {editSaving ? "Saving…" : "Save"}
+                          </button>
+                          <button onClick={() => setEditingId(null)}
+                            style={{ ...btn(false), padding: "6px 12px", fontSize: "0.75rem" }}>
+                            Cancel
+                          </button>
+                          {editMsg && <span style={{ fontSize: "0.72rem", color: editMsg === "Saved!" ? "#4ade80" : "#f09595" }}>{editMsg}</span>}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
