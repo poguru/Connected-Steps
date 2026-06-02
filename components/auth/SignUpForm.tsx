@@ -217,13 +217,6 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
         {loading ? "Creating account…" : "Sign up"}
       </button>
 
-      <p className="text-xs text-center mt-4" style={{ color: "var(--cs-muted)" }}>
-        Already have an account?{" "}
-        <button type="button" onClick={onSwitchToLogin}
-          style={{ color: "var(--cs-orange)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: "inherit", fontWeight: 600 }}>
-          Log in
-        </button>
-      </p>
     </form>
   );
 }
