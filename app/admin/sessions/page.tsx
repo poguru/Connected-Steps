@@ -222,6 +222,12 @@ export default function AdminSessionsPage() {
   const toggleAttend = (email: string) =>
     setAttendees((prev) => prev.map((a) => a.email === email ? { ...a, attended: !a.attended } : a));
 
+  const markAllPresent = () =>
+    setAttendees((prev) => prev.map((a) => a.points_synced ? a : { ...a, attended: true }));
+
+  const markAllAbsent = () =>
+    setAttendees((prev) => prev.map((a) => a.points_synced ? a : { ...a, attended: false }));
+
   const setBonus = (email: string, pts: number) =>
     setAttendees((prev) => prev.map((a) => a.email === email ? { ...a, bonus_points: pts } : a));
 
@@ -549,6 +555,15 @@ export default function AdminSessionsPage() {
                   </div>
                 ))}
               </div>
+
+              {/* Bulk actions */}
+              {attendees.length > 0 && (
+                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.75rem", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "10px", color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", marginRight: "4px" }}>Bulk:</span>
+                  <button onClick={markAllPresent} style={{ ...btn(true), padding: "6px 16px", fontSize: "0.78rem" }}>✓ Mark all present</button>
+                  <button onClick={markAllAbsent}  style={{ ...btn(false), padding: "6px 16px", fontSize: "0.78rem" }}>✗ Mark all absent</button>
+                </div>
+              )}
 
               {/* Attendance table */}
               {attendees.length === 0 ? (
