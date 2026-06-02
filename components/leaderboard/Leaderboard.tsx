@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { getSupabase } from "@/lib/supabase";
 import UserMenu, { MenuUser } from "@/components/ui/UserMenu";
 
 interface User {
@@ -26,6 +25,7 @@ interface LeaderboardEntry {
   month_points: number;
   total_points: number;
   updated_at:   string;
+  photo:        string | null;
 }
 
 
@@ -67,21 +67,19 @@ export default function Leaderboard() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const { data, error } = await getSupabase()
-        .from("leaderboard")
-        .select("id, user_email, user_name, location, goal, month_points, total_points, updated_at")
-        .order(tab === "month" ? "month_points" : "total_points", { ascending: false });
-      if (!error && data) {
-        const pointsKey = tab === "month" ? "month_points" : "total_points";
-        const sorted = [...data].sort((a, b) => {
-          const diff = (b[pointsKey] ?? 0) - (a[pointsKey] ?? 0);
-          if (diff !== 0) return diff;
-          const aFirst = a.user_name.split(" ")[0];
-          const bFirst = b.user_name.split(" ")[0];
-          return aFirst.localeCompare(bFirst, undefined, { sensitivity: "base" });
-        });
-        setEntries(sorted);
-      }
+      try {
+        const res  = await fetch("/api/leaderboard");
+        const data = await res.json();
+        if (data.entries) {
+          const pointsKey = tab === "month" ? "month_points" : "total_points";
+          const sorted = [...data.entries].sort((a: LeaderboardEntry, b: LeaderboardEntry) => {
+            const diff = (b[pointsKey] ?? 0) - (a[pointsKey] ?? 0);
+            if (diff !== 0) return diff;
+            return a.user_name.split(" ")[0].localeCompare(b.user_name.split(" ")[0], undefined, { sensitivity: "base" });
+          });
+          setEntries(sorted);
+        }
+      } catch { /* ignore */ }
       setLoading(false);
     }
     load();
@@ -239,7 +237,7 @@ export default function Leaderboard() {
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0 }}>
-                  <Avatar name={entry.user_name} photo={isMe ? user.photo : null} />
+                  <Avatar name={entry.user_name} photo={entry.photo} />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: "0.875rem", fontWeight: 600, color: isMe ? "var(--cs-orange)" : "var(--cs-white)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {entry.user_name} {isMe && <span style={{ fontSize: "10px", color: "var(--cs-orange)" }}>(you)</span>}
