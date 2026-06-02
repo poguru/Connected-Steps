@@ -409,7 +409,18 @@ export default function CommunityQA() {
 
         {/* Posts grid */}
         {loading ? (
-          <div style={{ color: "var(--cs-muted)", fontSize: "0.875rem", textAlign: "center", padding: "3rem" }}>Loading…</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            {[1, 2, 3].map((i) => (
+              <div key={i} style={{ background: "var(--cs-charcoal)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "10px", padding: "1.25rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                <div style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
+                  <div style={{ width: "52px", height: "20px", background: "rgba(255,255,255,0.06)", borderRadius: "20px" }} />
+                  <div style={{ width: "70px", height: "13px", background: "rgba(255,255,255,0.04)", borderRadius: "4px" }} />
+                </div>
+                <div style={{ width: "75%", height: "15px", background: "rgba(255,255,255,0.06)", borderRadius: "4px" }} />
+                <div style={{ width: "50%", height: "11px", background: "rgba(255,255,255,0.04)", borderRadius: "4px" }} />
+              </div>
+            ))}
+          </div>
         ) : filtered.length === 0 ? (
           <div style={{ background: "var(--cs-charcoal)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "10px", padding: "3rem", textAlign: "center" }}>
             <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>💬</div>

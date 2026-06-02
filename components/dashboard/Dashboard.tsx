@@ -584,14 +584,18 @@ export default function Dashboard() {
             <div className="font-display" style={{ fontSize: "1.2rem", fontWeight: 600, color: "var(--cs-white)", marginBottom: "0.25rem" }}>{fullName}</div>
             <div style={{ fontSize: "0.75rem", color: "var(--cs-orange)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.25rem" }}>{goalLabel[user.goal] ?? user.goal}</div>
 
-            <div style={{ display: "flex", justifyContent: "center", gap: "2rem", marginBottom: "1.25rem" }}>
+            <div style={{ display: "flex", justifyContent: "center", gap: "1.25rem", marginBottom: "1.25rem" }}>
               <div style={{ textAlign: "center" }}>
                 <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--cs-white)" }}>{activities.length}</div>
                 <div style={{ fontSize: "10px", color: "var(--cs-muted)", marginTop: "2px" }}>Activities</div>
               </div>
               <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--cs-orange)" }}>{points?.month_points ?? 0}</div>
+                <div style={{ fontSize: "10px", color: "var(--cs-muted)", marginTop: "2px" }}>This Month</div>
+              </div>
+              <div style={{ textAlign: "center" }}>
                 <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--cs-white)" }}>{points?.total_points ?? 0}</div>
-                <div style={{ fontSize: "10px", color: "var(--cs-muted)", marginTop: "2px" }}>Total Points</div>
+                <div style={{ fontSize: "10px", color: "var(--cs-muted)", marginTop: "2px" }}>Total Pts</div>
               </div>
             </div>
 
@@ -605,6 +609,34 @@ export default function Dashboard() {
 
         {/* ── Main feed ── */}
         <main className="cs-db-main">
+
+          {/* Mobile-only compact profile card */}
+          <div className="cs-mobile-profile-card">
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              {user.photo ? (
+                <img src={user.photo} alt={fullName} style={{ width: "48px", height: "48px", borderRadius: "50%", objectFit: "cover", border: "2px solid var(--cs-orange)", flexShrink: 0 }} />
+              ) : (
+                <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem", fontWeight: 700, color: "#fff", flexShrink: 0 }}>
+                  {user.firstName[0]}{user.lastName[0]}
+                </div>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--cs-white)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{fullName}</div>
+                <div style={{ fontSize: "0.72rem", color: "var(--cs-orange)", textTransform: "uppercase", letterSpacing: "0.08em" }}>{goalLabel[user.goal] ?? user.goal}</div>
+              </div>
+              <div style={{ display: "flex", gap: "1rem", flexShrink: 0 }}>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--cs-orange)" }}>{points?.month_points ?? 0}</div>
+                  <div style={{ fontSize: "9px", color: "var(--cs-muted)" }}>This Month</div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--cs-white)" }}>{points?.total_points ?? 0}</div>
+                  <div style={{ fontSize: "9px", color: "var(--cs-muted)" }}>Total Pts</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Upcoming Sessions */}
           {upcomingSessions.length > 0 && (
             <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(74,222,128,0.15)", borderRadius: "8px", padding: "1.25rem", marginBottom: "1.25rem" }}>
@@ -667,7 +699,17 @@ export default function Dashboard() {
           )}
 
           {sessionsLoading ? (
-            <div style={{ textAlign: "center", padding: "3rem", color: "var(--cs-muted)", fontSize: "0.875rem" }}>Loading…</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {[1,2,3].map((i) => (
+                <div key={i} style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1rem 1.25rem", display: "flex", gap: "1rem", alignItems: "center" }}>
+                  <div style={{ width: "44px", height: "44px", borderRadius: "8px", background: "rgba(255,255,255,0.05)", flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ width: "55%", height: "13px", background: "rgba(255,255,255,0.05)", borderRadius: "4px", marginBottom: "8px" }} />
+                    <div style={{ width: "35%", height: "10px", background: "rgba(255,255,255,0.04)", borderRadius: "4px" }} />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : sessions.length === 0 ? (
             <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "3rem", textAlign: "center" }}>
               <div style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>🏃</div>
@@ -705,6 +747,22 @@ export default function Dashboard() {
             </div>
             <span style={{ fontSize: "1.2rem" }}>🏆</span>
           </div>
+
+          {/* Push Notifications */}
+          {pushSupported && (
+            <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1rem 1.25rem", marginBottom: "1rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem" }}>
+              <div>
+                <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "2px" }}>Notifications</div>
+                <div style={{ fontSize: "0.82rem", color: "var(--cs-white)" }}>{pushEnabled ? "Push alerts on" : "Get session alerts"}</div>
+              </div>
+              <button
+                onClick={handlePushToggle}
+                style={{ flexShrink: 0, padding: "6px 14px", borderRadius: "6px", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)", border: pushEnabled ? "1px solid rgba(74,222,128,0.3)" : "1px solid rgba(232,98,10,0.3)", background: pushEnabled ? "rgba(74,222,128,0.1)" : "rgba(232,98,10,0.1)", color: pushEnabled ? "#4ade80" : "var(--cs-orange)" }}
+              >
+                {pushEnabled ? "Disable" : "Enable"}
+              </button>
+            </div>
+          )}
 
           {/* Share Your Story */}
           <div id="share-story" style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem" }}>

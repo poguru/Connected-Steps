@@ -48,6 +48,7 @@ export default function Leaderboard() {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab,       setTab]       = useState<"month" | "total">("month");
+  const [locFilter, setLocFilter] = useState("All");
 
   useEffect(() => {
     const stored = localStorage.getItem("cs_user");
@@ -82,10 +83,13 @@ export default function Leaderboard() {
 
   if (!user) return null;
 
+  const locations = ["All", ...Array.from(new Set(entries.map((e) => e.location).filter(Boolean))).sort()];
+
   const fullName  = `${user.firstName} ${user.lastName}`;
-  const myIndex   = entries.findIndex((e) => e.user_email === user.email);
+  const filtered  = locFilter === "All" ? entries : entries.filter((e) => e.location === locFilter);
+  const myIndex   = filtered.findIndex((e) => e.user_email === user.email);
   const myRank    = myIndex >= 0 ? myIndex + 1 : null;
-  const myEntry   = myIndex >= 0 ? entries[myIndex] : null;
+  const myEntry   = myIndex >= 0 ? filtered[myIndex] : null;
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--cs-black)", color: "var(--cs-white)" }}>
@@ -153,7 +157,17 @@ export default function Leaderboard() {
               </button>
             ))}
           </div>
-          <button onClick={() => router.push("/dashboard")} style={{ background: "none", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "6px", cursor: "pointer", color: "var(--cs-muted)", fontSize: "0.8rem", padding: "8px 16px", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+          <select
+            value={locFilter}
+            onChange={(e) => setLocFilter(e.target.value)}
+            style={{ padding: "7px 10px", borderRadius: "6px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "var(--cs-white)", fontSize: "0.8rem", fontFamily: "inherit", outline: "none", cursor: "pointer", colorScheme: "dark" }}
+          >
+            {locations.map((l) => (
+              <option key={l} value={l} style={{ background: "#1a1a1a" }}>{l === "All" ? "All locations" : l}</option>
+            ))}
+          </select>
+
+          <button onClick={() => router.push("/dashboard")} style={{ marginLeft: "auto", background: "none", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "6px", cursor: "pointer", color: "var(--cs-muted)", fontSize: "0.8rem", padding: "8px 16px", fontFamily: "inherit", whiteSpace: "nowrap" }}>
             ← Dashboard
           </button>
         </div>
@@ -173,7 +187,7 @@ export default function Leaderboard() {
             </div>
           )}
 
-          {!loading && entries.length === 0 && (
+          {!loading && filtered.length === 0 && (
             <div style={{ padding: "3rem", textAlign: "center" }}>
               <div style={{ fontSize: "2rem", marginBottom: "1rem" }}>🏃</div>
               <div style={{ fontSize: "1rem", fontWeight: 600, color: "var(--cs-white)", marginBottom: "0.5rem" }}>No entries yet</div>
@@ -181,7 +195,7 @@ export default function Leaderboard() {
             </div>
           )}
 
-          {entries.map((entry, i) => {
+          {filtered.map((entry, i) => {
             const isMe  = entry.user_email === user.email;
             const pts   = (tab === "month" ? entry.month_points : entry.total_points) ?? 0;
 
