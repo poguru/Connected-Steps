@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -20,6 +21,7 @@ function formatDate(date: string) {
 }
 
 export default function JoinClient({ id }: { id: string }) {
+  const router = useRouter();
   const [session, setSession]   = useState<SessionInfo | null>(null);
   const [loading, setLoading]   = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -40,6 +42,11 @@ export default function JoinClient({ id }: { id: string }) {
         if (u.email) { userEmail = u.email; setEmail(u.email); }
       }
     } catch { /* ignore */ }
+
+    if (!userEmail) {
+      router.replace(`/auth?tab=signin&redirect=/join/${id}`);
+      return;
+    }
 
     const url = userEmail
       ? `/api/sessions/${id}/join?email=${encodeURIComponent(userEmail)}`
