@@ -605,10 +605,6 @@ export default function Dashboard() {
 
         {/* ── Main feed ── */}
         <main className="cs-db-main">
-          <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1rem" }}>
-            Recent Sessions
-          </div>
-
           {/* Upcoming Sessions */}
           {upcomingSessions.length > 0 && (
             <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(74,222,128,0.15)", borderRadius: "8px", padding: "1.25rem", marginBottom: "1.25rem" }}>
