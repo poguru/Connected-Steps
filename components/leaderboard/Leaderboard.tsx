@@ -194,6 +194,30 @@ export default function Leaderboard() {
             </div>
           )}
 
+          {/* Pinned "your rank" row — always at the top */}
+          {!loading && myEntry && myRank !== null && (
+            <>
+              <div className="cs-lb-row" style={{ background: "rgba(232,98,10,0.1)", borderBottom: "2px solid rgba(232,98,10,0.2)" }}>
+                <div style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--cs-orange)" }}>#{myRank}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem", fontWeight: 700, flexShrink: 0 }}>
+                    {myEntry.user_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--cs-orange)" }}>
+                      {myEntry.user_name} <span style={{ fontSize: "10px" }}>(you)</span>
+                    </div>
+                    <div style={{ fontSize: "11px", color: "var(--cs-muted)" }}>📍 {myEntry.location}</div>
+                  </div>
+                </div>
+                <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--cs-orange)" }}>
+                  {(tab === "month" ? myEntry.month_points : myEntry.total_points) ?? 0}
+                  <span style={{ fontSize: "10px", fontWeight: 400, color: "var(--cs-muted)", marginLeft: "3px" }}>pts</span>
+                </div>
+              </div>
+            </>
+          )}
+
           {filtered.map((entry, i) => {
             const isMe  = entry.user_email === user.email;
             const pts   = (tab === "month" ? entry.month_points : entry.total_points) ?? 0;
@@ -230,33 +254,6 @@ export default function Leaderboard() {
               </div>
             );
           })}
-
-          {/* Pinned "your rank" row — only shown when user is outside top 10 */}
-          {!loading && myEntry && myRank !== null && myRank > 10 && (
-            <>
-              <div style={{ padding: "6px 0", textAlign: "center", fontSize: "12px", color: "#444", letterSpacing: "0.1em", borderTop: "1px solid rgba(255,255,255,0.04)" }}>
-                · · ·
-              </div>
-              <div className="cs-lb-row" style={{ background: "rgba(232,98,10,0.08)", borderTop: "1px solid rgba(232,98,10,0.15)" }}>
-                <div style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--cs-orange)" }}>#{myRank}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                  <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem", fontWeight: 700, flexShrink: 0 }}>
-                    {myEntry.user_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--cs-orange)" }}>
-                      {myEntry.user_name} <span style={{ fontSize: "10px" }}>(you)</span>
-                    </div>
-                    <div style={{ fontSize: "11px", color: "var(--cs-muted)" }}>📍 {myEntry.location}</div>
-                  </div>
-                </div>
-                <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--cs-orange)" }}>
-                  {(tab === "month" ? myEntry.month_points : myEntry.total_points) ?? 0}
-                  <span style={{ fontSize: "10px", fontWeight: 400, color: "var(--cs-muted)", marginLeft: "3px" }}>pts</span>
-                </div>
-              </div>
-            </>
-          )}
         </div>
 
         <div style={{ marginTop: "1rem", fontSize: "11px", color: "var(--cs-muted)", textAlign: "center" }}>
