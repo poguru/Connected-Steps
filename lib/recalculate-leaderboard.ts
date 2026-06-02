@@ -20,11 +20,13 @@ export async function recalculateMonth(month: string): Promise<{ message: string
 
   const db = getSupabaseServer();
 
+  const today = new Date().toISOString().slice(0, 10);
+
   const { data: sessions, error: sErr } = await db
     .from("sessions")
     .select("id, date, location")
     .gte("date", rangeStart)
-    .lte("date", rangeEnd)
+    .lte("date", rangeEnd < today ? rangeEnd : today)
     .order("date");
 
   if (sErr) throw new Error(sErr.message);
