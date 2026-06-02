@@ -157,9 +157,13 @@ export default function MembershipCard({ email, name }: Props) {
         </div>
 
         {/* Progress bar */}
-        <div style={{ width: "100%", height: "5px", background: "rgba(255,255,255,0.06)", borderRadius: "4px", overflow: "hidden", marginBottom: expiringSoon ? "0.75rem" : "0" }}>
+        <div style={{ width: "100%", height: "5px", background: "rgba(255,255,255,0.06)", borderRadius: "4px", overflow: "hidden", marginBottom: "0.6rem" }}>
           <div style={{ width: `${pct}%`, height: "100%", background: barColor, borderRadius: "4px", transition: "width 0.4s" }} />
         </div>
+
+        <a href="/payments" style={{ fontSize: "11px", color: "var(--cs-muted)", textDecoration: "none", display: "inline-block", marginBottom: expiringSoon ? "0.5rem" : "0" }}>
+          View payment history →
+        </a>
 
         {/* Renew CTA for expiring soon */}
         {expiringSoon && (
