@@ -13,12 +13,9 @@ import Features             from "@/components/home/Features";
 import StatsAndTestimonials from "@/components/home/StatsAndTestimonials";
 import CommunityQA         from "@/components/home/CommunityQA";
 import CallToAction         from "@/components/home/CallToAction";
-import UrgencyBanner        from "@/components/home/UrgencyBanner";
-
 export default function HomePage() {
   return (
     <>
-      <UrgencyBanner />
       <Navbar />
       <Hero />
       <RecentSessions />
