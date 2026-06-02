@@ -71,8 +71,8 @@ export default function UserMenu({ user }: Props) {
             {initials}
           </div>
         )}
-        <span style={{ fontSize: "0.875rem", color: "var(--cs-white)" }}>{fullName}</span>
-        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{ color: "var(--cs-muted)", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }}>
+        <span className="cs-usermenu-name" style={{ fontSize: "0.875rem", color: "var(--cs-white)" }}>{fullName}</span>
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" className="cs-usermenu-chevron" style={{ color: "var(--cs-muted)", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }}>
           <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </button>

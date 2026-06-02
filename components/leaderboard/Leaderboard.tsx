@@ -83,7 +83,7 @@ export default function Leaderboard() {
 
   if (!user) return null;
 
-  const locations = ["All", ...Array.from(new Set(entries.map((e) => e.location).filter(Boolean))).sort()];
+  const locations = ["All", ...Array.from(new Set(entries.map((e) => e.location).filter((l) => l && !l.includes("@")))).sort()];
 
   const fullName  = `${user.firstName} ${user.lastName}`;
   const filtered  = locFilter === "All" ? entries : entries.filter((e) => e.location === locFilter);
@@ -128,13 +128,16 @@ export default function Leaderboard() {
 
         {/* Header */}
         <div style={{ marginBottom: "2rem" }}>
+          <button onClick={() => router.push("/dashboard")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--cs-muted)", fontSize: "0.82rem", padding: "0 0 0.75rem", fontFamily: "inherit" }}>
+            ← Dashboard
+          </button>
           <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.5rem" }}>Connected Steps</div>
           <h1 className="font-display" style={{ fontSize: "2rem", fontWeight: 300, color: "var(--cs-white)", marginBottom: "0.5rem" }}>Community Leaderboard</h1>
           <p style={{ fontSize: "0.875rem", color: "var(--cs-muted)" }}>Top 3 this month win prizes. Earn points by attending training sessions.</p>
         </div>
 
-        {/* Tab switcher + back */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.5rem" }}>
+        {/* Tab switcher + location filter */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
           <div style={{ display: "flex", gap: "4px", padding: "4px", borderRadius: "6px", background: "rgba(255,255,255,0.05)" }}>
             {(["month", "total"] as const).map((t) => (
               <button
@@ -166,10 +169,6 @@ export default function Leaderboard() {
               <option key={l} value={l} style={{ background: "#1a1a1a" }}>{l === "All" ? "All locations" : l}</option>
             ))}
           </select>
-
-          <button onClick={() => router.push("/dashboard")} style={{ marginLeft: "auto", background: "none", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "6px", cursor: "pointer", color: "var(--cs-muted)", fontSize: "0.8rem", padding: "8px 16px", fontFamily: "inherit", whiteSpace: "nowrap" }}>
-            ← Dashboard
-          </button>
         </div>
 
         {/* Table */}

@@ -654,6 +654,12 @@ select.auth-input option {
   .cs-dashboard-body { padding-bottom: 80px !important; }
 }
 
+/* ─── UserMenu — hide name + chevron on mobile ──────────  */
+@media (max-width: 900px) {
+  .cs-usermenu-name    { display: none; }
+  .cs-usermenu-chevron { display: none; }
+}
+
 /* ─── Mobile profile card — visible only on mobile ────── */
 .cs-mobile-profile-card {
   display: none;
