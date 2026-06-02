@@ -41,8 +41,9 @@ export default function ProfilePage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [user,      setUser]      = useState<AppUser | null>(null);
-  const [photo,     setPhoto]     = useState<string | null>(null);
-  const [photoFile, setPhotoFile] = useState<string | null>(null); // preview base64
+  const [photo,      setPhoto]      = useState<string | null>(null);
+  const [photoFile,  setPhotoFile]  = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState("");
 
   // info form
   const [info,      setInfo]      = useState({ firstName: "", lastName: "", phone: "", location: "", goal: "5k" });
@@ -68,6 +69,12 @@ export default function ProfilePage() {
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setPhotoError("");
+    if (file.size > 2 * 1024 * 1024) {
+      setPhotoError("Photo must be under 2 MB. Please choose a smaller image.");
+      e.target.value = "";
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => setPhotoFile(reader.result as string);
     reader.readAsDataURL(file);
@@ -167,7 +174,8 @@ export default function ProfilePage() {
                   Save photo
                 </button>
               )}
-              <div style={{ fontSize: "11px", color: "#555" }}>JPG or PNG · Shown on your profile</div>
+              <div style={{ fontSize: "11px", color: "#555" }}>JPG or PNG · Max 2 MB</div>
+              {photoError && <div style={{ fontSize: "11px", color: "#f09595" }}>{photoError}</div>}
             </div>
           </div>
           <input ref={fileRef} type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: "none" }} />
