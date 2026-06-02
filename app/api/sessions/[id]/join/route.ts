@@ -188,9 +188,6 @@ async function sendJoinConfirmationEmail(p: {
           Go to Dashboard →
         </a>
 
-        <p style="color:#555;font-size:12px;margin-top:28px;">
-          If you are unable to attend, please cancel your registration before the session begins so others may take your place.
-        </p>
       </div>
 
       <!-- Footer -->
