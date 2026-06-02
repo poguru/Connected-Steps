@@ -6,6 +6,21 @@ function auth(req: NextRequest) {
   return pw && pw === process.env.ADMIN_PASSWORD;
 }
 
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  if (!auth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await params;
+  const db = getSupabaseServer();
+
+  // Delete attendance records first, then the session
+  await db.from("session_attendance").delete().eq("session_id", id);
+  const { error } = await db.from("sessions").delete().eq("id", id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ success: true });
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

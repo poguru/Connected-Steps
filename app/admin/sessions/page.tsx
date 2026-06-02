@@ -57,6 +57,16 @@ export default function AdminSessionsPage() {
   const [editSaving,  setEditSaving]  = useState(false);
   const [editMsg,     setEditMsg]     = useState("");
 
+  // Reschedule session
+  const [reschedulingId,    setReschedulingId]    = useState<string | null>(null);
+  const [rescheduleFields,  setRescheduleFields]  = useState({ date: "", time: "" });
+  const [rescheduleSaving,  setRescheduleSaving]  = useState(false);
+  const [rescheduleMsg,     setRescheduleMsg]     = useState("");
+
+  // Delete session
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleting,        setDeleting]        = useState(false);
+
   // Add user to session
   const [addEmail,    setAddEmail]    = useState("");
   const [addMsg,      setAddMsg]      = useState("");
@@ -135,6 +145,48 @@ export default function AdminSessionsPage() {
       setEditMsg(json.error ?? "Save failed.");
     }
     setEditSaving(false);
+  };
+
+  /* ── Reschedule session ── */
+  const startReschedule = (s: Session) => {
+    setReschedulingId(s.id);
+    setRescheduleFields({ date: s.date, time: s.time ?? "" });
+    setRescheduleMsg("");
+    setEditingId(null);
+    setDeleteConfirmId(null);
+  };
+
+  const saveReschedule = async (s: Session) => {
+    setRescheduleSaving(true); setRescheduleMsg("");
+    const res  = await fetch(`/api/admin/sessions/${s.id}`, {
+      method: "PATCH", headers,
+      body: JSON.stringify({ title: s.title, date: rescheduleFields.date, time: rescheduleFields.time, location: s.location, venue: s.venue }),
+    });
+    const json = await res.json();
+    if (res.ok) {
+      setRescheduleMsg("Rescheduled!");
+      await loadSessions();
+      if (selected?.id === s.id) setSelected((prev) => prev ? { ...prev, ...rescheduleFields } : prev);
+      setTimeout(() => { setReschedulingId(null); setRescheduleMsg(""); }, 800);
+    } else {
+      setRescheduleMsg(json.error ?? "Failed.");
+    }
+    setRescheduleSaving(false);
+  };
+
+  /* ── Delete session ── */
+  const deleteSession = async (id: string) => {
+    setDeleting(true);
+    const res = await fetch(`/api/admin/sessions/${id}`, { method: "DELETE", headers });
+    if (res.ok) {
+      if (selected?.id === id) { setSelected(null); setAttendees([]); }
+      await loadSessions();
+      setDeleteConfirmId(null);
+    } else {
+      const json = await res.json();
+      alert(json.error ?? "Delete failed.");
+    }
+    setDeleting(false);
   };
 
   /* ── Add user manually to session ── */
@@ -339,22 +391,22 @@ export default function AdminSessionsPage() {
                   <div key={s.id} style={{ borderRadius: "6px", border: "1px solid", borderColor: selected?.id === s.id ? "rgba(232,98,10,0.4)" : "rgba(255,255,255,0.07)", overflow: "hidden" }}>
 
                     {/* Session row */}
-                    <div style={{ display: "flex", alignItems: "center", position: "relative" }}>
-                      <button onClick={() => { if (editingId !== s.id) openSession(s); }}
+                    <div style={{ display: "flex", alignItems: "center" }}>
+                      <button onClick={() => { if (editingId !== s.id && reschedulingId !== s.id) openSession(s); }}
                         style={{ flex: 1, textAlign: "left", padding: "10px 12px", border: "none", cursor: "pointer", background: selected?.id === s.id ? "rgba(232,98,10,0.1)" : "transparent" }}>
                         <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#fff", marginBottom: "2px" }}>{s.title}</div>
                         <div style={{ fontSize: "0.72rem", color: "#888" }}>{s.date}{s.time ? ` ${s.time}` : ""} · {s.location}</div>
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); editingId === s.id ? setEditingId(null) : startEdit(s); }}
-                        title="Edit session"
-                        style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 6px", color: editingId === s.id ? "#e8620a" : "#555", fontSize: "0.8rem", flexShrink: 0 }}>
-                        ✏️
-                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); editingId === s.id ? setEditingId(null) : startEdit(s); setReschedulingId(null); setDeleteConfirmId(null); }}
+                        title="Edit" style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 5px", color: editingId === s.id ? "#e8620a" : "#555", fontSize: "0.8rem", flexShrink: 0 }}>✏️</button>
+                      <button onClick={(e) => { e.stopPropagation(); reschedulingId === s.id ? setReschedulingId(null) : startReschedule(s); }}
+                        title="Reschedule" style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 5px", color: reschedulingId === s.id ? "#e8620a" : "#555", fontSize: "0.8rem", flexShrink: 0 }}>📅</button>
                       <button onClick={(e) => { e.stopPropagation(); copyJoinLink(s.id); }}
-                        title="Copy join link"
-                        style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 8px", color: copiedId === s.id ? "#4ade80" : "#555", fontSize: "0.75rem", fontWeight: 600, fontFamily: "inherit", flexShrink: 0 }}>
+                        title="Copy join link" style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 5px", color: copiedId === s.id ? "#4ade80" : "#555", fontSize: "0.75rem", fontWeight: 600, fontFamily: "inherit", flexShrink: 0 }}>
                         {copiedId === s.id ? "✓" : "🔗"}
                       </button>
+                      <button onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(deleteConfirmId === s.id ? null : s.id); setEditingId(null); setReschedulingId(null); }}
+                        title="Delete" style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 6px", color: deleteConfirmId === s.id ? "#f09595" : "#555", fontSize: "0.8rem", flexShrink: 0 }}>🗑️</button>
                     </div>
 
                     {/* Inline edit form */}
@@ -368,16 +420,42 @@ export default function AdminSessionsPage() {
                         <input style={inp} value={editFields.location} onChange={(e) => setEditFields((p) => ({ ...p, location: e.target.value }))} placeholder="Location" />
                         <input style={inp} value={editFields.venue} onChange={(e) => setEditFields((p) => ({ ...p, venue: e.target.value }))} placeholder="Venue" />
                         <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                          <button onClick={() => saveEdit(s.id)} disabled={editSaving}
-                            style={{ ...btn(true), padding: "6px 16px", fontSize: "0.75rem" }}>
+                          <button onClick={() => saveEdit(s.id)} disabled={editSaving} style={{ ...btn(true), padding: "6px 16px", fontSize: "0.75rem" }}>
                             {editSaving ? "Saving…" : "Save"}
                           </button>
-                          <button onClick={() => setEditingId(null)}
-                            style={{ ...btn(false), padding: "6px 12px", fontSize: "0.75rem" }}>
-                            Cancel
-                          </button>
+                          <button onClick={() => setEditingId(null)} style={{ ...btn(false), padding: "6px 12px", fontSize: "0.75rem" }}>Cancel</button>
                           {editMsg && <span style={{ fontSize: "0.72rem", color: editMsg === "Saved!" ? "#4ade80" : "#f09595" }}>{editMsg}</span>}
                         </div>
+                      </div>
+                    )}
+
+                    {/* Inline reschedule form */}
+                    {reschedulingId === s.id && (
+                      <div style={{ padding: "10px 12px", borderTop: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)", display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <div style={{ fontSize: "10px", color: "#888", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "2px" }}>Reschedule</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+                          <input style={inp} type="date" value={rescheduleFields.date} onChange={(e) => setRescheduleFields((p) => ({ ...p, date: e.target.value }))} />
+                          <input style={inp} type="time" value={rescheduleFields.time} onChange={(e) => setRescheduleFields((p) => ({ ...p, time: e.target.value }))} />
+                        </div>
+                        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                          <button onClick={() => saveReschedule(s)} disabled={rescheduleSaving} style={{ ...btn(true), padding: "6px 16px", fontSize: "0.75rem" }}>
+                            {rescheduleSaving ? "Saving…" : "Save"}
+                          </button>
+                          <button onClick={() => setReschedulingId(null)} style={{ ...btn(false), padding: "6px 12px", fontSize: "0.75rem" }}>Cancel</button>
+                          {rescheduleMsg && <span style={{ fontSize: "0.72rem", color: rescheduleMsg === "Rescheduled!" ? "#4ade80" : "#f09595" }}>{rescheduleMsg}</span>}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Delete confirm */}
+                    {deleteConfirmId === s.id && (
+                      <div style={{ padding: "10px 12px", borderTop: "1px solid rgba(226,75,74,0.2)", background: "rgba(226,75,74,0.05)", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                        <span style={{ fontSize: "0.75rem", color: "#f09595", flex: 1 }}>Delete this session and all its attendance records?</span>
+                        <button onClick={() => deleteSession(s.id)} disabled={deleting}
+                          style={{ ...btn(false), padding: "5px 14px", fontSize: "0.75rem", background: "rgba(226,75,74,0.2)", color: "#f09595", flexShrink: 0 }}>
+                          {deleting ? "Deleting…" : "Yes, delete"}
+                        </button>
+                        <button onClick={() => setDeleteConfirmId(null)} style={{ ...btn(false), padding: "5px 10px", fontSize: "0.75rem", flexShrink: 0 }}>Cancel</button>
                       </div>
                     )}
                   </div>
