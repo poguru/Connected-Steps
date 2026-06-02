@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
-const ADMIN_EMAIL = process.env.ADMIN_NOTIFY_EMAIL ?? "connected.steps2106@gmail.com";
+const ADMIN_EMAIL = process.env.ADMIN_NOTIFY_EMAIL ?? "info@connectedsteps.in";
 
 async function notifyAdmin(p: { user_name: string; user_email: string; category: string; title: string; body: string }) {
   const key  = process.env.RESEND_API_KEY;
