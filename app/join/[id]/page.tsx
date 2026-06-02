@@ -29,27 +29,30 @@ export async function generateMetadata(
   });
   const timeStr  = session.time ? ` at ${session.time}` : "";
   const venue    = session.venue || session.location;
-  const title    = `${session.title} – Connected Steps`;
-  const desc     = `📅 ${dateStr}${timeStr} · 📍 ${venue}. Tap to register for this training session.`;
-  const imageUrl = session.photo_url ?? `${APP_URL}/logo.png`;
-  const pageUrl  = `${APP_URL}/join/${id}`;
+  const title   = session.title;
+  const desc    = `📅 ${dateStr}${timeStr} · 📍 ${venue}. Tap to register for this training session.`;
+  const pageUrl = `${APP_URL}/join/${id}`;
+
+  const ogImages = session.photo_url
+    ? [{ url: session.photo_url, width: 1200, height: 630, alt: session.title }]
+    : [];
 
   return {
-    title,
+    title: `${title} – Connected Steps`,
     description: desc,
     openGraph: {
       title,
       description: desc,
       url:         pageUrl,
       siteName:    "Connected Steps",
-      images: [{ url: imageUrl, width: 1200, height: 630, alt: session.title }],
-      type: "website",
+      images:      ogImages,
+      type:        "website",
     },
     twitter: {
-      card:        "summary_large_image",
+      card:        session.photo_url ? "summary_large_image" : "summary",
       title,
       description: desc,
-      images:      [imageUrl],
+      images:      session.photo_url ? [session.photo_url] : [],
     },
   };
 }
