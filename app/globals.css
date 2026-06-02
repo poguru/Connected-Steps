@@ -611,3 +611,45 @@ select.auth-input option {
 @media (max-width: 640px) {
   .stories-grid { grid-template-columns: 1fr !important; }
 }
+
+/* ─── Ask Coach FAB ──────────────────────────────────── */
+.cs-ask-fab-btn {
+  position: fixed;
+  bottom: 28px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 999px;
+  background: rgba(17, 17, 17, 0.95);
+  border: 1px solid rgba(232, 98, 10, 0.4);
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.cs-ask-fab-btn:hover {
+  border-color: var(--cs-orange);
+  transform: translateY(-2px);
+}
+
+@media (max-width: 900px) {
+  .cs-ask-fab-btn {
+    padding: 14px;
+    border-radius: 50%;
+    bottom: 20px;
+    right: 16px;
+  }
+
+  .cs-ask-fab-label { display: none; }
+
+  /* Extra bottom padding so FAB doesn't cover content */
+  .cs-dashboard-body { padding-bottom: 80px !important; }
+}

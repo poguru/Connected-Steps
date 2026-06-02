@@ -74,23 +74,12 @@ export default function AskCoachFab() {
       {/* Floating button */}
       <button
         onClick={() => setOpen(true)}
-        style={{
-          position: "fixed", bottom: "28px", right: "20px", zIndex: 50,
-          display: "flex", alignItems: "center", gap: "8px",
-          padding: "12px 20px", background: "var(--cs-dark)",
-          border: "1px solid rgba(232,98,10,0.4)",
-          color: "var(--cs-orange)", borderRadius: "50px",
-          fontSize: "0.82rem", fontWeight: 700, cursor: "pointer",
-          fontFamily: "inherit", boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
-          transition: "border-color 0.2s, transform 0.15s",
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--cs-orange)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(232,98,10,0.4)"; e.currentTarget.style.transform = "none"; }}
+        className="cs-ask-fab-btn"
       >
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
         </svg>
-        Ask your coach
+        <span className="cs-ask-fab-label">Ask your coach</span>
       </button>
 
       {/* Modal */}

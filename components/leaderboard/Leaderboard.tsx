@@ -64,7 +64,17 @@ export default function Leaderboard() {
         .from("leaderboard")
         .select("id, user_email, user_name, location, goal, month_points, total_points, updated_at")
         .order(tab === "month" ? "month_points" : "total_points", { ascending: false });
-      if (!error && data) setEntries(data);
+      if (!error && data) {
+        const pointsKey = tab === "month" ? "month_points" : "total_points";
+        const sorted = [...data].sort((a, b) => {
+          const diff = (b[pointsKey] ?? 0) - (a[pointsKey] ?? 0);
+          if (diff !== 0) return diff;
+          const aFirst = a.user_name.split(" ")[0];
+          const bFirst = b.user_name.split(" ")[0];
+          return aFirst.localeCompare(bFirst, undefined, { sensitivity: "base" });
+        });
+        setEntries(sorted);
+      }
       setLoading(false);
     }
     load();
