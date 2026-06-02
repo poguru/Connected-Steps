@@ -14,6 +14,18 @@ async function getSession(id: string) {
   return data;
 }
 
+async function getLatestPhoto() {
+  const db = getSupabaseServer();
+  const { data } = await db
+    .from("sessions")
+    .select("photo_url")
+    .not("photo_url", "is", null)
+    .order("date", { ascending: false })
+    .limit(1)
+    .single();
+  return data?.photo_url ?? null;
+}
+
 export async function generateMetadata(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<Metadata> {
@@ -29,12 +41,13 @@ export async function generateMetadata(
   });
   const timeStr  = session.time ? ` at ${session.time}` : "";
   const venue    = session.venue || session.location;
-  const title   = session.title;
-  const desc    = `📅 ${dateStr}${timeStr} · 📍 ${venue}. Tap to register for this training session.`;
-  const pageUrl = `${APP_URL}/join/${id}`;
+  const photoUrl = session.photo_url ?? await getLatestPhoto();
+  const title    = session.title;
+  const desc     = `📅 ${dateStr}${timeStr} · 📍 ${venue}. Tap to register for this training session.`;
+  const pageUrl  = `${APP_URL}/join/${id}`;
 
-  const ogImages = session.photo_url
-    ? [{ url: session.photo_url, width: 1200, height: 630, alt: session.title }]
+  const ogImages = photoUrl
+    ? [{ url: photoUrl, width: 1200, height: 630, alt: session.title }]
     : [];
 
   return {
@@ -49,10 +62,10 @@ export async function generateMetadata(
       type:        "website",
     },
     twitter: {
-      card:        session.photo_url ? "summary_large_image" : "summary",
+      card:        photoUrl ? "summary_large_image" : "summary",
       title,
       description: desc,
-      images:      session.photo_url ? [session.photo_url] : [],
+      images:      photoUrl ? [photoUrl] : [],
     },
   };
 }
