@@ -18,7 +18,6 @@ export default defineConfig({
     baseURL: BASE_URL,
     headless: true,
     screenshot: 'on',
-    screenshotPath: path.join(__dirname, 'screenshots'),
     video: 'off',
     trace: 'off',
     ignoreHTTPSErrors: false,
