@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -73,6 +74,58 @@ const cards = [
 ];
 
 export default function AdminHub() {
+  const [authed, setAuthed] = useState(false);
+  const [pw,     setPw]     = useState("");
+  const [error,  setError]  = useState("");
+
+  useEffect(() => {
+    const stored = localStorage.getItem("cs_admin_pw");
+    if (stored) verify(stored);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function verify(password: string) {
+    const res = await fetch("/api/admin/sessions", { headers: { "x-admin-password": password } });
+    if (res.ok || res.status === 200) {
+      localStorage.setItem("cs_admin_pw", password);
+      setAuthed(true);
+    } else {
+      setError("Incorrect password.");
+      localStorage.removeItem("cs_admin_pw");
+    }
+  }
+
+  if (!authed) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "2rem", width: "320px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.5rem" }}>
+            <Image src="/logo.png" alt="Connected Steps" width={32} height={32} className="rounded-full" />
+            <div>
+              <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "#fff" }}>Connected Steps</div>
+              <div style={{ fontSize: "10px", color: "#e8620a", letterSpacing: "0.1em", textTransform: "uppercase" }}>Admin</div>
+            </div>
+          </div>
+          <input
+            type="password"
+            placeholder="Admin password"
+            value={pw}
+            onChange={(e) => { setPw(e.target.value); setError(""); }}
+            onKeyDown={(e) => e.key === "Enter" && verify(pw)}
+            style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "#fff", fontSize: "0.875rem", outline: "none", boxSizing: "border-box", marginBottom: "0.75rem", fontFamily: "inherit" }}
+          />
+          {error && <div style={{ fontSize: "0.8rem", color: "#f09595", marginBottom: "0.75rem" }}>{error}</div>}
+          <button
+            onClick={() => verify(pw)}
+            style={{ width: "100%", padding: "10px", background: "#e8620a", color: "#fff", border: "none", borderRadius: "6px", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            Access Admin
+          </button>
+          <Link href="/" style={{ display: "block", textAlign: "center", marginTop: "1rem", fontSize: "0.75rem", color: "#555", textDecoration: "none" }}>← Back to site</Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
       <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none", marginBottom: "3rem" }}>

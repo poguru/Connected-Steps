@@ -18,10 +18,18 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Connected Steps — Your Goal, Our Plan",
+  title: {
+    default:  "Connected Steps — Your Goal, Our Plan",
+    template: "%s | Connected Steps",
+  },
   description:
-    "Expert coaching, personalised training plans, and a community built to help you hit every goal. Whether it's your first 5K or a full marathon — we run with you.",
+    "Expert coaching, personalised training plans, and a community built to help you hit every running goal. Your first 5K or a full marathon — we run with you.",
   metadataBase: new URL("https://www.connectedsteps.in"),
+  icons: {
+    icon:    "/logo.png",
+    apple:   "/logo.png",
+    shortcut:"/logo.png",
+  },
   openGraph: {
     title: "Connected Steps — Your Goal, Our Plan",
     description: "Expert coaching and a community built around your running goals.",
