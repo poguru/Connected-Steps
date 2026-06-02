@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { sendEmail, sendWhatsApp, expiryReminderEmailHTML } from "@/lib/notify";
+import { expiryReminderEmailHTML } from "@/lib/notify";
 
 const PLAN_LABELS: Record<string, string> = {
   monthly:   "Monthly",
@@ -10,18 +10,16 @@ const PLAN_LABELS: Record<string, string> = {
 };
 
 // Runs daily at 7am IST via Vercel Cron (vercel.json)
+// Sends reminders at 7 days and 1 day before expiry
 export async function GET(req: NextRequest) {
-  // Verify this is called by Vercel Cron or an authorised trigger
   const authHeader = req.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const db  = getSupabaseServer();
-  const now = new Date();
-
-  // Find memberships expiring in exactly 7 days and exactly 1 day (two reminder windows)
-  const results: { email: string; days: number; sent: string[] }[] = [];
+  const db      = getSupabaseServer();
+  const now     = new Date();
+  const results: { email: string; days: number; ok: boolean }[] = [];
 
   for (const daysAhead of [7, 1]) {
     const from = new Date(now);
@@ -38,13 +36,12 @@ export async function GET(req: NextRequest) {
       .gte("expires_at", from.toISOString())
       .lte("expires_at", to.toISOString());
 
-    if (!memberships || memberships.length === 0) continue;
+    if (!memberships?.length) continue;
 
-    // Get user details
     const emails = memberships.map((m) => m.user_email);
     const { data: users } = await db
       .from("users")
-      .select("email, first_name, last_name, phone")
+      .select("email, first_name, last_name")
       .in("email", emails);
 
     const userMap = Object.fromEntries((users ?? []).map((u) => [u.email, u]));
@@ -55,32 +52,42 @@ export async function GET(req: NextRequest) {
 
       const name      = `${u.first_name} ${u.last_name}`.trim() || "there";
       const planLabel = PLAN_LABELS[m.plan] ?? m.plan;
-      const sent: string[] = [];
 
-      // Email reminder
-      const emailResult = await sendEmail(
-        m.user_email,
-        name,
-        `Your membership expires in ${daysAhead} day${daysAhead === 1 ? "" : "s"} – Connected Steps`,
-        expiryReminderEmailHTML(name, planLabel, m.expires_at, daysAhead)
-      );
-      if (emailResult.ok) sent.push("email");
-
-      // WhatsApp reminder (uses membership_expiry template — create in MSG91)
-      if (u.phone?.trim()) {
-        const waResult = await sendWhatsApp(u.phone, [
-          name,
-          planLabel,
-          new Date(m.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }),
-          String(daysAhead),
-        ], "membership_expiry_alert");
-        if (waResult.ok) sent.push("whatsapp");
-      }
-
-      results.push({ email: m.user_email, days: daysAhead, sent });
+      const ok = await sendExpiryEmail(m.user_email, name, planLabel, m.expires_at, daysAhead);
+      results.push({ email: m.user_email, days: daysAhead, ok });
     }
   }
 
-  console.log("Expiry reminders sent:", JSON.stringify(results));
+  console.log("Expiry reminders:", JSON.stringify(results));
   return NextResponse.json({ ok: true, reminded: results.length, results });
+}
+
+async function sendExpiryEmail(
+  email: string,
+  name: string,
+  plan: string,
+  expiresAt: string,
+  daysLeft: number,
+): Promise<boolean> {
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey) return false;
+
+  const from    = process.env.RESEND_FROM_EMAIL ?? "Connected Steps <noreply@connectedsteps.in>";
+  const subject = `Your membership expires in ${daysLeft} day${daysLeft === 1 ? "" : "s"} – Connected Steps`;
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${resendKey}` },
+      body: JSON.stringify({
+        from,
+        to:      [email],
+        subject,
+        html:    expiryReminderEmailHTML(name, plan, expiresAt, daysLeft),
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
