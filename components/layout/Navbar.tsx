@@ -18,6 +18,7 @@ const beforeSessionLinks = [
 const afterSessionLinks = [
   { label: "Community",       href: "#community"    },
   { label: "Pricing",         href: "/pricing"      },
+  { label: "Corporate",       href: "/corporate"    },
   { label: "Upcoming Events", href: "/weekend-run", highlight: true },
 ];
 

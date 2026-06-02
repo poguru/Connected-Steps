@@ -262,7 +262,72 @@ export default function PricingPage() {
           </Link>{" "}
           — we'll help you choose.
         </p>
+
+        {/* Money-back guarantee */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.75rem", marginTop: "2.5rem", padding: "1rem 1.5rem", background: "rgba(74,222,128,0.06)", border: "1px solid rgba(74,222,128,0.2)", borderRadius: "10px", maxWidth: "480px", margin: "2.5rem auto 0" }}>
+          <span style={{ fontSize: "1.75rem" }}>🛡️</span>
+          <div>
+            <div style={{ fontSize: "0.875rem", fontWeight: 700, color: "#4ade80", marginBottom: "2px" }}>30-Day Money-Back Guarantee</div>
+            <div style={{ fontSize: "0.78rem", color: "var(--cs-muted)", lineHeight: 1.5 }}>Not happy in your first month? We'll refund every rupee. No questions asked.</div>
+          </div>
+        </div>
+
+        {/* FAQ */}
+        <div style={{ maxWidth: "680px", margin: "4rem auto 0" }}>
+          <h2 style={{ fontSize: "1.4rem", fontWeight: 300, color: "var(--cs-white)", marginBottom: "1.5rem", textAlign: "center" }}>
+            Frequently Asked Questions
+          </h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            {[
+              {
+                q: "Can I cancel anytime?",
+                a: "Yes — cancel before your next billing date and you won't be charged again. No lock-ins, no cancellation fees.",
+              },
+              {
+                q: "What happens after I sign up?",
+                a: "Within 24 hours your coach will reach out on WhatsApp, learn about your goal and current fitness level, and send you a personalised training plan. Your first session is typically within a week.",
+              },
+              {
+                q: "Do I need to be a runner already?",
+                a: "Not at all. Our Starter plan (5K) is built for complete beginners. Many of our members had never run before joining — and finished their first race within 8 weeks.",
+              },
+              {
+                q: "Are the sessions in-person or online?",
+                a: "Connected Steps runs in-person sessions across multiple locations in Hyderabad. Your plan, coach check-ins, and analytics are accessible online through your dashboard.",
+              },
+              {
+                q: "Can I switch plans later?",
+                a: "Yes. If you finish your 5K goal and want to work toward a half marathon, your coach will upgrade your plan. Just message us on WhatsApp.",
+              },
+              {
+                q: "Is this suitable for corporates or groups?",
+                a: "We offer group and corporate programmes. Message us on WhatsApp or visit our corporate wellness page for group pricing.",
+              },
+            ].map((item, i) => (
+              <FaqItem key={i} q={item.q} a={item.a} />
+            ))}
+          </div>
+        </div>
+
       </div>
+    </div>
+  );
+}
+
+function FaqItem({ q, a }: { q: string; a: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", overflow: "hidden" }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={{ width: "100%", padding: "1rem 1.25rem", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", textAlign: "left", gap: "1rem" }}
+      >
+        <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--cs-white)" }}>{q}</span>
+        <span style={{ fontSize: "1.1rem", color: "var(--cs-orange)", flexShrink: 0, transform: open ? "rotate(45deg)" : "none", transition: "transform 0.2s" }}>+</span>
+      </button>
+      {open && (
+        <div style={{ padding: "0 1.25rem 1rem", fontSize: "0.825rem", color: "var(--cs-muted)", lineHeight: 1.7 }}>{a}</div>
+      )}
     </div>
   );
 }

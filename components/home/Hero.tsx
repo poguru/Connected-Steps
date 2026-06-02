@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link  from "next/link";
 
 export default function Hero() {
   return (
@@ -32,6 +33,16 @@ export default function Hero() {
               real coach, a real plan, and a community that shows up. Whether you&rsquo;re lacing up
               for the first time or chasing a marathon PB — Connected Steps is built for you.
             </p>
+
+            {/* Hero CTAs */}
+            <div className="animate-fade-up-2" style={{ display: "flex", gap: "0.75rem", marginTop: "2rem", flexWrap: "wrap" }}>
+              <Link href="/quiz" style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "13px 24px", background: "var(--cs-orange)", color: "#fff", borderRadius: "6px", textDecoration: "none", fontWeight: 700, fontSize: "0.9rem", fontFamily: "var(--font-body)" }}>
+                Find my training plan →
+              </Link>
+              <Link href="/pricing" style={{ display: "inline-flex", alignItems: "center", padding: "13px 24px", background: "transparent", color: "var(--cs-white)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "6px", textDecoration: "none", fontWeight: 500, fontSize: "0.875rem", fontFamily: "var(--font-body)" }}>
+                View pricing
+              </Link>
+            </div>
           </div>
 
           <div className="hidden lg:flex items-center justify-center">
