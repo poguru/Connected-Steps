@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
       phone:     user.phone,
       goal:      user.goal,
       location:  user.location,
-      photo:     null,
+      photo:     user.photo ?? null,
     },
   });
 }

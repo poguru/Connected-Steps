@@ -28,12 +28,18 @@ interface LeaderboardEntry {
   updated_at:   string;
 }
 
-const goalLabel: Record<string, string> = {
-  "5k":  "First 5K",
-  "10k": "10K",
-  "half":"Half Marathon",
-  "full":"Full Marathon",
-};
+
+function Avatar({ name, photo, size = 36 }: { name: string; photo?: string | null; size?: number }) {
+  const initials = name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  if (photo) return (
+    <img src={photo} alt={name} style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--cs-orange)", flexShrink: 0 }} />
+  );
+  return (
+    <div style={{ width: size, height: size, borderRadius: "50%", background: "var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: `${size * 0.022}rem`, fontWeight: 700, flexShrink: 0 }}>
+      {initials}
+    </div>
+  );
+}
 
 function medal(rank: number) {
   if (rank === 1) return "🥇";
@@ -85,7 +91,6 @@ export default function Leaderboard() {
 
   const locations = ["All", ...Array.from(new Set(entries.map((e) => e.location).filter((l) => l && !l.includes("@")))).sort()];
 
-  const fullName  = `${user.firstName} ${user.lastName}`;
   const filtered  = locFilter === "All" ? entries : entries.filter((e) => e.location === locFilter);
   const myIndex   = filtered.findIndex((e) => e.user_email === user.email);
   const myRank    = myIndex >= 0 ? myIndex + 1 : null;
@@ -199,12 +204,10 @@ export default function Leaderboard() {
             <>
               <div className="cs-lb-row" style={{ background: "rgba(232,98,10,0.1)", borderBottom: "2px solid rgba(232,98,10,0.2)" }}>
                 <div style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--cs-orange)" }}>#{myRank}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                  <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem", fontWeight: 700, flexShrink: 0 }}>
-                    {myEntry.user_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--cs-orange)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0 }}>
+                  <Avatar name={myEntry.user_name} photo={user.photo} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--cs-orange)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {myEntry.user_name} <span style={{ fontSize: "10px" }}>(you)</span>
                     </div>
                     <div style={{ fontSize: "11px", color: "var(--cs-muted)" }}>📍 {myEntry.location}</div>
@@ -235,12 +238,10 @@ export default function Leaderboard() {
                   {medal(i + 1)}
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                  <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem", fontWeight: 700, flexShrink: 0 }}>
-                    {entry.user_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: "0.875rem", fontWeight: 600, color: isMe ? "var(--cs-orange)" : "var(--cs-white)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0 }}>
+                  <Avatar name={entry.user_name} photo={isMe ? user.photo : null} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 600, color: isMe ? "var(--cs-orange)" : "var(--cs-white)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {entry.user_name} {isMe && <span style={{ fontSize: "10px", color: "var(--cs-orange)" }}>(you)</span>}
                     </div>
                     <div style={{ fontSize: "11px", color: "var(--cs-muted)" }}>📍 {entry.location}</div>

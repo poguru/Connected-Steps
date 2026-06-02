@@ -80,13 +80,19 @@ export default function ProfilePage() {
     reader.readAsDataURL(file);
   }
 
-  function savePhoto() {
+  async function savePhoto() {
     if (!photoFile || !user) return;
     const updated = { ...user, photo: photoFile };
     localStorage.setItem("cs_user", JSON.stringify(updated));
     setUser(updated);
     setPhoto(photoFile);
     setPhotoFile(null);
+    // Persist to DB so photo survives logout
+    await fetch("/api/user/update", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ email: user.email, photo: photoFile }),
+    }).catch(() => {});
   }
 
   async function saveInfo() {

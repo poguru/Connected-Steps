@@ -4,7 +4,9 @@
       "WebFetch(domain:www.connectedsteps.in)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(git show *)",
+      "Bash(npm install *)"
     ]
   }
 }
