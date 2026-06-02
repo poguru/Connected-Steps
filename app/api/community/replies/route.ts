@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
       user_email,
       user_name,
       body: body.trim(),
-      approved: false,
+      approved: true,
     });
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

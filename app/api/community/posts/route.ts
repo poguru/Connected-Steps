@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     await db.from("community_posts").insert({
       user_email, user_name,
       category, title: title.trim(), body: body.trim(),
-      approved: false,
+      approved: true,
     });
     return NextResponse.json({ success: true });
   } catch (e: unknown) {

@@ -101,7 +101,10 @@ function ReplyForm({ postId, onDone }: { postId: number; onDone: () => void }) {
 }
 
 // ─── Post Card ───────────────────────────────────────────────────────────────
-function PostCard({ post, isLoggedIn, onLoginRedirect }: { post: Post; isLoggedIn: boolean; onLoginRedirect: () => void }) {
+function PostCard({ post, isLoggedIn, onLoginRedirect, likeCount, liked, onLike }: {
+  post: Post; isLoggedIn: boolean; onLoginRedirect: () => void;
+  likeCount: number; liked: boolean; onLike: () => void;
+}) {
   const c = CATEGORY_COLORS[post.category] ?? CATEGORY_COLORS["General"];
   const [expanded,      setExpanded]      = useState(false);
   const [replies,       setReplies]       = useState<Reply[]>([]);
@@ -155,7 +158,20 @@ function PostCard({ post, isLoggedIn, onLoginRedirect }: { post: Post; isLoggedI
       {/* Footer: author + actions */}
       <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "0.6rem", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
         <span style={{ fontSize: "11px", color: "var(--cs-muted)" }}>— {post.user_name}</span>
-        <div style={{ display: "flex", gap: "0.5rem" }}>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          {/* Like button */}
+          <button
+            onClick={() => { if (!isLoggedIn) { onLoginRedirect(); return; } onLike(); }}
+            style={{
+              fontSize: "11px", display: "flex", alignItems: "center", gap: "4px",
+              color: liked ? "var(--cs-orange)" : "var(--cs-muted)",
+              background: liked ? "rgba(232,98,10,0.1)" : "none",
+              border: `1px solid ${liked ? "rgba(232,98,10,0.3)" : "rgba(255,255,255,0.08)"}`,
+              borderRadius: "20px", padding: "3px 12px", cursor: "pointer", fontFamily: "inherit",
+              transition: "all 0.15s",
+            }}>
+            ♥{likeCount > 0 ? ` ${likeCount}` : ""}
+          </button>
           <button onClick={toggle}
             style={{
               fontSize: "11px", color: expanded ? "var(--cs-orange)" : "var(--cs-muted)",
@@ -335,6 +351,8 @@ export default function CommunityQA() {
   const [loading,    setLoading]    = useState(true);
   const [modalOpen,  setModalOpen]  = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [likeCounts, setLikeCounts] = useState<Record<number, number>>({});
+  const [likedByMe,  setLikedByMe]  = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const raw = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
@@ -366,7 +384,36 @@ export default function CommunityQA() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => { loadPosts(); }, []);
+  function loadLikes() {
+    const raw   = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
+    const email = raw ? (JSON.parse(raw).email ?? "") : "";
+    fetch(`/api/community/likes?email=${encodeURIComponent(email)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setLikeCounts(d.likeCounts ?? {});
+        setLikedByMe(new Set(d.likedByMe ?? []));
+      })
+      .catch(() => {});
+  }
+
+  useEffect(() => { loadPosts(); loadLikes(); }, []);
+
+  async function toggleLike(postId: number) {
+    const wasLiked = likedByMe.has(postId);
+    // Optimistic update
+    setLikedByMe((prev) => { const s = new Set(prev); wasLiked ? s.delete(postId) : s.add(postId); return s; });
+    setLikeCounts((prev) => ({ ...prev, [postId]: Math.max(0, (prev[postId] ?? 0) + (wasLiked ? -1 : 1)) }));
+
+    const raw   = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
+    const email = raw ? (JSON.parse(raw).email ?? "") : "";
+    const res   = await fetch("/api/community/likes", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ post_id: postId, email }),
+    }).catch(() => null);
+    if (!res?.ok) return;
+    const data = await res.json();
+    setLikeCounts((prev) => ({ ...prev, [postId]: data.count }));
+  }
 
   function handleAskClick() {
     if (!isLoggedIn) {
@@ -439,6 +486,9 @@ export default function CommunityQA() {
                 post={post}
                 isLoggedIn={isLoggedIn}
                 onLoginRedirect={() => { window.location.href = `/auth?redirect=${encodeURIComponent("/#community")}`; }}
+                likeCount={likeCounts[post.id] ?? 0}
+                liked={likedByMe.has(post.id)}
+                onLike={() => toggleLike(post.id)}
               />
             ))}
           </div>
