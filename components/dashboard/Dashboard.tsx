@@ -748,6 +748,16 @@ export default function Dashboard() {
             <span style={{ fontSize: "1.2rem" }}>🏆</span>
           </div>
 
+          {/* My Coach Questions link */}
+          <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1rem 1.25rem", marginBottom: "1rem", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}
+            onClick={() => router.push("/my-questions")}>
+            <div>
+              <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "2px" }}>Coach Q&A</div>
+              <div style={{ fontSize: "0.85rem", color: "var(--cs-white)", fontWeight: 500 }}>My questions & replies</div>
+            </div>
+            <span style={{ fontSize: "1.2rem" }}>💬</span>
+          </div>
+
           {/* Push Notifications */}
           {pushSupported && (
             <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1rem 1.25rem", marginBottom: "1rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem" }}>
