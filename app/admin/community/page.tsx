@@ -42,8 +42,9 @@ export default function AdminCommunityPage() {
   const [replies, setReplies] = useState<Reply[]>([]);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
-  const [actingPost,  setActingPost]  = useState<number | null>(null);
-  const [actingReply, setActingReply] = useState<number | null>(null);
+  const [actingPost,    setActingPost]    = useState<number | null>(null);
+  const [actingReply,   setActingReply]   = useState<number | null>(null);
+  const [approvingAll,  setApprovingAll]  = useState(false);
 
   async function load(password: string) {
     setLoading(true); setError("");
@@ -66,6 +67,18 @@ export default function AdminCommunityPage() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { const s = localStorage.getItem("cs_admin_pw"); if (s) load(s); }, []);
+
+  async function approveAll() {
+    setApprovingAll(true);
+    try {
+      await fetch("/api/admin/community", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-admin-password": pw },
+        body: JSON.stringify({ action: "approve_all" }),
+      });
+      setPosts((prev) => prev.map((p) => ({ ...p, approved: true })));
+    } finally { setApprovingAll(false); }
+  }
 
   async function actPost(id: number, action: "approve" | "reject") {
     setActingPost(id);
@@ -142,7 +155,15 @@ export default function AdminCommunityPage() {
 
         {/* Pending Posts */}
         <section>
-          <div style={{ fontSize: "11px", color: "#555", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1rem" }}>Pending Posts ({pendingPosts.length})</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
+            <div style={{ fontSize: "11px", color: "#555", letterSpacing: "0.08em", textTransform: "uppercase" }}>Pending Posts ({pendingPosts.length})</div>
+            {pendingPosts.length > 0 && (
+              <button onClick={approveAll} disabled={approvingAll}
+                style={{ padding: "5px 14px", background: "#4ade80", color: "#000", border: "none", borderRadius: "6px", fontSize: "0.78rem", fontWeight: 700, cursor: approvingAll ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: approvingAll ? 0.6 : 1 }}>
+                {approvingAll ? "Approving…" : `Approve all (${pendingPosts.length})`}
+              </button>
+            )}
+          </div>
           {pendingPosts.length === 0 ? (
             <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", padding: "1.5rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>No posts pending.</div>
           ) : (

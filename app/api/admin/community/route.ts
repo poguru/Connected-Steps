@@ -29,7 +29,9 @@ export async function PATCH(req: NextRequest) {
     if (!id || !action) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
 
     const db = getSupabaseServer();
-    if (action === "reject") {
+    if (action === "approve_all") {
+      await db.from("community_posts").update({ approved: true }).eq("approved", false);
+    } else if (action === "reject") {
       await db.from("community_posts").delete().eq("id", id);
     } else {
       await db.from("community_posts").update({ approved: true }).eq("id", id);
