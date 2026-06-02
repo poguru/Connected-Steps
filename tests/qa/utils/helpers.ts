@@ -1,4 +1,4 @@
-import { Page, expect } from '@playwright/test';
+import { Page } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
 
@@ -98,14 +98,14 @@ export async function hasHorizontalScroll(page: Page): Promise<boolean> {
 
 /** Get performance metrics via PerformanceNavigationTiming */
 export async function getNavTiming(page: Page): Promise<Record<string, number>> {
-  return page.evaluate(() => {
+  return page.evaluate((): Record<string, number> => {
     const [entry] = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
     if (!entry) return {};
     return {
       domContentLoaded: Math.round(entry.domContentLoadedEventEnd - entry.startTime),
-      loadComplete: Math.round(entry.loadEventEnd - entry.startTime),
-      ttfb: Math.round(entry.responseStart - entry.requestStart),
-      domInteractive: Math.round(entry.domInteractive - entry.startTime),
+      loadComplete:     Math.round(entry.loadEventEnd - entry.startTime),
+      ttfb:             Math.round(entry.responseStart - entry.requestStart),
+      domInteractive:   Math.round(entry.domInteractive - entry.startTime),
     };
   });
 }
