@@ -189,7 +189,7 @@ async function sendJoinConfirmationEmail(p: {
         </a>
 
         <p style="color:#555;font-size:12px;margin-top:28px;">
-          Can't make it? Open the session link and tap <em>Leave</em> before it starts so the spot is freed up.
+          If you are unable to attend, please cancel your registration before the session begins so others may take your place.
         </p>
       </div>
 
