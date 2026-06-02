@@ -103,3 +103,37 @@ export async function POST(
     skipped: syncedEmails.size,
   });
 }
+
+// PUT — manually add a user to a session's attendance list
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  if (!auth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await params;
+  const { email } = await req.json() as { email: string };
+  if (!email) return NextResponse.json({ error: "email required" }, { status: 400 });
+
+  const db = getSupabaseServer();
+
+  const { data: user } = await db
+    .from("users")
+    .select("email, first_name, last_name")
+    .eq("email", email.toLowerCase())
+    .single();
+
+  if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+  const { error } = await db.from("session_attendance").upsert({
+    session_id:    id,
+    user_email:    user.email,
+    user_name:     `${user.first_name} ${user.last_name}`.trim(),
+    attended:      false,
+    bonus_points:  0,
+    bonus_reason:  "",
+    points_synced: false,
+  }, { onConflict: "session_id,user_email", ignoreDuplicates: true });
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ success: true, name: `${user.first_name} ${user.last_name}`.trim() });
+}

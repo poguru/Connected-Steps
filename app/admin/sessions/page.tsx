@@ -57,6 +57,11 @@ export default function AdminSessionsPage() {
   const [editSaving,  setEditSaving]  = useState(false);
   const [editMsg,     setEditMsg]     = useState("");
 
+  // Add user to session
+  const [addEmail,    setAddEmail]    = useState("");
+  const [addMsg,      setAddMsg]      = useState("");
+  const [adding,      setAdding]      = useState(false);
+
   const headers = { "Content-Type": "application/json", "x-admin-password": password };
 
   /* ── Auth ── */
@@ -130,6 +135,25 @@ export default function AdminSessionsPage() {
       setEditMsg(json.error ?? "Save failed.");
     }
     setEditSaving(false);
+  };
+
+  /* ── Add user manually to session ── */
+  const addUser = async () => {
+    if (!selected || !addEmail.trim()) return;
+    setAdding(true); setAddMsg("");
+    const res  = await fetch(`/api/admin/sessions/${selected.id}/attendance`, {
+      method: "PUT", headers,
+      body: JSON.stringify({ email: addEmail.trim().toLowerCase() }),
+    });
+    const json = await res.json();
+    if (res.ok) {
+      setAddMsg(`✓ ${json.name} added`);
+      setAddEmail("");
+      await openSession(selected);
+    } else {
+      setAddMsg(json.error ?? "Failed to add user.");
+    }
+    setAdding(false);
   };
 
   /* ── Select session → load users ── */
@@ -417,6 +441,22 @@ export default function AdminSessionsPage() {
                   {lastSavedAt && <span style={{ fontSize: "10px", color: "#666", flexShrink: 0, marginLeft: "1rem" }}>at {lastSavedAt}</span>}
                 </div>
               )}
+
+              {/* Add user manually */}
+              <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", padding: "0.75rem 1rem", marginBottom: "1rem", display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+                <span style={{ fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.08em", flexShrink: 0 }}>Add member manually</span>
+                <input
+                  value={addEmail}
+                  onChange={(e) => { setAddEmail(e.target.value); setAddMsg(""); }}
+                  onKeyDown={(e) => e.key === "Enter" && addUser()}
+                  placeholder="Email address"
+                  style={{ ...inp, flex: 1, minWidth: "180px", padding: "6px 10px" }}
+                />
+                <button onClick={addUser} disabled={adding || !addEmail.trim()} style={{ ...btn(true), padding: "6px 16px", fontSize: "0.78rem", flexShrink: 0 }}>
+                  {adding ? "Adding…" : "Add"}
+                </button>
+                {addMsg && <span style={{ fontSize: "0.75rem", color: addMsg.startsWith("✓") ? "#4ade80" : "#f09595" }}>{addMsg}</span>}
+              </div>
 
               {/* Stats row */}
               <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
