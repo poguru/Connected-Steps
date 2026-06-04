@@ -96,7 +96,7 @@ export default function Leaderboard() {
   for (let i = 0; i < filtered.length; i++) {
     if (i === 0) { ranks.push(1); continue; }
     const samePts = (filtered[i][pointsKey] ?? 0) === (filtered[i - 1][pointsKey] ?? 0);
-    ranks.push(samePts ? ranks[i - 1] : i + 1);
+    ranks.push(samePts ? ranks[i - 1] : ranks[i - 1] + 1);
   }
 
   const myIndex   = filtered.findIndex((e) => e.user_email === user.email);
