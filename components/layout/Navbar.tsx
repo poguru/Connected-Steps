@@ -3,165 +3,140 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
+import { Menu, X } from "lucide-react";
 
-interface StoredUser {
-  firstName: string;
-  lastName:  string;
-  photo:     string | null;
-}
-
-const beforeSessionLinks = [
-  { label: "Training", href: "#training" },
-  { label: "Coaches",  href: "#coaches"  },
+const nav = [
+  { href: "/running-club-hyderabad", label: "Programs"    },
+  { href: "/#upcoming-sessions",     label: "Events"      },
+  { href: "/leaderboard",            label: "Leaderboard" },
+  { href: "/community",              label: "Community"   },
+  { href: "/pricing",                label: "Pricing"     },
 ];
-
-const afterSessionLinks = [
-  { label: "Community",       href: "#community"    },
-  { label: "Pricing",         href: "/pricing"      },
-  { label: "Corporate",       href: "/corporate"    },
-  { label: "Upcoming Events", href: "/weekend-run", highlight: true },
-];
-
 
 export default function Navbar() {
-  const [scrolled,     setScrolled]     = useState(false);
-  const [menuOpen,     setMenuOpen]     = useState(false);
-  const [loggedInUser, setLoggedInUser] = useState<StoredUser | null>(null);
+  const [open,     setOpen]     = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [authed,   setAuthed]   = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40);
-    window.addEventListener("scroll", onScroll, { passive: true });
-
     const stored = localStorage.getItem("cs_user");
-    if (stored) setLoggedInUser(JSON.parse(stored));
+    setAuthed(!!stored);
+  }, [pathname]);
 
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-    };
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Lock body scroll when mobile menu is open
-  useEffect(() => {
-    document.body.style.overflow = menuOpen ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
-  }, [menuOpen]);
-
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
-      style={menuOpen ? {
-        bottom: 0,
-        background: "rgba(8,28,45,0.99)",
-        display: "flex",
-        flexDirection: "column",
-      } : {
-        background: scrolled ? "rgba(8,28,45,0.97)" : "transparent",
-        backdropFilter: scrolled ? "blur(12px)" : "none",
-        borderBottom: scrolled ? "1px solid rgba(56,189,248,0.08)" : "none",
-      }}>
-      <div className="container" style={{ flexShrink: 0 }}>
-        <nav className="flex items-center justify-between h-24">
+    <header style={{
+      position: "sticky", top: 0, zIndex: 50,
+      transition: "all 0.3s",
+      ...(scrolled
+        ? { background: "oklch(0.18 0.015 270 / 70%)", backdropFilter: "blur(18px) saturate(140%)", borderBottom: "1px solid var(--border)", boxShadow: "var(--shadow-md)" }
+        : { background: "transparent", borderBottom: "1px solid transparent" }),
+    }}>
+      <div style={{ maxWidth: 1280, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", height: 64, padding: "0 1.5rem" }}>
 
-          {/* Brand */}
-          <Link href="/" className="group" style={{ flexShrink: 0 }} onClick={() => setMenuOpen(false)}>
-            <Image src="/logo.png" alt="Connected Steps logo" width={58} height={58}
-              className="rounded-full transition-transform duration-300 group-hover:scale-105" />
-          </Link>
+        {/* Logo */}
+        <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none", flexShrink: 0 }}>
+          <Image src="/logo.png" alt="Connected Steps" width={36} height={36} className="rounded-full" />
+          <span style={{ fontFamily: "var(--font-display)", fontSize: "1.1rem", fontWeight: 600, color: "var(--foreground)" }}>Connected Steps</span>
+        </Link>
 
-          {/* Desktop nav */}
-          <ul className="cs-home-nav-links" style={{ listStyle: "none", margin: 0, padding: 0 }}>
-
-            {/* Before-sessions links */}
-            {beforeSessionLinks.map((link) => (
-              <li key={link.label}>
-                <Link href={link.href}
-                  style={{ color: "var(--cs-muted)", textDecoration: "none", fontSize: "0.925rem", letterSpacing: "0.02em" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--cs-white)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = "var(--cs-muted)")}>
-                  {link.label}
-                </Link>
-              </li>
-            ))}
-
-            {/* After-sessions links */}
-            {afterSessionLinks.map((link) => (
-              <li key={link.label}>
-                {link.highlight ? (
-                  <Link href={link.href}
-                    style={{ color: "var(--cs-orange)", textDecoration: "none", display: "flex", alignItems: "center", gap: "5px", fontWeight: 600, fontSize: "0.925rem", letterSpacing: "0.02em" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.8")}
-                    onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}>
-                    <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--cs-orange)", display: "inline-block", animation: "navDot 1.8s ease-in-out infinite" }} />
-                    {link.label}
-                  </Link>
-                ) : (
-                  <Link href={link.href}
-                    style={{ color: "var(--cs-muted)", textDecoration: "none", fontSize: "0.925rem", letterSpacing: "0.02em" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = "var(--cs-white)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = "var(--cs-muted)")}>
-                    {link.label}
-                  </Link>
-                )}
-              </li>
-            ))}
-          </ul>
-
-          {/* CTA */}
-          <div className="cs-home-nav-cta">
-            {loggedInUser ? (
-              <>
-                <Link href="/dashboard" className="btn-outline" style={{ padding: "10px 22px", fontSize: "13px" }}>
-                  Dashboard
-                </Link>
-                <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: "0.5rem", textDecoration: "none" }}>
-                  {loggedInUser.photo ? (
-                    <img src={loggedInUser.photo} alt="Profile" style={{ width: "34px", height: "34px", borderRadius: "50%", objectFit: "cover", border: "2px solid var(--cs-orange)" }} />
-                  ) : (
-                    <div style={{ width: "34px", height: "34px", borderRadius: "50%", background: "var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", fontWeight: 700, color: "var(--cs-white)" }}>
-                      {loggedInUser.firstName[0]}{loggedInUser.lastName[0]}
-                    </div>
-                  )}
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link href="/auth" className="btn-outline" style={{ padding: "10px 22px", fontSize: "13px" }}>Sign in</Link>
-                <Link href="/auth" className="btn-primary" style={{ padding: "10px 22px", fontSize: "13px" }}>Join free</Link>
-              </>
-            )}
-          </div>
-
-          {/* Mobile burger */}
-          <button className="cs-home-nav-burger" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu">
-            <span style={{ transform: menuOpen ? "rotate(45deg) translate(4px, 4px)" : "none" }} />
-            <span style={{ opacity: menuOpen ? 0 : 1 }} />
-            <span style={{ transform: menuOpen ? "rotate(-45deg) translate(4px, -4px)" : "none" }} />
-          </button>
+        {/* Desktop nav */}
+        <nav style={{ display: "flex", alignItems: "center", gap: 4 }} className="hidden lg:flex">
+          {nav.map((n) => {
+            const active = pathname === n.href;
+            return (
+              <Link key={n.href} href={n.href} style={{
+                padding: "8px 16px", borderRadius: 999,
+                fontSize: "0.875rem", fontWeight: 500, textDecoration: "none",
+                transition: "background 0.2s, color 0.2s",
+                color: active ? "var(--primary)" : "var(--muted-foreground)",
+                background: active ? "oklch(0.72 0.19 49 / 8%)" : "transparent",
+              }}
+                onMouseEnter={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = "var(--surface-elevated)"; (e.currentTarget as HTMLElement).style.color = "var(--foreground)"; }}}
+                onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = "var(--muted-foreground)"; }}}
+              >
+                {n.label}
+              </Link>
+            );
+          })}
         </nav>
 
+        {/* Desktop CTA */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }} className="hidden lg:flex">
+          {authed ? (
+            <Link href="/dashboard" style={{
+              padding: "10px 20px", borderRadius: 999,
+              background: "var(--gradient-primary)",
+              color: "var(--primary-foreground)",
+              fontSize: "0.875rem", fontWeight: 600,
+              textDecoration: "none", boxShadow: "var(--shadow-md)",
+            }}>
+              Dashboard
+            </Link>
+          ) : (
+            <>
+              <Link href="/auth" style={{
+                padding: "10px 16px", borderRadius: 999,
+                fontSize: "0.875rem", fontWeight: 500,
+                color: "var(--foreground)", textDecoration: "none",
+              }}>
+                Sign in
+              </Link>
+              <Link href="/auth?tab=register" style={{
+                padding: "10px 20px", borderRadius: 999,
+                background: "var(--gradient-accent)",
+                color: "var(--accent-foreground)",
+                fontSize: "0.875rem", fontWeight: 600,
+                textDecoration: "none", boxShadow: "var(--shadow-orange)",
+                transition: "transform 0.2s",
+              }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = "scale(1.02)"}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = ""}
+              >
+                Join Community
+              </Link>
+            </>
+          )}
+        </div>
+
+        {/* Mobile burger */}
+        <button aria-label="Menu" onClick={() => setOpen(v => !v)} className="lg:hidden"
+          style={{ borderRadius: 12, border: "1px solid var(--border)", background: "var(--surface)", padding: 8, cursor: "pointer", color: "var(--foreground)" }}>
+          {open ? <X size={20} /> : <Menu size={20} />}
+        </button>
       </div>
 
-        {/* Mobile menu — outside container so it covers full width */}
-        {menuOpen && (
-          <div className="cs-home-mobile-menu" style={{ flex: 1, overflowY: "auto" }}>
-            {[...beforeSessionLinks, ...afterSessionLinks].map((link) => (
-              <Link key={link.label} href={link.href} onClick={() => setMenuOpen(false)}
-                style={{ fontSize: "1rem", color: (link as {highlight?: boolean}).highlight ? "var(--cs-orange)" : "var(--cs-muted)", fontWeight: (link as {highlight?: boolean}).highlight ? 600 : undefined, textDecoration: "none", display: "flex", alignItems: "center", gap: "8px", padding: "0.75rem 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                {(link as {highlight?: boolean}).highlight && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--cs-orange)", display: "inline-block" }} />}
-                {link.label}
+      {/* Mobile menu */}
+      {open && (
+        <div style={{ borderTop: "1px solid var(--border)", background: "var(--background)" }} className="lg:hidden">
+          <div style={{ padding: "1rem 1.5rem", display: "flex", flexDirection: "column", gap: 4 }}>
+            {nav.map((n) => (
+              <Link key={n.href} href={n.href} onClick={() => setOpen(false)} style={{
+                padding: "12px 16px", borderRadius: 12, fontSize: "0.875rem",
+                fontWeight: 500, textDecoration: "none", color: "var(--foreground)",
+              }}>
+                {n.label}
               </Link>
             ))}
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginTop: "1rem", paddingTop: "1rem" }}>
-              {loggedInUser ? (
-                <Link href="/dashboard" className="btn-primary" style={{ textAlign: "center", justifyContent: "center", padding: "14px", fontSize: "0.95rem" }} onClick={() => setMenuOpen(false)}>Go to Dashboard</Link>
-              ) : (
-                <>
-                  <Link href="/auth" className="btn-outline" style={{ textAlign: "center", justifyContent: "center", padding: "14px", fontSize: "0.95rem" }} onClick={() => setMenuOpen(false)}>Sign in</Link>
-                  <Link href="/auth" className="btn-primary" style={{ textAlign: "center", justifyContent: "center", padding: "14px", fontSize: "0.95rem" }} onClick={() => setMenuOpen(false)}>Join free</Link>
-                </>
-              )}
-            </div>
+            <Link href={authed ? "/dashboard" : "/auth?tab=register"} onClick={() => setOpen(false)} style={{
+              marginTop: 12, padding: "12px 16px", borderRadius: 999,
+              background: "var(--gradient-accent)", color: "var(--accent-foreground)",
+              fontSize: "0.875rem", fontWeight: 600, textDecoration: "none", textAlign: "center",
+              boxShadow: "var(--shadow-orange)",
+            }}>
+              {authed ? "Open Dashboard" : "Join Community"}
+            </Link>
           </div>
-        )}
+        </div>
+      )}
     </header>
   );
 }

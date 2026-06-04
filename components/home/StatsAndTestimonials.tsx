@@ -1,212 +1,129 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
+import { motion } from "framer-motion";
+import { Users, Calendar, Star, Quote } from "lucide-react";
 
-const FALLBACK = [
-  { id: -1, user_name: "Priya M.",  achievement: "Hyderabad — Half Marathon finisher", quote: "I went from barely running 2km to completing my first half marathon in 14 weeks. My coach adjusted the plan when life got busy and I never felt alone.", rating: 5 },
-  { id: -2, user_name: "James O.",  achievement: "London — Full Marathon, 3:41",       quote: "The analytics alone are worth it. Seeing my pace improve week-on-week kept me coming back. The community pushes you on days you don't want to lace up.", rating: 5 },
-  { id: -3, user_name: "Sunita R.", achievement: "Bengaluru — 5K PB: 23:14",          quote: "I have been a runner for years but I was plateauing. My Connected Steps coach identified the issue in the first week. Six weeks later, new PB.", rating: 5 },
+const FALLBACK_STORIES = [
+  { id: -1, user_name: "Priya Sharma",  achievement: "Ran first 10K in 2025",         quote: "I went from 'I can't run a kilometre' to finishing my first 10K in four months. The coaches and community made all the difference.", rating: 5 },
+  { id: -2, user_name: "Rohan Mehta",   achievement: "Hyderabad Marathon finisher",    quote: "The plan adapted around my work travel. I shaved 14 minutes off my PB. Best part — the people I run with are now my closest friends.", rating: 5 },
+  { id: -3, user_name: "Anjali Reddy",  achievement: "Corporate wellness lead",        quote: "We ran a 6-week challenge for 80 employees. Engagement was through the roof. Connected Steps made the rollout effortless.", rating: 5 },
 ];
 
 interface Story { id: number; user_name: string; achievement: string; quote: string; rating: number | null; }
 
-function fmt(n: number): string {
-  if (n >= 1000) return `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}k+`;
-  return String(n);
-}
-
-function Stars({ rating }: { rating: number | null }) {
-  const r = rating ?? 5;
-  return (
-    <div style={{ display: "flex", gap: "3px" }}>
-      {[1, 2, 3, 4, 5].map((i) => (
-        <svg key={i} width="13" height="13" viewBox="0 0 14 14"
-          fill={i <= r ? "var(--cs-orange)" : "rgba(255,255,255,0.15)"}>
-          <path d="M7 1l1.55 3.14L12 4.85l-2.5 2.43.59 3.44L7 9.1 4.91 10.72l.59-3.44L3 4.85l3.45-.71L7 1z" />
-        </svg>
-      ))}
-    </div>
-  );
-}
-
-function StoryCard({ story }: { story: Story }) {
-  return (
-    <div style={{
-      background: "var(--cs-charcoal)",
-      border: "1px solid rgba(255,255,255,0.08)",
-      borderRadius: "12px", padding: "1.5rem",
-      display: "flex", flexDirection: "column", gap: "1rem",
-      height: "100%", boxSizing: "border-box",
-    }}>
-      <Stars rating={story.rating} />
-      <p style={{ fontFamily: "var(--font-display)", fontSize: "1rem", fontWeight: 300, fontStyle: "italic", color: "var(--cs-white)", lineHeight: 1.6, flex: 1 }}>
-        &ldquo;{story.quote}&rdquo;
-      </p>
-      <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "0.75rem" }}>
-        <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--cs-white)" }}>{story.user_name}</div>
-        <div style={{ fontSize: "11px", color: "var(--cs-muted)", marginTop: "2px" }}>{story.achievement}</div>
-      </div>
-    </div>
-  );
-}
-
-function StoriesCarousel({ stories }: { stories: Story[] }) {
-  const [current, setCurrent] = useState(0);
-  const [paused,  setPaused]  = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const total    = stories.length;
-  const perPage  = 3;
-  const pages    = Math.ceil(total / perPage);
-
-  const next = useCallback(() => setCurrent((c) => (c + 1) % pages), [pages]);
-  const prev = useCallback(() => setCurrent((c) => (c - 1 + pages) % pages), [pages]);
-
+function CountUp({ to, suffix = "" }: { to: number; suffix?: string }) {
+  const [count,   setCount]   = useState(0);
+  const ref     = useRef<HTMLSpanElement>(null);
+  const started = useRef(false);
   useEffect(() => {
-    if (paused || pages <= 1) return;
-    timerRef.current = setInterval(next, 4000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [paused, pages, next]);
+    const obs = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting && !started.current) {
+        started.current = true;
+        const t0 = Date.now();
+        const dur = 2000;
+        const tick = () => {
+          const p = Math.min((Date.now() - t0) / dur, 1);
+          setCount(Math.floor((1 - Math.pow(1 - p, 3)) * to));
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
+    }, { threshold: 0.3 });
+    if (ref.current) obs.observe(ref.current);
+    return () => obs.disconnect();
+  }, [to]);
+  return <span ref={ref}>{count.toLocaleString()}{suffix}</span>;
+}
 
-  const visible = stories.slice(current * perPage, current * perPage + perPage);
-
-  return (
-    <div>
-      {/* Cards */}
-      <div className="stories-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1.25rem", alignItems: "stretch" }}>
-        {visible.map((story) => (
-          <StoryCard key={story.id} story={story} />
-        ))}
-      </div>
-
-      {/* Bottom navigation bar */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "1.25rem", marginTop: "2.5rem", paddingTop: "1.5rem", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-
-        {/* Prev */}
-        {pages > 1 && (
-          <button onClick={prev} aria-label="Previous"
-            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "6px", padding: "6px 14px", display: "flex", alignItems: "center", cursor: "pointer", color: "var(--cs-white)" }}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M9 2L5 7l4 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-        )}
-
-        {/* Dots */}
-        {pages > 1 && (
-          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-            {Array.from({ length: pages }).map((_, i) => (
-              <button key={i} onClick={() => setCurrent(i)} aria-label={`Go to page ${i + 1}`}
-                style={{ width: i === current ? "20px" : "8px", height: "8px", borderRadius: "4px", background: i === current ? "var(--cs-orange)" : "rgba(255,255,255,0.2)", border: "none", cursor: "pointer", transition: "all 0.25s", padding: 0 }} />
-            ))}
-          </div>
-        )}
-
-        {/* Page count */}
-        <span style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.06em" }}>
-          {current * perPage + 1}–{Math.min(current * perPage + perPage, total)} of {total}
-        </span>
-
-        {/* Next */}
-        {pages > 1 && (
-          <button onClick={next} aria-label="Next"
-            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "6px", padding: "6px 14px", display: "flex", alignItems: "center", cursor: "pointer", color: "var(--cs-white)" }}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M5 2l4 5-4 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-        )}
-
-        {/* Pause / Play */}
-        {pages > 1 && (
-          <button onClick={() => setPaused((p) => !p)} aria-label={paused ? "Play" : "Pause"}
-            style={{ background: "none", border: "none", cursor: "pointer", color: paused ? "var(--cs-orange)" : "var(--cs-muted)", padding: "4px", display: "flex", alignItems: "center", transition: "color 0.2s" }}>
-            {paused ? (
-              <svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor"><path d="M2 1l10 6-10 6V1z"/></svg>
-            ) : (
-              <svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor"><rect x="1" y="1" width="4" height="12" rx="1"/><rect x="7" y="1" width="4" height="12" rx="1"/></svg>
-            )}
-          </button>
-        )}
-      </div>
-    </div>
-  );
+function initials(name: string) {
+  return name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
 }
 
 export default function StatsAndTestimonials() {
-  const [stories,          setStories]          = useState<Story[]>([]);
-  const [avgRating,           setAvgRating]           = useState<number | null>(null);
-  const [totalRunners,        setTotalRunners]        = useState<number | null>(null);
-  const [sessionsConducted,   setSessionsConducted]   = useState<number | null>(null);
+  const [stories,  setStories]  = useState<Story[]>([]);
+  const [statsData, setStats]   = useState({ totalRunners: 0, trainingsConducted: 0, avgRating: 4.9 });
 
   useEffect(() => {
-    fetch("/api/stories")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.stories?.length) setStories(d.stories);
-        if (d.avg_rating != null) setAvgRating(d.avg_rating);
-      })
-      .catch(() => {});
-
-    fetch("/api/stats")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.totalRunners        != null) setTotalRunners(d.totalRunners);
-        if (d.trainingsConducted  != null) setSessionsConducted(d.trainingsConducted);
-        if (d.avgRating           != null) setAvgRating(d.avgRating);
-      })
-      .catch(() => {});
+    fetch("/api/stories").then(r => r.json()).then(d => { if (d.stories?.length) setStories(d.stories); }).catch(() => {});
+    fetch("/api/stats").then(r => r.json()).then(d => setStats(d)).catch(() => {});
   }, []);
 
-  const stats = [
-    { num: totalRunners       != null ? fmt(totalRunners)       : "—",   label: "Members & growing"   },
-    { num: "3",                                                            label: "Expert coaches"      },
-    { num: sessionsConducted  != null ? fmt(sessionsConducted)  : "—",   label: "Sessions conducted"  },
-    { num: avgRating          != null ? `${avgRating}★`         : "30+", label: avgRating != null ? "Coach rating" : "Years coach experience" },
-  ];
+  const display = stories.length ? stories : FALLBACK_STORIES;
 
-  const display = stories.length ? stories : FALLBACK;
+  const stats = [
+    { icon: Users,    label: "Community Members",  value: statsData.totalRunners        || 500,  suffix: "+", grad: "bg-gradient-primary" },
+    { icon: Calendar, label: "Sessions Conducted",  value: statsData.trainingsConducted  || 200,  suffix: "+", grad: "bg-gradient-accent"  },
+    { icon: Star,     label: "Expert Coaches",      value: 3,                                     suffix: "",  grad: "bg-gradient-cyan"    },
+    { icon: Star,     label: "Avg Coach Rating",    value: statsData.avgRating           || 4.9,  suffix: "★", grad: "bg-gradient-primary" },
+  ];
 
   return (
     <>
-      <section className="section" style={{ background: "var(--cs-charcoal)" }}>
-        <div className="container">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-4">
-            {stats.map((s, i) => (
-              <div key={s.label} className="text-center"
-                style={{ borderRight: i < stats.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
-                <div className="stat-num">{s.num}</div>
-                <div className="stat-label">{s.label}</div>
+      {/* Stats */}
+      <section style={{ maxWidth: 1280, margin: "0 auto", padding: "5rem 1.5rem" }}>
+        <div style={{ display: "grid", gap: "1rem" }} className="sm:grid-cols-2 lg:grid-cols-4">
+          {stats.map((s, i) => (
+            <motion.div key={s.label}
+              initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.4, delay: i * 0.08 }}
+              style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", background: "var(--surface)", padding: "1.5rem", boxShadow: "var(--shadow-md)", transition: "transform 0.2s, box-shadow 0.2s" }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-4px)"; (e.currentTarget as HTMLElement).style.boxShadow = "var(--shadow-lg)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.boxShadow = "var(--shadow-md)"; }}
+            >
+              <div style={{ width: 48, height: 48, borderRadius: 12, display: "grid", placeItems: "center", color: "#fff", boxShadow: "var(--shadow-md)", marginBottom: "1.25rem" }} className={s.grad}>
+                <s.icon size={20} />
               </div>
-            ))}
-          </div>
+              <div className="font-display" style={{ fontSize: "2.25rem", fontWeight: 700, color: "var(--foreground)" }}>
+                <CountUp to={typeof s.value === "number" ? s.value : 0} suffix={s.suffix} />
+              </div>
+              <div style={{ marginTop: 4, fontSize: "0.875rem", color: "var(--muted-foreground)" }}>{s.label}</div>
+            </motion.div>
+          ))}
         </div>
       </section>
 
-      <section id="community" className="section" style={{ background: "var(--cs-dark)" }}>
-        <div className="container">
-          <div style={{ textAlign: "center", marginBottom: "3rem" }}>
-            <span className="gold-line mx-auto" />
-            <div className="section-label">Runner stories</div>
-            <h2 className="font-display mt-2"
-              style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 300, color: "var(--cs-white)" }}>
-              Real runners.{" "}
-              <em className="not-italic" style={{ color: "var(--cs-orange)" }}>Real results.</em>
+      {/* Testimonials */}
+      <section style={{ background: "var(--gradient-soft)", padding: "5rem 0" }}>
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 1.5rem" }}>
+          <div style={{ textAlign: "center", marginBottom: "3.5rem" }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--primary)", marginBottom: "0.75rem" }}>
+              Runner Stories
+            </div>
+            <h2 className="font-display" style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 700, letterSpacing: "-0.015em", color: "var(--foreground)" }}>
+              Real runners. <span className="text-gradient-primary">Real results.</span>
             </h2>
-            {avgRating != null && (
-              <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", marginTop: "0.75rem", background: "rgba(232,98,10,0.08)", border: "1px solid rgba(232,98,10,0.2)", borderRadius: "20px", padding: "4px 14px" }}>
-                <Stars rating={Math.round(avgRating)} />
-                <span style={{ fontSize: "0.82rem", color: "var(--cs-orange)", fontWeight: 600 }}>{avgRating} / 5</span>
-                <span style={{ fontSize: "0.75rem", color: "var(--cs-muted)" }}>from {stories.length} runner{stories.length !== 1 ? "s" : ""}</span>
+            {statsData.avgRating > 0 && (
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: "1rem", background: "oklch(0.72 0.19 49 / 8%)", border: "1px solid oklch(0.72 0.19 49 / 20%)", borderRadius: 999, padding: "6px 16px" }}>
+                {[1,2,3,4,5].map(i => <Star key={i} size={14} style={{ fill: "var(--accent)", color: "var(--accent)" }} />)}
+                <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--accent)" }}>{statsData.avgRating} / 5</span>
               </div>
             )}
-            <p style={{ fontSize: "0.875rem", color: "var(--cs-muted)", marginTop: "0.75rem" }}>
-              Stories shared by our community.{" "}
-              <a href="/dashboard?share=story" style={{ color: "var(--cs-orange)", textDecoration: "none" }}>Share yours →</a>
-            </p>
           </div>
 
-          <StoriesCarousel stories={display} />
+          <div style={{ display: "grid", gap: "1.25rem" }} className="sm:grid-cols-2 lg:grid-cols-3">
+            {display.slice(0, 3).map((s, i) => (
+              <motion.div key={s.id}
+                initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.4, delay: i * 0.1 }}
+                style={{ borderRadius: 16, border: "1px solid var(--border)", background: "var(--surface)", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", boxShadow: "var(--shadow-md)" }}>
+                <Quote size={20} style={{ color: "var(--primary)", opacity: 0.5 }} />
+                <div style={{ display: "flex", gap: 2 }}>
+                  {[1,2,3,4,5].map(i => <Star key={i} size={13} style={{ fill: i <= (s.rating ?? 5) ? "var(--accent)" : "var(--muted)", color: i <= (s.rating ?? 5) ? "var(--accent)" : "var(--muted)" }} />)}
+                </div>
+                <p className="font-display" style={{ fontSize: "1rem", fontWeight: 400, fontStyle: "italic", color: "var(--foreground)", lineHeight: 1.65, flex: 1 }}>
+                  &ldquo;{s.quote}&rdquo;
+                </p>
+                <div style={{ borderTop: "1px solid var(--border)", paddingTop: "0.75rem", display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--gradient-primary)", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 700, color: "#fff", flexShrink: 0 }}>
+                    {initials(s.user_name)}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--foreground)" }}>{s.user_name}</div>
+                    <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 1 }}>{s.achievement}</div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </section>
     </>

@@ -2,48 +2,110 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { motion } from "framer-motion";
+import { ArrowRight, CheckCircle2, Building2 } from "lucide-react";
+
+const benefits = [
+  "Employee engagement",
+  "Wellness challenges",
+  "Team building events",
+  "Health tracking dashboards",
+];
+
+const partners = ["Microsoft", "Google", "Deloitte", "TCS", "Accenture", "Razorpay"];
 
 export default function CallToAction() {
   const [loggedIn, setLoggedIn] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && localStorage.getItem("cs_user")) setLoggedIn(true);
-  }, []);
+  useEffect(() => { setLoggedIn(!!localStorage.getItem("cs_user")); }, []);
 
   return (
-    <section className="section relative overflow-hidden noise" style={{ background: "var(--cs-black)" }}>
-      <div className="absolute inset-0 pointer-events-none"
-        style={{ background: "radial-gradient(ellipse 60% 80% at 50% 100%, rgba(232,98,10,0.15) 0%, transparent 70%)" }} />
-      <div className="container relative z-10 text-center">
-        <div className="max-w-2xl mx-auto">
-          <div className="flex justify-center mb-8">
-            <Image src="/logo.png" alt="Connected Steps" width={80} height={80} className="rounded-full opacity-90" />
+    <>
+      {/* Corporate Wellness */}
+      <section style={{ maxWidth: 1280, margin: "0 auto", padding: "5rem 1.5rem" }}>
+        <div style={{ position: "relative", overflow: "hidden", borderRadius: 24, background: "var(--gradient-primary)", padding: "3rem 2rem", color: "#fff", boxShadow: "var(--shadow-glow)" }} className="md:p-14">
+          <div className="grid-bg" style={{ position: "absolute", inset: 0, opacity: 0.2 }} />
+          <div style={{ position: "absolute", top: -80, right: -80, width: 288, height: 288, borderRadius: "50%", background: "oklch(0.74 0.2 50 / 30%)", filter: "blur(48px)" }} />
+          <div style={{ position: "relative", display: "grid", gap: "3rem" }} className="lg:grid-cols-2 lg:items-center">
+            <div>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 999, background: "rgba(255,255,255,0.15)", padding: "4px 12px", fontSize: 12, fontWeight: 500, backdropFilter: "blur(8px)", marginBottom: "1.25rem" }}>
+                <Building2 size={14} /> Corporate Wellness
+              </div>
+              <h2 className="font-display" style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 700, lineHeight: 1.15, marginBottom: "1rem" }}>
+                Build a fitter, happier <span className="text-italic-serif">team</span>.
+              </h2>
+              <p style={{ maxWidth: 480, color: "rgba(255,255,255,0.85)", lineHeight: 1.7, marginBottom: "2rem" }}>
+                Wellness programs, team challenges, and group runs designed for companies that care about their people.
+              </p>
+              <div style={{ display: "grid", gap: "0.75rem", marginBottom: "2.25rem" }} className="sm:grid-cols-2">
+                {benefits.map(b => (
+                  <div key={b} style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: "0.875rem" }}>
+                    <CheckCircle2 size={18} style={{ flexShrink: 0, marginTop: 2, color: "var(--accent)" }} />
+                    <span>{b}</span>
+                  </div>
+                ))}
+              </div>
+              <a href="mailto:corporate@connectedsteps.in"
+                style={{ display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 999, background: "var(--gradient-accent)", padding: "14px 24px", fontSize: "0.95rem", fontWeight: 600, color: "var(--accent-foreground)", textDecoration: "none", boxShadow: "var(--shadow-orange)", transition: "transform 0.2s" }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = "scale(1.02)"}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = ""}>
+                Book a Consultation <ArrowRight size={16} />
+              </a>
+              <div style={{ marginTop: "1.5rem", fontSize: 12, color: "rgba(255,255,255,0.7)" }}>Trusted by teams at:</div>
+              <div style={{ marginTop: "0.75rem", display: "flex", flexWrap: "wrap", gap: "1.5rem", fontSize: "0.875rem", fontWeight: 600, color: "rgba(255,255,255,0.8)" }}>
+                {partners.map(p => <span key={p}>{p}</span>)}
+              </div>
+            </div>
+            <div style={{ display: "grid", gap: "1rem" }} className="sm:grid-cols-2">
+              {[
+                { num: "80+",  label: "Companies served" },
+                { num: "95%",  label: "Participant satisfaction" },
+                { num: "6 wk", label: "Average programme length" },
+                { num: "40%",  label: "Avg activity increase" },
+              ].map(s => (
+                <div key={s.label} style={{ borderRadius: 16, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)", padding: "1.25rem", backdropFilter: "blur(8px)" }}>
+                  <div className="font-display" style={{ fontSize: "2rem", fontWeight: 700 }}>{s.num}</div>
+                  <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.75)", marginTop: 4 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="section-label mb-4">Join Connected Steps</div>
-          <h2 className="font-display mb-6"
-            style={{ fontSize: "clamp(2.5rem, 5vw, 4rem)", fontWeight: 300, color: "var(--cs-cream)", lineHeight: 1.1 }}>
-            Your goal is waiting.
-            <br /><em className="not-italic" style={{ color: "var(--cs-orange)" }}>We have the plan.</em>
-          </h2>
-          <p className="text-base leading-relaxed mb-10"
-            style={{ color: "var(--cs-muted)", maxWidth: "480px", margin: "0 auto 2.5rem" }}>
-            Start free today. No credit card needed. Your first training week is on us.
-          </p>
-          <div className="hero-cta" style={{ justifyContent: "center" }}>
-            <Link href={loggedIn ? "/dashboard" : "/auth"} className="btn-primary">
-              {loggedIn ? "Go to Dashboard" : "Start training free"}
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </Link>
-            <Link href="/pricing" className="btn-outline">View pricing</Link>
-          </div>
-          <p className="mt-6 text-xs tracking-wide" style={{ color: "rgba(154,128,112,0.6)" }}>
-            Free plan available · No commitment · Cancel anytime
-          </p>
         </div>
-      </div>
-    </section>
+      </section>
+
+      {/* Final CTA */}
+      <section style={{ background: "var(--gradient-soft)", padding: "5rem 0" }}>
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 1.5rem", textAlign: "center" }}>
+          <motion.div initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--primary)", marginBottom: "1rem" }}>
+              Join Connected Steps
+            </div>
+            <h2 className="font-display" style={{ fontSize: "clamp(2.5rem, 5vw, 4rem)", fontWeight: 700, letterSpacing: "-0.015em", color: "var(--foreground)", marginBottom: "1.25rem" }}>
+              Your goal is waiting.{" "}
+              <span className="text-gradient-accent">We have the plan.</span>
+            </h2>
+            <p style={{ fontSize: "1.1rem", color: "var(--muted-foreground)", maxWidth: 480, margin: "0 auto 2.5rem", lineHeight: 1.7 }}>
+              Start free today. No credit card needed. Your first training week is on us.
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "0.75rem" }}>
+              <Link href={loggedIn ? "/dashboard" : "/auth?tab=register"}
+                style={{ display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 999, background: "var(--gradient-accent)", padding: "14px 32px", fontSize: "1rem", fontWeight: 700, color: "var(--accent-foreground)", textDecoration: "none", boxShadow: "var(--shadow-orange)", transition: "transform 0.2s" }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = "scale(1.02)"}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = ""}>
+                {loggedIn ? "Go to Dashboard" : "Start training free"} <ArrowRight size={18} />
+              </Link>
+              <Link href="/pricing"
+                style={{ display: "inline-flex", alignItems: "center", borderRadius: 999, border: "1px solid var(--border)", background: "var(--surface)", padding: "14px 32px", fontSize: "1rem", fontWeight: 600, color: "var(--foreground)", textDecoration: "none", boxShadow: "var(--shadow-md)", transition: "background 0.2s" }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--surface-elevated)"}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "var(--surface)"}>
+                View pricing
+              </Link>
+            </div>
+            <p style={{ marginTop: "1.5rem", fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
+              Free plan available · No commitment · Cancel anytime
+            </p>
+          </motion.div>
+        </div>
+      </section>
+    </>
   );
 }

@@ -119,27 +119,26 @@ export default function PricingPage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--cs-black)", color: "var(--cs-white)" }}>
+    <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)" }}>
 
       {/* Navbar */}
-      <header style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 50, background: "rgba(10,10,10,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0 2rem", height: "64px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <header style={{ position: "sticky", top: 0, zIndex: 50, background: "oklch(0.18 0.015 270 / 70%)", backdropFilter: "blur(18px) saturate(140%)", borderBottom: "1px solid var(--border)", padding: "0 2rem", height: "64px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none" }}>
           <Image src="/logo.png" alt="Connected Steps" width={36} height={36} className="rounded-full" />
-          <span style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--cs-white)", fontFamily: "var(--font-display)" }}>Connected Steps</span>
+          <span style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--foreground)", fontFamily: "var(--font-display)" }}>Connected Steps</span>
         </Link>
-        <Link href="/" style={{ fontSize: "0.8rem", color: "var(--cs-muted)", textDecoration: "none" }}>← Back to home</Link>
+        <Link href="/" style={{ fontSize: "0.8rem", color: "var(--muted-foreground)", textDecoration: "none" }}>← Back to home</Link>
       </header>
 
-      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "7rem 1.5rem 5rem" }}>
+      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "4rem 1.5rem 5rem" }}>
 
         {/* Header */}
         <div style={{ textAlign: "center", marginBottom: "4rem" }}>
-          <div style={{ fontSize: "10px", color: "var(--cs-orange)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "1rem", fontWeight: 600 }}>Pricing</div>
-          <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(2.4rem, 5vw, 4rem)", fontWeight: 300, color: "var(--cs-white)", marginBottom: "1rem", lineHeight: 1.1 }}>
-            Simple, honest pricing.<br />
-            <em style={{ color: "var(--cs-orange)", fontStyle: "normal" }}>Longer you commit, more you save.</em>
+          <div style={{ fontSize: 11, color: "var(--primary)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "1rem", fontWeight: 600 }}>Pricing</div>
+          <h1 className="font-display" style={{ fontSize: "clamp(2.4rem, 5vw, 4rem)", fontWeight: 700, color: "var(--foreground)", marginBottom: "1rem", lineHeight: 1.1, letterSpacing: "-0.015em" }}>
+            Simple. <span className="text-italic-serif">Honest.</span>
           </h1>
-          <p style={{ fontSize: "1rem", color: "var(--cs-muted)", maxWidth: "480px", margin: "0 auto", lineHeight: 1.7 }}>
+          <p style={{ fontSize: "1rem", color: "var(--muted-foreground)", maxWidth: "480px", margin: "0 auto", lineHeight: 1.7 }}>
             All plans include every feature — no tiers, no hidden fees.<br />
             All prices inclusive of GST.
           </p>
@@ -177,12 +176,13 @@ export default function PricingPage() {
                 onMouseLeave={() => setHovered(null)}
                 style={{
                   position:   "relative",
-                  background: isPopular ? "rgba(232,98,10,0.07)" : "var(--cs-dark)",
-                  border:     `1px solid ${isPopular || isHovered ? "rgba(232,98,10,0.5)" : "rgba(255,255,255,0.07)"}`,
-                  borderRadius: "12px",
+                  background: isPopular ? "var(--surface-elevated)" : "var(--surface)",
+                  border:     `1px solid ${isPopular ? "var(--primary)" : isHovered ? "oklch(0.72 0.19 49 / 40%)" : "var(--border)"}`,
+                  borderRadius: 20,
                   padding:    "2rem 1.75rem",
-                  transition: "border-color 0.2s, transform 0.2s",
+                  transition: "border-color 0.2s, transform 0.2s, box-shadow 0.2s",
                   transform:  isPopular ? "scale(1.03)" : isHovered ? "translateY(-4px)" : "none",
+                  boxShadow:  isPopular ? "var(--shadow-glow)" : isHovered ? "var(--shadow-card)" : "var(--shadow-md)",
                 }}
               >
                 {/* Badge */}
@@ -241,9 +241,10 @@ export default function PricingPage() {
                     letterSpacing: "0.04em",
                     cursor:     paying || success ? "not-allowed" : "pointer",
                     opacity:    paying && !isBuying ? 0.5 : 1,
-                    background: isPopular ? "var(--cs-orange)" : "transparent",
-                    color:      isPopular ? "#fff" : "var(--cs-white)",
-                    border:     isPopular ? "none" : "1px solid rgba(255,255,255,0.2)",
+                    background: isPopular ? "var(--gradient-accent)" : "transparent",
+                    color:      isPopular ? "var(--accent-foreground)" : "var(--foreground)",
+                    border:     isPopular ? "none" : "1px solid var(--border)",
+                    boxShadow:  isPopular ? "var(--shadow-orange)" : "none",
                     fontFamily: "var(--font-body)",
                     transition: "background 0.2s, opacity 0.2s",
                   }}
@@ -317,16 +318,16 @@ export default function PricingPage() {
 function FaqItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", overflow: "hidden" }}>
+    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
       <button
         onClick={() => setOpen((v) => !v)}
         style={{ width: "100%", padding: "1rem 1.25rem", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", textAlign: "left", gap: "1rem" }}
       >
-        <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--cs-white)" }}>{q}</span>
-        <span style={{ fontSize: "1.1rem", color: "var(--cs-orange)", flexShrink: 0, transform: open ? "rotate(45deg)" : "none", transition: "transform 0.2s" }}>+</span>
+        <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--foreground)" }}>{q}</span>
+        <span style={{ fontSize: "1.1rem", color: "var(--primary)", flexShrink: 0, transform: open ? "rotate(45deg)" : "none", transition: "transform 0.2s" }}>+</span>
       </button>
       {open && (
-        <div style={{ padding: "0 1.25rem 1rem", fontSize: "0.825rem", color: "var(--cs-muted)", lineHeight: 1.7 }}>{a}</div>
+        <div style={{ padding: "0 1.25rem 1rem", fontSize: "0.825rem", color: "var(--muted-foreground)", lineHeight: 1.7 }}>{a}</div>
       )}
     </div>
   );

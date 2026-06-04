@@ -548,7 +548,7 @@ export default function Dashboard() {
 
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--cs-black)", color: "var(--cs-white)" }}>
+    <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)" }}>
 
       {/* ── Navbar ── */}
       <header className="cs-app-nav">
