@@ -90,8 +90,17 @@ export default function Leaderboard() {
   const locations = ["All", ...Array.from(new Set(entries.map((e) => e.location).filter((l) => l && !l.includes("@")))).sort()];
 
   const filtered  = locFilter === "All" ? entries : entries.filter((e) => e.location === locFilter);
+
+  const pointsKey = tab === "month" ? "month_points" : "total_points";
+  const ranks: number[] = [];
+  for (let i = 0; i < filtered.length; i++) {
+    if (i === 0) { ranks.push(1); continue; }
+    const samePts = (filtered[i][pointsKey] ?? 0) === (filtered[i - 1][pointsKey] ?? 0);
+    ranks.push(samePts ? ranks[i - 1] : i + 1);
+  }
+
   const myIndex   = filtered.findIndex((e) => e.user_email === user.email);
-  const myRank    = myIndex >= 0 ? myIndex + 1 : null;
+  const myRank    = myIndex >= 0 ? ranks[myIndex] : null;
   const myEntry   = myIndex >= 0 ? filtered[myIndex] : null;
 
   return (
@@ -232,8 +241,8 @@ export default function Leaderboard() {
                   background: isMe ? "rgba(232,98,10,0.06)" : "transparent",
                 }}
               >
-                <div style={{ fontSize: i < 3 ? "1.25rem" : "0.875rem", fontWeight: 700, color: i < 3 ? "var(--cs-orange)" : "var(--cs-muted)" }}>
-                  {medal(i + 1)}
+                <div style={{ fontSize: ranks[i] <= 3 ? "1.25rem" : "0.875rem", fontWeight: 700, color: ranks[i] <= 3 ? "var(--cs-orange)" : "var(--cs-muted)" }}>
+                  {medal(ranks[i])}
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0 }}>
