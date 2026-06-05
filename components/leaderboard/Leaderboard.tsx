@@ -126,7 +126,7 @@ export default function Leaderboard() {
             The <span className="text-italic-serif">Leaderboard</span>.
           </h1>
           <p style={{ margin: "1rem auto 0", maxWidth: 480, fontSize: "1rem", color: "var(--muted-foreground)" }}>
-            Friendly competition. Real accountability. The runners showing up for every kilometre.
+            Earn points by attending sessions and winning challenges. The more you show up, the higher you climb.
           </p>
 
           {/* Tabs + filter */}
@@ -228,7 +228,7 @@ export default function Leaderboard() {
           </div>
           <div style={{ marginTop: "2rem", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
             <TrendingUp size={16} style={{ color: "var(--accent)" }} />
-            Want to climb the ranks? Attend a session and start logging.
+            Want to climb the ranks? Attend sessions and complete challenges to earn points.
           </div>
         </section>
       )}
