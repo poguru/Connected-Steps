@@ -108,7 +108,7 @@ export default function Leaderboard() {
         <div className="absolute -top-32 left-1/2 h-96 rounded-full blur-3xl pointer-events-none"
           style={{ width: "60rem", transform: "translateX(-50%)", background: "oklch(0.74 0.2 50 / 20%)" }} />
         <div className="dot-bg absolute inset-0" style={{ opacity: 0.4 }} />
-        <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "4rem 1.5rem 3rem", textAlign: "center" }}>
+        <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "6.5rem 1.5rem 3rem", textAlign: "center" }}>
 
           {/* Live badge */}
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 999, border: "1px solid var(--border)", background: "oklch(0.19 0.015 270 / 60%)", padding: "6px 14px", fontSize: 12, fontWeight: 500, color: "var(--muted-foreground)", backdropFilter: "blur(8px)", marginBottom: "1.25rem" }}>
