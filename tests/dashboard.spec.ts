@@ -13,8 +13,9 @@ const MOCK_USER = {
 async function loginAs(page: Page) {
   await page.goto('http://localhost:3000');
   await page.evaluate((u) => localStorage.setItem('cs_user', JSON.stringify(u)), MOCK_USER);
-  await page.goto('http://localhost:3000/dashboard');
-  await page.waitForLoadState('networkidle');
+  await page.goto('http://localhost:3000/dashboard', { waitUntil: 'domcontentloaded' });
+  // Wait until the user's name is rendered — confirms React hydration is complete
+  await page.waitForSelector('text=Test User', { timeout: 20000 });
 }
 
 // ─── 1. Auth Guard ────────────────────────────────────────────────────────────

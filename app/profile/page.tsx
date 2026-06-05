@@ -135,129 +135,92 @@ export default function ProfilePage() {
 
   if (!user) return null;
 
-  const initials = `${user.firstName[0] ?? ""}${user.lastName[0] ?? ""}`.toUpperCase();
+  const ini = `${user.firstName[0] ?? ""}${user.lastName[0] ?? ""}`.toUpperCase();
   const displayPhoto = photoFile ?? photo;
 
-  return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff" }}>
+  const sectionStyle: React.CSSProperties = { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: "1.5rem", boxShadow: "var(--shadow-md)" };
+  const labelStyle:   React.CSSProperties = { display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5, letterSpacing: "0.04em" };
+  const newInputStyle: React.CSSProperties = { ...inputStyle, background: "var(--surface-elevated)", border: "1px solid var(--border)", borderRadius: 10, color: "var(--foreground)" };
 
-      {/* Header */}
-      <header style={{ background: "#0a0a0a", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0 1.5rem", height: "60px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 10 }}>
+  return (
+    <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)" }}>
+
+      <header style={{ background: "oklch(0.18 0.015 270 / 80%)", backdropFilter: "blur(18px)", borderBottom: "1px solid var(--border)", padding: "0 1.5rem", height: "60px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <Link href="/dashboard">
             <Image src="/logo.png" alt="" width={28} height={28} className="rounded-full" />
           </Link>
-          <span style={{ fontSize: "0.95rem", fontWeight: 600 }}>Edit Profile</span>
+          <span className="font-display" style={{ fontSize: "1rem", fontWeight: 600, color: "var(--foreground)" }}>Edit Profile</span>
         </div>
-        <Link href="/dashboard" style={{ fontSize: "0.78rem", color: "#888", textDecoration: "none" }}>← Dashboard</Link>
+        <Link href="/dashboard" style={{ fontSize: "0.78rem", color: "var(--muted-foreground)", textDecoration: "none" }}>← Dashboard</Link>
       </header>
 
       <div style={{ maxWidth: "560px", margin: "0 auto", padding: "2rem 1.25rem", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
 
-        {/* ── Photo ── */}
-        <section style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "10px", padding: "1.5rem" }}>
-          <div style={{ fontSize: "11px", color: "#555", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1.25rem" }}>Profile Photo</div>
+        {/* Photo */}
+        <section style={sectionStyle}>
+          <div style={{ fontSize: 11, color: "var(--muted-foreground)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1.25rem", fontWeight: 600 }}>Profile Photo</div>
           <div style={{ display: "flex", alignItems: "center", gap: "1.25rem" }}>
             {displayPhoto ? (
-              <img src={displayPhoto} alt="avatar" style={{ width: "72px", height: "72px", borderRadius: "50%", objectFit: "cover", border: "2px solid #e8620a", flexShrink: 0 }} />
+              <img src={displayPhoto} alt="avatar" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--primary)", flexShrink: 0 }} />
             ) : (
-              <div style={{ width: "72px", height: "72px", borderRadius: "50%", background: "#e8620a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.4rem", fontWeight: 700, color: "#fff", flexShrink: 0 }}>
-                {initials}
+              <div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--gradient-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.4rem", fontWeight: 700, color: "#fff", flexShrink: 0 }}>
+                {ini}
               </div>
             )}
             <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-              <button
-                onClick={() => fileRef.current?.click()}
-                style={{ padding: "8px 16px", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "6px", color: "#fff", fontSize: "0.82rem", cursor: "pointer", fontFamily: "inherit" }}
-              >
+              <button onClick={() => fileRef.current?.click()}
+                style={{ padding: "8px 16px", background: "var(--surface-elevated)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--foreground)", fontSize: "0.82rem", cursor: "pointer", fontFamily: "inherit" }}>
                 Choose photo
               </button>
               {photoFile && (
-                <button
-                  onClick={savePhoto}
-                  style={{ padding: "8px 16px", background: "#e8620a", border: "none", borderRadius: "6px", color: "#fff", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
-                >
+                <button onClick={savePhoto}
+                  style={{ padding: "8px 16px", background: "var(--gradient-accent)", border: "none", borderRadius: 8, color: "var(--accent-foreground)", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", boxShadow: "var(--shadow-orange)" }}>
                   Save photo
                 </button>
               )}
-              <div style={{ fontSize: "11px", color: "#555" }}>JPG or PNG · Max 2 MB</div>
-              {photoError && <div style={{ fontSize: "11px", color: "#f09595" }}>{photoError}</div>}
+              <div style={{ fontSize: 11, color: "var(--muted-foreground)" }}>JPG or PNG · Max 2 MB</div>
+              {photoError && <div style={{ fontSize: 11, color: "#f09595" }}>{photoError}</div>}
             </div>
           </div>
           <input ref={fileRef} type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: "none" }} />
         </section>
 
-        {/* ── Personal Info ── */}
-        <section style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "10px", padding: "1.5rem" }}>
-          <div style={{ fontSize: "11px", color: "#555", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1.25rem" }}>Personal Info</div>
+        {/* Personal Info */}
+        <section style={sectionStyle}>
+          <div style={{ fontSize: 11, color: "var(--muted-foreground)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1.25rem", fontWeight: 600 }}>Personal Info</div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-              <div>
-                <label style={{ display: "block", fontSize: "11px", color: "#666", marginBottom: "5px" }}>First name</label>
-                <input value={info.firstName} onChange={(e) => setInfo((p) => ({ ...p, firstName: e.target.value }))} style={inputStyle} />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: "11px", color: "#666", marginBottom: "5px" }}>Last name</label>
-                <input value={info.lastName} onChange={(e) => setInfo((p) => ({ ...p, lastName: e.target.value }))} style={inputStyle} />
-              </div>
+              <div><label style={labelStyle}>First name</label><input value={info.firstName} onChange={e => setInfo(p => ({ ...p, firstName: e.target.value }))} style={newInputStyle} /></div>
+              <div><label style={labelStyle}>Last name</label><input value={info.lastName} onChange={e => setInfo(p => ({ ...p, lastName: e.target.value }))} style={newInputStyle} /></div>
             </div>
+            <div><label style={labelStyle}>Email</label><input value={user.email} readOnly style={{ ...newInputStyle, color: "var(--muted-foreground)", cursor: "not-allowed" }} /></div>
+            <div><label style={labelStyle}>Phone</label><input value={info.phone} onChange={e => setInfo(p => ({ ...p, phone: e.target.value }))} placeholder="+91 00000 00000" style={newInputStyle} /></div>
+            <div><label style={labelStyle}>Training location</label><input value={info.location} onChange={e => setInfo(p => ({ ...p, location: e.target.value }))} placeholder="e.g. Kondapur" style={newInputStyle} /></div>
             <div>
-              <label style={{ display: "block", fontSize: "11px", color: "#666", marginBottom: "5px" }}>Email</label>
-              <input value={user.email} readOnly style={{ ...inputStyle, color: "#555", cursor: "not-allowed" }} />
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: "11px", color: "#666", marginBottom: "5px" }}>Phone</label>
-              <input value={info.phone} onChange={(e) => setInfo((p) => ({ ...p, phone: e.target.value }))} placeholder="+91 00000 00000" style={inputStyle} />
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: "11px", color: "#666", marginBottom: "5px" }}>Training location</label>
-              <input value={info.location} onChange={(e) => setInfo((p) => ({ ...p, location: e.target.value }))} placeholder="e.g. Kondapur, Hyderabad" style={inputStyle} />
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: "11px", color: "#666", marginBottom: "5px" }}>Goal</label>
-              <select value={info.goal} onChange={(e) => setInfo((p) => ({ ...p, goal: e.target.value }))} style={{ ...inputStyle, colorScheme: "dark" }}>
-                {GOAL_OPTIONS.map((g) => <option key={g.value} value={g.value} style={{ background: "#1a1a1a", color: "#fff" }}>{g.label}</option>)}
+              <label style={labelStyle}>Goal</label>
+              <select value={info.goal} onChange={e => setInfo(p => ({ ...p, goal: e.target.value }))} style={{ ...newInputStyle, cursor: "pointer", colorScheme: "dark" }}>
+                {GOAL_OPTIONS.map(g => <option key={g.value} value={g.value} style={{ background: "#1a1a1a" }}>{g.label}</option>)}
               </select>
             </div>
-
             {infoError && <div style={{ fontSize: "0.8rem", color: "#f09595" }}>{infoError}</div>}
-            {infoMsg   && <div style={{ fontSize: "0.8rem", color: "#4ade80" }}>{infoMsg}</div>}
-
-            <button
-              onClick={saveInfo}
-              disabled={infoSaving}
-              style={{ padding: "11px", background: infoSaving ? "rgba(232,98,10,0.6)" : "#e8620a", color: "#fff", border: "none", borderRadius: "6px", fontSize: "0.875rem", fontWeight: 600, cursor: infoSaving ? "not-allowed" : "pointer", fontFamily: "inherit" }}
-            >
+            {infoMsg   && <div style={{ fontSize: "0.8rem", color: "var(--cs-success)" }}>{infoMsg}</div>}
+            <button onClick={saveInfo} disabled={infoSaving} style={{ padding: "12px", background: infoSaving ? "oklch(0.72 0.19 49 / 60%)" : "var(--gradient-accent)", color: "var(--accent-foreground)", border: "none", borderRadius: 999, fontSize: "0.875rem", fontWeight: 700, cursor: infoSaving ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: infoSaving ? "none" : "var(--shadow-orange)" }}>
               {infoSaving ? "Saving…" : "Save changes"}
             </button>
           </div>
         </section>
 
-        {/* ── Change Password ── */}
-        <section style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "10px", padding: "1.5rem" }}>
-          <div style={{ fontSize: "11px", color: "#555", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1.25rem" }}>Change Password</div>
+        {/* Change Password */}
+        <section style={sectionStyle}>
+          <div style={{ fontSize: 11, color: "var(--muted-foreground)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1.25rem", fontWeight: 600 }}>Change Password</div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            <div>
-              <label style={{ display: "block", fontSize: "11px", color: "#666", marginBottom: "5px" }}>Current password</label>
-              <input type="password" value={pw.current} onChange={(e) => setPw((p) => ({ ...p, current: e.target.value }))} style={inputStyle} />
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: "11px", color: "#666", marginBottom: "5px" }}>New password</label>
-              <input type="password" value={pw.next} onChange={(e) => setPw((p) => ({ ...p, next: e.target.value }))} style={inputStyle} />
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: "11px", color: "#666", marginBottom: "5px" }}>Confirm new password</label>
-              <input type="password" value={pw.confirm} onChange={(e) => setPw((p) => ({ ...p, confirm: e.target.value }))} style={inputStyle} />
-            </div>
-
+            <div><label style={labelStyle}>Current password</label><input type="password" value={pw.current} onChange={e => setPw(p => ({ ...p, current: e.target.value }))} style={newInputStyle} /></div>
+            <div><label style={labelStyle}>New password</label><input type="password" value={pw.next} onChange={e => setPw(p => ({ ...p, next: e.target.value }))} style={newInputStyle} /></div>
+            <div><label style={labelStyle}>Confirm new password</label><input type="password" value={pw.confirm} onChange={e => setPw(p => ({ ...p, confirm: e.target.value }))} style={newInputStyle} /></div>
             {pwError && <div style={{ fontSize: "0.8rem", color: "#f09595" }}>{pwError}</div>}
-            {pwMsg   && <div style={{ fontSize: "0.8rem", color: "#4ade80" }}>{pwMsg}</div>}
-
-            <button
-              onClick={savePassword}
-              disabled={pwSaving}
-              style={{ padding: "11px", background: pwSaving ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.07)", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "6px", fontSize: "0.875rem", fontWeight: 600, cursor: pwSaving ? "not-allowed" : "pointer", fontFamily: "inherit" }}
-            >
+            {pwMsg   && <div style={{ fontSize: "0.8rem", color: "var(--cs-success)" }}>{pwMsg}</div>}
+            <button onClick={savePassword} disabled={pwSaving} style={{ padding: "12px", background: pwSaving ? "var(--surface-elevated)" : "var(--surface-elevated)", color: "var(--foreground)", border: "1px solid var(--border)", borderRadius: 999, fontSize: "0.875rem", fontWeight: 700, cursor: pwSaving ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
               {pwSaving ? "Changing…" : "Change password"}
             </button>
           </div>

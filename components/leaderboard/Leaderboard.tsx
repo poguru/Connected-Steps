@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { motion } from "framer-motion";
 import { Crown, Trophy, Medal, Flame, TrendingUp } from "lucide-react";
-import UserMenu, { MenuUser } from "@/components/ui/UserMenu";
+import { MenuUser } from "@/components/ui/UserMenu";
+import AppNav from "@/components/layout/AppNav";
+import { getSupabase } from "@/lib/supabase";
 
 interface User       { firstName: string; lastName: string; email: string; phone: string; photo: string | null; goal: string; location: string; }
 interface LeaderboardEntry { id: string; user_email: string; user_name: string; location: string; month_points: number; total_points: number; photo: string | null; }
@@ -14,39 +15,67 @@ interface LeaderboardEntry { id: string; user_email: string; user_name: string; 
 function initials(name: string) { return name.split(" ").map(n => n[0] ?? "").join("").slice(0, 2).toUpperCase(); }
 
 const podiumCfg = [
-  { ring: "from-amber-300 via-yellow-400 to-amber-600", badge: "linear-gradient(135deg,#fcd34d,#d97706)", icon: Crown,  heights: ["h-40 sm:h-48", "h-56 sm:h-72", "h-32 sm:h-40"] },
-  { ring: "from-zinc-200 via-zinc-400 to-zinc-500",    badge: "linear-gradient(135deg,#e4e4e7,#a1a1aa)", icon: Trophy, heights: ["h-40 sm:h-48", "h-56 sm:h-72", "h-32 sm:h-40"] },
-  { ring: "from-orange-400 via-amber-600 to-amber-800", badge: "linear-gradient(135deg,#fb923c,#92400e)", icon: Medal,  heights: ["h-40 sm:h-48", "h-56 sm:h-72", "h-32 sm:h-40"] },
+  { ring: "from-amber-300 via-yellow-400 to-amber-600", badge: "linear-gradient(135deg,#fcd34d,#d97706)", icon: Crown  },
+  { ring: "from-zinc-200 via-zinc-400 to-zinc-500",    badge: "linear-gradient(135deg,#e4e4e7,#a1a1aa)", icon: Trophy },
+  { ring: "from-orange-400 via-amber-600 to-amber-800", badge: "linear-gradient(135deg,#fb923c,#92400e)", icon: Medal  },
 ];
 
 export default function Leaderboard() {
   const router = useRouter();
-  const [user,       setUser]       = useState<User | null>(null);
-  const [entries,    setEntries]    = useState<LeaderboardEntry[]>([]);
-  const [tab,        setTab]        = useState<"month" | "total">("month");
-  const [loading,    setLoading]    = useState(true);
-  const [locFilter,  setLocFilter]  = useState("All");
+  const [user,      setUser]      = useState<User | null>(null);
+  const [entries,   setEntries]   = useState<LeaderboardEntry[]>([]);
+  const [tab,       setTab]       = useState<"month" | "total">("month");
+  const [loading,   setLoading]   = useState(true);
+  const [locFilter, setLocFilter] = useState("All");
+  const [live,      setLive]      = useState(false);
 
-  useEffect(() => {
-    const stored = localStorage.getItem("cs_user");
-    if (!stored) { router.push("/auth"); return; }
-    setUser(JSON.parse(stored));
-  }, [router]);
+  // Keep a ref so the realtime callback always reads the latest tab without
+  // needing to be re-created (avoids channel churn on tab switch).
+  const tabRef = useRef(tab);
+  useEffect(() => { tabRef.current = tab; }, [tab]);
 
+  const fetchLeaderboard = useCallback(() => {
+    fetch("/api/leaderboard")
+      .then(r => r.json())
+      .then(d => {
+        if (d.entries) {
+          const key = tabRef.current === "month" ? "month_points" : "total_points";
+          setEntries([...d.entries].sort((a: LeaderboardEntry, b: LeaderboardEntry) => (b[key] ?? 0) - (a[key] ?? 0)));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Initial fetch + re-sort when tab changes
   useEffect(() => {
     setLoading(true);
     fetch("/api/leaderboard")
       .then(r => r.json())
       .then(d => {
         if (d.entries) {
-          const pointsKey = tab === "month" ? "month_points" : "total_points";
-          const sorted = [...d.entries].sort((a: LeaderboardEntry, b: LeaderboardEntry) => (b[pointsKey] ?? 0) - (a[pointsKey] ?? 0));
-          setEntries(sorted);
+          const key = tab === "month" ? "month_points" : "total_points";
+          setEntries([...d.entries].sort((a: LeaderboardEntry, b: LeaderboardEntry) => (b[key] ?? 0) - (a[key] ?? 0)));
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [tab]);
+
+  // Supabase realtime — stable channel, refetches on any leaderboard row change
+  useEffect(() => {
+    const supabase = getSupabase();
+    const channel = supabase
+      .channel("leaderboard-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "leaderboard" }, fetchLeaderboard)
+      .subscribe(status => { if (status === "SUBSCRIBED") setLive(true); });
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchLeaderboard]);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("cs_user");
+    if (!stored) { router.push("/auth"); return; }
+    setUser(JSON.parse(stored));
+  }, [router]);
 
   if (!user) return null;
 
@@ -68,23 +97,11 @@ export default function Leaderboard() {
   return (
     <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)" }}>
 
-      {/* Navbar */}
-      <header className="cs-app-nav" style={{ background: "oklch(0.18 0.015 270 / 70%)", backdropFilter: "blur(18px)", borderBottom: "1px solid var(--border)" }}>
-        <div className="cs-app-nav-inner">
-          <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none" }}>
-            <Image src="/logo.png" alt="Connected Steps" width={36} height={36} className="rounded-full" />
-            <span className="font-display" style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--foreground)" }}>Connected Steps</span>
-          </Link>
-          <nav className="cs-app-nav-links">
-            {[{ label: "Dashboard", href: "/dashboard" }, { label: "Weekend Run", href: "/weekend-run" }, { label: "Leaderboard", href: "/leaderboard" }, { label: "Community", href: "/community" }, { label: "Achievements", href: "/achievements" }, { label: "Pricing", href: "/pricing" }].map(item => (
-              <Link key={item.label} href={item.href} style={{ fontSize: "0.875rem", color: item.label === "Leaderboard" ? "var(--primary)" : "var(--muted-foreground)", textDecoration: "none" }}>{item.label}</Link>
-            ))}
-          </nav>
-          <div className="cs-app-nav-user">
-            <UserMenu user={user as MenuUser} onUserUpdate={u => { setUser(u as User); localStorage.setItem("cs_user", JSON.stringify(u)); }} />
-          </div>
-        </div>
-      </header>
+      <AppNav
+        user={user as MenuUser}
+        onUserUpdate={u => { setUser(u as User); localStorage.setItem("cs_user", JSON.stringify(u)); }}
+        activeLabel="Leaderboard"
+      />
 
       {/* Hero */}
       <section style={{ position: "relative", overflow: "hidden" }}>
@@ -92,8 +109,17 @@ export default function Leaderboard() {
           style={{ width: "60rem", transform: "translateX(-50%)", background: "oklch(0.74 0.2 50 / 20%)" }} />
         <div className="dot-bg absolute inset-0" style={{ opacity: 0.4 }} />
         <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "4rem 1.5rem 3rem", textAlign: "center" }}>
+
+          {/* Live badge */}
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 999, border: "1px solid var(--border)", background: "oklch(0.19 0.015 270 / 60%)", padding: "6px 14px", fontSize: 12, fontWeight: 500, color: "var(--muted-foreground)", backdropFilter: "blur(8px)", marginBottom: "1.25rem" }}>
-            <Flame size={14} style={{ color: "var(--accent)" }} /> Updated live · Hyderabad chapter
+            {live ? (
+              <>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#4ade80", display: "inline-block", boxShadow: "0 0 0 2px oklch(0.74 0.22 150 / 25%)" }} className="animate-pulse" />
+                Live updates · Hyderabad chapter
+              </>
+            ) : (
+              <><Flame size={14} style={{ color: "var(--accent)" }} /> Updated live · Hyderabad chapter</>
+            )}
           </div>
 
           <h1 className="font-display" style={{ fontSize: "clamp(2.5rem, 7vw, 5rem)", fontWeight: 700, lineHeight: 1.02, letterSpacing: "-0.015em" }}>
@@ -139,10 +165,11 @@ export default function Leaderboard() {
                 const cfg = podiumCfg[idx];
                 const Icon = cfg.icon;
                 const heightMap = ["10rem", "14rem", "8rem"];
+                const gradient = cfg.ring.includes("amber") ? "#fcd34d,#d97706" : cfg.ring.includes("zinc") ? "#e4e4e7,#a1a1aa" : "#fb923c,#92400e";
                 return (
                   <motion.div key={r.user_email} initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.12 }}
                     style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                    <div style={{ position: "relative", marginBottom: 12, borderRadius: "50%", padding: 3, background: `linear-gradient(135deg, ${cfg.ring.includes("amber") ? "#fcd34d,#d97706" : cfg.ring.includes("zinc") ? "#e4e4e7,#a1a1aa" : "#fb923c,#92400e"})` }}>
+                    <div style={{ position: "relative", marginBottom: 12, borderRadius: "50%", padding: 3, background: `linear-gradient(135deg, ${gradient})` }}>
                       <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--surface)", display: "grid", placeItems: "center", fontFamily: "var(--font-display)", fontSize: "1.1rem", fontWeight: 700, color: "var(--foreground)" }}>
                         {initials(r.user_name)}
                       </div>
@@ -153,7 +180,7 @@ export default function Leaderboard() {
                     <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--foreground)", textAlign: "center" }}>{r.user_name.split(" ")[0]}</div>
                     <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginBottom: 16 }}>📍 {r.location}</div>
                     <div style={{ width: "100%", height: heightMap[i], position: "relative", overflow: "hidden", borderRadius: "12px 12px 0 0", border: "1px solid var(--border)", background: "var(--surface)", padding: 12, textAlign: "center" }}>
-                      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: `linear-gradient(90deg, ${cfg.ring.includes("amber") ? "#fcd34d,#d97706" : cfg.ring.includes("zinc") ? "#e4e4e7,#a1a1aa" : "#fb923c,#92400e"})` }} />
+                      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: `linear-gradient(90deg, ${gradient})` }} />
                       <Icon size={20} style={{ margin: "8px auto 4px", display: "block", color: "var(--accent)" }} />
                       <div className="font-display" style={{ fontSize: "1.5rem", fontWeight: 700 }}>{r[pointsKey] ?? 0}</div>
                       <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted-foreground)" }}>pts</div>

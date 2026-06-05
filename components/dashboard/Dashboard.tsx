@@ -5,9 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import UserMenu, { MenuUser } from "@/components/ui/UserMenu";
+import AppNav from "@/components/layout/AppNav";
+import { getSupabase } from "@/lib/supabase";
 import MembershipCard from "@/components/ui/MembershipCard";
 import TrainingPlan from "@/components/dashboard/TrainingPlan";
 import AskCoachFab from "@/components/ui/AskCoachFab";
+import DashboardHero from "@/components/dashboard/DashboardHero";
 
 interface SessionRecord {
   attended:      boolean;
@@ -340,6 +343,7 @@ export default function Dashboard() {
   const [leaveConfirmId,    setLeaveConfirmId]     = useState<string | null>(null);
   const [leavingId,         setLeavingId]          = useState<string | null>(null);
   const [leaveError,        setLeaveError]         = useState<string>("");
+  const [rsvpCounts,     setRsvpCounts]     = useState<Record<string, number>>({});
   const [pushEnabled,    setPushEnabled]    = useState(false);
   const [pushSupported,  setPushSupported]  = useState(false);
   const [storyOpen,      setStoryOpen]      = useState(false);
@@ -431,6 +435,72 @@ export default function Dashboard() {
       router.replace("/dashboard");
     }
   }, [searchParams, router]);
+
+  // ── Fetch RSVP counts once upcoming sessions are known ───────────────────
+  useEffect(() => {
+    if (!upcomingSessions.length) return;
+    const ids = upcomingSessions.map(s => s.id).join(",");
+    fetch(`/api/sessions/rsvp-counts?ids=${ids}`)
+      .then(r => r.json())
+      .then(d => { if (d.counts) setRsvpCounts(d.counts); })
+      .catch(() => {});
+  }, [upcomingSessions]);
+
+  // ── Supabase realtime: session_attendance changes ─────────────────────────
+  useEffect(() => {
+    if (!user) return;
+    const supabase = getSupabase();
+    const channel = supabase
+      .channel("dashboard-session-attendance")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "session_attendance" },
+        (payload) => {
+          const newRow = payload.new as Record<string, string> | null;
+          const oldRow = payload.old as Record<string, string> | null;
+          const sessionId = newRow?.session_id ?? oldRow?.session_id;
+          const email     = newRow?.user_email  ?? oldRow?.user_email;
+          if (!sessionId) return;
+
+          // Keep current user's join state in sync across tabs / devices
+          if (email === user.email) {
+            if (payload.eventType === "INSERT") {
+              setJoinedSessionIds(prev => new Set([...prev, sessionId]));
+            } else if (payload.eventType === "DELETE") {
+              setJoinedSessionIds(prev => { const n = new Set(prev); n.delete(sessionId); return n; });
+            }
+          }
+
+          // Update RSVP count for the session
+          setRsvpCounts(prev => {
+            const cur = prev[sessionId] ?? 0;
+            if (payload.eventType === "INSERT") return { ...prev, [sessionId]: cur + 1 };
+            if (payload.eventType === "DELETE") return { ...prev, [sessionId]: Math.max(0, cur - 1) };
+            return prev;
+          });
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
+  // ── Supabase realtime: live points update when leaderboard row changes ────
+  useEffect(() => {
+    if (!user) return;
+    const supabase = getSupabase();
+    const channel = supabase
+      .channel("dashboard-user-points")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "leaderboard", filter: `user_email=eq.${user.email}` },
+        (payload) => {
+          const row = payload.new as { month_points?: number; total_points?: number } | null;
+          if (row) setPoints({ month_points: row.month_points ?? 0, total_points: row.total_points ?? 0 });
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
 
   async function handleLeaveSession(sessionId: string, userEmail: string) {
     setLeavingId(sessionId); setLeaveError("");
@@ -550,23 +620,11 @@ export default function Dashboard() {
   return (
     <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)" }}>
 
-      {/* ── Navbar ── */}
-      <header className="cs-app-nav">
-        <div className="cs-app-nav-inner">
-          <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none" }}>
-            <Image src="/logo.png" alt="Connected Steps" width={36} height={36} className="rounded-full" />
-            <span className="font-display" style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--cs-white)", whiteSpace: "nowrap" }}>Connected Steps</span>
-          </Link>
-          <nav className="cs-app-nav-links">
-            {[{ label: "Home", href: "/" }, { label: "Dashboard", href: "/dashboard" }, { label: "Weekend Run", href: "/weekend-run" }, { label: "Leaderboard", href: "/leaderboard" }, { label: "Community", href: "/community" }, { label: "Achievements", href: "/achievements" }, { label: "Pricing", href: "/pricing" }].map((item) => (
-              <Link key={item.label} href={item.href} style={{ fontSize: "0.875rem", color: item.label === "Dashboard" ? "var(--cs-orange)" : "var(--cs-muted)", textDecoration: "none" }}>{item.label}</Link>
-            ))}
-          </nav>
-          <div className="cs-app-nav-user">
-            <UserMenu user={user as MenuUser} onUserUpdate={(u) => { setUser(u as User); localStorage.setItem("cs_user", JSON.stringify(u)); }} />
-          </div>
-        </div>
-      </header>
+      <AppNav
+        user={user as MenuUser}
+        onUserUpdate={(u) => { setUser(u as User); localStorage.setItem("cs_user", JSON.stringify(u)); }}
+        activeLabel="Dashboard"
+      />
 
       {/* ── Body ── */}
       <div className="cs-dashboard-body">
@@ -610,6 +668,14 @@ export default function Dashboard() {
         {/* ── Main feed ── */}
         <main className="cs-db-main">
 
+          {/* Personalised hero — greeting, today's workout, streak, progress, coach tip */}
+          <DashboardHero
+            user={{ firstName: user.firstName, goal: user.goal, location: user.location }}
+            sessions={sessions}
+            upcomingSessions={upcomingSessions}
+            joinedSessionIds={joinedSessionIds}
+          />
+
           {/* Mobile-only compact profile card */}
           <div className="cs-mobile-profile-card">
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
@@ -650,6 +716,7 @@ export default function Dashboard() {
                   const isUrgent = diff <= 1;
                   const dateStr = sessionDate.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
                   const joined = joinedSessionIds.has(s.id);
+                  const rsvpCount = rsvpCounts[s.id] ?? 0;
                   const confirmingLeave = leaveConfirmId === s.id;
                   const isLeaving = leavingId === s.id;
                   return (
@@ -666,6 +733,7 @@ export default function Dashboard() {
                           <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "20px", background: isUrgent ? "var(--cs-orange)" : "rgba(255,255,255,0.07)", color: isUrgent ? "#fff" : "var(--cs-muted)" }}>{badge}</span>
                           {joined ? <span style={{ fontSize: "0.7rem", color: "#4ade80", fontWeight: 600 }}>✓ Joined</span>
                                   : <span style={{ fontSize: "0.7rem", color: "var(--cs-orange)", fontWeight: 600 }}>Join →</span>}
+                          {rsvpCount > 0 && <span style={{ fontSize: "0.65rem", color: "var(--cs-muted)" }}>{rsvpCount} joined</span>}
                         </div>
                       </div>
                       {joined && (
