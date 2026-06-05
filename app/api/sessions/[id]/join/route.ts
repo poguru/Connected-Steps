@@ -168,37 +168,82 @@ async function sendJoinConfirmationEmail(p: {
   const firstName = p.firstName || "there";
   const dateLabel = formatDate(p.date) + (p.time ? ` at ${p.time}` : "");
 
-  const html = `
-    <div style="font-family:sans-serif;max-width:520px;margin:0 auto;background:#0d0d0d;border-radius:10px;overflow:hidden;">
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
+  <tr><td align="center">
+    <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+
       <!-- Header -->
-      <div style="background:#111;padding:24px 28px;border-bottom:1px solid rgba(255,255,255,0.07);">
-        <span style="font-size:1rem;font-weight:700;color:#fff;">Connected Steps</span>
-      </div>
+      <tr><td style="background:#0a0a0a;padding:24px 36px;">
+        <div style="font-size:20px;font-weight:700;color:#fff;letter-spacing:-0.3px;">Connected Steps</div>
+        <div style="font-size:10px;color:#e8620a;letter-spacing:0.14em;text-transform:uppercase;margin-top:3px;">Your Goal, Our Plan</div>
+      </td></tr>
+      <tr><td style="height:4px;background:#e8620a;"></td></tr>
+
+      <!-- Confirmation banner -->
+      <tr><td style="background:#0f2a0f;padding:20px 36px;text-align:center;">
+        <div style="font-size:28px;margin-bottom:6px;">✅</div>
+        <div style="font-size:18px;font-weight:700;color:#4ade80;">Your Registration is Confirmed!</div>
+      </td></tr>
 
       <!-- Body -->
-      <div style="padding:28px;">
-        <p style="color:#e0e0e0;margin:0 0 6px;">Hi <strong>${firstName}</strong>,</p>
-        <p style="color:#e0e0e0;margin:0 0 20px;">You're registered for the upcoming training session. See you on the track! 🏃</p>
+      <tr><td style="padding:32px 36px;">
+        <p style="margin:0 0 8px;font-size:15px;color:#333;">Hi <strong>${firstName}</strong>,</p>
+        <p style="margin:0 0 24px;font-size:15px;color:#555;line-height:1.6;">
+          You're all set for the upcoming Connected Steps training session. We're excited to have you — see you on the track! 🏃
+        </p>
 
-        <!-- Session details -->
-        <div style="background:rgba(255,122,0,0.07);border:1px solid rgba(255,122,0,0.25);border-radius:8px;padding:18px 20px;margin-bottom:24px;line-height:1.9;">
-          <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:10px;">${p.title}</div>
-          <div style="font-size:13px;color:#ccc;">📅 ${dateLabel}</div>
-          ${p.venue ? `<div style="font-size:13px;color:#ccc;">📍 ${p.venue}</div>` : ""}
-        </div>
+        <!-- Session card -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff8f4;border:1px solid #fde0c8;border-radius:10px;overflow:hidden;margin-bottom:28px;">
+          <tr><td style="padding:16px 20px;border-bottom:1px solid #fde0c8;">
+            <div style="font-size:10px;color:#e8620a;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">Session</div>
+            <div style="font-size:18px;font-weight:700;color:#0a0a0a;">${p.title}</div>
+          </td></tr>
+          <tr><td style="padding:14px 20px;">
+            <div style="font-size:13px;color:#444;margin-bottom:6px;">📅 <strong>${dateLabel}</strong></div>
+            ${p.venue ? `<div style="font-size:13px;color:#444;">📍 <strong>${p.venue}</strong></div>` : ""}
+          </td></tr>
+        </table>
 
-        <a href="${appUrl}/dashboard" style="display:inline-block;padding:12px 28px;background:#ff7a00;color:#fff;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
-          Go to Dashboard →
-        </a>
+        <!-- CTA -->
+        <table cellpadding="0" cellspacing="0" style="margin:0 auto 28px;">
+          <tr><td style="background:#e8620a;border-radius:6px;">
+            <a href="${appUrl}/dashboard" style="display:block;padding:13px 36px;font-size:14px;font-weight:700;color:#fff;text-decoration:none;">
+              Go to Dashboard →
+            </a>
+          </td></tr>
+        </table>
 
-      </div>
+        <!-- Reminder tip -->
+        <p style="margin:0 0 6px;font-size:13px;color:#888;line-height:1.6;text-align:center;">
+          Arrive 10–15 minutes early for warm-up. Carry a water bottle! 💧
+        </p>
+      </td></tr>
+
+      <!-- Contact -->
+      <tr><td style="background:#f9f9f9;border-top:1px solid #e5e5e5;padding:18px 36px;">
+        <p style="margin:0 0 4px;font-size:13px;color:#555;font-weight:600;">In case of any queries or questions</p>
+        <p style="margin:0;font-size:13px;color:#555;">
+          📞 Call / WhatsApp us at
+          <a href="https://wa.me/919703620570" style="color:#e8620a;text-decoration:none;font-weight:700;">+91 97036 20570</a>
+        </p>
+      </td></tr>
 
       <!-- Footer -->
-      <div style="padding:16px 28px;border-top:1px solid rgba(255,255,255,0.06);">
-        <p style="color:#444;font-size:11px;margin:0;">Connected Steps · <a href="${appUrl}" style="color:#ff7a00;text-decoration:none;">connectedsteps.in</a></p>
-      </div>
-    </div>
-  `;
+      <tr><td style="padding:14px 36px;text-align:center;">
+        <p style="margin:0;font-size:11px;color:#aaa;">
+          Connected Steps · Hyderabad, India ·
+          <a href="${appUrl}" style="color:#e8620a;text-decoration:none;">connectedsteps.in</a>
+        </p>
+      </td></tr>
+
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
 
   const res  = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -209,7 +254,7 @@ async function sendJoinConfirmationEmail(p: {
     body: JSON.stringify({
       from:    fromEmail,
       to:      [p.email],
-      subject: `You're registered for ${p.title} — Connected Steps`,
+      subject: `Your registration is confirmed — ${p.title} | Connected Steps`,
       html,
     }),
   });
