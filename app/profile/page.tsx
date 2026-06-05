@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import ConnectedApps from "@/components/settings/ConnectedApps";
 
 interface AppUser {
   firstName: string;
@@ -224,6 +225,12 @@ export default function ProfilePage() {
               {pwSaving ? "Changing…" : "Change password"}
             </button>
           </div>
+        </section>
+
+        {/* Connected Apps */}
+        <section style={sectionStyle}>
+          <div style={{ fontSize: 11, color: "var(--muted-foreground)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1.25rem", fontWeight: 600 }}>Connected Apps</div>
+          <ConnectedApps userEmail={user.email} />
         </section>
 
       </div>
