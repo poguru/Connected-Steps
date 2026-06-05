@@ -4,10 +4,19 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { motion, AnimatePresence } from "framer-motion";
+import { CheckCircle2 } from "lucide-react";
 import SignUpForm from "./SignUpForm";
 import LoginForm from "./LoginForm";
 
 type Tab = "signup" | "login";
+
+const perks = [
+  "Personalised training plan from day one",
+  "Weekly check-ins with a real coach",
+  "Community group runs every weekend",
+  "Race-day strategy and pacing support",
+];
 
 export default function AuthPage() {
   const searchParams = useSearchParams();
@@ -20,148 +29,122 @@ export default function AuthPage() {
   }, [searchParams]);
 
   return (
-    <div className="auth-layout">
+    <div style={{ minHeight: "100vh", display: "flex", background: "var(--background)" }}>
 
       {/* ── Left brand panel ── */}
-      <div className="auth-left">
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", maxWidth: "400px", width: "100%" }}>
+      <div className="hidden lg:flex" style={{ width: "45%", flexShrink: 0, position: "relative", overflow: "hidden", flexDirection: "column", justifyContent: "center", alignItems: "center", padding: "4rem", background: "var(--gradient-primary)" }}>
+        <div className="grid-bg" style={{ position: "absolute", inset: 0, opacity: 0.2 }} />
+        <div style={{ position: "absolute", top: -80, right: -80, width: 300, height: 300, borderRadius: "50%", background: "oklch(0.74 0.2 50 / 30%)", filter: "blur(60px)" }} />
+        <div style={{ position: "absolute", bottom: -60, left: -60, width: 250, height: 250, borderRadius: "50%", background: "oklch(0.72 0.19 49 / 20%)", filter: "blur(50px)" }} />
 
-          {/* Logo */}
-          <Link href="/" style={{ textDecoration: "none" }}>
-            <Image
-              src="/logo.png"
-              alt="Connected Steps"
-              width={120}
-              height={120}
-              className="rounded-full"
-              style={{ border: "2px solid rgba(232,98,10,0.4)", display: "block" }}
-            />
+        <div style={{ position: "relative", maxWidth: 380, textAlign: "center" }}>
+          <Link href="/" style={{ textDecoration: "none", display: "inline-block", marginBottom: "2rem" }}>
+            <Image src="/logo.png" alt="Connected Steps" width={100} height={100} className="rounded-full"
+              style={{ border: "3px solid rgba(255,255,255,0.3)", display: "block" }} />
           </Link>
 
-          {/* Brand name */}
-          <div className="font-display" style={{ fontSize: "1.9rem", fontWeight: 600, color: "var(--cs-white)", marginTop: "1.25rem" }}>
+          <div className="font-display" style={{ fontSize: "2rem", fontWeight: 700, color: "#fff", marginBottom: "0.5rem" }}>
             Connected Steps
           </div>
-          <div style={{ fontSize: "11px", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--cs-orange)", marginTop: "6px" }}>
+          <div style={{ fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)", marginBottom: "2rem" }}>
             Your Goal, Our Plan
           </div>
 
-          {/* Divider */}
-          <div style={{ width: "40px", height: "1px", background: "var(--cs-orange)", margin: "1.75rem auto", opacity: 0.5 }} />
-
-          {/* Pitch */}
-          <div style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--cs-orange)", marginBottom: "1rem", fontFamily: "var(--font-body)" }}>
-            Every journey starts with a step
-          </div>
-          <h2
-            className="font-display"
-            style={{ fontSize: "clamp(1.8rem, 2.5vw, 2.5rem)", fontWeight: 300, lineHeight: 1.2, marginBottom: "1.25rem" }}
-          >
-            <span style={{ color: "var(--cs-white)" }}>Train smarter.</span><br />
-            <span style={{ color: "var(--cs-orange)" }}>Live better.</span>
+          <h2 className="font-display" style={{ fontSize: "clamp(1.8rem, 2.5vw, 2.5rem)", fontWeight: 700, lineHeight: 1.15, color: "#fff", marginBottom: "2rem" }}>
+            Train smarter.<br />
+            <span className="text-italic-serif">Live better.</span>
           </h2>
-          <p style={{ fontSize: "0.875rem", lineHeight: 1.8, color: "var(--cs-muted)" }}>
-            Connected Steps is a community-driven fitness movement built on real transformations.
-            We pair you with National-level athletes and elite coaches to help you break through
-            your limits. Whether you're looking to lose weight, run your first marathon, or simply
-            lead a more active life, we provide the expert plan to get you there.
-          </p>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, textAlign: "left" }}>
+            {perks.map(p => (
+              <div key={p} style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: "0.875rem", color: "rgba(255,255,255,0.9)" }}>
+                <CheckCircle2 size={16} style={{ flexShrink: 0, marginTop: 2, color: "var(--accent)" }} />
+                {p}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ marginTop: "2.5rem", display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ display: "flex" }}>
+              {["A","B","C","D"].map((l, i) => (
+                <div key={l} style={{ width: 32, height: 32, borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 700, color: "#fff", marginLeft: i === 0 ? 0 : -10, border: "2px solid rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.2)", backdropFilter: "blur(4px)" }}>
+                  {l}
+                </div>
+              ))}
+            </div>
+            <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.85)" }}>
+              <strong>500+ runners</strong> already training
+            </span>
+          </div>
         </div>
       </div>
 
       {/* ── Right form panel ── */}
-      <div className="auth-right">
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "3rem 2rem", overflowY: "auto", minHeight: "100vh" }}>
+
         {/* Mobile logo */}
-        <Link href="/" className="auth-mobile-logo" style={{ textDecoration: "none" }}>
-          <Image src="/logo.png" alt="Connected Steps" width={40} height={40} className="rounded-full" />
-          <div className="font-display" style={{ fontSize: "1rem", fontWeight: 600, color: "var(--cs-white)" }}>
-            Connected Steps
-          </div>
+        <Link href="/" className="lg:hidden" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none", marginBottom: "2rem" }}>
+          <Image src="/logo.png" alt="Connected Steps" width={36} height={36} className="rounded-full" />
+          <span className="font-display" style={{ fontSize: "1rem", fontWeight: 600, color: "var(--foreground)" }}>Connected Steps</span>
         </Link>
 
-        <div style={{ width: "100%", maxWidth: "360px", margin: "0 auto" }}>
+        <div style={{ width: "100%", maxWidth: 400, margin: "0 auto" }}>
+
           {/* Heading */}
-          <div style={{ marginBottom: "1.75rem" }}>
-            <h1 className="font-display" style={{ fontSize: "1.5rem", fontWeight: 300, color: "var(--cs-white)", marginBottom: "0.25rem" }}>
+          <div style={{ marginBottom: "2rem" }}>
+            <h1 className="font-display" style={{ fontSize: "1.75rem", fontWeight: 700, color: "var(--foreground)", marginBottom: "0.5rem", letterSpacing: "-0.015em" }}>
               {tab === "signup" ? "Create your account" : "Welcome back"}
             </h1>
-            <p style={{ fontSize: "0.875rem", color: "var(--cs-muted)" }}>
-              {tab === "signup"
-                ? "Start your running journey today — it's free."
-                : "Sign in to continue your training."}
+            <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>
+              {tab === "signup" ? "Start your running journey today — it's free." : "Sign in to continue your training."}
             </p>
           </div>
 
-          {/* Registration success banner */}
+          {/* Registration success */}
           {justRegistered && (
-            <div style={{ background: "rgba(232,98,10,0.12)", border: "1px solid rgba(232,98,10,0.4)", borderRadius: "4px", padding: "10px 14px", marginBottom: "1.25rem", fontSize: "0.8rem", color: "var(--cs-orange)" }}>
-              ✓ Account created! Please sign in to continue.
+            <div style={{ background: "oklch(0.72 0.19 49 / 10%)", border: "1px solid oklch(0.72 0.19 49 / 30%)", borderRadius: 10, padding: "10px 14px", marginBottom: "1.5rem", fontSize: "0.8rem", color: "var(--primary)", display: "flex", alignItems: "center", gap: 8 }}>
+              <CheckCircle2 size={14} /> Account created! Please sign in to continue.
             </div>
           )}
 
           {/* Tab switcher */}
-          <div
-            style={{ display: "flex", gap: "4px", padding: "4px", marginBottom: "1.5rem", borderRadius: "4px", background: "rgba(255,255,255,0.05)" }}
-          >
-            {(["signup", "login"] as Tab[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                style={{
-                  flex: 1,
-                  padding: "8px",
-                  borderRadius: "3px",
-                  fontSize: "0.875rem",
-                  fontWeight: 500,
-                  background: tab === t ? "var(--cs-orange)" : "transparent",
-                  color: tab === t ? "var(--cs-white)" : "var(--cs-muted)",
-                  fontFamily: "var(--font-body)",
-                  border: "none",
-                  cursor: "pointer",
-                  transition: "background 0.2s, color 0.2s",
-                }}
-              >
+          <div style={{ display: "flex", gap: 4, padding: 4, marginBottom: "1.75rem", borderRadius: 999, background: "var(--surface)" }}>
+            {(["signup", "login"] as Tab[]).map(t => (
+              <button key={t} onClick={() => setTab(t)} style={{
+                flex: 1, padding: "10px", borderRadius: 999,
+                fontSize: "0.875rem", fontWeight: 600,
+                background: tab === t ? "var(--gradient-accent)" : "transparent",
+                color: tab === t ? "var(--accent-foreground)" : "var(--muted-foreground)",
+                fontFamily: "var(--font-body)", border: "none", cursor: "pointer",
+                transition: "all 0.2s",
+                boxShadow: tab === t ? "var(--shadow-orange)" : "none",
+              }}>
                 {t === "signup" ? "Create account" : "Sign in"}
               </button>
             ))}
           </div>
 
           {/* Form */}
-          {tab === "signup" ? (
-            <SignUpForm onSwitchToLogin={() => setTab("login")} />
-          ) : (
-            <LoginForm onSwitchToSignUp={() => setTab("signup")} />
-          )}
+          <AnimatePresence mode="wait">
+            <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
+              {tab === "signup" ? <SignUpForm onSwitchToLogin={() => setTab("login")} /> : <LoginForm onSwitchToSignUp={() => setTab("signup")} />}
+            </motion.div>
+          </AnimatePresence>
 
-          {/* Switch */}
-          <p style={{ fontSize: "0.875rem", textAlign: "center", marginTop: "1.5rem", color: "var(--cs-muted)" }}>
+          {/* Switch link */}
+          <p style={{ fontSize: "0.875rem", textAlign: "center", marginTop: "1.5rem", color: "var(--muted-foreground)" }}>
             {tab === "signup" ? (
-              <>
-                Already have an account?{" "}
-                <button
-                  onClick={() => setTab("login")}
-                  style={{ color: "var(--cs-orange)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontWeight: 500 }}
-                >
-                  Sign in
-                </button>
+              <>Already have an account?{" "}
+                <button onClick={() => setTab("login")} style={{ color: "var(--primary)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontWeight: 600 }}>Sign in</button>
               </>
             ) : (
-              <>
-                New to Connected Steps?{" "}
-                <button
-                  onClick={() => setTab("signup")}
-                  style={{ color: "var(--cs-orange)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontWeight: 500 }}
-                >
-                  Create account
-                </button>
+              <>New to Connected Steps?{" "}
+                <button onClick={() => setTab("signup")} style={{ color: "var(--primary)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontWeight: 600 }}>Create account</button>
               </>
             )}
           </p>
 
-          <Link
-            href="/"
-            style={{ display: "block", textAlign: "center", marginTop: "1rem", fontSize: "0.75rem", letterSpacing: "0.05em", color: "var(--cs-muted)" }}
-          >
+          <Link href="/" style={{ display: "block", textAlign: "center", marginTop: "1rem", fontSize: "0.75rem", color: "var(--muted-foreground)", textDecoration: "none" }}>
             ← Back to home
           </Link>
         </div>

@@ -291,16 +291,17 @@ h1, h2, h3 {
 
 /* ─── Cards ──────────────────────────────────────────── */
 .card-dark {
-  background: var(--cs-charcoal);
-  border: 1px solid rgba(56,189,248,0.1);
-  border-radius: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
   padding: 2rem;
-  transition: border-color 0.2s, transform 0.2s;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  box-shadow: var(--shadow-md);
 }
 
 .card-dark:hover {
-  border-color: rgba(56,189,248,0.4);
-  box-shadow: 0 4px 24px rgba(56,189,248,0.1);
+  border-color: oklch(0.72 0.19 49 / 30%);
+  box-shadow: var(--shadow-lg);
   transform: translateY(-4px);
 }
 
@@ -482,9 +483,9 @@ select.auth-input option {
 /* ─── App pages (Dashboard / Leaderboard / Community) ── */
 .cs-app-nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 50;
-  background: rgba(8,28,45,0.97);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(56,189,248,0.08);
+  background: oklch(0.18 0.015 270 / 80%);
+  backdrop-filter: blur(18px) saturate(140%);
+  border-bottom: 1px solid var(--border);
 }
 
 .cs-app-nav-inner {
@@ -630,7 +631,7 @@ select.auth-input option {
 .auth-layout {
   min-height: 100vh;
   display: flex;
-  background: var(--cs-black);
+  background: var(--background);
 }
 
 .auth-left {

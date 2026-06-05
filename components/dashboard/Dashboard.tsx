@@ -573,7 +573,7 @@ export default function Dashboard() {
 
         {/* ── Left sidebar ── */}
         <aside className="cs-db-left">
-          <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.75rem", textAlign: "center" }}>
+          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: "1.75rem", textAlign: "center", boxShadow: "var(--shadow-md)" }}>
             {user.photo ? (
               <img src={user.photo} alt={fullName} style={{ width: "80px", height: "80px", borderRadius: "50%", objectFit: "cover", border: "3px solid var(--cs-orange)", margin: "0 auto 1rem" }} />
             ) : (
@@ -639,7 +639,7 @@ export default function Dashboard() {
 
           {/* Upcoming Sessions */}
           {upcomingSessions.length > 0 && (
-            <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(74,222,128,0.15)", borderRadius: "8px", padding: "1.25rem", marginBottom: "1.25rem" }}>
+            <div style={{ background: "var(--surface)", border: "1px solid oklch(0.74 0.18 150 / 20%)", borderRadius: 16, padding: "1.25rem", marginBottom: "1.25rem", boxShadow: "var(--shadow-md)" }}>
               <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Upcoming Sessions</div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
                 {upcomingSessions.map((s) => {
