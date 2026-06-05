@@ -92,7 +92,7 @@ export async function POST(
     date:      session.date,
     time:      session.time,
     venue:     session.venue || session.location,
-  }).catch(() => {});
+  }).catch(e => console.error("Join confirmation email failed:", e));
 
   return NextResponse.json({ success: true, already: false, session });
 }
@@ -158,7 +158,10 @@ async function sendJoinConfirmationEmail(p: {
   venue:     string | null;
 }) {
   const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) return;
+  if (!resendKey) {
+    console.error("RESEND_API_KEY not set — join confirmation email not sent to", p.email);
+    return;
+  }
 
   const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
   const fromEmail = process.env.RESEND_FROM_EMAIL   ?? "Connected Steps <noreply@connectedsteps.in>";
@@ -197,7 +200,7 @@ async function sendJoinConfirmationEmail(p: {
     </div>
   `;
 
-  await fetch("https://api.resend.com/emails", {
+  const res  = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       "Content-Type":  "application/json",
@@ -210,4 +213,12 @@ async function sendJoinConfirmationEmail(p: {
       html,
     }),
   });
+
+  if (!res.ok) {
+    const err = await res.text().catch(() => res.status.toString());
+    console.error(`Resend error for ${p.email}: ${err}`);
+  } else {
+    const data = await res.json().catch(() => ({}));
+    console.log(`Join confirmation email sent to ${p.email}, id=${data.id}`);
+  }
 }
