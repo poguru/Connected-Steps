@@ -1,0 +1,65 @@
+{
+  "expo": {
+    "name": "Connected Steps",
+    "slug": "connected-steps",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "connectedsteps",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0a0a"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "in.connectedsteps.app",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "Connected Steps reads your workout and activity data to track your training progress.",
+        "NSHealthUpdateUsageDescription": "Connected Steps may update health data to keep your profile in sync."
+      },
+      "entitlements": {
+        "com.apple.developer.healthkit": true,
+        "com.apple.developer.healthkit.background-delivery": true
+      }
+    },
+    "android": {
+      "package": "in.connectedsteps.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0a0a0a"
+      },
+      "permissions": [
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_DISTANCE",
+        "android.permission.health.READ_TOTAL_CALORIES_BURNED",
+        "android.permission.health.READ_EXERCISE",
+        "android.permission.health.READ_HEART_RATE",
+        "android.permission.health.READ_ACTIVE_CALORIES_BURNED"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "react-native-health-connect",
+        {
+          "permissions": [
+            "Steps",
+            "Distance",
+            "TotalCaloriesBurned",
+            "ExerciseSession",
+            "HeartRate",
+            "ActiveCaloriesBurned"
+          ]
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "YOUR_EAS_PROJECT_ID"
+      }
+    }
+  }
+}
