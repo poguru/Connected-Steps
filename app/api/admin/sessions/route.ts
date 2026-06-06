@@ -86,27 +86,41 @@ async function sendSessionAnnouncementEmails(
   });
   const displayVenue = session.venue || session.location;
 
-  const results = await Promise.allSettled(
-    users.map(u => {
-      const name = `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() || "there";
-      return fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Content-Type":  "application/json",
-          "Authorization": `Bearer ${resendKey}`,
-        },
-        body: JSON.stringify({
-          from:    fromEmail,
-          to:      [u.email],
-          subject: `New Session: ${session.title} — Connected Steps`,
-          html:    buildAnnouncementEmail(name, session.title, dateStr, session.time, displayVenue, joinUrl),
-        }),
-      });
-    })
-  );
+  // Resend batch API — up to 100 emails per request, avoids per-call rate limits
+  const BATCH_SIZE = 100;
+  let sent = 0, failed = 0;
 
-  const sent   = results.filter(r => r.status === "fulfilled").length;
-  const failed = results.filter(r => r.status === "rejected").length;
+  for (let i = 0; i < users.length; i += BATCH_SIZE) {
+    const chunk = users.slice(i, i + BATCH_SIZE);
+    const batch = chunk.map(u => {
+      const name = `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() || "there";
+      return {
+        from:    fromEmail,
+        to:      [u.email],
+        subject: `New Session: ${session.title} — Connected Steps`,
+        html:    buildAnnouncementEmail(name, session.title, dateStr, session.time, displayVenue, joinUrl),
+      };
+    });
+
+    try {
+      const res = await fetch("https://api.resend.com/emails/batch", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${resendKey}` },
+        body:    JSON.stringify(batch),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        sent += batch.length;
+      } else {
+        console.error(`Resend batch error (chunk ${i}):`, data);
+        failed += batch.length;
+      }
+    } catch (err) {
+      console.error(`Resend batch fetch error (chunk ${i}):`, err);
+      failed += batch.length;
+    }
+  }
+
   console.log(`Session announcement emails: ${sent} sent, ${failed} failed (${users.length} total users)`);
 }
 
