@@ -162,3 +162,87 @@ export async function registerPushToken(userEmail: string, token: string, platfo
     body: JSON.stringify({ user_email: userEmail, token, platform }),
   });
 }
+
+// ── Admin API (coach-authenticated) ───────────────────────────────────────────
+
+function coachHeaders(token: string) {
+  return { "Content-Type": "application/json", "x-coach-token": token };
+}
+
+export async function adminGetSessions(coachToken: string): Promise<Session[]> {
+  const res = await fetch(`${CS_API_BASE}/api/admin/sessions`, { headers: coachHeaders(coachToken) });
+  if (!res.ok) throw new Error("Unauthorized");
+  const data = await res.json();
+  return data.data as Session[];
+}
+
+export async function adminCreateSession(coachToken: string, body: {
+  title: string; date: string; time?: string; location: string; venue?: string;
+}): Promise<Session> {
+  const res = await fetch(`${CS_API_BASE}/api/admin/sessions`, {
+    method: "POST", headers: coachHeaders(coachToken), body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("Failed to create session");
+  const data = await res.json();
+  return data.data as Session;
+}
+
+export interface AttendanceUser {
+  email: string; name: string; location: string;
+  attended: boolean; bonus_points: number; bonus_reason: string;
+}
+export interface AdminSession extends Session { [k: string]: unknown }
+
+export async function adminGetAttendance(coachToken: string, sessionId: string): Promise<{ session: AdminSession; users: AttendanceUser[] }> {
+  const res = await fetch(`${CS_API_BASE}/api/admin/sessions/${sessionId}/attendance`, { headers: coachHeaders(coachToken) });
+  if (!res.ok) throw new Error("Failed to load attendance");
+  return res.json();
+}
+
+export async function adminSaveAttendance(coachToken: string, sessionId: string, users: AttendanceUser[]): Promise<void> {
+  await fetch(`${CS_API_BASE}/api/admin/sessions/${sessionId}/attendance`, {
+    method: "POST", headers: coachHeaders(coachToken), body: JSON.stringify({ users }),
+  });
+}
+
+export interface AdminMember {
+  email: string; first_name: string; last_name: string;
+  phone: string; location: string; goal: string;
+  isActiveMember: boolean; membership: string | null;
+  total_points: number; session_count: number;
+}
+
+export async function adminGetMembers(coachToken: string): Promise<{ users: AdminMember[]; stats: Record<string, number> }> {
+  const res = await fetch(`${CS_API_BASE}/api/admin/users`, { headers: coachHeaders(coachToken) });
+  if (!res.ok) throw new Error("Failed to load members");
+  return res.json();
+}
+
+export interface CoachQuestion {
+  id: string; user_email: string; user_name: string;
+  category: string; question: string; answer: string | null;
+  status: string; created_at: string;
+}
+
+export async function adminGetQuestions(coachToken: string): Promise<CoachQuestion[]> {
+  const res = await fetch(`${CS_API_BASE}/api/coach-questions`, { headers: coachHeaders(coachToken) });
+  if (!res.ok) throw new Error("Failed to load questions");
+  const data = await res.json();
+  return data.questions as CoachQuestion[];
+}
+
+export async function adminAnswerQuestion(coachToken: string, id: string, answer: string): Promise<void> {
+  await fetch(`${CS_API_BASE}/api/coach-questions/${id}`, {
+    method: "PATCH", headers: coachHeaders(coachToken), body: JSON.stringify({ answer }),
+  });
+}
+
+export async function adminAssignPlan(coachToken: string, body: {
+  user_email: string; title: string; coach_name: string;
+  days: { type: string; detail: string; emoji: string }[];
+}): Promise<void> {
+  const res = await fetch(`${CS_API_BASE}/api/admin/training-plans`, {
+    method: "POST", headers: coachHeaders(coachToken), body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("Failed to assign plan");
+}

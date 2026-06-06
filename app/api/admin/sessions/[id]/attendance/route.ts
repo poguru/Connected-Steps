@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-
-function auth(req: NextRequest) {
-  const pw = req.headers.get("x-admin-password");
-  return pw && pw === process.env.ADMIN_PASSWORD;
-}
+import { isAdminOrCoach } from "@/lib/admin-auth";
 
 // GET — session info + users who joined via link + their attendance status
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!auth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const db = getSupabaseServer();
 
@@ -59,7 +55,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!auth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const { users } = await req.json() as {
     users: { email: string; name: string; attended: boolean; bonus_points: number; bonus_reason: string }[];
@@ -109,7 +105,7 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!auth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const { email } = await req.json() as { email: string };
   if (!email) return NextResponse.json({ error: "email required" }, { status: 400 });

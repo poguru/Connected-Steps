@@ -9,13 +9,10 @@ webpush.setVapidDetails(
   process.env.VAPID_PRIVATE_KEY!
 );
 
-function auth(req: NextRequest) {
-  const pw = req.headers.get("x-admin-password");
-  return pw && pw === process.env.ADMIN_PASSWORD;
-}
+import { isAdminOrCoach } from "@/lib/admin-auth";
 
 export async function GET(req: NextRequest) {
-  if (!auth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const db = getSupabaseServer();
   const { data, error } = await db
     .from("sessions")
@@ -26,7 +23,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!auth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { title, date, time, location, venue } = await req.json();
   if (!title || !date || !location) {
     return NextResponse.json({ error: "title, date and location are required." }, { status: 400 });

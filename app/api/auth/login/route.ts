@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { signCoachToken } from "@/lib/admin-auth";
 
 export async function POST(req: NextRequest) {
   const { identifier, password } = await req.json();
@@ -27,16 +28,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid credentials. Please check and try again." }, { status: 401 });
   }
 
+  const role       = user.role ?? "user";
+  const coachToken = role === "coach" ? signCoachToken(user.email) : undefined;
+
   return NextResponse.json({
     success: true,
     user: {
-      firstName: user.first_name,
-      lastName:  user.last_name,
-      email:     user.email,
-      phone:     user.phone,
-      goal:      user.goal,
-      location:  user.location,
-      photo:     user.photo ?? null,
+      firstName:  user.first_name,
+      lastName:   user.last_name,
+      email:      user.email,
+      phone:      user.phone,
+      goal:       user.goal,
+      location:   user.location,
+      photo:      user.photo ?? null,
+      role,
+      coachToken,
     },
   });
 }

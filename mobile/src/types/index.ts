@@ -1,13 +1,15 @@
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
 export interface CSUser {
-  email:     string;
-  firstName: string;
-  lastName:  string;
-  phone:     string;
-  goal:      string;
-  location:  string;
-  photo:     string | null;
+  email:      string;
+  firstName:  string;
+  lastName:   string;
+  phone:      string;
+  goal:       string;
+  location:   string;
+  photo:      string | null;
+  role?:      "user" | "coach";
+  coachToken?: string;
 }
 
 // ── Leaderboard ───────────────────────────────────────────────────────────────

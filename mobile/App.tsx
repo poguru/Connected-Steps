@@ -6,22 +6,29 @@ import { View, ActivityIndicator }    from "react-native";
 import AsyncStorage                   from "@react-native-async-storage/async-storage";
 import { SafeAreaProvider }           from "react-native-safe-area-context";
 
-import { UserProvider, useUser }  from "./src/context/UserContext";
-import LoginScreen                from "./src/screens/LoginScreen";
-import TabNavigator               from "./src/navigation/TabNavigator";
-import ConversationScreen         from "./src/screens/ConversationScreen";
-import { STORAGE_KEY_USER }       from "./src/config";
-import { registerPushToken }      from "./src/services/api";
-import type { CSUser }            from "./src/types";
+import { UserProvider, useUser }   from "./src/context/UserContext";
+import LoginScreen                 from "./src/screens/LoginScreen";
+import TabNavigator                from "./src/navigation/TabNavigator";
+import ConversationScreen          from "./src/screens/ConversationScreen";
+import AdminHomeScreen             from "./src/screens/admin/AdminHomeScreen";
+import AdminSessionsScreen         from "./src/screens/admin/AdminSessionsScreen";
+import AdminAttendanceScreen       from "./src/screens/admin/AdminAttendanceScreen";
+import AdminMembersScreen          from "./src/screens/admin/AdminMembersScreen";
+import AdminQuestionsScreen        from "./src/screens/admin/AdminQuestionsScreen";
+import AdminTrainingScreen         from "./src/screens/admin/AdminTrainingScreen";
+import { STORAGE_KEY_USER }        from "./src/config";
+import { registerPushToken }       from "./src/services/api";
+import type { CSUser }             from "./src/types";
 
 export type RootStackParamList = {
-  Login:        undefined;
-  MainTabs:     undefined;
-  Conversation: {
-    conversationId: string;
-    coachName:      string;
-    senderType:     "user" | "coach";
-  };
+  Login:           undefined;
+  MainTabs:        undefined;
+  Conversation:    { conversationId: string; coachName: string; senderType: "user" | "coach" };
+  AdminSessions:   undefined;
+  AdminAttendance: { sessionId: string; sessionTitle: string };
+  AdminMembers:    undefined;
+  AdminQuestions:  undefined;
+  AdminTraining:   undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -95,13 +102,14 @@ function RootNav() {
       initialRouteName={initialRoute}
       screenOptions={{ headerShown: false, animation: "fade" }}
     >
-      <Stack.Screen name="Login"        component={LoginScreen}        />
-      <Stack.Screen name="MainTabs"     component={TabNavigator}       />
-      <Stack.Screen
-        name="Conversation"
-        component={ConversationScreen}
-        options={{ animation: "slide_from_right", gestureEnabled: true }}
-      />
+      <Stack.Screen name="Login"        component={LoginScreen}          />
+      <Stack.Screen name="MainTabs"     component={TabNavigator}         />
+      <Stack.Screen name="Conversation"    component={ConversationScreen}    options={{ animation: "slide_from_right", gestureEnabled: true }} />
+      <Stack.Screen name="AdminSessions"   component={AdminSessionsScreen}   options={{ animation: "slide_from_right", gestureEnabled: true }} />
+      <Stack.Screen name="AdminAttendance" component={AdminAttendanceScreen} options={{ animation: "slide_from_right", gestureEnabled: true }} />
+      <Stack.Screen name="AdminMembers"    component={AdminMembersScreen}    options={{ animation: "slide_from_right", gestureEnabled: true }} />
+      <Stack.Screen name="AdminQuestions"  component={AdminQuestionsScreen}  options={{ animation: "slide_from_right", gestureEnabled: true }} />
+      <Stack.Screen name="AdminTraining"   component={AdminTrainingScreen}   options={{ animation: "slide_from_right", gestureEnabled: true }} />
     </Stack.Navigator>
   );
 }

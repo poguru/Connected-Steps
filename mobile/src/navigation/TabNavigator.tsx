@@ -1,12 +1,14 @@
 import React from "react";
 import { Text } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import HomeScreen        from "../screens/HomeScreen";
-import TrainingScreen    from "../screens/TrainingScreen";
-import CommunityScreen   from "../screens/CommunityScreen";
-import LeaderboardScreen from "../screens/LeaderboardScreen";
-import MessagesScreen    from "../screens/MessagesScreen";
-import ProfileScreen     from "../screens/ProfileScreen";
+import { useUser }         from "../context/UserContext";
+import HomeScreen          from "../screens/HomeScreen";
+import TrainingScreen      from "../screens/TrainingScreen";
+import CommunityScreen     from "../screens/CommunityScreen";
+import LeaderboardScreen   from "../screens/LeaderboardScreen";
+import MessagesScreen      from "../screens/MessagesScreen";
+import ProfileScreen       from "../screens/ProfileScreen";
+import AdminHomeScreen     from "../screens/admin/AdminHomeScreen";
 
 export type TabParamList = {
   Home:        undefined;
@@ -14,6 +16,7 @@ export type TabParamList = {
   Community:   undefined;
   Leaderboard: undefined;
   Messages:    undefined;
+  Admin:       undefined;
   Profile:     undefined;
 };
 
@@ -25,10 +28,14 @@ const ICONS: Record<string, string> = {
   Community:   "👥",
   Leaderboard: "🏆",
   Messages:    "💬",
+  Admin:       "⚙️",
   Profile:     "👤",
 };
 
 export default function TabNavigator() {
+  const { user } = useUser();
+  const isCoach  = user?.role === "coach";
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -60,6 +67,9 @@ export default function TabNavigator() {
       <Tab.Screen name="Community"   component={CommunityScreen}   options={{ title: "Community"   }} />
       <Tab.Screen name="Leaderboard" component={LeaderboardScreen} options={{ title: "Leaderboard" }} />
       <Tab.Screen name="Messages"    component={MessagesScreen}    options={{ title: "Messages"    }} />
+      {isCoach && (
+        <Tab.Screen name="Admin" component={AdminHomeScreen} options={{ title: "Admin" }} />
+      )}
       <Tab.Screen name="Profile"     component={ProfileScreen}     options={{ title: "Profile"     }} />
     </Tab.Navigator>
   );
