@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
-// GET /api/messages/[id]?limit=50&before=<iso>  → paginated messages
+// GET /api/messages/[id]?limit=50&before=<iso>  → paginated messages, oldest-first
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id }  = await params;
@@ -22,7 +22,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const { data, error } = await q;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // Return oldest-first so client can append
     return NextResponse.json({ messages: (data ?? []).reverse() });
   } catch (e: unknown) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
@@ -51,32 +50,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     if (msgErr) return NextResponse.json({ error: msgErr.message }, { status: 500 });
 
-    // Update conversation preview + unread counter for the recipient
+    // Read current unread counter then increment — avoids needing a DB function
     const unreadField = sender_type === "user" ? "coach_unread" : "user_unread";
+    const { data: conv } = await db
+      .from("conversations")
+      .select(`id, ${unreadField}`)
+      .eq("id", id)
+      .single();
+
+    const currentUnread = (conv as Record<string, number> | null)?.[unreadField] ?? 0;
+
     await db
       .from("conversations")
       .update({
         last_message_at:      new Date().toISOString(),
         last_message_preview: body.trim().slice(0, 80),
-        [unreadField]:        db.rpc("increment_unread" as never) as never,  // handled inline below
-      })
-      .eq("id", id);
-
-    // Simpler unread increment — just raw SQL via rpc isn't available without a function,
-    // so we read then write
-    await db.rpc("increment_conversation_unread" as never, {
-      conv_id:    id,
-      unread_col: unreadField,
-    }).catch(() => {
-      // If the RPC doesn't exist yet, fall back to a simple update (won't be accurate but won't break)
-    });
-
-    // Update last_message_at and preview (always works)
-    await db
-      .from("conversations")
-      .update({
-        last_message_at:      new Date().toISOString(),
-        last_message_preview: body.trim().slice(0, 80),
+        [unreadField]:        currentUnread + 1,
       })
       .eq("id", id);
 
@@ -89,49 +78,44 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 }
 
+type ConvRow = { user_email: string; coaches: { name: string } | null };
+
 async function sendPushNotification({
   db, conversationId, senderEmail, senderType, body,
 }: {
-  db: ReturnType<typeof getSupabaseServer>;
+  db:             ReturnType<typeof getSupabaseServer>;
   conversationId: string;
-  senderEmail: string;
-  senderType: string;
-  body: string;
+  senderEmail:    string;
+  senderType:     string;
+  body:           string;
 }) {
-  // Get conversation to find the recipient email
   const { data: conv } = await db
     .from("conversations")
     .select("user_email, coaches(name)")
     .eq("id", conversationId)
-    .single();
+    .single<ConvRow>();
 
   if (!conv) return;
 
   // Recipient is the other party
-  const recipientEmail = senderType === "user" ? (conv as { coaches?: { name?: string }; user_email: string }).coaches?.name : conv.user_email;
-  if (!recipientEmail) return;
-
-  // Look up recipient's push token — for users we use their email, for coaches we look up the coach email
-  const targetEmail = senderType === "user" ? conv.user_email : senderEmail;
-  // When sender is coach, recipient is user
-  const lookupEmail = senderType === "coach" ? conv.user_email : senderEmail;
+  const recipientEmail = senderType === "coach" ? conv.user_email : null;
+  if (!recipientEmail) return; // coach push notifications not yet supported
 
   const { data: tokens } = await db
     .from("push_tokens")
     .select("token")
-    .eq("user_email", lookupEmail === targetEmail ? conv.user_email : lookupEmail);
+    .eq("user_email", recipientEmail);
 
   if (!tokens?.length) return;
 
-  const coachesInfo = (conv as { coaches?: { name?: string } }).coaches;
   const senderName = senderType === "coach"
-    ? (coachesInfo?.name ?? "Coach")
+    ? (conv.coaches?.name ?? "Coach")
     : senderEmail.split("@")[0];
 
   await fetch("https://exp.host/--/api/v2/push/send", {
-    method: "POST",
+    method:  "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify(
+    body:    JSON.stringify(
       tokens.map((t: { token: string }) => ({
         to:    t.token,
         title: senderName,
