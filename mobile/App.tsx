@@ -16,7 +16,7 @@ import AdminAttendanceScreen       from "./src/screens/admin/AdminAttendanceScre
 import AdminMembersScreen          from "./src/screens/admin/AdminMembersScreen";
 import AdminQuestionsScreen        from "./src/screens/admin/AdminQuestionsScreen";
 import AdminTrainingScreen         from "./src/screens/admin/AdminTrainingScreen";
-import { STORAGE_KEY_USER }        from "./src/config";
+import { STORAGE_KEY_USER, CS_API_BASE } from "./src/config";
 import { registerPushToken }       from "./src/services/api";
 import type { CSUser }             from "./src/types";
 
@@ -76,10 +76,21 @@ function RootNav() {
   const [initialRoute, setInitialRoute] = useState<"Login" | "MainTabs">("Login");
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY_USER).then(raw => {
+    AsyncStorage.getItem(STORAGE_KEY_USER).then(async raw => {
       if (raw) {
         try {
           const stored: CSUser = JSON.parse(raw);
+
+          // Always refresh role from server — ensures coach tab appears
+          // even if the user was cached before the role system existed
+          try {
+            const res  = await fetch(`${CS_API_BASE}/api/auth/role?email=${encodeURIComponent(stored.email)}`);
+            const data = await res.json();
+            stored.role       = data.role       ?? stored.role ?? "user";
+            stored.coachToken = data.coachToken ?? stored.coachToken;
+            await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(stored));
+          } catch { /* network offline — use cached role */ }
+
           setUser(stored);
           setInitialRoute("MainTabs");
           setupPushNotifications(stored.email);
