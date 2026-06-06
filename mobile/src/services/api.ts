@@ -29,6 +29,13 @@ export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
   return data.entries as LeaderboardEntry[];
 }
 
+export async function getFriendsLeaderboard(email: string): Promise<LeaderboardEntry[]> {
+  const res = await fetch(`${CS_API_BASE}/api/leaderboard?friends_of=${encodeURIComponent(email)}`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.entries as LeaderboardEntry[];
+}
+
 export async function getUserStats(email: string): Promise<UserStats> {
   const res = await fetch(`${CS_API_BASE}/api/leaderboard/user?email=${encodeURIComponent(email)}`);
   if (!res.ok) throw new Error("Failed to load stats");

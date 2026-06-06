@@ -1,33 +1,68 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const db = getSupabaseServer();
+  const friendsOf = new URL(req.url).searchParams.get("friends_of");
 
-  const { data: entries, error } = await db
+  // ── Base leaderboard entries ──────────────────────────────────────────────
+  let q = db
     .from("leaderboard")
-    .select("id, user_email, user_name, location, goal, month_points, total_points, updated_at")
-    .order("month_points", { ascending: false });
+    .select("id, user_email, user_name, location, goal, month_points, total_points, week_points, prev_month_rank, updated_at");
 
+  if (friendsOf) {
+    // Friends tab — get followed emails first
+    const { data: follows } = await db
+      .from("follows")
+      .select("following_email")
+      .eq("follower_email", friendsOf);
+    const emails = (follows ?? []).map(f => f.following_email);
+    if (!emails.length) return NextResponse.json({ entries: [] });
+    q = q.in("user_email", emails);
+  }
+
+  const { data: entries, error } = await q.order("month_points", { ascending: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!entries?.length) return NextResponse.json({ entries: [] });
 
-  // Fetch photos for all users in one query
-  const emails = entries.map((e) => e.user_email);
+  // ── Compute week_points from session attendance (current ISO week) ─────────
+  const weekStart = getISOWeekStart();
+  const { data: weekAttendance } = await db
+    .from("session_attendance")
+    .select("user_email, bonus_points, sessions!inner(date)")
+    .eq("attended", true)
+    .gte("sessions.date", weekStart);
+
+  const weekMap: Record<string, number> = {};
+  for (const row of weekAttendance ?? []) {
+    const pts = (row.bonus_points && row.bonus_points > 0) ? row.bonus_points : 25;
+    weekMap[row.user_email] = (weekMap[row.user_email] ?? 0) + pts;
+  }
+
+  // ── Fetch user photos ─────────────────────────────────────────────────────
+  const emails = entries.map(e => e.user_email);
   const { data: users } = await db
     .from("users")
     .select("email, photo")
     .in("email", emails);
-
   const photoMap: Record<string, string | null> = {};
-  for (const u of users ?? []) {
-    photoMap[u.email] = u.photo ?? null;
-  }
+  for (const u of users ?? []) photoMap[u.email] = u.photo ?? null;
 
-  const enriched = entries.map((e) => ({
+  const enriched = entries.map(e => ({
     ...e,
-    photo: photoMap[e.user_email] ?? null,
+    week_points:     weekMap[e.user_email] ?? (e.week_points ?? 0),
+    photo:           photoMap[e.user_email] ?? null,
   }));
 
   return NextResponse.json({ entries: enriched });
+}
+
+function getISOWeekStart(): string {
+  const now  = new Date();
+  const day  = now.getDay(); // 0=Sun
+  const diff = (day === 0 ? -6 : 1 - day);
+  const mon  = new Date(now);
+  mon.setDate(now.getDate() + diff);
+  mon.setHours(0, 0, 0, 0);
+  return mon.toISOString().slice(0, 10);
 }

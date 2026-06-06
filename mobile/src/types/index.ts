@@ -15,14 +15,16 @@ export interface CSUser {
 // ── Leaderboard ───────────────────────────────────────────────────────────────
 
 export interface LeaderboardEntry {
-  id:           string;
-  user_email:   string;
-  user_name:    string;
-  location:     string | null;
-  goal:         string | null;
-  month_points: number;
-  total_points: number;
-  photo:        string | null;
+  id:              string;
+  user_email:      string;
+  user_name:       string;
+  location:        string | null;
+  goal:            string | null;
+  week_points:     number;
+  month_points:    number;
+  total_points:    number;
+  prev_month_rank: number | null;
+  photo:           string | null;
 }
 
 export interface UserStats {
