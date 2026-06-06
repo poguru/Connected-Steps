@@ -23,6 +23,7 @@
         "backgroundColor": "#0a0a0a"
       }
     },
+    "newArchEnabled": false,
     "plugins": [
       "expo-secure-store"
     ],
