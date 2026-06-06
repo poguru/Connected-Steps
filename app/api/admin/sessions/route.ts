@@ -2,14 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import webpush from "web-push";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendWhatsApp, sessionWAParams } from "@/lib/notify";
+import { isAdminOrCoach } from "@/lib/admin-auth";
 
 webpush.setVapidDetails(
   "mailto:connected.steps2106@gmail.com",
   process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
   process.env.VAPID_PRIVATE_KEY!
 );
-
-import { isAdminOrCoach } from "@/lib/admin-auth";
 
 export async function GET(req: NextRequest) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
