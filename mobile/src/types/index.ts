@@ -85,6 +85,36 @@ export interface Membership {
   started_at: string;
 }
 
+// ── Messaging ────────────────────────────────────────────────────────────────
+
+export interface Coach {
+  id:             string;
+  name:           string;
+  specialization: string | null;
+  email:          string;
+  avatar_url:     string | null;
+  bio:            string | null;
+}
+
+export interface Conversation {
+  id:                   string;
+  user_email:           string;
+  last_message_at:      string;
+  last_message_preview: string | null;
+  user_unread:          number;
+  coach_unread:         number;
+  coaches:              Pick<Coach, "id" | "name" | "specialization" | "avatar_url"> | null;
+}
+
+export interface Message {
+  id:           string;
+  sender_email: string;
+  sender_type:  "user" | "coach";
+  body:         string;
+  created_at:   string;
+  read_at:      string | null;
+}
+
 // ── Community ─────────────────────────────────────────────────────────────────
 
 export interface CommunityPost {

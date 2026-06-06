@@ -5,6 +5,7 @@ import HomeScreen        from "../screens/HomeScreen";
 import TrainingScreen    from "../screens/TrainingScreen";
 import CommunityScreen   from "../screens/CommunityScreen";
 import LeaderboardScreen from "../screens/LeaderboardScreen";
+import MessagesScreen    from "../screens/MessagesScreen";
 import ProfileScreen     from "../screens/ProfileScreen";
 
 export type TabParamList = {
@@ -12,17 +13,19 @@ export type TabParamList = {
   Training:    undefined;
   Community:   undefined;
   Leaderboard: undefined;
+  Messages:    undefined;
   Profile:     undefined;
 };
 
 const Tab = createBottomTabNavigator<TabParamList>();
 
-const ICONS: Record<string, { active: string; inactive: string }> = {
-  Home:        { active: "🏠", inactive: "🏠" },
-  Training:    { active: "🏃", inactive: "🏃" },
-  Community:   { active: "👥", inactive: "👥" },
-  Leaderboard: { active: "🏆", inactive: "🏆" },
-  Profile:     { active: "👤", inactive: "👤" },
+const ICONS: Record<string, string> = {
+  Home:        "🏠",
+  Training:    "🏃",
+  Community:   "👥",
+  Leaderboard: "🏆",
+  Messages:    "💬",
+  Profile:     "👤",
 };
 
 export default function TabNavigator() {
@@ -32,7 +35,7 @@ export default function TabNavigator() {
         headerShown: false,
         tabBarIcon: ({ focused }) => (
           <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.4 }}>
-            {focused ? ICONS[route.name].active : ICONS[route.name].inactive}
+            {ICONS[route.name]}
           </Text>
         ),
         tabBarStyle: {
@@ -44,8 +47,8 @@ export default function TabNavigator() {
           paddingTop:       6,
         },
         tabBarLabelStyle: {
-          fontSize:   10,
-          fontWeight: "600",
+          fontSize:      10,
+          fontWeight:    "600",
           letterSpacing: 0.2,
         },
         tabBarActiveTintColor:   "#e8620a",
@@ -56,6 +59,7 @@ export default function TabNavigator() {
       <Tab.Screen name="Training"    component={TrainingScreen}    options={{ title: "Training"    }} />
       <Tab.Screen name="Community"   component={CommunityScreen}   options={{ title: "Community"   }} />
       <Tab.Screen name="Leaderboard" component={LeaderboardScreen} options={{ title: "Leaderboard" }} />
+      <Tab.Screen name="Messages"    component={MessagesScreen}    options={{ title: "Messages"    }} />
       <Tab.Screen name="Profile"     component={ProfileScreen}     options={{ title: "Profile"     }} />
     </Tab.Navigator>
   );

@@ -6,15 +6,22 @@ import { View, ActivityIndicator }    from "react-native";
 import AsyncStorage                   from "@react-native-async-storage/async-storage";
 import { SafeAreaProvider }           from "react-native-safe-area-context";
 
-import { UserProvider, useUser } from "./src/context/UserContext";
-import LoginScreen               from "./src/screens/LoginScreen";
-import TabNavigator              from "./src/navigation/TabNavigator";
-import { STORAGE_KEY_USER }      from "./src/config";
-import type { CSUser }           from "./src/types";
+import { UserProvider, useUser }  from "./src/context/UserContext";
+import LoginScreen                from "./src/screens/LoginScreen";
+import TabNavigator               from "./src/navigation/TabNavigator";
+import ConversationScreen         from "./src/screens/ConversationScreen";
+import { STORAGE_KEY_USER }       from "./src/config";
+import { registerPushToken }      from "./src/services/api";
+import type { CSUser }            from "./src/types";
 
 export type RootStackParamList = {
-  Login:    undefined;
-  MainTabs: undefined;
+  Login:        undefined;
+  MainTabs:     undefined;
+  Conversation: {
+    conversationId: string;
+    coachName:      string;
+    senderType:     "user" | "coach";
+  };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -37,8 +44,27 @@ const NAV_THEME = {
   },
 };
 
+async function setupPushNotifications(userEmail: string) {
+  try {
+    // Dynamic import so the app doesn't crash if expo-notifications isn't installed yet
+    const Notifications = await import("expo-notifications").catch(() => null);
+    if (!Notifications) return;
+
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== "granted") {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== "granted") return;
+
+    const tokenData = await Notifications.getExpoPushTokenAsync();
+    await registerPushToken(userEmail, tokenData.data, "expo");
+  } catch { /* notifications unavailable in current environment */ }
+}
+
 function RootNav() {
-  const { setUser }                     = useUser();
+  const { user, setUser }               = useUser();
   const [loading,      setLoading]      = useState(true);
   const [initialRoute, setInitialRoute] = useState<"Login" | "MainTabs">("Login");
 
@@ -46,10 +72,11 @@ function RootNav() {
     AsyncStorage.getItem(STORAGE_KEY_USER).then(raw => {
       if (raw) {
         try {
-          const user: CSUser = JSON.parse(raw);
-          setUser(user);
+          const stored: CSUser = JSON.parse(raw);
+          setUser(stored);
           setInitialRoute("MainTabs");
-        } catch { /* corrupted data — go to login */ }
+          setupPushNotifications(stored.email);
+        } catch { /* corrupted — fall through to login */ }
       }
       setLoading(false);
     });
@@ -68,8 +95,13 @@ function RootNav() {
       initialRouteName={initialRoute}
       screenOptions={{ headerShown: false, animation: "fade" }}
     >
-      <Stack.Screen name="Login"    component={LoginScreen}  />
-      <Stack.Screen name="MainTabs" component={TabNavigator} />
+      <Stack.Screen name="Login"        component={LoginScreen}        />
+      <Stack.Screen name="MainTabs"     component={TabNavigator}       />
+      <Stack.Screen
+        name="Conversation"
+        component={ConversationScreen}
+        options={{ animation: "slide_from_right", gestureEnabled: true }}
+      />
     </Stack.Navigator>
   );
 }
