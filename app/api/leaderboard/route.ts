@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
 
   const weekMap: Record<string, number> = {};
   for (const row of weekAttendance ?? []) {
-    const pts = (row.bonus_points && row.bonus_points > 0) ? row.bonus_points : 25;
+    const pts = (row.bonus_points && row.bonus_points > 0) ? row.bonus_points : 5;
     weekMap[row.user_email] = (weekMap[row.user_email] ?? 0) + pts;
   }
 

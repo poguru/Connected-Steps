@@ -16,6 +16,7 @@ import AdminAttendanceScreen       from "./src/screens/admin/AdminAttendanceScre
 import AdminMembersScreen          from "./src/screens/admin/AdminMembersScreen";
 import AdminQuestionsScreen        from "./src/screens/admin/AdminQuestionsScreen";
 import AdminTrainingScreen         from "./src/screens/admin/AdminTrainingScreen";
+import AdminScoringAuditScreen     from "./src/screens/admin/AdminScoringAuditScreen";
 import { STORAGE_KEY_USER, CS_API_BASE } from "./src/config";
 import { registerPushToken }       from "./src/services/api";
 import type { CSUser }             from "./src/types";
@@ -29,6 +30,7 @@ export type RootStackParamList = {
   AdminMembers:    undefined;
   AdminQuestions:  undefined;
   AdminTraining:   undefined;
+  AdminScoringAudit: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -120,7 +122,8 @@ function RootNav() {
       <Stack.Screen name="AdminAttendance" component={AdminAttendanceScreen} options={{ animation: "slide_from_right", gestureEnabled: true }} />
       <Stack.Screen name="AdminMembers"    component={AdminMembersScreen}    options={{ animation: "slide_from_right", gestureEnabled: true }} />
       <Stack.Screen name="AdminQuestions"  component={AdminQuestionsScreen}  options={{ animation: "slide_from_right", gestureEnabled: true }} />
-      <Stack.Screen name="AdminTraining"   component={AdminTrainingScreen}   options={{ animation: "slide_from_right", gestureEnabled: true }} />
+      <Stack.Screen name="AdminTraining"      component={AdminTrainingScreen}      options={{ animation: "slide_from_right", gestureEnabled: true }} />
+      <Stack.Screen name="AdminScoringAudit" component={AdminScoringAuditScreen}  options={{ animation: "slide_from_right", gestureEnabled: true }} />
     </Stack.Navigator>
   );
 }

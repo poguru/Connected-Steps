@@ -48,7 +48,8 @@ export async function GET(req: NextRequest) {
     const events: FeedEvent[] = [];
 
     for (const s of sessions ?? []) {
-      const sess = s.sessions as { id: string; title: string; date: string; venue: string | null } | null;
+      const sessRaw = s.sessions as unknown;
+      const sess    = (Array.isArray(sessRaw) ? sessRaw[0] : sessRaw) as { id: string; title: string; date: string; venue: string | null } | null;
       if (!sess) continue;
       events.push({
         id:          `session_${s.user_email}_${sess.id}`,

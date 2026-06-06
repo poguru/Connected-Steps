@@ -100,8 +100,8 @@ export default function ProfileScreen() {
   const sessionCount  = achieve?.sessionCount ?? 0;
   const hasMembership = achieve?.hasMembership ?? false;
   const rank          = achieve?.leaderboardRank;
-  const totalXP       = stats?.total_points ?? 0;
-  const monthXP       = stats?.month_points ?? 0;
+  const totalXP       = stats?.total_xp  ?? (stats?.total_points ?? 0) * 5;
+  const monthXP       = stats?.month_xp  ?? (stats?.month_points ?? 0) * 5;
 
   const levelInfo  = getLevelInfo(totalXP);
   const nextTitle  = getNextTitle(totalXP);

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity,
-  ActivityIndicator, RefreshControl, Image, ScrollView,
+  ActivityIndicator, RefreshControl, Image, ScrollView, Modal,
 } from "react-native";
 import { useSafeAreaInsets }  from "react-native-safe-area-context";
 import { useUser }            from "../context/UserContext";
@@ -9,6 +9,7 @@ import { getLeaderboard, getFriendsLeaderboard } from "../services/api";
 import type { LeaderboardEntry } from "../types";
 import LevelBadge             from "../components/LevelBadge";
 import { getLevelInfo }       from "../utils/xp";
+import { CS_API_BASE }        from "../config";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Period = "weekly" | "monthly" | "alltime" | "friends";
@@ -128,6 +129,124 @@ function Podium({ top3, period }: { top3: RankedEntry[]; period: Period }) {
   );
 }
 
+// ── Score breakdown modal ─────────────────────────────────────────────────────
+interface Breakdown {
+  user_name: string; session_points: number; weekly_bonus: number;
+  total_month: number; total_alltime: number; total_xp: number;
+  sessions: { date: string; title: string; base_pts: number; bonus_pts: number; total_pts: number }[];
+}
+
+function BreakdownModal({ email, name, onClose }: { email: string; name: string; onClose: () => void }) {
+  const [data, setData] = useState<Breakdown | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`${CS_API_BASE}/api/leaderboard/breakdown?email=${encodeURIComponent(email)}`)
+      .then(r => r.json())
+      .then(d => { setData(d.breakdown); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [email]);
+
+  return (
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={M.root}>
+        <View style={M.header}>
+          <Text style={M.title}>Score Breakdown</Text>
+          <TouchableOpacity onPress={onClose} style={M.closeBtn}><Text style={M.closeText}>Done</Text></TouchableOpacity>
+        </View>
+        {loading ? <ActivityIndicator color={C.orange} style={{ marginTop: 40 }} /> : !data ? (
+          <Text style={M.empty}>No data available.</Text>
+        ) : (
+          <ScrollView contentContainerStyle={M.scroll}>
+            <Text style={M.userName}>{data.user_name}</Text>
+
+            {/* Summary grid */}
+            <View style={M.grid}>
+              {[
+                { label: "Sessions",      val: data.session_points, suffix: "pts" },
+                { label: "Weekly Bonus",  val: data.weekly_bonus,   suffix: "pts" },
+                { label: "Month Total",   val: data.total_month,    suffix: "pts" },
+                { label: "Total XP",      val: data.total_xp,       suffix: "XP"  },
+              ].map(item => (
+                <View key={item.label} style={M.gridItem}>
+                  <Text style={M.gridVal}>{item.val}<Text style={M.gridSuffix}> {item.suffix}</Text></Text>
+                  <Text style={M.gridLabel}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Session-by-session */}
+            <Text style={M.sectionLabel}>SESSION BREAKDOWN</Text>
+            {data.sessions.length === 0 ? (
+              <Text style={M.empty}>No attended sessions this month.</Text>
+            ) : (
+              <View style={M.table}>
+                <View style={[M.tableRow, M.tableHead]}>
+                  <Text style={[M.tableCell, M.tableCellHead, { flex: 2 }]}>Session</Text>
+                  <Text style={[M.tableCell, M.tableCellHead]}>Base</Text>
+                  <Text style={[M.tableCell, M.tableCellHead]}>Bonus</Text>
+                  <Text style={[M.tableCell, M.tableCellHead]}>Total</Text>
+                </View>
+                {data.sessions.map((s, i) => (
+                  <View key={i} style={[M.tableRow, i % 2 === 1 && M.tableRowAlt]}>
+                    <Text style={[M.tableCell, { flex: 2 }]} numberOfLines={1}>{s.title}</Text>
+                    <Text style={M.tableCell}>{s.base_pts}</Text>
+                    <Text style={[M.tableCell, s.bonus_pts > 0 && { color: C.orange }]}>{s.bonus_pts > 0 ? `+${s.bonus_pts}` : "0"}</Text>
+                    <Text style={[M.tableCell, { fontWeight: "700", color: C.white }]}>{s.total_pts}</Text>
+                  </View>
+                ))}
+                {/* Totals row */}
+                <View style={[M.tableRow, M.tableTotal]}>
+                  <Text style={[M.tableCell, M.tableTotalCell, { flex: 2 }]}>Sessions subtotal</Text>
+                  <Text style={M.tableCell} />
+                  <Text style={M.tableCell} />
+                  <Text style={[M.tableCell, M.tableTotalCell]}>{data.session_points}</Text>
+                </View>
+                <View style={[M.tableRow, M.tableTotal]}>
+                  <Text style={[M.tableCell, { flex: 2, color: C.textSub }]}>Weekly bonus (4+ sessions/week)</Text>
+                  <Text style={M.tableCell} />
+                  <Text style={M.tableCell} />
+                  <Text style={[M.tableCell, { color: C.orange, fontWeight: "700" }]}>+{data.weekly_bonus}</Text>
+                </View>
+                <View style={[M.tableRow, M.tableTotal, { backgroundColor: "rgba(232,98,10,0.12)" }]}>
+                  <Text style={[M.tableCell, M.tableTotalCell, { flex: 2 }]}>Month Total</Text>
+                  <Text style={M.tableCell} /><Text style={M.tableCell} />
+                  <Text style={[M.tableCell, M.tableTotalCell, { color: C.orange, fontSize: 16 }]}>{data.total_month}</Text>
+                </View>
+              </View>
+            )}
+          </ScrollView>
+        )}
+      </View>
+    </Modal>
+  );
+}
+
+const M = StyleSheet.create({
+  root:     { flex: 1, backgroundColor: C.bg },
+  header:   { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 20, borderBottomWidth: 1, borderBottomColor: "#1e1e1e" },
+  title:    { fontSize: 18, fontWeight: "800", color: C.white },
+  closeBtn: { backgroundColor: C.orangeDim, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: C.orangeMid },
+  closeText:{ fontSize: 13, color: C.orange, fontWeight: "700" },
+  scroll:   { padding: 20, paddingBottom: 48 },
+  userName: { fontSize: 20, fontWeight: "800", color: C.white, marginBottom: 20 },
+  empty:    { fontSize: 13, color: C.textMuted, textAlign: "center", marginTop: 24 },
+  grid:     { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 28 },
+  gridItem: { flex: 1, minWidth: "44%", backgroundColor: C.surface, borderRadius: 14, borderWidth: 1, borderColor: "#1e1e1e", padding: 14 },
+  gridVal:  { fontSize: 22, fontWeight: "800", color: C.white, letterSpacing: -0.3 },
+  gridSuffix:{ fontSize: 12, fontWeight: "400", color: C.textMuted },
+  gridLabel: { fontSize: 10, color: C.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 4 },
+  sectionLabel: { fontSize: 10, fontWeight: "700", color: C.textMuted, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 12 },
+  table:        { backgroundColor: C.surface, borderRadius: 16, borderWidth: 1, borderColor: "#1e1e1e", overflow: "hidden" },
+  tableRow:     { flexDirection: "row", alignItems: "center", paddingVertical: 10, paddingHorizontal: 14 },
+  tableRowAlt:  { backgroundColor: "#0d0d0d" },
+  tableHead:    { backgroundColor: "#1a1a1a", paddingVertical: 8 },
+  tableTotal:   { borderTopWidth: 1, borderTopColor: "#1e1e1e" },
+  tableCell:    { flex: 1, fontSize: 12, color: C.textSub, textAlign: "right" },
+  tableCellHead:{ fontSize: 10, fontWeight: "700", color: C.textMuted, textTransform: "uppercase", textAlign: "right" },
+  tableTotalCell:{ fontWeight: "700", color: C.white },
+});
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function LeaderboardScreen() {
   const { user }   = useUser();
@@ -137,6 +256,7 @@ export default function LeaderboardScreen() {
   const [friends,    setFriends]   = useState<LeaderboardEntry[]>([]);
   const [loading,    setLoading]   = useState(true);
   const [refreshing, setRefreshing]= useState(false);
+  const [breakdown,  setBreakdown] = useState<{ email: string; name: string } | null>(null);
   const listRef = useRef<FlatList>(null);
 
   const load = useCallback(async (silent = false) => {
@@ -171,7 +291,7 @@ export default function LeaderboardScreen() {
     const mvCol  = movementColor(item.movement);
 
     return (
-      <View style={[S.row, isMe && S.rowMe]}>
+      <TouchableOpacity style={[S.row, isMe && S.rowMe]} onPress={() => setBreakdown({ email: item.user_email, name: item.user_name })} activeOpacity={0.8}>
         {/* Rank */}
         <View style={S.rankCol}>
           <Text style={[S.rankNum, item.rank <= 3 && S.rankNumTop]}>{MEDALS[item.rank - 1] ?? `#${item.rank}`}</Text>
@@ -199,7 +319,7 @@ export default function LeaderboardScreen() {
           <Text style={[S.pts, isMe && S.ptsMe]}>{item.pts.toLocaleString()}</Text>
           <Text style={S.ptsLabel}>XP</Text>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   }
 
@@ -316,6 +436,13 @@ export default function LeaderboardScreen() {
               </Text>
             </View>
           }
+        />
+      )}
+      {breakdown && (
+        <BreakdownModal
+          email={breakdown.email}
+          name={breakdown.name}
+          onClose={() => setBreakdown(null)}
         />
       )}
     </View>

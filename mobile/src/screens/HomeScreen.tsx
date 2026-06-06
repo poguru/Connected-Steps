@@ -125,8 +125,8 @@ export default function HomeScreen() {
   if (!user) return null;
 
   // ── Derived state ──────────────────────────────────────────────────────────
-  const totalXP       = stats?.total_points ?? 0;
-  const monthXP       = stats?.month_points ?? 0;
+  const totalXP       = stats?.total_xp     ?? (stats?.total_points ?? 0) * 5;
+  const monthXP       = stats?.month_xp     ?? (stats?.month_points ?? 0) * 5;
   const levelInfo     = getLevelInfo(totalXP);
   const streaks       = computeStreaks(history);
   const totalSessions = achieve?.sessionCount    ?? 0;

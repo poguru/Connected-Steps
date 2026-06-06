@@ -91,7 +91,7 @@ export async function recalculateMonth(month: string): Promise<{ message: string
       if (att.attended) basePoints += 5 + (att.bonus_points ?? 0);
     }
 
-    // Weekly bonus: +10 for any week where user attended 4+ sessions
+    // Weekly bonus: +5 for any week where user attended 4+ sessions
     const weekAttCount = new Map<string, number>();
     for (const att of userAtt) {
       if (!att.attended) continue;
@@ -102,7 +102,7 @@ export async function recalculateMonth(month: string): Promise<{ message: string
     }
     let weeklyBonus = 0;
     for (const count of weekAttCount.values()) {
-      if (count >= 4) weeklyBonus += 10;
+      if (count >= 4) weeklyBonus += 5;
     }
 
     const newMonthPts = basePoints + weeklyBonus;

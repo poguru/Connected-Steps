@@ -9,10 +9,11 @@ import type { RootStackParamList } from "../../../App";
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const TILES = [
-  { screen: "AdminSessions"  as const, icon: "📅", label: "Sessions",       sub: "Create & manage"         },
-  { screen: "AdminMembers"   as const, icon: "👥", label: "Members",         sub: "View all athletes"       },
-  { screen: "AdminQuestions" as const, icon: "💬", label: "Coach Q&A",       sub: "Answer pending questions"},
-  { screen: "AdminTraining"  as const, icon: "🏃", label: "Training Plans",  sub: "Assign to members"      },
+  { screen: "AdminSessions"     as const, icon: "📅", label: "Sessions",       sub: "Create & manage"          },
+  { screen: "AdminMembers"      as const, icon: "👥", label: "Members",         sub: "View all athletes"        },
+  { screen: "AdminQuestions"    as const, icon: "💬", label: "Coach Q&A",       sub: "Answer pending questions" },
+  { screen: "AdminTraining"     as const, icon: "🏃", label: "Training Plans",  sub: "Assign to members"        },
+  { screen: "AdminScoringAudit" as const, icon: "🔍", label: "Score Audit",     sub: "Verify points & XP"       },
 ];
 
 export default function AdminHomeScreen() {

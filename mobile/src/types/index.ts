@@ -28,8 +28,10 @@ export interface LeaderboardEntry {
 }
 
 export interface UserStats {
-  month_points: number;
-  total_points: number;
+  month_points: number;  // leaderboard points this month (5 pts/session)
+  total_points: number;  // leaderboard points all-time  (5 pts/session)
+  month_xp:     number;  // XP this month (25 pts/session — used for levels)
+  total_xp:     number;  // XP all-time   (25 pts/session — used for levels)
 }
 
 export interface UserAchievements {

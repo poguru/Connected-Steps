@@ -54,8 +54,8 @@ export default function TrainingScreen() {
   useEffect(() => { load(); }, [load]);
 
   const today       = todayIdx();
-  const totalXP     = stats?.total_points  ?? 0;
-  const monthXP     = stats?.month_points  ?? 0;
+  const totalXP     = stats?.total_xp  ?? (stats?.total_points ?? 0) * 5;
+  const monthXP     = stats?.month_xp  ?? (stats?.month_points ?? 0) * 5;
   const levelInfo   = getLevelInfo(totalXP);
   const streaks     = computeStreaks(history);
   const totalSess   = achieve?.sessionCount    ?? 0;
