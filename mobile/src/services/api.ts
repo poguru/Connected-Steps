@@ -4,6 +4,7 @@ import type {
   Session, UserSession, TrainingPlan, Membership,
   CommunityPost, Story,
   Coach, Conversation, Message,
+  SessionPhoto, FeedEvent,
 } from "../types";
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -236,6 +237,59 @@ export async function adminAnswerQuestion(coachToken: string, id: string, answer
     method: "PATCH", headers: coachHeaders(coachToken), body: JSON.stringify({ answer }),
   });
 }
+
+// ── Photos ────────────────────────────────────────────────────────────────────
+
+export async function getSessionPhotos(sessionId: string): Promise<SessionPhoto[]> {
+  const res = await fetch(`${CS_API_BASE}/api/sessions/${sessionId}/photos`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.photos as SessionPhoto[];
+}
+
+export async function uploadSessionPhoto(sessionId: string, params: {
+  photoUri:      string;
+  uploaderEmail: string;
+  uploaderName:  string;
+  caption?:      string;
+  mimeType?:     string;
+}): Promise<SessionPhoto> {
+  const form = new FormData();
+  form.append("photo",          { uri: params.photoUri, name: "photo.jpg", type: params.mimeType ?? "image/jpeg" } as never);
+  form.append("uploader_email", params.uploaderEmail);
+  form.append("uploader_name",  params.uploaderName);
+  if (params.caption) form.append("caption", params.caption);
+
+  const res = await fetch(`${CS_API_BASE}/api/sessions/${sessionId}/photos`, { method: "POST", body: form });
+  if (!res.ok) throw new Error("Upload failed");
+  const data = await res.json();
+  return data.photo as SessionPhoto;
+}
+
+export async function likePhoto(sessionId: string, photoId: string, userEmail: string): Promise<"liked" | "unliked"> {
+  const res = await fetch(`${CS_API_BASE}/api/sessions/${sessionId}/photos/${photoId}?action=like`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_email: userEmail }),
+  });
+  const data = await res.json();
+  return data.action as "liked" | "unliked";
+}
+
+export async function deletePhoto(sessionId: string, photoId: string, userEmail: string): Promise<void> {
+  await fetch(`${CS_API_BASE}/api/sessions/${sessionId}/photos/${photoId}?email=${encodeURIComponent(userEmail)}`, { method: "DELETE" });
+}
+
+// ── Activity Feed ─────────────────────────────────────────────────────────────
+
+export async function getActivityFeed(email: string): Promise<FeedEvent[]> {
+  const res = await fetch(`${CS_API_BASE}/api/feed?email=${encodeURIComponent(email)}`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.events as FeedEvent[];
+}
+
+// ── Admin API (coach-authenticated) ───────────────────────────────────────────
 
 export async function adminAssignPlan(coachToken: string, body: {
   user_email: string; title: string; coach_name: string;

@@ -117,6 +117,28 @@ export interface Message {
   read_at:      string | null;
 }
 
+// ── Photos & Feed ────────────────────────────────────────────────────────────
+
+export interface SessionPhoto {
+  id:             string;
+  session_id:     string;
+  uploader_email: string;
+  uploader_name:  string | null;
+  photo_url:      string;
+  caption:        string | null;
+  likes:          number;
+  created_at:     string;
+}
+
+export interface FeedEvent {
+  id:          string;
+  actor_email: string;
+  actor_name:  string;
+  event_type:  "session_attended" | "photo_uploaded" | "badge_earned";
+  payload:     Record<string, string | number>;
+  created_at:  string;
+}
+
 // ── Community ─────────────────────────────────────────────────────────────────
 
 export interface CommunityPost {
