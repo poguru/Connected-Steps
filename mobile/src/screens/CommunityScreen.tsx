@@ -3,6 +3,7 @@ import {
   View, Text, FlatList, ScrollView, StyleSheet,
   TouchableOpacity, ActivityIndicator, RefreshControl,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getSessions, getCommunityPosts, getStories } from "../services/api";
 import type { Session, CommunityPost, Story } from "../types";
 
@@ -87,6 +88,7 @@ function StoryCard({ item }: { item: Story }) {
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function CommunityScreen() {
+  const insets                      = useSafeAreaInsets();
   const [tab,        setTab]        = useState<Tab>("sessions");
   const [sessions,   setSessions]   = useState<Session[]>([]);
   const [posts,      setPosts]      = useState<CommunityPost[]>([]);
@@ -115,7 +117,7 @@ export default function CommunityScreen() {
   return (
     <View style={S.root}>
       {/* Header */}
-      <View style={S.header}>
+      <View style={[S.header, { paddingTop: Math.max(insets.top + 12, 20) }]}>
         <Text style={S.headerTitle}>Community</Text>
         <Text style={S.headerSub}>Upcoming runs, questions & member stories</Text>
       </View>

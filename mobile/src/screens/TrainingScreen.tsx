@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, StyleSheet,
   ActivityIndicator, RefreshControl,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUser }        from "../context/UserContext";
 import { getTrainingPlan } from "../services/api";
 import type { TrainingPlan } from "../types";
@@ -13,6 +14,7 @@ const todayIdx = () => { const d = new Date().getDay(); return d === 0 ? 6 : d -
 
 export default function TrainingScreen() {
   const { user }                         = useUser();
+  const insets                           = useSafeAreaInsets();
   const [plan,       setPlan]            = useState<TrainingPlan | null>(null);
   const [loading,    setLoading]         = useState(true);
   const [refreshing, setRefreshing]      = useState(false);
@@ -35,7 +37,7 @@ export default function TrainingScreen() {
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={C.orange} />}
     >
-      <View style={S.header}>
+      <View style={[S.header, { paddingTop: Math.max(insets.top + 12, 20) }]}>
         <Text style={S.headerTitle}>Training Plan</Text>
         {plan && <Text style={S.headerSub}>by {plan.coach_name || "your coach"}</Text>}
       </View>

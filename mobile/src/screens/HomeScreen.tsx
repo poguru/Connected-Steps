@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator, RefreshControl, Image, Linking,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation }    from "@react-navigation/native";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { useUser }           from "../context/UserContext";
@@ -68,6 +69,7 @@ function StatBadge({ icon, value, label }: { icon: string; value: string | numbe
 export default function HomeScreen() {
   const { user }                          = useUser();
   const navigation                        = useNavigation<Nav>();
+  const insets                            = useSafeAreaInsets();
   const [stats,      setStats]            = useState<UserStats | null>(null);
   const [achieve,    setAchieve]          = useState<UserAchievements | null>(null);
   const [nextSession, setNextSession]     = useState<Session | null>(null);
@@ -152,7 +154,7 @@ export default function HomeScreen() {
       }
     >
       {/* ── SECTION 1: HERO ─────────────────────────────────────────────── */}
-      <View style={S.hero}>
+      <View style={[S.hero, { paddingTop: Math.max(insets.top + 12, 20) }]}>
         {/* Warm glow accent */}
         <View style={S.heroGlow} pointerEvents="none" />
 
@@ -435,7 +437,7 @@ const C = {
 
 const S = StyleSheet.create({
   root:  { flex: 1, backgroundColor: C.bg },
-  scroll: { paddingBottom: 32 },
+  scroll: { paddingBottom: 48 },
 
   // Hero
   hero:             { backgroundColor: C.heroBg, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: "#1a1205", overflow: "hidden" },

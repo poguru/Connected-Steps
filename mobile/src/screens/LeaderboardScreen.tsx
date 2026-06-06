@@ -3,6 +3,7 @@ import {
   View, Text, FlatList, StyleSheet,
   ActivityIndicator, RefreshControl, Image,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUser }            from "../context/UserContext";
 import { getLeaderboard }    from "../services/api";
 import type { LeaderboardEntry } from "../types";
@@ -11,6 +12,7 @@ const MEDAL = ["🥇", "🥈", "🥉"];
 
 export default function LeaderboardScreen() {
   const { user }                     = useUser();
+  const insets                       = useSafeAreaInsets();
   const [entries,    setEntries]     = useState<LeaderboardEntry[]>([]);
   const [loading,    setLoading]     = useState(true);
   const [refreshing, setRefreshing]  = useState(false);
@@ -59,7 +61,7 @@ export default function LeaderboardScreen() {
   return (
     <View style={S.container}>
       {/* Banner */}
-      <View style={S.banner}>
+      <View style={[S.banner, { paddingTop: Math.max(insets.top + 12, 20) }]}>
         <Text style={S.bannerTitle}>Monthly Leaderboard</Text>
         {myRank > 0 && (
           <Text style={S.bannerSub}>You're ranked #{myRank}</Text>

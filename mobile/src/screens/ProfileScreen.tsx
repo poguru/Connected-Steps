@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, StyleSheet,
   TouchableOpacity, Alert, Linking, ActivityIndicator,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -34,6 +35,7 @@ function Row({ icon, label, value, onPress }: { icon: string; label: string; val
 
 export default function ProfileScreen() {
   const { user, setUser }                = useUser();
+  const insets                           = useSafeAreaInsets();
   const navigation                       = useNavigation<Nav>();
   const [membership, setMembership]      = useState<Membership | null>(null);
   const [loading,    setLoading]         = useState(true);
@@ -68,7 +70,7 @@ export default function ProfileScreen() {
   return (
     <ScrollView style={S.root} contentContainerStyle={S.scroll} showsVerticalScrollIndicator={false}>
       {/* Avatar block */}
-      <View style={S.avatarSection}>
+      <View style={[S.avatarSection, { paddingTop: Math.max(insets.top + 20, 36) }]}>
         <View style={S.avatarRing}>
           <View style={S.avatar}>
             <Text style={S.avatarInitials}>{initials}</Text>
