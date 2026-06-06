@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/expiry-reminders",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/rank-snapshot",
+      "schedule": "35 18 L * *"
     }
   ]
 }
