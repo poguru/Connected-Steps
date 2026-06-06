@@ -346,14 +346,6 @@ export default function Dashboard() {
   const [rsvpCounts,     setRsvpCounts]     = useState<Record<string, number>>({});
   const [pushEnabled,    setPushEnabled]    = useState(false);
   const [pushSupported,  setPushSupported]  = useState(false);
-  const [storyOpen,      setStoryOpen]      = useState(false);
-  const [storyForm,      setStoryForm]      = useState({ quote: "", achievement: "", rating: 5 });
-  const [storySaving,    setStorySaving]    = useState(false);
-  const [storyMsg,       setStoryMsg]       = useState("");
-  const [qaOpen,         setQaOpen]         = useState(false);
-  const [qaForm,         setQaForm]         = useState({ category: "General", title: "", body: "" });
-  const [qaSaving,       setQaSaving]       = useState(false);
-  const [qaMsg,          setQaMsg]          = useState("");
 
   useEffect(() => {
     const stored = localStorage.getItem("cs_user");
@@ -401,12 +393,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (searchParams.get("share") === "story") {
-      setStoryOpen(true);
-      setTimeout(() => {
-        document.getElementById("share-story")?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 300);
+      router.replace("/community");
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   useEffect(() => {
     const status = searchParams.get("strava");
@@ -613,9 +602,18 @@ export default function Dashboard() {
 
   if (!user) return null;
 
-  const fullName = `${user.firstName} ${user.lastName}`;
+  const fullName     = `${user.firstName} ${user.lastName}`;
+  const totalAttended = sessions.filter(r => r.attended).length;
+  const monthStart    = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+  const monthAttended = sessions.filter(r => r.attended && r.sessions && new Date(r.sessions.date + "T00:00") >= monthStart).length;
 
-
+  const ACHIEVEMENTS = [
+    { icon: "🏅", label: "First Session", earned: totalAttended >= 1  },
+    { icon: "🏃", label: "5 Sessions",    earned: totalAttended >= 5  },
+    { icon: "⭐", label: "10 Sessions",   earned: totalAttended >= 10 },
+    { icon: "🔥", label: "25 Sessions",   earned: totalAttended >= 25 },
+    { icon: "🏆", label: "50 Sessions",   earned: totalAttended >= 50 },
+  ];
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)" }}>
@@ -631,44 +629,69 @@ export default function Dashboard() {
 
         {/* ── Left sidebar ── */}
         <aside className="cs-db-left">
-          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: "1.75rem", textAlign: "center", boxShadow: "var(--shadow-md)" }}>
+          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 20, padding: "1.75rem", textAlign: "center", boxShadow: "var(--shadow-md)" }}>
             {user.photo ? (
-              <img src={user.photo} alt={fullName} style={{ width: "80px", height: "80px", borderRadius: "50%", objectFit: "cover", border: "3px solid var(--cs-orange)", margin: "0 auto 1rem" }} />
+              <img src={user.photo} alt={fullName} style={{ width: "76px", height: "76px", borderRadius: "50%", objectFit: "cover", border: "3px solid var(--cs-orange)", margin: "0 auto 1rem", display: "block" }} />
             ) : (
-              <div style={{ width: "80px", height: "80px", borderRadius: "50%", background: "var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.5rem", fontWeight: 700, color: "var(--cs-white)", margin: "0 auto 1rem" }}>
+              <div style={{ width: "76px", height: "76px", borderRadius: "50%", background: "oklch(0.72 0.19 49 / 12%)", border: "3px solid var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.6rem", fontWeight: 800, color: "var(--cs-orange)", margin: "0 auto 1rem" }}>
                 {user.firstName[0]}{user.lastName[0]}
               </div>
             )}
-            <div className="font-display" style={{ fontSize: "1.2rem", fontWeight: 600, color: "var(--cs-white)", marginBottom: "0.25rem" }}>{fullName}</div>
-            <div style={{ fontSize: "0.75rem", color: "var(--cs-orange)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.25rem" }}>{goalLabel[user.goal] ?? user.goal}</div>
+            <div className="font-display" style={{ fontSize: "1.15rem", fontWeight: 700, color: "var(--cs-white)", marginBottom: "0.2rem" }}>{fullName}</div>
+            <div style={{ fontSize: "0.72rem", color: "var(--cs-orange)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.5rem", fontWeight: 600 }}>{goalLabel[user.goal] ?? user.goal}</div>
 
-            <div style={{ display: "flex", justifyContent: "center", gap: "1.25rem", marginBottom: "1.25rem" }}>
+            <div style={{ display: "flex", justifyContent: "center", gap: "1rem", marginBottom: "1.25rem" }}>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--cs-white)" }}>{activities.length}</div>
-                <div style={{ fontSize: "10px", color: "var(--cs-muted)", marginTop: "2px" }}>Activities</div>
+                <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "var(--cs-orange)", letterSpacing: "-0.5px" }}>{points?.month_points ?? 0}</div>
+                <div style={{ fontSize: "9px", color: "var(--cs-muted)", marginTop: "3px", textTransform: "uppercase", letterSpacing: "0.04em" }}>This Month</div>
               </div>
+              <div style={{ width: "1px", background: "rgba(255,255,255,0.06)", margin: "2px 0" }} />
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--cs-orange)" }}>{points?.month_points ?? 0}</div>
-                <div style={{ fontSize: "10px", color: "var(--cs-muted)", marginTop: "2px" }}>This Month</div>
-              </div>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--cs-white)" }}>{points?.total_points ?? 0}</div>
-                <div style={{ fontSize: "10px", color: "var(--cs-muted)", marginTop: "2px" }}>Total Pts</div>
+                <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "var(--cs-white)", letterSpacing: "-0.5px" }}>{points?.total_points ?? 0}</div>
+                <div style={{ fontSize: "9px", color: "var(--cs-muted)", marginTop: "3px", textTransform: "uppercase", letterSpacing: "0.04em" }}>All-Time</div>
               </div>
             </div>
 
-            <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "1rem", textAlign: "left" }}>
-              <div style={{ fontSize: "11px", color: "var(--cs-muted)", marginBottom: "6px" }}>Training location</div>
-              <div style={{ fontSize: "0.875rem", color: "var(--cs-white)" }}>📍 {user.location || "—"}</div>
-            </div>
+            {user.location && (
+              <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "1rem", textAlign: "left" }}>
+                <div style={{ fontSize: "9px", color: "var(--cs-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Location</div>
+                <div style={{ fontSize: "0.82rem", color: "var(--cs-white)" }}>📍 {user.location}</div>
+              </div>
+            )}
           </div>
-
         </aside>
 
         {/* ── Main feed ── */}
         <main className="cs-db-main">
 
-          {/* Personalised hero — greeting, today's workout, streak, progress, coach tip */}
+          {/* Mobile-only compact profile card */}
+          <div className="cs-mobile-profile-card">
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              {user.photo ? (
+                <img src={user.photo} alt={fullName} style={{ width: "44px", height: "44px", borderRadius: "50%", objectFit: "cover", border: "2px solid var(--cs-orange)", flexShrink: 0 }} />
+              ) : (
+                <div style={{ width: "44px", height: "44px", borderRadius: "50%", background: "oklch(0.72 0.19 49 / 12%)", border: "2px solid var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.9rem", fontWeight: 800, color: "var(--cs-orange)", flexShrink: 0 }}>
+                  {user.firstName[0]}{user.lastName[0]}
+                </div>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--cs-white)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{fullName}</div>
+                <div style={{ fontSize: "0.7rem", color: "var(--cs-orange)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}>{goalLabel[user.goal] ?? user.goal}</div>
+              </div>
+              <div style={{ display: "flex", gap: "1.25rem", flexShrink: 0 }}>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: "1rem", fontWeight: 800, color: "var(--cs-orange)" }}>{points?.month_points ?? 0}</div>
+                  <div style={{ fontSize: "9px", color: "var(--cs-muted)", textTransform: "uppercase", letterSpacing: "0.03em" }}>This Month</div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: "1rem", fontWeight: 800, color: "var(--cs-white)" }}>{points?.total_points ?? 0}</div>
+                  <div style={{ fontSize: "9px", color: "var(--cs-muted)", textTransform: "uppercase", letterSpacing: "0.03em" }}>All-Time</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── 1. Hero ── */}
           <DashboardHero
             user={{ firstName: user.firstName, goal: user.goal, location: user.location }}
             sessions={sessions}
@@ -676,40 +699,59 @@ export default function Dashboard() {
             joinedSessionIds={joinedSessionIds}
           />
 
-          {/* Mobile-only compact profile card */}
-          <div className="cs-mobile-profile-card">
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-              {user.photo ? (
-                <img src={user.photo} alt={fullName} style={{ width: "48px", height: "48px", borderRadius: "50%", objectFit: "cover", border: "2px solid var(--cs-orange)", flexShrink: 0 }} />
-              ) : (
-                <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem", fontWeight: 700, color: "#fff", flexShrink: 0 }}>
-                  {user.firstName[0]}{user.lastName[0]}
+          {/* ── 2. Progress 2×2 grid ── */}
+          <div style={{ marginBottom: "1.25rem" }}>
+            <div style={{ fontSize: "10px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.65rem" }}>Progress</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              {[
+                { label: "Month Points",  value: points?.month_points ?? 0, hi: true  },
+                { label: "All-Time Pts",  value: points?.total_points ?? 0, hi: false },
+                { label: "This Month",    value: `${monthAttended} session${monthAttended !== 1 ? "s" : ""}`, hi: false },
+                { label: "Total Sessions",value: totalAttended,              hi: false },
+              ].map((s) => (
+                <div key={s.label} style={{
+                  background:    s.hi ? "oklch(0.15 0.03 49)" : "var(--surface)",
+                  border:        `1px solid ${s.hi ? "oklch(0.72 0.19 49 / 22%)" : "var(--border)"}`,
+                  borderRadius:  16, padding: "1.1rem 1.25rem",
+                  boxShadow:     "var(--shadow-md)",
+                }}>
+                  <div style={{ fontSize: "clamp(1.4rem, 3vw, 1.75rem)", fontWeight: 800, color: s.hi ? "var(--cs-orange)" : "var(--foreground)", letterSpacing: "-0.5px", lineHeight: 1.1, marginBottom: "0.35rem" }}>
+                    {s.value}
+                  </div>
+                  <div style={{ fontSize: "10px", color: "var(--cs-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{s.label}</div>
                 </div>
-              )}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--cs-white)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{fullName}</div>
-                <div style={{ fontSize: "0.72rem", color: "var(--cs-orange)", textTransform: "uppercase", letterSpacing: "0.08em" }}>{goalLabel[user.goal] ?? user.goal}</div>
-              </div>
-              <div style={{ display: "flex", gap: "1rem", flexShrink: 0 }}>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--cs-orange)" }}>{points?.month_points ?? 0}</div>
-                  <div style={{ fontSize: "9px", color: "var(--cs-muted)" }}>This Month</div>
-                </div>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--cs-white)" }}>{points?.total_points ?? 0}</div>
-                  <div style={{ fontSize: "9px", color: "var(--cs-muted)" }}>Total Pts</div>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
-          {/* Upcoming Sessions */}
+          {/* ── 3. Achievements ── */}
+          {!sessionsLoading && (
+            <div style={{ marginBottom: "1.5rem" }}>
+              <div style={{ fontSize: "10px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.65rem" }}>Achievements</div>
+              <div style={{ display: "flex", gap: "0.5rem", overflowX: "auto", paddingBottom: "4px" }}>
+                {ACHIEVEMENTS.map((a) => (
+                  <div key={a.label} style={{
+                    display: "flex", alignItems: "center", gap: "0.4rem", flexShrink: 0,
+                    background: a.earned ? "oklch(0.72 0.19 49 / 10%)" : "var(--surface)",
+                    border: `1px solid ${a.earned ? "oklch(0.72 0.19 49 / 25%)" : "var(--border)"}`,
+                    borderRadius: 24, padding: "0.45rem 0.85rem",
+                    opacity: a.earned ? 1 : 0.45,
+                  }}>
+                    <span style={{ fontSize: "0.95rem" }}>{a.earned ? a.icon : "🔒"}</span>
+                    <span style={{ fontSize: "0.75rem", fontWeight: 600, color: a.earned ? "var(--cs-white)" : "var(--cs-muted)", whiteSpace: "nowrap" }}>{a.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── 4. Upcoming sessions ── */}
           {upcomingSessions.length > 0 && (
-            <div style={{ background: "var(--surface)", border: "1px solid oklch(0.74 0.18 150 / 20%)", borderRadius: 16, padding: "1.25rem", marginBottom: "1.25rem", boxShadow: "var(--shadow-md)" }}>
-              <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Upcoming Sessions</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: "1.25rem", marginBottom: "1.25rem", boxShadow: "var(--shadow-md)" }}>
+              <div style={{ fontSize: "10px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.75rem" }}>Upcoming Sessions</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 {upcomingSessions.map((s) => {
-                  const today = new Date(); today.setHours(0,0,0,0);
+                  const today = new Date(); today.setHours(0, 0, 0, 0);
                   const sessionDate = new Date(s.date + "T00:00:00");
                   const diff = Math.round((sessionDate.getTime() - today.getTime()) / 86400000);
                   const badge = diff === 0 ? "Today" : diff === 1 ? "Tomorrow" : `In ${diff}d`;
@@ -720,34 +762,37 @@ export default function Dashboard() {
                   const confirmingLeave = leaveConfirmId === s.id;
                   const isLeaving = leavingId === s.id;
                   return (
-                    <div key={s.id} style={{ borderRadius: "6px", background: "rgba(255,255,255,0.03)", border: `1px solid ${joined ? "rgba(74,222,128,0.2)" : "rgba(255,255,255,0.06)"}`, overflow: "hidden" }}>
-                      <div onClick={() => !joined && router.push(`/join/${s.id}`)}
-                        style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.6rem 0.75rem", cursor: joined ? "default" : "pointer" }}
-                        onMouseEnter={(e) => { if (!joined) e.currentTarget.style.opacity = "0.85"; }}
-                        onMouseLeave={(e) => { if (!joined) e.currentTarget.style.opacity = "1"; }}>
+                    <div key={s.id} style={{ borderRadius: 12, background: joined ? "oklch(0.74 0.22 150 / 5%)" : "rgba(255,255,255,0.02)", border: `1px solid ${joined ? "oklch(0.74 0.22 150 / 20%)" : "rgba(255,255,255,0.06)"}`, overflow: "hidden" }}>
+                      <div
+                        onClick={() => !joined && router.push(`/join/${s.id}`)}
+                        style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.7rem 0.9rem", cursor: joined ? "default" : "pointer" }}
+                        onMouseEnter={(e) => { if (!joined) (e.currentTarget as HTMLElement).style.opacity = "0.82"; }}
+                        onMouseLeave={(e) => { if (!joined) (e.currentTarget as HTMLElement).style.opacity = "1"; }}
+                      >
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--cs-white)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
-                          <div style={{ fontSize: "0.72rem", color: "var(--cs-muted)", marginTop: "1px" }}>{dateStr}{s.time ? ` · ${s.time}` : ""}</div>
+                          <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--cs-white)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
+                          <div style={{ fontSize: "0.72rem", color: "var(--cs-muted)", marginTop: "2px" }}>{dateStr}{s.time ? ` · ${s.time}` : ""}{s.venue ? ` · 📍 ${s.venue}` : ""}</div>
                         </div>
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px", flexShrink: 0 }}>
-                          <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "20px", background: isUrgent ? "var(--cs-orange)" : "rgba(255,255,255,0.07)", color: isUrgent ? "#fff" : "var(--cs-muted)" }}>{badge}</span>
-                          {joined ? <span style={{ fontSize: "0.7rem", color: "#4ade80", fontWeight: 600 }}>✓ Joined</span>
-                                  : <span style={{ fontSize: "0.7rem", color: "var(--cs-orange)", fontWeight: 600 }}>Join →</span>}
-                          {rsvpCount > 0 && <span style={{ fontSize: "0.65rem", color: "var(--cs-muted)" }}>{rsvpCount} joined</span>}
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "3px", flexShrink: 0 }}>
+                          <span style={{ fontSize: "10px", fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: isUrgent ? "var(--cs-orange)" : "rgba(255,255,255,0.07)", color: isUrgent ? "#fff" : "var(--cs-muted)" }}>{badge}</span>
+                          {joined
+                            ? <span style={{ fontSize: "0.7rem", color: "#4ade80", fontWeight: 600 }}>✓ Joined</span>
+                            : <span style={{ fontSize: "0.7rem", color: "var(--cs-orange)", fontWeight: 600 }}>Join →</span>}
+                          {rsvpCount > 0 && <span style={{ fontSize: "0.65rem", color: "var(--cs-muted)" }}>{rsvpCount} going</span>}
                         </div>
                       </div>
                       {joined && (
-                        <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", padding: "0.4rem 0.75rem", display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                        <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", padding: "0.4rem 0.9rem", display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
                           {!confirmingLeave ? (
                             <button onClick={() => { setLeaveConfirmId(s.id); setLeaveError(""); }}
                               style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.7rem", color: "var(--cs-muted)", fontFamily: "inherit", padding: 0 }}>
-                              Can't attend? Leave
+                              Can&apos;t attend? Leave
                             </button>
                           ) : (
                             <>
                               <span style={{ fontSize: "0.7rem", color: "var(--cs-muted)" }}>Sure?</span>
                               <button onClick={() => handleLeaveSession(s.id, user!.email)} disabled={isLeaving}
-                                style={{ background: "rgba(226,75,74,0.15)", border: "1px solid rgba(226,75,74,0.3)", borderRadius: "4px", cursor: isLeaving ? "not-allowed" : "pointer", fontSize: "0.7rem", color: "#f09595", fontWeight: 600, fontFamily: "inherit", padding: "2px 10px", opacity: isLeaving ? 0.6 : 1 }}>
+                                style={{ background: "rgba(226,75,74,0.15)", border: "1px solid rgba(226,75,74,0.3)", borderRadius: 4, cursor: isLeaving ? "not-allowed" : "pointer", fontSize: "0.7rem", color: "#f09595", fontWeight: 600, fontFamily: "inherit", padding: "2px 10px", opacity: isLeaving ? 0.6 : 1 }}>
                                 {isLeaving ? "Leaving…" : "Yes, leave"}
                               </button>
                               <button onClick={() => { setLeaveConfirmId(null); setLeaveError(""); }}
@@ -766,33 +811,33 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* ── 5. Session history ── */}
+          <div style={{ fontSize: "10px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.65rem" }}>Session History</div>
           {sessionsLoading ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              {[1,2,3].map((i) => (
-                <div key={i} style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1rem 1.25rem", display: "flex", gap: "1rem", alignItems: "center" }}>
-                  <div style={{ width: "44px", height: "44px", borderRadius: "8px", background: "rgba(255,255,255,0.05)", flexShrink: 0 }} />
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+              {[1, 2, 3].map((i) => (
+                <div key={i} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "1rem 1.25rem", display: "flex", gap: "1rem", alignItems: "center" }}>
+                  <div style={{ width: "42px", height: "42px", borderRadius: 10, background: "rgba(255,255,255,0.05)", flexShrink: 0 }} />
                   <div style={{ flex: 1 }}>
-                    <div style={{ width: "55%", height: "13px", background: "rgba(255,255,255,0.05)", borderRadius: "4px", marginBottom: "8px" }} />
-                    <div style={{ width: "35%", height: "10px", background: "rgba(255,255,255,0.04)", borderRadius: "4px" }} />
+                    <div style={{ width: "55%", height: "12px", background: "rgba(255,255,255,0.05)", borderRadius: 4, marginBottom: "8px" }} />
+                    <div style={{ width: "35%", height: "10px", background: "rgba(255,255,255,0.04)", borderRadius: 4 }} />
                   </div>
                 </div>
               ))}
             </div>
           ) : sessions.length === 0 ? (
-            <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "3rem", textAlign: "center" }}>
+            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: "2.5rem", textAlign: "center", boxShadow: "var(--shadow-md)" }}>
               <div style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>🏃</div>
-              <div style={{ fontSize: "1rem", fontWeight: 600, color: "var(--cs-white)", marginBottom: "0.5rem" }}>
-                Your session history will appear here
-              </div>
-              <p style={{ fontSize: "0.875rem", color: "var(--cs-muted)", maxWidth: "380px", margin: "0 auto 1.5rem", lineHeight: 1.7 }}>
-                Attend a Connected Steps training session and your coach will log your attendance. Your points and progress will show up here automatically.
+              <div style={{ fontSize: "1rem", fontWeight: 700, color: "var(--cs-white)", marginBottom: "0.5rem" }}>No session history yet</div>
+              <p style={{ fontSize: "0.82rem", color: "var(--cs-muted)", maxWidth: "340px", margin: "0 auto 1.5rem", lineHeight: 1.7 }}>
+                Attend a Connected Steps session and your coach will log your attendance. Points show up here automatically.
               </p>
-              <Link href="/weekend-run" style={{ display: "inline-block", padding: "10px 24px", background: "var(--cs-orange)", color: "#fff", borderRadius: "4px", textDecoration: "none", fontSize: "0.85rem", fontWeight: 600 }}>
+              <Link href="/weekend-run" style={{ display: "inline-block", padding: "10px 24px", background: "var(--cs-orange)", color: "#fff", borderRadius: 8, textDecoration: "none", fontSize: "0.82rem", fontWeight: 700 }}>
                 Register for the next run →
               </Link>
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
               {sessions.map((rec, i) => (
                 <SessionCard key={i} rec={rec} userEmail={user.email} />
               ))}
@@ -802,219 +847,63 @@ export default function Dashboard() {
 
         {/* ── Right sidebar ── */}
         <aside className="cs-db-right">
+
+          {/* Training Plan */}
           <div id="training-plan">
             <TrainingPlan goal={user.goal} email={user.email} />
           </div>
 
-          {/* Leaderboard link */}
-          <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1rem 1.25rem", marginBottom: "1rem", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}
-            onClick={() => router.push("/leaderboard")}>
+          {/* Leaderboard */}
+          <div
+            onClick={() => router.push("/leaderboard")}
+            style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "0.9rem 1.1rem", marginBottom: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", boxShadow: "var(--shadow-md)", transition: "opacity 0.15s" }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = "0.82"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
+          >
             <div>
-              <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "2px" }}>Leaderboard</div>
-              <div style={{ fontSize: "0.85rem", color: "var(--cs-white)", fontWeight: 500 }}>View community rankings</div>
+              <div style={{ fontSize: "10px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "2px" }}>Leaderboard</div>
+              <div style={{ fontSize: "0.85rem", color: "var(--cs-white)", fontWeight: 600 }}>View rankings</div>
             </div>
-            <span style={{ fontSize: "1.2rem" }}>🏆</span>
+            <span style={{ fontSize: "1.25rem" }}>🏆</span>
           </div>
 
-          {/* My Coach Questions link */}
-          <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1rem 1.25rem", marginBottom: "1rem", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}
-            onClick={() => router.push("/my-questions")}>
-            <div>
-              <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "2px" }}>Coach Q&A</div>
-              <div style={{ fontSize: "0.85rem", color: "var(--cs-white)", fontWeight: 500 }}>My questions & replies</div>
-            </div>
-            <span style={{ fontSize: "1.2rem" }}>💬</span>
+          {/* Community — one card replaces Ask/Story/QA forms */}
+          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, marginBottom: "0.75rem", overflow: "hidden", boxShadow: "var(--shadow-md)" }}>
+            <div style={{ padding: "0.9rem 1.1rem 0.5rem", fontSize: "10px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600 }}>Community</div>
+            {[
+              { icon: "📝", label: "Share Your Story",    href: "/community"    },
+              { icon: "❓", label: "Ask a Question",      href: "/community"    },
+              { icon: "💬", label: "My Coach Q&A",        href: "/my-questions" },
+            ].map((item, i, arr) => (
+              <div
+                key={item.label}
+                onClick={() => router.push(item.href)}
+                style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.75rem 1.1rem", borderTop: i > 0 ? "1px solid rgba(255,255,255,0.05)" : "none", cursor: "pointer", transition: "background 0.12s" }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+              >
+                <span style={{ fontSize: "1rem" }}>{item.icon}</span>
+                <span style={{ fontSize: "0.82rem", color: "var(--cs-white)", fontWeight: 500, flex: 1 }}>{item.label}</span>
+                <span style={{ fontSize: "0.75rem", color: "var(--cs-orange)", fontWeight: 600 }}>→</span>
+              </div>
+            ))}
           </div>
 
-          {/* Push Notifications */}
+          {/* Push Notifications (compact) */}
           {pushSupported && (
-            <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1rem 1.25rem", marginBottom: "1rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem" }}>
+            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "0.9rem 1.1rem", marginBottom: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", boxShadow: "var(--shadow-md)" }}>
               <div>
-                <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "2px" }}>Notifications</div>
-                <div style={{ fontSize: "0.82rem", color: "var(--cs-white)" }}>{pushEnabled ? "Push alerts on" : "Get session alerts"}</div>
+                <div style={{ fontSize: "10px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "2px" }}>Notifications</div>
+                <div style={{ fontSize: "0.8rem", color: "var(--cs-white)" }}>{pushEnabled ? "Alerts on" : "Session alerts"}</div>
               </div>
               <button
                 onClick={handlePushToggle}
-                style={{ flexShrink: 0, padding: "6px 14px", borderRadius: "6px", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)", border: pushEnabled ? "1px solid rgba(74,222,128,0.3)" : "1px solid rgba(232,98,10,0.3)", background: pushEnabled ? "rgba(74,222,128,0.1)" : "rgba(232,98,10,0.1)", color: pushEnabled ? "#4ade80" : "var(--cs-orange)" }}
+                style={{ flexShrink: 0, padding: "5px 12px", borderRadius: 8, fontSize: "0.75rem", fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)", border: pushEnabled ? "1px solid rgba(74,222,128,0.3)" : "1px solid rgba(232,98,10,0.3)", background: pushEnabled ? "rgba(74,222,128,0.1)" : "rgba(232,98,10,0.1)", color: pushEnabled ? "#4ade80" : "var(--cs-orange)", whiteSpace: "nowrap" }}
               >
-                {pushEnabled ? "Disable" : "Enable"}
+                {pushEnabled ? "On ✓" : "Enable"}
               </button>
             </div>
           )}
-
-          {/* Share Your Story */}
-          <div id="share-story" style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem" }}>
-            <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Share Your Story</div>
-            {storyMsg ? (
-              <div style={{ fontSize: "0.82rem", color: "#4ade80", lineHeight: 1.5 }}>{storyMsg}</div>
-            ) : !storyOpen ? (
-              <>
-                <div style={{ fontSize: "0.82rem", color: "var(--cs-muted)", lineHeight: 1.5, marginBottom: "0.75rem" }}>
-                  Inspire fellow runners — share your journey and it may appear on the homepage.
-                </div>
-                <button
-                  onClick={() => setStoryOpen(true)}
-                  style={{ width: "100%", padding: "10px", background: "var(--cs-orange)", color: "var(--cs-white)", border: "none", borderRadius: "4px", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)" }}
-                >
-                  Write a story
-                </button>
-              </>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-                {/* Star rating picker */}
-                <div>
-                  <div style={{ fontSize: "11px", color: "var(--cs-muted)", marginBottom: "6px" }}>Your rating</div>
-                  <div style={{ display: "flex", gap: "6px" }}>
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        onClick={() => setStoryForm((p) => ({ ...p, rating: star }))}
-                        style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1 }}
-                      >
-                        <svg width="22" height="22" viewBox="0 0 14 14"
-                          fill={star <= storyForm.rating ? "var(--cs-orange)" : "rgba(255,255,255,0.15)"}
-                          style={{ transition: "fill 0.1s" }}>
-                          <path d="M7 1l1.55 3.14L12 4.85l-2.5 2.43.59 3.44L7 9.1 4.91 10.72l.59-3.44L3 4.85l3.45-.71L7 1z" />
-                        </svg>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <textarea
-                  placeholder="Share your running journey… (max 1000 characters)"
-                  maxLength={1000}
-                  value={storyForm.quote}
-                  onChange={(e) => setStoryForm((p) => ({ ...p, quote: e.target.value }))}
-                  rows={4}
-                  style={{ width: "100%", padding: "10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "var(--cs-white)", fontSize: "0.82rem", fontFamily: "var(--font-body)", outline: "none", resize: "vertical", boxSizing: "border-box" }}
-                />
-                <input
-                  placeholder="Your achievement (e.g. Hyderabad — First 10K)"
-                  value={storyForm.achievement}
-                  onChange={(e) => setStoryForm((p) => ({ ...p, achievement: e.target.value }))}
-                  style={{ width: "100%", padding: "9px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "var(--cs-white)", fontSize: "0.82rem", fontFamily: "var(--font-body)", outline: "none", boxSizing: "border-box" }}
-                />
-                <div style={{ display: "flex", gap: "0.5rem" }}>
-                  <button
-                    disabled={storySaving || !storyForm.quote.trim() || !storyForm.achievement.trim()}
-                    onClick={async () => {
-                      setStorySaving(true);
-                      try {
-                        const res = await fetch("/api/stories", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            user_email: user.email,
-                            user_name: `${user.firstName} ${user.lastName}`.trim(),
-                            quote: storyForm.quote,
-                            achievement: storyForm.achievement,
-                            rating: storyForm.rating,
-                          }),
-                        });
-                        const data = await res.json();
-                        if (!res.ok) { setStoryMsg(data.error || "Failed to submit."); }
-                        else { setStoryMsg("Story submitted! It will appear on the homepage once approved."); }
-                        setStoryOpen(false);
-                      } catch { setStoryMsg("Something went wrong."); }
-                      finally { setStorySaving(false); }
-                    }}
-                    style={{ flex: 1, padding: "9px", background: storySaving ? "rgba(232,98,10,0.5)" : "var(--cs-orange)", color: "var(--cs-white)", border: "none", borderRadius: "4px", fontSize: "0.8rem", fontWeight: 600, cursor: storySaving ? "not-allowed" : "pointer", fontFamily: "var(--font-body)" }}
-                  >
-                    {storySaving ? "Submitting…" : "Submit"}
-                  </button>
-                  <button
-                    onClick={() => setStoryOpen(false)}
-                    style={{ padding: "9px 14px", background: "transparent", color: "var(--cs-muted)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", fontSize: "0.8rem", cursor: "pointer", fontFamily: "var(--font-body)" }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Ask the Community */}
-          <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "1.25rem", marginBottom: "1rem" }}>
-            <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Ask the Community</div>
-            {qaMsg ? (
-              <div style={{ fontSize: "0.82rem", color: "#4ade80", lineHeight: 1.5 }}>{qaMsg}</div>
-            ) : !qaOpen ? (
-              <>
-                <div style={{ fontSize: "0.82rem", color: "var(--cs-muted)", lineHeight: 1.5, marginBottom: "0.75rem" }}>
-                  Recovery tips, shoe advice, race info — ask the community.
-                </div>
-                <button
-                  onClick={() => setQaOpen(true)}
-                  style={{ width: "100%", padding: "10px", background: "rgba(255,255,255,0.07)", color: "var(--cs-white)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "4px", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)" }}
-                >
-                  Ask a question
-                </button>
-              </>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-                <select
-                  value={qaForm.category}
-                  onChange={(e) => setQaForm((p) => ({ ...p, category: e.target.value }))}
-                  style={{ width: "100%", padding: "9px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "var(--cs-white)", fontSize: "0.82rem", fontFamily: "var(--font-body)", outline: "none", colorScheme: "dark" }}
-                >
-                  {["General", "Recovery", "Shoes & Gear", "Races & Marathons", "Running Tips"].map((c) => (
-                    <option key={c} value={c} style={{ background: "#1a1a1a" }}>{c}</option>
-                  ))}
-                </select>
-                <input
-                  placeholder="Your question or topic (max 120 chars)"
-                  maxLength={120}
-                  value={qaForm.title}
-                  onChange={(e) => setQaForm((p) => ({ ...p, title: e.target.value }))}
-                  style={{ width: "100%", padding: "9px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "var(--cs-white)", fontSize: "0.82rem", fontFamily: "var(--font-body)", outline: "none", boxSizing: "border-box" }}
-                />
-                <textarea
-                  placeholder="Add more details… (max 600 characters)"
-                  maxLength={600}
-                  value={qaForm.body}
-                  onChange={(e) => setQaForm((p) => ({ ...p, body: e.target.value }))}
-                  rows={3}
-                  style={{ width: "100%", padding: "10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "var(--cs-white)", fontSize: "0.82rem", fontFamily: "var(--font-body)", outline: "none", resize: "vertical", boxSizing: "border-box" }}
-                />
-                <div style={{ display: "flex", gap: "0.5rem" }}>
-                  <button
-                    disabled={qaSaving || !qaForm.title.trim() || !qaForm.body.trim()}
-                    onClick={async () => {
-                      setQaSaving(true);
-                      try {
-                        const res = await fetch("/api/community/posts", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            user_email: user.email,
-                            user_name: `${user.firstName} ${user.lastName}`.trim(),
-                            category: qaForm.category,
-                            title: qaForm.title,
-                            body: qaForm.body,
-                          }),
-                        });
-                        const data = await res.json();
-                        if (!res.ok) setQaMsg(data.error || "Failed to submit.");
-                        else setQaMsg("Post submitted! It will appear on the homepage once approved.");
-                        setQaOpen(false);
-                      } catch { setQaMsg("Something went wrong."); }
-                      finally { setQaSaving(false); }
-                    }}
-                    style={{ flex: 1, padding: "9px", background: qaSaving ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.1)", color: "var(--cs-white)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "4px", fontSize: "0.8rem", fontWeight: 600, cursor: qaSaving ? "not-allowed" : "pointer", fontFamily: "var(--font-body)" }}
-                  >
-                    {qaSaving ? "Submitting…" : "Submit"}
-                  </button>
-                  <button
-                    onClick={() => setQaOpen(false)}
-                    style={{ padding: "9px 14px", background: "transparent", color: "var(--cs-muted)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", fontSize: "0.8rem", cursor: "pointer", fontFamily: "var(--font-body)" }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
 
           {/* Rate Your Coach */}
           <RateCoachWidget

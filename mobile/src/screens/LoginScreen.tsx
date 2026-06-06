@@ -5,15 +5,16 @@ import {
   Platform, ScrollView, Image,
 } from "react-native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { login }        from "../services/api";
-import AsyncStorage     from "@react-native-async-storage/async-storage";
+import { login }            from "../services/api";
+import AsyncStorage         from "@react-native-async-storage/async-storage";
+import { useUser }          from "../context/UserContext";
 import { STORAGE_KEY_USER } from "../config";
-import type { CSUser }  from "../types";
 import type { RootStackParamList } from "../../App";
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, "Login"> };
 
 export default function LoginScreen({ navigation }: Props) {
+  const { setUser }                   = useUser();
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [loading,  setLoading]  = useState(false);
@@ -26,9 +27,10 @@ export default function LoginScreen({ navigation }: Props) {
     }
     setLoading(true); setError("");
     try {
-      const user: CSUser = await login(email.trim().toLowerCase(), password);
+      const user = await login(email.trim().toLowerCase(), password);
       await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
-      navigation.replace("HealthSync", { user });
+      setUser(user);
+      navigation.replace("MainTabs");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Login failed. Please try again.");
     } finally {
