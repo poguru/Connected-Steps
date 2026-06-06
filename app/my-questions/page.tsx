@@ -54,7 +54,7 @@ export default function MyQuestionsPage() {
     <div style={{ minHeight: "100vh", background: "var(--cs-black)", color: "var(--cs-white)" }}>
 
       {/* Navbar */}
-      <header style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(8,28,45,0.97)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(56,189,248,0.08)", height: "64px", display: "flex", alignItems: "center", padding: "0 2rem", gap: "0.75rem" }}>
+      <header style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(8,28,45,0.97)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(56,189,248,0.08)", paddingTop: "env(safe-area-inset-top)", display: "flex", alignItems: "center", padding: "0 2rem", minHeight: "calc(var(--nav-h) + env(safe-area-inset-top))", gap: "0.75rem" }}>
         <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none" }}>
           <Image src="/logo.png" alt="Connected Steps" width={32} height={32} className="rounded-full" />
           <span style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--cs-white)" }}>Connected Steps</span>

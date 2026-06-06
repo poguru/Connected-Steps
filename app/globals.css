@@ -4,6 +4,10 @@
 :root {
   --radius: 0.875rem;
 
+  /* App nav */
+  --nav-h:     72px;
+  --nav-total: calc(var(--nav-h) + env(safe-area-inset-top));
+
   /* Colours — dark premium fitness, orange as the soul */
   --background:           oklch(0.14 0.012 270);
   --foreground:           oklch(0.97 0.005 250);
@@ -444,8 +448,8 @@ select.auth-input option {
 
   .btn-primary, .btn-outline { padding: 11px 18px; font-size: 13px; }
 
-  /* Dashboard — tighter on phones */
-  .cs-dashboard-body { padding: 4.5rem 0.75rem 2rem !important; gap: 0.75rem !important; }
+  /* Dashboard — tighter on phones, still clears safe area */
+  .cs-dashboard-body { padding: calc(var(--nav-total) + 16px) 0.75rem calc(2rem + env(safe-area-inset-bottom)) !important; gap: 0.75rem !important; }
 
   /* Leaderboard — compact on phones */
   .cs-lb-header, .cs-lb-row {
@@ -483,9 +487,11 @@ select.auth-input option {
 /* ─── App pages (Dashboard / Leaderboard / Community) ── */
 .cs-app-nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 50;
-  background: oklch(0.18 0.015 270 / 80%);
-  backdrop-filter: blur(18px) saturate(140%);
+  background: oklch(0.18 0.015 270 / 85%);
+  backdrop-filter: blur(20px) saturate(150%);
   border-bottom: 1px solid var(--border);
+  /* Push content below notch / status bar */
+  padding-top: env(safe-area-inset-top);
 }
 
 .cs-app-nav-inner {
@@ -495,7 +501,7 @@ select.auth-input option {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 64px;
+  height: var(--nav-h);
 }
 
 .cs-app-nav-links {
@@ -514,7 +520,7 @@ select.auth-input option {
 .cs-dashboard-body {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 5rem 2rem 3rem;
+  padding: calc(var(--nav-total) + 24px) 2rem 3rem;
   display: grid;
   grid-template-columns: 280px 1fr 260px;
   gap: 2rem;
@@ -556,7 +562,7 @@ select.auth-input option {
 @media (max-width: 900px) {
   .cs-dashboard-body {
     grid-template-columns: 1fr;
-    padding: 5rem 1rem 3rem;
+    padding: calc(var(--nav-total) + 24px) 1rem calc(3rem + env(safe-area-inset-bottom));
     gap: 1rem;
   }
 
@@ -598,6 +604,8 @@ select.auth-input option {
   }
 
   .cs-app-nav-inner { padding: 0 1rem; }
+  /* Shrink nav label slightly on tablets */
+  --nav-h: 68px;
 
   /* Reorder dashboard columns: sessions → rest (profile hidden on mobile) */
   .cs-db-left  { display: none; }
@@ -629,7 +637,7 @@ select.auth-input option {
 
 /* ─── Auth split layout ──────────────────────────────── */
 .auth-layout {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   background: var(--background);
 }
@@ -645,7 +653,7 @@ select.auth-input option {
   justify-content: center;
   padding: 3rem 2rem;
   overflow-y: auto;
-  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .auth-mobile-logo {

@@ -59,7 +59,7 @@ export default function AppNav({ user, onUserUpdate, activeLabel }: Props) {
       </header>
 
       {open && (
-        <div className="cs-mobile-menu" style={{ position: "fixed", top: 64, left: 0, right: 0, zIndex: 49 }}>
+        <div className="cs-mobile-menu" style={{ position: "fixed", top: "var(--nav-total)", left: 0, right: 0, zIndex: 49 }}>
           {NAV_LINKS.map(item => (
             <Link key={item.label} href={item.href}
               onClick={() => setOpen(false)}
