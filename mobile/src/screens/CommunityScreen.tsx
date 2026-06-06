@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
-  View, Text, FlatList, ScrollView, StyleSheet,
+  View, Text, FlatList, StyleSheet,
   TouchableOpacity, ActivityIndicator, RefreshControl,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getSessions, getCommunityPosts, getStories } from "../services/api";
+import { useSafeAreaInsets }   from "react-native-safe-area-context";
+import { getSessions, getCommunityPosts, getStories, getLeaderboard } from "../services/api";
 import type { Session, CommunityPost, Story } from "../types";
 
 type Tab = "sessions" | "posts" | "stories";
@@ -51,9 +51,7 @@ function PostCard({ item }: { item: CommunityPost }) {
   return (
     <TouchableOpacity style={S.postCard} onPress={() => setExpanded(e => !e)} activeOpacity={0.85}>
       <View style={S.postTop}>
-        <View style={S.postCategoryPill}>
-          <Text style={S.postCategory}>{item.category}</Text>
-        </View>
+        <View style={S.postCategoryPill}><Text style={S.postCategory}>{item.category}</Text></View>
         <Text style={S.postAge}>{timeAgo(item.created_at)}</Text>
       </View>
       <Text style={S.postTitle}>{item.title}</Text>
@@ -67,17 +65,13 @@ function StoryCard({ item }: { item: Story }) {
   return (
     <View style={S.storyCard}>
       <View style={S.storyHeader}>
-        <View style={S.storyAvatar}>
-          <Text style={S.storyInitial}>{item.user_name.charAt(0).toUpperCase()}</Text>
-        </View>
-        <View>
+        <View style={S.storyAvatar}><Text style={S.storyInitial}>{item.user_name.charAt(0).toUpperCase()}</Text></View>
+        <View style={{ flex: 1 }}>
           <Text style={S.storyName}>{item.user_name}</Text>
           <Text style={S.storyAchievement}>{item.achievement}</Text>
         </View>
         {item.rating ? (
-          <View style={S.ratingBadge}>
-            <Text style={S.ratingText}>{"★".repeat(item.rating)}</Text>
-          </View>
+          <View style={S.ratingBadge}><Text style={S.ratingText}>{"★".repeat(item.rating)}</Text></View>
         ) : null}
       </View>
       <Text style={S.storyQuote}>"{item.quote}"</Text>
@@ -88,20 +82,27 @@ function StoryCard({ item }: { item: Story }) {
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function CommunityScreen() {
-  const insets                      = useSafeAreaInsets();
-  const [tab,        setTab]        = useState<Tab>("sessions");
-  const [sessions,   setSessions]   = useState<Session[]>([]);
-  const [posts,      setPosts]      = useState<CommunityPost[]>([]);
-  const [stories,    setStories]    = useState<Story[]>([]);
-  const [loading,    setLoading]    = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const insets                          = useSafeAreaInsets();
+  const [tab,         setTab]           = useState<Tab>("sessions");
+  const [sessions,    setSessions]      = useState<Session[]>([]);
+  const [posts,       setPosts]         = useState<CommunityPost[]>([]);
+  const [stories,     setStories]       = useState<Story[]>([]);
+  const [activeCount, setActiveCount]   = useState(0);
+  const [loading,     setLoading]       = useState(true);
+  const [refreshing,  setRefreshing]    = useState(false);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    const [s, p, st] = await Promise.allSettled([getSessions(), getCommunityPosts(), getStories()]);
+    const [s, p, st, lb] = await Promise.allSettled([
+      getSessions(), getCommunityPosts(), getStories(), getLeaderboard(),
+    ]);
     if (s.status  === "fulfilled") setSessions(s.value);
     if (p.status  === "fulfilled") setPosts(p.value);
     if (st.status === "fulfilled") setStories(st.value);
+    if (lb.status === "fulfilled") {
+      const active = (lb.value as any[]).filter((e: any) => e.month_points > 0).length;
+      setActiveCount(active);
+    }
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -116,20 +117,40 @@ export default function CommunityScreen() {
 
   return (
     <View style={S.root}>
+
       {/* Header */}
       <View style={[S.header, { paddingTop: Math.max(insets.top + 12, 20) }]}>
         <Text style={S.headerTitle}>Community</Text>
         <Text style={S.headerSub}>Upcoming runs, questions & member stories</Text>
       </View>
 
+      {/* Weekly activity summary — always visible */}
+      <View style={S.summaryBar}>
+        <View style={S.summaryItem}>
+          <Text style={S.summaryVal}>{loading ? "—" : activeCount}</Text>
+          <Text style={S.summaryLabel}>Active runners</Text>
+        </View>
+        <View style={S.summarySep} />
+        <View style={S.summaryItem}>
+          <Text style={S.summaryVal}>{loading ? "—" : sessions.length}</Text>
+          <Text style={S.summaryLabel}>Upcoming sessions</Text>
+        </View>
+        <View style={S.summarySep} />
+        <View style={S.summaryItem}>
+          <Text style={S.summaryVal}>{loading ? "—" : posts.length}</Text>
+          <Text style={S.summaryLabel}>Questions</Text>
+        </View>
+        <View style={S.summarySep} />
+        <View style={S.summaryItem}>
+          <Text style={S.summaryVal}>{loading ? "—" : stories.length}</Text>
+          <Text style={S.summaryLabel}>Stories</Text>
+        </View>
+      </View>
+
       {/* Tab bar */}
       <View style={S.tabBar}>
         {TABS.map(t => (
-          <TouchableOpacity
-            key={t.key}
-            style={[S.tabItem, tab === t.key && S.tabItemActive]}
-            onPress={() => setTab(t.key)}
-          >
+          <TouchableOpacity key={t.key} style={[S.tabItem, tab === t.key && S.tabItemActive]} onPress={() => setTab(t.key)}>
             <Text style={[S.tabText, tab === t.key && S.tabTextActive]}>{t.label}</Text>
             {!loading && t.count > 0 ? (
               <View style={[S.tabBadge, tab === t.key && S.tabBadgeActive]}>
@@ -150,8 +171,14 @@ export default function CommunityScreen() {
           renderItem={({ item }) => <SessionCard item={item} />}
           contentContainerStyle={S.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={C.orange} />}
-          ListEmptyComponent={<Text style={S.empty}>No upcoming sessions.</Text>}
           showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={S.emptyState}>
+              <Text style={S.emptyIcon}>🗓</Text>
+              <Text style={S.emptyTitle}>No sessions scheduled yet</Text>
+              <Text style={S.emptyText}>New runs are added every week. Check back soon to register for your next session.</Text>
+            </View>
+          }
         />
       ) : tab === "posts" ? (
         <FlatList
@@ -160,8 +187,14 @@ export default function CommunityScreen() {
           renderItem={({ item }) => <PostCard item={item} />}
           contentContainerStyle={S.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={C.orange} />}
-          ListEmptyComponent={<Text style={S.empty}>No community posts yet.</Text>}
           showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={S.emptyState}>
+              <Text style={S.emptyIcon}>💬</Text>
+              <Text style={S.emptyTitle}>No questions yet</Text>
+              <Text style={S.emptyText}>Be the first to ask a question. The community and coaches are here to help.</Text>
+            </View>
+          }
         />
       ) : (
         <FlatList
@@ -170,8 +203,14 @@ export default function CommunityScreen() {
           renderItem={({ item }) => <StoryCard item={item} />}
           contentContainerStyle={S.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={C.orange} />}
-          ListEmptyComponent={<Text style={S.empty}>No stories yet.</Text>}
           showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={S.emptyState}>
+              <Text style={S.emptyIcon}>⭐</Text>
+              <Text style={S.emptyTitle}>No stories yet</Text>
+              <Text style={S.emptyText}>Every runner has a story. Share yours and inspire the community.</Text>
+            </View>
+          }
         />
       )}
     </View>
@@ -179,28 +218,28 @@ export default function CommunityScreen() {
 }
 
 const C = {
-  bg:       "#080808",
-  surface:  "#111111",
-  border:   "#222222",
-  orange:   "#e8620a",
-  orangeDim:"rgba(232,98,10,0.12)",
-  white:    "#f5f5f5",
-  text:     "#f0f0f0",
-  textSub:  "#888888",
-  textMuted:"#505050",
-  green:    "#4ade80",
+  bg:       "#080808", surface: "#111111", border: "#222222",
+  orange:   "#e8620a", orangeDim: "rgba(232,98,10,0.12)",
+  white:    "#f5f5f5", text: "#f0f0f0", textSub: "#888888", textMuted: "#505050",
   gold:     "#f59e0b",
 };
 
 const S = StyleSheet.create({
   root:    { flex: 1, backgroundColor: C.bg },
-  header:  { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: C.border },
+  header:  { paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: C.border },
   headerTitle: { fontSize: 22, fontWeight: "800", color: C.white, letterSpacing: -0.3 },
   headerSub:   { fontSize: 12, color: C.textSub, marginTop: 4 },
 
+  // Activity summary bar
+  summaryBar:  { flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: "#0d0d0d" },
+  summaryItem: { flex: 1, alignItems: "center" },
+  summaryVal:  { fontSize: 16, fontWeight: "800", color: C.orange, letterSpacing: -0.3 },
+  summaryLabel:{ fontSize: 9, color: C.textSub, textTransform: "uppercase", letterSpacing: 0.3, marginTop: 2, textAlign: "center" },
+  summarySep:  { width: 1, height: 28, backgroundColor: C.border },
+
   // Tab bar
   tabBar:         { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: C.border },
-  tabItem:        { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 14, gap: 5 },
+  tabItem:        { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 13, gap: 5 },
   tabItemActive:  { borderBottomWidth: 2, borderBottomColor: C.orange },
   tabText:        { fontSize: 13, fontWeight: "600", color: C.textMuted },
   tabTextActive:  { color: C.orange },
@@ -210,7 +249,12 @@ const S = StyleSheet.create({
   tabBadgeTextActive: { color: C.orange },
 
   list:  { padding: 16, paddingBottom: 40 },
-  empty: { color: C.textMuted, textAlign: "center", marginTop: 48, fontSize: 14 },
+
+  // Empty states
+  emptyState: { alignItems: "center", paddingTop: 56, paddingHorizontal: 32 },
+  emptyIcon:  { fontSize: 48, marginBottom: 14 },
+  emptyTitle: { fontSize: 16, fontWeight: "700", color: C.white, marginBottom: 8 },
+  emptyText:  { fontSize: 13, color: C.textSub, textAlign: "center", lineHeight: 20 },
 
   // Session card
   sessionCard:     { flexDirection: "row", gap: 14, backgroundColor: C.surface, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: C.border, marginBottom: 10 },

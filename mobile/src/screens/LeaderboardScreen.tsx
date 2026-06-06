@@ -3,9 +3,9 @@ import {
   View, Text, FlatList, StyleSheet,
   ActivityIndicator, RefreshControl, Image,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets }  from "react-native-safe-area-context";
 import { useUser }            from "../context/UserContext";
-import { getLeaderboard }    from "../services/api";
+import { getLeaderboard }     from "../services/api";
 import type { LeaderboardEntry } from "../types";
 
 const MEDAL = ["🥇", "🥈", "🥉"];
@@ -19,23 +19,25 @@ export default function LeaderboardScreen() {
 
   async function load(silent = false) {
     if (!silent) setLoading(true);
-    try {
-      const data = await getLeaderboard();
-      setEntries(data);
-    } catch { /* keep stale */ }
+    try { setEntries(await getLeaderboard()); } catch { /* keep stale */ }
     finally { setLoading(false); setRefreshing(false); }
   }
 
   useEffect(() => { load(); }, []);
 
-  const myRank = user
-    ? entries.findIndex(e => e.user_email === user.email) + 1
+  // ── Rank context ──────────────────────────────────────────────────────────
+  const myIdx      = user ? entries.findIndex(e => e.user_email === user.email) : -1;
+  const myRank     = myIdx >= 0 ? myIdx + 1 : 0;
+  const myEntry    = myIdx >= 0 ? entries[myIdx] : null;
+  const entryAbove = myIdx > 0  ? entries[myIdx - 1] : null;
+  const ptsToOvertake = entryAbove && myEntry
+    ? Math.max(0, entryAbove.month_points - myEntry.month_points + 1)
     : 0;
 
   function renderItem({ item, index }: { item: LeaderboardEntry; index: number }) {
-    const rank    = index + 1;
-    const isMe    = item.user_email === user?.email;
-    const medal   = MEDAL[index] ?? null;
+    const rank  = index + 1;
+    const isMe  = item.user_email === user?.email;
+    const medal = MEDAL[index] ?? null;
 
     return (
       <View style={[S.row, isMe && S.rowMe]}>
@@ -53,21 +55,51 @@ export default function LeaderboardScreen() {
           </Text>
           {item.location ? <Text style={S.location} numberOfLines={1}>{item.location}</Text> : null}
         </View>
-        <Text style={S.pts}>{item.month_points}<Text style={S.ptsUnit}> pts</Text></Text>
+        <Text style={[S.pts, isMe && S.ptsMe]}>{item.month_points}<Text style={S.ptsUnit}> pts</Text></Text>
       </View>
     );
   }
 
   return (
     <View style={S.container}>
+
       {/* Banner */}
       <View style={[S.banner, { paddingTop: Math.max(insets.top + 12, 20) }]}>
         <Text style={S.bannerTitle}>Monthly Leaderboard</Text>
-        {myRank > 0 && (
-          <Text style={S.bannerSub}>You're ranked #{myRank}</Text>
-        )}
+        <Text style={S.bannerSub}>Points reset every month · Attend sessions to earn points</Text>
       </View>
 
+      {/* Rank context card */}
+      {!loading && myRank > 0 && (
+        <View style={S.rankCard}>
+          <View style={S.rankCardLeft}>
+            <Text style={S.rankCardBig}>#{myRank}</Text>
+            <Text style={S.rankCardLabel}>Your rank</Text>
+          </View>
+          <View style={S.rankCardDivider} />
+          <View style={S.rankCardRight}>
+            {entryAbove && ptsToOvertake > 0 ? (
+              <>
+                <Text style={S.rankCardMotivation}>
+                  {ptsToOvertake} pt{ptsToOvertake !== 1 ? "s" : ""} away from #{myRank - 1}
+                </Text>
+                <Text style={S.rankCardCompetitor} numberOfLines={1}>
+                  — {entryAbove.user_name}
+                </Text>
+              </>
+            ) : myRank === 1 ? (
+              <>
+                <Text style={S.rankCardMotivation}>🏆 You're leading!</Text>
+                <Text style={S.rankCardCompetitor}>Keep attending sessions to stay on top</Text>
+              </>
+            ) : (
+              <Text style={S.rankCardMotivation}>Attend more sessions to climb the board</Text>
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* List */}
       {loading ? (
         <ActivityIndicator color={C.orange} style={{ marginTop: 48 }} />
       ) : (
@@ -79,32 +111,62 @@ export default function LeaderboardScreen() {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={C.orange} />
           }
-          ListEmptyComponent={<Text style={S.empty}>No entries yet.</Text>}
+          ListEmptyComponent={
+            <View style={S.emptyState}>
+              <Text style={S.emptyIcon}>🏃</Text>
+              <Text style={S.emptyTitle}>No entries yet</Text>
+              <Text style={S.emptyText}>Attend a session to appear on the leaderboard and start earning points.</Text>
+            </View>
+          }
+          showsVerticalScrollIndicator={false}
         />
       )}
     </View>
   );
 }
 
-const C = { bg: "#0a0a0a", surface: "#141414", border: "#1e1e1e", orange: "#e8620a", muted: "#555", text: "#f0f0f0", gold: "#f5c518" };
+const C = {
+  bg:       "#080808", surface: "#111111", border: "#222222",
+  orange:   "#e8620a", orangeDim: "rgba(232,98,10,0.12)",
+  white:    "#f5f5f5", text: "#f0f0f0", textSub: "#888888", textMuted: "#505050",
+  green:    "#4ade80",
+};
 
 const S = StyleSheet.create({
-  container:     { flex: 1, backgroundColor: C.bg },
-  banner:        { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: C.border },
-  bannerTitle:   { fontSize: 18, fontWeight: "700", color: C.text },
-  bannerSub:     { fontSize: 13, color: C.orange, marginTop: 3 },
-  list:          { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 40 },
-  row:           { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12, marginVertical: 2 },
-  rowMe:         { backgroundColor: "rgba(232,98,10,0.08)", borderWidth: 1, borderColor: "rgba(232,98,10,0.2)" },
-  rank:          { width: 28, fontSize: 13, color: C.muted, textAlign: "center", fontWeight: "600" },
-  rankTop:       { fontSize: 18 },
-  avatar:        { width: 38, height: 38, borderRadius: 19, backgroundColor: C.surface },
+  container: { flex: 1, backgroundColor: C.bg },
+
+  banner:      { paddingHorizontal: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: C.border },
+  bannerTitle: { fontSize: 22, fontWeight: "800", color: C.white, letterSpacing: -0.3 },
+  bannerSub:   { fontSize: 12, color: C.textSub, marginTop: 5 },
+
+  // Rank context card
+  rankCard:          { flexDirection: "row", alignItems: "center", margin: 16, marginBottom: 4, backgroundColor: "#130d07", borderRadius: 16, borderWidth: 1, borderColor: "rgba(232,98,10,0.2)", padding: 16, gap: 16 },
+  rankCardLeft:      { alignItems: "center", minWidth: 60 },
+  rankCardBig:       { fontSize: 28, fontWeight: "800", color: C.orange, letterSpacing: -0.5 },
+  rankCardLabel:     { fontSize: 10, color: C.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 },
+  rankCardDivider:   { width: 1, height: 40, backgroundColor: "#222" },
+  rankCardRight:     { flex: 1 },
+  rankCardMotivation:{ fontSize: 14, fontWeight: "700", color: C.white, marginBottom: 4 },
+  rankCardCompetitor:{ fontSize: 12, color: C.textSub },
+
+  list: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 40 },
+
+  row:          { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12, marginVertical: 2 },
+  rowMe:        { backgroundColor: "rgba(232,98,10,0.08)", borderWidth: 1, borderColor: "rgba(232,98,10,0.2)" },
+  rank:         { width: 28, fontSize: 13, color: C.textSub, textAlign: "center", fontWeight: "600" },
+  rankTop:      { fontSize: 18 },
+  avatar:       { width: 38, height: 38, borderRadius: 19, backgroundColor: C.surface },
   avatarFallback:{ width: 38, height: 38, borderRadius: 19, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, alignItems: "center", justifyContent: "center" },
-  avatarInitial: { fontSize: 15, fontWeight: "700", color: C.orange },
-  name:          { fontSize: 14, fontWeight: "600", color: C.text },
-  nameMe:        { color: C.orange },
-  location:      { fontSize: 11, color: C.muted, marginTop: 1 },
-  pts:           { fontSize: 16, fontWeight: "700", color: C.text },
-  ptsUnit:       { fontSize: 11, color: C.muted, fontWeight: "400" },
-  empty:         { color: C.muted, textAlign: "center", marginTop: 48, fontSize: 14 },
+  avatarInitial:{ fontSize: 15, fontWeight: "700", color: C.orange },
+  name:         { fontSize: 14, fontWeight: "600", color: C.text },
+  nameMe:       { color: C.orange },
+  location:     { fontSize: 11, color: C.textSub, marginTop: 1 },
+  pts:          { fontSize: 16, fontWeight: "700", color: C.text },
+  ptsMe:        { color: C.orange },
+  ptsUnit:      { fontSize: 11, color: C.textSub, fontWeight: "400" },
+
+  emptyState: { alignItems: "center", paddingTop: 60, paddingHorizontal: 32 },
+  emptyIcon:  { fontSize: 48, marginBottom: 16 },
+  emptyTitle: { fontSize: 16, fontWeight: "700", color: C.white, marginBottom: 8 },
+  emptyText:  { fontSize: 13, color: C.textSub, textAlign: "center", lineHeight: 20 },
 });

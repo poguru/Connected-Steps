@@ -3,10 +3,10 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator, RefreshControl, Image, Linking,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useNavigation }    from "@react-navigation/native";
+import { useSafeAreaInsets }   from "react-native-safe-area-context";
+import { useNavigation }       from "@react-navigation/native";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
-import { useUser }           from "../context/UserContext";
+import { useUser }             from "../context/UserContext";
 import {
   getUserStats, getUserAchievements, getSessions,
   getTrainingPlan, getMembership, getStories,
@@ -15,12 +15,23 @@ import type {
   UserStats, UserAchievements, Session,
   TrainingPlan, Membership, Story,
 } from "../types";
-import type { TabParamList } from "../navigation/TabNavigator";
+import type { TabParamList }   from "../navigation/TabNavigator";
+import ProgressBar             from "../components/ProgressBar";
 
 type Nav = BottomTabNavigationProp<TabParamList>;
 
-const DAY_NAMES  = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-// getDay() returns 0=Sun..6=Sat — map to 0=Mon..6=Sun
+// ── Constants ─────────────────────────────────────────────────────────────────
+const SESSIONS_GOAL = 8;
+const POINTS_GOAL   = 1000;
+const DAY_NAMES     = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const MILESTONES    = [
+  { target: 1,  icon: "🏅", label: "First Session",  reward: "Starter badge"  },
+  { target: 5,  icon: "🏃", label: "5 Sessions",     reward: "+100 bonus pts" },
+  { target: 10, icon: "⭐", label: "10 Sessions",    reward: "+200 bonus pts" },
+  { target: 25, icon: "🔥", label: "25 Sessions",    reward: "+500 bonus pts" },
+  { target: 50, icon: "🏆", label: "50 Sessions",    reward: "Legend badge"   },
+];
+
 const todayIdx = () => { const d = new Date().getDay(); return d === 0 ? 6 : d - 1; };
 
 function fmtDate(dateStr: string) {
@@ -39,17 +50,13 @@ function planDuration(startedAt: string, expiresAt: string) {
   return Math.max(1, Math.round((new Date(expiresAt).getTime() - new Date(startedAt).getTime()) / 86400000));
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// ── Sub-components ─────────────────────────────────────────────────────────────
 
 function SectionLabel({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
   return (
     <View style={S.sectionRow}>
       <Text style={S.sectionLabel}>{title}</Text>
-      {action ? (
-        <TouchableOpacity onPress={onAction}>
-          <Text style={S.sectionAction}>{action}</Text>
-        </TouchableOpacity>
-      ) : null}
+      {action ? <TouchableOpacity onPress={onAction}><Text style={S.sectionAction}>{action}</Text></TouchableOpacity> : null}
     </View>
   );
 }
@@ -64,23 +71,23 @@ function StatBadge({ icon, value, label }: { icon: string; value: string | numbe
   );
 }
 
-// ── Main screen ───────────────────────────────────────────────────────────────
+// ── Main screen ────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
-  const { user }                          = useUser();
-  const navigation                        = useNavigation<Nav>();
-  const insets                            = useSafeAreaInsets();
-  const [stats,      setStats]            = useState<UserStats | null>(null);
-  const [achieve,    setAchieve]          = useState<UserAchievements | null>(null);
-  const [nextSession, setNextSession]     = useState<Session | null>(null);
-  const [plan,       setPlan]             = useState<TrainingPlan | null>(null);
-  const [membership, setMembership]       = useState<Membership | null>(null);
-  const [stories,    setStories]          = useState<Story[]>([]);
-  const [loading,    setLoading]          = useState(true);
-  const [refreshing, setRefreshing]       = useState(false);
-  const [planExpanded, setPlanExpanded]   = useState(false);
-  const [communityTab, setCommunityTab]   = useState<"sessions" | "stories">("sessions");
-  const [sessions,   setSessions]         = useState<Session[]>([]);
+  const { user }                        = useUser();
+  const navigation                      = useNavigation<Nav>();
+  const insets                          = useSafeAreaInsets();
+  const [stats,      setStats]          = useState<UserStats | null>(null);
+  const [achieve,    setAchieve]        = useState<UserAchievements | null>(null);
+  const [nextSession, setNextSession]   = useState<Session | null>(null);
+  const [plan,       setPlan]           = useState<TrainingPlan | null>(null);
+  const [membership, setMembership]     = useState<Membership | null>(null);
+  const [stories,    setStories]        = useState<Story[]>([]);
+  const [sessions,   setSessions]       = useState<Session[]>([]);
+  const [loading,    setLoading]        = useState(true);
+  const [refreshing, setRefreshing]     = useState(false);
+  const [planExpanded, setPlanExpanded] = useState(false);
+  const [communityTab, setCommunityTab] = useState<"sessions" | "stories">("sessions");
 
   const load = useCallback(async (silent = false) => {
     if (!user) return;
@@ -118,27 +125,31 @@ export default function HomeScreen() {
     return "Good evening";
   })();
 
+  // ── Derived data ─────────────────────────────────────────────────────────────
   const todayPlanIdx = todayIdx();
-  const completedDays = plan
-    ? plan.days.filter((d) => d.type.toLowerCase() !== "rest").length
-    : 0;
+  const todayDay     = plan?.days[todayPlanIdx] ?? null;
+  const isRestDay    = todayDay?.type.toLowerCase().includes("rest") ?? false;
+  const totalAttended= achieve?.sessionCount ?? 0;
+  const monthPts     = stats?.month_points ?? 0;
+  const monthAttended= achieve?.sessionCount ?? 0; // approx - total sessions count
 
-  // ── Achievements chips ────────────────────────────────────────────────────
-  const count = achieve?.sessionCount ?? 0;
-  const CHIPS = [
-    { icon: "🏅", label: "First Session",  earned: count >= 1  },
-    { icon: "🏃", label: "5 Sessions",     earned: count >= 5  },
-    { icon: "⭐", label: "10 Sessions",    earned: count >= 10 },
-    { icon: "🔥", label: "25 Sessions",    earned: count >= 25 },
-    { icon: "🏆", label: "50 Sessions",    earned: count >= 50 },
-    { icon: "💎", label: "Member",         earned: achieve?.hasMembership ?? false },
+  const nextMilestone = MILESTONES.find(m => totalAttended < m.target);
+  const milestoneProgress = nextMilestone
+    ? Math.min(totalAttended / nextMilestone.target, 1)
+    : 1;
+
+  const ACHIEVEMENT_CHIPS = [
+    { icon: "🏅", label: "First Session", earned: totalAttended >= 1,  target: 1  },
+    { icon: "🏃", label: "5 Sessions",    earned: totalAttended >= 5,  target: 5  },
+    { icon: "⭐", label: "10 Sessions",   earned: totalAttended >= 10, target: 10 },
+    { icon: "🔥", label: "25 Sessions",   earned: totalAttended >= 25, target: 25 },
+    { icon: "🏆", label: "50 Sessions",   earned: totalAttended >= 50, target: 50 },
   ];
 
-  // ── Membership ────────────────────────────────────────────────────────────
-  const mem = membership?.isActive ? membership : null;
-  const left     = mem ? daysLeft(mem.expires_at) : 0;
-  const duration = mem ? planDuration(mem.started_at, mem.expires_at) : 1;
-  const progress = mem ? Math.max(0.02, Math.min(1, 1 - left / duration)) : 0;
+  const mem      = membership?.isActive ? membership : null;
+  const memLeft  = mem ? daysLeft(mem.expires_at) : 0;
+  const memDur   = mem ? planDuration(mem.started_at, mem.expires_at) : 1;
+  const memProg  = mem ? Math.max(0.02, Math.min(1, 1 - memLeft / memDur)) : 0;
 
   return (
     <ScrollView
@@ -146,18 +157,12 @@ export default function HomeScreen() {
       contentContainerStyle={S.scroll}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => { setRefreshing(true); load(true); }}
-          tintColor={C.orange}
-        />
+        <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={C.orange} />
       }
     >
-      {/* ── SECTION 1: HERO ─────────────────────────────────────────────── */}
+      {/* ── HERO ───────────────────────────────────────────────────────────── */}
       <View style={[S.hero, { paddingTop: Math.max(insets.top + 12, 20) }]}>
-        {/* Warm glow accent */}
         <View style={S.heroGlow} pointerEvents="none" />
-
         <View style={S.heroTop}>
           <View>
             <Text style={S.heroGreeting}>{greeting},</Text>
@@ -171,23 +176,64 @@ export default function HomeScreen() {
             </View>
           )}
         </View>
-
         {loading ? (
           <ActivityIndicator color={C.orange} style={{ marginTop: 20, alignSelf: "flex-start" }} />
         ) : (
           <View style={S.heroBadges}>
-            <StatBadge icon="🏃" value={achieve?.sessionCount ?? 0}            label="Sessions" />
+            <StatBadge icon="🏃" value={totalAttended}                                                    label="Sessions"   />
             <View style={S.badgeDivider} />
-            <StatBadge icon="🏆" value={stats?.month_points ?? 0}              label="This Month" />
+            <StatBadge icon="🏆" value={monthPts}                                                         label="This Month" />
             <View style={S.badgeDivider} />
-            <StatBadge icon="🎯" value={achieve?.leaderboardRank ? `#${achieve.leaderboardRank}` : "—"} label="Rank" />
+            <StatBadge icon="🎯" value={achieve?.leaderboardRank ? `#${achieve.leaderboardRank}` : "—"}   label="Rank"       />
           </View>
         )}
       </View>
 
       <View style={S.body}>
 
-        {/* ── SECTION 2: NEXT SESSION ────────────────────────────────────── */}
+        {/* ── TODAY'S MISSION (most dominant card) ───────────────────────── */}
+        {!loading && (
+          <View style={S.missionCard}>
+            <View style={S.missionCardGlow} pointerEvents="none" />
+            <View style={S.missionTop}>
+              <Text style={S.missionEyebrow}>TODAY'S MISSION</Text>
+              {!isRestDay && <View style={S.streakBadge}><Text style={S.streakBadgeText}>🔥 Keep your streak</Text></View>}
+            </View>
+
+            {todayDay ? (
+              <View style={S.missionWorkoutRow}>
+                <Text style={S.missionEmoji}>{todayDay.emoji}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[S.missionType, isRestDay && { color: C.textMuted }]}>{todayDay.type}</Text>
+                  {!isRestDay && todayDay.detail ? (
+                    <Text style={S.missionDetail}>{todayDay.detail}</Text>
+                  ) : null}
+                </View>
+                {isRestDay && <Text style={S.restLabel}>Rest day</Text>}
+              </View>
+            ) : (
+              <View style={S.missionWorkoutRow}>
+                <Text style={S.missionEmoji}>🏃</Text>
+                <Text style={S.missionNoPlan}>Join a session to unlock your personalized training plan.</Text>
+              </View>
+            )}
+
+            {!isRestDay && (
+              <TouchableOpacity
+                style={S.missionCTA}
+                activeOpacity={0.82}
+                onPress={() => navigation.navigate("Community")}
+              >
+                <Text style={S.missionCTAText}>
+                  {nextSession ? `Join: ${nextSession.title}  →` : "Browse Sessions  →"}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+        {loading && <View style={[S.missionCard, { height: 140, opacity: 0.3 }]} />}
+
+        {/* ── NEXT SESSION ───────────────────────────────────────────────── */}
         <SectionLabel title="NEXT SESSION" />
         {loading ? (
           <View style={[S.card, S.skeletonCard]} />
@@ -198,134 +244,155 @@ export default function HomeScreen() {
                 <Text style={S.featuredTitle} numberOfLines={2}>{nextSession.title}</Text>
                 <View style={S.featuredMeta}>
                   <Text style={S.metaText}>📅 {fmtDate(nextSession.date)}</Text>
-                  {nextSession.time ? <Text style={S.metaDot}>·</Text> : null}
-                  {nextSession.time ? <Text style={S.metaText}>⏰ {fmtTime(nextSession.time)}</Text> : null}
+                  {nextSession.time ? <><Text style={S.metaDot}>·</Text><Text style={S.metaText}>⏰ {fmtTime(nextSession.time)}</Text></> : null}
                 </View>
-                {nextSession.venue ? (
-                  <Text style={S.metaText} numberOfLines={1}>📍 {nextSession.venue}</Text>
-                ) : null}
+                {nextSession.venue ? <Text style={S.metaText} numberOfLines={1}>📍 {nextSession.venue}</Text> : null}
               </View>
-              <View style={S.featuredBadge}>
-                <Text style={S.featuredBadgeText}>Upcoming</Text>
-              </View>
+              <View style={S.featuredBadge}><Text style={S.featuredBadgeText}>Upcoming</Text></View>
             </View>
-            <TouchableOpacity
-              style={S.featuredBtn}
-              activeOpacity={0.82}
-              onPress={() => navigation.navigate("Community")}
-            >
-              <Text style={S.featuredBtnText}>View Session  →</Text>
+            <TouchableOpacity style={S.featuredBtn} activeOpacity={0.82} onPress={() => navigation.navigate("Community")}>
+              <Text style={S.featuredBtnText}>Register Now  →</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <View style={[S.card, S.emptyCard]}>
-            <Text style={S.emptyText}>No upcoming sessions right now.</Text>
+            <Text style={S.emptyIcon}>🗓</Text>
+            <Text style={S.emptyTitle}>No sessions scheduled yet</Text>
+            <Text style={S.emptyText}>Register for your next run and keep your streak alive.</Text>
+            <TouchableOpacity style={S.emptyBtn} onPress={() => navigation.navigate("Community")}>
+              <Text style={S.emptyBtnText}>Browse Community  →</Text>
+            </TouchableOpacity>
           </View>
         )}
 
-        {/* ── SECTION 3: TRAINING PLAN ───────────────────────────────────── */}
-        <SectionLabel title="TRAINING PLAN" action="Full Plan" onAction={() => navigation.navigate("Training")} />
+        {/* ── MONTHLY GOALS ──────────────────────────────────────────────── */}
         {!loading && (
-          plan ? (
+          <>
+            <SectionLabel title="MONTHLY GOALS" />
             <View style={S.card}>
-              <TouchableOpacity
-                style={S.planHeader}
-                onPress={() => setPlanExpanded(e => !e)}
-                activeOpacity={0.7}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={S.planTitle}>{plan.title}</Text>
-                  {plan.coach_name ? (
-                    <Text style={S.planCoach}>by {plan.coach_name}</Text>
-                  ) : null}
+              <View style={S.goalRow}>
+                <View style={S.goalInfo}>
+                  <Text style={S.goalText}>🏃 Sessions attended</Text>
+                  <Text style={S.goalCount}>{monthAttended} / {SESSIONS_GOAL}</Text>
                 </View>
-                <View style={S.planProgress}>
-                  <Text style={S.planProgressText}>{completedDays}/7</Text>
-                  <Text style={S.planProgressSub}>days</Text>
+                <ProgressBar progress={monthAttended / SESSIONS_GOAL} delay={200} />
+                {monthAttended >= SESSIONS_GOAL && (
+                  <Text style={S.goalComplete}>✓ Goal reached!</Text>
+                )}
+              </View>
+              <View style={[S.goalRow, { borderTopWidth: 1, borderTopColor: C.border, paddingTop: 14, marginTop: 2 }]}>
+                <View style={S.goalInfo}>
+                  <Text style={S.goalText}>🏆 Points earned</Text>
+                  <Text style={S.goalCount}>{monthPts} / {POINTS_GOAL}</Text>
                 </View>
-                <Text style={[S.chevron, planExpanded && S.chevronUp]}>›</Text>
-              </TouchableOpacity>
-
-              {planExpanded && (
-                <View style={S.planDays}>
-                  {plan.days.map((day, i) => {
-                    const isToday = i === todayPlanIdx;
-                    const isRest  = day.type.toLowerCase().includes("rest");
-                    return (
-                      <View key={i} style={[S.dayRow, isToday && S.dayRowToday]}>
-                        <Text style={[S.dayName, isToday && S.dayNameToday]}>
-                          {DAY_NAMES[i]}
-                        </Text>
-                        <Text style={S.dayEmoji}>{day.emoji}</Text>
-                        <View style={{ flex: 1 }}>
-                          <Text style={[S.dayType, isRest && S.dayTypeRest, isToday && S.dayTypeToday]}>
-                            {day.type}
-                          </Text>
-                          {!isRest && day.detail ? (
-                            <Text style={S.dayDetail} numberOfLines={1}>{day.detail}</Text>
-                          ) : null}
-                        </View>
-                        {isToday && <View style={S.todayDot} />}
-                      </View>
-                    );
-                  })}
-                </View>
-              )}
+                <ProgressBar progress={monthPts / POINTS_GOAL} delay={400} color="#4ade80" />
+                {monthPts >= POINTS_GOAL && (
+                  <Text style={[S.goalComplete, { color: "#4ade80" }]}>✓ Goal reached!</Text>
+                )}
+              </View>
             </View>
-          ) : (
-            <View style={[S.card, S.emptyCard]}>
-              <Text style={S.emptyText}>No training plan assigned yet.</Text>
-            </View>
-          )
+          </>
         )}
-        {loading && <View style={[S.card, S.skeletonCard]} />}
 
-        {/* ── SECTION 4: PROGRESS SNAPSHOT ──────────────────────────────── */}
+        {/* ── NEXT MILESTONE ─────────────────────────────────────────────── */}
+        {!loading && nextMilestone && (
+          <>
+            <SectionLabel title="NEXT MILESTONE" />
+            <View style={S.milestoneCard}>
+              <View style={S.milestoneCardGlow} pointerEvents="none" />
+              <View style={S.milestoneTop}>
+                <Text style={S.milestoneIcon}>{nextMilestone.icon}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={S.milestoneLabel}>{nextMilestone.label} Badge</Text>
+                  <Text style={S.milestoneReward}>{nextMilestone.reward}</Text>
+                </View>
+                <View style={S.milestoneProgressBox}>
+                  <Text style={S.milestoneProgressText}>{totalAttended}</Text>
+                  <Text style={S.milestoneProgressDenom}>/{nextMilestone.target}</Text>
+                </View>
+              </View>
+              <ProgressBar progress={milestoneProgress} height={6} delay={600} color="#f59e0b" />
+              <Text style={S.milestoneHint}>
+                {nextMilestone.target - totalAttended === 1
+                  ? "1 more session to unlock"
+                  : `${nextMilestone.target - totalAttended} more sessions to unlock`}
+              </Text>
+            </View>
+          </>
+        )}
+
+        {/* ── TRAINING PLAN ──────────────────────────────────────────────── */}
+        <SectionLabel title="TRAINING PLAN" action="Full Plan" onAction={() => navigation.navigate("Training")} />
+        {loading ? (
+          <View style={[S.card, S.skeletonCard]} />
+        ) : plan ? (
+          <View style={S.card}>
+            <TouchableOpacity style={S.planHeader} onPress={() => setPlanExpanded(e => !e)} activeOpacity={0.7}>
+              <View style={{ flex: 1 }}>
+                <Text style={S.planTitle}>{plan.title}</Text>
+                {plan.coach_name ? <Text style={S.planCoach}>by {plan.coach_name}</Text> : null}
+              </View>
+              <View style={S.planProgress}>
+                <Text style={S.planProgressText}>{plan.days.filter(d => !d.type.toLowerCase().includes("rest")).length}/7</Text>
+                <Text style={S.planProgressSub}>days</Text>
+              </View>
+              <Text style={[S.chevron, planExpanded && S.chevronUp]}>›</Text>
+            </TouchableOpacity>
+            {planExpanded && (
+              <View style={S.planDays}>
+                {plan.days.map((day, i) => {
+                  const isToday = i === todayPlanIdx;
+                  const isRest  = day.type.toLowerCase().includes("rest");
+                  return (
+                    <View key={i} style={[S.dayRow, isToday && S.dayRowToday]}>
+                      <Text style={[S.dayName, isToday && S.dayNameToday]}>{DAY_NAMES[i]}</Text>
+                      <Text style={S.dayEmoji}>{day.emoji}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[S.dayType, isRest && S.dayTypeRest, isToday && S.dayTypeToday]}>{day.type}</Text>
+                        {!isRest && day.detail ? <Text style={S.dayDetail} numberOfLines={1}>{day.detail}</Text> : null}
+                      </View>
+                      {isToday && <View style={S.todayDot} />}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={[S.card, S.emptyCard]}>
+            <Text style={S.emptyIcon}>📋</Text>
+            <Text style={S.emptyTitle}>No plan assigned yet</Text>
+            <Text style={S.emptyText}>Join a session to unlock your personalized training plan.</Text>
+          </View>
+        )}
+
+        {/* ── PROGRESS 2×2 GRID ──────────────────────────────────────────── */}
         <SectionLabel title="PROGRESS" />
         <View style={S.grid}>
-          <View style={[S.gridCell, S.gridCellHighlight]}>
-            <Text style={S.gridVal}>{loading ? "—" : (stats?.month_points ?? 0)}</Text>
-            <Text style={S.gridLabel}>Month Points</Text>
-          </View>
-          <View style={S.gridCell}>
-            <Text style={S.gridVal}>{loading ? "—" : (stats?.total_points ?? 0)}</Text>
-            <Text style={S.gridLabel}>All-Time Points</Text>
-          </View>
-          <View style={S.gridCell}>
-            <Text style={S.gridVal}>
-              {loading ? "—" : (achieve?.leaderboardRank ? `#${achieve.leaderboardRank}` : "—")}
-            </Text>
-            <Text style={S.gridLabel}>Leaderboard Rank</Text>
-          </View>
-          <View style={[S.gridCell, S.gridCellLast]}>
-            <Text style={S.gridVal}>{loading ? "—" : (achieve?.sessionCount ?? 0)}</Text>
-            <Text style={S.gridLabel}>Total Sessions</Text>
-          </View>
+          {[
+            { label: "Month Points",   value: loading ? "—" : monthPts,                                                          hi: true  },
+            { label: "All-Time Points",value: loading ? "—" : (stats?.total_points ?? 0),                                        hi: false },
+            { label: "Leaderboard",    value: loading ? "—" : (achieve?.leaderboardRank ? `#${achieve.leaderboardRank}` : "—"),  hi: false },
+            { label: "Total Sessions", value: loading ? "—" : totalAttended,                                                     hi: false },
+          ].map(s => (
+            <View key={s.label} style={[S.gridCell, s.hi && S.gridCellHi]}>
+              <Text style={[S.gridVal, s.hi && { color: C.orange }]}>{s.value}</Text>
+              <Text style={S.gridLabel}>{s.label}</Text>
+            </View>
+          ))}
         </View>
 
-        {/* ── SECTION 5: COMMUNITY ACTIVITY ─────────────────────────────── */}
+        {/* ── COMMUNITY ──────────────────────────────────────────────────── */}
         <SectionLabel title="COMMUNITY" action="See all" onAction={() => navigation.navigate("Community")} />
         <View style={S.card}>
-          {/* Tab switcher */}
           <View style={S.communityTabs}>
-            <TouchableOpacity
-              style={[S.communityTab, communityTab === "sessions" && S.communityTabActive]}
-              onPress={() => setCommunityTab("sessions")}
-            >
-              <Text style={[S.communityTabText, communityTab === "sessions" && S.communityTabTextActive]}>
-                Sessions
-              </Text>
+            <TouchableOpacity style={[S.communityTab, communityTab === "sessions" && S.communityTabActive]} onPress={() => setCommunityTab("sessions")}>
+              <Text style={[S.communityTabText, communityTab === "sessions" && S.communityTabTextActive]}>Sessions</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[S.communityTab, communityTab === "stories" && S.communityTabActive]}
-              onPress={() => setCommunityTab("stories")}
-            >
-              <Text style={[S.communityTabText, communityTab === "stories" && S.communityTabTextActive]}>
-                Stories
-              </Text>
+            <TouchableOpacity style={[S.communityTab, communityTab === "stories" && S.communityTabActive]} onPress={() => setCommunityTab("stories")}>
+              <Text style={[S.communityTabText, communityTab === "stories" && S.communityTabTextActive]}>Stories</Text>
             </TouchableOpacity>
           </View>
-
           {loading ? (
             <ActivityIndicator color={C.orange} style={{ padding: 20 }} />
           ) : communityTab === "sessions" ? (
@@ -342,14 +409,17 @@ export default function HomeScreen() {
                   </View>
                 </View>
               ))
-            ) : <Text style={[S.emptyText, { padding: 16 }]}>No upcoming sessions.</Text>
+            ) : (
+              <View style={S.communityEmpty}>
+                <Text style={S.emptyText}>No upcoming sessions right now.</Text>
+                <Text style={[S.emptyText, { color: C.orange, marginTop: 4 }]}>Check back soon — new runs are added weekly.</Text>
+              </View>
+            )
           ) : (
             stories.slice(0, 2).length > 0 ? (
               stories.slice(0, 2).map((s, i) => (
                 <View key={s.id} style={[S.communityItem, i === 0 && S.communityItemFirst]}>
-                  <View style={S.storyAvatar}>
-                    <Text style={S.storyInitial}>{s.user_name.charAt(0).toUpperCase()}</Text>
-                  </View>
+                  <View style={S.storyAvatar}><Text style={S.storyInitial}>{s.user_name.charAt(0).toUpperCase()}</Text></View>
                   <View style={{ flex: 1 }}>
                     <Text style={S.communityItemTitle} numberOfLines={1}>{s.user_name}</Text>
                     <Text style={S.storyAchievement} numberOfLines={1}>{s.achievement}</Text>
@@ -357,22 +427,37 @@ export default function HomeScreen() {
                   </View>
                 </View>
               ))
-            ) : <Text style={[S.emptyText, { padding: 16 }]}>No stories yet.</Text>
+            ) : (
+              <View style={S.communityEmpty}>
+                <Text style={S.emptyText}>No stories yet — be the first to share yours.</Text>
+              </View>
+            )
           )}
         </View>
 
-        {/* ── SECTION 6: ACHIEVEMENTS ────────────────────────────────────── */}
+        {/* ── ACHIEVEMENTS ───────────────────────────────────────────────── */}
         <SectionLabel title="ACHIEVEMENTS" />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.chipsScroll}>
-          {CHIPS.map((chip) => (
-            <View key={chip.label} style={[S.chip, !chip.earned && S.chipLocked]}>
-              <Text style={[S.chipIcon, !chip.earned && S.chipIconLocked]}>{chip.earned ? chip.icon : "🔒"}</Text>
-              <Text style={[S.chipLabel, !chip.earned && S.chipLabelLocked]}>{chip.label}</Text>
-            </View>
-          ))}
-        </ScrollView>
+        {!loading && totalAttended === 0 ? (
+          <View style={[S.card, S.emptyCard]}>
+            <Text style={S.emptyIcon}>🏅</Text>
+            <Text style={S.emptyTitle}>Badges locked</Text>
+            <Text style={S.emptyText}>Complete your first session to start unlocking achievement badges.</Text>
+          </View>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.chipsScroll}>
+            {ACHIEVEMENT_CHIPS.map(chip => (
+              <View key={chip.label} style={[S.chip, !chip.earned && S.chipLocked]}>
+                <Text style={S.chipIcon}>{chip.earned ? chip.icon : "🔒"}</Text>
+                <Text style={[S.chipLabel, !chip.earned && S.chipLabelLocked]}>{chip.label}</Text>
+                {!chip.earned && (
+                  <Text style={S.chipProgress}>{totalAttended}/{chip.target}</Text>
+                )}
+              </View>
+            ))}
+          </ScrollView>
+        )}
 
-        {/* ── SECTION 7: MEMBERSHIP ──────────────────────────────────────── */}
+        {/* ── MEMBERSHIP ─────────────────────────────────────────────────── */}
         {!loading && (
           <View style={{ marginTop: 8 }}>
             <SectionLabel title="MEMBERSHIP" />
@@ -381,29 +466,25 @@ export default function HomeScreen() {
                 <View style={S.memberRow}>
                   <View>
                     <Text style={S.memberPlan}>{mem.plan}</Text>
-                    <Text style={S.memberLeft}>{left} days left</Text>
+                    <Text style={S.memberLeft}>{memLeft} days left</Text>
                   </View>
-                  <View style={S.memberBadge}>
-                    <Text style={S.memberBadgeText}>Active</Text>
-                  </View>
+                  <View style={S.memberBadge}><Text style={S.memberBadgeText}>Active</Text></View>
                 </View>
-                <View style={S.memberBarBg}>
-                  <View style={[S.memberBarFill, { width: `${Math.round(progress * 100)}%` }]} />
-                </View>
-                <TouchableOpacity
-                  style={S.renewBtn}
-                  onPress={() => Linking.openURL("https://www.connectedsteps.in/payments")}
-                >
+                <ProgressBar progress={memProg} height={5} delay={300} color="#4ade80" />
+                {memLeft <= 7 && (
+                  <Text style={S.memberWarning}>
+                    ⚠️ Renew soon to keep your streak, points and training plan active.
+                  </Text>
+                )}
+                <TouchableOpacity style={S.renewBtn} onPress={() => Linking.openURL("https://www.connectedsteps.in/payments")}>
                   <Text style={S.renewBtnText}>Renew Membership  →</Text>
                 </TouchableOpacity>
               </View>
             ) : (
               <View style={[S.card, S.memberCard]}>
                 <Text style={S.memberPlan}>No active membership</Text>
-                <TouchableOpacity
-                  style={[S.renewBtn, { marginTop: 12 }]}
-                  onPress={() => Linking.openURL("https://www.connectedsteps.in/pricing")}
-                >
+                <Text style={S.emptyText}>Join to unlock your training plan, track sessions, and climb the leaderboard.</Text>
+                <TouchableOpacity style={[S.renewBtn, { marginTop: 14 }]} onPress={() => Linking.openURL("https://www.connectedsteps.in/pricing")}>
                   <Text style={S.renewBtnText}>View Plans  →</Text>
                 </TouchableOpacity>
               </View>
@@ -416,58 +497,69 @@ export default function HomeScreen() {
   );
 }
 
-// ── Design tokens ─────────────────────────────────────────────────────────────
+// ── Design tokens ──────────────────────────────────────────────────────────────
 const C = {
-  bg:          "#080808",
-  heroBg:      "#0f0a05",
-  surface:     "#111111",
-  surfaceHigh: "#181818",
-  border:      "#222222",
-  borderSub:   "#1a1a1a",
-  orange:      "#e8620a",
-  orangeDim:   "rgba(232,98,10,0.12)",
-  orangeMid:   "rgba(232,98,10,0.22)",
-  white:       "#f5f5f5",
-  text:        "#f0f0f0",
-  textSub:     "#888888",
-  textMuted:   "#505050",
-  green:       "#4ade80",
-  gold:        "#f59e0b",
+  bg:       "#080808", heroBg: "#0f0a05", surface: "#111111", surfaceHigh: "#181818",
+  border:   "#222222", borderSub: "#1a1a1a", orange: "#e8620a",
+  orangeDim:"rgba(232,98,10,0.12)", orangeMid:"rgba(232,98,10,0.22)",
+  white:    "#f5f5f5", text: "#f0f0f0", textSub: "#888888", textMuted: "#505050",
+  green:    "#4ade80", gold: "#f59e0b",
 };
 
 const S = StyleSheet.create({
   root:  { flex: 1, backgroundColor: C.bg },
-  scroll: { paddingBottom: 48 },
+  scroll:{ paddingBottom: 48 },
 
   // Hero
-  hero:             { backgroundColor: C.heroBg, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: "#1a1205", overflow: "hidden" },
-  heroGlow:         { position: "absolute", top: -80, right: -60, width: 220, height: 220, borderRadius: 110, backgroundColor: C.orange, opacity: 0.05 },
-  heroTop:          { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 },
-  heroGreeting:     { fontSize: 14, color: C.textSub, fontWeight: "500", marginBottom: 2 },
-  heroName:         { fontSize: 26, fontWeight: "800", color: C.white, letterSpacing: -0.4 },
-  heroAvatar:       { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: C.orange },
+  hero:              { backgroundColor: C.heroBg, paddingHorizontal: 20, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: "#1a1205", overflow: "hidden" },
+  heroGlow:          { position: "absolute", top: -80, right: -60, width: 220, height: 220, borderRadius: 110, backgroundColor: C.orange, opacity: 0.05 },
+  heroTop:           { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 },
+  heroGreeting:      { fontSize: 14, color: C.textSub, fontWeight: "500", marginBottom: 2 },
+  heroName:          { fontSize: 26, fontWeight: "800", color: C.white, letterSpacing: -0.4 },
+  heroAvatar:        { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: C.orange },
   heroAvatarFallback:{ width: 44, height: 44, borderRadius: 22, backgroundColor: C.orangeDim, borderWidth: 2, borderColor: C.orange, alignItems: "center", justifyContent: "center" },
   heroAvatarInitial: { fontSize: 18, fontWeight: "700", color: C.orange },
-  heroBadges:       { flexDirection: "row", alignItems: "center" },
-  statBadge:        { flex: 1, alignItems: "center" },
-  statIcon:         { fontSize: 18, marginBottom: 4 },
-  statValue:        { fontSize: 20, fontWeight: "800", color: C.white, letterSpacing: -0.3 },
-  statLabel:        { fontSize: 10, color: C.textSub, marginTop: 2, textTransform: "uppercase", letterSpacing: 0.4 },
-  badgeDivider:     { width: 1, height: 36, backgroundColor: "#1e1e1e", marginHorizontal: 4 },
+  heroBadges:        { flexDirection: "row", alignItems: "center" },
+  statBadge:         { flex: 1, alignItems: "center" },
+  statIcon:          { fontSize: 18, marginBottom: 4 },
+  statValue:         { fontSize: 20, fontWeight: "800", color: C.white, letterSpacing: -0.3 },
+  statLabel:         { fontSize: 10, color: C.textSub, marginTop: 2, textTransform: "uppercase", letterSpacing: 0.4 },
+  badgeDivider:      { width: 1, height: 36, backgroundColor: "#1e1e1e", marginHorizontal: 4 },
 
-  // Body wrapper
-  body: { paddingHorizontal: 16, paddingTop: 24 },
+  body: { paddingHorizontal: 16, paddingTop: 20 },
 
   // Section labels
-  sectionRow:    { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
+  sectionRow:    { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10, marginTop: 4 },
   sectionLabel:  { fontSize: 11, fontWeight: "700", color: C.textMuted, letterSpacing: 0.8, textTransform: "uppercase" },
   sectionAction: { fontSize: 12, color: C.orange, fontWeight: "600" },
 
+  // Today's Mission card
+  missionCard:       { backgroundColor: "#130d07", borderRadius: 20, borderWidth: 1, borderColor: "rgba(232,98,10,0.25)", padding: 20, marginBottom: 24, overflow: "hidden" },
+  missionCardGlow:   { position: "absolute", top: -40, right: -40, width: 160, height: 160, borderRadius: 80, backgroundColor: C.orange, opacity: 0.07 },
+  missionTop:        { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
+  missionEyebrow:    { fontSize: 10, fontWeight: "800", color: C.orange, letterSpacing: 1, textTransform: "uppercase" },
+  streakBadge:       { backgroundColor: "rgba(232,98,10,0.15)", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  streakBadgeText:   { fontSize: 11, color: C.orange, fontWeight: "700" },
+  missionWorkoutRow: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 18 },
+  missionEmoji:      { fontSize: 36 },
+  missionType:       { fontSize: 20, fontWeight: "800", color: C.white, letterSpacing: -0.3 },
+  missionDetail:     { fontSize: 13, color: C.textSub, marginTop: 3 },
+  missionNoPlan:     { flex: 1, fontSize: 14, color: C.textSub, lineHeight: 20 },
+  restLabel:         { fontSize: 12, color: C.textMuted, fontStyle: "italic" },
+  missionCTA:        { backgroundColor: C.orange, borderRadius: 14, padding: 15, alignItems: "center" },
+  missionCTAText:    { color: "#fff", fontWeight: "800", fontSize: 15, letterSpacing: 0.2 },
+
   // Cards
-  card:         { backgroundColor: C.surface, borderRadius: 20, borderWidth: 1, borderColor: C.border, marginBottom: 24, overflow: "hidden" },
-  skeletonCard: { height: 110, opacity: 0.4 },
-  emptyCard:    { padding: 20 },
-  emptyText:    { fontSize: 13, color: C.textMuted, textAlign: "center" },
+  card:        { backgroundColor: C.surface, borderRadius: 20, borderWidth: 1, borderColor: C.border, marginBottom: 24, overflow: "hidden" },
+  skeletonCard:{ height: 100, opacity: 0.3 },
+
+  // Empty states
+  emptyCard:  { padding: 24, alignItems: "center" },
+  emptyIcon:  { fontSize: 36, marginBottom: 10 },
+  emptyTitle: { fontSize: 15, fontWeight: "700", color: C.text, marginBottom: 6, textAlign: "center" },
+  emptyText:  { fontSize: 13, color: C.textMuted, textAlign: "center", lineHeight: 19 },
+  emptyBtn:   { marginTop: 14, borderWidth: 1, borderColor: C.orange, borderRadius: 10, paddingHorizontal: 18, paddingVertical: 10 },
+  emptyBtnText: { fontSize: 13, color: C.orange, fontWeight: "700" },
 
   // Featured session card
   featuredCard:    { backgroundColor: C.surface, borderRadius: 20, borderWidth: 1, borderColor: C.border, marginBottom: 24, overflow: "hidden" },
@@ -480,6 +572,25 @@ const S = StyleSheet.create({
   featuredBadgeText: { fontSize: 10, color: C.orange, fontWeight: "700" },
   featuredBtn:     { margin: 12, marginTop: 4, backgroundColor: C.orange, borderRadius: 14, padding: 15, alignItems: "center" },
   featuredBtnText: { color: "#fff", fontWeight: "700", fontSize: 15, letterSpacing: 0.1 },
+
+  // Monthly Goals
+  goalRow:      { padding: 18, gap: 10 },
+  goalInfo:     { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+  goalText:     { fontSize: 14, color: C.text, fontWeight: "500" },
+  goalCount:    { fontSize: 13, color: C.orange, fontWeight: "700" },
+  goalComplete: { fontSize: 11, color: C.green, fontWeight: "700", marginTop: 6 },
+
+  // Next Milestone
+  milestoneCard:      { backgroundColor: "#0d0d0a", borderRadius: 20, borderWidth: 1, borderColor: "rgba(245,158,11,0.2)", padding: 18, marginBottom: 24, overflow: "hidden" },
+  milestoneCardGlow:  { position: "absolute", top: -50, right: -50, width: 140, height: 140, borderRadius: 70, backgroundColor: C.gold, opacity: 0.05 },
+  milestoneTop:       { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 14 },
+  milestoneIcon:      { fontSize: 32 },
+  milestoneLabel:     { fontSize: 15, fontWeight: "700", color: C.white },
+  milestoneReward:    { fontSize: 12, color: C.gold, marginTop: 2 },
+  milestoneProgressBox: { alignItems: "center" },
+  milestoneProgressText:{ fontSize: 22, fontWeight: "800", color: C.gold, letterSpacing: -0.5 },
+  milestoneProgressDenom:{ fontSize: 12, color: C.textMuted },
+  milestoneHint:      { fontSize: 12, color: C.textMuted, marginTop: 8, textAlign: "right" },
 
   // Training plan
   planHeader:      { flexDirection: "row", alignItems: "center", padding: 18, gap: 12 },
@@ -502,55 +613,53 @@ const S = StyleSheet.create({
   dayDetail:       { fontSize: 11, color: C.textSub, marginTop: 2 },
   todayDot:        { width: 6, height: 6, borderRadius: 3, backgroundColor: C.orange },
 
-  // Progress 2x2 grid
+  // Progress 2×2 grid
   grid:         { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 24 },
   gridCell:     { flex: 1, minWidth: "45%", backgroundColor: C.surface, borderRadius: 18, padding: 18, borderWidth: 1, borderColor: C.border },
-  gridCellHighlight: { borderColor: C.orangeMid, backgroundColor: "#130d07" },
-  gridCellLast: {},
+  gridCellHi:   { borderColor: C.orangeMid, backgroundColor: "#130d07" } as any,
   gridVal:      { fontSize: 26, fontWeight: "800", color: C.white, letterSpacing: -0.5, marginBottom: 4 },
   gridLabel:    { fontSize: 11, color: C.textSub, textTransform: "uppercase", letterSpacing: 0.4 },
 
   // Community card
-  communityTabs:      { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: C.border },
-  communityTab:       { flex: 1, paddingVertical: 13, alignItems: "center" },
-  communityTabActive: { borderBottomWidth: 2, borderBottomColor: C.orange },
-  communityTabText:   { fontSize: 13, color: C.textSub, fontWeight: "600" },
-  communityTabTextActive: { color: C.orange },
-  communityItem:      { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 16, paddingVertical: 13, borderTopWidth: 1, borderTopColor: C.border },
-  communityItemFirst: { borderTopWidth: 0 },
-  communityItemTitle: { fontSize: 13, fontWeight: "700", color: C.text, marginBottom: 3 },
-  communityItemSub:   { fontSize: 11, color: C.textSub },
-  communityDatePill:  { alignItems: "center", justifyContent: "center", minWidth: 52, backgroundColor: C.surfaceHigh, borderRadius: 10, padding: 8 },
-  communityDateText:  { fontSize: 10, fontWeight: "700", color: C.orange, textAlign: "center" },
-  communityTimeText:  { fontSize: 10, color: C.textSub, marginTop: 2, textAlign: "center" },
-  storyAvatar:        { width: 36, height: 36, borderRadius: 18, backgroundColor: C.orangeDim, alignItems: "center", justifyContent: "center" },
-  storyInitial:       { fontSize: 14, fontWeight: "700", color: C.orange },
-  storyAchievement:   { fontSize: 11, color: C.orange, fontWeight: "600", marginBottom: 3 },
-  storyQuote:         { fontSize: 12, color: C.textSub, lineHeight: 17, fontStyle: "italic" },
+  communityTabs:         { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: C.border },
+  communityTab:          { flex: 1, paddingVertical: 13, alignItems: "center" },
+  communityTabActive:    { borderBottomWidth: 2, borderBottomColor: C.orange },
+  communityTabText:      { fontSize: 13, color: C.textSub, fontWeight: "600" },
+  communityTabTextActive:{ color: C.orange },
+  communityItem:         { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 16, paddingVertical: 13, borderTopWidth: 1, borderTopColor: C.border },
+  communityItemFirst:    { borderTopWidth: 0 },
+  communityItemTitle:    { fontSize: 13, fontWeight: "700", color: C.text, marginBottom: 3 },
+  communityItemSub:      { fontSize: 11, color: C.textSub },
+  communityDatePill:     { alignItems: "center", justifyContent: "center", minWidth: 52, backgroundColor: C.surfaceHigh, borderRadius: 10, padding: 8 },
+  communityDateText:     { fontSize: 10, fontWeight: "700", color: C.orange, textAlign: "center" },
+  communityTimeText:     { fontSize: 10, color: C.textSub, marginTop: 2, textAlign: "center" },
+  communityEmpty:        { padding: 18, alignItems: "center", gap: 4 },
+  storyAvatar:           { width: 36, height: 36, borderRadius: 18, backgroundColor: C.orangeDim, alignItems: "center", justifyContent: "center" },
+  storyInitial:          { fontSize: 14, fontWeight: "700", color: C.orange },
+  storyAchievement:      { fontSize: 11, color: C.orange, fontWeight: "600", marginBottom: 3 },
+  storyQuote:            { fontSize: 12, color: C.textSub, lineHeight: 17, fontStyle: "italic" },
 
   // Achievement chips
-  chipsScroll: { paddingBottom: 24, gap: 8 },
-  chip:        { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: C.surfaceHigh, borderRadius: 24, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: C.border },
-  chipLocked:  { opacity: 0.4 },
-  chipIcon:    { fontSize: 16 },
-  chipIconLocked: {},
-  chipLabel:   { fontSize: 13, color: C.text, fontWeight: "600" },
-  chipLabelLocked: { color: C.textMuted },
+  chipsScroll:    { paddingBottom: 24, gap: 8 },
+  chip:           { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: C.surfaceHigh, borderRadius: 24, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: C.border },
+  chipLocked:     { opacity: 0.4 },
+  chipIcon:       { fontSize: 16 },
+  chipLabel:      { fontSize: 13, color: C.text, fontWeight: "600" },
+  chipLabelLocked:{ color: C.textMuted },
+  chipProgress:   { fontSize: 10, color: C.textMuted, marginLeft: 2 },
 
   // Membership
-  memberCard:    { padding: 18 },
-  memberRow:     { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 14 },
-  memberPlan:    { fontSize: 15, fontWeight: "700", color: C.text, marginBottom: 3, textTransform: "capitalize" },
-  memberLeft:    { fontSize: 12, color: C.textSub },
-  memberBadge:   { backgroundColor: "#0a2010", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: "rgba(74,222,128,0.2)" },
+  memberCard:      { padding: 18 },
+  memberRow:       { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 14 },
+  memberPlan:      { fontSize: 15, fontWeight: "700", color: C.text, marginBottom: 3, textTransform: "capitalize" },
+  memberLeft:      { fontSize: 12, color: C.textSub },
+  memberBadge:     { backgroundColor: "#0a2010", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: "rgba(74,222,128,0.2)" },
   memberBadgeText: { fontSize: 11, color: C.green, fontWeight: "700" },
-  memberBarBg:   { height: 5, backgroundColor: C.border, borderRadius: 4, marginBottom: 16, overflow: "hidden" },
-  memberBarFill: { height: "100%", backgroundColor: C.green, borderRadius: 4 },
-  renewBtn:      { backgroundColor: "transparent", borderWidth: 1, borderColor: C.orange, borderRadius: 12, padding: 13, alignItems: "center" },
-  renewBtnText:  { color: C.orange, fontWeight: "700", fontSize: 13 },
+  memberWarning:   { fontSize: 12, color: "#f59e0b", lineHeight: 17, marginTop: 10, marginBottom: 4 },
+  renewBtn:        { marginTop: 14, borderWidth: 1, borderColor: C.orange, borderRadius: 12, padding: 13, alignItems: "center" },
+  renewBtnText:    { color: C.orange, fontWeight: "700", fontSize: 13 },
 
-  // Orange mid used in featuredCard/gridCell
-  orangeMid: C.orangeMid,
+  orangeMid: "rgba(232,98,10,0.22)",
 });
 
 const orangeMid = "rgba(232,98,10,0.22)";
