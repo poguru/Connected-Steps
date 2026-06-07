@@ -5,6 +5,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
+    const userEmail = new URL(req.url).searchParams.get("user_email");
     const db = getSupabaseServer();
 
     const { data: photos, error } = await db
@@ -15,16 +16,21 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // Attach like counts
     const ids = (photos ?? []).map(p => p.id);
+
+    // Fetch all likes for like counts
     const { data: likes } = ids.length
-      ? await db.from("photo_likes").select("photo_id").in("photo_id", ids)
+      ? await db.from("photo_likes").select("photo_id, user_email").in("photo_id", ids)
       : { data: [] };
 
     const likeMap: Record<string, number> = {};
-    for (const l of likes ?? []) likeMap[l.photo_id] = (likeMap[l.photo_id] ?? 0) + 1;
+    const userLikedSet = new Set<string>();
+    for (const l of likes ?? []) {
+      likeMap[l.photo_id] = (likeMap[l.photo_id] ?? 0) + 1;
+      if (userEmail && l.user_email === userEmail) userLikedSet.add(l.photo_id);
+    }
 
-    const result = (photos ?? []).map(p => ({ ...p, likes: likeMap[p.id] ?? 0 }));
+    const result = (photos ?? []).map(p => ({ ...p, likes: likeMap[p.id] ?? 0, user_liked: userLikedSet.has(p.id) }));
     return NextResponse.json({ photos: result });
   } catch (e: unknown) {
     return NextResponse.json({ error: String(e) }, { status: 500 });

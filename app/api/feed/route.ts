@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
     // Fetch recent photo uploads from followed users
     const { data: photos } = await db
       .from("session_photos")
-      .select("id, uploader_email, uploader_name, session_id, created_at")
+      .select("id, uploader_email, uploader_name, session_id, photo_url, caption, created_at")
       .in("uploader_email", following)
       .order("created_at", { ascending: false })
       .limit(10);
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
         actor_email: p.uploader_email,
         actor_name:  p.uploader_name ?? p.uploader_email.split("@")[0],
         event_type:  "photo_uploaded",
-        payload:     { session_id: p.session_id, photo_id: p.id },
+        payload:     { session_id: p.session_id, photo_id: p.id, photo_url: p.photo_url, caption: p.caption ?? "" },
         created_at:  p.created_at,
       });
     }

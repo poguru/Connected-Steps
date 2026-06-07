@@ -11,6 +11,8 @@ import MembershipCard from "@/components/ui/MembershipCard";
 import TrainingPlan from "@/components/dashboard/TrainingPlan";
 import AskCoachFab from "@/components/ui/AskCoachFab";
 import DashboardHero from "@/components/dashboard/DashboardHero";
+import SessionPhotos from "@/components/dashboard/SessionPhotos";
+import FollowerFeed from "@/components/dashboard/FollowerFeed";
 
 interface SessionRecord {
   attended:      boolean;
@@ -181,7 +183,7 @@ function RateCoachWidget({ userEmail, hasAttended }: { userEmail: string; hasAtt
 
 interface FeedbackItem { id: number; user_name: string; rating: number; comment: string; created_at: string; }
 
-function SessionCard({ rec, userEmail }: { rec: SessionRecord; userEmail: string }) {
+function SessionCard({ rec, userEmail, userName }: { rec: SessionRecord; userEmail: string; userName: string }) {
   const s = rec.sessions;
   const [feedback,    setFeedback]    = useState<FeedbackItem[]>([]);
   const [fbLoading,   setFbLoading]   = useState(true);
@@ -266,6 +268,11 @@ function SessionCard({ rec, userEmail }: { rec: SessionRecord; userEmail: string
           </div>
         </div>
       </div>
+
+      {/* Photos section */}
+      {rec.attended && s && (
+        <SessionPhotos sessionId={s.id} userEmail={userEmail} userName={userName} />
+      )}
 
       {/* Feedback section */}
       {rec.attended && (
@@ -745,7 +752,10 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* ── 4. Upcoming sessions ── */}
+          {/* ── 4. Follower activity feed ── */}
+          <FollowerFeed userEmail={user.email} />
+
+          {/* ── 5. Upcoming sessions ──*/}
           {upcomingSessions.length > 0 && (
             <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: "1.25rem", marginBottom: "1.25rem", boxShadow: "var(--shadow-md)" }}>
               <div style={{ fontSize: "10px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.75rem" }}>Upcoming Sessions</div>
@@ -811,7 +821,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* ── 5. Session history ── */}
+          {/* ── 6. Session history ── */}
           <div style={{ fontSize: "10px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.65rem" }}>Session History</div>
           {sessionsLoading ? (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
@@ -839,7 +849,7 @@ export default function Dashboard() {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
               {sessions.map((rec, i) => (
-                <SessionCard key={i} rec={rec} userEmail={user.email} />
+                <SessionCard key={i} rec={rec} userEmail={user.email} userName={fullName} />
               ))}
             </div>
           )}
