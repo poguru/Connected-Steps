@@ -292,7 +292,8 @@ export default function AdminSessionsPage() {
     setPhotoUploading(false);
   };
 
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedId,    setCopiedId]    = useState<string | null>(null);
+  const [shareSession, setShareSession] = useState<Session | null>(null);
 
   function copyJoinLink(sessionId: string) {
     const url = `${window.location.origin}/join/${sessionId}`;
@@ -300,6 +301,77 @@ export default function AdminSessionsPage() {
       setCopiedId(sessionId);
       setTimeout(() => setCopiedId(null), 2000);
     });
+  }
+
+  function ShareSheet({ session, onClose }: { session: Session; onClose: () => void }) {
+    const APP_URL   = window.location.origin;
+    const url       = `${APP_URL}/join/${session.id}`;
+    const storyUrl  = `${APP_URL}/api/og/session/${session.id}?format=story`;
+    const [copied, setCopied] = useState(false);
+
+    const dateStr = new Date(session.date + "T12:00:00Z").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
+    const timeStr = session.time ?? "";
+    const venue   = session.venue || session.location;
+
+    const waText = encodeURIComponent(
+      `🏃 *Connected Steps*\n\n*${session.title}*\n\n📅 ${dateStr}${timeStr ? `\n⏰ ${timeStr}` : ""}\n📍 ${venue}\n\nJoin the run 👇\n${url}`
+    );
+    const tweetText = encodeURIComponent(`🏃 ${session.title} — Connected Steps\n📅 ${dateStr} · 📍 ${venue}\n\nJoin us:`);
+
+    const platforms = [
+      { label: "WhatsApp",  icon: "💬", color: "#25D366", href: `https://wa.me/?text=${waText}` },
+      { label: "Telegram",  icon: "✈️",  color: "#0088cc", href: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(`🏃 ${session.title} — ${dateStr} · ${venue}`)}` },
+      { label: "X",         icon: "𝕏",  color: "#1DA1F2", href: `https://twitter.com/intent/tweet?text=${tweetText}&url=${encodeURIComponent(url)}` },
+      { label: "Facebook",  icon: "f",  color: "#1877F2", href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}` },
+      { label: "LinkedIn",  icon: "in", color: "#0A66C2", href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}` },
+    ];
+
+    async function handleCopy() {
+      try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* ignore */ }
+    }
+
+    async function nativeShare() {
+      if (!navigator.share) return;
+      try { await navigator.share({ title: `${session.title} – Connected Steps`, text: `Join me for ${session.title}!`, url }); } catch { /* ignore */ }
+    }
+
+    return (
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 500, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+        <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: "#1a1a1a", borderRadius: "20px 20px 0 0", padding: "1.5rem", paddingBottom: "2rem" }}>
+          <div style={{ width: 40, height: 4, background: "rgba(255,255,255,0.15)", borderRadius: 99, margin: "0 auto 1.25rem" }} />
+          <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.4)", textAlign: "center", marginBottom: "1.25rem", letterSpacing: "0.06em", textTransform: "uppercase" }}>Share Session</div>
+
+          <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "0.75rem 1rem", marginBottom: "1.25rem", fontSize: "0.82rem", color: "rgba(255,255,255,0.7)", lineHeight: 1.6 }}>
+            <div style={{ fontWeight: 700, color: "#fff", marginBottom: 2 }}>{session.title}</div>
+            <div>📅 {dateStr}{timeStr ? ` · ⏰ ${timeStr}` : ""} · 📍 {venue}</div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "0.5rem", marginBottom: "1rem" }}>
+            {platforms.map(p => (
+              <a key={p.label} href={p.href} target="_blank" rel="noopener noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, textDecoration: "none" }}>
+                <div style={{ width: 52, height: 52, borderRadius: 14, background: p.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem", fontWeight: 800, color: "#fff" }}>{p.icon}</div>
+                <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.55)", textAlign: "center" }}>{p.label}</span>
+              </a>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <button onClick={handleCopy} style={{ width: "100%", padding: "12px", background: copied ? "rgba(74,222,128,0.15)" : "rgba(255,255,255,0.07)", border: `1px solid ${copied ? "rgba(74,222,128,0.3)" : "rgba(255,255,255,0.1)"}`, borderRadius: 10, color: copied ? "#4ade80" : "#fff", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              {copied ? "✓ Link copied!" : "🔗 Copy link"}
+            </button>
+            <a href={storyUrl} download={`${session.title.replace(/\s+/g, "-")}-story.png`}
+              style={{ width: "100%", padding: "12px", background: "rgba(232,98,10,0.12)", border: "1px solid rgba(232,98,10,0.3)", borderRadius: 10, color: "#e8620a", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, textDecoration: "none" }}>
+              📸 Download Story Image (Instagram)
+            </a>
+            {typeof navigator !== "undefined" && "share" in navigator && (
+              <button onClick={nativeShare} style={{ width: "100%", padding: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, color: "rgba(255,255,255,0.7)", fontSize: "0.875rem", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                ↗ More options…
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const attendCount = attendees.filter((a) => a.attended).length;
@@ -337,6 +409,7 @@ export default function AdminSessionsPage() {
 
   /* ── Dashboard ── */
   return (
+    <>
     <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", display: "flex", flexDirection: "column" }}>
 
       {/* Header */}
@@ -407,9 +480,9 @@ export default function AdminSessionsPage() {
                         title="Edit" style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 5px", color: editingId === s.id ? "#e8620a" : "#555", fontSize: "0.8rem", flexShrink: 0 }}>✏️</button>
                       <button onClick={(e) => { e.stopPropagation(); reschedulingId === s.id ? setReschedulingId(null) : startReschedule(s); }}
                         title="Reschedule" style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 5px", color: reschedulingId === s.id ? "#e8620a" : "#555", fontSize: "0.8rem", flexShrink: 0 }}>📅</button>
-                      <button onClick={(e) => { e.stopPropagation(); copyJoinLink(s.id); }}
-                        title="Copy join link" style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 5px", color: copiedId === s.id ? "#4ade80" : "#555", fontSize: "0.75rem", fontWeight: 600, fontFamily: "inherit", flexShrink: 0 }}>
-                        {copiedId === s.id ? "✓" : "🔗"}
+                      <button onClick={(e) => { e.stopPropagation(); setShareSession(s); }}
+                        title="Share session" style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 5px", color: "#e8620a", fontSize: "0.8rem", flexShrink: 0 }}>
+                        ↗
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(deleteConfirmId === s.id ? null : s.id); setEditingId(null); setReschedulingId(null); }}
                         title="Delete" style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 6px", color: deleteConfirmId === s.id ? "#f09595" : "#555", fontSize: "0.8rem", flexShrink: 0 }}>🗑️</button>
@@ -508,9 +581,9 @@ export default function AdminSessionsPage() {
 
                 <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
                   <button
-                    onClick={() => copyJoinLink(selected.id)}
-                    style={{ ...btn(false), display: "flex", alignItems: "center", gap: "6px", color: copiedId === selected.id ? "#4ade80" : "#fff", borderColor: copiedId === selected.id ? "rgba(74,222,128,0.4)" : undefined }}>
-                    {copiedId === selected.id ? "✓ Copied!" : "🔗 Copy join link"}
+                    onClick={() => setShareSession(selected)}
+                    style={{ ...btn(false), display: "flex", alignItems: "center", gap: "6px" }}>
+                    ↗ Share Session
                   </button>
                   <button onClick={saveAttendance} disabled={saving} style={btn(true)}>
                     {saving ? "Saving & updating leaderboard…" : "Save Attendance"}
@@ -644,5 +717,7 @@ export default function AdminSessionsPage() {
         </div>
       </div>
     </div>
+    {shareSession && <ShareSheet session={shareSession} onClose={() => setShareSession(null)} />}
+    </>
   );
 }
