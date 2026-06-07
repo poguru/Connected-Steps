@@ -47,7 +47,7 @@ export default function SessionShareSheet({ session, onClose }: Props) {
   const [toastGreen, setToastGreen] = useState(true);
   const blobRef = useRef<Blob | null>(null);
 
-  const shareImageUrl = `${APP_URL}/api/og/session/${session.id}?format=story`;
+  const shareImageUrl = `${APP_URL}/api/og/session/${session.id}?format=story&v=3`;
   const joinUrl       = `${APP_URL}/join/${session.id}`;
   const dateStr       = formatDate(session.date);
   const caption       = buildCaption(session, joinUrl, dateStr);
