@@ -175,12 +175,16 @@ export async function sendEmail(
 }
 
 // ── WhatsApp OTP ──────────────────────────────────────────────────────────────
-// Requires a MSG91 WhatsApp template named "otp_verification" (or MSG91_OTP_TEMPLATE env):
-//   Body: Hi {{1}}, your Connected Steps OTP is *{{2}}*. Valid for 10 minutes. Do not share with anyone.
+// Requires a MSG91 WhatsApp Authentication template named "otp_verification" (or MSG91_OTP_TEMPLATE env):
+//   Category: Authentication
+//   Body:    {{1}} is your Connected Steps verification code. Do not share this code.
+//   Footer:  This code expires in 10 minutes.
+//   Button:  Copy Code (OTP type)
+// {{1}} = the 6-digit code only (Authentication templates don't support name variables)
 
-export async function sendWhatsAppOTP(phone: string, name: string, code: string): Promise<NotifyResult> {
+export async function sendWhatsAppOTP(phone: string, _name: string, code: string): Promise<NotifyResult> {
   const template = process.env.MSG91_OTP_TEMPLATE ?? "otp_verification";
-  return sendWhatsApp(phone, [name, code], template);
+  return sendWhatsApp(phone, [code], template);
 }
 
 // ── Message builders ──────────────────────────────────────────────────────────
