@@ -72,95 +72,91 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   );
 
   if (isStory) {
-    // ── 1080 x 1920 Instagram Story — vertically balanced layout ────────────
+    // ── 1080 x 1920 Instagram Story ─────────────────────────────────────────
+    // 4 sections pinned with equal flex-grow spacers between them so content
+    // fills the full canvas without top-loading.
     return new ImageResponse(
       (
-        <div style={{ width: W, height: H, display: "flex", flexDirection: "column", alignItems: "center", background: "#000000", padding: "80px 90px", fontFamily: "sans-serif", justifyContent: "space-between" }}>
+        <div style={{ width: W, height: H, display: "flex", flexDirection: "column", alignItems: "center", background: "#000000", padding: "100px 90px", fontFamily: "sans-serif" }}>
 
-          {/* ── 1. Branding: logo + name ── */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
-            <div style={{ width: 208, height: 208, borderRadius: "50%", overflow: "hidden", border: "5px solid #ffffff", display: "flex", flexShrink: 0 }}>
+          {/* ── 1. Logo ── */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 24 }}>
+            <div style={{ width: 200, height: 200, borderRadius: "50%", overflow: "hidden", border: "5px solid #ffffff", display: "flex", flexShrink: 0 }}>
               {logoDataUrl
                 ? <img src={logoDataUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 : <div style={{ width: "100%", height: "100%", background: ORANGE, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 96, fontWeight: 900, color: WHITE }}>C</div>
               }
             </div>
-            <span style={{ fontSize: 32, fontWeight: 800, color: WHITE, letterSpacing: "0.1em", textTransform: "uppercase" }}>Connected Steps</span>
+            <span style={{ fontSize: 30, fontWeight: 800, color: WHITE, letterSpacing: "0.12em", textTransform: "uppercase" }}>Connected Steps</span>
           </div>
 
-          {/* ── 2. Title + tagline + accent ── */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
-            <div style={{ display: "flex", textAlign: "center", fontSize: title.length > 20 ? 74 : 90, fontWeight: 900, color: ORANGE, lineHeight: 1.05, textTransform: "uppercase" }}>
+          <div style={{ flexGrow: 1 }} />
+
+          {/* ── 2. Session name + tagline ── */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
+            <div style={{ width: 200, height: 4, background: ORANGE, borderRadius: 99 }} />
+            <div style={{ display: "flex", textAlign: "center", fontSize: title.length > 22 ? 70 : title.length > 14 ? 82 : 96, fontWeight: 900, color: ORANGE, lineHeight: 1.08, textTransform: "uppercase" }}>
               {title}
             </div>
-            <div style={{ display: "flex", fontSize: 36, color: "#aaaaaa", textAlign: "center" }}>
+            <div style={{ display: "flex", fontSize: 36, color: "#888888", textAlign: "center", fontWeight: 500, letterSpacing: "0.02em" }}>
               Train smarter. Live better.
             </div>
-            <div style={{ width: 180, height: 5, background: ORANGE, borderRadius: 99 }} />
+            <div style={{ width: 200, height: 4, background: ORANGE, borderRadius: 99 }} />
           </div>
 
+          <div style={{ flexGrow: 1 }} />
+
           {/* ── 3. Event details card ── */}
-          <div style={{ display: "flex", flexDirection: "column", width: "100%", background: "#111111", border: "1px solid #2a2a2a", borderRadius: 24, padding: "44px 52px", gap: 0 }}>
-            {/* Date row */}
-            <div style={{ display: "flex", alignItems: "center", gap: 36 }}>
-              <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke={ORANGE} strokeWidth="1.5" style={{ flexShrink: 0 }}>
+          <div style={{ display: "flex", flexDirection: "column", width: "100%", background: "#0f0f0f", border: "1px solid #222222", borderRadius: 28, padding: "48px 56px" }}>
+
+            {/* Date */}
+            <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
+              <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke={ORANGE} strokeWidth="1.5" style={{ flexShrink: 0 }}>
                 <rect x="3" y="4" width="18" height="18" rx="2" />
                 <line x1="16" y1="2" x2="16" y2="6" />
                 <line x1="8" y1="2" x2="8" y2="6" />
                 <line x1="3" y1="10" x2="21" y2="10" />
               </svg>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <span style={{ fontSize: 24, color: ORANGE, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em" }}>Date</span>
-                <span style={{ fontSize: 38, color: WHITE, fontWeight: 700 }}>{dateStr}</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <span style={{ fontSize: 22, color: ORANGE, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em" }}>Date</span>
+                <span style={{ fontSize: 40, color: WHITE, fontWeight: 700, lineHeight: 1.1 }}>{dateStr}</span>
               </div>
             </div>
 
-            {/* Thin separator */}
-            <div style={{ height: 1, background: "#2a2a2a", margin: "32px 0" }} />
+            <div style={{ height: 1, background: "#1e1e1e", margin: "36px 0" }} />
 
-            {/* Time row */}
-            <div style={{ display: "flex", alignItems: "center", gap: 36 }}>
-              <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke={ORANGE} strokeWidth="1.5" style={{ flexShrink: 0 }}>
+            {/* Time */}
+            <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
+              <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke={ORANGE} strokeWidth="1.5" style={{ flexShrink: 0 }}>
                 <circle cx="12" cy="12" r="10" />
                 <polyline points="12 6 12 12 16 14" />
               </svg>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <span style={{ fontSize: 24, color: ORANGE, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em" }}>Time</span>
-                <span style={{ fontSize: 38, color: WHITE, fontWeight: 700 }}>{timeStr || "6:00 AM"}</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <span style={{ fontSize: 22, color: ORANGE, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em" }}>Time</span>
+                <span style={{ fontSize: 40, color: WHITE, fontWeight: 700 }}>{timeStr || "TBA"}</span>
               </div>
             </div>
 
-            {/* Thin separator */}
-            <div style={{ height: 1, background: "#2a2a2a", margin: "32px 0" }} />
+            <div style={{ height: 1, background: "#1e1e1e", margin: "36px 0" }} />
 
-            {/* Venue row */}
-            <div style={{ display: "flex", alignItems: "center", gap: 36 }}>
-              <svg width="60" height="60" viewBox="0 0 24 24" fill={ORANGE} style={{ flexShrink: 0 }}>
+            {/* Venue */}
+            <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
+              <svg width="56" height="56" viewBox="0 0 24 24" fill={ORANGE} style={{ flexShrink: 0 }}>
                 <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
               </svg>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <span style={{ fontSize: 24, color: ORANGE, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em" }}>Venue</span>
-                <span style={{ fontSize: 38, color: WHITE, fontWeight: 700, lineHeight: 1.2 }}>{venue}</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <span style={{ fontSize: 22, color: ORANGE, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em" }}>Venue</span>
+                <span style={{ fontSize: 40, color: WHITE, fontWeight: 700, lineHeight: 1.2 }}>{venue}</span>
               </div>
             </div>
+
           </div>
 
-          {/* ── 4. Registration URL ── */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 26, color: "#888888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.14em" }}>Register Now</span>
-            <span style={{ fontSize: 44, color: WHITE, fontWeight: 800 }}>connectedsteps.in</span>
-          </div>
+          <div style={{ flexGrow: 1 }} />
 
-          {/* ── 5. CTA button ── */}
-          <div style={{ display: "flex", background: ORANGE, borderRadius: 20, padding: "42px 0", width: "100%", justifyContent: "center" }}>
-            <span style={{ fontSize: 52, fontWeight: 900, color: WHITE, textTransform: "uppercase", letterSpacing: "0.05em" }}>Join the Run</span>
-          </div>
-
-          {/* ── 6. Footer ── */}
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <span style={{ fontSize: 22, color: "#555555", fontWeight: 600, letterSpacing: "0.06em" }}>Connected Steps</span>
-            <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#555555" }} />
-            <span style={{ fontSize: 22, color: "#555555" }}>Your Goal. Our Plan.</span>
+          {/* ── 4. CTA ── */}
+          <div style={{ display: "flex", background: ORANGE, borderRadius: 22, padding: "48px 0", width: "100%", justifyContent: "center", alignItems: "center" }}>
+            <span style={{ fontSize: 56, fontWeight: 900, color: WHITE, textTransform: "uppercase", letterSpacing: "0.06em" }}>Join the Run</span>
           </div>
 
         </div>
