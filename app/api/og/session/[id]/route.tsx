@@ -22,13 +22,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const W = isStory ? 1080 : 1200;
   const H = isStory ? 1920 : 630;
 
-  // Fetch session
+  // Fetch session — with timeout so crawlers never hang
   const db = getSupabaseServer();
-  const { data: session } = await db
-    .from("sessions")
-    .select("title, date, time, venue, location, photo_url")
-    .eq("id", id)
-    .single();
+  const { data: session } = await Promise.race([
+    db.from("sessions").select("title, date, time, venue, location, photo_url").eq("id", id).single(),
+    new Promise<{ data: null }>(resolve => setTimeout(() => resolve({ data: null }), 4000)),
+  ]) as { data: { title: string; date: string; time: string | null; venue: string | null; location: string; photo_url: string | null } | null };
 
   const title    = session?.title      ?? "Training Session";
   const venue    = session?.venue      ?? session?.location ?? "Hyderabad";
@@ -103,7 +102,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           <div style={{ width: "100%", height: 12, background: "#e8620a", flexShrink: 0 }} />
         </div>
       ),
-      { width: W, height: H }
+      { width: W, height: H, headers: { "Cache-Control": "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400" } }
     );
   }
 
@@ -177,6 +176,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 5, background: "#e8620a" }} />
       </div>
     ),
-    { width: W, height: H }
+    { width: W, height: H, headers: { "Cache-Control": "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400" } }
   );
 }
