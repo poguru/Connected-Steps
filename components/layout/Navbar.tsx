@@ -49,7 +49,7 @@ export default function Navbar() {
         </Link>
 
         {/* Desktop nav */}
-        <nav style={{ display: "flex", alignItems: "center", gap: 4 }} className="hidden lg:flex">
+        <nav style={{ alignItems: "center", gap: 4 }} className="hidden lg:flex">
           {nav.map((n) => {
             const active = pathname === n.href;
             return (
@@ -70,7 +70,7 @@ export default function Navbar() {
         </nav>
 
         {/* Desktop CTA */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }} className="hidden lg:flex">
+        <div style={{ alignItems: "center", gap: 8 }} className="hidden lg:flex">
           {authed ? (
             <Link href="/dashboard" style={{
               padding: "10px 20px", borderRadius: 999,
