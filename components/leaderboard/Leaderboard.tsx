@@ -207,7 +207,17 @@ export default function Leaderboard() {
                       </div>
                     </div>
                     <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--foreground)", textAlign: "center" }}>{r.user_name.split(" ")[0]}</div>
-                    <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginBottom: 16 }}>📍 {r.location}</div>
+                    <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginBottom: 8 }}>📍 {r.location}</div>
+                    {r.user_email !== user.email && (
+                      <button onClick={() => toggleFollow(r.user_email)} disabled={followBusy.has(r.user_email)}
+                        style={{ marginBottom: 8, padding: "4px 14px", borderRadius: 999, fontSize: 11, fontWeight: 600, cursor: followBusy.has(r.user_email) ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", border: "1px solid", transition: "all 0.15s", opacity: followBusy.has(r.user_email) ? 0.6 : 1,
+                          background:  followingSet.has(r.user_email) ? "transparent" : "var(--gradient-accent)",
+                          color:       followingSet.has(r.user_email) ? "var(--muted-foreground)" : "var(--accent-foreground)",
+                          borderColor: followingSet.has(r.user_email) ? "var(--border)" : "transparent",
+                        }}>
+                        {followBusy.has(r.user_email) ? "…" : followingSet.has(r.user_email) ? "Following" : "Follow"}
+                      </button>
+                    )}
                     <div style={{ width: "100%", height: heightMap[i], position: "relative", overflow: "hidden", borderRadius: "12px 12px 0 0", border: "1px solid var(--border)", background: "var(--surface)", padding: 12, textAlign: "center" }}>
                       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: `linear-gradient(90deg, ${gradient})` }} />
                       <Icon size={20} style={{ margin: "8px auto 4px", display: "block", color: "var(--accent)" }} />

@@ -13,6 +13,7 @@ import AskCoachFab from "@/components/ui/AskCoachFab";
 import DashboardHero from "@/components/dashboard/DashboardHero";
 import SessionPhotos from "@/components/dashboard/SessionPhotos";
 import FollowerFeed from "@/components/dashboard/FollowerFeed";
+import PeopleYouMayKnow from "@/components/dashboard/PeopleYouMayKnow";
 
 interface SessionRecord {
   attended:      boolean;
@@ -354,6 +355,9 @@ export default function Dashboard() {
   const [pushEnabled,    setPushEnabled]    = useState(false);
   const [pushSupported,  setPushSupported]  = useState(false);
   const [followCounts,   setFollowCounts]   = useState<{ followers: number; following: number } | null>(null);
+  const [followModal,    setFollowModal]    = useState<"followers" | "following" | null>(null);
+  const [followModalUsers, setFollowModalUsers] = useState<{ email: string; name: string }[]>([]);
+  const [followModalLoading, setFollowModalLoading] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem("cs_user");
@@ -524,6 +528,18 @@ export default function Dashboard() {
     }
   }
 
+  async function openFollowModal(type: "followers" | "following") {
+    if (!user) return;
+    setFollowModal(type);
+    setFollowModalLoading(true);
+    setFollowModalUsers([]);
+    try {
+      const res  = await fetch(`/api/follow?email=${encodeURIComponent(user.email)}&type=${type}`);
+      const data = await res.json();
+      setFollowModalUsers(data.users ?? []);
+    } finally { setFollowModalLoading(false); }
+  }
+
   const syncToLeaderboard = useCallback(async (user: User, acts: Activity[]) => {
     const monthStart = new Date();
     monthStart.setDate(1);
@@ -668,15 +684,14 @@ export default function Dashboard() {
 
             {followCounts !== null && (
               <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "1rem", display: "flex", justifyContent: "center", gap: "2rem", marginBottom: user.location ? "1rem" : 0 }}>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--cs-white)" }}>{followCounts.followers}</div>
-                  <div style={{ fontSize: "9px", color: "var(--cs-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Followers</div>
-                </div>
-                <div style={{ width: "1px", background: "rgba(255,255,255,0.06)" }} />
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--cs-white)" }}>{followCounts.following}</div>
-                  <div style={{ fontSize: "9px", color: "var(--cs-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Following</div>
-                </div>
+                {(["followers", "following"] as const).map((type, i) => (
+                  <button key={type} onClick={() => openFollowModal(type)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "center" }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity = "0.7"}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity = "1"}>
+                    <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--cs-white)" }}>{type === "followers" ? followCounts.followers : followCounts.following}</div>
+                    <div style={{ fontSize: "9px", color: "var(--cs-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{type}</div>
+                  </button>
+                )).reduce<React.ReactNode[]>((acc, el, i) => i === 0 ? [el] : [...acc, <div key="div" style={{ width: "1px", background: "rgba(255,255,255,0.06)" }} />, el], [])}
               </div>
             )}
 
@@ -879,6 +894,9 @@ export default function Dashboard() {
         {/* ── Right sidebar ── */}
         <aside className="cs-db-right">
 
+          {/* People you may know */}
+          <PeopleYouMayKnow userEmail={user.email} />
+
           {/* Training Plan */}
           <div id="training-plan">
             <TrainingPlan goal={user.goal} email={user.email} />
@@ -949,6 +967,39 @@ export default function Dashboard() {
       </div>
 
       <AskCoachFab />
+
+      {/* Followers / Following modal */}
+      {followModal && (
+        <div onClick={() => setFollowModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "var(--surface)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-md)" }}>
+            <div style={{ padding: "1rem 1.25rem", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--cs-white)", textTransform: "capitalize" }}>{followModal}</span>
+              <button onClick={() => setFollowModal(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "var(--cs-muted)", padding: 0 }}>✕</button>
+            </div>
+            <div style={{ maxHeight: "60vh", overflowY: "auto" }}>
+              {followModalLoading ? (
+                <div style={{ padding: "2rem", textAlign: "center", fontSize: "0.82rem", color: "var(--cs-muted)" }}>Loading…</div>
+              ) : followModalUsers.length === 0 ? (
+                <div style={{ padding: "2rem", textAlign: "center", fontSize: "0.82rem", color: "var(--cs-muted)" }}>
+                  {followModal === "followers" ? "No followers yet. Share your profile to get followers!" : "You're not following anyone yet. Check the leaderboard to find runners!"}
+                </div>
+              ) : (
+                followModalUsers.map((u, i) => (
+                  <div key={u.email} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.75rem 1.25rem", borderTop: i > 0 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: "oklch(0.72 0.19 49 / 15%)", border: "1px solid oklch(0.72 0.19 49 / 25%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem", fontWeight: 700, color: "var(--cs-orange)", flexShrink: 0 }}>
+                      {u.name[0]?.toUpperCase() ?? "?"}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--cs-white)" }}>{u.name}</div>
+                      <div style={{ fontSize: "0.72rem", color: "var(--cs-muted)" }}>{u.email}</div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
