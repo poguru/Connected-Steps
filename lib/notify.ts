@@ -3,7 +3,7 @@
  * NOTIFICATIONS_PAUSED = true disables all outbound alerts temporarily.
  * Set to false when MSG91 templates are approved and ready to go live.
  */
-const NOTIFICATIONS_PAUSED = true;
+const NOTIFICATIONS_PAUSED = false;
 
 // ── Phone normalisation (Indian numbers → 91XXXXXXXXXX, no +) ────────────────
 
@@ -150,35 +150,37 @@ export async function sendEmail(
   html: string
 ): Promise<NotifyResult> {
   if (NOTIFICATIONS_PAUSED) return { to, channel: "email", ok: true };
-  const authKey   = process.env.MSG91_AUTH_KEY;
-  const fromEmail = process.env.MSG91_FROM_EMAIL ?? "noreply@connectedsteps.in";
-  const fromName  = process.env.MSG91_FROM_NAME  ?? "Connected Steps";
 
-  if (!authKey) {
-    return { to, channel: "email", ok: false, error: "MSG91 not configured." };
+  const apiKey    = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.RESEND_FROM_EMAIL ?? "noreply@connectedsteps.in";
+
+  if (!apiKey) {
+    return { to, channel: "email", ok: false, error: "Resend API key not configured." };
   }
 
-  const body = {
-    from:    { name: fromName, email: fromEmail },
-    to:      [{ name: toName, email: to }],
-    subject,
-    html,
-  };
-
   try {
-    const res = await fetch("https://api.msg91.com/api/v5/email/send", {
+    const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
-      headers: { authkey: authKey, "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: `Connected Steps <${fromEmail}>`, to: [to], subject, html }),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.type === "error") {
+    if (!res.ok) {
       return { to, channel: "email", ok: false, error: data.message ?? String(res.status) };
     }
     return { to, channel: "email", ok: true };
   } catch (e: unknown) {
     return { to, channel: "email", ok: false, error: String(e) };
   }
+}
+
+// ── WhatsApp OTP ──────────────────────────────────────────────────────────────
+// Requires a MSG91 WhatsApp template named "otp_verification" (or MSG91_OTP_TEMPLATE env):
+//   Body: Hi {{1}}, your Connected Steps OTP is *{{2}}*. Valid for 10 minutes. Do not share with anyone.
+
+export async function sendWhatsAppOTP(phone: string, name: string, code: string): Promise<NotifyResult> {
+  const template = process.env.MSG91_OTP_TEMPLATE ?? "otp_verification";
+  return sendWhatsApp(phone, [name, code], template);
 }
 
 // ── Message builders ──────────────────────────────────────────────────────────

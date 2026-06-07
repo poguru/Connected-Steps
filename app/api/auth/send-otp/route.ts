@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { sendEmail, sendSMS } from "@/lib/notify";
+import { sendEmail, sendWhatsAppOTP } from "@/lib/notify";
 
 function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -21,7 +21,7 @@ function otpEmailHTML(name: string, code: string): string {
       <tr><td style="height:3px;background:#e8620a;"></td></tr>
       <tr><td style="padding:40px;">
         <p style="margin:0 0 8px;font-size:15px;color:#444;">Hi <strong>${name}</strong>,</p>
-        <p style="margin:0 0 28px;font-size:14px;color:#666;line-height:1.6;">Use the code below to verify your email address. It expires in 30 minutes.</p>
+        <p style="margin:0 0 28px;font-size:14px;color:#666;line-height:1.6;">Use the code below to verify your email address. It expires in 10 minutes.</p>
         <div style="text-align:center;margin:0 0 32px;">
           <div style="display:inline-block;background:#0a0a0a;border-radius:10px;padding:20px 40px;">
             <div style="font-size:36px;font-weight:800;color:#e8620a;letter-spacing:0.25em;">${code}</div>
@@ -38,25 +38,43 @@ function otpEmailHTML(name: string, code: string): string {
 </body></html>`;
 }
 
+// POST /api/auth/send-otp
+// Body: { type: "email" | "phone", value: string, name?: string, purpose: "register" | "login" }
+// purpose "register" → rejects if already registered
+// purpose "login"    → rejects if no account found
 export async function POST(req: NextRequest) {
   try {
-    const { type, value, name } = await req.json();
+    const { type, value, name, purpose = "register" } = await req.json();
+
     if (!type || !value) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    if (type !== "email" && type !== "phone") return NextResponse.json({ error: "Invalid type" }, { status: 400 });
 
     const db = getSupabaseServer();
-    const identifier = type === "email" ? (value as string).toLowerCase() : value;
+    const identifier = type === "email" ? (value as string).toLowerCase().trim() : (value as string).trim();
 
-    // Check duplicate email early
+    // ── Existence check ───────────────────────────────────────────────────────
     if (type === "email") {
-      const { data: existing } = await db
-        .from("users").select("id").eq("email", identifier).single();
-      if (existing) return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
+      const { data: existing } = await db.from("users").select("id").eq("email", identifier).single();
+      if (purpose === "register" && existing) {
+        return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
+      }
+      if (purpose === "login" && !existing) {
+        return NextResponse.json({ error: "No account found with this email." }, { status: 404 });
+      }
+    } else {
+      const { data: existing } = await db.from("users").select("id").eq("phone", identifier).single();
+      if (purpose === "register" && existing) {
+        return NextResponse.json({ error: "An account with this phone number already exists." }, { status: 409 });
+      }
+      if (purpose === "login" && !existing) {
+        return NextResponse.json({ error: "No account found with this phone number." }, { status: 404 });
+      }
     }
 
+    // ── Generate & store OTP ──────────────────────────────────────────────────
     const code      = generateOTP();
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 min
 
-    // Replace any existing OTP for this identifier+type
     await db.from("otp_verifications").delete().eq("identifier", identifier).eq("type", type);
     const { error: insertErr } = await db.from("otp_verifications").insert({
       identifier,
@@ -67,10 +85,17 @@ export async function POST(req: NextRequest) {
     });
     if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
 
+    // ── Send ──────────────────────────────────────────────────────────────────
+    const displayName = (name as string | undefined)?.trim() || "there";
     if (type === "email") {
-      await sendEmail(value, name || "there", "Your Connected Steps verification code", otpEmailHTML(name || "there", code));
+      await sendEmail(
+        identifier,
+        displayName,
+        "Your Connected Steps verification code",
+        otpEmailHTML(displayName, code)
+      );
     } else {
-      await sendSMS(value, `Your Connected Steps OTP is ${code}. Valid for 30 minutes. Do not share with anyone.`);
+      await sendWhatsAppOTP(identifier, displayName, code);
     }
 
     return NextResponse.json({ success: true });

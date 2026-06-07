@@ -3,7 +3,7 @@
 import { useState, useRef, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Eye, EyeOff, Camera } from "lucide-react";
+import { Eye, EyeOff, Camera, CheckCircle2 } from "lucide-react";
 
 const GOALS = [
   { id: "5k",       label: "First 5K"            },
@@ -30,66 +30,264 @@ const focusHandlers = {
   onBlur:  (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => { e.currentTarget.style.borderColor = "var(--border)";  e.currentTarget.style.boxShadow = "none"; },
 };
 
+type Step = "email" | "email-otp" | "phone" | "phone-otp" | "details";
+
 interface Props { onSwitchToLogin: () => void; }
 
 export default function SignUpForm({ onSwitchToLogin }: Props) {
   const router  = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phone: "", dob: "", password: "", confirm: "" });
+
+  const [step,          setStep]          = useState<Step>("email");
+  const [email,         setEmail]         = useState("");
+  const [emailOtp,      setEmailOtp]      = useState("");
+  const [phone,         setPhone]         = useState("");
+  const [phoneOtp,      setPhoneOtp]      = useState("");
+  const [sending,       setSending]       = useState(false);
+  const [verifying,     setVerifying]     = useState(false);
+  const [otpError,      setOtpError]      = useState("");
+
+  const [form, setForm]       = useState({ firstName: "", lastName: "", dob: "", password: "", confirm: "" });
   const [goal,      setGoal]      = useState("5k");
   const [location,  setLocation]  = useState("");
   const [customLoc, setCustomLoc] = useState("");
   const [photo,     setPhoto]     = useState<string | null>(null);
   const [showPw,    setShowPw]    = useState(false);
-  const [loading,   setLoading]   = useState(false);
-  const [error,     setError]     = useState("");
+  const [submitting,setSubmitting]= useState(false);
+  const [formError, setFormError] = useState("");
 
-  const handleChange = (e: ChangeEvent<HTMLInputElement>) => { setForm(p => ({ ...p, [e.target.name]: e.target.value })); setError(""); };
-  const handlePhoto  = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFormChange = (e: ChangeEvent<HTMLInputElement>) => { setForm(p => ({ ...p, [e.target.name]: e.target.value })); setFormError(""); };
+  const handlePhoto = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = () => setPhoto(reader.result as string);
     reader.readAsDataURL(file);
   };
 
-  const validate = () => {
-    if (!form.firstName || !form.lastName) return "Please enter your full name.";
-    if (!form.email)     return "Please enter your email.";
-    if (!form.phone)     return "Please enter your phone number.";
-    if (form.password.length < 8)          return "Password must be at least 8 characters.";
-    if (form.password !== form.confirm)    return "Passwords do not match.";
-    if (!form.dob)       return "Please enter your date of birth.";
-    if (!goal)           return "Please select your running goal.";
-    if (!location)       return "Please select your training location.";
-    if (location === "Others" && !customLoc.trim()) return "Please enter your training location.";
-    return null;
-  };
+  // ── Step progress ─────────────────────────────────────────────────────────
+  const stepIndex = ["email", "email-otp", "phone", "phone-otp", "details"].indexOf(step);
+  const progress  = Math.round(((stepIndex + 1) / 5) * 100);
 
-  const handleSubmit = async (e: { preventDefault(): void }) => {
+  // ── Send OTP ──────────────────────────────────────────────────────────────
+  async function sendOtp(type: "email" | "phone", value: string, isResend = false) {
+    setSending(true); setOtpError("");
+    try {
+      const res  = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, value, purpose: "register" }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setOtpError(data.error ?? "Failed to send OTP."); return false; }
+      if (!isResend) setStep(type === "email" ? "email-otp" : "phone-otp");
+      return true;
+    } catch { setOtpError("Network error. Please try again."); return false; }
+    finally { setSending(false); }
+  }
+
+  // ── Verify OTP ────────────────────────────────────────────────────────────
+  async function verifyOtp(type: "email" | "phone", value: string, code: string) {
+    setVerifying(true); setOtpError("");
+    try {
+      const res  = await fetch("/api/auth/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, value, code }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setOtpError(data.error ?? "Verification failed."); return false; }
+      return true;
+    } catch { setOtpError("Network error. Please try again."); return false; }
+    finally { setVerifying(false); }
+  }
+
+  // ── Submit registration ───────────────────────────────────────────────────
+  async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
-    const err = validate(); if (err) { setError(err); return; }
-    setLoading(true);
+    if (!form.firstName || !form.lastName) { setFormError("Please enter your full name."); return; }
+    if (form.password.length < 8)          { setFormError("Password must be at least 8 characters."); return; }
+    if (form.password !== form.confirm)    { setFormError("Passwords do not match."); return; }
+    if (!form.dob)                         { setFormError("Please enter your date of birth."); return; }
+    if (!location)                         { setFormError("Please select your training location."); return; }
+    if (location === "Others" && !customLoc.trim()) { setFormError("Please enter your training location."); return; }
+
+    setSubmitting(true);
     try {
       const finalLocation = location === "Others" ? customLoc : location;
-      const res  = await fetch("/api/auth/register", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ firstName: form.firstName, lastName: form.lastName, email: form.email, phone: form.phone, password: form.password, goal, location: finalLocation }) });
+      const res  = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ firstName: form.firstName, lastName: form.lastName, email, phone, password: form.password, goal, location: finalLocation, dob: form.dob }),
+      });
       const data = await res.json();
-      if (!res.ok) { setError(data.error); return; }
+      if (!res.ok) { setFormError(data.error ?? "Registration failed."); return; }
       localStorage.setItem("cs_pending_photo", photo ?? "");
       router.push("/auth?tab=login&registered=true");
-    } catch (e: unknown) { setError("Network error: " + (e instanceof Error ? e.message : String(e))); }
-    finally { setLoading(false); }
-  };
+    } catch { setFormError("Network error. Please try again."); }
+    finally { setSubmitting(false); }
+  }
 
+  // ── Shared OTP input block ────────────────────────────────────────────────
+  function OtpBlock({
+    label, onVerify, onResend, code, setCode,
+  }: { label: string; onVerify: () => void; onResend: () => void; code: string; setCode: (v: string) => void }) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <p style={{ margin: 0, fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.6 }}>{label}</p>
+        <input
+          style={{ ...inputStyle, fontSize: 22, letterSpacing: "0.3em", textAlign: "center", fontWeight: 700 }}
+          type="text" inputMode="numeric" maxLength={6} placeholder="——————"
+          value={code} onChange={e => { setCode(e.target.value.replace(/\D/g, "").slice(0, 6)); setOtpError(""); }}
+          {...focusHandlers}
+        />
+        {otpError && <div style={{ background: "oklch(0.62 0.22 22 / 10%)", border: "1px solid oklch(0.62 0.22 22 / 30%)", borderRadius: 8, padding: "10px 14px", fontSize: "0.8rem", color: "#f09595", textAlign: "center" }}>{otpError}</div>}
+        <button
+          type="button" onClick={onVerify} disabled={verifying || code.length !== 6}
+          style={{ width: "100%", padding: "13px", borderRadius: 999, background: code.length === 6 ? "var(--gradient-accent)" : "oklch(0.72 0.19 49 / 30%)", color: "var(--accent-foreground)", border: "none", cursor: code.length === 6 ? "pointer" : "not-allowed", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem" }}
+        >
+          {verifying ? "Verifying…" : "Verify →"}
+        </button>
+        <button type="button" onClick={onResend} disabled={sending} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--muted-foreground)", fontFamily: "var(--font-body)", textDecoration: "underline" }}>
+          {sending ? "Sending…" : "Resend OTP"}
+        </button>
+      </div>
+    );
+  }
+
+  // ── Progress bar ──────────────────────────────────────────────────────────
+  const ProgressBar = () => (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+        {["Email", "Phone", "Details"].map((label, i) => {
+          const done = (i === 0 && stepIndex >= 2) || (i === 1 && stepIndex >= 4) || (i === 2 && false);
+          const active = (i === 0 && stepIndex < 2) || (i === 1 && stepIndex >= 2 && stepIndex < 4) || (i === 2 && stepIndex >= 4);
+          return (
+            <div key={label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: done || active ? "var(--primary)" : "var(--muted-foreground)", fontWeight: done || active ? 600 : 400 }}>
+              {done ? <CheckCircle2 size={13} /> : <span style={{ width: 13, height: 13, borderRadius: "50%", border: `1.5px solid ${active ? "var(--primary)" : "var(--border)"}`, display: "inline-block" }} />}
+              {label}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ height: 3, borderRadius: 99, background: "var(--border)" }}>
+        <div style={{ height: "100%", borderRadius: 99, background: "var(--gradient-accent)", width: `${progress}%`, transition: "width 0.3s ease" }} />
+      </div>
+    </div>
+  );
+
+  // ══ STEP: email ══════════════════════════════════════════════════════════
+  if (step === "email") return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <ProgressBar />
+      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Step 1 — Verify your email</p>
+      <input
+        style={inputStyle} type="email" placeholder="Email address"
+        value={email} onChange={e => { setEmail(e.target.value); setOtpError(""); }}
+        autoComplete="email" {...focusHandlers}
+      />
+      {otpError && <div style={{ background: "oklch(0.62 0.22 22 / 10%)", border: "1px solid oklch(0.62 0.22 22 / 30%)", borderRadius: 8, padding: "10px 14px", fontSize: "0.8rem", color: "#f09595", textAlign: "center" }}>{otpError}</div>}
+      <button
+        type="button" onClick={() => sendOtp("email", email)}
+        disabled={sending || !email.includes("@")}
+        style={{ width: "100%", padding: "13px", borderRadius: 999, background: email.includes("@") ? "var(--gradient-accent)" : "oklch(0.72 0.19 49 / 30%)", color: "var(--accent-foreground)", border: "none", cursor: email.includes("@") ? "pointer" : "not-allowed", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem", boxShadow: email.includes("@") ? "var(--shadow-orange)" : "none" }}
+      >
+        {sending ? "Sending…" : "Send OTP to Email →"}
+      </button>
+    </div>
+  );
+
+  // ══ STEP: email-otp ══════════════════════════════════════════════════════
+  if (step === "email-otp") return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <ProgressBar />
+      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Step 1 — Verify your email</p>
+      <OtpBlock
+        label={`OTP sent to ${email}. Check your inbox.`}
+        code={emailOtp} setCode={setEmailOtp}
+        onVerify={async () => {
+          const ok = await verifyOtp("email", email, emailOtp);
+          if (ok) { setEmailOtp(""); setStep("phone"); }
+        }}
+        onResend={() => sendOtp("email", email, true)}
+      />
+      <button type="button" onClick={() => { setStep("email"); setOtpError(""); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--muted-foreground)", fontFamily: "var(--font-body)" }}>
+        ← Change email
+      </button>
+    </div>
+  );
+
+  // ══ STEP: phone ══════════════════════════════════════════════════════════
+  if (step === "phone") return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <ProgressBar />
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+        <CheckCircle2 size={14} style={{ color: "var(--primary)", flexShrink: 0 }} />
+        <span style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600 }}>Email verified: {email}</span>
+      </div>
+      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Step 2 — Verify your WhatsApp number</p>
+      <input
+        style={inputStyle} type="tel" placeholder="Phone number (e.g. 9876543210)"
+        value={phone} onChange={e => { setPhone(e.target.value); setOtpError(""); }}
+        autoComplete="tel" {...focusHandlers}
+      />
+      {otpError && <div style={{ background: "oklch(0.62 0.22 22 / 10%)", border: "1px solid oklch(0.62 0.22 22 / 30%)", borderRadius: 8, padding: "10px 14px", fontSize: "0.8rem", color: "#f09595", textAlign: "center" }}>{otpError}</div>}
+      <button
+        type="button" onClick={() => sendOtp("phone", phone)}
+        disabled={sending || phone.replace(/\D/g, "").length < 10}
+        style={{ width: "100%", padding: "13px", borderRadius: 999, background: phone.replace(/\D/g, "").length >= 10 ? "var(--gradient-accent)" : "oklch(0.72 0.19 49 / 30%)", color: "var(--accent-foreground)", border: "none", cursor: phone.replace(/\D/g, "").length >= 10 ? "pointer" : "not-allowed", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem", boxShadow: phone.replace(/\D/g, "").length >= 10 ? "var(--shadow-orange)" : "none" }}
+      >
+        {sending ? "Sending…" : "Send OTP to WhatsApp →"}
+      </button>
+    </div>
+  );
+
+  // ══ STEP: phone-otp ══════════════════════════════════════════════════════
+  if (step === "phone-otp") return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <ProgressBar />
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+        <CheckCircle2 size={14} style={{ color: "var(--primary)", flexShrink: 0 }} />
+        <span style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600 }}>Email verified: {email}</span>
+      </div>
+      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Step 2 — Verify your WhatsApp number</p>
+      <OtpBlock
+        label={`OTP sent to WhatsApp ${phone}. Check your messages.`}
+        code={phoneOtp} setCode={setPhoneOtp}
+        onVerify={async () => {
+          const ok = await verifyOtp("phone", phone, phoneOtp);
+          if (ok) { setPhoneOtp(""); setStep("details"); }
+        }}
+        onResend={() => sendOtp("phone", phone, true)}
+      />
+      <button type="button" onClick={() => { setStep("phone"); setOtpError(""); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--muted-foreground)", fontFamily: "var(--font-body)" }}>
+        ← Change number
+      </button>
+    </div>
+  );
+
+  // ══ STEP: details ════════════════════════════════════════════════════════
   return (
     <form onSubmit={handleSubmit} noValidate style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <ProgressBar />
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--primary)" }}>
+          <CheckCircle2 size={12} /> {email}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--primary)" }}>
+          <CheckCircle2 size={12} /> {phone}
+        </div>
+      </div>
+
+      <p style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Step 3 — Your details</p>
 
       {/* Photo */}
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 8 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 4 }}>
         <button type="button" onClick={() => fileRef.current?.click()}
-          style={{ position: "relative", width: 72, height: 72, borderRadius: "50%", overflow: "hidden", border: "2px dashed oklch(0.72 0.19 49 / 50%)", background: "oklch(0.72 0.19 49 / 8%)", cursor: "pointer", marginBottom: 8 }}>
+          style={{ position: "relative", width: 64, height: 64, borderRadius: "50%", overflow: "hidden", border: "2px dashed oklch(0.72 0.19 49 / 50%)", background: "oklch(0.72 0.19 49 / 8%)", cursor: "pointer", marginBottom: 4 }}>
           {photo ? <Image src={photo} alt="Profile" fill className="object-cover" /> : (
             <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--primary)" }}>
-              <Camera size={24} />
+              <Camera size={20} />
             </div>
           )}
         </button>
@@ -97,35 +295,33 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
         <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>{photo ? "Change photo" : "Add profile photo (optional)"}</span>
       </div>
 
-      {/* Name row */}
+      {/* Name */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        <input style={inputStyle} name="firstName" type="text" placeholder="First name" value={form.firstName} onChange={handleChange} autoComplete="given-name" {...focusHandlers} />
-        <input style={inputStyle} name="lastName"  type="text" placeholder="Last name"  value={form.lastName}  onChange={handleChange} autoComplete="family-name" {...focusHandlers} />
+        <input style={inputStyle} name="firstName" type="text" placeholder="First name" value={form.firstName} onChange={handleFormChange} autoComplete="given-name" {...focusHandlers} />
+        <input style={inputStyle} name="lastName"  type="text" placeholder="Last name"  value={form.lastName}  onChange={handleFormChange} autoComplete="family-name" {...focusHandlers} />
       </div>
 
-      <input style={inputStyle} name="email" type="email" placeholder="Email address" value={form.email} onChange={handleChange} autoComplete="email" {...focusHandlers} />
-      <input style={inputStyle} name="phone" type="tel"   placeholder="Phone number"  value={form.phone} onChange={handleChange} autoComplete="tel"   {...focusHandlers} />
-
+      {/* DOB */}
       <div>
         <label style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5 }}>Date of Birth</label>
-        <input style={{ ...inputStyle, colorScheme: "dark" }} name="dob" type="date" value={form.dob} onChange={handleChange} {...focusHandlers} />
+        <input style={{ ...inputStyle, colorScheme: "dark" }} name="dob" type="date" value={form.dob} onChange={handleFormChange} {...focusHandlers} />
       </div>
 
       {/* Password */}
       <div style={{ position: "relative" }}>
         <input style={{ ...inputStyle, paddingRight: 44 }} name="password" type={showPw ? "text" : "password"}
-          placeholder="Password (min 8 chars)" value={form.password} onChange={handleChange} autoComplete="new-password" {...focusHandlers} />
+          placeholder="Password (min 8 chars)" value={form.password} onChange={handleFormChange} autoComplete="new-password" {...focusHandlers} />
         <button type="button" onClick={() => setShowPw(!showPw)}
           style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--muted-foreground)", display: "flex", padding: 0 }}>
           {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
         </button>
       </div>
-      <input style={inputStyle} name="confirm" type={showPw ? "text" : "password"} placeholder="Confirm password" value={form.confirm} onChange={handleChange} autoComplete="new-password" {...focusHandlers} />
+      <input style={inputStyle} name="confirm" type={showPw ? "text" : "password"} placeholder="Confirm password" value={form.confirm} onChange={handleFormChange} autoComplete="new-password" {...focusHandlers} />
 
       {/* Goal */}
       <div>
         <label style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5 }}>Running goal</label>
-        <select value={goal} onChange={e => setGoal(e.target.value)} style={{ ...inputStyle, cursor: "pointer", colorScheme: "dark" }} onFocus={focusHandlers.onFocus as any} onBlur={focusHandlers.onBlur as any}>
+        <select value={goal} onChange={e => setGoal(e.target.value)} style={{ ...inputStyle, cursor: "pointer", colorScheme: "dark" }} onFocus={focusHandlers.onFocus as never} onBlur={focusHandlers.onBlur as never}>
           {GOALS.map(g => <option key={g.id} value={g.id} style={{ background: "#1a1a1a" }}>{g.label}</option>)}
         </select>
       </div>
@@ -133,7 +329,7 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
       {/* Location */}
       <div>
         <label style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5 }}>Training location</label>
-        <select value={location} onChange={e => setLocation(e.target.value)} style={{ ...inputStyle, cursor: "pointer", colorScheme: "dark" }} onFocus={focusHandlers.onFocus as any} onBlur={focusHandlers.onBlur as any}>
+        <select value={location} onChange={e => setLocation(e.target.value)} style={{ ...inputStyle, cursor: "pointer", colorScheme: "dark" }} onFocus={focusHandlers.onFocus as never} onBlur={focusHandlers.onBlur as never}>
           <option value="">Select a location</option>
           {["Kondapur", "Kukatpally", "Kokapet", "Miyapur", "Others"].map(loc => <option key={loc} value={loc} style={{ background: "#1a1a1a" }}>{loc}</option>)}
         </select>
@@ -146,21 +342,21 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
         By signing up you agree to our <span style={{ color: "var(--foreground)" }}>Terms</span>, <span style={{ color: "var(--foreground)" }}>Privacy Policy</span> and <span style={{ color: "var(--foreground)" }}>Cookie Policy</span>.
       </p>
 
-      {error && (
+      {formError && (
         <div style={{ background: "oklch(0.62 0.22 22 / 10%)", border: "1px solid oklch(0.62 0.22 22 / 30%)", borderRadius: 8, padding: "10px 14px", fontSize: "0.8rem", color: "#f09595", textAlign: "center" }}>
-          {error}
+          {formError}
         </div>
       )}
 
-      <button type="submit" disabled={loading} style={{
+      <button type="submit" disabled={submitting} style={{
         width: "100%", padding: "13px", borderRadius: 999,
-        background: loading ? "oklch(0.72 0.19 49 / 60%)" : "var(--gradient-accent)",
+        background: submitting ? "oklch(0.72 0.19 49 / 60%)" : "var(--gradient-accent)",
         color: "var(--accent-foreground)", border: "none",
-        cursor: loading ? "not-allowed" : "pointer",
+        cursor: submitting ? "not-allowed" : "pointer",
         fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem",
-        boxShadow: loading ? "none" : "var(--shadow-orange)",
+        boxShadow: submitting ? "none" : "var(--shadow-orange)",
       }}>
-        {loading ? "Creating account…" : "Create account"}
+        {submitting ? "Creating account…" : "Create account"}
       </button>
     </form>
   );
