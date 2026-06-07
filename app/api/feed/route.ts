@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     // Fetch recent attended sessions from followed users
     const { data: sessions } = await db
       .from("session_attendance")
-      .select("user_email, user_name, attended, sessions(id, title, date, venue)")
+      .select("user_email, user_name, attended, sessions(id, title, date, venue, photo_url)")
       .in("user_email", following)
       .eq("attended", true)
       .order("sessions(date)", { ascending: false })
@@ -49,14 +49,14 @@ export async function GET(req: NextRequest) {
 
     for (const s of sessions ?? []) {
       const sessRaw = s.sessions as unknown;
-      const sess    = (Array.isArray(sessRaw) ? sessRaw[0] : sessRaw) as { id: string; title: string; date: string; venue: string | null } | null;
+      const sess    = (Array.isArray(sessRaw) ? sessRaw[0] : sessRaw) as { id: string; title: string; date: string; venue: string | null; photo_url: string | null } | null;
       if (!sess) continue;
       events.push({
         id:          `session_${s.user_email}_${sess.id}`,
         actor_email: s.user_email,
         actor_name:  s.user_name ?? s.user_email.split("@")[0],
         event_type:  "session_attended",
-        payload:     { session_title: sess.title, session_date: sess.date, venue: sess.venue ?? "" },
+        payload:     { session_title: sess.title, session_date: sess.date, venue: sess.venue ?? "", photo_url: sess.photo_url ?? "" },
         created_at:  sess.date + "T06:00:00Z",
       });
     }
