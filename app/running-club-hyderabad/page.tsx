@@ -19,14 +19,14 @@ export default function RunningClubHyderabadPage() {
     <div style={{ minHeight: "100vh", background: "var(--cs-black)", color: "var(--cs-white)" }}>
 
       {/* Navbar */}
-      <header style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(8,28,45,0.97)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(56,189,248,0.08)", padding: "0 2rem", height: "64px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none" }}>
+      <header style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(8,28,45,0.97)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(56,189,248,0.08)", padding: "0 1.25rem", height: "64px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none", flexShrink: 0 }}>
           <Image src="/logo.png" alt="Connected Steps" width={36} height={36} className="rounded-full" />
-          <span style={{ fontSize: "1rem", fontWeight: 600, color: "var(--cs-white)" }}>Connected Steps</span>
+          <span style={{ fontSize: "1rem", fontWeight: 600, color: "var(--cs-white)", whiteSpace: "nowrap" }}>Connected Steps</span>
         </Link>
-        <div style={{ display: "flex", gap: "0.75rem" }}>
-          <Link href="/pricing" style={{ fontSize: "0.8rem", color: "var(--cs-orange)", textDecoration: "none", fontWeight: 600 }}>View pricing</Link>
-          <Link href="/auth" style={{ fontSize: "0.8rem", color: "var(--cs-muted)", textDecoration: "none", padding: "6px 14px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px" }}>Join free</Link>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexShrink: 0 }}>
+          <Link href="/pricing" className="hidden sm:block" style={{ fontSize: "0.8rem", color: "var(--cs-orange)", textDecoration: "none", fontWeight: 600 }}>View pricing</Link>
+          <Link href="/auth" style={{ fontSize: "0.8rem", color: "var(--cs-muted)", textDecoration: "none", padding: "6px 14px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", whiteSpace: "nowrap" }}>Join free</Link>
         </div>
       </header>
 
