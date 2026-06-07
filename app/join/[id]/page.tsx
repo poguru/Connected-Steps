@@ -14,17 +14,6 @@ async function getSession(id: string) {
   return data;
 }
 
-async function getLatestPhoto() {
-  const db = getSupabaseServer();
-  const { data } = await db
-    .from("sessions")
-    .select("photo_url")
-    .not("photo_url", "is", null)
-    .order("date", { ascending: false })
-    .limit(1)
-    .single();
-  return data?.photo_url ?? null;
-}
 
 export async function generateMetadata(
   { params }: { params: Promise<{ id: string }> }
@@ -41,14 +30,10 @@ export async function generateMetadata(
   });
   const timeStr  = session.time ? ` at ${session.time}` : "";
   const venue    = session.venue || session.location;
-  const photoUrl = session.photo_url ?? await getLatestPhoto();
   const title    = session.title;
-  const desc     = `📅 ${dateStr}${timeStr} · 📍 ${venue}. Tap to register for this training session.`;
+  const desc     = `📅 ${dateStr}${timeStr} · 📍 ${venue}. Join the Connected Steps community run.`;
   const pageUrl  = `${APP_URL}/join/${id}`;
-
-  const ogImages = photoUrl
-    ? [{ url: photoUrl, width: 1200, height: 630, alt: session.title }]
-    : [];
+  const ogImage  = `${APP_URL}/api/og/session/${id}`;
 
   return {
     title: `${title} – Connected Steps`,
@@ -58,14 +43,14 @@ export async function generateMetadata(
       description: desc,
       url:         pageUrl,
       siteName:    "Connected Steps",
-      images:      ogImages,
+      images:      [{ url: ogImage, width: 1200, height: 630, alt: title }],
       type:        "website",
     },
     twitter: {
-      card:        photoUrl ? "summary_large_image" : "summary",
+      card:        "summary_large_image",
       title,
       description: desc,
-      images:      photoUrl ? [photoUrl] : [],
+      images:      [ogImage],
     },
   };
 }
