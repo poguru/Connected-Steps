@@ -72,10 +72,6 @@ export default function SessionShareSheet({ session, onClose }: Props) {
     return new File([blob], `${session.title.replace(/\s+/g, "-")}-session.png`, { type: "image/png" });
   }
 
-  async function tryClipboardUrl() {
-    try { await navigator.clipboard.writeText(joinUrl); } catch { /* ignore */ }
-  }
-
   // ── Instagram ───────────────────────────────────────────────────────────────
   async function shareToInstagram() {
     setBusy(true);
@@ -99,11 +95,11 @@ export default function SessionShareSheet({ session, onClose }: Props) {
   }
 
   // ── WhatsApp ────────────────────────────────────────────────────────────────
-  // Strategy: share ONLY the image file via native share API (no text).
-  // This guarantees ONE WhatsApp message with the session poster.
-  // We also silently copy the registration URL so the user can paste it as a
-  // caption inside WhatsApp's compose view before sending.
-  // Fallback (desktop): wa.me with full caption — WhatsApp shows text + OG link preview.
+  // On mobile: navigator.share({ files: [image], text: caption }) opens the
+  // native share sheet. When the user picks WhatsApp, WhatsApp shows a compose
+  // view with the image attached and the caption pre-filled — ONE message.
+  // Fallback (desktop / no-file-share): wa.me URL with full caption — WhatsApp
+  // renders text + OG card preview as one message with the session details.
   async function shareToWhatsApp() {
     setBusy(true);
     try {
@@ -111,15 +107,11 @@ export default function SessionShareSheet({ session, onClose }: Props) {
       if (blob && typeof navigator !== "undefined" && navigator.share) {
         const file = makeFile(blob);
         if (navigator.canShare?.({ files: [file] })) {
-          // Copy the registration link silently — user can paste it as caption
-          await tryClipboardUrl();
-          await navigator.share({ files: [file] });
-          showToast("Registration link copied — paste it as a caption before sending.");
+          await navigator.share({ files: [file], text: caption });
           return;
         }
       }
-      // Desktop / no-file-share fallback: open wa.me with full caption
-      // (WhatsApp renders text + OG card preview as ONE message)
+      // Desktop / no-file-share fallback
       window.open(`https://wa.me/?text=${encodeURIComponent(caption)}`, "_blank");
     } catch (e) {
       if (e instanceof Error && e.name !== "AbortError") {
