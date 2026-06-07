@@ -5,177 +5,212 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 export const runtime = "edge";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+const ORANGE  = "#e8620a";
+const BLACK   = "#0a0a0a";
+const WHITE   = "#ffffff";
+const MUTED   = "#999999";
 
 function formatDate(date: string) {
   return new Date(date + "T12:00:00Z").toLocaleDateString("en-IN", {
-    weekday: "short", day: "numeric", month: "long", year: "numeric",
+    weekday: "long", day: "numeric", month: "long", year: "numeric",
   });
 }
 
-// GET /api/og/session/[id]          → 1200×630  Open Graph card
-// GET /api/og/session/[id]?format=story → 1080×1920 Instagram Story
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id }   = await params;
-  const format   = new URL(req.url).searchParams.get("format");
-  const isStory  = format === "story";
+async function fetchImageAsDataUrl(url: string): Promise<string | null> {
+  try {
+    const res = await Promise.race([
+      fetch(url),
+      new Promise<null>((_, reject) => setTimeout(() => reject(new Error("timeout")), 3000)),
+    ]) as Response;
+    if (!res.ok) return null;
+    const buf  = await res.arrayBuffer();
+    const mime = res.headers.get("content-type") ?? "image/jpeg";
+    const b64  = Buffer.from(buf).toString("base64");
+    return `data:${mime};base64,${b64}`;
+  } catch {
+    return null;
+  }
+}
 
+// GET /api/og/session/[id]               → 1200x630 Open Graph card
+// GET /api/og/session/[id]?format=story  → 1080x1920 Instagram Story
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id }  = await params;
+  const format  = new URL(req.url).searchParams.get("format");
+  const isStory = format === "story";
   const W = isStory ? 1080 : 1200;
   const H = isStory ? 1920 : 630;
 
-  // Fetch session — with timeout so crawlers never hang
+  // Fetch session data with timeout
   const db = getSupabaseServer();
-  const { data: session } = await Promise.race([
+  const sessionRes = await Promise.race([
     db.from("sessions").select("title, date, time, venue, location, photo_url").eq("id", id).single(),
     new Promise<{ data: null }>(resolve => setTimeout(() => resolve({ data: null }), 4000)),
   ]) as { data: { title: string; date: string; time: string | null; venue: string | null; location: string; photo_url: string | null } | null };
 
+  const session  = sessionRes.data;
   const title    = session?.title      ?? "Training Session";
   const venue    = session?.venue      ?? session?.location ?? "Hyderabad";
   const dateStr  = session?.date ? formatDate(session.date) : "";
   const timeStr  = session?.time ?? "";
-  const photoUrl = session?.photo_url ?? null;
-  const joinUrl  = `${APP_URL}/join/${id}`;
+
+  // Pre-fetch photo as data URL (avoids external fetch issues in Satori)
+  const photoDataUrl = session?.photo_url ? await fetchImageAsDataUrl(session.photo_url) : null;
+
+  const cacheHeaders = { "Cache-Control": "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400" };
 
   if (isStory) {
-    // ── 1080 × 1920 Instagram Story ────────────────────────────────────────
+    // ── 1080 x 1920 Instagram Story ────────────────────────────────────────
     return new ImageResponse(
       (
-        <div style={{ width: W, height: H, display: "flex", flexDirection: "column", background: "#0a0a0a", fontFamily: "sans-serif", position: "relative", overflow: "hidden" }}>
-          {/* Background photo (blurred) */}
-          {photoUrl && (
-            <img src={photoUrl} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.18 }} />
-          )}
+        <div style={{ width: W, height: H, display: "flex", flexDirection: "column", background: BLACK, position: "relative" }}>
+          {/* Top orange bar */}
+          <div style={{ width: "100%", height: 16, background: ORANGE, flexShrink: 0 }} />
 
-          {/* Orange accent bar top */}
-          <div style={{ width: "100%", height: 12, background: "#e8620a", flexShrink: 0 }} />
-
-          {/* Brand header */}
-          <div style={{ display: "flex", alignItems: "center", gap: 24, padding: "60px 80px 0" }}>
-            <img src={`${APP_URL}/logo.png`} style={{ width: 80, height: 80, borderRadius: "50%", border: "3px solid #e8620a", objectFit: "cover" }} />
-            <div>
-              <div style={{ fontSize: 44, fontWeight: 800, color: "#fff", lineHeight: 1.1 }}>Connected Steps</div>
-              <div style={{ fontSize: 26, color: "#e8620a", letterSpacing: "0.12em", textTransform: "uppercase", marginTop: 6 }}>Your Goal, Our Plan</div>
+          {/* Logo area */}
+          <div style={{ display: "flex", alignItems: "center", gap: 28, padding: "64px 80px 0" }}>
+            <div style={{ width: 88, height: 88, borderRadius: "50%", background: ORANGE, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 52, fontWeight: 900, color: WHITE, fontFamily: "serif" }}>C</div>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <span style={{ fontSize: 46, fontWeight: 800, color: WHITE }}>Connected Steps</span>
+              <span style={{ fontSize: 24, color: ORANGE, letterSpacing: "0.15em", textTransform: "uppercase", marginTop: 6 }}>Your Goal, Our Plan</span>
             </div>
           </div>
 
           {/* Session photo */}
-          {photoUrl && (
-            <div style={{ margin: "60px 80px 0", borderRadius: 32, overflow: "hidden", height: 560 }}>
-              <img src={photoUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          {photoDataUrl && (
+            <div style={{ margin: "60px 80px 0", borderRadius: 32, overflow: "hidden", height: 520, display: "flex" }}>
+              <img src={photoDataUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </div>
           )}
 
-          {/* Main content */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 80px" }}>
-            <div style={{ fontSize: 26, color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 24 }}>🏃 Training Session</div>
-            <div style={{ fontSize: 88, fontWeight: 900, color: "#fff", lineHeight: 1.05, marginBottom: 48 }}>{title}</div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-              {dateStr && (
-                <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-                  <span style={{ fontSize: 48 }}>📅</span>
-                  <span style={{ fontSize: 44, color: "#ddd", fontWeight: 600 }}>{dateStr}</span>
-                </div>
-              )}
-              {timeStr && (
-                <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-                  <span style={{ fontSize: 48 }}>⏰</span>
-                  <span style={{ fontSize: 44, color: "#ddd", fontWeight: 600 }}>{timeStr}</span>
-                </div>
-              )}
-              <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-                <span style={{ fontSize: 48 }}>📍</span>
-                <span style={{ fontSize: 44, color: "#ddd", fontWeight: 600 }}>{venue}</span>
-              </div>
+          {/* Category label */}
+          <div style={{ display: "flex", margin: photoDataUrl ? "48px 80px 0" : "80px 80px 0" }}>
+            <div style={{ background: "rgba(232,98,10,0.2)", border: `1px solid ${ORANGE}`, borderRadius: 8, padding: "8px 20px", fontSize: 24, fontWeight: 700, color: ORANGE, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+              Training Session
             </div>
-          </div>
-
-          {/* CTA */}
-          <div style={{ padding: "0 80px 100px", display: "flex", flexDirection: "column", gap: 28 }}>
-            <div style={{ background: "#e8620a", borderRadius: 24, padding: "44px 60px", display: "flex", justifyContent: "center" }}>
-              <span style={{ fontSize: 52, fontWeight: 800, color: "#fff" }}>Register Now →</span>
-            </div>
-            <div style={{ fontSize: 32, color: "rgba(255,255,255,0.4)", textAlign: "center" }}>connectedsteps.in</div>
-          </div>
-
-          {/* Bottom bar */}
-          <div style={{ width: "100%", height: 12, background: "#e8620a", flexShrink: 0 }} />
-        </div>
-      ),
-      { width: W, height: H, headers: { "Cache-Control": "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400" } }
-    );
-  }
-
-  // ── 1200 × 630 Open Graph card ─────────────────────────────────────────────
-  return new ImageResponse(
-    (
-      <div style={{ width: W, height: H, display: "flex", background: "#0a0a0a", fontFamily: "sans-serif", position: "relative", overflow: "hidden" }}>
-        {/* Left: session photo */}
-        {photoUrl ? (
-          <div style={{ width: 480, height: H, flexShrink: 0, position: "relative" }}>
-            <img src={photoUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, transparent 60%, #0a0a0a 100%)" }} />
-          </div>
-        ) : (
-          <div style={{ width: 480, height: H, flexShrink: 0, background: "linear-gradient(135deg, #1a0800 0%, #2d1200 50%, #0a0a0a 100%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 24 }}>
-            <img src={`${APP_URL}/logo.png`} style={{ width: 120, height: 120, borderRadius: "50%", border: "4px solid #e8620a", objectFit: "cover" }} />
-            <div style={{ fontSize: 28, fontWeight: 800, color: "#e8620a", letterSpacing: "0.05em" }}>CONNECTED STEPS</div>
-            <div style={{ fontSize: 96 }}>🏃</div>
-          </div>
-        )}
-
-        {/* Right: content */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "48px 52px", position: "relative" }}>
-          {/* Brand */}
-          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 36 }}>
-            <img src={`${APP_URL}/logo.png`} style={{ width: 44, height: 44, borderRadius: "50%", border: "2px solid #e8620a", objectFit: "cover" }} />
-            <div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>Connected Steps</div>
-              <div style={{ fontSize: 11, color: "#e8620a", letterSpacing: "0.1em", textTransform: "uppercase" }}>Your Goal, Our Plan</div>
-            </div>
-          </div>
-
-          {/* Category tag */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-            <div style={{ background: "rgba(232,98,10,0.15)", border: "1px solid rgba(232,98,10,0.4)", borderRadius: 6, padding: "4px 12px", fontSize: 12, fontWeight: 700, color: "#e8620a", textTransform: "uppercase", letterSpacing: "0.08em" }}>Training Session</div>
           </div>
 
           {/* Title */}
-          <div style={{ fontSize: title.length > 30 ? 34 : 40, fontWeight: 900, color: "#fff", lineHeight: 1.1, marginBottom: 28, flex: 1 }}>{title}</div>
+          <div style={{ display: "flex", padding: "28px 80px 0", fontSize: title.length > 25 ? 72 : 88, fontWeight: 900, color: WHITE, lineHeight: 1.05 }}>
+            {title}
+          </div>
 
           {/* Details */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
+          <div style={{ display: "flex", flexDirection: "column", padding: "48px 80px 0", gap: 28 }}>
+            {dateStr && (
+              <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+                <div style={{ width: 8, height: 48, background: ORANGE, borderRadius: 4, flexShrink: 0 }} />
+                <span style={{ fontSize: 38, color: "#ddd", fontWeight: 600 }}>{dateStr}</span>
+              </div>
+            )}
+            {timeStr && (
+              <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+                <div style={{ width: 8, height: 48, background: ORANGE, borderRadius: 4, flexShrink: 0 }} />
+                <span style={{ fontSize: 38, color: "#ddd", fontWeight: 600 }}>{timeStr}</span>
+              </div>
+            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+              <div style={{ width: 8, height: 48, background: ORANGE, borderRadius: 4, flexShrink: 0 }} />
+              <span style={{ fontSize: 38, color: "#ddd", fontWeight: 600 }}>{venue}</span>
+            </div>
+          </div>
+
+          {/* Spacer */}
+          <div style={{ flex: 1 }} />
+
+          {/* CTA */}
+          <div style={{ padding: "0 80px 60px", display: "flex", flexDirection: "column", gap: 24 }}>
+            <div style={{ background: ORANGE, borderRadius: 20, padding: "40px 0", display: "flex", justifyContent: "center" }}>
+              <span style={{ fontSize: 48, fontWeight: 800, color: WHITE }}>Register Now</span>
+            </div>
+            <span style={{ fontSize: 28, color: MUTED, textAlign: "center" }}>connectedsteps.in</span>
+          </div>
+
+          {/* Bottom orange bar */}
+          <div style={{ width: "100%", height: 16, background: ORANGE, flexShrink: 0 }} />
+        </div>
+      ),
+      { width: W, height: H, headers: cacheHeaders }
+    );
+  }
+
+  // ── 1200 x 630 Open Graph card ──────────────────────────────────────────────
+  return new ImageResponse(
+    (
+      <div style={{ width: W, height: H, display: "flex", background: BLACK, position: "relative" }}>
+
+        {/* Left panel: photo or branded gradient */}
+        <div style={{ width: 460, height: H, flexShrink: 0, display: "flex", position: "relative", overflow: "hidden" }}>
+          {photoDataUrl ? (
+            <>
+              <img src={photoDataUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              {/* Fade to right */}
+              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, transparent 55%, #0a0a0a 100%)" }} />
+            </>
+          ) : (
+            <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #1c0a00 0%, #2d1200 60%, #0a0a0a 100%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20 }}>
+              <div style={{ width: 110, height: 110, borderRadius: "50%", background: ORANGE, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64, fontWeight: 900, color: WHITE, fontFamily: "serif" }}>C</div>
+              <span style={{ fontSize: 22, fontWeight: 800, color: ORANGE, letterSpacing: "0.1em", textTransform: "uppercase" }}>Connected Steps</span>
+            </div>
+          )}
+        </div>
+
+        {/* Right panel: content */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "44px 48px", position: "relative" }}>
+
+          {/* Logo row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 28 }}>
+            <div style={{ width: 40, height: 40, borderRadius: "50%", background: ORANGE, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 900, color: WHITE, fontFamily: "serif" }}>C</div>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <span style={{ fontSize: 18, fontWeight: 800, color: WHITE }}>Connected Steps</span>
+              <span style={{ fontSize: 10, color: ORANGE, letterSpacing: "0.12em", textTransform: "uppercase" }}>Your Goal, Our Plan</span>
+            </div>
+          </div>
+
+          {/* Tag */}
+          <div style={{ display: "flex", marginBottom: 16 }}>
+            <div style={{ background: "rgba(232,98,10,0.15)", border: `1px solid rgba(232,98,10,0.5)`, borderRadius: 6, padding: "4px 12px", fontSize: 11, fontWeight: 700, color: ORANGE, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+              Training Session
+            </div>
+          </div>
+
+          {/* Title */}
+          <div style={{ display: "flex", fontSize: title.length > 28 ? 32 : 38, fontWeight: 900, color: WHITE, lineHeight: 1.1, marginBottom: 24, flex: 1 }}>
+            {title}
+          </div>
+
+          {/* Details */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
             {dateStr && (
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 20 }}>📅</span>
-                <span style={{ fontSize: 18, color: "#ccc", fontWeight: 600 }}>{dateStr}</span>
+                <div style={{ width: 3, height: 18, background: ORANGE, borderRadius: 2, flexShrink: 0 }} />
+                <span style={{ fontSize: 15, color: "#cccccc", fontWeight: 600 }}>{dateStr}</span>
               </div>
             )}
             {timeStr && (
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 20 }}>⏰</span>
-                <span style={{ fontSize: 18, color: "#ccc", fontWeight: 600 }}>{timeStr}</span>
+                <div style={{ width: 3, height: 18, background: ORANGE, borderRadius: 2, flexShrink: 0 }} />
+                <span style={{ fontSize: 15, color: "#cccccc", fontWeight: 600 }}>{timeStr}</span>
               </div>
             )}
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 20 }}>📍</span>
-              <span style={{ fontSize: 18, color: "#ccc", fontWeight: 600 }}>{venue}</span>
+              <div style={{ width: 3, height: 18, background: ORANGE, borderRadius: 2, flexShrink: 0 }} />
+              <span style={{ fontSize: 15, color: "#cccccc", fontWeight: 600 }}>{venue}</span>
             </div>
           </div>
 
           {/* CTA */}
-          <div style={{ background: "#e8620a", borderRadius: 10, padding: "14px 28px", display: "flex", alignItems: "center", justifyContent: "center", width: "100%" }}>
-            <span style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>Register Now →</span>
+          <div style={{ background: ORANGE, borderRadius: 8, padding: "13px 0", display: "flex", justifyContent: "center" }}>
+            <span style={{ fontSize: 17, fontWeight: 800, color: WHITE }}>Register Now</span>
           </div>
 
-          {/* URL */}
-          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.35)", marginTop: 14 }}>{joinUrl}</div>
+          <span style={{ fontSize: 11, color: MUTED, marginTop: 10 }}>{APP_URL}/join/{id}</span>
         </div>
 
-        {/* Top accent */}
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 5, background: "#e8620a" }} />
+        {/* Top orange accent */}
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 5, background: ORANGE }} />
       </div>
     ),
-    { width: W, height: H, headers: { "Cache-Control": "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400" } }
+    { width: W, height: H, headers: cacheHeaders }
   );
 }
