@@ -22,12 +22,14 @@ const podiumCfg = [
 
 export default function Leaderboard() {
   const router = useRouter();
-  const [user,      setUser]      = useState<User | null>(null);
-  const [entries,   setEntries]   = useState<LeaderboardEntry[]>([]);
-  const [tab,       setTab]       = useState<"month" | "total">("month");
-  const [loading,   setLoading]   = useState(true);
-  const [locFilter, setLocFilter] = useState("All");
-  const [live,      setLive]      = useState(false);
+  const [user,        setUser]        = useState<User | null>(null);
+  const [entries,     setEntries]     = useState<LeaderboardEntry[]>([]);
+  const [tab,         setTab]         = useState<"month" | "total">("month");
+  const [loading,     setLoading]     = useState(true);
+  const [locFilter,   setLocFilter]   = useState("All");
+  const [live,        setLive]        = useState(false);
+  const [followingSet,setFollowingSet]= useState<Set<string>>(new Set());
+  const [followBusy,  setFollowBusy]  = useState<Set<string>>(new Set());
 
   // Keep a ref so the realtime callback always reads the latest tab without
   // needing to be re-created (avoids channel churn on tab switch).
@@ -74,8 +76,35 @@ export default function Leaderboard() {
   useEffect(() => {
     const stored = localStorage.getItem("cs_user");
     if (!stored) { router.push("/auth"); return; }
-    setUser(JSON.parse(stored));
+    const u: User = JSON.parse(stored);
+    setUser(u);
+    fetch(`/api/follow?email=${encodeURIComponent(u.email)}&type=following`)
+      .then(r => r.json())
+      .then(d => setFollowingSet(new Set((d.users ?? []).map((x: { email: string }) => x.email))))
+      .catch(() => {});
   }, [router]);
+
+  async function toggleFollow(targetEmail: string) {
+    if (!user) return;
+    setFollowBusy(prev => new Set(prev).add(targetEmail));
+    try {
+      const res  = await fetch("/api/follow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ follower_email: user.email, following_email: targetEmail }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setFollowingSet(prev => {
+          const next = new Set(prev);
+          data.action === "followed" ? next.add(targetEmail) : next.delete(targetEmail);
+          return next;
+        });
+      }
+    } finally {
+      setFollowBusy(prev => { const next = new Set(prev); next.delete(targetEmail); return next; });
+    }
+  }
 
   if (!user) return null;
 
@@ -197,14 +226,16 @@ export default function Leaderboard() {
       {!loading && rest.length > 0 && (
         <section style={{ maxWidth: 960, margin: "0 auto", padding: "0 1.5rem 6rem" }}>
           <div style={{ overflow: "hidden", borderRadius: 24, border: "1px solid var(--border)", background: "var(--surface)", boxShadow: "var(--shadow-card)" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 100px", gap: 16, borderBottom: "1px solid var(--border)", background: "var(--surface-elevated)", padding: "12px 24px", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted-foreground)" }}>
-              <div>Rank</div><div>Runner</div><div style={{ textAlign: "right" }}>Points</div>
+            <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 100px 80px", gap: 16, borderBottom: "1px solid var(--border)", background: "var(--surface-elevated)", padding: "12px 24px", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted-foreground)" }}>
+              <div>Rank</div><div>Runner</div><div style={{ textAlign: "right" }}>Points</div><div />
             </div>
             {rest.map((r, i) => {
-              const isMe = r.user_email === user.email;
+              const isMe      = r.user_email === user.email;
+              const following = followingSet.has(r.user_email);
+              const busy      = followBusy.has(r.user_email);
               return (
                 <motion.div key={r.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }}
-                  style={{ display: "grid", gridTemplateColumns: "60px 1fr 100px", gap: 16, alignItems: "center", borderBottom: "1px solid oklch(1 0 0 / 4%)", padding: "14px 24px", background: isMe ? "oklch(0.72 0.19 49 / 5%)" : "transparent", transition: "background 0.2s" }}
+                  style={{ display: "grid", gridTemplateColumns: "60px 1fr 100px 80px", gap: 16, alignItems: "center", borderBottom: "1px solid oklch(1 0 0 / 4%)", padding: "14px 24px", background: isMe ? "oklch(0.72 0.19 49 / 5%)" : "transparent", transition: "background 0.2s" }}
                   onMouseEnter={e => { if (!isMe) (e.currentTarget as HTMLElement).style.background = "var(--surface-elevated)"; }}
                   onMouseLeave={e => { if (!isMe) (e.currentTarget as HTMLElement).style.background = "transparent"; }}>
                   <div style={{ fontFamily: "monospace", fontSize: "0.875rem", fontWeight: 700, color: "var(--muted-foreground)" }}>#{ranks[i + 3]}</div>
@@ -221,6 +252,21 @@ export default function Leaderboard() {
                   </div>
                   <div style={{ textAlign: "right", fontFamily: "var(--font-display)", fontSize: "1rem", fontWeight: 700, color: "var(--primary)" }}>
                     {r[pointsKey] ?? 0} <span style={{ fontSize: 10, fontWeight: 400, color: "var(--muted-foreground)" }}>pts</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    {!isMe && (
+                      <button
+                        onClick={() => toggleFollow(r.user_email)}
+                        disabled={busy}
+                        style={{ padding: "5px 12px", borderRadius: 999, fontSize: 11, fontWeight: 600, cursor: busy ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", border: "1px solid", transition: "all 0.15s", opacity: busy ? 0.6 : 1,
+                          background:   following ? "transparent"              : "var(--gradient-accent)",
+                          color:        following ? "var(--muted-foreground)"  : "var(--accent-foreground)",
+                          borderColor:  following ? "var(--border)"            : "transparent",
+                        }}
+                      >
+                        {busy ? "…" : following ? "Following" : "Follow"}
+                      </button>
+                    )}
                   </div>
                 </motion.div>
               );

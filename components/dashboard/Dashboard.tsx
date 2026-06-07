@@ -353,6 +353,7 @@ export default function Dashboard() {
   const [rsvpCounts,     setRsvpCounts]     = useState<Record<string, number>>({});
   const [pushEnabled,    setPushEnabled]    = useState(false);
   const [pushSupported,  setPushSupported]  = useState(false);
+  const [followCounts,   setFollowCounts]   = useState<{ followers: number; following: number } | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem("cs_user");
@@ -387,6 +388,12 @@ export default function Dashboard() {
       .then((d) => { setSessions(d.sessions ?? []); })
       .catch(() => {})
       .finally(() => setSessLoading(false));
+
+    Promise.all([
+      fetch(`/api/follow?email=${encodeURIComponent(u.email)}&type=followers`).then(r => r.json()),
+      fetch(`/api/follow?email=${encodeURIComponent(u.email)}&type=following`).then(r => r.json()),
+    ]).then(([f1, f2]) => setFollowCounts({ followers: (f1.users ?? []).length, following: (f2.users ?? []).length }))
+      .catch(() => {});
 
     if (typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window) {
       setPushSupported(true);
@@ -659,8 +666,22 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {followCounts !== null && (
+              <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "1rem", display: "flex", justifyContent: "center", gap: "2rem", marginBottom: user.location ? "1rem" : 0 }}>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--cs-white)" }}>{followCounts.followers}</div>
+                  <div style={{ fontSize: "9px", color: "var(--cs-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Followers</div>
+                </div>
+                <div style={{ width: "1px", background: "rgba(255,255,255,0.06)" }} />
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--cs-white)" }}>{followCounts.following}</div>
+                  <div style={{ fontSize: "9px", color: "var(--cs-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Following</div>
+                </div>
+              </div>
+            )}
+
             {user.location && (
-              <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "1rem", textAlign: "left" }}>
+              <div style={{ borderTop: followCounts !== null ? "none" : "1px solid rgba(255,255,255,0.06)", paddingTop: followCounts !== null ? 0 : "1rem", textAlign: "left" }}>
                 <div style={{ fontSize: "9px", color: "var(--cs-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Location</div>
                 <div style={{ fontSize: "0.82rem", color: "var(--cs-white)" }}>📍 {user.location}</div>
               </div>

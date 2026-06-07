@@ -13,6 +13,14 @@ interface Photo {
   user_liked: boolean;
 }
 
+interface PhotoComment {
+  id: string;
+  commenter_email: string;
+  commenter_name: string;
+  comment: string;
+  created_at: string;
+}
+
 interface SessionPhotosProps {
   sessionId: number;
   userEmail: string;
@@ -26,7 +34,11 @@ export default function SessionPhotos({ sessionId, userEmail, userName }: Sessio
   const [showUpload, setShowUpload] = useState(false);
   const [error, setError]         = useState("");
   const [lightbox, setLightbox]   = useState<Photo | null>(null);
+  const [comments, setComments]   = useState<PhotoComment[]>([]);
+  const [newComment, setNewComment] = useState("");
+  const [postingComment, setPostingComment] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const commentInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch(`/api/sessions/${sessionId}/photos?user_email=${encodeURIComponent(userEmail)}`)
@@ -77,6 +89,35 @@ export default function SessionPhotos({ sessionId, userEmail, userName }: Sessio
     if (lightbox?.id === photoId) setLightbox(null);
   }
 
+  function openLightbox(photo: Photo) {
+    setLightbox(photo);
+    setComments([]);
+    setNewComment("");
+    fetch(`/api/sessions/${sessionId}/photos/${photo.id}/comments`)
+      .then(r => r.json())
+      .then(d => setComments(d.comments ?? []));
+  }
+
+  async function postComment() {
+    if (!newComment.trim() || !lightbox) return;
+    setPostingComment(true);
+    try {
+      const res  = await fetch(`/api/sessions/${sessionId}/photos/${lightbox.id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commenter_email: userEmail, commenter_name: userName, comment: newComment.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok) { setComments(prev => [...prev, data.comment]); setNewComment(""); }
+    } finally { setPostingComment(false); }
+  }
+
+  async function deleteComment(commentId: string) {
+    if (!lightbox) return;
+    await fetch(`/api/sessions/${sessionId}/photos/${lightbox.id}/comments?comment_id=${commentId}&email=${encodeURIComponent(userEmail)}`, { method: "DELETE" });
+    setComments(prev => prev.filter(c => c.id !== commentId));
+  }
+
   return (
     <>
       {/* Lightbox */}
@@ -85,10 +126,12 @@ export default function SessionPhotos({ sessionId, userEmail, userName }: Sessio
           onClick={() => setLightbox(null)}
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}
         >
-          <div onClick={e => e.stopPropagation()} style={{ maxWidth: "min(560px, 95vw)", width: "100%", background: "var(--cs-dark)", borderRadius: "12px", overflow: "hidden" }}>
-            <img src={lightbox.photo_url} alt={lightbox.caption ?? "Session photo"} style={{ width: "100%", maxHeight: "70vh", objectFit: "contain", display: "block", background: "#000" }} />
-            <div style={{ padding: "0.875rem 1rem" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: lightbox.caption ? "0.4rem" : 0 }}>
+          <div onClick={e => e.stopPropagation()} style={{ maxWidth: "min(560px, 95vw)", width: "100%", background: "var(--cs-dark)", borderRadius: "12px", overflow: "hidden", maxHeight: "92vh", display: "flex", flexDirection: "column" }}>
+            <img src={lightbox.photo_url} alt={lightbox.caption ?? "Session photo"} style={{ width: "100%", maxHeight: "50vh", objectFit: "contain", display: "block", background: "#000", flexShrink: 0 }} />
+
+            <div style={{ padding: "0.75rem 1rem", borderBottom: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
+              {/* Uploader + like + delete */}
+              <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
                 <span style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--cs-white)", flex: 1 }}>{lightbox.uploader_name}</span>
                 <button onClick={() => toggleLike(lightbox.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: "1.1rem", lineHeight: 1 }}>
                   {lightbox.user_liked ? "❤️" : "🤍"}
@@ -100,7 +143,51 @@ export default function SessionPhotos({ sessionId, userEmail, userName }: Sessio
                   </button>
                 )}
               </div>
-              {lightbox.caption && <div style={{ fontSize: "0.8rem", color: "var(--cs-muted)", lineHeight: 1.5 }}>{lightbox.caption}</div>}
+              {lightbox.caption && <div style={{ fontSize: "0.78rem", color: "var(--cs-muted)", marginTop: "0.3rem", lineHeight: 1.5 }}>{lightbox.caption}</div>}
+            </div>
+
+            {/* Comments */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "0.6rem 1rem" }}>
+              {comments.length === 0 ? (
+                <div style={{ fontSize: "0.75rem", color: "var(--cs-muted)", textAlign: "center", padding: "0.5rem 0" }}>No comments yet. Be the first!</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  {comments.map(c => (
+                    <div key={c.id} style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start" }}>
+                      <div style={{ width: 26, height: 26, borderRadius: "50%", background: "oklch(0.72 0.19 49 / 15%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: 700, color: "var(--cs-orange)", flexShrink: 0 }}>
+                        {c.commenter_name[0]?.toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--cs-white)" }}>{c.commenter_name} </span>
+                        <span style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.75)", lineHeight: 1.5 }}>{c.comment}</span>
+                      </div>
+                      {c.commenter_email === userEmail && (
+                        <button onClick={() => deleteComment(c.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: "10px", color: "rgba(240,149,149,0.5)", flexShrink: 0 }}>✕</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Comment input */}
+            <div style={{ padding: "0.6rem 1rem", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", gap: "0.5rem", alignItems: "center", flexShrink: 0 }}>
+              <input
+                ref={commentInputRef}
+                type="text"
+                placeholder="Add a comment…"
+                value={newComment}
+                onChange={e => setNewComment(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") postComment(); }}
+                style={{ flex: 1, padding: "7px 10px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "var(--cs-white)", fontSize: "0.8rem", fontFamily: "inherit", outline: "none" }}
+              />
+              <button
+                onClick={postComment}
+                disabled={postingComment || !newComment.trim()}
+                style={{ padding: "7px 14px", background: newComment.trim() ? "var(--cs-orange)" : "rgba(255,255,255,0.08)", border: "none", borderRadius: "6px", cursor: newComment.trim() ? "pointer" : "default", fontSize: "0.78rem", fontWeight: 600, color: newComment.trim() ? "#fff" : "var(--cs-muted)", fontFamily: "inherit", flexShrink: 0 }}
+              >
+                {postingComment ? "…" : "Post"}
+              </button>
             </div>
           </div>
         </div>
@@ -151,7 +238,7 @@ export default function SessionPhotos({ sessionId, userEmail, userName }: Sessio
             {photos.map(photo => (
               <div key={photo.id} style={{ flexShrink: 0, width: "120px" }}>
                 <div
-                  onClick={() => setLightbox(photo)}
+                  onClick={() => openLightbox(photo)}
                   style={{ cursor: "pointer", position: "relative", borderRadius: "6px", overflow: "hidden" }}
                 >
                   <img
