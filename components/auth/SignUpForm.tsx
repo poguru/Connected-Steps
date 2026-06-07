@@ -4,6 +4,7 @@ import { useState, useRef, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Eye, EyeOff, Camera, CheckCircle2 } from "lucide-react";
+import OtpInput from "./OtpInput";
 
 const GOALS = [
   { id: "5k",       label: "First 5K"            },
@@ -128,31 +129,7 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
   }
 
   // ── Shared OTP input block ────────────────────────────────────────────────
-  function OtpBlock({
-    label, onVerify, onResend, code, setCode,
-  }: { label: string; onVerify: () => void; onResend: () => void; code: string; setCode: (v: string) => void }) {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <p style={{ margin: 0, fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.6 }}>{label}</p>
-        <input
-          style={{ ...inputStyle, fontSize: 22, letterSpacing: "0.3em", textAlign: "center", fontWeight: 700 }}
-          type="text" inputMode="numeric" maxLength={6} placeholder="——————"
-          value={code} onChange={e => { setCode(e.target.value.replace(/\D/g, "").slice(0, 6)); setOtpError(""); }}
-          {...focusHandlers}
-        />
-        {otpError && <div style={{ background: "oklch(0.62 0.22 22 / 10%)", border: "1px solid oklch(0.62 0.22 22 / 30%)", borderRadius: 8, padding: "10px 14px", fontSize: "0.8rem", color: "#f09595", textAlign: "center" }}>{otpError}</div>}
-        <button
-          type="button" onClick={onVerify} disabled={verifying || code.length !== 6}
-          style={{ width: "100%", padding: "13px", borderRadius: 999, background: code.length === 6 ? "var(--gradient-accent)" : "oklch(0.72 0.19 49 / 30%)", color: "var(--accent-foreground)", border: "none", cursor: code.length === 6 ? "pointer" : "not-allowed", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem" }}
-        >
-          {verifying ? "Verifying…" : "Verify →"}
-        </button>
-        <button type="button" onClick={onResend} disabled={sending} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--muted-foreground)", fontFamily: "var(--font-body)", textDecoration: "underline" }}>
-          {sending ? "Sending…" : "Resend OTP"}
-        </button>
-      </div>
-    );
-  }
+  // OtpBlock inlined below — no longer a nested component (caused focus loss on re-render)
 
   // ── Progress bar ──────────────────────────────────────────────────────────
   const ProgressBar = () => (
@@ -201,15 +178,18 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <ProgressBar />
       <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Step 1 — Verify your email</p>
-      <OtpBlock
-        label={`OTP sent to ${email}. Check your inbox.`}
-        code={emailOtp} setCode={setEmailOtp}
-        onVerify={async () => {
-          const ok = await verifyOtp("email", email, emailOtp);
-          if (ok) { setEmailOtp(""); setStep("phone"); }
-        }}
-        onResend={() => sendOtp("email", email, true)}
-      />
+      <p style={{ margin: 0, fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.6 }}>OTP sent to {email}. Check your inbox.</p>
+      <OtpInput value={emailOtp} onChange={v => { setEmailOtp(v); setOtpError(""); }} />
+      {otpError && <div style={{ background: "oklch(0.62 0.22 22 / 10%)", border: "1px solid oklch(0.62 0.22 22 / 30%)", borderRadius: 8, padding: "10px 14px", fontSize: "0.8rem", color: "#f09595", textAlign: "center" }}>{otpError}</div>}
+      <button type="button" onClick={async () => { const ok = await verifyOtp("email", email, emailOtp); if (ok) { setEmailOtp(""); setStep("phone"); } }}
+        disabled={verifying || emailOtp.length !== 6}
+        style={{ width: "100%", padding: "13px", borderRadius: 999, background: emailOtp.length === 6 ? "var(--gradient-accent)" : "oklch(0.72 0.19 49 / 30%)", color: "var(--accent-foreground)", border: "none", cursor: emailOtp.length === 6 ? "pointer" : "not-allowed", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem" }}>
+        {verifying ? "Verifying…" : "Verify →"}
+      </button>
+      <button type="button" onClick={() => sendOtp("email", email, true)} disabled={sending}
+        style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--muted-foreground)", fontFamily: "var(--font-body)", textDecoration: "underline" }}>
+        {sending ? "Sending…" : "Resend OTP"}
+      </button>
       <button type="button" onClick={() => { setStep("email"); setOtpError(""); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--muted-foreground)", fontFamily: "var(--font-body)" }}>
         ← Change email
       </button>
@@ -250,15 +230,18 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
         <span style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600 }}>Email verified: {email}</span>
       </div>
       <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Step 2 — Verify your WhatsApp number</p>
-      <OtpBlock
-        label={`OTP sent to WhatsApp ${phone}. Check your messages.`}
-        code={phoneOtp} setCode={setPhoneOtp}
-        onVerify={async () => {
-          const ok = await verifyOtp("phone", phone, phoneOtp);
-          if (ok) { setPhoneOtp(""); setStep("details"); }
-        }}
-        onResend={() => sendOtp("phone", phone, true)}
-      />
+      <p style={{ margin: 0, fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.6 }}>OTP sent to WhatsApp {phone}. Check your messages.</p>
+      <OtpInput value={phoneOtp} onChange={v => { setPhoneOtp(v); setOtpError(""); }} />
+      {otpError && <div style={{ background: "oklch(0.62 0.22 22 / 10%)", border: "1px solid oklch(0.62 0.22 22 / 30%)", borderRadius: 8, padding: "10px 14px", fontSize: "0.8rem", color: "#f09595", textAlign: "center" }}>{otpError}</div>}
+      <button type="button" onClick={async () => { const ok = await verifyOtp("phone", phone, phoneOtp); if (ok) { setPhoneOtp(""); setStep("details"); } }}
+        disabled={verifying || phoneOtp.length !== 6}
+        style={{ width: "100%", padding: "13px", borderRadius: 999, background: phoneOtp.length === 6 ? "var(--gradient-accent)" : "oklch(0.72 0.19 49 / 30%)", color: "var(--accent-foreground)", border: "none", cursor: phoneOtp.length === 6 ? "pointer" : "not-allowed", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem" }}>
+        {verifying ? "Verifying…" : "Verify →"}
+      </button>
+      <button type="button" onClick={() => sendOtp("phone", phone, true)} disabled={sending}
+        style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--muted-foreground)", fontFamily: "var(--font-body)", textDecoration: "underline" }}>
+        {sending ? "Sending…" : "Resend OTP"}
+      </button>
       <button type="button" onClick={() => { setStep("phone"); setOtpError(""); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--muted-foreground)", fontFamily: "var(--font-body)" }}>
         ← Change number
       </button>

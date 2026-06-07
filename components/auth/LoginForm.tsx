@@ -4,6 +4,7 @@ import { useState, FormEvent, ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
+import OtpInput from "./OtpInput";
 
 const inputStyle: React.CSSProperties = {
   width: "100%", padding: "11px 14px",
@@ -185,12 +186,7 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
         OTP sent to <strong style={{ color: "var(--foreground)" }}>{identifier}</strong>.{" "}
         {identifier.includes("@") ? "Check your inbox." : "Check your WhatsApp."}
       </p>
-      <input
-        style={{ ...inputStyle, fontSize: 22, letterSpacing: "0.3em", textAlign: "center", fontWeight: 700 }}
-        type="text" inputMode="numeric" maxLength={6} placeholder="——————"
-        value={otpCode} onChange={e => { setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6)); setOtpError(""); }}
-        onFocus={focusOn} onBlur={focusOff}
-      />
+      <OtpInput value={otpCode} onChange={v => { setOtpCode(v); setOtpError(""); }} />
       {otpError && <div style={{ background: "oklch(0.62 0.22 22 / 10%)", border: "1px solid oklch(0.62 0.22 22 / 30%)", borderRadius: 8, padding: "10px 14px", fontSize: "0.8rem", color: "#f09595", textAlign: "center" }}>{otpError}</div>}
       <button
         type="button" onClick={verifyOtp} disabled={verifying || otpCode.length !== 6}
