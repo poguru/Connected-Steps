@@ -54,7 +54,10 @@ export async function sendWhatsApp(
   const namespace  = process.env.MSG91_NAMESPACE;
   const template   = templateName ?? process.env.MSG91_WHATSAPP_TEMPLATE ?? "session_alert";
 
+  console.log("[MSG91 WA] env check — authKey:", !!authKey, "fromNumber:", !!fromNumber, "namespace:", namespace ?? "MISSING", "template:", template);
+
   if (!authKey || !fromNumber) {
+    console.error("[MSG91 WA] SKIPPED — MSG91_AUTH_KEY or MSG91_WHATSAPP_NUMBER not set in env");
     return { to: phone, channel: "whatsapp", ok: false, error: "MSG91 WhatsApp not configured." };
   }
 
