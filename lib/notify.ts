@@ -81,6 +81,7 @@ export async function sendWhatsApp(
     },
   };
 
+  console.log("[MSG91 WA] sending to:", to, "template:", body.payload.template.name, "namespace:", (body.payload.template as Record<string,unknown>).namespace ?? "MISSING", "components:", JSON.stringify(components));
   try {
     const res = await fetch(
       "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/",
@@ -91,9 +92,10 @@ export async function sendWhatsApp(
       }
     );
     const data = await res.json().catch(() => ({}));
+    console.log("[MSG91 WA] response status:", res.status, "body:", JSON.stringify(data));
     if (!res.ok || data.hasError) {
       const errMsg = data.message ?? data.errors ?? JSON.stringify(data) ?? String(res.status);
-      console.error("MSG91 WA error:", errMsg);
+      console.error("[MSG91 WA] error:", errMsg);
       return { to: phone, channel: "whatsapp", ok: false, error: errMsg };
     }
     return { to: phone, channel: "whatsapp", ok: true };
@@ -177,7 +179,7 @@ export async function sendEmail(
 // ── WhatsApp OTP ──────────────────────────────────────────────────────────────
 // Requires a MSG91 WhatsApp Authentication template named "otp_verification" (or MSG91_OTP_TEMPLATE env):
 //   Category: Authentication
-//   Body:    {{1}} is your Connected Steps verification code. Do not share this code.
+//   Body:    Your Connected Steps verification code is {{1}}. Do not share this code.
 //   Footer:  This code expires in 10 minutes.
 //   Button:  Copy Code (OTP type)
 // {{1}} = the 6-digit code only (Authentication templates don't support name variables)
