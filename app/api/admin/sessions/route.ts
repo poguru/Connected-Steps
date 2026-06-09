@@ -4,11 +4,15 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendWhatsApp, sessionWAParams } from "@/lib/notify";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 
-webpush.setVapidDetails(
-  "mailto:connected.steps2106@gmail.com",
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-);
+// Lazy VAPID init — only called when push is actually needed,
+// so missing env vars don't crash the module at build time.
+function initWebPush(): boolean {
+  const pub  = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const priv = process.env.VAPID_PRIVATE_KEY;
+  if (!pub || !priv) return false;
+  webpush.setVapidDetails("mailto:connected.steps2106@gmail.com", pub, priv);
+  return true;
+}
 
 export async function GET(req: NextRequest) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -256,7 +260,7 @@ async function notifyUsers(
       .select("subscription")
       .in("user_email", emails);
 
-    if (subs && subs.length > 0) {
+    if (subs && subs.length > 0 && initWebPush()) {
       const payload = JSON.stringify({
         title: "New Session – Connected Steps",
         body:  `${title} at ${displayLocation}. Tap to register.`,

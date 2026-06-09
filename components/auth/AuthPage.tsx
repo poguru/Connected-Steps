@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2 } from "lucide-react";
 import SignUpForm from "./SignUpForm";
 import LoginForm from "./LoginForm";
@@ -82,11 +81,21 @@ export default function AuthPage() {
       {/* ── Right form panel ── */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "3rem 2rem", overflowY: "auto", minHeight: "100vh" }}>
 
-        {/* Mobile logo */}
-        <Link href="/" className="lg:hidden" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none", marginBottom: "2rem" }}>
-          <Image src="/logo.png" alt="Connected Steps" width={36} height={36} className="rounded-full" />
-          <span className="font-display" style={{ fontSize: "1rem", fontWeight: 600, color: "var(--foreground)" }}>Connected Steps</span>
-        </Link>
+        {/* Mobile logo + value strip */}
+        <div className="lg:hidden" style={{ marginBottom: "1.5rem" }}>
+          <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none", marginBottom: "1rem" }}>
+            <Image src="/logo.png" alt="Connected Steps" width={32} height={32} className="rounded-full" />
+            <span className="font-display" style={{ fontSize: "1rem", fontWeight: 600, color: "var(--foreground)" }}>Connected Steps</span>
+          </Link>
+          <div style={{ display: "flex", gap: "1rem", padding: "10px 12px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, flexWrap: "wrap" }}>
+            {["500+ runners", "3 expert coaches", "4.9★ rated"].map(t => (
+              <span key={t} style={{ fontSize: 11, color: "var(--muted-foreground)", display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--cs-orange)", display: "inline-block", flexShrink: 0 }} />
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
 
         <div style={{ width: "100%", maxWidth: 400, margin: "0 auto" }}>
 
@@ -124,12 +133,10 @@ export default function AuthPage() {
             ))}
           </div>
 
-          {/* Form */}
-          <AnimatePresence mode="wait">
-            <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
-              {tab === "signup" ? <SignUpForm onSwitchToLogin={() => setTab("login")} /> : <LoginForm onSwitchToSignUp={() => setTab("signup")} />}
-            </motion.div>
-          </AnimatePresence>
+          {/* Form — no key prop: avoids re-mounting and losing typed data on tab switch */}
+          <div className="animate-fade-up">
+            {tab === "signup" ? <SignUpForm onSwitchToLogin={() => setTab("login")} /> : <LoginForm onSwitchToSignUp={() => setTab("signup")} />}
+          </div>
 
           {/* Switch link */}
           <p style={{ fontSize: "0.875rem", textAlign: "center", marginTop: "1.5rem", color: "var(--muted-foreground)" }}>

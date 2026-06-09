@@ -287,6 +287,54 @@ export async function deletePhoto(sessionId: string, photoId: string, userEmail:
   await fetch(`${CS_API_BASE}/api/sessions/${sessionId}/photos/${photoId}?email=${encodeURIComponent(userEmail)}`, { method: "DELETE" });
 }
 
+// ── Session Registration ──────────────────────────────────────────────────────
+
+export async function joinSession(sessionId: string, email: string): Promise<{ success: boolean; already: boolean }> {
+  const res = await fetch(`${CS_API_BASE}/api/sessions/${sessionId}/join`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Failed to join session");
+  return data as { success: boolean; already: boolean };
+}
+
+export async function leaveSession(sessionId: string, email: string): Promise<void> {
+  const res = await fetch(`${CS_API_BASE}/api/sessions/${sessionId}/join`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error ?? "Failed to leave session");
+  }
+}
+
+export async function getRSVPCounts(sessionIds: string[]): Promise<Record<string, number>> {
+  if (!sessionIds.length) return {};
+  const res = await fetch(`${CS_API_BASE}/api/sessions/rsvp-counts?ids=${sessionIds.join(",")}`);
+  if (!res.ok) return {};
+  const data = await res.json();
+  return data.counts as Record<string, number>;
+}
+
+// ── Auth: Register ────────────────────────────────────────────────────────────
+
+export async function registerUser(params: {
+  firstName: string; lastName: string; email: string;
+  phone?: string; goal?: string; location?: string; password: string;
+}): Promise<void> {
+  const res = await fetch(`${CS_API_BASE}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Registration failed");
+}
+
 // ── Activity Feed ─────────────────────────────────────────────────────────────
 
 export async function getActivityFeed(email: string): Promise<FeedEvent[]> {

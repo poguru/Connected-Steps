@@ -3,6 +3,7 @@
 import { useState, useRef, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { Eye, EyeOff, Camera, CheckCircle2 } from "lucide-react";
 import OtpInput from "./OtpInput";
 
@@ -108,7 +109,7 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
     if (!form.firstName || !form.lastName) { setFormError("Please enter your full name."); return; }
     if (form.password.length < 8)          { setFormError("Password must be at least 8 characters."); return; }
     if (form.password !== form.confirm)    { setFormError("Passwords do not match."); return; }
-    if (!form.dob)                         { setFormError("Please enter your date of birth."); return; }
+    // DOB is optional — used for age-appropriate training plans only
     if (!location)                         { setFormError("Please select your training location."); return; }
     if (location === "Others" && !customLoc.trim()) { setFormError("Please enter your training location."); return; }
 
@@ -204,7 +205,10 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
         <CheckCircle2 size={14} style={{ color: "var(--primary)", flexShrink: 0 }} />
         <span style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600 }}>Email verified: {email}</span>
       </div>
-      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Step 2 — Verify your WhatsApp number</p>
+      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Step 2 — Add your WhatsApp number</p>
+      <p style={{ margin: 0, fontSize: 12, color: "var(--muted-foreground)", lineHeight: 1.5 }}>
+        Your coach uses WhatsApp to reach you. You can also skip this and add it later from your profile.
+      </p>
       <input
         style={inputStyle} type="tel" placeholder="Phone number (e.g. 9876543210)"
         value={phone} onChange={e => { setPhone(e.target.value); setOtpError(""); }}
@@ -217,6 +221,13 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
         style={{ width: "100%", padding: "13px", borderRadius: 999, background: phone.replace(/\D/g, "").length >= 10 ? "var(--gradient-accent)" : "oklch(0.72 0.19 49 / 30%)", color: "var(--accent-foreground)", border: "none", cursor: phone.replace(/\D/g, "").length >= 10 ? "pointer" : "not-allowed", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem", boxShadow: phone.replace(/\D/g, "").length >= 10 ? "var(--shadow-orange)" : "none" }}
       >
         {sending ? "Sending…" : "Send OTP to WhatsApp →"}
+      </button>
+      {/* Safety net: allow skipping phone verification for launch */}
+      <button
+        type="button" onClick={() => setStep("details")}
+        style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "var(--muted-foreground)", fontFamily: "var(--font-body)", textDecoration: "underline", textAlign: "center" }}
+      >
+        Skip for now — I&apos;ll add my number later
       </button>
     </div>
   );
@@ -286,7 +297,7 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
 
       {/* DOB */}
       <div>
-        <label style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5 }}>Date of Birth</label>
+        <label style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5 }}>Date of Birth <span style={{ opacity: 0.6 }}>(optional)</span></label>
         <input style={{ ...inputStyle, colorScheme: "dark" }} name="dob" type="date" value={form.dob} onChange={handleFormChange} {...focusHandlers} />
       </div>
 
@@ -322,7 +333,10 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
       </div>
 
       <p style={{ fontSize: 11, textAlign: "center", color: "var(--muted-foreground)", lineHeight: 1.6 }}>
-        By signing up you agree to our <span style={{ color: "var(--foreground)" }}>Terms</span>, <span style={{ color: "var(--foreground)" }}>Privacy Policy</span> and <span style={{ color: "var(--foreground)" }}>Cookie Policy</span>.
+        By signing up you agree to our{" "}
+        <Link href="/terms"   target="_blank" style={{ color: "var(--primary)", textDecoration: "none" }}>Terms</Link>,{" "}
+        <Link href="/privacy" target="_blank" style={{ color: "var(--primary)", textDecoration: "none" }}>Privacy Policy</Link> and{" "}
+        <Link href="/cookies" target="_blank" style={{ color: "var(--primary)", textDecoration: "none" }}>Cookie Policy</Link>.
       </p>
 
       {formError && (

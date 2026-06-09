@@ -40,7 +40,8 @@ export async function POST(req: NextRequest) {
     });
 
     if (error) {
-      return NextResponse.json({ error: "Insert failed: " + error.message }, { status: 500 });
+      console.error("Register insert error:", error.message);
+      return NextResponse.json({ error: "Registration failed. Please try again." }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

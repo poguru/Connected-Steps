@@ -2,24 +2,35 @@ import React, { useState, useRef } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, KeyboardAvoidingView,
-  Platform, ScrollView, Image,
+  Platform, ScrollView,
 } from "react-native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { login }            from "../services/api";
-import AsyncStorage         from "@react-native-async-storage/async-storage";
-import { useUser }          from "../context/UserContext";
-import { STORAGE_KEY_USER } from "../config";
+import { login, registerUser }  from "../services/api";
+import AsyncStorage              from "@react-native-async-storage/async-storage";
+import { useUser }               from "../context/UserContext";
+import { STORAGE_KEY_USER }      from "../config";
 import type { RootStackParamList } from "../../App";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? "https://www.connectedsteps.in";
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, "Login"> };
+type Screen  = "login" | "register";
 type Mode    = "password" | "otp";
 type OtpStep = "identifier" | "code";
 
-// ── 6-digit OTP input boxes ──────────────────────────────────────────────────
+const GOALS = [
+  "Complete my first 5K",
+  "Run a 10K",
+  "Finish a half marathon",
+  "Finish a full marathon",
+  "Improve my pace",
+  "General fitness",
+];
+
+// ── 6-digit OTP boxes ─────────────────────────────────────────────────────────
+
 function OtpBoxes({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const refs = useRef<(TextInput | null)[]>(Array(6).fill(null));
+  const refs   = useRef<(TextInput | null)[]>(Array(6).fill(null));
   const digits = Array(6).fill("").map((_, i) => value[i] ?? "");
 
   function handleChange(index: number, char: string) {
@@ -28,11 +39,8 @@ function OtpBoxes({ value, onChange }: { value: string; onChange: (v: string) =>
     onChange(next.join(""));
     if (digit && index < 5) refs.current[index + 1]?.focus();
   }
-
   function handleKeyPress(index: number, key: string) {
-    if (key === "Backspace" && !digits[index] && index > 0) {
-      refs.current[index - 1]?.focus();
-    }
+    if (key === "Backspace" && !digits[index] && index > 0) refs.current[index - 1]?.focus();
   }
 
   return (
@@ -57,23 +65,58 @@ function OtpBoxes({ value, onChange }: { value: string; onChange: (v: string) =>
   );
 }
 
+// ── Goal picker ───────────────────────────────────────────────────────────────
+
+function GoalPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <View style={styles.goalGrid}>
+      {GOALS.map(g => (
+        <TouchableOpacity
+          key={g}
+          style={[styles.goalChip, value === g && styles.goalChipActive]}
+          onPress={() => onChange(g)}
+          activeOpacity={0.75}
+        >
+          <Text style={[styles.goalChipText, value === g && styles.goalChipTextActive]}>{g}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
+// ── Main screen ───────────────────────────────────────────────────────────────
+
 export default function LoginScreen({ navigation }: Props) {
   const { setUser } = useUser();
+  const [screen, setScreen] = useState<Screen>("login");
 
-  // Password mode
-  const [email,    setEmail]    = useState("");
-  const [password, setPassword] = useState("");
-  const [pwLoading, setPwLoading] = useState(false);
-  const [pwError,   setPwError]   = useState("");
-
-  // OTP mode
+  // ── Login state ──
   const [mode,       setMode]       = useState<Mode>("password");
   const [otpStep,    setOtpStep]    = useState<OtpStep>("identifier");
+  const [email,      setEmail]      = useState("");
+  const [password,   setPassword]   = useState("");
   const [identifier, setIdentifier] = useState("");
   const [otpCode,    setOtpCode]    = useState("");
+  const [pwLoading,  setPwLoading]  = useState(false);
+  const [pwError,    setPwError]    = useState("");
   const [sending,    setSending]    = useState(false);
   const [verifying,  setVerifying]  = useState(false);
   const [otpError,   setOtpError]   = useState("");
+
+  // ── Register state ──
+  const [regStep,     setRegStep]     = useState<1 | 2>(1);
+  const [regFirst,    setRegFirst]    = useState("");
+  const [regLast,     setRegLast]     = useState("");
+  const [regEmail,    setRegEmail]    = useState("");
+  const [regPhone,    setRegPhone]    = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [regConfirm,  setRegConfirm]  = useState("");
+  const [regGoal,     setRegGoal]     = useState("");
+  const [regLocation, setRegLocation] = useState("");
+  const [regLoading,  setRegLoading]  = useState(false);
+  const [regError,    setRegError]    = useState("");
+
+  // ── Login: password ──────────────────────────────────────────────────────────
 
   async function handlePasswordLogin() {
     if (!email.trim() || !password.trim()) { setPwError("Please enter your email and password."); return; }
@@ -87,6 +130,8 @@ export default function LoginScreen({ navigation }: Props) {
       setPwError(e instanceof Error ? e.message : "Login failed. Please try again.");
     } finally { setPwLoading(false); }
   }
+
+  // ── Login: OTP ───────────────────────────────────────────────────────────────
 
   async function sendOtp() {
     if (!identifier.trim()) { setOtpError("Please enter your email or phone."); return; }
@@ -123,10 +168,56 @@ export default function LoginScreen({ navigation }: Props) {
     finally { setVerifying(false); }
   }
 
-  function switchMode(m: Mode) {
-    setMode(m); setOtpStep("identifier");
-    setOtpCode(""); setOtpError(""); setPwError("");
+  // ── Register ─────────────────────────────────────────────────────────────────
+
+  function validateStep1(): string | null {
+    if (!regFirst.trim())                  return "First name is required.";
+    if (!regLast.trim())                   return "Last name is required.";
+    if (!regEmail.trim() || !regEmail.includes("@")) return "A valid email is required.";
+    if (regPassword.length < 6)            return "Password must be at least 6 characters.";
+    if (regPassword !== regConfirm)        return "Passwords do not match.";
+    return null;
   }
+
+  function validateStep2(): string | null {
+    if (!regGoal)                          return "Please select your running goal.";
+    return null;
+  }
+
+  async function handleRegister() {
+    const err = validateStep2();
+    if (err) { setRegError(err); return; }
+    setRegLoading(true); setRegError("");
+    try {
+      await registerUser({
+        firstName: regFirst.trim(),
+        lastName:  regLast.trim(),
+        email:     regEmail.trim().toLowerCase(),
+        phone:     regPhone.trim() || undefined,
+        goal:      regGoal || undefined,
+        location:  regLocation.trim() || undefined,
+        password:  regPassword,
+      });
+      // Auto-login after registration
+      const user = await login(regEmail.trim().toLowerCase(), regPassword);
+      await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+      setUser(user);
+      navigation.replace("MainTabs");
+    } catch (e: unknown) {
+      setRegError(e instanceof Error ? e.message : "Registration failed. Please try again.");
+    } finally { setRegLoading(false); }
+  }
+
+  function switchMode(m: Mode) {
+    setMode(m); setOtpStep("identifier"); setOtpCode(""); setOtpError(""); setPwError("");
+  }
+
+  function switchScreen(s: Screen) {
+    setScreen(s);
+    setPwError(""); setOtpError(""); setRegError(""); setRegStep(1);
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
@@ -141,106 +232,214 @@ export default function LoginScreen({ navigation }: Props) {
           <Text style={styles.tagline}>Your Goal, Our Plan</Text>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.title}>Sign in</Text>
-
-          {/* Mode toggle */}
-          <View style={styles.toggle}>
-            {(["password", "otp"] as Mode[]).map(m => (
-              <TouchableOpacity key={m} onPress={() => switchMode(m)}
-                style={[styles.toggleBtn, mode === m && styles.toggleBtnActive]}>
-                <Text style={[styles.toggleText, mode === m && styles.toggleTextActive]}>
-                  {m === "password" ? "Password" : "Sign in with OTP"}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* ── Password mode ── */}
-          {mode === "password" && (
-            <>
-              <Text style={styles.label}>Email or phone</Text>
-              <TextInput style={styles.input} placeholder="you@example.com" placeholderTextColor="#555"
-                value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
-
-              <Text style={styles.label}>Password</Text>
-              <TextInput style={styles.input} placeholder="••••••••" placeholderTextColor="#555"
-                value={password} onChangeText={setPassword} secureTextEntry />
-
-              {!!pwError && <Text style={styles.error}>{pwError}</Text>}
-
-              <TouchableOpacity style={[styles.btn, pwLoading && styles.btnDisabled]} onPress={handlePasswordLogin} disabled={pwLoading} activeOpacity={0.85}>
-                {pwLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Sign in →</Text>}
-              </TouchableOpacity>
-            </>
-          )}
-
-          {/* ── OTP mode: identifier step ── */}
-          {mode === "otp" && otpStep === "identifier" && (
-            <>
-              <Text style={styles.label}>Email or WhatsApp number</Text>
-              <TextInput style={styles.input} placeholder="you@example.com or 9876543210"
-                placeholderTextColor="#555" value={identifier} onChangeText={t => { setIdentifier(t); setOtpError(""); }}
-                autoCapitalize="none" autoCorrect={false} keyboardType="email-address" />
-
-              {!!otpError && <Text style={styles.error}>{otpError}</Text>}
-
-              <TouchableOpacity style={[styles.btn, sending && styles.btnDisabled]} onPress={sendOtp} disabled={sending} activeOpacity={0.85}>
-                {sending ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Send OTP →</Text>}
-              </TouchableOpacity>
-            </>
-          )}
-
-          {/* ── OTP mode: code step ── */}
-          {mode === "otp" && otpStep === "code" && (
-            <>
-              <Text style={[styles.subtitle, { marginBottom: 8 }]}>
-                OTP sent to {identifier}.{identifier.includes("@") ? " Check your inbox." : " Check your WhatsApp."}
+        {/* Screen toggle: Sign in / Create account */}
+        <View style={styles.screenToggle}>
+          {(["login", "register"] as Screen[]).map(s => (
+            <TouchableOpacity key={s} onPress={() => switchScreen(s)}
+              style={[styles.screenToggleBtn, screen === s && styles.screenToggleBtnActive]}>
+              <Text style={[styles.screenToggleText, screen === s && styles.screenToggleTextActive]}>
+                {s === "login" ? "Sign in" : "Create account"}
               </Text>
-
-              <OtpBoxes value={otpCode} onChange={v => { setOtpCode(v); setOtpError(""); }} />
-
-              {!!otpError && <Text style={styles.error}>{otpError}</Text>}
-
-              <TouchableOpacity style={[styles.btn, (verifying || otpCode.length !== 6) && styles.btnDisabled]}
-                onPress={verifyOtp} disabled={verifying || otpCode.length !== 6} activeOpacity={0.85}>
-                {verifying ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Verify & Sign in →</Text>}
-              </TouchableOpacity>
-
-              <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 12 }}>
-                <TouchableOpacity onPress={() => { setOtpStep("identifier"); setOtpCode(""); setOtpError(""); }}>
-                  <Text style={styles.link}>← Change</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={sendOtp} disabled={sending}>
-                  <Text style={styles.link}>{sending ? "Sending…" : "Resend OTP"}</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-
-          <Text style={styles.hint}>Use the same credentials as the Connected Steps website.</Text>
+            </TouchableOpacity>
+          ))}
         </View>
+
+        {/* ── LOGIN ── */}
+        {screen === "login" && (
+          <View style={styles.card}>
+            {/* Mode toggle */}
+            <View style={styles.toggle}>
+              {(["password", "otp"] as Mode[]).map(m => (
+                <TouchableOpacity key={m} onPress={() => switchMode(m)}
+                  style={[styles.toggleBtn, mode === m && styles.toggleBtnActive]}>
+                  <Text style={[styles.toggleText, mode === m && styles.toggleTextActive]}>
+                    {m === "password" ? "Password" : "Sign in with OTP"}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {mode === "password" && (
+              <>
+                <Text style={styles.label}>Email or phone</Text>
+                <TextInput style={styles.input} placeholder="you@example.com" placeholderTextColor="#555"
+                  value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
+                <Text style={styles.label}>Password</Text>
+                <TextInput style={styles.input} placeholder="••••••••" placeholderTextColor="#555"
+                  value={password} onChangeText={setPassword} secureTextEntry />
+                {!!pwError && <Text style={styles.error}>{pwError}</Text>}
+                <TouchableOpacity style={[styles.btn, pwLoading && styles.btnDisabled]} onPress={handlePasswordLogin} disabled={pwLoading} activeOpacity={0.85}>
+                  {pwLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Sign in →</Text>}
+                </TouchableOpacity>
+              </>
+            )}
+
+            {mode === "otp" && otpStep === "identifier" && (
+              <>
+                <Text style={styles.label}>Email or WhatsApp number</Text>
+                <TextInput style={styles.input} placeholder="you@example.com or 9876543210"
+                  placeholderTextColor="#555" value={identifier} onChangeText={t => { setIdentifier(t); setOtpError(""); }}
+                  autoCapitalize="none" autoCorrect={false} keyboardType="email-address" />
+                {!!otpError && <Text style={styles.error}>{otpError}</Text>}
+                <TouchableOpacity style={[styles.btn, sending && styles.btnDisabled]} onPress={sendOtp} disabled={sending} activeOpacity={0.85}>
+                  {sending ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Send OTP →</Text>}
+                </TouchableOpacity>
+              </>
+            )}
+
+            {mode === "otp" && otpStep === "code" && (
+              <>
+                <Text style={[styles.subtitle, { marginBottom: 8 }]}>
+                  OTP sent to {identifier}.{identifier.includes("@") ? " Check your inbox." : " Check your WhatsApp."}
+                </Text>
+                <OtpBoxes value={otpCode} onChange={v => { setOtpCode(v); setOtpError(""); }} />
+                {!!otpError && <Text style={styles.error}>{otpError}</Text>}
+                <TouchableOpacity style={[styles.btn, (verifying || otpCode.length !== 6) && styles.btnDisabled]}
+                  onPress={verifyOtp} disabled={verifying || otpCode.length !== 6} activeOpacity={0.85}>
+                  {verifying ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Verify & Sign in →</Text>}
+                </TouchableOpacity>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 12 }}>
+                  <TouchableOpacity onPress={() => { setOtpStep("identifier"); setOtpCode(""); setOtpError(""); }}>
+                    <Text style={styles.link}>← Change</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={sendOtp} disabled={sending}>
+                    <Text style={styles.link}>{sending ? "Sending…" : "Resend OTP"}</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            <Text style={styles.hint}>Use the same credentials as the Connected Steps website.</Text>
+          </View>
+        )}
+
+        {/* ── REGISTER ── */}
+        {screen === "register" && (
+          <View style={styles.card}>
+
+            {/* Step indicator */}
+            <View style={styles.stepRow}>
+              {[1, 2].map(n => (
+                <View key={n} style={[styles.stepDot, regStep === n && styles.stepDotActive, regStep > n && styles.stepDotDone]}>
+                  <Text style={[styles.stepDotText, (regStep === n || regStep > n) && styles.stepDotTextActive]}>
+                    {regStep > n ? "✓" : n}
+                  </Text>
+                </View>
+              ))}
+              <View style={[styles.stepLine, regStep > 1 && styles.stepLineDone]} />
+            </View>
+            <Text style={styles.stepLabel}>{regStep === 1 ? "Account details" : "Your running goal"}</Text>
+
+            {/* ── Step 1: Account ── */}
+            {regStep === 1 && (
+              <>
+                <View style={styles.row2}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.label}>First name</Text>
+                    <TextInput style={styles.input} placeholder="Rahul" placeholderTextColor="#555"
+                      value={regFirst} onChangeText={setRegFirst} autoCapitalize="words" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.label}>Last name</Text>
+                    <TextInput style={styles.input} placeholder="Kumar" placeholderTextColor="#555"
+                      value={regLast} onChangeText={setRegLast} autoCapitalize="words" />
+                  </View>
+                </View>
+
+                <Text style={styles.label}>Email</Text>
+                <TextInput style={styles.input} placeholder="you@example.com" placeholderTextColor="#555"
+                  value={regEmail} onChangeText={setRegEmail} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
+
+                <Text style={styles.label}>WhatsApp number (optional)</Text>
+                <TextInput style={styles.input} placeholder="9876543210" placeholderTextColor="#555"
+                  value={regPhone} onChangeText={setRegPhone} keyboardType="phone-pad" />
+
+                <Text style={styles.label}>Password</Text>
+                <TextInput style={styles.input} placeholder="Min. 6 characters" placeholderTextColor="#555"
+                  value={regPassword} onChangeText={setRegPassword} secureTextEntry />
+
+                <Text style={styles.label}>Confirm password</Text>
+                <TextInput style={styles.input} placeholder="Repeat your password" placeholderTextColor="#555"
+                  value={regConfirm} onChangeText={setRegConfirm} secureTextEntry />
+
+                {!!regError && <Text style={styles.error}>{regError}</Text>}
+
+                <TouchableOpacity style={styles.btn} activeOpacity={0.85}
+                  onPress={() => {
+                    const err = validateStep1();
+                    if (err) { setRegError(err); return; }
+                    setRegError(""); setRegStep(2);
+                  }}>
+                  <Text style={styles.btnText}>Next →</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {/* ── Step 2: Goal ── */}
+            {regStep === 2 && (
+              <>
+                <Text style={styles.label}>What's your running goal?</Text>
+                <GoalPicker value={regGoal} onChange={setRegGoal} />
+
+                <Text style={[styles.label, { marginTop: 16 }]}>City / Location (optional)</Text>
+                <TextInput style={styles.input} placeholder="Hyderabad" placeholderTextColor="#555"
+                  value={regLocation} onChangeText={setRegLocation} autoCapitalize="words" />
+
+                {!!regError && <Text style={styles.error}>{regError}</Text>}
+
+                <TouchableOpacity
+                  style={[styles.btn, (regLoading || !regGoal) && styles.btnDisabled]}
+                  onPress={handleRegister}
+                  disabled={regLoading || !regGoal}
+                  activeOpacity={0.85}
+                >
+                  {regLoading
+                    ? <ActivityIndicator color="#fff" />
+                    : <Text style={styles.btnText}>Create my account →</Text>
+                  }
+                </TouchableOpacity>
+
+                <TouchableOpacity style={{ marginTop: 14, alignItems: "center" }} onPress={() => { setRegStep(1); setRegError(""); }}>
+                  <Text style={styles.link}>← Back</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            <Text style={styles.hint}>By creating an account you agree to train hard and never skip leg day.</Text>
+          </View>
+        )}
+
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
+// ── Design tokens ─────────────────────────────────────────────────────────────
+
 const C = {
   bg: "#0a0a0a", surface: "#141414", border: "#222",
-  orange: "#e8620a", muted: "#666", text: "#f0f0f0",
+  orange: "#e8620a", orangeDim: "rgba(232,98,10,0.12)", muted: "#666", text: "#f0f0f0",
 };
 
 const styles = StyleSheet.create({
   container:       { flex: 1, backgroundColor: C.bg },
   scroll:          { flexGrow: 1, padding: 24, justifyContent: "center" },
-  header:          { alignItems: "center", marginBottom: 36 },
+  header:          { alignItems: "center", marginBottom: 24 },
   logoRing:        { width: 72, height: 72, borderRadius: 36, backgroundColor: C.surface, borderWidth: 2, borderColor: C.orange, alignItems: "center", justifyContent: "center", marginBottom: 12 },
   logoEmoji:       { fontSize: 32 },
   brand:           { fontSize: 22, fontWeight: "700", color: C.text, letterSpacing: -0.3 },
   tagline:         { fontSize: 12, color: C.muted, marginTop: 4, letterSpacing: 0.5 },
+
+  // Screen toggle (Sign in / Create account)
+  screenToggle:         { flexDirection: "row", backgroundColor: "#111", borderRadius: 999, padding: 4, marginBottom: 20, borderWidth: 1, borderColor: C.border },
+  screenToggleBtn:      { flex: 1, paddingVertical: 10, borderRadius: 999, alignItems: "center" },
+  screenToggleBtnActive:{ backgroundColor: C.orange },
+  screenToggleText:     { fontSize: 13, fontWeight: "600", color: C.muted },
+  screenToggleTextActive:{ color: "#fff" },
+
   card:            { backgroundColor: C.surface, borderRadius: 16, padding: 24, borderWidth: 1, borderColor: C.border },
   title:           { fontSize: 18, fontWeight: "700", color: C.text, marginBottom: 16 },
-  subtitle:        { fontSize: 13, color: C.muted, lineHeight: 18, marginBottom: 24 },
+  subtitle:        { fontSize: 13, color: C.muted, lineHeight: 18, marginBottom: 8 },
   label:           { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 },
   input:           { backgroundColor: "#1a1a1a", borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 14, color: C.text, fontSize: 15, marginBottom: 16 },
   error:           { color: "#f09595", fontSize: 13, marginBottom: 12 },
@@ -249,11 +448,36 @@ const styles = StyleSheet.create({
   btnText:         { color: "#fff", fontWeight: "700", fontSize: 15 },
   hint:            { fontSize: 12, color: C.muted, textAlign: "center", marginTop: 16, lineHeight: 17 },
   link:            { fontSize: 13, color: C.muted, textDecorationLine: "underline" },
-  toggle:          { flexDirection: "row", backgroundColor: "#1a1a1a", borderRadius: 999, padding: 4, marginBottom: 20 },
-  toggleBtn:       { flex: 1, paddingVertical: 9, borderRadius: 999, alignItems: "center" },
-  toggleBtnActive: { backgroundColor: C.orange },
-  toggleText:      { fontSize: 13, fontWeight: "600", color: C.muted },
-  toggleTextActive:{ color: "#fff" },
-  otpBox:          { width: 44, height: 54, borderRadius: 10, borderWidth: 1.5, borderColor: C.border, backgroundColor: "#1a1a1a", fontSize: 20, fontWeight: "700", color: C.text },
-  otpBoxFilled:    { borderColor: C.orange, backgroundColor: "rgba(232,98,10,0.1)" },
+
+  // Login mode toggle
+  toggle:           { flexDirection: "row", backgroundColor: "#1a1a1a", borderRadius: 999, padding: 4, marginBottom: 20 },
+  toggleBtn:        { flex: 1, paddingVertical: 9, borderRadius: 999, alignItems: "center" },
+  toggleBtnActive:  { backgroundColor: C.orange },
+  toggleText:       { fontSize: 13, fontWeight: "600", color: C.muted },
+  toggleTextActive: { color: "#fff" },
+
+  // OTP boxes
+  otpBox:        { width: 44, height: 54, borderRadius: 10, borderWidth: 1.5, borderColor: C.border, backgroundColor: "#1a1a1a", fontSize: 20, fontWeight: "700", color: C.text },
+  otpBoxFilled:  { borderColor: C.orange, backgroundColor: "rgba(232,98,10,0.1)" },
+
+  // Register step indicator
+  stepRow:           { flexDirection: "row", alignItems: "center", justifyContent: "center", marginBottom: 6, position: "relative" },
+  stepLine:          { position: "absolute", left: "30%", right: "30%", height: 2, backgroundColor: C.border, zIndex: 0 },
+  stepLineDone:      { backgroundColor: C.orange },
+  stepDot:           { width: 32, height: 32, borderRadius: 16, backgroundColor: "#1a1a1a", borderWidth: 2, borderColor: C.border, alignItems: "center", justifyContent: "center", zIndex: 1, marginHorizontal: 20 },
+  stepDotActive:     { borderColor: C.orange, backgroundColor: C.orangeDim },
+  stepDotDone:       { borderColor: C.orange, backgroundColor: C.orange },
+  stepDotText:       { fontSize: 12, fontWeight: "700", color: C.muted },
+  stepDotTextActive: { color: "#fff" },
+  stepLabel:         { fontSize: 12, color: C.muted, textAlign: "center", marginBottom: 20, textTransform: "uppercase", letterSpacing: 0.5 },
+
+  // Register 2-column row
+  row2: { flexDirection: "row", gap: 12 },
+
+  // Goal picker
+  goalGrid:          { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
+  goalChip:          { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: C.border, backgroundColor: "#1a1a1a" },
+  goalChipActive:    { borderColor: C.orange, backgroundColor: C.orangeDim },
+  goalChipText:      { fontSize: 12, color: C.muted, fontWeight: "600" },
+  goalChipTextActive:{ color: C.orange },
 });

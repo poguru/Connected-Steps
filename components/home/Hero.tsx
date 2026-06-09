@@ -2,10 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Star, Activity } from "lucide-react";
-import { motion } from "framer-motion";
+import { ArrowRight, Star } from "lucide-react";
 
-function CountUp({ to, suffix = "", duration = 2000 }: { to: number; suffix?: string; duration?: number }) {
+function CountUp({ to, suffix = "", duration = 1800 }: { to: number; suffix?: string; duration?: number }) {
   const [count,   setCount]   = useState(0);
   const ref     = useRef<HTMLSpanElement>(null);
   const started = useRef(false);
@@ -38,78 +37,68 @@ export default function Hero() {
   }, []);
 
   return (
-    <section className="relative overflow-hidden bg-gradient-soft">
+    <section className="relative overflow-hidden bg-gradient-soft animate-fade-in">
       <div className="dot-bg absolute inset-0 opacity-50" />
       <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full blur-3xl pointer-events-none"
-        style={{ background: "oklch(0.74 0.2 50 / 20%)" }} />
-      <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full blur-3xl pointer-events-none"
-        style={{ background: "oklch(0.72 0.19 49 / 15%)" }} />
+        style={{ background: "oklch(0.74 0.2 50 / 18%)" }} />
 
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "3rem 1.5rem 5rem", display: "grid", gap: "3rem", alignItems: "center" }}
-        className="lg:grid-cols-2 lg:gap-16 lg:py-20">
+      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "2.5rem 1.5rem 3rem" }}
+        className="lg:grid lg:grid-cols-2 lg:gap-16 lg:items-center">
 
-        {/* Left */}
-        <div>
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-            style={{ display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 999,
-              border: "1px solid var(--border)", background: "var(--surface)",
-              padding: "6px 14px", fontSize: 12, fontWeight: 500,
-              color: "var(--muted-foreground)", marginBottom: "1.5rem",
-              boxShadow: "var(--shadow-md)" }}>
-            <span style={{ position: "relative", display: "inline-flex", width: 8, height: 8 }}>
+        {/* ── Left ─────────────────────────────────────────────────────── */}
+        <div className="animate-fade-up">
+          {/* Badge */}
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 999,
+            border: "1px solid var(--border)", background: "var(--surface)",
+            padding: "5px 12px", fontSize: 11, fontWeight: 500,
+            color: "var(--muted-foreground)", marginBottom: "1.25rem",
+            boxShadow: "var(--shadow-md)" }}>
+            <span style={{ position: "relative", display: "inline-flex", width: 7, height: 7 }}>
               <span className="animate-pulse-ring" style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "var(--accent)" }} />
-              <span style={{ position: "relative", display: "inline-flex", width: 8, height: 8, borderRadius: "50%", background: "var(--accent)" }} />
+              <span style={{ position: "relative", display: "inline-flex", width: 7, height: 7, borderRadius: "50%", background: "var(--accent)" }} />
             </span>
-            Hyderabad&rsquo;s #1 running community
-          </motion.div>
+            Hyderabad&rsquo;s coached running club
+          </div>
 
-          <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}
-            className="font-display"
-            style={{ fontSize: "clamp(2.8rem, 7vw, 4.5rem)", fontWeight: 700, lineHeight: 1.02, letterSpacing: "-0.015em", color: "var(--foreground)" }}>
-            Run Together.
-            <br />
-            <span className="text-gradient-primary">Grow</span>{" "}
-            <span className="text-gradient-accent">Together.</span>
-          </motion.h1>
+          {/* Headline — product-first, benefit-second */}
+          <h1 className="font-display animate-fade-up-1"
+            style={{ fontSize: "clamp(2.2rem, 6vw, 3.75rem)", fontWeight: 700, lineHeight: 1.05, letterSpacing: "-0.015em", color: "var(--foreground)", marginBottom: "1rem" }}>
+            Your personal running coach.{" "}
+            <span className="text-gradient-accent">Your next race. Your way.</span>
+          </h1>
 
-          <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }}
-            style={{ marginTop: "1.5rem", maxWidth: 520, fontSize: "1.1rem", color: "var(--muted-foreground)", lineHeight: 1.7 }}>
-            Join a community-first fitness club with elite coaches, group runs, training programs,
-            and corporate wellness — built to help every step matter.
-          </motion.p>
+          {/* Sub — answers "what is it" in one sentence */}
+          <p className="animate-fade-up-2" style={{ maxWidth: 500, fontSize: "1rem", color: "var(--muted-foreground)", lineHeight: 1.7, marginBottom: "1.75rem" }}>
+            Connected Steps pairs you with a certified running coach in Hyderabad — for personalised training plans,
+            weekend group runs, and real accountability from 5K to marathon.
+          </p>
 
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.3 }}
-            style={{ marginTop: "2.25rem", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
+          {/* CTAs */}
+          <div className="hero-cta animate-fade-up-3">
             <Link href="/auth?tab=register"
               style={{ display: "inline-flex", alignItems: "center", gap: 8,
-                borderRadius: 999, background: "var(--gradient-accent)",
-                padding: "14px 28px", fontSize: "0.95rem", fontWeight: 600,
+                borderRadius: 8, background: "var(--gradient-accent)",
+                padding: "12px 24px", fontSize: "0.9rem", fontWeight: 600,
                 color: "var(--accent-foreground)", textDecoration: "none",
-                boxShadow: "var(--shadow-orange)", transition: "transform 0.2s" }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = "scale(1.02)"}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = ""}>
-              Join Community <ArrowRight size={16} />
+                boxShadow: "var(--shadow-orange)" }}>
+              Get my free account <ArrowRight size={15} />
             </Link>
-            <Link href="/running-club-hyderabad"
+            <Link href="/pricing"
               style={{ display: "inline-flex", alignItems: "center", gap: 8,
-                borderRadius: 999, border: "1px solid var(--border)",
-                background: "var(--surface)", padding: "14px 28px",
-                fontSize: "0.95rem", fontWeight: 600,
-                color: "var(--foreground)", textDecoration: "none",
-                boxShadow: "var(--shadow-md)", transition: "background 0.2s" }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--surface-elevated)"}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "var(--surface)"}>
-              Explore Programs
+                borderRadius: 8, border: "1px solid var(--border)",
+                background: "var(--surface)", padding: "12px 24px",
+                fontSize: "0.9rem", fontWeight: 500,
+                color: "var(--foreground)", textDecoration: "none" }}>
+              See plans from ₹40/day
             </Link>
-          </motion.div>
+          </div>
 
-          {/* Social proof */}
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 0.45 }}
-            style={{ marginTop: "2.5rem", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "1.5rem", fontSize: "0.875rem", color: "var(--muted-foreground)" }}>
+          {/* Trust row */}
+          <div className="animate-fade-up-4" style={{ marginTop: "1.75rem", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "1.25rem", fontSize: "0.85rem", color: "var(--muted-foreground)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <div style={{ display: "flex" }}>
                 {["A","B","C","D"].map((l, i) => (
-                  <div key={l} style={{ width: 28, height: 28, borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 10, fontWeight: 700, color: "#fff", marginLeft: i === 0 ? 0 : -8, border: "2px solid var(--background)", background: ["var(--gradient-primary)","var(--gradient-accent)","linear-gradient(135deg,oklch(0.72 0.14 210),oklch(0.6 0.18 210))","linear-gradient(135deg,oklch(0.55 0.18 300),oklch(0.45 0.22 300))"][i] }}>
+                  <div key={l} style={{ width: 26, height: 26, borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 9, fontWeight: 700, color: "#fff", marginLeft: i === 0 ? 0 : -7, border: "2px solid var(--background)", background: ["var(--gradient-primary)","var(--gradient-accent)","linear-gradient(135deg,oklch(0.72 0.14 210),oklch(0.6 0.18 210))","linear-gradient(135deg,oklch(0.55 0.18 300),oklch(0.45 0.22 300))"][i] }}>
                     {l}
                   </div>
                 ))}
@@ -117,49 +106,43 @@ export default function Hero() {
               <span><span style={{ fontWeight: 600, color: "var(--foreground)" }}><CountUp to={stats.totalRunners || 500} suffix="+" /></span> runners joined</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              {[1,2,3,4,5].map(i => <Star key={i} size={16} style={{ fill: "var(--accent)", color: "var(--accent)" }} />)}
+              {[1,2,3,4,5].map(i => <Star key={i} size={13} style={{ fill: "var(--accent)", color: "var(--accent)" }} />)}
               <span><span style={{ fontWeight: 600, color: "var(--foreground)" }}>{stats.avgRating ?? 4.9}</span> avg rating</span>
             </div>
-          </motion.div>
+          </div>
         </div>
 
-        {/* Right — hero card */}
-        <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.7, delay: 0.2 }}
-          className="relative hidden lg:block">
-          <div style={{ position: "absolute", inset: -24, borderRadius: 32, background: "var(--gradient-accent)", opacity: 0.2, filter: "blur(32px)" }} />
-          <div style={{ position: "relative", overflow: "hidden", borderRadius: 28, border: "1px solid var(--border)", background: "var(--surface)", boxShadow: "var(--shadow-card)" }}>
-            {/* Placeholder hero image */}
-            <div style={{ aspectRatio: "4/3", background: "linear-gradient(135deg, oklch(0.19 0.015 270) 0%, oklch(0.28 0.06 40) 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {/* ── Right — quick stats panel (desktop only) ─────────────────── */}
+        <div className="relative hidden lg:block animate-fade-up-2">
+          <div style={{ position: "absolute", inset: -20, borderRadius: 28, background: "var(--gradient-accent)", opacity: 0.12, filter: "blur(28px)" }} />
+          <div style={{ position: "relative", borderRadius: 20, border: "1px solid var(--border)", background: "var(--surface)", boxShadow: "var(--shadow-card)", overflow: "hidden" }}>
+
+            {/* Hero visual */}
+            <div style={{ padding: "2rem", background: "linear-gradient(135deg, oklch(0.17 0.015 270) 0%, oklch(0.24 0.055 40) 100%)", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 200 }}>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: "5rem", marginBottom: "1rem" }}>🏃</div>
-                <div className="font-display" style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--foreground)" }}>Run. Together.</div>
-                <div style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", marginTop: "0.5rem" }}>Hyderabad's running community</div>
+                <div style={{ fontSize: "4rem", marginBottom: "0.75rem" }}>🏃</div>
+                <div className="font-display" style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--foreground)" }}>Every step counts.</div>
+                <div style={{ fontSize: "0.8rem", color: "var(--muted-foreground)", marginTop: "0.35rem" }}>Join Hyderabad's running community</div>
               </div>
             </div>
 
-            {/* Live now card */}
-            <div className="glass" style={{ position: "absolute", top: 16, left: 16, borderRadius: 16, padding: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 12, background: "var(--gradient-accent)", display: "grid", placeItems: "center", color: "#fff" }}>
-                  <Activity size={16} />
+            {/* Stat strip */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", borderTop: "1px solid var(--border)" }}>
+              {[
+                { val: stats.totalRunners || 500, suffix: "+", label: "Runners" },
+                { val: stats.trainingsConducted || 200, suffix: "+", label: "Sessions" },
+                { val: 25, suffix: "+", label: "Yrs experience" },
+              ].map((s, i) => (
+                <div key={s.label} style={{ padding: "1rem", textAlign: "center", borderLeft: i > 0 ? "1px solid var(--border)" : "none" }}>
+                  <div className="font-display" style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--cs-orange)", lineHeight: 1 }}>
+                    <CountUp to={s.val} suffix={s.suffix} />
+                  </div>
+                  <div style={{ fontSize: "10px", color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 4 }}>{s.label}</div>
                 </div>
-                <div>
-                  <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted-foreground)" }}>Live now</div>
-                  <div style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--foreground)" }}>Sessions this week</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Stats card */}
-            <div style={{ position: "absolute", bottom: 16, right: 16, borderRadius: 16, padding: 16, background: "var(--gradient-primary)", color: "#fff", boxShadow: "var(--shadow-glow)" }}>
-              <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.8 }}>This month</div>
-              <div className="font-display" style={{ marginTop: 4, fontSize: "1.5rem", fontWeight: 700 }}>
-                <CountUp to={stats.trainingsConducted || 200} suffix="+ sessions" />
-              </div>
-              <div style={{ fontSize: 12, opacity: 0.8 }}>conducted</div>
+              ))}
             </div>
           </div>
-        </motion.div>
+        </div>
 
       </div>
     </section>

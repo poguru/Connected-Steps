@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { motion } from "framer-motion";
 import { Users, Calendar, Star, Quote } from "lucide-react";
 
 const FALLBACK_STORIES = [
@@ -64,10 +63,9 @@ export default function StatsAndTestimonials() {
       <section style={{ maxWidth: 1280, margin: "0 auto", padding: "5rem 1.5rem" }}>
         <div style={{ display: "grid", gap: "1rem" }} className="sm:grid-cols-2 lg:grid-cols-4">
           {stats.map((s, i) => (
-            <motion.div key={s.label}
-              initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.4, delay: i * 0.08 }}
-              style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", background: "var(--surface)", padding: "1.5rem", boxShadow: "var(--shadow-md)", transition: "transform 0.2s, box-shadow 0.2s" }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-4px)"; (e.currentTarget as HTMLElement).style.boxShadow = "var(--shadow-lg)"; }}
+            <div key={s.label}
+              style={{ position: "relative", overflow: "hidden", borderRadius: 12, border: "1px solid var(--border)", background: "var(--surface)", padding: "1.25rem", boxShadow: "var(--shadow-md)", transition: "transform 0.2s, box-shadow 0.2s" }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; (e.currentTarget as HTMLElement).style.boxShadow = "var(--shadow-lg)"; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.boxShadow = "var(--shadow-md)"; }}
             >
               <div style={{ width: 48, height: 48, borderRadius: 12, display: "grid", placeItems: "center", color: "#fff", boxShadow: "var(--shadow-md)", marginBottom: "1.25rem" }} className={s.grad}>
@@ -77,7 +75,7 @@ export default function StatsAndTestimonials() {
                 <CountUp to={typeof s.value === "number" ? s.value : 0} suffix={s.suffix} />
               </div>
               <div style={{ marginTop: 4, fontSize: "0.875rem", color: "var(--muted-foreground)" }}>{s.label}</div>
-            </motion.div>
+            </div>
           ))}
         </div>
       </section>
@@ -102,9 +100,8 @@ export default function StatsAndTestimonials() {
 
           <div style={{ display: "grid", gap: "1.25rem" }} className="sm:grid-cols-2 lg:grid-cols-3">
             {display.slice(0, 3).map((s, i) => (
-              <motion.div key={s.id}
-                initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.4, delay: i * 0.1 }}
-                style={{ borderRadius: 16, border: "1px solid var(--border)", background: "var(--surface)", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", boxShadow: "var(--shadow-md)" }}>
+              <div key={s.id}
+                style={{ borderRadius: 12, border: "1px solid var(--border)", background: "var(--surface)", padding: "1.25rem", display: "flex", flexDirection: "column", gap: "0.875rem", boxShadow: "var(--shadow-md)", borderTop: "2px solid var(--cs-orange)" }}>
                 <Quote size={20} style={{ color: "var(--primary)", opacity: 0.5 }} />
                 <div style={{ display: "flex", gap: 2 }}>
                   {[1,2,3,4,5].map(i => <Star key={i} size={13} style={{ fill: i <= (s.rating ?? 5) ? "var(--accent)" : "var(--muted)", color: i <= (s.rating ?? 5) ? "var(--accent)" : "var(--muted)" }} />)}
@@ -121,7 +118,7 @@ export default function StatsAndTestimonials() {
                     <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 1 }}>{s.achievement}</div>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>

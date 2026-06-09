@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import Razorpay from "razorpay";
 
-const razorpay = new Razorpay({
-  key_id:     process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
+function getRazorpay() {
+  const key_id     = process.env.RAZORPAY_KEY_ID;
+  const key_secret = process.env.RAZORPAY_KEY_SECRET;
+  if (!key_id || !key_secret) throw new Error("Razorpay keys not configured");
+  return new Razorpay({ key_id, key_secret });
+}
 
 // Amount in paise (INR × 100)
 const PLAN_AMOUNTS: Record<string, number> = {
@@ -24,7 +26,7 @@ export async function POST(req: NextRequest) {
   const amount = PLAN_AMOUNTS[plan];
 
   try {
-    const order = await razorpay.orders.create({
+    const order = await getRazorpay().orders.create({
       amount,
       currency: "INR",
       receipt:  `cs_${plan}_${Date.now()}`,

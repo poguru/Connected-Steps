@@ -17,8 +17,13 @@ export async function POST(req: NextRequest) {
     } = body;
 
     // Verify Razorpay signature
+    const razorpaySecret = process.env.RAZORPAY_KEY_SECRET;
+    if (!razorpaySecret) {
+      console.error("RAZORPAY_KEY_SECRET not set");
+      return NextResponse.json({ error: "Payment verification unavailable" }, { status: 503 });
+    }
     const expected = crypto
-      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
+      .createHmac("sha256", razorpaySecret)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest("hex");
 

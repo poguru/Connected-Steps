@@ -8,7 +8,7 @@ import UserMenu, { MenuUser } from "@/components/ui/UserMenu";
 
 const NAV_LINKS = [
   { label: "Dashboard",    href: "/dashboard"    },
-  { label: "Weekend Run",  href: "/weekend-run"  },
+  { label: "Sessions",     href: "/weekend-run"  },
   { label: "Leaderboard",  href: "/leaderboard"  },
   { label: "Community",    href: "/community"    },
   { label: "Achievements", href: "/achievements" },

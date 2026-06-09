@@ -65,7 +65,10 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
     localStorage.removeItem("cs_pending_photo");
     const savedStrava = localStorage.getItem(`cs_strava_${user.email}`);
     if (savedStrava) localStorage.setItem("cs_strava", savedStrava);
-    router.push(searchParams.get("redirect") ?? "/dashboard");
+    // Validate redirect to prevent open redirect attacks — only allow relative paths
+    const raw = searchParams.get("redirect") ?? "";
+    const safe = raw.startsWith("/") && !raw.startsWith("//") ? raw : "/dashboard";
+    router.push(safe);
   }
 
   async function sendOtp() {

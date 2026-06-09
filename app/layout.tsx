@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, DM_Sans } from "next/font/google";
 import "./globals.css";
-import CookieBanner    from "@/components/ui/CookieBanner";
-import WhatsAppButton  from "@/components/layout/WhatsAppButton";
+import CookieBanner from "@/components/ui/CookieBanner";
 
 const cormorant = Cormorant_Garamond({
   subsets: ["latin"],
@@ -58,7 +57,6 @@ export default function RootLayout({
     <html lang="en" className={`${cormorant.variable} ${dmSans.variable}`}>
       <body className="antialiased">
         {children}
-        <WhatsAppButton />
         <CookieBanner />
       </body>
     </html>

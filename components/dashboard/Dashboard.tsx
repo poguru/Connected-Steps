@@ -184,148 +184,136 @@ function RateCoachWidget({ userEmail, hasAttended }: { userEmail: string; hasAtt
 
 interface FeedbackItem { id: number; user_name: string; rating: number; comment: string; created_at: string; }
 
+// ── Compact expandable session row ───────────────────────────────────────────
 function SessionCard({ rec, userEmail, userName }: { rec: SessionRecord; userEmail: string; userName: string }) {
   const s = rec.sessions;
+  const [expanded,    setExpanded]    = useState(false);
   const [feedback,    setFeedback]    = useState<FeedbackItem[]>([]);
-  const [fbLoading,   setFbLoading]   = useState(true);
-  const [showFb,      setShowFb]      = useState(false);
+  const [fbLoaded,    setFbLoaded]    = useState(false);
   const [myRating,    setMyRating]    = useState(0);
   const [myComment,   setMyComment]   = useState("");
   const [submitting,  setSubmitting]  = useState(false);
   const [submitted,   setSubmitted]   = useState(false);
   const [fbMsg,       setFbMsg]       = useState("");
 
-  useEffect(() => {
-    if (!s) return;
-    fetch(`/api/sessions/${s.id}/feedback?email=${encodeURIComponent(userEmail)}`)
-      .then((r) => r.json())
-      .then((d) => {
-        setFeedback(d.feedback ?? []);
-        if (d.myFeedback) { setSubmitted(true); setMyRating(d.myFeedback.rating); setMyComment(d.myFeedback.comment ?? ""); }
-      })
-      .finally(() => setFbLoading(false));
-  }, [s, userEmail]);
+  function toggle() {
+    if (!expanded && !fbLoaded && s) {
+      fetch(`/api/sessions/${s.id}/feedback?email=${encodeURIComponent(userEmail)}`)
+        .then(r => r.json())
+        .then(d => {
+          setFeedback(d.feedback ?? []);
+          if (d.myFeedback) { setSubmitted(true); setMyRating(d.myFeedback.rating); setMyComment(d.myFeedback.comment ?? ""); }
+          setFbLoaded(true);
+        })
+        .catch(() => setFbLoaded(true));
+    }
+    setExpanded(e => !e);
+  }
 
   if (!s) return null;
-  const dateStr = new Date(s.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  const dateStr = new Date(s.date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" });
   const totalPts = rec.bonus_points ?? 0;
 
   async function submitFeedback() {
-    if (!myRating) return;
-    if (!myComment.trim()) { setFbMsg("Please write a review before submitting."); return; }
+    if (!myRating || !myComment.trim()) { setFbMsg("Please add a star rating and comment."); return; }
     setSubmitting(true); setFbMsg("");
     const res  = await fetch(`/api/sessions/${s!.id}/feedback`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: userEmail, rating: myRating, comment: myComment }),
     });
     const data = await res.json();
-    if (res.ok) {
-      setSubmitted(true);
-      setFbMsg("Thanks for your feedback!");
-      const r2 = await fetch(`/api/sessions/${s!.id}/feedback`);
-      const d2 = await r2.json();
-      setFeedback(d2.feedback ?? []);
-    } else {
-      setFbMsg(data.error ?? "Something went wrong.");
-    }
+    if (res.ok) { setSubmitted(true); setFbMsg("Thanks!"); }
+    else { setFbMsg(data.error ?? "Something went wrong."); }
     setSubmitting(false);
   }
 
   const Stars = ({ value, interactive }: { value: number; interactive?: boolean }) => (
-    <div style={{ display: "flex", gap: "3px" }}>
-      {[1,2,3,4,5].map((star) => (
-        <svg key={star} width="16" height="16" viewBox="0 0 24 24"
+    <div style={{ display:"flex", gap:3 }}>
+      {[1,2,3,4,5].map(star => (
+        <svg key={star} width={interactive ? 18 : 14} height={interactive ? 18 : 14} viewBox="0 0 24 24"
           onClick={interactive ? () => setMyRating(star) : undefined}
           style={{ cursor: interactive ? "pointer" : "default" }}>
           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
-            fill={star <= value ? "var(--cs-orange)" : "rgba(255,255,255,0.15)"}
-            stroke={star <= value ? "var(--cs-orange)" : "rgba(255,255,255,0.2)"} strokeWidth="1" />
+            fill={star <= value ? "var(--cs-orange)" : "rgba(255,255,255,0.12)"}
+            stroke={star <= value ? "var(--cs-orange)" : "rgba(255,255,255,0.15)"} strokeWidth="1" />
         </svg>
       ))}
     </div>
   );
 
   return (
-    <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", overflow: "hidden" }}>
-      {s.photo_url && (
-        <img src={s.photo_url} alt={`${s.title} group photo`} style={{ width: "100%", maxHeight: "220px", objectFit: "cover", display: "block" }} />
-      )}
-      <div style={{ padding: "1rem 1.25rem", display: "flex", alignItems: "center", gap: "1rem" }}>
-        <div style={{ width: "44px", height: "44px", borderRadius: "8px", background: rec.attended ? "rgba(232,98,10,0.12)" : "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.3rem", flexShrink: 0 }}>
-          {rec.attended ? "✅" : "❌"}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--cs-white)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
-          <div style={{ fontSize: "0.78rem", color: "var(--cs-muted)", marginTop: "2px" }}>{dateStr} · 📍 {s.venue || s.location}</div>
-          {rec.bonus_reason && <div style={{ fontSize: "0.75rem", color: "var(--cs-orange)", marginTop: "2px" }}>{rec.bonus_reason}</div>}
-        </div>
-        <div style={{ textAlign: "right", flexShrink: 0 }}>
-          <div style={{ fontSize: "0.8rem", color: rec.attended ? "var(--cs-orange)" : "var(--cs-muted)", fontWeight: 700 }}>
-            {rec.attended ? (totalPts > 0 ? `+${totalPts} pts` : "Attended") : "Not attended"}
-          </div>
-          <div style={{ fontSize: "10px", color: "var(--cs-muted)", marginTop: "2px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-            {rec.attended ? (totalPts > 0 ? "Bonus points" : "No bonus") : "—"}
-          </div>
-        </div>
-      </div>
+    <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12, overflow:"hidden" }}>
+      {/* ── Compact row — always visible ── */}
+      <button
+        onClick={toggle}
+        style={{ width:"100%", display:"flex", alignItems:"center", gap:"0.75rem", padding:"0.7rem 1rem", background:"none", border:"none", cursor:"pointer", textAlign:"left" }}>
+        {/* Status dot */}
+        <div style={{ width:8, height:8, borderRadius:"50%", flexShrink:0, background: rec.attended ? "#4ade80" : "rgba(255,255,255,0.2)" }} />
+        {/* Date */}
+        <span style={{ fontSize:"0.72rem", color:"var(--muted-foreground)", fontFamily:"var(--font-body)", flexShrink:0, width:52 }}>{dateStr}</span>
+        {/* Title */}
+        <span style={{ fontSize:"0.85rem", fontWeight:600, color:"var(--foreground)", flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", fontFamily:"var(--font-body)" }}>{s.title}</span>
+        {/* Points / status */}
+        <span style={{ fontSize:"0.75rem", fontWeight:700, color: rec.attended ? (totalPts > 0 ? "var(--cs-orange)" : "#4ade80") : "var(--muted-foreground)", flexShrink:0, fontFamily:"var(--font-body)" }}>
+          {rec.attended ? (totalPts > 0 ? `+${totalPts} pts` : "✓") : "—"}
+        </span>
+        {/* Expand chevron */}
+        <span style={{ fontSize:"0.75rem", color:"var(--muted-foreground)", flexShrink:0, fontFamily:"var(--font-body)", transition:"transform 0.2s", display:"inline-block", transform: expanded ? "rotate(180deg)" : "none" }}>▾</span>
+      </button>
 
-      {/* Photos section */}
-      {rec.attended && s && (
-        <SessionPhotos sessionId={s.id} userEmail={userEmail} userName={userName} />
-      )}
+      {/* ── Expanded detail ── */}
+      {expanded && (
+        <div style={{ borderTop:"1px solid var(--border)", padding:"0.875rem 1rem", display:"flex", flexDirection:"column", gap:"0.75rem" }}>
+          {/* Venue */}
+          {(s.venue || s.location) && (
+            <div style={{ fontSize:"0.78rem", color:"var(--muted-foreground)" }}>📍 {s.venue || s.location}</div>
+          )}
+          {rec.bonus_reason && (
+            <div style={{ fontSize:"0.75rem", color:"var(--cs-orange)" }}>{rec.bonus_reason}</div>
+          )}
 
-      {/* Feedback section */}
-      {rec.attended && (
-        <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "0.875rem 1.25rem" }}>
-          {/* Rate prompt / submitted state */}
-          {!submitted ? (
+          {/* Photos */}
+          {rec.attended && <SessionPhotos sessionId={s.id} userEmail={userEmail} userName={userName} />}
+
+          {/* Feedback */}
+          {rec.attended && !submitted && (
             <div>
-              <div style={{ fontSize: "11px", color: "var(--cs-muted)", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: "0.5rem" }}>Rate this session</div>
+              <div style={{ fontSize:"10px", color:"var(--muted-foreground)", textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:8 }}>Rate this session</div>
               <Stars value={myRating} interactive />
               {myRating > 0 && (
-                <div style={{ marginTop: "0.6rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                  <textarea
-                    placeholder="Share your experience (required)"
-                    value={myComment} onChange={(e) => setMyComment(e.target.value)}
+                <div style={{ marginTop:8, display:"flex", flexDirection:"column", gap:8 }}>
+                  <textarea placeholder="Share your experience (required)" value={myComment} onChange={e => setMyComment(e.target.value)}
                     rows={2} maxLength={300}
-                    style={{ width: "100%", padding: "8px 10px", background: "rgba(255,255,255,0.04)", border: `1px solid ${!myComment.trim() ? "rgba(240,149,149,0.4)" : "rgba(255,255,255,0.1)"}`, borderRadius: "6px", color: "var(--cs-white)", fontSize: "0.8rem", fontFamily: "var(--font-body)", outline: "none", resize: "none", boxSizing: "border-box" }}
-                  />
+                    style={{ width:"100%", padding:"8px 10px", background:"rgba(255,255,255,0.04)", border:"1px solid var(--border)", borderRadius:8, color:"var(--foreground)", fontSize:"0.8rem", fontFamily:"var(--font-body)", outline:"none", resize:"none", boxSizing:"border-box" }} />
                   <button onClick={submitFeedback} disabled={submitting}
-                    style={{ alignSelf: "flex-start", padding: "7px 16px", background: "var(--cs-orange)", color: "#fff", border: "none", borderRadius: "4px", fontSize: "0.78rem", fontWeight: 600, cursor: submitting ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", opacity: submitting ? 0.7 : 1 }}>
-                    {submitting ? "Submitting…" : "Submit"}
+                    style={{ alignSelf:"flex-start", padding:"6px 14px", background:"var(--gradient-accent)", color:"#fff", border:"none", borderRadius:8, fontSize:"0.78rem", fontWeight:600, cursor: submitting ? "not-allowed" : "pointer", fontFamily:"var(--font-body)", opacity: submitting ? 0.7 : 1 }}>
+                    {submitting ? "Submitting…" : "Submit rating"}
                   </button>
+                  {fbMsg && <span style={{ fontSize:"0.72rem", color:"#f09595" }}>{fbMsg}</span>}
                 </div>
               )}
-              {fbMsg && <div style={{ fontSize: "0.75rem", color: fbMsg.startsWith("Thanks") ? "#4ade80" : "#f09595", marginTop: "0.4rem" }}>{fbMsg}</div>}
             </div>
-          ) : (
-            <div style={{ fontSize: "0.78rem", color: "var(--cs-muted)" }}>
-              Your rating: <Stars value={myRating} />
-              {fbMsg && <span style={{ color: "#4ade80", marginLeft: "8px" }}>{fbMsg}</span>}
+          )}
+          {rec.attended && submitted && (
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+              <Stars value={myRating} />
+              <span style={{ fontSize:"0.75rem", color:"var(--muted-foreground)" }}>{fbMsg || "Your rating"}</span>
             </div>
           )}
 
-          {/* All feedback */}
-          {!fbLoading && feedback.length > 0 && (
-            <div style={{ marginTop: "0.75rem" }}>
-              <button onClick={() => setShowFb((p) => !p)}
-                style={{ fontSize: "11px", color: "var(--cs-orange)", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "var(--font-body)", letterSpacing: "0.05em" }}>
-                {showFb ? "▲ Hide" : `▼ See ${feedback.length} review${feedback.length !== 1 ? "s" : ""}`}
-              </button>
-              {showFb && (
-                <div style={{ marginTop: "0.6rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-                  {feedback.map((f) => (
-                    <div key={f.id} style={{ background: "rgba(255,255,255,0.03)", borderRadius: "6px", padding: "0.6rem 0.75rem" }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
-                        <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--cs-white)" }}>{f.user_name}</span>
-                        <Stars value={f.rating} />
-                      </div>
-                      {f.comment && <div style={{ fontSize: "0.78rem", color: "var(--cs-muted)", lineHeight: 1.5 }}>{f.comment}</div>}
-                    </div>
-                  ))}
+          {/* Others' reviews */}
+          {fbLoaded && feedback.length > 0 && (
+            <div style={{ display:"flex", flexDirection:"column", gap:"0.5rem" }}>
+              <div style={{ fontSize:"10px", color:"var(--muted-foreground)", textTransform:"uppercase", letterSpacing:"0.08em" }}>{feedback.length} review{feedback.length !== 1 ? "s" : ""}</div>
+              {feedback.map(f => (
+                <div key={f.id} style={{ background:"rgba(255,255,255,0.03)", borderRadius:8, padding:"0.5rem 0.75rem" }}>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:3 }}>
+                    <span style={{ fontSize:"0.78rem", fontWeight:600, color:"var(--foreground)" }}>{f.user_name}</span>
+                    <Stars value={f.rating} />
+                  </div>
+                  {f.comment && <div style={{ fontSize:"0.75rem", color:"var(--muted-foreground)", lineHeight:1.5 }}>{f.comment}</div>}
                 </div>
-              )}
+              ))}
             </div>
           )}
         </div>
@@ -742,48 +730,35 @@ export default function Dashboard() {
             joinedSessionIds={joinedSessionIds}
           />
 
-          {/* ── 2. Progress 2×2 grid ── */}
-          <div style={{ marginBottom: "1.25rem" }}>
-            <div style={{ fontSize: "10px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.65rem" }}>Progress</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-              {[
-                { label: "Month Points",  value: points?.month_points ?? 0, hi: true  },
-                { label: "All-Time Pts",  value: points?.total_points ?? 0, hi: false },
-                { label: "This Month",    value: `${monthAttended} session${monthAttended !== 1 ? "s" : ""}`, hi: false },
-                { label: "Total Sessions",value: totalAttended,              hi: false },
-              ].map((s) => (
-                <div key={s.label} style={{
-                  background:    s.hi ? "oklch(0.15 0.03 49)" : "var(--surface)",
-                  border:        `1px solid ${s.hi ? "oklch(0.72 0.19 49 / 22%)" : "var(--border)"}`,
-                  borderRadius:  16, padding: "1.1rem 1.25rem",
-                  boxShadow:     "var(--shadow-md)",
-                }}>
-                  <div style={{ fontSize: "clamp(1.4rem, 3vw, 1.75rem)", fontWeight: 800, color: s.hi ? "var(--cs-orange)" : "var(--foreground)", letterSpacing: "-0.5px", lineHeight: 1.1, marginBottom: "0.35rem" }}>
-                    {s.value}
-                  </div>
-                  <div style={{ fontSize: "10px", color: "var(--cs-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{s.label}</div>
+          {/* ── 2. Compact stat row ── */}
+          <div className="stat-row" style={{ marginBottom: "1rem" }}>
+            {[
+              { label: "Month Pts",     value: points?.month_points ?? 0, orange: true  },
+              { label: "All-Time Pts",  value: points?.total_points ?? 0, orange: false },
+              { label: "This Month",    value: monthAttended,              orange: false },
+              { label: "Total Sessions",value: totalAttended,              orange: false },
+            ].map(s => (
+              <div key={s.label} className="stat-cell">
+                <div className="stat-cell-val" style={s.orange ? { color:"var(--cs-orange)" } : {}}>
+                  {typeof s.value === "number" ? s.value.toLocaleString() : s.value}
                 </div>
-              ))}
-            </div>
+                <div className="stat-cell-label">{s.label}</div>
+              </div>
+            ))}
           </div>
 
-          {/* ── 3. Achievements ── */}
+          {/* ── 3. Achievements — compact icon grid ── */}
           {!sessionsLoading && (
-            <div style={{ marginBottom: "1.5rem" }}>
-              <div style={{ fontSize: "10px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.65rem" }}>Achievements</div>
-              <div style={{ display: "flex", gap: "0.5rem", overflowX: "auto", paddingBottom: "4px" }}>
-                {ACHIEVEMENTS.map((a) => (
-                  <div key={a.label} style={{
-                    display: "flex", alignItems: "center", gap: "0.4rem", flexShrink: 0,
-                    background: a.earned ? "oklch(0.72 0.19 49 / 10%)" : "var(--surface)",
-                    border: `1px solid ${a.earned ? "oklch(0.72 0.19 49 / 25%)" : "var(--border)"}`,
-                    borderRadius: 24, padding: "0.45rem 0.85rem",
-                    opacity: a.earned ? 1 : 0.45,
-                  }}>
-                    <span style={{ fontSize: "0.95rem" }}>{a.earned ? a.icon : "🔒"}</span>
-                    <span style={{ fontSize: "0.75rem", fontWeight: 600, color: a.earned ? "var(--cs-white)" : "var(--cs-muted)", whiteSpace: "nowrap" }}>{a.label}</span>
-                  </div>
-                ))}
+            <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12, padding:"0.75rem 1rem", marginBottom:"1rem", display:"flex", alignItems:"center", gap:"0.75rem", flexWrap:"wrap" }}>
+              <span style={{ fontSize:"10px", color:"var(--muted-foreground)", textTransform:"uppercase", letterSpacing:"0.1em", fontWeight:600, flexShrink:0 }}>Badges</span>
+              {ACHIEVEMENTS.map(a => (
+                <div key={a.label} title={a.label} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:2, opacity: a.earned ? 1 : 0.3 }}>
+                  <span style={{ fontSize:"1.2rem" }}>{a.earned ? a.icon : "🔒"}</span>
+                  <span style={{ fontSize:"9px", color: a.earned ? "var(--cs-orange)" : "var(--muted-foreground)", whiteSpace:"nowrap" }}>{a.label}</span>
+                </div>
+              ))}
+              <div style={{ marginLeft:"auto", fontSize:"11px", color:"var(--muted-foreground)" }}>
+                {ACHIEVEMENTS.filter(a => a.earned).length}/{ACHIEVEMENTS.length} earned
               </div>
             </div>
           )}
@@ -791,101 +766,41 @@ export default function Dashboard() {
           {/* ── 4. Follower activity feed ── */}
           <FollowerFeed userEmail={user.email} />
 
-          {/* ── 5. Upcoming sessions ──*/}
-          {upcomingSessions.length > 0 && (
-            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: "1.25rem", marginBottom: "1.25rem", boxShadow: "var(--shadow-md)" }}>
-              <div style={{ fontSize: "10px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.75rem" }}>Upcoming Sessions</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                {upcomingSessions.map((s) => {
-                  const today = new Date(); today.setHours(0, 0, 0, 0);
-                  const sessionDate = new Date(s.date + "T00:00:00");
-                  const diff = Math.round((sessionDate.getTime() - today.getTime()) / 86400000);
-                  const badge = diff === 0 ? "Today" : diff === 1 ? "Tomorrow" : `In ${diff}d`;
-                  const isUrgent = diff <= 1;
-                  const dateStr = sessionDate.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
-                  const joined = joinedSessionIds.has(s.id);
-                  const rsvpCount = rsvpCounts[s.id] ?? 0;
-                  const confirmingLeave = leaveConfirmId === s.id;
-                  const isLeaving = leavingId === s.id;
-                  return (
-                    <div key={s.id} style={{ borderRadius: 12, background: joined ? "oklch(0.74 0.22 150 / 5%)" : "rgba(255,255,255,0.02)", border: `1px solid ${joined ? "oklch(0.74 0.22 150 / 20%)" : "rgba(255,255,255,0.06)"}`, overflow: "hidden" }}>
-                      <div
-                        onClick={() => !joined && router.push(`/join/${s.id}`)}
-                        style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.7rem 0.9rem", cursor: joined ? "default" : "pointer" }}
-                        onMouseEnter={(e) => { if (!joined) (e.currentTarget as HTMLElement).style.opacity = "0.82"; }}
-                        onMouseLeave={(e) => { if (!joined) (e.currentTarget as HTMLElement).style.opacity = "1"; }}
-                      >
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--cs-white)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
-                          <div style={{ fontSize: "0.72rem", color: "var(--cs-muted)", marginTop: "2px" }}>{dateStr}{s.time ? ` · ${s.time}` : ""}{s.venue ? ` · 📍 ${s.venue}` : ""}</div>
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "3px", flexShrink: 0 }}>
-                          <span style={{ fontSize: "10px", fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: isUrgent ? "var(--cs-orange)" : "rgba(255,255,255,0.07)", color: isUrgent ? "#fff" : "var(--cs-muted)" }}>{badge}</span>
-                          {joined
-                            ? <span style={{ fontSize: "0.7rem", color: "#4ade80", fontWeight: 600 }}>✓ Joined</span>
-                            : <span style={{ fontSize: "0.7rem", color: "var(--cs-orange)", fontWeight: 600 }}>Join →</span>}
-                          {rsvpCount > 0 && <span style={{ fontSize: "0.65rem", color: "var(--cs-muted)" }}>{rsvpCount} going</span>}
-                        </div>
-                      </div>
-                      {joined && (
-                        <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", padding: "0.4rem 0.9rem", display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-                          {!confirmingLeave ? (
-                            <button onClick={() => { setLeaveConfirmId(s.id); setLeaveError(""); }}
-                              style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.7rem", color: "var(--cs-muted)", fontFamily: "inherit", padding: 0 }}>
-                              Can&apos;t attend? Leave
-                            </button>
-                          ) : (
-                            <>
-                              <span style={{ fontSize: "0.7rem", color: "var(--cs-muted)" }}>Sure?</span>
-                              <button onClick={() => handleLeaveSession(s.id, user!.email)} disabled={isLeaving}
-                                style={{ background: "rgba(226,75,74,0.15)", border: "1px solid rgba(226,75,74,0.3)", borderRadius: 4, cursor: isLeaving ? "not-allowed" : "pointer", fontSize: "0.7rem", color: "#f09595", fontWeight: 600, fontFamily: "inherit", padding: "2px 10px", opacity: isLeaving ? 0.6 : 1 }}>
-                                {isLeaving ? "Leaving…" : "Yes, leave"}
-                              </button>
-                              <button onClick={() => { setLeaveConfirmId(null); setLeaveError(""); }}
-                                style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.7rem", color: "var(--cs-muted)", fontFamily: "inherit", padding: 0 }}>
-                                Cancel
-                              </button>
-                            </>
-                          )}
-                          {leaveError && leaveConfirmId === s.id && <span style={{ fontSize: "0.7rem", color: "#f09595" }}>{leaveError}</span>}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* ── 6. Session history ── */}
-          <div style={{ fontSize: "10px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.65rem" }}>Session History</div>
+          {/* ── 5. Session history ── */}
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"0.5rem" }}>
+            <span style={{ fontSize:"10px", color:"var(--muted-foreground)", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:600 }}>Session History</span>
+            {!sessionsLoading && sessions.length > 0 && (
+              <span style={{ fontSize:"11px", color:"var(--muted-foreground)" }}>{sessions.filter(r=>r.attended).length} attended · click to expand</span>
+            )}
+          </div>
           {sessionsLoading ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-              {[1, 2, 3].map((i) => (
-                <div key={i} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "1rem 1.25rem", display: "flex", gap: "1rem", alignItems: "center" }}>
-                  <div style={{ width: "42px", height: "42px", borderRadius: 10, background: "rgba(255,255,255,0.05)", flexShrink: 0 }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ width: "55%", height: "12px", background: "rgba(255,255,255,0.05)", borderRadius: 4, marginBottom: "8px" }} />
-                    <div style={{ width: "35%", height: "10px", background: "rgba(255,255,255,0.04)", borderRadius: 4 }} />
-                  </div>
+            <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12 }}>
+              {[1,2,3,4].map((i, idx) => (
+                <div key={i} style={{ display:"flex", alignItems:"center", gap:"0.75rem", padding:"0.7rem 1rem", borderTop: idx > 0 ? "1px solid var(--border)" : "none" }}>
+                  <div style={{ width:8, height:8, borderRadius:"50%", background:"rgba(255,255,255,0.08)", flexShrink:0 }} />
+                  <div style={{ width:42, height:10, background:"rgba(255,255,255,0.06)", borderRadius:4, flexShrink:0 }} />
+                  <div style={{ flex:1, height:12, background:"rgba(255,255,255,0.05)", borderRadius:4 }} />
+                  <div style={{ width:36, height:10, background:"rgba(255,255,255,0.04)", borderRadius:4, flexShrink:0 }} />
                 </div>
               ))}
             </div>
           ) : sessions.length === 0 ? (
-            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: "2.5rem", textAlign: "center", boxShadow: "var(--shadow-md)" }}>
-              <div style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>🏃</div>
-              <div style={{ fontSize: "1rem", fontWeight: 700, color: "var(--cs-white)", marginBottom: "0.5rem" }}>No session history yet</div>
-              <p style={{ fontSize: "0.82rem", color: "var(--cs-muted)", maxWidth: "340px", margin: "0 auto 1.5rem", lineHeight: 1.7 }}>
-                Attend a Connected Steps session and your coach will log your attendance. Points show up here automatically.
+            <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12, padding:"1.5rem", textAlign:"center" }}>
+              <div style={{ fontSize:"1.75rem", marginBottom:"0.5rem" }}>🏃</div>
+              <div style={{ fontSize:"0.9rem", fontWeight:700, color:"var(--foreground)", marginBottom:"0.35rem" }}>No sessions yet</div>
+              <p style={{ fontSize:"0.8rem", color:"var(--muted-foreground)", maxWidth:300, margin:"0 auto 1rem", lineHeight:1.6 }}>
+                Attend a session and your coach will log your attendance. Points appear here automatically.
               </p>
-              <Link href="/weekend-run" style={{ display: "inline-block", padding: "10px 24px", background: "var(--cs-orange)", color: "#fff", borderRadius: 8, textDecoration: "none", fontSize: "0.82rem", fontWeight: 700 }}>
-                Register for the next run →
+              <Link href="/weekend-run" style={{ display:"inline-block", padding:"8px 20px", background:"var(--gradient-accent)", color:"#fff", borderRadius:8, textDecoration:"none", fontSize:"0.8rem", fontWeight:700, boxShadow:"var(--shadow-orange)" }}>
+                Register for next run →
               </Link>
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+            <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12, overflow:"hidden" }}>
               {sessions.map((rec, i) => (
-                <SessionCard key={i} rec={rec} userEmail={user.email} userName={fullName} />
+                <div key={i} style={{ borderTop: i > 0 ? "1px solid var(--border)" : "none" }}>
+                  <SessionCard rec={rec} userEmail={user.email} userName={fullName} />
+                </div>
               ))}
             </div>
           )}

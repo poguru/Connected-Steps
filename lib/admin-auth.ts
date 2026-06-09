@@ -2,7 +2,12 @@ import crypto from "crypto";
 import type { NextRequest } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
-const SECRET = process.env.COACH_TOKEN_SECRET ?? process.env.ADMIN_PASSWORD ?? "cs-coach-fallback";
+function requireSecret(): string {
+  const s = process.env.COACH_TOKEN_SECRET ?? process.env.ADMIN_PASSWORD;
+  if (!s) throw new Error("COACH_TOKEN_SECRET or ADMIN_PASSWORD must be set in environment variables");
+  return s;
+}
+const SECRET = requireSecret();
 
 // ── Token helpers ─────────────────────────────────────────────────────────────
 

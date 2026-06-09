@@ -128,7 +128,6 @@ function SessionCard({ s, i, onJoin, mobile }: { s: Session; i: number; onJoin: 
           {countdown}
         </span>
       </div>
-      <div style={{ fontSize: "11px", color: "var(--cs-muted)", marginBottom: "0.75rem", fontWeight: 600 }}>SESSION {String(i + 1).padStart(2, "0")}</div>
       <div style={{ fontSize: "1.05rem", fontWeight: 600, color: "var(--cs-white)", marginBottom: "0.75rem", lineHeight: 1.3 }}>{s.title}</div>
       <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "1rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.8rem", color: "var(--cs-muted)" }}>
@@ -144,7 +143,7 @@ function SessionCard({ s, i, onJoin, mobile }: { s: Session; i: number; onJoin: 
           {s.location}
         </div>
       </div>
-      <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--cs-orange)", letterSpacing: "0.04em" }}>Join session →</div>
+      <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--cs-orange)", letterSpacing: "0.04em" }}>Register for free →</div>
     </div>
   );
 }

@@ -205,7 +205,7 @@ export default function ProfilePage() {
               </select>
             </div>
             {infoError && <div style={{ fontSize: "0.8rem", color: "#f09595" }}>{infoError}</div>}
-            {infoMsg   && <div style={{ fontSize: "0.8rem", color: "var(--cs-success)" }}>{infoMsg}</div>}
+            {infoMsg   && <div style={{ fontSize: "0.8rem", color: "#4ade80" }}>{infoMsg}</div>}
             <button onClick={saveInfo} disabled={infoSaving} style={{ padding: "12px", background: infoSaving ? "oklch(0.72 0.19 49 / 60%)" : "var(--gradient-accent)", color: "var(--accent-foreground)", border: "none", borderRadius: 999, fontSize: "0.875rem", fontWeight: 700, cursor: infoSaving ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: infoSaving ? "none" : "var(--shadow-orange)" }}>
               {infoSaving ? "Saving…" : "Save changes"}
             </button>
@@ -220,7 +220,7 @@ export default function ProfilePage() {
             <div><label style={labelStyle}>New password</label><input type="password" value={pw.next} onChange={e => setPw(p => ({ ...p, next: e.target.value }))} style={newInputStyle} /></div>
             <div><label style={labelStyle}>Confirm new password</label><input type="password" value={pw.confirm} onChange={e => setPw(p => ({ ...p, confirm: e.target.value }))} style={newInputStyle} /></div>
             {pwError && <div style={{ fontSize: "0.8rem", color: "#f09595" }}>{pwError}</div>}
-            {pwMsg   && <div style={{ fontSize: "0.8rem", color: "var(--cs-success)" }}>{pwMsg}</div>}
+            {pwMsg   && <div style={{ fontSize: "0.8rem", color: "#4ade80" }}>{pwMsg}</div>}
             <button onClick={savePassword} disabled={pwSaving} style={{ padding: "12px", background: pwSaving ? "var(--surface-elevated)" : "var(--surface-elevated)", color: "var(--foreground)", border: "1px solid var(--border)", borderRadius: 999, fontSize: "0.875rem", fontWeight: 700, cursor: pwSaving ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
               {pwSaving ? "Changing…" : "Change password"}
             </button>

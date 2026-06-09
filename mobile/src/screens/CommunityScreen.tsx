@@ -1,10 +1,14 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View, Text, FlatList, StyleSheet,
-  TouchableOpacity, ActivityIndicator, RefreshControl,
+  TouchableOpacity, ActivityIndicator, RefreshControl, Alert,
 } from "react-native";
-import { useSafeAreaInsets }   from "react-native-safe-area-context";
-import { getSessions, getCommunityPosts, getStories, getLeaderboard } from "../services/api";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useUser }           from "../context/UserContext";
+import {
+  getSessions, getCommunityPosts, getStories, getLeaderboard,
+  getUserSessions, joinSession, leaveSession, getRSVPCounts,
+} from "../services/api";
 import type { Session, CommunityPost, Story } from "../types";
 
 type Tab = "sessions" | "posts" | "stories";
@@ -28,23 +32,89 @@ function timeAgo(dateStr: string) {
   return `${Math.floor(d / 30)}mo ago`;
 }
 
-// ── Sub-renders ───────────────────────────────────────────────────────────────
+function isPast(session: Session) {
+  const dateStr = session.date;
+  const timeStr = session.time ?? "23:59";
+  const [h, m]  = timeStr.split(":").map(Number);
+  const start   = new Date(`${dateStr}T${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:00+05:30`);
+  return new Date() > new Date(start.getTime() + 2 * 60 * 60 * 1000);
+}
 
-function SessionCard({ item }: { item: Session }) {
+// ── Session Card ──────────────────────────────────────────────────────────────
+
+interface SessionCardProps {
+  item:       Session;
+  joined:     boolean;
+  rsvpCount:  number;
+  joining:    boolean;
+  canJoin:    boolean;
+  onJoin:     () => void;
+  onLeave:    () => void;
+}
+
+function SessionCard({ item, joined, rsvpCount, joining, canJoin, onJoin, onLeave }: SessionCardProps) {
+  const past = isPast(item);
+
   return (
-    <View style={S.sessionCard}>
-      <View style={S.sessionDate}>
-        <Text style={S.sessionDateText}>{fmtDate(item.date)}</Text>
+    <View style={[S.sessionCard, joined && S.sessionCardJoined]}>
+      {/* Date / time column */}
+      <View style={[S.sessionDateCol, joined && S.sessionDateColJoined]}>
+        <Text style={[S.sessionDateText, joined && S.sessionDateTextJoined]}>{fmtDate(item.date)}</Text>
         {item.time ? <Text style={S.sessionTimeText}>{fmtTime(item.time)}</Text> : null}
+        {rsvpCount > 0 && (
+          <View style={S.rsvpPill}>
+            <Text style={S.rsvpText}>🏃 {rsvpCount}</Text>
+          </View>
+        )}
       </View>
-      <View style={{ flex: 1 }}>
+
+      {/* Info + CTA */}
+      <View style={{ flex: 1, gap: 6 }}>
         <Text style={S.sessionTitle} numberOfLines={2}>{item.title}</Text>
         {item.venue    ? <Text style={S.sessionMeta} numberOfLines={1}>📍 {item.venue}</Text>    : null}
         {item.location ? <Text style={S.sessionMeta} numberOfLines={1}>🗺 {item.location}</Text> : null}
+
+        {past ? (
+          joined ? (
+            <View style={S.attendedBadge}>
+              <Text style={S.attendedText}>✓ You registered</Text>
+            </View>
+          ) : (
+            <View style={S.closedBadge}>
+              <Text style={S.closedText}>Registration closed</Text>
+            </View>
+          )
+        ) : joined ? (
+          <View style={S.joinedRow}>
+            <View style={S.joinedBadge}>
+              <Text style={S.joinedText}>✓ You're in!</Text>
+            </View>
+            <TouchableOpacity onPress={onLeave} disabled={joining} style={S.leaveBtn} activeOpacity={0.75}>
+              {joining
+                ? <ActivityIndicator size="small" color={C.textMuted} />
+                : <Text style={S.leaveBtnText}>Leave</Text>
+              }
+            </TouchableOpacity>
+          </View>
+        ) : canJoin ? (
+          <TouchableOpacity
+            style={[S.joinBtn, joining && { opacity: 0.6 }]}
+            onPress={onJoin}
+            disabled={joining}
+            activeOpacity={0.82}
+          >
+            {joining
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Text style={S.joinBtnText}>Join this run →</Text>
+            }
+          </TouchableOpacity>
+        ) : null}
       </View>
     </View>
   );
 }
+
+// ── Post Card ─────────────────────────────────────────────────────────────────
 
 function PostCard({ item }: { item: CommunityPost }) {
   const [expanded, setExpanded] = useState(false);
@@ -60,6 +130,8 @@ function PostCard({ item }: { item: CommunityPost }) {
     </TouchableOpacity>
   );
 }
+
+// ── Story Card ────────────────────────────────────────────────────────────────
 
 function StoryCard({ item }: { item: Story }) {
   return (
@@ -79,35 +151,107 @@ function StoryCard({ item }: { item: Story }) {
   );
 }
 
-// ── Main screen ───────────────────────────────────────────────────────────────
+// ── Main Screen ───────────────────────────────────────────────────────────────
 
 export default function CommunityScreen() {
-  const insets                          = useSafeAreaInsets();
-  const [tab,         setTab]           = useState<Tab>("sessions");
-  const [sessions,    setSessions]      = useState<Session[]>([]);
-  const [posts,       setPosts]         = useState<CommunityPost[]>([]);
-  const [stories,     setStories]       = useState<Story[]>([]);
-  const [activeCount, setActiveCount]   = useState(0);
-  const [loading,     setLoading]       = useState(true);
-  const [refreshing,  setRefreshing]    = useState(false);
+  const insets          = useSafeAreaInsets();
+  const { user }        = useUser();
+
+  const [tab,          setTab]          = useState<Tab>("sessions");
+  const [sessions,     setSessions]     = useState<Session[]>([]);
+  const [posts,        setPosts]        = useState<CommunityPost[]>([]);
+  const [stories,      setStories]      = useState<Story[]>([]);
+  const [activeCount,  setActiveCount]  = useState(0);
+  const [loading,      setLoading]      = useState(true);
+  const [refreshing,   setRefreshing]   = useState(false);
+
+  // Registration state
+  const [joinedIds,    setJoinedIds]    = useState<Set<string>>(new Set());
+  const [rsvpCounts,   setRsvpCounts]   = useState<Record<string, number>>({});
+  const [joiningId,    setJoiningId]    = useState<string | null>(null);
+
+  // Prevent double-tap
+  const actionInFlight = useRef(false);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     const [s, p, st, lb] = await Promise.allSettled([
       getSessions(), getCommunityPosts(), getStories(), getLeaderboard(),
     ]);
-    if (s.status  === "fulfilled") setSessions(s.value);
+    let loadedSessions: Session[] = [];
+    if (s.status  === "fulfilled") { loadedSessions = s.value; setSessions(s.value); }
     if (p.status  === "fulfilled") setPosts(p.value);
     if (st.status === "fulfilled") setStories(st.value);
     if (lb.status === "fulfilled") {
-      const active = (lb.value as any[]).filter((e: any) => e.month_points > 0).length;
-      setActiveCount(active);
+      setActiveCount((lb.value as any[]).filter((e: any) => e.month_points > 0).length);
     }
+
+    // Load user's registrations & RSVP counts in parallel
+    if (user && loadedSessions.length) {
+      const ids = loadedSessions.map(s => s.id);
+      const [userSessions, counts] = await Promise.allSettled([
+        getUserSessions(user.email),
+        getRSVPCounts(ids),
+      ]);
+      if (userSessions.status === "fulfilled") {
+        setJoinedIds(new Set(userSessions.value.map(us => us.sessions.id)));
+      }
+      if (counts.status === "fulfilled") {
+        setRsvpCounts(counts.value);
+      }
+    }
+
     setLoading(false);
     setRefreshing(false);
-  }, []);
+  }, [user]);
 
   useEffect(() => { load(); }, [load]);
+
+  async function handleJoin(session: Session) {
+    if (!user || actionInFlight.current) return;
+    actionInFlight.current = true;
+    setJoiningId(session.id);
+    try {
+      await joinSession(session.id, user.email);
+      setJoinedIds(prev => new Set([...prev, session.id]));
+      setRsvpCounts(prev => ({ ...prev, [session.id]: (prev[session.id] ?? 0) + 1 }));
+      Alert.alert("You're in! 🏃", `See you at ${session.title}.\nA confirmation email is on its way.`);
+    } catch (e: unknown) {
+      Alert.alert("Couldn't register", e instanceof Error ? e.message : "Please try again.");
+    } finally {
+      setJoiningId(null);
+      actionInFlight.current = false;
+    }
+  }
+
+  async function handleLeave(session: Session) {
+    if (!user || actionInFlight.current) return;
+    Alert.alert(
+      "Leave session?",
+      `Remove your registration for ${session.title}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Leave",
+          style: "destructive",
+          onPress: async () => {
+            actionInFlight.current = true;
+            setJoiningId(session.id);
+            try {
+              await leaveSession(session.id, user.email);
+              setJoinedIds(prev => { const next = new Set(prev); next.delete(session.id); return next; });
+              setRsvpCounts(prev => ({ ...prev, [session.id]: Math.max(0, (prev[session.id] ?? 1) - 1) }));
+            } catch (e: unknown) {
+              Alert.alert("Couldn't leave", e instanceof Error ? e.message : "Please try again.");
+            } finally {
+              setJoiningId(null);
+              actionInFlight.current = false;
+            }
+          },
+        },
+      ]
+    );
+  }
 
   const TABS: { key: Tab; label: string; count: number }[] = [
     { key: "sessions", label: "Sessions", count: sessions.length },
@@ -124,7 +268,7 @@ export default function CommunityScreen() {
         <Text style={S.headerSub}>Upcoming runs, questions & member stories</Text>
       </View>
 
-      {/* Weekly activity summary — always visible */}
+      {/* Summary bar */}
       <View style={S.summaryBar}>
         <View style={S.summaryItem}>
           <Text style={S.summaryVal}>{loading ? "—" : activeCount}</Text>
@@ -137,8 +281,8 @@ export default function CommunityScreen() {
         </View>
         <View style={S.summarySep} />
         <View style={S.summaryItem}>
-          <Text style={S.summaryVal}>{loading ? "—" : posts.length}</Text>
-          <Text style={S.summaryLabel}>Questions</Text>
+          <Text style={S.summaryVal}>{loading ? "—" : joinedIds.size}</Text>
+          <Text style={S.summaryLabel}>Your registrations</Text>
         </View>
         <View style={S.summarySep} />
         <View style={S.summaryItem}>
@@ -168,7 +312,17 @@ export default function CommunityScreen() {
         <FlatList
           data={sessions}
           keyExtractor={i => i.id}
-          renderItem={({ item }) => <SessionCard item={item} />}
+          renderItem={({ item }) => (
+            <SessionCard
+              item={item}
+              joined={joinedIds.has(item.id)}
+              rsvpCount={rsvpCounts[item.id] ?? 0}
+              joining={joiningId === item.id}
+              canJoin={!!user && !isPast(item)}
+              onJoin={() => handleJoin(item)}
+              onLeave={() => handleLeave(item)}
+            />
+          )}
           contentContainerStyle={S.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={C.orange} />}
           showsVerticalScrollIndicator={false}
@@ -176,7 +330,7 @@ export default function CommunityScreen() {
             <View style={S.emptyState}>
               <Text style={S.emptyIcon}>🗓</Text>
               <Text style={S.emptyTitle}>No sessions scheduled yet</Text>
-              <Text style={S.emptyText}>New runs are added every week. Check back soon to register for your next session.</Text>
+              <Text style={S.emptyText}>New runs are added every week. Check back soon.</Text>
             </View>
           }
         />
@@ -192,7 +346,7 @@ export default function CommunityScreen() {
             <View style={S.emptyState}>
               <Text style={S.emptyIcon}>💬</Text>
               <Text style={S.emptyTitle}>No questions yet</Text>
-              <Text style={S.emptyText}>Be the first to ask a question. The community and coaches are here to help.</Text>
+              <Text style={S.emptyText}>The community and coaches are here to help.</Text>
             </View>
           }
         />
@@ -208,7 +362,7 @@ export default function CommunityScreen() {
             <View style={S.emptyState}>
               <Text style={S.emptyIcon}>⭐</Text>
               <Text style={S.emptyTitle}>No stories yet</Text>
-              <Text style={S.emptyText}>Every runner has a story. Share yours and inspire the community.</Text>
+              <Text style={S.emptyText}>Share yours and inspire the community.</Text>
             </View>
           }
         />
@@ -217,11 +371,22 @@ export default function CommunityScreen() {
   );
 }
 
+// ── Tokens ────────────────────────────────────────────────────────────────────
+
 const C = {
-  bg:       "#080808", surface: "#111111", border: "#222222",
-  orange:   "#e8620a", orangeDim: "rgba(232,98,10,0.12)",
-  white:    "#f5f5f5", text: "#f0f0f0", textSub: "#888888", textMuted: "#505050",
-  gold:     "#f59e0b",
+  bg:        "#080808",
+  surface:   "#111111",
+  border:    "#222222",
+  orange:    "#e8620a",
+  orangeDim: "rgba(232,98,10,0.12)",
+  orangeMid: "rgba(232,98,10,0.22)",
+  green:     "#4ade80",
+  greenDim:  "rgba(74,222,128,0.10)",
+  white:     "#f5f5f5",
+  text:      "#f0f0f0",
+  textSub:   "#888888",
+  textMuted: "#505050",
+  gold:      "#f59e0b",
 };
 
 const S = StyleSheet.create({
@@ -230,58 +395,73 @@ const S = StyleSheet.create({
   headerTitle: { fontSize: 22, fontWeight: "800", color: C.white, letterSpacing: -0.3 },
   headerSub:   { fontSize: 12, color: C.textSub, marginTop: 4 },
 
-  // Activity summary bar
-  summaryBar:  { flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: "#0d0d0d" },
-  summaryItem: { flex: 1, alignItems: "center" },
-  summaryVal:  { fontSize: 16, fontWeight: "800", color: C.orange, letterSpacing: -0.3 },
-  summaryLabel:{ fontSize: 9, color: C.textSub, textTransform: "uppercase", letterSpacing: 0.3, marginTop: 2, textAlign: "center" },
-  summarySep:  { width: 1, height: 28, backgroundColor: C.border },
+  summaryBar:   { flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: "#0d0d0d" },
+  summaryItem:  { flex: 1, alignItems: "center" },
+  summaryVal:   { fontSize: 16, fontWeight: "800", color: C.orange, letterSpacing: -0.3 },
+  summaryLabel: { fontSize: 9, color: C.textSub, textTransform: "uppercase", letterSpacing: 0.3, marginTop: 2, textAlign: "center" },
+  summarySep:   { width: 1, height: 28, backgroundColor: C.border },
 
-  // Tab bar
-  tabBar:         { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: C.border },
-  tabItem:        { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 13, gap: 5 },
-  tabItemActive:  { borderBottomWidth: 2, borderBottomColor: C.orange },
-  tabText:        { fontSize: 13, fontWeight: "600", color: C.textMuted },
-  tabTextActive:  { color: C.orange },
-  tabBadge:       { backgroundColor: C.border, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 },
-  tabBadgeActive: { backgroundColor: C.orangeDim },
-  tabBadgeText:   { fontSize: 10, color: C.textSub, fontWeight: "700" },
+  tabBar:             { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: C.border },
+  tabItem:            { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 13, gap: 5 },
+  tabItemActive:      { borderBottomWidth: 2, borderBottomColor: C.orange },
+  tabText:            { fontSize: 13, fontWeight: "600", color: C.textMuted },
+  tabTextActive:      { color: C.orange },
+  tabBadge:           { backgroundColor: C.border, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 },
+  tabBadgeActive:     { backgroundColor: C.orangeDim },
+  tabBadgeText:       { fontSize: 10, color: C.textSub, fontWeight: "700" },
   tabBadgeTextActive: { color: C.orange },
 
-  list:  { padding: 16, paddingBottom: 40 },
+  list: { padding: 16, paddingBottom: 40 },
 
-  // Empty states
   emptyState: { alignItems: "center", paddingTop: 56, paddingHorizontal: 32 },
   emptyIcon:  { fontSize: 48, marginBottom: 14 },
   emptyTitle: { fontSize: 16, fontWeight: "700", color: C.white, marginBottom: 8 },
   emptyText:  { fontSize: 13, color: C.textSub, textAlign: "center", lineHeight: 20 },
 
   // Session card
-  sessionCard:     { flexDirection: "row", gap: 14, backgroundColor: C.surface, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: C.border, marginBottom: 10 },
-  sessionDate:     { alignItems: "center", justifyContent: "center", minWidth: 58, backgroundColor: "#0f0f0f", borderRadius: 12, padding: 10 },
-  sessionDateText: { fontSize: 11, fontWeight: "700", color: C.orange, textAlign: "center" },
-  sessionTimeText: { fontSize: 11, color: C.textSub, marginTop: 3, textAlign: "center" },
-  sessionTitle:    { fontSize: 14, fontWeight: "700", color: C.text, marginBottom: 6, lineHeight: 20 },
-  sessionMeta:     { fontSize: 12, color: C.textSub, marginTop: 2 },
+  sessionCard:           { flexDirection: "row", gap: 14, backgroundColor: C.surface, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: C.border, marginBottom: 10 },
+  sessionCardJoined:     { borderColor: "rgba(74,222,128,0.25)", backgroundColor: "#0a120a" },
+  sessionDateCol:        { alignItems: "center", justifyContent: "flex-start", minWidth: 60, backgroundColor: "#0f0f0f", borderRadius: 12, padding: 10, gap: 4 },
+  sessionDateColJoined:  { backgroundColor: "rgba(74,222,128,0.06)" },
+  sessionDateText:       { fontSize: 11, fontWeight: "700", color: C.orange, textAlign: "center" },
+  sessionDateTextJoined: { color: C.green },
+  sessionTimeText:       { fontSize: 11, color: C.textSub, textAlign: "center" },
+  rsvpPill:              { backgroundColor: C.orangeDim, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, marginTop: 4 },
+  rsvpText:              { fontSize: 10, color: C.orange, fontWeight: "700" },
+  sessionTitle:          { fontSize: 14, fontWeight: "700", color: C.text, lineHeight: 20 },
+  sessionMeta:           { fontSize: 12, color: C.textSub },
+
+  // Join / leave UI
+  joinBtn:       { backgroundColor: C.orange, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 14, alignItems: "center", marginTop: 4 },
+  joinBtnText:   { color: "#fff", fontWeight: "700", fontSize: 13 },
+  joinedRow:     { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
+  joinedBadge:   { backgroundColor: C.greenDim, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: "rgba(74,222,128,0.25)" },
+  joinedText:    { fontSize: 12, color: C.green, fontWeight: "700" },
+  leaveBtn:      { borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+  leaveBtnText:  { fontSize: 12, color: C.textMuted, fontWeight: "600" },
+  attendedBadge: { backgroundColor: "rgba(74,222,128,0.06)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: "rgba(74,222,128,0.15)", marginTop: 4 },
+  attendedText:  { fontSize: 11, color: C.green },
+  closedBadge:   { backgroundColor: "#1a1a1a", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, marginTop: 4 },
+  closedText:    { fontSize: 11, color: C.textMuted },
 
   // Post card
-  postCard:    { backgroundColor: C.surface, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: C.border, marginBottom: 10 },
-  postTop:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
+  postCard:         { backgroundColor: C.surface, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: C.border, marginBottom: 10 },
+  postTop:          { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
   postCategoryPill: { backgroundColor: C.orangeDim, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  postCategory:{ fontSize: 10, color: C.orange, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3 },
-  postAge:     { fontSize: 11, color: C.textMuted },
-  postTitle:   { fontSize: 14, fontWeight: "700", color: C.text, lineHeight: 20, marginBottom: 6 },
-  postBody:    { fontSize: 13, color: C.textSub, lineHeight: 20, marginBottom: 10 },
-  postAuthor:  { fontSize: 12, color: C.textMuted, fontStyle: "italic" },
+  postCategory:     { fontSize: 10, color: C.orange, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3 },
+  postAge:          { fontSize: 11, color: C.textMuted },
+  postTitle:        { fontSize: 14, fontWeight: "700", color: C.text, lineHeight: 20, marginBottom: 6 },
+  postBody:         { fontSize: 13, color: C.textSub, lineHeight: 20, marginBottom: 10 },
+  postAuthor:       { fontSize: 12, color: C.textMuted, fontStyle: "italic" },
 
   // Story card
-  storyCard:     { backgroundColor: C.surface, borderRadius: 18, padding: 18, borderWidth: 1, borderColor: C.border, marginBottom: 10 },
-  storyHeader:   { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 14 },
-  storyAvatar:   { width: 40, height: 40, borderRadius: 20, backgroundColor: C.orangeDim, alignItems: "center", justifyContent: "center" },
-  storyInitial:  { fontSize: 16, fontWeight: "700", color: C.orange },
-  storyName:     { fontSize: 14, fontWeight: "700", color: C.text },
+  storyCard:        { backgroundColor: C.surface, borderRadius: 18, padding: 18, borderWidth: 1, borderColor: C.border, marginBottom: 10 },
+  storyHeader:      { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 14 },
+  storyAvatar:      { width: 40, height: 40, borderRadius: 20, backgroundColor: C.orangeDim, alignItems: "center", justifyContent: "center" },
+  storyInitial:     { fontSize: 16, fontWeight: "700", color: C.orange },
+  storyName:        { fontSize: 14, fontWeight: "700", color: C.text },
   storyAchievement: { fontSize: 11, color: C.orange, marginTop: 2 },
-  ratingBadge:   { marginLeft: "auto" as any, backgroundColor: "rgba(245,158,11,0.1)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  ratingText:    { fontSize: 12, color: C.gold },
-  storyQuote:    { fontSize: 14, color: C.textSub, lineHeight: 22, fontStyle: "italic" },
+  ratingBadge:      { marginLeft: "auto" as any, backgroundColor: "rgba(245,158,11,0.1)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  ratingText:       { fontSize: 12, color: C.gold },
+  storyQuote:       { fontSize: 14, color: C.textSub, lineHeight: 22, fontStyle: "italic" },
 });

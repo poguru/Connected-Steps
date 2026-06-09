@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import Razorpay from "razorpay";
 
-const razorpay = new Razorpay({
-  key_id:     process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
+function getRazorpay() {
+  const key_id     = process.env.RAZORPAY_KEY_ID;
+  const key_secret = process.env.RAZORPAY_KEY_SECRET;
+  if (!key_id || !key_secret) throw new Error("Razorpay keys not configured");
+  return new Razorpay({ key_id, key_secret });
+}
 
 const DEFAULT_FEE_PAISE = 19900; // ₹199 fallback
 
@@ -16,7 +18,7 @@ export async function POST(req: NextRequest) {
 
     const fee = (typeof amount_paise === "number" && amount_paise > 0) ? amount_paise : DEFAULT_FEE_PAISE;
 
-    const order = await razorpay.orders.create({
+    const order = await getRazorpay().orders.create({
       amount:   fee,
       currency: "INR",
       receipt:  `run_${event_date}_${Date.now()}`,

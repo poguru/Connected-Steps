@@ -2,37 +2,29 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { motion } from "framer-motion";
-import { Crown, Trophy, Medal, Flame, TrendingUp } from "lucide-react";
+import { Flame, TrendingUp } from "lucide-react";
 import { MenuUser } from "@/components/ui/UserMenu";
 import AppNav from "@/components/layout/AppNav";
 import { getSupabase } from "@/lib/supabase";
 
-interface User       { firstName: string; lastName: string; email: string; phone: string; photo: string | null; goal: string; location: string; }
-interface LeaderboardEntry { id: string; user_email: string; user_name: string; location: string; month_points: number; total_points: number; photo: string | null; }
+interface User  { firstName: string; lastName: string; email: string; phone: string; photo: string | null; goal: string; location: string; }
+interface Entry { id: string; user_email: string; user_name: string; location: string; month_points: number; total_points: number; photo: string | null; }
 
 function initials(name: string) { return name.split(" ").map(n => n[0] ?? "").join("").slice(0, 2).toUpperCase(); }
 
-const podiumCfg = [
-  { ring: "from-amber-300 via-yellow-400 to-amber-600", badge: "linear-gradient(135deg,#fcd34d,#d97706)", icon: Crown  },
-  { ring: "from-zinc-200 via-zinc-400 to-zinc-500",    badge: "linear-gradient(135deg,#e4e4e7,#a1a1aa)", icon: Trophy },
-  { ring: "from-orange-400 via-amber-600 to-amber-800", badge: "linear-gradient(135deg,#fb923c,#92400e)", icon: Medal  },
-];
+const MEDAL = ["🥇", "🥈", "🥉"];
 
 export default function Leaderboard() {
   const router = useRouter();
-  const [user,        setUser]        = useState<User | null>(null);
-  const [entries,     setEntries]     = useState<LeaderboardEntry[]>([]);
-  const [tab,         setTab]         = useState<"month" | "total">("month");
-  const [loading,     setLoading]     = useState(true);
-  const [locFilter,   setLocFilter]   = useState("All");
-  const [live,        setLive]        = useState(false);
-  const [followingSet,setFollowingSet]= useState<Set<string>>(new Set());
-  const [followBusy,  setFollowBusy]  = useState<Set<string>>(new Set());
+  const [user,          setUser]          = useState<User | null>(null);
+  const [entries,       setEntries]       = useState<Entry[]>([]);
+  const [tab,           setTab]           = useState<"month" | "total">("month");
+  const [loading,       setLoading]       = useState(true);
+  const [locFilter,     setLocFilter]     = useState("All");
+  const [live,          setLive]          = useState(false);
+  const [followingSet,  setFollowingSet]  = useState<Set<string>>(new Set());
+  const [followBusy,    setFollowBusy]    = useState<Set<string>>(new Set());
 
-  // Keep a ref so the realtime callback always reads the latest tab without
-  // needing to be re-created (avoids channel churn on tab switch).
   const tabRef = useRef(tab);
   useEffect(() => { tabRef.current = tab; }, [tab]);
 
@@ -42,13 +34,12 @@ export default function Leaderboard() {
       .then(d => {
         if (d.entries) {
           const key = tabRef.current === "month" ? "month_points" : "total_points";
-          setEntries([...d.entries].sort((a: LeaderboardEntry, b: LeaderboardEntry) => (b[key] ?? 0) - (a[key] ?? 0)));
+          setEntries([...d.entries].sort((a: Entry, b: Entry) => (b[key] ?? 0) - (a[key] ?? 0)));
         }
       })
       .catch(() => {});
   }, []);
 
-  // Initial fetch + re-sort when tab changes
   useEffect(() => {
     setLoading(true);
     fetch("/api/leaderboard")
@@ -56,14 +47,13 @@ export default function Leaderboard() {
       .then(d => {
         if (d.entries) {
           const key = tab === "month" ? "month_points" : "total_points";
-          setEntries([...d.entries].sort((a: LeaderboardEntry, b: LeaderboardEntry) => (b[key] ?? 0) - (a[key] ?? 0)));
+          setEntries([...d.entries].sort((a: Entry, b: Entry) => (b[key] ?? 0) - (a[key] ?? 0)));
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [tab]);
 
-  // Supabase realtime — stable channel, refetches on any leaderboard row change
   useEffect(() => {
     const supabase = getSupabase();
     const channel = supabase
@@ -89,8 +79,7 @@ export default function Leaderboard() {
     setFollowBusy(prev => new Set(prev).add(targetEmail));
     try {
       const res  = await fetch("/api/follow", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ follower_email: user.email, following_email: targetEmail }),
       });
       const data = await res.json();
@@ -118,13 +107,13 @@ export default function Leaderboard() {
     ranks.push((filtered[i][pointsKey] ?? 0) === (filtered[i-1][pointsKey] ?? 0) ? ranks[i-1] : ranks[i-1] + 1);
   }
 
-  const myIndex = filtered.findIndex(e => e.user_email === user.email);
-  const myRank  = myIndex >= 0 ? ranks[myIndex] : null;
-  const podium  = filtered.slice(0, 3);
-  const rest    = filtered.slice(3);
+  const myIndex  = filtered.findIndex(e => e.user_email === user.email);
+  const myRank   = myIndex >= 0 ? ranks[myIndex] : null;
+  const podium   = filtered.slice(0, 3);
+  const rest     = filtered.slice(3);
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)" }}>
+    <div style={{ minHeight:"100vh", background:"var(--background)", color:"var(--foreground)" }}>
 
       <AppNav
         user={user as MenuUser}
@@ -132,99 +121,97 @@ export default function Leaderboard() {
         activeLabel="Leaderboard"
       />
 
-      {/* Hero */}
-      <section style={{ position: "relative", overflow: "hidden" }}>
-        <div className="absolute -top-32 left-1/2 h-96 rounded-full blur-3xl pointer-events-none"
-          style={{ width: "60rem", transform: "translateX(-50%)", background: "oklch(0.74 0.2 50 / 20%)" }} />
-        <div className="dot-bg absolute inset-0" style={{ opacity: 0.4 }} />
-        <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "calc(var(--nav-total) + 2rem) 1.5rem 3rem", textAlign: "center" }}>
+      {/* ── Page header ── */}
+      <section style={{ position:"relative", overflow:"hidden" }}>
+        <div className="dot-bg absolute inset-0" style={{ opacity:0.3 }} />
+        <div style={{ position:"relative", maxWidth:960, margin:"0 auto", padding:"calc(var(--nav-total) + 1.5rem) 1.5rem 2rem" }}>
 
-          {/* Live badge */}
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 999, border: "1px solid var(--border)", background: "oklch(0.19 0.015 270 / 60%)", padding: "6px 14px", fontSize: 12, fontWeight: 500, color: "var(--muted-foreground)", backdropFilter: "blur(8px)", marginBottom: "1.25rem" }}>
-            {live ? (
-              <>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#4ade80", display: "inline-block", boxShadow: "0 0 0 2px oklch(0.74 0.22 150 / 25%)" }} className="animate-pulse" />
-                Live updates · Hyderabad chapter
-              </>
-            ) : (
-              <><Flame size={14} style={{ color: "var(--accent)" }} /> Updated live · Hyderabad chapter</>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12, marginBottom:"1.5rem" }}>
+            {/* Title + live indicator */}
+            <div>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+                <h1 className="font-display" style={{ fontSize:"clamp(1.75rem, 5vw, 2.5rem)", fontWeight:700, lineHeight:1.05, letterSpacing:"-0.015em", margin:0 }}>
+                  Leaderboard
+                </h1>
+                {live && (
+                  <span style={{ display:"inline-flex", alignItems:"center", gap:5, borderRadius:20, background:"oklch(0.74 0.22 150 / 10%)", border:"1px solid oklch(0.74 0.22 150 / 25%)", padding:"3px 10px", fontSize:11, color:"#4ade80", fontWeight:600 }}>
+                    <span style={{ width:6, height:6, borderRadius:"50%", background:"#4ade80", display:"inline-block" }} className="animate-pulse" />
+                    Live
+                  </span>
+                )}
+              </div>
+              <p style={{ fontSize:"0.85rem", color:"var(--muted-foreground)", margin:0 }}>
+                Earn points by attending sessions — the more you show up, the higher you climb.
+              </p>
+            </div>
+
+            {/* My rank badge */}
+            {myRank && (
+              <div style={{ display:"inline-flex", alignItems:"center", gap:8, borderRadius:8, background:"oklch(0.72 0.19 49 / 10%)", border:"1px solid oklch(0.72 0.19 49 / 30%)", padding:"8px 16px" }}>
+                <span style={{ fontSize:"0.8rem", color:"var(--muted-foreground)" }}>Your rank</span>
+                <span style={{ fontSize:"1.25rem", fontWeight:800, color:"var(--cs-orange)", letterSpacing:"-0.5px" }}>#{myRank}</span>
+              </div>
             )}
           </div>
 
-          <h1 className="font-display" style={{ fontSize: "clamp(2.5rem, 7vw, 5rem)", fontWeight: 700, lineHeight: 1.02, letterSpacing: "-0.015em" }}>
-            The <span className="text-italic-serif">Leaderboard</span>.
-          </h1>
-          <p style={{ margin: "1rem auto 0", maxWidth: 480, fontSize: "1rem", color: "var(--muted-foreground)" }}>
-            Earn points by attending sessions and winning challenges. The more you show up, the higher you climb.
-          </p>
-
-          {/* Tabs + filter */}
-          <div style={{ marginTop: "2rem", display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: 12 }}>
-            <div style={{ display: "inline-flex", borderRadius: 999, border: "1px solid var(--border)", background: "oklch(0.19 0.015 270 / 70%)", padding: 4, backdropFilter: "blur(8px)" }}>
+          {/* Tab + filter row */}
+          <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+            <div style={{ display:"inline-flex", borderRadius:8, border:"1px solid var(--border)", background:"var(--surface)", padding:3 }}>
               {(["month", "total"] as const).map(t => (
                 <button key={t} onClick={() => setTab(t)} style={{
-                  borderRadius: 999, padding: "8px 20px", fontSize: "0.875rem", fontWeight: 600, border: "none", cursor: "pointer", fontFamily: "var(--font-body)", transition: "all 0.2s",
+                  borderRadius:6, padding:"7px 16px", fontSize:"0.8rem", fontWeight:600, border:"none", cursor:"pointer", fontFamily:"var(--font-body)", transition:"all 0.15s",
                   background: tab === t ? "var(--gradient-accent)" : "transparent",
-                  color: tab === t ? "var(--accent-foreground)" : "var(--muted-foreground)",
-                  boxShadow: tab === t ? "var(--shadow-orange)" : "none",
+                  color:      tab === t ? "#fff" : "var(--muted-foreground)",
+                  boxShadow:  tab === t ? "var(--shadow-orange)" : "none",
                 }}>
                   {t === "month" ? "This month" : "All time"}
                 </button>
               ))}
             </div>
-            <select value={locFilter} onChange={e => setLocFilter(e.target.value)}
-              style={{ padding: "8px 12px", borderRadius: 999, border: "1px solid var(--border)", background: "oklch(0.19 0.015 270 / 70%)", color: "var(--foreground)", fontSize: "0.8rem", fontFamily: "var(--font-body)", outline: "none", cursor: "pointer", colorScheme: "dark", backdropFilter: "blur(8px)" }}>
-              {locations.map(l => <option key={l} value={l} style={{ background: "#1a1a1a" }}>{l === "All" ? "All locations" : l}</option>)}
-            </select>
+            {locations.length > 2 && (
+              <select value={locFilter} onChange={e => setLocFilter(e.target.value)}
+                style={{ padding:"7px 12px", borderRadius:8, border:"1px solid var(--border)", background:"var(--surface)", color:"var(--foreground)", fontSize:"0.8rem", fontFamily:"var(--font-body)", outline:"none", cursor:"pointer", colorScheme:"dark" }}>
+                {locations.map(l => <option key={l} value={l} style={{ background:"#1a1a1a" }}>{l === "All" ? "All locations" : l}</option>)}
+              </select>
+            )}
           </div>
 
-          {/* My rank pill */}
-          {myRank && (
-            <div style={{ marginTop: "1.25rem", display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 999, background: "oklch(0.72 0.19 49 / 10%)", border: "1px solid oklch(0.72 0.19 49 / 25%)", padding: "6px 16px", fontSize: "0.875rem" }}>
-              <span style={{ color: "var(--muted-foreground)" }}>Your rank:</span>
-              <span style={{ fontWeight: 700, color: "var(--primary)" }}>#{myRank}</span>
-            </div>
-          )}
-
-          {/* Podium */}
+          {/* ── Compact podium strip ── */}
           {!loading && podium.length >= 3 && (
-            <div style={{ maxWidth: 640, margin: "3rem auto 0", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", alignItems: "flex-end", gap: 12 }}>
-              {[1, 0, 2].map((idx, i) => {
+            <div style={{ marginTop:"1.5rem", display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:8, maxWidth:520 }}>
+              {[1, 0, 2].map(idx => {
                 const r   = podium[idx];
-                const cfg = podiumCfg[idx];
-                const Icon = cfg.icon;
-                const heightMap = ["10rem", "14rem", "8rem"];
-                const gradient = cfg.ring.includes("amber") ? "#fcd34d,#d97706" : cfg.ring.includes("zinc") ? "#e4e4e7,#a1a1aa" : "#fb923c,#92400e";
+                const isMe = r.user_email === user.email;
+                const following = followingSet.has(r.user_email);
+                const busy = followBusy.has(r.user_email);
+                const borderColors = ["rgba(252,211,77,0.4)", "rgba(228,228,231,0.3)", "rgba(251,146,60,0.35)"];
                 return (
-                  <motion.div key={r.user_email} initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.12 }}
-                    style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                    <div style={{ position: "relative", marginBottom: 12, borderRadius: "50%", padding: 3, background: `linear-gradient(135deg, ${gradient})` }}>
-                      <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--surface)", display: "grid", placeItems: "center", fontFamily: "var(--font-display)", fontSize: "1.1rem", fontWeight: 700, color: "var(--foreground)" }}>
-                        {initials(r.user_name)}
-                      </div>
-                      <div style={{ position: "absolute", bottom: -6, left: "50%", transform: "translateX(-50%)", width: 24, height: 24, borderRadius: "50%", background: cfg.badge, display: "grid", placeItems: "center", fontSize: 10, fontWeight: 700, color: "#000", boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
-                        {idx + 1}
-                      </div>
+                  <div key={r.user_email} style={{
+                    background:"var(--surface)",
+                    border:`1px solid ${isMe ? "oklch(0.72 0.19 49 / 35%)" : borderColors[idx]}`,
+                    borderRadius:12, padding:"0.875rem 0.75rem", textAlign:"center",
+                    boxShadow: idx === 0 ? "0 0 0 1px rgba(252,211,77,0.15), var(--shadow-md)" : "var(--shadow-md)",
+                  }}>
+                    <div style={{ fontSize:"1.25rem", marginBottom:6 }}>{MEDAL[idx]}</div>
+                    <div style={{ width:44, height:44, borderRadius:"50%", background:"var(--gradient-primary)", display:"grid", placeItems:"center", margin:"0 auto 6px", fontSize:"0.85rem", fontWeight:700, color:"#fff" }}>
+                      {initials(r.user_name)}
                     </div>
-                    <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--foreground)", textAlign: "center" }}>{r.user_name.split(" ")[0]}</div>
-                    <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginBottom: 8 }}>📍 {r.location}</div>
-                    {r.user_email !== user.email && (
-                      <button onClick={() => toggleFollow(r.user_email)} disabled={followBusy.has(r.user_email)}
-                        style={{ marginBottom: 8, padding: "4px 14px", borderRadius: 999, fontSize: 11, fontWeight: 600, cursor: followBusy.has(r.user_email) ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", border: "1px solid", transition: "all 0.15s", opacity: followBusy.has(r.user_email) ? 0.6 : 1,
-                          background:  followingSet.has(r.user_email) ? "transparent" : "var(--gradient-accent)",
-                          color:       followingSet.has(r.user_email) ? "var(--muted-foreground)" : "var(--accent-foreground)",
-                          borderColor: followingSet.has(r.user_email) ? "var(--border)" : "transparent",
+                    <div style={{ fontSize:"0.8rem", fontWeight:700, color: isMe ? "var(--cs-orange)" : "var(--foreground)", marginBottom:2 }}>
+                      {r.user_name.split(" ")[0]}{isMe ? " ★" : ""}
+                    </div>
+                    <div style={{ fontSize:"1rem", fontWeight:800, color:"var(--cs-orange)", letterSpacing:"-0.3px" }}>{r[pointsKey] ?? 0}</div>
+                    <div style={{ fontSize:9, color:"var(--muted-foreground)", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:8 }}>pts</div>
+                    {!isMe && (
+                      <button onClick={() => toggleFollow(r.user_email)} disabled={busy}
+                        style={{ padding:"4px 12px", borderRadius:20, fontSize:10, fontWeight:700, cursor: busy ? "not-allowed" : "pointer", fontFamily:"var(--font-body)", border:"1px solid", transition:"all 0.15s", opacity: busy ? 0.6 : 1,
+                          background:  following ? "transparent" : "var(--gradient-accent)",
+                          color:       following ? "var(--muted-foreground)" : "#fff",
+                          borderColor: following ? "var(--border)" : "transparent",
                         }}>
-                        {followBusy.has(r.user_email) ? "…" : followingSet.has(r.user_email) ? "Following" : "Follow"}
+                        {busy ? "…" : following ? "Following" : "Follow"}
                       </button>
                     )}
-                    <div style={{ width: "100%", height: heightMap[i], position: "relative", overflow: "hidden", borderRadius: "12px 12px 0 0", border: "1px solid var(--border)", background: "var(--surface)", padding: 12, textAlign: "center" }}>
-                      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: `linear-gradient(90deg, ${gradient})` }} />
-                      <Icon size={20} style={{ margin: "8px auto 4px", display: "block", color: "var(--accent)" }} />
-                      <div className="font-display" style={{ fontSize: "1.5rem", fontWeight: 700 }}>{r[pointsKey] ?? 0}</div>
-                      <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted-foreground)" }}>pts</div>
-                    </div>
-                  </motion.div>
+                  </div>
                 );
               })}
             </div>
@@ -232,65 +219,82 @@ export default function Leaderboard() {
         </div>
       </section>
 
-      {/* Full table */}
-      {!loading && rest.length > 0 && (
-        <section style={{ maxWidth: 960, margin: "0 auto", padding: "0 1.5rem 6rem" }}>
-          <div style={{ overflow: "hidden", borderRadius: 24, border: "1px solid var(--border)", background: "var(--surface)", boxShadow: "var(--shadow-card)" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 100px 80px", gap: 16, borderBottom: "1px solid var(--border)", background: "var(--surface-elevated)", padding: "12px 24px", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted-foreground)" }}>
-              <div>Rank</div><div>Runner</div><div style={{ textAlign: "right" }}>Points</div><div />
+      {/* ── Rankings table ── */}
+      {!loading && filtered.length > 3 && (
+        <section style={{ maxWidth:960, margin:"0 auto", padding:"0 1.5rem 4rem" }}>
+          <div style={{ overflow:"hidden", borderRadius:12, border:"1px solid var(--border)", background:"var(--surface)" }}>
+
+            {/* Header */}
+            <div className="cs-lb-header">
+              <div>Rank</div>
+              <div>Runner</div>
+              <div className="cs-lb-monthly-col" style={{ textAlign:"right" }}>Month pts</div>
+              <div style={{ textAlign:"right" }}>All-time</div>
             </div>
+
+            {/* Rows */}
             {rest.map((r, i) => {
               const isMe      = r.user_email === user.email;
               const following = followingSet.has(r.user_email);
               const busy      = followBusy.has(r.user_email);
               return (
-                <motion.div key={r.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }}
-                  style={{ display: "grid", gridTemplateColumns: "60px 1fr 100px 80px", gap: 16, alignItems: "center", borderBottom: "1px solid oklch(1 0 0 / 4%)", padding: "14px 24px", background: isMe ? "oklch(0.72 0.19 49 / 5%)" : "transparent", transition: "background 0.2s" }}
-                  onMouseEnter={e => { if (!isMe) (e.currentTarget as HTMLElement).style.background = "var(--surface-elevated)"; }}
-                  onMouseLeave={e => { if (!isMe) (e.currentTarget as HTMLElement).style.background = "transparent"; }}>
-                  <div style={{ fontFamily: "monospace", fontSize: "0.875rem", fontWeight: 700, color: "var(--muted-foreground)" }}>#{ranks[i + 3]}</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 40, height: 40, flexShrink: 0, borderRadius: "50%", background: "var(--gradient-primary)", display: "grid", placeItems: "center", fontFamily: "var(--font-display)", fontSize: "0.875rem", fontWeight: 600, color: "#fff" }}>
+                <div key={r.id} className={`cs-lb-row${isMe ? " is-me" : ""}`}>
+                  <div style={{ fontFamily:"monospace", fontSize:"0.8rem", fontWeight:700, color: isMe ? "var(--cs-orange)" : "var(--muted-foreground)" }}>
+                    #{ranks[i + 3]}
+                  </div>
+                  <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                    <div style={{ width:32, height:32, flexShrink:0, borderRadius:"50%", background:"var(--gradient-primary)", display:"grid", placeItems:"center", fontSize:"0.72rem", fontWeight:700, color:"#fff" }}>
                       {initials(r.user_name)}
                     </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: "0.875rem", fontWeight: 600, color: isMe ? "var(--primary)" : "var(--foreground)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div style={{ minWidth:0 }}>
+                      <div style={{ fontSize:"0.82rem", fontWeight:600, color: isMe ? "var(--cs-orange)" : "var(--foreground)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                         {r.user_name}{isMe ? " (you)" : ""}
                       </div>
-                      <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 1 }}>📍 {r.location}</div>
+                      {r.location && <div style={{ fontSize:10, color:"var(--muted-foreground)" }}>{r.location}</div>}
                     </div>
                   </div>
-                  <div style={{ textAlign: "right", fontFamily: "var(--font-display)", fontSize: "1rem", fontWeight: 700, color: "var(--primary)" }}>
-                    {r[pointsKey] ?? 0} <span style={{ fontSize: 10, fontWeight: 400, color: "var(--muted-foreground)" }}>pts</span>
+                  <div className="cs-lb-monthly-col" style={{ textAlign:"right", fontSize:"0.82rem", fontWeight:600, color:"var(--muted-foreground)" }}>
+                    {r.month_points ?? 0}
                   </div>
-                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"flex-end", gap:8 }}>
+                    <span style={{ fontWeight:700, color:"var(--cs-orange)", fontSize:"0.85rem" }}>{r[pointsKey] ?? 0}</span>
                     {!isMe && (
-                      <button
-                        onClick={() => toggleFollow(r.user_email)}
-                        disabled={busy}
-                        style={{ padding: "5px 12px", borderRadius: 999, fontSize: 11, fontWeight: 600, cursor: busy ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", border: "1px solid", transition: "all 0.15s", opacity: busy ? 0.6 : 1,
-                          background:   following ? "transparent"              : "var(--gradient-accent)",
-                          color:        following ? "var(--muted-foreground)"  : "var(--accent-foreground)",
-                          borderColor:  following ? "var(--border)"            : "transparent",
-                        }}
-                      >
-                        {busy ? "…" : following ? "Following" : "Follow"}
+                      <button onClick={() => toggleFollow(r.user_email)} disabled={busy}
+                        style={{ padding:"3px 10px", borderRadius:6, fontSize:10, fontWeight:600, cursor: busy ? "not-allowed" : "pointer", fontFamily:"var(--font-body)", border:"1px solid", opacity: busy ? 0.6 : 1,
+                          background:  following ? "transparent" : "oklch(0.72 0.19 49 / 12%)",
+                          color:       following ? "var(--muted-foreground)" : "var(--cs-orange)",
+                          borderColor: following ? "var(--border)" : "oklch(0.72 0.19 49 / 30%)",
+                        }}>
+                        {busy ? "…" : following ? "✓" : "+Follow"}
                       </button>
                     )}
                   </div>
-                </motion.div>
+                </div>
               );
             })}
           </div>
-          <div style={{ marginTop: "2rem", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
-            <TrendingUp size={16} style={{ color: "var(--accent)" }} />
-            Want to climb the ranks? Attend sessions and complete challenges to earn points.
+
+          <div style={{ marginTop:"1.25rem", display:"flex", alignItems:"center", justifyContent:"center", gap:6, fontSize:"0.72rem", color:"var(--muted-foreground)" }}>
+            <TrendingUp size={13} style={{ color:"var(--accent)" }} />
+            Attend sessions to earn points and climb the ranks.
           </div>
         </section>
       )}
 
       {loading && (
-        <div style={{ display: "flex", justifyContent: "center", padding: "4rem", color: "var(--muted-foreground)", fontSize: "0.875rem" }}>Loading leaderboard…</div>
+        <div style={{ display:"flex", flexDirection:"column", gap:1, maxWidth:960, margin:"0 auto", padding:"0 1.5rem" }}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="cs-lb-row" style={{ borderRadius: i === 0 ? "12px 12px 0 0" : i === 7 ? "0 0 12px 12px" : 0 }}>
+              <div style={{ width:28, height:10, background:"rgba(255,255,255,0.06)", borderRadius:4 }} />
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <div style={{ width:32, height:32, borderRadius:"50%", background:"rgba(255,255,255,0.06)" }} />
+                <div style={{ width:"60%", height:10, background:"rgba(255,255,255,0.05)", borderRadius:4 }} />
+              </div>
+              <div style={{ width:30, height:10, background:"rgba(255,255,255,0.04)", borderRadius:4, marginLeft:"auto" }} />
+              <div style={{ width:30, height:10, background:"rgba(255,255,255,0.04)", borderRadius:4, marginLeft:"auto" }} />
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

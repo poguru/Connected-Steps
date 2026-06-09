@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { ArrowRight, CheckCircle2, Building2 } from "lucide-react";
 
 const benefits = [
@@ -11,8 +10,6 @@ const benefits = [
   "Team building events",
   "Health tracking dashboards",
 ];
-
-const partners = ["Microsoft", "Google", "Deloitte", "TCS", "Accenture", "Razorpay"];
 
 export default function CallToAction() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -50,9 +47,16 @@ export default function CallToAction() {
                 onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = ""}>
                 Book a Consultation <ArrowRight size={16} />
               </a>
-              <div style={{ marginTop: "1.5rem", fontSize: 12, color: "rgba(255,255,255,0.7)" }}>Trusted by teams at:</div>
-              <div style={{ marginTop: "0.75rem", display: "flex", flexWrap: "wrap", gap: "1.5rem", fontSize: "0.875rem", fontWeight: 600, color: "rgba(255,255,255,0.8)" }}>
-                {partners.map(p => <span key={p}>{p}</span>)}
+              <div style={{ marginTop: "1.5rem", display: "flex", flexWrap: "wrap", gap: "0.6rem" }}>
+                {[
+                  { icon: "📩", text: "Free consultation" },
+                  { icon: "📊", text: "Custom pricing" },
+                  { icon: "🏃", text: "Flexible programme length" },
+                ].map(t => (
+                  <span key={t.text} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: "rgba(255,255,255,0.75)", background: "rgba(255,255,255,0.1)", borderRadius: 20, padding: "4px 10px", backdropFilter: "blur(4px)" }}>
+                    {t.icon} {t.text}
+                  </span>
+                ))}
               </div>
             </div>
             <div style={{ display: "grid", gap: "1rem" }} className="sm:grid-cols-2">
@@ -75,7 +79,7 @@ export default function CallToAction() {
       {/* Final CTA */}
       <section style={{ background: "var(--gradient-soft)", padding: "5rem 0" }}>
         <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 1.5rem", textAlign: "center" }}>
-          <motion.div initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
+          <div>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--primary)", marginBottom: "1rem" }}>
               Join Connected Steps
             </div>
@@ -84,14 +88,14 @@ export default function CallToAction() {
               <span className="text-gradient-accent">We have the plan.</span>
             </h2>
             <p style={{ fontSize: "1.1rem", color: "var(--muted-foreground)", maxWidth: 480, margin: "0 auto 2.5rem", lineHeight: 1.7 }}>
-              Start free today. No credit card needed. Your first training week is on us.
+              Create your free account in 60 seconds. Browse sessions, see your plan preview, and join the community — before you spend a rupee.
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "0.75rem" }}>
               <Link href={loggedIn ? "/dashboard" : "/auth?tab=register"}
                 style={{ display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 999, background: "var(--gradient-accent)", padding: "14px 32px", fontSize: "1rem", fontWeight: 700, color: "var(--accent-foreground)", textDecoration: "none", boxShadow: "var(--shadow-orange)", transition: "transform 0.2s" }}
                 onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = "scale(1.02)"}
                 onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = ""}>
-                {loggedIn ? "Go to Dashboard" : "Start training free"} <ArrowRight size={18} />
+                {loggedIn ? "Go to Dashboard" : "Join free — start running"} <ArrowRight size={18} />
               </Link>
               <Link href="/pricing"
                 style={{ display: "inline-flex", alignItems: "center", borderRadius: 999, border: "1px solid var(--border)", background: "var(--surface)", padding: "14px 32px", fontSize: "1rem", fontWeight: 600, color: "var(--foreground)", textDecoration: "none", boxShadow: "var(--shadow-md)", transition: "background 0.2s" }}
@@ -101,9 +105,9 @@ export default function CallToAction() {
               </Link>
             </div>
             <p style={{ marginTop: "1.5rem", fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
-              Free plan available · No commitment · Cancel anytime
+              Free account · No credit card needed · Cancel anytime
             </p>
-          </motion.div>
+          </div>
         </div>
       </section>
     </>

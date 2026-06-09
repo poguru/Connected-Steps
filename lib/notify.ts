@@ -54,10 +54,8 @@ export async function sendWhatsApp(
   const namespace  = process.env.MSG91_NAMESPACE;
   const template   = templateName ?? process.env.MSG91_WHATSAPP_TEMPLATE ?? "session_alert";
 
-  console.log("[MSG91 WA] env check — authKey:", !!authKey, "fromNumber:", !!fromNumber, "namespace:", namespace ?? "MISSING", "template:", template);
-
   if (!authKey || !fromNumber) {
-    console.error("[MSG91 WA] SKIPPED — MSG91_AUTH_KEY or MSG91_WHATSAPP_NUMBER not set in env");
+    console.error("[MSG91 WA] SKIPPED — MSG91_AUTH_KEY or MSG91_WHATSAPP_NUMBER not set");
     return { to: phone, channel: "whatsapp", ok: false, error: "MSG91 WhatsApp not configured." };
   }
 
@@ -84,7 +82,6 @@ export async function sendWhatsApp(
     },
   };
 
-  console.log("[MSG91 WA] sending to:", to, "template:", body.payload.template.name, "namespace:", (body.payload.template as Record<string,unknown>).namespace ?? "MISSING", "components:", JSON.stringify(components));
   try {
     const res = await fetch(
       "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/",
@@ -95,7 +92,6 @@ export async function sendWhatsApp(
       }
     );
     const data = await res.json().catch(() => ({}));
-    console.log("[MSG91 WA] response status:", res.status, "body:", JSON.stringify(data));
     if (!res.ok || data.hasError) {
       const errMsg = data.message ?? data.errors ?? JSON.stringify(data) ?? String(res.status);
       console.error("[MSG91 WA] error:", errMsg);
