@@ -95,29 +95,15 @@ export default function SessionShareSheet({ session, onClose }: Props) {
   }
 
   // ── WhatsApp ────────────────────────────────────────────────────────────────
-  // On mobile: navigator.share({ files: [image], text: caption }) opens the
-  // native share sheet. When the user picks WhatsApp, WhatsApp shows a compose
-  // view with the image attached and the caption pre-filled — ONE message.
-  // Fallback (desktop / no-file-share): wa.me URL with full caption — WhatsApp
-  // renders text + OG card preview as one message with the session details.
-  async function shareToWhatsApp() {
-    setBusy(true);
-    try {
-      const blob = await getBlob();
-      if (blob && typeof navigator !== "undefined" && navigator.share) {
-        const file = makeFile(blob);
-        if (navigator.canShare?.({ files: [file] })) {
-          await navigator.share({ files: [file], text: caption });
-          return;
-        }
-      }
-      // Desktop / no-file-share fallback
-      window.open(`https://wa.me/?text=${encodeURIComponent(caption)}`, "_blank");
-    } catch (e) {
-      if (e instanceof Error && e.name !== "AbortError") {
-        window.open(`https://wa.me/?text=${encodeURIComponent(caption)}`, "_blank");
-      }
-    } finally { setBusy(false); }
+  // Always use wa.me with the text caption — WhatsApp auto-renders a rich
+  // link preview card from the join URL (showing the session OG poster image).
+  // This gives one clean, professional message on all devices.
+  //
+  // Note: navigator.share({ files, text }) is intentionally NOT used here
+  // because Android WhatsApp strips the text when a file is attached, causing
+  // the image and caption to send as two separate messages.
+  function shareToWhatsApp() {
+    window.open(`https://wa.me/?text=${encodeURIComponent(caption)}`, "_blank");
   }
 
   // ── Copy link ───────────────────────────────────────────────────────────────
@@ -192,10 +178,10 @@ export default function SessionShareSheet({ session, onClose }: Props) {
           </button>
 
           {/* WhatsApp */}
-          <button onClick={shareToWhatsApp} disabled={busy}
-            style={{ width: "100%", padding: "14px", background: "#25D366", border: "none", borderRadius: 12, color: "#fff", fontSize: "0.9rem", fontWeight: 700, cursor: busy ? "wait" : "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, opacity: busy ? 0.7 : 1 }}>
+          <button onClick={shareToWhatsApp}
+            style={{ width: "100%", padding: "14px", background: "#25D366", border: "none", borderRadius: 12, color: "#fff", fontSize: "0.9rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
             <span style={{ fontSize: "1.25rem" }}>💬</span>
-            {busy ? "Loading image…" : "Share on WhatsApp"}
+            Share on WhatsApp
           </button>
 
           {/* Copy link */}
