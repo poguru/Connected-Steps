@@ -75,7 +75,7 @@ export async function sendWhatsApp(
       type: "template",
       template: {
         name: template,
-        language: { code: "en", policy: "deterministic" },
+        language: { code: "en_US", policy: "deterministic" },
         ...(namespace ? { namespace } : {}),
         to_and_components: [{ to: [to], components }],
       },

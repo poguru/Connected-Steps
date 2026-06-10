@@ -137,11 +137,10 @@ export default function LoginScreen({ navigation }: Props) {
     if (!identifier.trim()) { setOtpError("Please enter your email or phone."); return; }
     setSending(true); setOtpError("");
     try {
-      const isEmail = identifier.includes("@");
       const res  = await fetch(`${API_BASE}/api/auth/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: isEmail ? "email" : "phone", value: identifier.trim(), purpose: "login" }),
+        body: JSON.stringify({ type: "email", value: identifier.trim(), purpose: "login" }),
       });
       const data = await res.json();
       if (!res.ok) { setOtpError(data.error ?? "Failed to send OTP."); return; }
@@ -261,7 +260,7 @@ export default function LoginScreen({ navigation }: Props) {
 
             {mode === "password" && (
               <>
-                <Text style={styles.label}>Email or phone</Text>
+                <Text style={styles.label}>Email</Text>
                 <TextInput style={styles.input} placeholder="you@example.com" placeholderTextColor="#555"
                   value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
                 <Text style={styles.label}>Password</Text>
@@ -276,8 +275,8 @@ export default function LoginScreen({ navigation }: Props) {
 
             {mode === "otp" && otpStep === "identifier" && (
               <>
-                <Text style={styles.label}>Email or WhatsApp number</Text>
-                <TextInput style={styles.input} placeholder="you@example.com or 9876543210"
+                <Text style={styles.label}>Email address</Text>
+                <TextInput style={styles.input} placeholder="you@example.com"
                   placeholderTextColor="#555" value={identifier} onChangeText={t => { setIdentifier(t); setOtpError(""); }}
                   autoCapitalize="none" autoCorrect={false} keyboardType="email-address" />
                 {!!otpError && <Text style={styles.error}>{otpError}</Text>}
@@ -290,7 +289,7 @@ export default function LoginScreen({ navigation }: Props) {
             {mode === "otp" && otpStep === "code" && (
               <>
                 <Text style={[styles.subtitle, { marginBottom: 8 }]}>
-                  OTP sent to {identifier}.{identifier.includes("@") ? " Check your inbox." : " Check your WhatsApp."}
+                  OTP sent to {identifier}. Check your inbox.
                 </Text>
                 <OtpBoxes value={otpCode} onChange={v => { setOtpCode(v); setOtpError(""); }} />
                 {!!otpError && <Text style={styles.error}>{otpError}</Text>}

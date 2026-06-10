@@ -39,7 +39,7 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
 
   const handlePasswordSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!form.identifier || !form.password) { setPwError("Please enter your email or phone and password."); return; }
+    if (!form.identifier || !form.password) { setPwError("Please enter your email and password."); return; }
     setPwLoading(true);
     try {
       const res  = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier: form.identifier, password: form.password }) });
@@ -75,11 +75,10 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
     if (!identifier.trim()) { setOtpError("Please enter your email or phone number."); return; }
     setSending(true); setOtpError("");
     try {
-      const isEmail = identifier.includes("@");
       const res  = await fetch("/api/auth/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: isEmail ? "email" : "phone", value: identifier.trim(), purpose: "login" }),
+        body: JSON.stringify({ type: "email", value: identifier.trim(), purpose: "login" }),
       });
       const data = await res.json();
       if (!res.ok) { setOtpError(data.error ?? "Failed to send OTP."); return; }
@@ -131,7 +130,7 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
     <form onSubmit={handlePasswordSubmit} noValidate style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <ModeToggle />
 
-      <input style={inputStyle} name="identifier" type="text" placeholder="Email address or phone number"
+      <input style={inputStyle} name="identifier" type="text" placeholder="Email address"
         value={form.identifier} onChange={handleChange} autoComplete="username"
         onFocus={focusOn} onBlur={focusOff} />
 
@@ -164,10 +163,10 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <ModeToggle />
       <p style={{ margin: 0, fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.6 }}>
-        Enter your registered email or WhatsApp number and we&apos;ll send you a one-time code.
+        Enter your registered email and we&apos;ll send you a one-time code.
       </p>
       <input
-        style={inputStyle} type="text" placeholder="Email or phone number"
+        style={inputStyle} type="email" placeholder="Email address"
         value={identifier} onChange={e => { setIdentifier(e.target.value); setOtpError(""); }}
         autoComplete="username" onFocus={focusOn} onBlur={focusOff}
       />
@@ -187,7 +186,7 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
       <ModeToggle />
       <p style={{ margin: 0, fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.6 }}>
         OTP sent to <strong style={{ color: "var(--foreground)" }}>{identifier}</strong>.{" "}
-        {identifier.includes("@") ? "Check your inbox." : "Check your WhatsApp."}
+        {"Check your inbox."}
       </p>
       <OtpInput value={otpCode} onChange={v => { setOtpCode(v); setOtpError(""); }} />
       {otpError && <div style={{ background: "oklch(0.62 0.22 22 / 10%)", border: "1px solid oklch(0.62 0.22 22 / 30%)", borderRadius: 8, padding: "10px 14px", fontSize: "0.8rem", color: "#f09595", textAlign: "center" }}>{otpError}</div>}

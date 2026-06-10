@@ -32,7 +32,7 @@ const focusHandlers = {
   onBlur:  (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => { e.currentTarget.style.borderColor = "var(--border)";  e.currentTarget.style.boxShadow = "none"; },
 };
 
-type Step = "email" | "email-otp" | "phone" | "phone-otp" | "details";
+type Step = "email" | "email-otp" | "details";
 
 interface Props { onSwitchToLogin: () => void; }
 
@@ -44,7 +44,6 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
   const [email,         setEmail]         = useState("");
   const [emailOtp,      setEmailOtp]      = useState("");
   const [phone,         setPhone]         = useState("");
-  const [phoneOtp,      setPhoneOtp]      = useState("");
   const [sending,       setSending]       = useState(false);
   const [verifying,     setVerifying]     = useState(false);
   const [otpError,      setOtpError]      = useState("");
@@ -67,8 +66,8 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
   };
 
   // ── Step progress ─────────────────────────────────────────────────────────
-  const stepIndex = ["email", "email-otp", "phone", "phone-otp", "details"].indexOf(step);
-  const progress  = Math.round(((stepIndex + 1) / 5) * 100);
+  const stepIndex = ["email", "email-otp", "details"].indexOf(step);
+  const progress  = Math.round(((stepIndex + 1) / 3) * 100);
 
   // ── Send OTP ──────────────────────────────────────────────────────────────
   async function sendOtp(type: "email" | "phone", value: string, isResend = false) {
@@ -136,9 +135,9 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
   const ProgressBar = () => (
     <div style={{ marginBottom: 20 }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-        {["Email", "Phone", "Details"].map((label, i) => {
-          const done = (i === 0 && stepIndex >= 2) || (i === 1 && stepIndex >= 4) || (i === 2 && false);
-          const active = (i === 0 && stepIndex < 2) || (i === 1 && stepIndex >= 2 && stepIndex < 4) || (i === 2 && stepIndex >= 4);
+        {["Email", "Details"].map((label, i) => {
+          const done = (i === 0 && stepIndex >= 2);
+          const active = (i === 0 && stepIndex < 2) || (i === 1 && stepIndex >= 2);
           return (
             <div key={label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: done || active ? "var(--primary)" : "var(--muted-foreground)", fontWeight: done || active ? 600 : 400 }}>
               {done ? <CheckCircle2 size={13} /> : <span style={{ width: 13, height: 13, borderRadius: "50%", border: `1.5px solid ${active ? "var(--primary)" : "var(--border)"}`, display: "inline-block" }} />}
@@ -182,7 +181,7 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
       <p style={{ margin: 0, fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.6 }}>OTP sent to {email}. Check your inbox.</p>
       <OtpInput value={emailOtp} onChange={v => { setEmailOtp(v); setOtpError(""); }} />
       {otpError && <div style={{ background: "oklch(0.62 0.22 22 / 10%)", border: "1px solid oklch(0.62 0.22 22 / 30%)", borderRadius: 8, padding: "10px 14px", fontSize: "0.8rem", color: "#f09595", textAlign: "center" }}>{otpError}</div>}
-      <button type="button" onClick={async () => { const ok = await verifyOtp("email", email, emailOtp); if (ok) { setEmailOtp(""); setStep("phone"); } }}
+      <button type="button" onClick={async () => { const ok = await verifyOtp("email", email, emailOtp); if (ok) { setEmailOtp(""); setStep("details"); } }}
         disabled={verifying || emailOtp.length !== 6}
         style={{ width: "100%", padding: "13px", borderRadius: 999, background: emailOtp.length === 6 ? "var(--gradient-accent)" : "oklch(0.72 0.19 49 / 30%)", color: "var(--accent-foreground)", border: "none", cursor: emailOtp.length === 6 ? "pointer" : "not-allowed", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem" }}>
         {verifying ? "Verifying…" : "Verify →"}
@@ -197,68 +196,6 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
     </div>
   );
 
-  // ══ STEP: phone ══════════════════════════════════════════════════════════
-  if (step === "phone") return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <ProgressBar />
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-        <CheckCircle2 size={14} style={{ color: "var(--primary)", flexShrink: 0 }} />
-        <span style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600 }}>Email verified: {email}</span>
-      </div>
-      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Step 2 — Add your WhatsApp number</p>
-      <p style={{ margin: 0, fontSize: 12, color: "var(--muted-foreground)", lineHeight: 1.5 }}>
-        Your coach uses WhatsApp to reach you. You can also skip this and add it later from your profile.
-      </p>
-      <input
-        style={inputStyle} type="tel" placeholder="Phone number (e.g. 9876543210)"
-        value={phone} onChange={e => { setPhone(e.target.value); setOtpError(""); }}
-        autoComplete="tel" {...focusHandlers}
-      />
-      {otpError && <div style={{ background: "oklch(0.62 0.22 22 / 10%)", border: "1px solid oklch(0.62 0.22 22 / 30%)", borderRadius: 8, padding: "10px 14px", fontSize: "0.8rem", color: "#f09595", textAlign: "center" }}>{otpError}</div>}
-      <button
-        type="button" onClick={() => sendOtp("phone", phone)}
-        disabled={sending || phone.replace(/\D/g, "").length < 10}
-        style={{ width: "100%", padding: "13px", borderRadius: 999, background: phone.replace(/\D/g, "").length >= 10 ? "var(--gradient-accent)" : "oklch(0.72 0.19 49 / 30%)", color: "var(--accent-foreground)", border: "none", cursor: phone.replace(/\D/g, "").length >= 10 ? "pointer" : "not-allowed", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem", boxShadow: phone.replace(/\D/g, "").length >= 10 ? "var(--shadow-orange)" : "none" }}
-      >
-        {sending ? "Sending…" : "Send OTP to WhatsApp →"}
-      </button>
-      {/* Safety net: allow skipping phone verification for launch */}
-      <button
-        type="button" onClick={() => setStep("details")}
-        style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "var(--muted-foreground)", fontFamily: "var(--font-body)", textDecoration: "underline", textAlign: "center" }}
-      >
-        Skip for now — I&apos;ll add my number later
-      </button>
-    </div>
-  );
-
-  // ══ STEP: phone-otp ══════════════════════════════════════════════════════
-  if (step === "phone-otp") return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <ProgressBar />
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-        <CheckCircle2 size={14} style={{ color: "var(--primary)", flexShrink: 0 }} />
-        <span style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600 }}>Email verified: {email}</span>
-      </div>
-      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Step 2 — Verify your WhatsApp number</p>
-      <p style={{ margin: 0, fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.6 }}>OTP sent to WhatsApp {phone}. Check your messages.</p>
-      <OtpInput value={phoneOtp} onChange={v => { setPhoneOtp(v); setOtpError(""); }} />
-      {otpError && <div style={{ background: "oklch(0.62 0.22 22 / 10%)", border: "1px solid oklch(0.62 0.22 22 / 30%)", borderRadius: 8, padding: "10px 14px", fontSize: "0.8rem", color: "#f09595", textAlign: "center" }}>{otpError}</div>}
-      <button type="button" onClick={async () => { const ok = await verifyOtp("phone", phone, phoneOtp); if (ok) { setPhoneOtp(""); setStep("details"); } }}
-        disabled={verifying || phoneOtp.length !== 6}
-        style={{ width: "100%", padding: "13px", borderRadius: 999, background: phoneOtp.length === 6 ? "var(--gradient-accent)" : "oklch(0.72 0.19 49 / 30%)", color: "var(--accent-foreground)", border: "none", cursor: phoneOtp.length === 6 ? "pointer" : "not-allowed", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem" }}>
-        {verifying ? "Verifying…" : "Verify →"}
-      </button>
-      <button type="button" onClick={() => sendOtp("phone", phone, true)} disabled={sending}
-        style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--muted-foreground)", fontFamily: "var(--font-body)", textDecoration: "underline" }}>
-        {sending ? "Sending…" : "Resend OTP"}
-      </button>
-      <button type="button" onClick={() => { setStep("phone"); setOtpError(""); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--muted-foreground)", fontFamily: "var(--font-body)" }}>
-        ← Change number
-      </button>
-    </div>
-  );
-
   // ══ STEP: details ════════════════════════════════════════════════════════
   return (
     <form onSubmit={handleSubmit} noValidate style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -268,12 +205,9 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
         <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--primary)" }}>
           <CheckCircle2 size={12} /> {email}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--primary)" }}>
-          <CheckCircle2 size={12} /> {phone}
-        </div>
       </div>
 
-      <p style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Step 3 — Your details</p>
+      <p style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Step 2 — Your details</p>
 
       {/* Photo */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 4 }}>
@@ -311,6 +245,12 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
         </button>
       </div>
       <input style={inputStyle} name="confirm" type={showPw ? "text" : "password"} placeholder="Confirm password" value={form.confirm} onChange={handleFormChange} autoComplete="new-password" {...focusHandlers} />
+
+      {/* Phone */}
+      <div>
+        <label style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5 }}>WhatsApp number <span style={{ opacity: 0.6 }}>(optional)</span></label>
+        <input style={inputStyle} type="tel" placeholder="e.g. 9876543210" value={phone} onChange={e => setPhone(e.target.value)} autoComplete="tel" {...focusHandlers} />
+      </div>
 
       {/* Goal */}
       <div>

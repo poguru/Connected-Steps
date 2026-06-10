@@ -71,6 +71,12 @@ const cards = [
     desc:  "Create and publish weekend run events, manage promo codes and member discount coupons.",
     icon:  "🎟️",
   },
+  {
+    href:  "/admin/coach-ops",
+    title: "Coach Operations",
+    desc:  "Athlete roster, attendance tracking, cohort management, bulk messaging, and plan templates.",
+    icon:  "🎯",
+  },
 ];
 
 export default function AdminHub() {
