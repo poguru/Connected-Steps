@@ -19,7 +19,8 @@ export type NotificationType =
   | "coach_message"
   | "achievement"
   | "membership_expiry"
-  | "new_session";
+  | "new_session"
+  | "streak_at_risk";
 
 export interface InAppNotification {
   user_email: string;
