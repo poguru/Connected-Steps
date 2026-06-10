@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import RoiCalculator from "@/components/pricing/RoiCalculator";
 
 declare global {
   interface Window {
@@ -418,7 +419,12 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {/* ── 6. GUARANTEE ── */}
+        {/* ── 6. ROI CALCULATOR ── */}
+        <div style={{ marginBottom: "3rem" }}>
+          <RoiCalculator />
+        </div>
+
+        {/* ── 8. GUARANTEE ── */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", padding: "1rem 1.25rem", background: "rgba(74,222,128,0.05)", border: "1px solid rgba(74,222,128,0.18)", borderRadius: 12, marginBottom: "2.5rem", maxWidth: 480, margin: "0 auto 2.5rem" }}>
           <span style={{ fontSize: "1.5rem", flexShrink: 0 }}>🛡️</span>
           <div>
@@ -427,7 +433,7 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {/* ── 7. FAQ ── */}
+        {/* ── 9. FAQ ── */}
         <div style={{ maxWidth: "640px", margin: "0 auto" }}>
           <div style={{ fontSize: 10, color: "var(--cs-orange)", textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: 700, textAlign: "center", marginBottom: "1rem" }}>FAQ</div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
