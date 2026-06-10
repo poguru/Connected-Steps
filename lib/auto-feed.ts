@@ -7,6 +7,7 @@
 
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { createNotification } from "@/lib/notify-inapp";
+import { triggerReferralReward } from "@/lib/referrals";
 
 type FeedPostType = "run" | "achievement" | "general";
 
@@ -59,6 +60,11 @@ export async function autoFeedSessionCompleted(
       .eq("attended", true);
 
     const total = count ?? 0;
+    // First-session: trigger referral reward for the referrer (if this user was referred)
+    if (total === 1) {
+      triggerReferralReward(email).catch(() => {});
+    }
+
     // First-session upgrade prompt notification (fires exactly once)
     if (total === 1) {
       createNotification({

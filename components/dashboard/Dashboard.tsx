@@ -10,6 +10,7 @@ import { getSupabase } from "@/lib/supabase";
 import MembershipCard from "@/components/ui/MembershipCard";
 import UpgradeBanner from "@/components/ui/UpgradeBanner";
 import PostSessionUpgradePrompt from "@/components/dashboard/PostSessionUpgradePrompt";
+import ReferralCard from "@/components/dashboard/ReferralCard";
 import TrainingPlan from "@/components/dashboard/TrainingPlan";
 import AskCoachFab from "@/components/ui/AskCoachFab";
 import DashboardHero from "@/components/dashboard/DashboardHero";
@@ -820,6 +821,11 @@ export default function Dashboard() {
 
           {/* People you may know */}
           <PeopleYouMayKnow userEmail={user.email} />
+
+          {/* Referral card — shown only when NEXT_PUBLIC_ENABLE_REFERRALS=true */}
+          {process.env.NEXT_PUBLIC_ENABLE_REFERRALS === "true" && (
+            <ReferralCard userEmail={user.email} />
+          )}
 
           {/* Training Plan */}
           <div id="training-plan">
