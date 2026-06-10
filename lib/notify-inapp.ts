@@ -21,7 +21,8 @@ export type NotificationType =
   | "membership_expiry"
   | "new_session"
   | "streak_at_risk"
-  | "upgrade_prompt";
+  | "upgrade_prompt"
+  | "weekly_digest";
 
 export interface InAppNotification {
   user_email: string;
