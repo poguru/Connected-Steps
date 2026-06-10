@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import type { FeedEvent } from "@/app/api/feed/route";
+import PostCard from "@/components/community/PostCard";
+import type { UserPost } from "@/app/api/posts/route";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -43,6 +45,25 @@ export default function FeedItem({ event, currentUserEmail, compact = false }: P
   const [reactions, setReactions] = useState(event.reactions);
   const [imgExpanded, setImgExpanded] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  // user_post events render as a full PostCard
+  if (event.event_type === "user_post") {
+    const post: UserPost = {
+      id:           event.payload.post_id as string,
+      author_email: event.actor_email,
+      author_name:  event.actor_name,
+      post_type:    event.payload.post_type as UserPost["post_type"],
+      body:         event.payload.body as string,
+      photo_url:    (event.payload.photo_url as string) || null,
+      approved:     true,
+      created_at:   event.created_at,
+      likes:        event.reactions.like,
+      celebrates:   event.reactions.celebrate,
+      comments:     0,
+      my_reaction:  event.reactions.my_reaction,
+    };
+    return <PostCard post={post} currentUserEmail={currentUserEmail} />;
+  }
 
   const { verb, icon, accent } = eventMeta(event);
   const photoUrl  = event.payload.photo_url  as string | undefined;

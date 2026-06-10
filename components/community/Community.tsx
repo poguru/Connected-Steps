@@ -6,11 +6,14 @@ import { Search, X } from "lucide-react";
 import { MenuUser } from "@/components/ui/UserMenu";
 import AppNav from "@/components/layout/AppNav";
 import ActivityFeed from "@/components/feed/ActivityFeed";
+import PostCard from "@/components/community/PostCard";
+import CreatePost from "@/components/community/CreatePost";
+import type { UserPost } from "@/app/api/posts/route";
 
 interface User   { firstName: string; lastName: string; email: string; phone: string; goal: string; location: string; photo: string | null; }
 interface Runner { user_email: string; user_name: string; location: string; goal: string; total_points: number; month_points: number; }
 
-type Tab = "discover" | "activity";
+type Tab = "discover" | "posts" | "activity";
 
 const goalLabel: Record<string, string> = {
   "5k": "5K", "10k": "10K", "half": "Half Marathon", "full": "Full Marathon",
@@ -62,6 +65,11 @@ export default function Community() {
   const [followBusy,   setFollowBusy]   = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Posts tab
+  const [posts,        setPosts]        = useState<UserPost[]>([]);
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [showCreate,   setShowCreate]   = useState(false);
+
   const doSearch = useCallback(async (q: string) => {
     setSearching(true);
     try {
@@ -87,6 +95,17 @@ export default function Community() {
     const t = setTimeout(() => doSearch(query), 300);
     return () => clearTimeout(t);
   }, [query, doSearch]);
+
+  // Load posts when Posts tab is opened
+  useEffect(() => {
+    if (tab !== "posts" || !user || posts.length > 0) return;
+    setPostsLoading(true);
+    fetch(`/api/posts?scope=global&limit=20`)
+      .then(r => r.json())
+      .then(d => setPosts(d.posts ?? []))
+      .catch(() => {})
+      .finally(() => setPostsLoading(false));
+  }, [tab, user, posts.length]);
 
   async function toggleFollow(targetEmail: string) {
     if (!user) return;
@@ -130,9 +149,9 @@ export default function Community() {
 
         {/* Tabs */}
         <div style={{ display: "flex", gap: 4, padding: 4, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, marginBottom: "1.25rem" }}>
-          {(["discover", "activity"] as Tab[]).map(t => (
-            <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: "8px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: "0.8rem", fontWeight: 600, background: tab === t ? "var(--gradient-accent)" : "transparent", color: tab === t ? "#fff" : "var(--muted-foreground)", boxShadow: tab === t ? "var(--shadow-orange)" : "none", transition: "all 0.15s" }}>
-              {t === "discover" ? "🔍 Discover" : "⚡ Activity"}
+          {([["discover","🔍 Discover"],["posts","✍️ Posts"],["activity","⚡ Activity"]] as [Tab,string][]).map(([t, label]) => (
+            <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: "8px 8px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: "0.75rem", fontWeight: 600, background: tab === t ? "var(--gradient-accent)" : "transparent", color: tab === t ? "#fff" : "var(--muted-foreground)", boxShadow: tab === t ? "var(--shadow-orange)" : "none", transition: "all 0.15s", whiteSpace: "nowrap" }}>
+              {label}
             </button>
           ))}
         </div>
@@ -187,6 +206,55 @@ export default function Community() {
                 )}
               </div>
             </div>
+          </>
+        )}
+
+        {/* ── POSTS TAB ── */}
+        {tab === "posts" && user && (
+          <>
+            {/* Compose button */}
+            <button onClick={() => setShowCreate(true)}
+              style={{ display: "flex", alignItems: "center", gap: "0.6rem", width: "100%", padding: "0.875rem 1rem", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, cursor: "pointer", fontFamily: "var(--font-body)", fontSize: "0.85rem", color: "var(--muted-foreground)", marginBottom: "1rem", textAlign: "left", transition: "border-color 0.15s" }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = "oklch(0.72 0.19 49 / 40%)")}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = "var(--border)")}>
+              <div style={{ width: 34, height: 34, borderRadius: "50%", background: "oklch(0.72 0.19 49 / 12%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem", fontWeight: 700, color: "var(--cs-orange)", flexShrink: 0 }}>
+                {user.firstName.charAt(0)}
+              </div>
+              <span>Share a run, achievement, or question…</span>
+              <span style={{ marginLeft: "auto", fontSize: "0.75rem", color: "var(--cs-orange)", fontWeight: 700, flexShrink: 0 }}>Post</span>
+            </button>
+
+            {postsLoading ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+                {[1,2,3].map(i => <div key={i} style={{ height: 120, borderRadius: 14, background: "var(--surface)", border: "1px solid var(--border)", opacity: 0.6 }} />)}
+              </div>
+            ) : posts.length === 0 ? (
+              <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "2.5rem 1.5rem", textAlign: "center" }}>
+                <div style={{ fontSize: "2rem", marginBottom: 8 }}>✍️</div>
+                <div style={{ fontSize: "0.9rem", fontWeight: 600, marginBottom: 4 }}>No posts yet</div>
+                <div style={{ fontSize: "0.8rem", color: "var(--muted-foreground)", marginBottom: "1rem" }}>Be the first to share a run update, achievement, or question.</div>
+                <button onClick={() => setShowCreate(true)} style={{ padding: "9px 20px", background: "var(--gradient-accent)", color: "#fff", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: "0.82rem", fontWeight: 700, boxShadow: "var(--shadow-orange)" }}>
+                  Create first post →
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                {posts.map(p => (
+                  <PostCard key={p.id} post={p} currentUserEmail={user.email}
+                    onDeleted={id => setPosts(prev => prev.filter(x => x.id !== id))} />
+                ))}
+              </div>
+            )}
+
+            {/* CreatePost sheet */}
+            {showCreate && (
+              <CreatePost
+                currentUserEmail={user.email}
+                currentUserName={`${user.firstName} ${user.lastName}`.trim()}
+                onPosted={post => { setPosts(prev => [post, ...prev]); setShowCreate(false); }}
+                onClose={() => setShowCreate(false)}
+              />
+            )}
           </>
         )}
 

@@ -7,7 +7,8 @@ export type EventType =
   | "session_attended"
   | "photo_uploaded"
   | "badge_earned"
-  | "member_joined";
+  | "member_joined"
+  | "user_post";
 
 export interface FeedEvent {
   id:          string;
@@ -69,14 +70,14 @@ export async function GET(req: NextRequest) {
 
     const fetchSize = limit * 3; // over-fetch to allow for deduplication and sorting
 
-    const [attendanceRes, photosRes, newMembersRes] = await Promise.all([
+    const [attendanceRes, photosRes, newMembersRes, userPostsRes] = await Promise.all([
       // Session attendance events
       db
         .from("session_attendance")
         .select("user_email, user_name, sessions(id, title, date, venue, photo_url)")
         .in("user_email", emailPool)
         .eq("attended", true)
-        .lt("sessions(date)", before.slice(0, 10)) // compare date string YYYY-MM-DD
+        .lt("sessions(date)", before.slice(0, 10))
         .order("sessions(date)", { ascending: false })
         .limit(fetchSize),
 
@@ -89,7 +90,7 @@ export async function GET(req: NextRequest) {
         .order("created_at", { ascending: false })
         .limit(fetchSize),
 
-      // New member join events (only useful in global scope or if following new people)
+      // New member join events
       db
         .from("users")
         .select("email, first_name, last_name, created_at")
@@ -97,6 +98,16 @@ export async function GET(req: NextRequest) {
         .lt("created_at", before)
         .order("created_at", { ascending: false })
         .limit(20),
+
+      // User-generated posts
+      db
+        .from("user_posts")
+        .select("id, author_email, author_name, post_type, body, photo_url, created_at")
+        .in("author_email", emailPool)
+        .eq("approved", true)
+        .lt("created_at", before)
+        .order("created_at", { ascending: false })
+        .limit(fetchSize),
     ]);
 
     // ── Build event objects ───────────────────────────────────────────────────
@@ -156,6 +167,23 @@ export async function GET(req: NextRequest) {
         event_type:  "member_joined",
         payload:     {},
         created_at:  u.created_at,
+      });
+    }
+
+    // User-generated posts
+    for (const p of userPostsRes.data ?? []) {
+      events.push({
+        id:          `post_${p.id}`,
+        actor_email: p.author_email,
+        actor_name:  p.author_name,
+        event_type:  "user_post",
+        payload:     {
+          post_id:   p.id,
+          post_type: p.post_type,
+          body:      p.body,
+          photo_url: p.photo_url ?? "",
+        },
+        created_at: p.created_at,
       });
     }
 
