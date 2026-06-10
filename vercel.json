@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/rank-snapshot",
       "schedule": "0 18 1 * *"
+    },
+    {
+      "path": "/api/cron/session-reminders",
+      "schedule": "30 13 * * *"
     }
   ]
 }

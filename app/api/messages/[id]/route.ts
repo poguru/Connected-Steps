@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { createNotification } from "@/lib/notify-inapp";
 
 // GET /api/messages/[id]?limit=50&before=<iso>  → paginated messages, oldest-first
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -69,8 +70,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       })
       .eq("id", id);
 
-    // Fire push notification to recipient — non-blocking
-    sendPushNotification({ db, conversationId: id, senderEmail: sender_email, senderType: sender_type, body: body.trim() }).catch(() => {});
+    // In-app notification + push — non-blocking
+    notifyRecipient({ db, conversationId: id, senderEmail: sender_email, senderType: sender_type, body: body.trim() }).catch(() => {});
 
     return NextResponse.json({ message: msg });
   } catch (e: unknown) {
@@ -80,7 +81,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
 type ConvRow = { user_email: string; coaches: { name: string } | null };
 
-async function sendPushNotification({
+// Creates an in-app notification and fires push to the recipient.
+// notify-inapp handles push internally, so we only need to call createNotification.
+async function notifyRecipient({
   db, conversationId, senderEmail, senderType, body,
 }: {
   db:             ReturnType<typeof getSupabaseServer>;
@@ -89,6 +92,8 @@ async function sendPushNotification({
   senderType:     string;
   body:           string;
 }) {
+  if (senderType !== "coach") return; // only notify user when coach sends
+
   const { data: conv } = await db
     .from("conversations")
     .select("user_email, coaches(name)")
@@ -97,32 +102,13 @@ async function sendPushNotification({
 
   if (!conv) return;
 
-  // Recipient is the other party
-  const recipientEmail = senderType === "coach" ? conv.user_email : null;
-  if (!recipientEmail) return; // coach push notifications not yet supported
+  const coachName = conv.coaches?.name ?? "Your coach";
 
-  const { data: tokens } = await db
-    .from("push_tokens")
-    .select("token")
-    .eq("user_email", recipientEmail);
-
-  if (!tokens?.length) return;
-
-  const senderName = senderType === "coach"
-    ? (conv.coaches?.name ?? "Coach")
-    : senderEmail.split("@")[0];
-
-  await fetch("https://exp.host/--/api/v2/push/send", {
-    method:  "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body:    JSON.stringify(
-      tokens.map((t: { token: string }) => ({
-        to:    t.token,
-        title: senderName,
-        body:  body.slice(0, 100),
-        data:  { conversationId },
-        sound: "default",
-      }))
-    ),
+  await createNotification({
+    user_email: conv.user_email,
+    type:       "coach_message",
+    title:      `${coachName} sent you a message`,
+    body:       body.slice(0, 120),
+    action_url: "/dashboard/messages",
   });
 }

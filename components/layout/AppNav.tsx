@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Menu, X } from "lucide-react";
 import UserMenu, { MenuUser } from "@/components/ui/UserMenu";
+import NotificationBell from "@/components/ui/NotificationBell";
 
 const NAV_LINKS = [
   { label: "Dashboard",    href: "/dashboard"    },
@@ -46,6 +47,7 @@ export default function AppNav({ user, onUserUpdate, activeLabel }: Props) {
           </nav>
 
           <div className="cs-app-nav-user">
+            <NotificationBell userEmail={user.email} />
             <button
               className="cs-mobile-nav-toggle"
               onClick={() => setOpen(o => !o)}

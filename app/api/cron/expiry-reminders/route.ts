@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { expiryReminderEmailHTML } from "@/lib/notify";
+import { createNotification } from "@/lib/notify-inapp";
 
 const PLAN_LABELS: Record<string, string> = {
   monthly:   "Monthly",
@@ -54,6 +55,16 @@ export async function GET(req: NextRequest) {
       const planLabel = PLAN_LABELS[m.plan] ?? m.plan;
 
       const ok = await sendExpiryEmail(m.user_email, name, planLabel, m.expires_at, daysAhead);
+
+      // In-app notification (fire-and-forget)
+      createNotification({
+        user_email: m.user_email,
+        type:       "membership_expiry",
+        title:      `Your membership expires in ${daysAhead} day${daysAhead === 1 ? "" : "s"}`,
+        body:       `Your ${planLabel} plan ends soon. Renew to keep your coach, training plan, and free run access.`,
+        action_url: "/pricing",
+      }).catch(() => {});
+
       results.push({ email: m.user_email, days: daysAhead, ok });
     }
   }
