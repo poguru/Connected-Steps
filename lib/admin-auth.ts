@@ -31,6 +31,27 @@ export function verifyCoachToken(token: string): string | null {
 
 export const COOKIE_NAME = "cs_coach_session";
 
+// ── Regular user token ────────────────────────────────────────────────────────
+// Same HMAC approach as coach tokens; kept separate so the two roles are distinct.
+
+export function signUserToken(email: string): string {
+  const hmac = crypto.createHmac("sha256", SECRET).update(`user:${email.toLowerCase()}`).digest("hex");
+  return `${Buffer.from(email.toLowerCase()).toString("base64url")}.${hmac}`;
+}
+
+export function verifyUserToken(token: string): string | null {
+  const [emailB64, hmac] = token.split(".");
+  if (!emailB64 || !hmac) return null;
+  try {
+    const email    = Buffer.from(emailB64, "base64url").toString("utf8");
+    const expected = crypto.createHmac("sha256", SECRET).update(`user:${email}`).digest("hex");
+    if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(hmac))) return null;
+    return email;
+  } catch {
+    return null;
+  }
+}
+
 // ── Unified admin auth ────────────────────────────────────────────────────────
 // Returns true for:
 //   1. x-admin-password header matching ADMIN_PASSWORD  (super-admin)

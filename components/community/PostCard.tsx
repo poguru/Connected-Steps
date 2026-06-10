@@ -117,20 +117,29 @@ export default function PostCard({ post, currentUserEmail, onDeleted }: Props) {
     } finally { setSendingCom(false); }
   }
 
+  function userAuthHeaders(): Record<string, string> {
+    const token = typeof window !== "undefined" ? localStorage.getItem("cs_user_token") : null;
+    return token ? { "Content-Type": "application/json", "x-user-token": token } : { "Content-Type": "application/json" };
+  }
+
+  function alertRelogin() {
+    alert("Your session has expired. Please log out and log back in, then try again.");
+  }
+
   async function deleteComment(commentId: string) {
-    await fetch(`/api/posts/${post.id}/comments/${commentId}`, {
-      method: "DELETE", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: currentUserEmail }),
+    const res = await fetch(`/api/posts/${post.id}/comments/${commentId}`, {
+      method: "DELETE", headers: userAuthHeaders(),
     });
+    if (res.status === 401) { alertRelogin(); return; }
     setComments(prev => prev.filter(c => c.id !== commentId));
     setCommentCount(c => Math.max(0, c - 1));
   }
 
   async function deletePost() {
     const res = await fetch(`/api/posts/${post.id}`, {
-      method: "DELETE", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: currentUserEmail }),
+      method: "DELETE", headers: userAuthHeaders(),
     });
+    if (res.status === 401) { alertRelogin(); return; }
     if (res.ok) onDeleted?.(post.id);
   }
 

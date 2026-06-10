@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 type Params = { params: Promise<{ id: string }> };
 
 // DELETE /api/posts/[id]  — only the author can delete
 export async function DELETE(req: NextRequest, { params }: Params) {
-  const { id }         = await params;
-  const { email }      = await req.json().catch(() => ({} as { email?: string }));
-  if (!email) return NextResponse.json({ error: "email required" }, { status: 400 });
+  const { id } = await params;
+  const email  = verifyUserToken(req.headers.get("x-user-token") ?? "");
+  if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const db = getSupabaseServer();
 

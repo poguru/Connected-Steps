@@ -61,7 +61,9 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
 
   function saveAndRedirect(user: Record<string, unknown>) {
     const photo = localStorage.getItem("cs_pending_photo") ?? null;
-    localStorage.setItem("cs_user", JSON.stringify({ ...user, photo: photo || null }));
+    const { userToken, ...userWithoutToken } = user;
+    localStorage.setItem("cs_user", JSON.stringify({ ...userWithoutToken, photo: photo || null }));
+    if (userToken) localStorage.setItem("cs_user_token", userToken as string);
     localStorage.removeItem("cs_pending_photo");
     const savedStrava = localStorage.getItem(`cs_strava_${user.email}`);
     if (savedStrava) localStorage.setItem("cs_strava", savedStrava);

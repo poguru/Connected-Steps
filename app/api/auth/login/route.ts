@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { signCoachToken } from "@/lib/admin-auth";
+import { signCoachToken, signUserToken } from "@/lib/admin-auth";
 
 export async function POST(req: NextRequest) {
   const { identifier, password } = await req.json();
@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
 
   const role       = user.role ?? "user";
   const coachToken = role === "coach" ? signCoachToken(user.email) : undefined;
+  const userToken  = signUserToken(user.email);
 
   return NextResponse.json({
     success: true,
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
       photo:      user.photo ?? null,
       role,
       coachToken,
+      userToken,
     },
   });
 }

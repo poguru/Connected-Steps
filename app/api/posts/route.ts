@@ -70,6 +70,7 @@ export async function GET(req: NextRequest) {
 
   const enriched: UserPost[] = posts.map(p => ({
     ...p,
+    approved:    true,
     likes:       likeMap[p.id]?.like      ?? 0,
     celebrates:  likeMap[p.id]?.celebrate ?? 0,
     comments:    commentMap[p.id]         ?? 0,
