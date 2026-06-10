@@ -9,7 +9,7 @@ import type { MenuUser } from "@/components/ui/UserMenu";
 type Scope = "global" | "following";
 
 interface AppUser {
-  email: string; first_name: string; last_name: string;
+  email: string; firstName: string; lastName: string;
   phone?: string; goal?: string; location?: string; photo?: string | null;
 }
 
