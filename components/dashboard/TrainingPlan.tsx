@@ -150,6 +150,15 @@ export default function TrainingPlan({ goal, email }: Props) {
         </div>
       )}
 
+      {!isCustom && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 8px", background: "oklch(0.72 0.19 49 / 6%)", border: "1px solid oklch(0.72 0.19 49 / 18%)", borderRadius: 7, marginBottom: "0.65rem" }}>
+          <span style={{ fontSize: "10px", color: "var(--muted-foreground)", lineHeight: 1.4 }}>
+            Sample plan · <span style={{ color: "var(--foreground)" }}>Premium members get a personalised plan from their coach</span>
+          </span>
+          <a href="/pricing" style={{ fontSize: "10px", color: "var(--cs-orange)", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap", marginLeft: 8, flexShrink: 0 }}>Upgrade →</a>
+        </div>
+      )}
+
       {/* Full week — compact, no Today duplicate */}
       <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
         {DAYS.map((day, i) => {

@@ -8,6 +8,7 @@ import UserMenu, { MenuUser } from "@/components/ui/UserMenu";
 import AppNav from "@/components/layout/AppNav";
 import { getSupabase } from "@/lib/supabase";
 import MembershipCard from "@/components/ui/MembershipCard";
+import UpgradeBanner from "@/components/ui/UpgradeBanner";
 import TrainingPlan from "@/components/dashboard/TrainingPlan";
 import AskCoachFab from "@/components/ui/AskCoachFab";
 import DashboardHero from "@/components/dashboard/DashboardHero";
@@ -729,6 +730,9 @@ export default function Dashboard() {
             upcomingSessions={upcomingSessions}
             joinedSessionIds={joinedSessionIds}
           />
+
+          {/* ── Upgrade banner (non-members only, self-dismissible) ── */}
+          <UpgradeBanner userEmail={user.email} />
 
           {/* ── 2. Compact stat row ── */}
           <div className="stat-row" style={{ marginBottom: "1rem" }}>
