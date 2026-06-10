@@ -6,6 +6,7 @@
  */
 
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { createNotification } from "@/lib/notify-inapp";
 
 type FeedPostType = "run" | "achievement" | "general";
 
@@ -58,6 +59,17 @@ export async function autoFeedSessionCompleted(
       .eq("attended", true);
 
     const total = count ?? 0;
+    // First-session upgrade prompt notification (fires exactly once)
+    if (total === 1) {
+      createNotification({
+        user_email: email,
+        type:       "upgrade_prompt",
+        title:      "You completed your first session! 🎉",
+        body:       "Get a personalised training plan from your coach and run every weekend for free.",
+        action_url: "/pricing",
+      }).catch(() => {});
+    }
+
     if (!MILESTONE_THRESHOLDS.includes(total)) continue;
 
     // Use user_achievements as a dedup guard with a feed-specific badge_id.

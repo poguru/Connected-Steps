@@ -20,7 +20,8 @@ export type NotificationType =
   | "achievement"
   | "membership_expiry"
   | "new_session"
-  | "streak_at_risk";
+  | "streak_at_risk"
+  | "upgrade_prompt";
 
 export interface InAppNotification {
   user_email: string;
