@@ -80,7 +80,7 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
       });
       const data = await res.json();
       if (!res.ok) { setOtpError(data.error ?? "Failed to send OTP."); return false; }
-      if (!isResend) setStep(type === "email" ? "email-otp" : "phone-otp");
+      if (!isResend) setStep("email-otp");
       return true;
     } catch { setOtpError("Network error. Please try again."); return false; }
     finally { setSending(false); }
