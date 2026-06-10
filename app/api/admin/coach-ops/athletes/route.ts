@@ -14,15 +14,15 @@ export async function GET(req: NextRequest) {
       db.from("training_plans").select("user_email, title, created_at").eq("active", true),
       db.from("sessions").select("id, title, date").order("date", { ascending: false }),
       db.from("session_attendance").select("user_email, session_id, attended"),
-      db.from("cohort_members").select("cohort_id, user_email").catch(() => ({ data: [] })),
-      db.from("cohorts").select("id, name, color").catch(() => ({ data: [] })),
+      db.from("cohort_members").select("cohort_id, user_email"),
+      db.from("cohorts").select("id, name, color"),
     ]);
 
   const now            = new Date();
   const twoWeeksAgo   = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
   const membershipMap  = Object.fromEntries((membershipsRes.data ?? []).map(m => [m.user_email, m]));
   const planMap        = Object.fromEntries((plansRes.data ?? []).map(p => [p.user_email, p]));
-  const cohortMap      = Object.fromEntries(((cohortsRes as { data: { id: string; name: string; color: string }[] | null }).data ?? []).map(c => [c.id, c]));
+  const cohortMap      = Object.fromEntries((cohortsRes.data ?? []).map(c => [c.id, c]));
   const sessions       = (sessionsRes.data ?? []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   // user_email → { session_id → attended }
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 
   // user_email → cohort names[]
   const userCohortNames: Record<string, string[]> = {};
-  for (const m of ((cohortMembersRes as { data: { cohort_id: string; user_email: string }[] | null }).data ?? [])) {
+  for (const m of (cohortMembersRes.data ?? [])) {
     if (!userCohortNames[m.user_email]) userCohortNames[m.user_email] = [];
     const name = cohortMap[m.cohort_id]?.name;
     if (name) userCohortNames[m.user_email].push(name);
