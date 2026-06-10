@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { createNotification } from "@/lib/notify-inapp";
+import { autoFeedBadgeEarned } from "@/lib/auto-feed";
 
 const SESSION_BADGES = [
   { id: "first_session",  threshold: 1,  label: "First Session 🎯" },
@@ -78,6 +79,7 @@ export async function GET(req: NextRequest) {
             body:       `You earned the ${badge.label} badge.`,
             action_url: "/achievements",
           }).catch(() => {});
+          autoFeedBadgeEarned(key, badge.label).catch(() => {});
         }
       }
     };

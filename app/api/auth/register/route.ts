@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { autoFeedMemberJoined } from "@/lib/auto-feed";
 
 export async function POST(req: NextRequest) {
   try {
@@ -43,6 +44,9 @@ export async function POST(req: NextRequest) {
       console.error("Register insert error:", error.message);
       return NextResponse.json({ error: "Registration failed. Please try again." }, { status: 500 });
     }
+
+    autoFeedMemberJoined(email.toLowerCase(), firstName, lastName, location ?? null)
+      .catch(() => {});
 
     return NextResponse.json({ success: true });
   } catch (e: unknown) {

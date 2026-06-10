@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail, sendWhatsApp, paymentEmailHTML, membershipWAParams } from "@/lib/notify";
+import { autoFeedMembershipActivated } from "@/lib/auto-feed";
 
 const PLAN_MONTHS: Record<string, number> = {
   monthly:  1,
@@ -92,6 +93,8 @@ export async function POST(req: NextRequest) {
   const planLabel    = PLAN_LABELS[plan] ?? plan;
   const amountINR    = amount / 100;
   const expiryISO    = expiresAt.toISOString();
+
+  autoFeedMembershipActivated(email.toLowerCase(), displayName, planLabel).catch(() => {});
 
   // Fire-and-forget: email + WhatsApp
   sendEmail(

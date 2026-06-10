@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
+import { autoFeedSessionCompleted } from "@/lib/auto-feed";
 
 // GET — session info + users who joined via link + their attendance status
 export async function GET(
@@ -66,11 +67,14 @@ export async function POST(
   // Fetch existing records to preserve points_synced status
   const { data: existing } = await db
     .from("session_attendance")
-    .select("user_email, points_synced")
+    .select("user_email, attended, points_synced")
     .eq("session_id", id);
 
-  const syncedEmails = new Set(
+  const syncedEmails    = new Set(
     (existing ?? []).filter((r) => r.points_synced).map((r) => r.user_email)
+  );
+  const previouslyAttended = new Set(
+    (existing ?? []).filter((r) => r.attended).map((r) => r.user_email)
   );
 
   // Only upsert rows that are not already synced
@@ -91,6 +95,18 @@ export async function POST(
       .from("session_attendance")
       .upsert(toUpsert, { onConflict: "session_id,user_email", ignoreDuplicates: false });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Auto-feed: generate posts for users newly marked as attended (false → true).
+  // Fire-and-forget — failure must not affect this response.
+  const newlyAttended = toUpsert.filter(
+    u => u.attended && !previouslyAttended.has(u.user_email)
+  );
+  if (newlyAttended.length) {
+    autoFeedSessionCompleted(
+      id,
+      newlyAttended.map(u => ({ email: u.user_email, name: u.user_name })),
+    ).catch(() => {});
   }
 
   return NextResponse.json({
