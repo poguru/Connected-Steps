@@ -79,7 +79,12 @@ export default function CreatePost({ currentUserEmail, currentUserName, onPosted
     finally  { setSubmitting(false); }
   }
 
-  const remaining = 800 - body.length;
+  const charCount  = body.length;
+  const remaining  = 800 - charCount;
+  const counterColor =
+    charCount >= 800 ? "#f09595" :
+    charCount >= 700 ? "#f59e0b" :
+    "var(--muted-foreground)";
 
   return (
     <>
@@ -130,8 +135,8 @@ export default function CreatePost({ currentUserEmail, currentUserName, onPosted
           onBlur={e  => (e.currentTarget.style.borderColor = "var(--border)")}
           autoFocus
         />
-        <div style={{ fontSize: "10px", color: remaining < 50 ? "#f09595" : "var(--muted-foreground)", textAlign: "right", marginBottom: "0.75rem" }}>
-          {remaining} chars left
+        <div style={{ fontSize: "10px", color: counterColor, textAlign: "right", marginBottom: "0.75rem", fontWeight: charCount >= 700 ? 600 : 400, transition: "color 0.15s" }}>
+          {charCount} / 800
         </div>
 
         {/* Photo preview */}
