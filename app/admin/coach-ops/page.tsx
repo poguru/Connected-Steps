@@ -59,6 +59,13 @@ function fmtDate(iso: string | null) {
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
 
+// Credential is either a raw admin password or "__token__<coachToken>"
+function makeAuthHeaders(credential: string): Record<string, string> {
+  return credential.startsWith("__token__")
+    ? { "x-coach-token": credential.slice(9) }
+    : { "x-admin-password": credential };
+}
+
 function emptyDays() {
   return DAYS.map(() => ({ type: "Rest", detail: "Recovery day", emoji: "😴" }));
 }
@@ -70,16 +77,24 @@ function AuthGate({ onAuth }: { onAuth: (pw: string) => void }) {
   const [err, setErr]   = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function verify(password: string) {
-    if (!password) return;
+  async function verify(credential: string) {
+    if (!credential) return;
     setBusy(true); setErr("");
-    const res = await fetch("/api/admin/coach-ops/athletes", { headers: { "x-admin-password": password } });
-    if (res.ok) { localStorage.setItem("cs_admin_pw", password); onAuth(password); }
+    const res = await fetch("/api/admin/coach-ops/athletes", { headers: makeAuthHeaders(credential) });
+    if (res.ok) { localStorage.setItem("cs_admin_pw", credential); onAuth(credential); }
     else { setErr("Incorrect password."); localStorage.removeItem("cs_admin_pw"); }
     setBusy(false);
   }
 
-  useEffect(() => { const s = localStorage.getItem("cs_admin_pw"); if (s) verify(s); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const saved = localStorage.getItem("cs_admin_pw");
+    if (saved) { verify(saved); return; }
+    // Auto-login coaches who are already signed in
+    try {
+      const user = JSON.parse(localStorage.getItem("cs_user") ?? "{}");
+      if (user.coachToken) verify(`__token__${user.coachToken}`);
+    } catch {}
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -157,30 +172,30 @@ export default function CoachOpsDashboard() {
   const [tplAssigning, setTplAssigning] = useState(false);
   const [tplAssignMsg, setTplAssignMsg] = useState("");
 
-  const h = useCallback((password: string) => ({
-    "x-admin-password": password,
+  const h = useCallback((credential: string) => ({
+    ...makeAuthHeaders(credential),
     "Content-Type": "application/json",
   }), []);
 
   // ── Loaders ─────────────────────────────────────────────────────────────────
 
-  const loadAthletes = useCallback(async (password: string) => {
+  const loadAthletes = useCallback(async (credential: string) => {
     setLoading(true);
-    const res = await fetch("/api/admin/coach-ops/athletes", { headers: { "x-admin-password": password } });
+    const res = await fetch("/api/admin/coach-ops/athletes", { headers: makeAuthHeaders(credential) });
     const data = await res.json().catch(() => ({}));
     setAthletes(data.athletes ?? []);
     setStats(data.stats ?? null);
     setLoading(false);
   }, []);
 
-  const loadCohorts = useCallback(async (password: string) => {
-    const res  = await fetch("/api/admin/cohorts", { headers: { "x-admin-password": password } });
+  const loadCohorts = useCallback(async (credential: string) => {
+    const res  = await fetch("/api/admin/cohorts", { headers: makeAuthHeaders(credential) });
     const data = await res.json().catch(() => ({}));
     setCohorts(data.cohorts ?? []);
   }, []);
 
-  const loadTemplates = useCallback(async (password: string) => {
-    const res  = await fetch("/api/admin/plan-templates", { headers: { "x-admin-password": password } });
+  const loadTemplates = useCallback(async (credential: string) => {
+    const res  = await fetch("/api/admin/plan-templates", { headers: makeAuthHeaders(credential) });
     const data = await res.json().catch(() => ({}));
     setTemplates(data.templates ?? []);
   }, []);

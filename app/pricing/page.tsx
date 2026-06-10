@@ -72,12 +72,16 @@ function CrossIcon() {
 
 export default function PricingPage() {
   const router = useRouter();
-  const [paying,    setPaying]    = useState<string | null>(null);
-  const [success,   setSuccess]   = useState<string | null>(null);
-  const [errorMsg,  setErrorMsg]  = useState<string | null>(null);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [userName,  setUserName]  = useState<string>("");
-  const [isMember,  setIsMember]  = useState(false);
+  const [paying,       setPaying]       = useState<string | null>(null);
+  const [success,      setSuccess]      = useState<string | null>(null);
+  const [errorMsg,     setErrorMsg]     = useState<string | null>(null);
+  const [userEmail,    setUserEmail]    = useState<string | null>(null);
+  const [userName,     setUserName]     = useState<string>("");
+  const [isMember,     setIsMember]     = useState(false);
+  const [couponCode,   setCouponCode]   = useState("");
+  const [couponData,   setCouponData]   = useState<{ coupon_id: string; discount_type: string; discount_value: number; description: string } | null>(null);
+  const [couponErr,    setCouponErr]    = useState("");
+  const [couponLoading, setCouponLoading] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem("cs_user");
@@ -98,6 +102,28 @@ export default function PricingPage() {
     }
   }, []);
 
+  async function validateCoupon() {
+    if (!couponCode.trim()) return;
+    setCouponLoading(true); setCouponErr(""); setCouponData(null);
+    try {
+      const res  = await fetch("/api/coupons/validate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: couponCode.trim(), email: userEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setCouponErr(data.error ?? "Invalid coupon."); return; }
+      setCouponData({ coupon_id: data.coupon_id, discount_type: data.discount_type, discount_value: data.discount_value, description: data.description });
+    } catch { setCouponErr("Could not validate coupon. Please try again."); }
+    finally { setCouponLoading(false); }
+  }
+
+  function discountedAmount(baseAmountPaise: number): number {
+    if (!couponData) return baseAmountPaise;
+    if (couponData.discount_type === "percent") return Math.max(100, Math.round(baseAmountPaise * (1 - couponData.discount_value / 100)));
+    if (couponData.discount_type === "fixed")   return Math.max(100, baseAmountPaise - couponData.discount_value * 100);
+    return baseAmountPaise;
+  }
+
   async function handleBuy(planId: string) {
     setErrorMsg(null);
     if (!userEmail) { router.push(`/auth?redirect=/pricing`); return; }
@@ -105,7 +131,7 @@ export default function PricingPage() {
     try {
       const orderRes = await fetch("/api/payment/create-order", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: planId, email: userEmail }),
+        body: JSON.stringify({ plan: planId, email: userEmail, coupon_id: couponData?.coupon_id ?? null }),
       });
       const order = await orderRes.json();
       if (!orderRes.ok) throw new Error(order.error ?? "Order creation failed");
@@ -123,7 +149,7 @@ export default function PricingPage() {
         handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
           const verifyRes = await fetch("/api/payment/verify", {
             method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...response, plan: planId, email: userEmail, name: userName, amount: order.amount }),
+            body: JSON.stringify({ ...response, plan: planId, email: userEmail, name: userName, amount: order.amount, coupon_id: couponData?.coupon_id ?? null }),
           });
           const result = await verifyRes.json();
           if (!verifyRes.ok) throw new Error(result.error ?? "Verification failed");
@@ -292,10 +318,14 @@ export default function PricingPage() {
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 210px), 1fr))", gap: "0.75rem", alignItems: "start" }}>
             {plans.map(plan => {
-              const total    = Math.round(plan.payFor * MONTHLY_RATE);
-              const perMonth = Math.round(total / plan.months);
-              const saving   = Math.round((plan.months - plan.payFor) * MONTHLY_RATE);
-              const isBuying = paying === plan.id;
+              const total       = Math.round(plan.payFor * MONTHLY_RATE);
+              const totalPaise  = total * 100;
+              const finalPaise  = discountedAmount(totalPaise);
+              const finalTotal  = Math.round(finalPaise / 100);
+              const perMonth    = Math.round(finalTotal / plan.months);
+              const saving      = Math.round((plan.months - plan.payFor) * MONTHLY_RATE);
+              const isBuying    = paying === plan.id;
+              const hasDiscount = couponData && finalTotal < total;
 
               return (
                 <div key={plan.id} style={{ position: "relative", background: plan.popular ? "oklch(0.19 0.03 40)" : "var(--surface)", border: `1px solid ${plan.popular ? "oklch(0.72 0.19 49 / 50%)" : "var(--border)"}`, borderRadius: 12, padding: plan.badge ? "1.5rem 1.25rem 1.25rem" : "1.25rem", boxShadow: plan.popular ? "var(--shadow-glow)" : "var(--shadow-md)" }}>
@@ -311,12 +341,22 @@ export default function PricingPage() {
                     <span style={{ fontFamily: "var(--font-display)", fontSize: "2.2rem", fontWeight: 300, color: "var(--foreground)", lineHeight: 1 }}>₹{perMonth.toLocaleString("en-IN")}</span>
                     <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginLeft: 4 }}>/mo</span>
                   </div>
-                  <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginBottom: saving > 0 ? "0.25rem" : "1rem" }}>
-                    ₹{total.toLocaleString("en-IN")} billed {plan.months === 1 ? "monthly" : `every ${plan.months} months`}
-                  </div>
+                  {hasDiscount
+                    ? (
+                      <div style={{ fontSize: "0.75rem", marginBottom: "0.25rem" }}>
+                        <span style={{ color: "var(--muted-foreground)", textDecoration: "line-through", marginRight: 6 }}>₹{total.toLocaleString("en-IN")}</span>
+                        <span style={{ color: "#4ade80", fontWeight: 700 }}>₹{finalTotal.toLocaleString("en-IN")}</span>
+                      </div>
+                    )
+                    : (
+                      <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginBottom: saving > 0 ? "0.25rem" : "1rem" }}>
+                        ₹{total.toLocaleString("en-IN")} billed {plan.months === 1 ? "monthly" : `every ${plan.months} months`}
+                      </div>
+                    )
+                  }
                   {saving > 0 && (
                     <div style={{ fontSize: "0.72rem", color: "#4ade80", fontWeight: 600, marginBottom: "1rem" }}>
-                      Save ₹{saving.toLocaleString("en-IN")}
+                      Save ₹{saving.toLocaleString("en-IN")}{hasDiscount ? " + coupon" : ""}
                     </div>
                   )}
                   <button
@@ -329,6 +369,30 @@ export default function PricingPage() {
               );
             })}
           </div>
+
+          {/* ── Coupon code ── */}
+          <div style={{ marginTop: "1.25rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
+            {couponData ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.25)", borderRadius: 8, padding: "8px 14px", fontSize: "0.8rem" }}>
+                <span style={{ color: "#4ade80", fontWeight: 700 }}>✓ {couponData.description || "Coupon applied"}</span>
+                <button onClick={() => { setCouponData(null); setCouponCode(""); }} style={{ background: "none", border: "none", color: "var(--muted-foreground)", cursor: "pointer", fontSize: "0.75rem", padding: 0 }}>Remove</button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", gap: "0.5rem", width: "100%", maxWidth: 360 }}>
+                <input
+                  value={couponCode} onChange={e => { setCouponCode(e.target.value); setCouponErr(""); }}
+                  onKeyDown={e => e.key === "Enter" && validateCoupon()}
+                  placeholder="Have a coupon code?"
+                  style={{ flex: 1, padding: "9px 12px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--foreground)", fontSize: "0.82rem", fontFamily: "var(--font-body)", outline: "none" }}
+                />
+                <button onClick={validateCoupon} disabled={couponLoading || !couponCode.trim()} style={{ padding: "9px 16px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--foreground)", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)", opacity: couponLoading || !couponCode.trim() ? 0.5 : 1 }}>
+                  {couponLoading ? "…" : "Apply"}
+                </button>
+              </div>
+            )}
+            {couponErr && <div style={{ fontSize: "0.78rem", color: "#f09595" }}>{couponErr}</div>}
+          </div>
+
           <p style={{ textAlign: "center", fontSize: 11, color: "var(--muted-foreground)", marginTop: "1rem" }}>
             All prices include GST. Not sure?{" "}
             <Link href="https://wa.me/9703620570" target="_blank" rel="noopener noreferrer" style={{ color: "var(--cs-orange)", textDecoration: "none" }}>Chat with us →</Link>

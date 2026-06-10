@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Razorpay from "razorpay";
+import { getSupabaseServer } from "@/lib/supabase-server";
 
 function getRazorpay() {
   const key_id     = process.env.RAZORPAY_KEY_ID;
@@ -16,24 +17,50 @@ const PLAN_AMOUNTS: Record<string, number> = {
   annual:   1080000,
 };
 
+function applyDiscount(amount: number, type: string, value: number): number {
+  if (type === "percent") return Math.max(100, Math.round(amount * (1 - value / 100)));
+  if (type === "fixed")   return Math.max(100, amount - value * 100);
+  return amount;
+}
+
 export async function POST(req: NextRequest) {
-  const { plan, email } = await req.json();
+  const { plan, email, coupon_id } = await req.json();
 
   if (!plan || !email || !PLAN_AMOUNTS[plan]) {
     return NextResponse.json({ error: "Invalid plan or missing email" }, { status: 400 });
   }
 
-  const amount = PLAN_AMOUNTS[plan];
+  const originalAmount = PLAN_AMOUNTS[plan];
+  let amount           = originalAmount;
+  let discountApplied  = 0;
+
+  if (coupon_id) {
+    const db = getSupabaseServer();
+    const { data: coupon } = await db
+      .from("coupons")
+      .select("id, discount_type, discount_value, expires_at, use_count, max_uses")
+      .eq("id", coupon_id)
+      .single();
+
+    if (
+      coupon &&
+      coupon.use_count < coupon.max_uses &&
+      (!coupon.expires_at || new Date(coupon.expires_at) > new Date())
+    ) {
+      amount         = applyDiscount(originalAmount, coupon.discount_type, coupon.discount_value);
+      discountApplied = originalAmount - amount;
+    }
+  }
 
   try {
     const order = await getRazorpay().orders.create({
       amount,
       currency: "INR",
       receipt:  `cs_${plan}_${Date.now()}`,
-      notes:    { email, plan },
+      notes:    { email, plan, coupon_id: coupon_id ?? "" },
     });
 
-    return NextResponse.json({ orderId: order.id, amount, currency: "INR" });
+    return NextResponse.json({ orderId: order.id, amount, originalAmount, discountApplied, currency: "INR" });
   } catch (e: unknown) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }

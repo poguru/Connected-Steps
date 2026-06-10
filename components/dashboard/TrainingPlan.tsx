@@ -108,7 +108,10 @@ export default function TrainingPlan({ goal, email }: Props) {
 
   useEffect(() => {
     if (!email) { setLoading(false); return; }
-    fetch(`/api/user/training-plan?email=${encodeURIComponent(email)}`)
+    const token = typeof window !== "undefined" ? localStorage.getItem("cs_user_token") : null;
+    fetch(`/api/user/training-plan?email=${encodeURIComponent(email)}`, {
+      headers: token ? { "x-user-token": token } : {},
+    })
       .then(r => r.json())
       .then(d => {
         if (d.plan?.days?.length === 7) {

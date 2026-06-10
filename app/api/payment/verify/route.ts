@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
     email,
     name,
     amount,
+    coupon_id,
   } = await req.json();
 
   // Verify Razorpay signature
@@ -65,6 +66,19 @@ export async function POST(req: NextRequest) {
   );
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Record coupon usage (fire-and-forget — payment already succeeded)
+  if (coupon_id) {
+    const recordUsage = async () => {
+      await db.from("coupon_uses").insert({ coupon_id, used_by_email: email.toLowerCase(), used_at: new Date().toISOString() }).catch(() => {});
+      await db.rpc("increment_coupon_use_count", { coupon_uuid: coupon_id }).catch(async () => {
+        // fallback if RPC not defined
+        const { data: c } = await db.from("coupons").select("use_count").eq("id", coupon_id).single();
+        if (c) await db.from("coupons").update({ use_count: c.use_count + 1 }).eq("id", coupon_id);
+      });
+    };
+    recordUsage().catch(console.error);
+  }
 
   // Fetch user phone for WhatsApp
   const { data: userRow } = await db.from("users").select("phone").eq("email", email.toLowerCase()).single();

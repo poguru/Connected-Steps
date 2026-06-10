@@ -109,7 +109,9 @@ export default function TrainingPlansAdmin() {
     setSelectedUser(u);
     setSaveMsg("");
     setErrors(Array(7).fill(false));
-    fetch(`/api/user/training-plan?email=${encodeURIComponent(u.email)}`)
+    fetch(`/api/user/training-plan?email=${encodeURIComponent(u.email)}`, {
+      headers: { "x-admin-password": password },
+    })
       .then((r) => r.json())
       .then((d) => {
         if (d.plan) {
