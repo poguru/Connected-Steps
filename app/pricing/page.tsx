@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import RoiCalculator from "@/components/pricing/RoiCalculator";
+import { COACHES } from "@/lib/coach-data";
 
 declare global {
   interface Window {
@@ -419,12 +420,43 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {/* ── 6. ROI CALCULATOR ── */}
+        {/* ── 6. MEET YOUR COACHES ── */}
+        <div style={{ marginBottom: "3rem" }}>
+          <div style={{ fontSize: 10, color: "var(--cs-orange)", textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: 700, textAlign: "center", marginBottom: "0.5rem" }}>
+            Your coaching team
+          </div>
+          <p style={{ textAlign: "center", fontSize: "0.85rem", color: "var(--muted-foreground)", margin: "0 auto 1.5rem", maxWidth: 420 }}>
+            National-level athletes and NIS-certified coaches. Every premium member trains with one of these coaches directly.
+          </p>
+          <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap" }}>
+            {COACHES.map(coach => (
+              <Link key={coach.slug} href={`/coaches/${coach.slug}`}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "1rem 1.25rem", textDecoration: "none", minWidth: 140, maxWidth: 180, flex: "1 1 140px", transition: "border-color 0.15s" }}
+                onMouseEnter={e => ((e.currentTarget as HTMLElement).style.borderColor = "oklch(0.72 0.19 49 / 40%)")}
+                onMouseLeave={e => ((e.currentTarget as HTMLElement).style.borderColor = "var(--border)")}>
+                {coach.photo ? (
+                  <img src={coach.photo} alt={coach.name} style={{ width: 60, height: 60, borderRadius: "50%", objectFit: "cover", objectPosition: "top center", border: "2px solid oklch(0.72 0.19 49 / 30%)" }} />
+                ) : (
+                  <div style={{ width: 60, height: 60, borderRadius: "50%", background: "oklch(0.72 0.19 49 / 10%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem", fontWeight: 800, color: "var(--cs-orange)" }}>
+                    {coach.initials}
+                  </div>
+                )}
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--foreground)" }}>{coach.name.split(" ")[0]}</div>
+                  <div style={{ fontSize: "10px", color: "var(--cs-orange)", fontWeight: 600, marginTop: 2 }}>{coach.role.split(" ")[0]} Coach</div>
+                </div>
+                <span style={{ fontSize: "10px", color: "var(--cs-orange)", fontWeight: 600 }}>View profile →</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* ── 7. ROI CALCULATOR ── */}
         <div style={{ marginBottom: "3rem" }}>
           <RoiCalculator />
         </div>
 
-        {/* ── 8. GUARANTEE ── */}
+        {/* ── 9. GUARANTEE ── */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", padding: "1rem 1.25rem", background: "rgba(74,222,128,0.05)", border: "1px solid rgba(74,222,128,0.18)", borderRadius: 12, marginBottom: "2.5rem", maxWidth: 480, margin: "0 auto 2.5rem" }}>
           <span style={{ fontSize: "1.5rem", flexShrink: 0 }}>🛡️</span>
           <div>
@@ -433,7 +465,7 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {/* ── 9. FAQ ── */}
+        {/* ── 10. FAQ ── */}
         <div style={{ maxWidth: "640px", margin: "0 auto" }}>
           <div style={{ fontSize: 10, color: "var(--cs-orange)", textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: 700, textAlign: "center", marginBottom: "1rem" }}>FAQ</div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>

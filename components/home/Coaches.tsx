@@ -1,6 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
+
+const COACH_SLUGS: Record<string, string> = {
+  "Ashokan K":             "ashokan-k",
+  "Durga Rao Vana":        "durga-rao-vana",
+  "Achyuta Kumari Kolli":  "achyuta-kumari-kolli",
+};
 
 interface CoachRating { coach_name: string; avg: number; count: number; }
 
@@ -210,9 +217,19 @@ export default function Coaches() {
               </div>
 
               {"instagram" in coach && coach.instagram && (
-                <div style={{ fontSize: "0.8rem", color: "var(--cs-muted)" }}>
+                <div style={{ fontSize: "0.8rem", color: "var(--cs-muted)", marginBottom: "0.75rem" }}>
                   Instagram: <span style={{ color: "var(--cs-orange)" }}>{coach.instagram as string}</span>
                 </div>
+              )}
+
+              {COACH_SLUGS[coach.name] && (
+                <Link
+                  href={`/coaches/${COACH_SLUGS[coach.name]}`}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.8rem", color: "var(--cs-orange)", fontWeight: 600, textDecoration: "none", border: "1px solid rgba(232,98,10,0.35)", borderRadius: 6, padding: "6px 14px", transition: "background 0.15s" }}
+                  onMouseEnter={e => (e.currentTarget.style.background = "rgba(232,98,10,0.08)")}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                  View full profile →
+                </Link>
               )}
             </div>
           </div>
