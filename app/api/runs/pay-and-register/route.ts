@@ -36,7 +36,21 @@ export async function POST(req: NextRequest) {
 
     const db = getSupabaseServer();
 
-    // Check duplicate
+    // Idempotency guard: if this razorpay_payment_id was already recorded,
+    // return success immediately without touching any data.  This handles
+    // Razorpay webhook retries (which fire a second POST when the first
+    // request times out) and prevents duplicate run_registration rows.
+    const { data: alreadyProcessed } = await db
+      .from("run_registrations")
+      .select("id")
+      .eq("razorpay_payment_id", razorpay_payment_id)
+      .maybeSingle();
+
+    if (alreadyProcessed) {
+      return NextResponse.json({ success: true });
+    }
+
+    // Check duplicate by email + event (belt-and-suspenders against other entry paths)
     const { data: existing } = await db
       .from("run_registrations")
       .select("id")

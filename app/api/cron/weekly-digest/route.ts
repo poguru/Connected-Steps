@@ -26,7 +26,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { createNotifications } from "@/lib/notify-inapp";
 import { paginateAll } from "@/lib/paginate";
-import { acquireCronLock } from "@/lib/cron-lock";
+import { acquireCronLock, releaseCronLock } from "@/lib/cron-lock";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -207,16 +207,11 @@ export async function GET(req: NextRequest) {
   const startMs = Date.now();
   const db  = getSupabaseServer();
   const now = new Date();
-
-  // Execution-protection: one run per calendar day (UTC).
-  // A duplicate scheduler trigger returns 200 immediately so Vercel
-  // does not keep retrying.
   const executionDate = now.toISOString().slice(0, 10);
-  const acquired = await acquireCronLock("weekly-digest", executionDate);
-  if (!acquired) {
-    console.log(`[weekly-digest] already ran for ${executionDate} — skipping`);
-    return NextResponse.json({ skipped: true, reason: "already_ran", date: executionDate });
-  }
+
+  // ── Phase 1: fetch all data (no lock held) ─────────────────────────────────
+  // All paginateAll / DB reads happen before the lock is acquired.  A transient
+  // DB error here returns 500 with no lock committed, so Vercel retries cleanly.
 
   // Week window: today → 7 days out (IST: UTC+5:30)
   const todayIST   = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);
@@ -251,7 +246,7 @@ export async function GET(req: NextRequest) {
   const sessions    = (sessionsRes.data ?? []) as SessionRow[];
 
   if (!users.length) {
-    return NextResponse.json({ message: "No users", sent: 0 });
+    return NextResponse.json({ message: "No users", sent: 0 });  // no lock needed
   }
 
   // ── 2. Compute leaderboard ranks ────────────────────────────────────────────
@@ -325,57 +320,103 @@ export async function GET(req: NextRequest) {
     void sessionLine; void rankLine; void planLine; // used in notification body below
   }
 
-  // ── 5. Batch in-app notifications ───────────────────────────────────────────
-  const sessionSummary = sessions.length > 0
-    ? `${sessions.length} session${sessions.length > 1 ? "s" : ""} this week: ${sessions.map(s => s.title).slice(0, 2).join(", ")}${sessions.length > 2 ? "…" : ""}.`
-    : "No sessions this week.";
-
-  await createNotifications(
-    notifUsers,
-    "weekly_digest",
-    "Your week at Connected Steps 🏃",
-    sessionSummary,
-    "/dashboard",
-  ).catch(err => console.error("[weekly-digest] in-app error:", err));
-
-  // ── 6. Send emails via Resend batch API (max 100 per request) ──────────────
-  let emailSent = 0, emailFailed = 0;
-  const resendKey = process.env.RESEND_API_KEY;
-
-  if (resendKey && emailBatch.length > 0) {
-    const CHUNK = 100;
-    for (let i = 0; i < emailBatch.length; i += CHUNK) {
-      const chunk = emailBatch.slice(i, i + CHUNK);
-      try {
-        const res  = await fetch("https://api.resend.com/emails/batch", {
-          method:  "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${resendKey}` },
-          body:    JSON.stringify(chunk),
-        });
-        if (res.ok) { emailSent    += chunk.length; }
-        else        { emailFailed  += chunk.length; console.error("[weekly-digest] Resend batch error:", await res.text().catch(() => res.status)); }
-      } catch (err) {
-        emailFailed += chunk.length;
-        console.error("[weekly-digest] Resend fetch error:", err);
-      }
-    }
+  // No users at all — return without acquiring the lock.
+  if (!notifUsers.length) {
+    return NextResponse.json({ message: "No users", sent: 0 });
   }
 
-  console.log(
-    `[weekly-digest] users=${users.length} pages_users=${usersResult.pages}` +
-    ` pages_lb=${leaderboardResult.pages} pages_mem=${membershipsResult.pages}` +
-    ` sessions=${sessions.length} premium=${premiumEmails.length}` +
-    ` notified=${notifUsers.length} email_sent=${emailSent} email_failed=${emailFailed}` +
-    ` duration=${Date.now() - startMs}ms`,
-  );
+  // ── Phase 2: acquire lock ──────────────────────────────────────────────────
+  // Lock is acquired only after all data is ready.  A concurrent duplicate
+  // invocation will hit a 23505 here and return {skipped: true}.
+  const acquired = await acquireCronLock("weekly-digest", executionDate);
+  if (!acquired) {
+    console.log(`[weekly-digest] already ran for ${executionDate} — skipping`);
+    return NextResponse.json({ skipped: true, reason: "already_ran", date: executionDate });
+  }
 
-  return NextResponse.json({
-    ok:            true,
-    users:         users.length,
-    sessions_this_week: sessions.length,
-    premium_users: premiumEmails.length,
-    notified:      notifUsers.length,
-    email_sent:    emailSent,
-    email_failed:  emailFailed,
-  });
+  // ── Phase 3: send (lock held) ──────────────────────────────────────────────
+  // Wrapped in try/catch: execution failure releases the lock so the Vercel
+  // retry can re-acquire and re-attempt.  An already-sent-today filter removes
+  // users who received a digest in a prior partial run, preventing duplicates.
+  try {
+    // Filter users who were already sent a digest today (retry safety).
+    const dayStart = executionDate + "T00:00:00.000Z";
+    const { data: alreadySentRows } = await db
+      .from("notifications")
+      .select("user_email")
+      .eq("type", "weekly_digest")
+      .in("user_email", notifUsers.map(u => u.email))
+      .gte("created_at", dayStart);
+
+    const alreadySentSet = new Set((alreadySentRows ?? []).map(n => n.user_email.toLowerCase()));
+    const freshNotifUsers = notifUsers.filter(u => !alreadySentSet.has(u.email.toLowerCase()));
+    const freshEmailBatch = emailBatch.filter(e => !alreadySentSet.has(e.to[0]?.toLowerCase() ?? ""));
+
+    if (!freshNotifUsers.length) {
+      // All users already notified in a prior partial run — idempotent success.
+      console.log(`[weekly-digest] all ${notifUsers.length} users already notified today — complete`);
+      return NextResponse.json({ ok: true, users: users.length, notified: 0, email_sent: 0, email_failed: 0 });
+    }
+
+    // ── 5. Batch in-app notifications ─────────────────────────────────────────
+    const sessionSummary = sessions.length > 0
+      ? `${sessions.length} session${sessions.length > 1 ? "s" : ""} this week: ${sessions.map(s => s.title).slice(0, 2).join(", ")}${sessions.length > 2 ? "…" : ""}.`
+      : "No sessions this week.";
+
+    await createNotifications(
+      freshNotifUsers,
+      "weekly_digest",
+      "Your week at Connected Steps 🏃",
+      sessionSummary,
+      "/dashboard",
+    );
+
+    // ── 6. Send emails via Resend batch API (max 100 per request) ─────────────
+    let emailSent = 0, emailFailed = 0;
+    const resendKey = process.env.RESEND_API_KEY;
+
+    if (resendKey && freshEmailBatch.length > 0) {
+      const CHUNK = 100;
+      for (let i = 0; i < freshEmailBatch.length; i += CHUNK) {
+        const chunk = freshEmailBatch.slice(i, i + CHUNK);
+        try {
+          const res = await fetch("https://api.resend.com/emails/batch", {
+            method:  "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${resendKey}` },
+            body:    JSON.stringify(chunk),
+          });
+          if (res.ok) { emailSent   += chunk.length; }
+          else        { emailFailed += chunk.length; console.error("[weekly-digest] Resend batch error:", await res.text().catch(() => res.status)); }
+        } catch (err) {
+          emailFailed += chunk.length;
+          console.error("[weekly-digest] Resend fetch error:", err);
+        }
+      }
+    }
+
+    console.log(
+      `[weekly-digest] users=${users.length} pages_users=${usersResult.pages}` +
+      ` pages_lb=${leaderboardResult.pages} pages_mem=${membershipsResult.pages}` +
+      ` sessions=${sessions.length} premium=${premiumEmails.length}` +
+      ` notified=${freshNotifUsers.length} skipped_already_sent=${alreadySentSet.size}` +
+      ` email_sent=${emailSent} email_failed=${emailFailed}` +
+      ` duration=${Date.now() - startMs}ms`,
+    );
+
+    return NextResponse.json({
+      ok:                 true,
+      users:              users.length,
+      sessions_this_week: sessions.length,
+      premium_users:      premiumEmails.length,
+      notified:           freshNotifUsers.length,
+      email_sent:         emailSent,
+      email_failed:       emailFailed,
+    });
+
+  } catch (err: unknown) {
+    await releaseCronLock("weekly-digest", executionDate);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[weekly-digest] send error (lock released):", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }

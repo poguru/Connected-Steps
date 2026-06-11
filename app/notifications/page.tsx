@@ -99,10 +99,16 @@ export default function NotificationsPage() {
   const [markingAll,  setMarkingAll]  = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
+  // All notification API calls require the user token for ownership verification.
+  const userToken = (): string =>
+    typeof window !== "undefined" ? (localStorage.getItem("cs_user_token") ?? "") : "";
+
   const fetchPage = useCallback(async (email: string, cursor?: string) => {
     const params = new URLSearchParams({ email, limit: "20" });
     if (cursor) params.set("before", cursor);
-    const res  = await fetch(`/api/notifications?${params}`);
+    const res  = await fetch(`/api/notifications?${params}`, {
+      headers: { "x-user-token": userToken() },
+    });
     return res.json() as Promise<{ notifications: Notification[]; has_more: boolean; next_cursor: string | null }>;
   }, []);
 
@@ -121,7 +127,7 @@ export default function NotificationsPage() {
         if (d.notifications.some(n => !n.read_at)) {
           fetch("/api/notifications", {
             method:  "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", "x-user-token": userToken() },
             body:    JSON.stringify({ email: u.email }),
           }).catch(() => {});
           setNotifs(prev => prev.map(n => ({ ...n, read_at: n.read_at ?? new Date().toISOString() })));
@@ -161,7 +167,7 @@ export default function NotificationsPage() {
     setMarkingAll(true);
     await fetch("/api/notifications", {
       method:  "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-user-token": userToken() },
       body:    JSON.stringify({ email: user.email }),
     }).catch(() => {});
     setNotifs(prev => prev.map(n => ({ ...n, read_at: n.read_at ?? new Date().toISOString() })));
@@ -169,8 +175,10 @@ export default function NotificationsPage() {
   }
 
   function handleNotifClick(n: Notification) {
-    // Mark individual as read
-    fetch(`/api/notifications/${n.id}`, { method: "PATCH" }).catch(() => {});
+    fetch(`/api/notifications/${n.id}`, {
+      method: "PATCH",
+      headers: { "x-user-token": userToken() },
+    }).catch(() => {});
     if (n.action_url) router.push(n.action_url);
   }
 

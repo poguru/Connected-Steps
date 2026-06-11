@@ -3,7 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { expiryReminderEmailHTML } from "@/lib/notify";
 import { createNotification } from "@/lib/notify-inapp";
 import { paginateAll } from "@/lib/paginate";
-import { acquireCronLock } from "@/lib/cron-lock";
+import { acquireCronLock, releaseCronLock } from "@/lib/cron-lock";
 
 const PLAN_LABELS: Record<string, string> = {
   monthly:   "Monthly",
@@ -23,18 +23,22 @@ export async function GET(req: NextRequest) {
   const startMs = Date.now();
   const db      = getSupabaseServer();
   const now     = new Date();
-
-  // Execution-protection: one run per calendar day (UTC).
   const executionDate = now.toISOString().slice(0, 10);
-  const acquired = await acquireCronLock("expiry-reminders", executionDate);
-  if (!acquired) {
-    console.log(`[expiry-reminders] already ran for ${executionDate} — skipping`);
-    return NextResponse.json({ skipped: true, reason: "already_ran", date: executionDate });
+
+  // ── Phase 1: fetch all data (no lock held) ────────────────────────────────
+  // All reads happen before lock acquisition.  A fetch failure here returns 500
+  // with no lock written, so Vercel's retry fires against a clean slate.
+
+  interface Pending {
+    user_email: string;
+    name:       string;
+    planLabel:  string;
+    expiresAt:  string;
+    daysAhead:  number;
   }
 
-  const results: { email: string; days: number; ok: boolean }[] = [];
-
   let totalPages = 0;
+  const pending: Pending[] = [];
 
   for (const daysAhead of [7, 1]) {
     const from = new Date(now);
@@ -44,8 +48,6 @@ export async function GET(req: NextRequest) {
     const to = new Date(from);
     to.setHours(23, 59, 59, 999);
 
-    // Paginated: unlikely to have 1000+ expirations on a single day today,
-    // but guards against bulk imports or future scale.
     const { rows: memberships, pages } = await paginateAll<{ user_email: string; plan: string; expires_at: string }>(
       (rangeFrom, rangeTo) =>
         db.from("memberships")
@@ -71,30 +73,87 @@ export async function GET(req: NextRequest) {
     for (const m of memberships) {
       const u = userMap[m.user_email];
       if (!u) continue;
-
-      const name      = `${u.first_name} ${u.last_name}`.trim() || "there";
-      const planLabel = PLAN_LABELS[m.plan] ?? m.plan;
-
-      const ok = await sendExpiryEmail(m.user_email, name, planLabel, m.expires_at, daysAhead);
-
-      // In-app notification (fire-and-forget)
-      createNotification({
+      pending.push({
         user_email: m.user_email,
-        type:       "membership_expiry",
-        title:      `Your membership expires in ${daysAhead} day${daysAhead === 1 ? "" : "s"}`,
-        body:       `Your ${planLabel} plan ends soon. Renew to keep your coach, training plan, and free run access.`,
-        action_url: "/pricing",
-      }).catch(() => {});
-
-      results.push({ email: m.user_email, days: daysAhead, ok });
+        name:       `${u.first_name} ${u.last_name}`.trim() || "there",
+        planLabel:  PLAN_LABELS[m.plan] ?? m.plan,
+        expiresAt:  m.expires_at,
+        daysAhead,
+      });
     }
   }
 
-  console.log(
-    `[expiry-reminders] reminded=${results.length} pages=${totalPages}` +
-    ` duration=${Date.now() - startMs}ms`,
-  );
-  return NextResponse.json({ ok: true, reminded: results.length, results });
+  // Nothing expiring — return without writing a lock row.
+  if (!pending.length) {
+    console.log(`[expiry-reminders] nothing expiring pages=${totalPages} duration=${Date.now() - startMs}ms`);
+    return NextResponse.json({ ok: true, reminded: 0, results: [] });
+  }
+
+  // ── Phase 2: acquire lock ─────────────────────────────────────────────────
+  const acquired = await acquireCronLock("expiry-reminders", executionDate);
+  if (!acquired) {
+    console.log(`[expiry-reminders] already ran for ${executionDate} — skipping`);
+    return NextResponse.json({ skipped: true, reason: "already_ran", date: executionDate });
+  }
+
+  // ── Phase 3: send (lock held) ─────────────────────────────────────────────
+  // Re-check who was already notified today INSIDE the lock.  This handles the
+  // retry scenario: a prior partial run may have sent some notifications before
+  // failing.  Those users are in the notifications table — we filter them out
+  // so no one gets a duplicate email or in-app notification.
+  try {
+    const allEmails  = pending.map(p => p.user_email);
+    const dayStart   = executionDate + "T00:00:00.000Z";
+
+    const { data: alreadySentRows } = await db
+      .from("notifications")
+      .select("user_email")
+      .eq("type", "membership_expiry")
+      .in("user_email", allEmails)
+      .gte("created_at", dayStart);
+
+    const alreadySentSet = new Set((alreadySentRows ?? []).map(n => n.user_email.toLowerCase()));
+    const toSend = pending.filter(p => !alreadySentSet.has(p.user_email.toLowerCase()));
+
+    if (!toSend.length) {
+      // All users were already notified in a prior partial run — idempotent success.
+      console.log(`[expiry-reminders] all ${pending.length} already notified today pages=${totalPages} duration=${Date.now() - startMs}ms`);
+      return NextResponse.json({ ok: true, reminded: 0, results: [] });
+    }
+
+    // Send emails + notifications in parallel per user.
+    // Bodies are personalised (plan label, days, expiry date) so we use
+    // individual createNotification calls fired concurrently.
+    const sendResults = await Promise.allSettled(
+      toSend.map(async (p) => {
+        const emailOk = await sendExpiryEmail(p.user_email, p.name, p.planLabel, p.expiresAt, p.daysAhead);
+        createNotification({
+          user_email: p.user_email,
+          type:       "membership_expiry",
+          title:      `Your membership expires in ${p.daysAhead} day${p.daysAhead === 1 ? "" : "s"}`,
+          body:       `Your ${p.planLabel} plan ends soon. Renew to keep your coach, training plan, and free run access.`,
+          action_url: "/pricing",
+        }).catch(() => {});
+        return { email: p.user_email, days: p.daysAhead, ok: emailOk };
+      }),
+    );
+
+    const results = sendResults
+      .filter((r): r is PromiseFulfilledResult<{ email: string; days: number; ok: boolean }> => r.status === "fulfilled")
+      .map(r => r.value);
+
+    console.log(
+      `[expiry-reminders] reminded=${results.length} skipped=${alreadySentSet.size}` +
+      ` pages=${totalPages} duration=${Date.now() - startMs}ms`,
+    );
+    return NextResponse.json({ ok: true, reminded: results.length, results });
+
+  } catch (err: unknown) {
+    await releaseCronLock("expiry-reminders", executionDate);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[expiry-reminders] send error (lock released):", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
 
 async function sendExpiryEmail(

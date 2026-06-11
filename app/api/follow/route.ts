@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       .select("id")
       .eq("follower_email", follower_email)
       .eq("following_email", following_email)
-      .single();
+      .maybeSingle();
 
     if (existing) {
       // Unfollow
@@ -33,8 +33,12 @@ export async function POST(req: NextRequest) {
         .eq("following_email", following_email);
       return NextResponse.json({ action: "unfollowed" });
     } else {
-      // Follow
-      await db.from("follows").insert({ follower_email, following_email });
+      // Follow — ON CONFLICT DO NOTHING handles a concurrent double-click
+      // that races past the SELECT above before either INSERT commits.
+      await db.from("follows").upsert(
+        { follower_email, following_email },
+        { onConflict: "follower_email,following_email", ignoreDuplicates: true },
+      );
       return NextResponse.json({ action: "followed" });
     }
   } catch (e: unknown) {
