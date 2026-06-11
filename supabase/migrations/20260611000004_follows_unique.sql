@@ -19,13 +19,14 @@
 -- adding it, so this script can be re-run safely.
 -- ============================================================
 
--- 1. Remove duplicate rows (keep smallest id per pair)
-DELETE FROM follows
-WHERE id NOT IN (
-  SELECT MIN(id)
-  FROM   follows
-  GROUP BY follower_email, following_email
-);
+-- 1. Remove duplicate rows, keeping one row per (follower, following) pair.
+--    ctid is the physical row address — always comparable, works on any column type.
+--    The row with the smaller ctid (earliest physical position) is kept.
+DELETE FROM follows f1
+USING follows f2
+WHERE f1.follower_email  = f2.follower_email
+  AND f1.following_email = f2.following_email
+  AND f1.ctid > f2.ctid;
 
 -- 2. Add the UNIQUE constraint (idempotent check)
 DO $$
