@@ -39,9 +39,10 @@ function otpEmailHTML(name: string, code: string): string {
 }
 
 // POST /api/auth/send-otp
-// Body: { type: "email" | "phone", value: string, name?: string, purpose: "register" | "login" }
-// purpose "register" → rejects if already registered
-// purpose "login"    → rejects if no account found
+// Body: { type: "email" | "phone", value: string, name?: string, purpose: "register" | "login" | "change_email" }
+// purpose "register"     → rejects if already registered
+// purpose "login"        → rejects if no account found
+// purpose "change_email" → rejects if already taken by another account (same as register)
 export async function POST(req: NextRequest) {
   try {
     const { type, value, name, purpose = "register" } = await req.json();
@@ -55,8 +56,8 @@ export async function POST(req: NextRequest) {
     // ── Existence check ───────────────────────────────────────────────────────
     if (type === "email") {
       const { data: existing } = await db.from("users").select("id").eq("email", identifier).single();
-      if (purpose === "register" && existing) {
-        return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
+      if ((purpose === "register" || purpose === "change_email") && existing) {
+        return NextResponse.json({ error: "This email is already in use by another account." }, { status: 409 });
       }
       if (purpose === "login" && !existing) {
         return NextResponse.json({ error: "No account found with this email." }, { status: 404 });

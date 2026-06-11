@@ -52,6 +52,15 @@ export default function ProfilePage() {
   const [infoMsg,    setInfoMsg]    = useState("");
   const [infoError,  setInfoError]  = useState("");
 
+  // email change flow  — idle → editing → otp_sent
+  type EmailStep = "idle" | "editing" | "otp_sent";
+  const [emailStep,    setEmailStep]    = useState<EmailStep>("idle");
+  const [newEmail,     setNewEmail]     = useState("");
+  const [emailOtp,     setEmailOtp]     = useState("");
+  const [emailBusy,    setEmailBusy]    = useState(false);
+  const [emailError,   setEmailError]   = useState("");
+  const [emailSuccess, setEmailSuccess] = useState("");
+
   // password form
   const [pw,      setPw]      = useState({ current: "", next: "", confirm: "" });
   const [pwSaving, setPwSaving] = useState(false);
@@ -113,6 +122,42 @@ export default function ProfilePage() {
       setInfoMsg("Profile updated.");
     } catch { setInfoError("Something went wrong."); }
     finally { setInfoSaving(false); }
+  }
+
+  async function sendEmailOtp() {
+    const trimmed = newEmail.trim().toLowerCase();
+    if (!trimmed || !trimmed.includes("@")) { setEmailError("Enter a valid email address."); return; }
+    if (trimmed === user?.email.toLowerCase()) { setEmailError("This is already your current email."); return; }
+    setEmailBusy(true); setEmailError("");
+    try {
+      const res  = await fetch("/api/auth/send-otp", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "email", value: trimmed, name: user?.firstName, purpose: "change_email" }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setEmailError(data.error || "Failed to send code."); return; }
+      setEmailStep("otp_sent");
+    } catch { setEmailError("Something went wrong."); }
+    finally { setEmailBusy(false); }
+  }
+
+  async function verifyAndChangeEmail() {
+    if (!emailOtp.trim()) { setEmailError("Enter the verification code."); return; }
+    setEmailBusy(true); setEmailError("");
+    try {
+      const res  = await fetch("/api/user/change-email", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentEmail: user?.email, newEmail: newEmail.trim().toLowerCase(), otp: emailOtp.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setEmailError(data.error || "Verification failed."); return; }
+      const updated = { ...user!, email: data.email };
+      localStorage.setItem("cs_user", JSON.stringify(updated));
+      setUser(updated);
+      setEmailStep("idle"); setNewEmail(""); setEmailOtp("");
+      setEmailSuccess("Email updated successfully.");
+    } catch { setEmailError("Something went wrong."); }
+    finally { setEmailBusy(false); }
   }
 
   async function savePassword() {
@@ -195,7 +240,88 @@ export default function ProfilePage() {
               <div><label style={labelStyle}>First name</label><input value={info.firstName} onChange={e => setInfo(p => ({ ...p, firstName: e.target.value }))} style={newInputStyle} /></div>
               <div><label style={labelStyle}>Last name</label><input value={info.lastName} onChange={e => setInfo(p => ({ ...p, lastName: e.target.value }))} style={newInputStyle} /></div>
             </div>
-            <div><label style={labelStyle}>Email</label><input value={user.email} readOnly style={{ ...newInputStyle, color: "var(--muted-foreground)", cursor: "not-allowed" }} /></div>
+            {/* Email — edit + OTP verify flow */}
+            <div>
+              <label style={labelStyle}>Email</label>
+
+              {/* idle: show current email + Edit button */}
+              {emailStep === "idle" && (
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input value={user.email} readOnly style={{ ...newInputStyle, flex: 1, color: "var(--muted-foreground)", cursor: "not-allowed" }} />
+                  <button
+                    onClick={() => { setEmailStep("editing"); setEmailError(""); setEmailSuccess(""); }}
+                    style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface-elevated)", color: "var(--foreground)", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                    Edit
+                  </button>
+                </div>
+              )}
+
+              {/* editing: new email input + Send code / Cancel */}
+              {emailStep === "editing" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      value={newEmail}
+                      onChange={e => { setNewEmail(e.target.value); setEmailError(""); }}
+                      placeholder="New email address"
+                      type="email"
+                      autoFocus
+                      style={{ ...newInputStyle, flex: 1 }}
+                    />
+                    <button
+                      onClick={() => { setEmailStep("idle"); setNewEmail(""); setEmailError(""); }}
+                      style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border)", background: "transparent", color: "var(--muted-foreground)", fontSize: "0.8rem", cursor: "pointer", fontFamily: "inherit" }}>
+                      Cancel
+                    </button>
+                  </div>
+                  <button
+                    onClick={sendEmailOtp}
+                    disabled={emailBusy || !newEmail.trim()}
+                    style={{ padding: "10px 16px", borderRadius: 10, border: "none", background: emailBusy ? "oklch(0.72 0.19 49 / 50%)" : "var(--gradient-accent)", color: "#fff", fontSize: "0.82rem", fontWeight: 700, cursor: emailBusy ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: emailBusy ? "none" : "var(--shadow-orange)" }}>
+                    {emailBusy ? "Sending…" : "Send verification code"}
+                  </button>
+                </div>
+              )}
+
+              {/* otp_sent: code input + Verify button */}
+              {emailStep === "otp_sent" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ fontSize: "0.78rem", color: "var(--muted-foreground)" }}>
+                    A 6-digit code was sent to <strong style={{ color: "var(--foreground)" }}>{newEmail}</strong>
+                  </div>
+                  <input
+                    value={emailOtp}
+                    onChange={e => { setEmailOtp(e.target.value.replace(/\D/g, "").slice(0, 6)); setEmailError(""); }}
+                    placeholder="6-digit code"
+                    inputMode="numeric"
+                    autoFocus
+                    style={{ ...newInputStyle, letterSpacing: "0.2em", fontSize: "1.1rem", textAlign: "center" }}
+                  />
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      onClick={verifyAndChangeEmail}
+                      disabled={emailBusy || emailOtp.length < 6}
+                      style={{ flex: 1, padding: "10px 16px", borderRadius: 10, border: "none", background: emailBusy || emailOtp.length < 6 ? "oklch(0.72 0.19 49 / 50%)" : "var(--gradient-accent)", color: "#fff", fontSize: "0.82rem", fontWeight: 700, cursor: emailBusy || emailOtp.length < 6 ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: emailBusy || emailOtp.length < 6 ? "none" : "var(--shadow-orange)" }}>
+                      {emailBusy ? "Verifying…" : "Verify & update email"}
+                    </button>
+                    <button
+                      onClick={() => { setEmailStep("editing"); setEmailOtp(""); setEmailError(""); }}
+                      style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "transparent", color: "var(--muted-foreground)", fontSize: "0.8rem", cursor: "pointer", fontFamily: "inherit" }}>
+                      ← Back
+                    </button>
+                  </div>
+                  <button
+                    onClick={sendEmailOtp}
+                    disabled={emailBusy}
+                    style={{ background: "none", border: "none", padding: 0, fontSize: "0.75rem", color: "var(--muted-foreground)", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}>
+                    Didn't receive it? Resend code
+                  </button>
+                </div>
+              )}
+
+              {emailError   && <div style={{ fontSize: "0.78rem", color: "#f09595", marginTop: 4 }}>{emailError}</div>}
+              {emailSuccess && <div style={{ fontSize: "0.78rem", color: "#4ade80", marginTop: 4 }}>{emailSuccess}</div>}
+            </div>
             <div><label style={labelStyle}>Phone</label><input value={info.phone} onChange={e => setInfo(p => ({ ...p, phone: e.target.value }))} placeholder="+91 00000 00000" style={newInputStyle} /></div>
             <div><label style={labelStyle}>Training location</label><input value={info.location} onChange={e => setInfo(p => ({ ...p, location: e.target.value }))} placeholder="e.g. Kondapur" style={newInputStyle} /></div>
             <div>
