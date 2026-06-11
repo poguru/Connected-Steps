@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail, sendWhatsAppOTP } from "@/lib/notify";
+import { isRateLimited, recordFailure, getClientIp } from "@/lib/rate-limit";
 
 function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -50,6 +51,17 @@ export async function POST(req: NextRequest) {
     if (!type || !value) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     if (type !== "email" && type !== "phone") return NextResponse.json({ error: "Invalid type" }, { status: 400 });
 
+    const ip  = getClientIp(req);
+    const key = `send-otp:${ip}:${String(value).toLowerCase().trim()}`;
+
+    if (isRateLimited(key)) {
+      return NextResponse.json(
+        { error: "Too many OTP requests. Please wait 15 minutes before requesting a new code." },
+        { status: 429, headers: { "Retry-After": "900" } }
+      );
+    }
+    recordFailure(key); // count every send (not just failures) to prevent SMS spam
+
     const db = getSupabaseServer();
     const identifier = type === "email" ? (value as string).toLowerCase().trim() : (value as string).trim();
 
@@ -57,7 +69,8 @@ export async function POST(req: NextRequest) {
     if (type === "email") {
       const { data: existing } = await db.from("users").select("id").eq("email", identifier).single();
       if ((purpose === "register" || purpose === "change_email") && existing) {
-        return NextResponse.json({ error: "This email is already in use by another account." }, { status: 409 });
+        // 400 (not 409) so clients handle this as a validation error, not a conflict
+        return NextResponse.json({ error: "This email is already in use by another account." }, { status: 400 });
       }
       if (purpose === "login" && !existing) {
         return NextResponse.json({ error: "No account found with this email." }, { status: 404 });

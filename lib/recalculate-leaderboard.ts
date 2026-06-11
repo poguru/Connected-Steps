@@ -52,32 +52,37 @@ export async function recalculateMonth(month: string): Promise<{ message: string
 
   const userMap = new Map((users ?? []).map((u) => [u.email, u]));
 
+  // Fetch all existing leaderboard fields so we can preserve run/km data on upsert
   const { data: existing } = await db
     .from("leaderboard")
-    .select("user_email, month_points, total_points, points_month")
+    .select("user_email, month_points, total_points, points_month, month_runs, month_km, month_time_secs, total_runs, total_km, total_time_secs")
     .in("user_email", emails);
   const lbMap = new Map((existing ?? []).map((e) => [e.user_email, e]));
 
-  // Build session date lookup
   const sessionDateMap = new Map(sessions.map((s) => [s.id, s.date]));
 
   const userAttMap  = new Map<string, { session_id: string; attended: boolean; bonus_points: number }[]>();
-  const attIdsByUser = new Map<string, number[]>();
+  const allAttIds:  number[] = [];
 
   for (const att of allAtt) {
     if (!userAttMap.has(att.user_email)) {
       userAttMap.set(att.user_email, []);
-      attIdsByUser.set(att.user_email, []);
     }
     userAttMap.get(att.user_email)!.push({
       session_id:   att.session_id,
       attended:     att.attended,
       bonus_points: att.bonus_points ?? 0,
     });
-    attIdsByUser.get(att.user_email)!.push(att.id);
+    allAttIds.push(att.id);
   }
 
-  let updated = 0;
+  // ── Build all leaderboard rows in memory ──────────────────────────────────
+  // Scoring rules are unchanged:
+  //   Base:          5 pts per attended session + manual bonus_points
+  //   Weekly bonus:  +5 if user attended 4+ sessions in any calendar week
+  //   Total:         preserved across months (old_total - old_month + new_month)
+
+  const upsertRows: Record<string, unknown>[] = [];
 
   for (const email of emails) {
     const user = userMap.get(email);
@@ -85,13 +90,11 @@ export async function recalculateMonth(month: string): Promise<{ message: string
 
     const userAtt = userAttMap.get(email) ?? [];
 
-    // Base points: 5 per attended session (any location) + manual bonus_points
     let basePoints = 0;
     for (const att of userAtt) {
       if (att.attended) basePoints += 5 + (att.bonus_points ?? 0);
     }
 
-    // Weekly bonus: +5 for any week where user attended 4+ sessions
     const weekAttCount = new Map<string, number>();
     for (const att of userAtt) {
       if (!att.attended) continue;
@@ -111,39 +114,45 @@ export async function recalculateMonth(month: string): Promise<{ message: string
     const oldTotal    = lb?.total_points ?? 0;
     const newTotal    = Math.max(0, oldTotal - oldMonthPts + newMonthPts);
 
-    if (lb) {
-      await db.from("leaderboard").update({
-        month_points: newMonthPts,
-        total_points: newTotal,
-        points_month: month,
-        updated_at:   new Date().toISOString(),
-      }).eq("user_email", email);
-    } else {
-      await db.from("leaderboard").insert({
-        user_email:      email,
-        user_name:       `${user.first_name} ${user.last_name}`,
-        location:        user.location ?? "",
-        goal:            user.goal ?? "",
-        month_points:    newMonthPts,
-        total_points:    newMonthPts,
-        points_month:    month,
-        month_runs:      0,
-        month_km:        0,
-        month_time_secs: 0,
-        total_runs:      0,
-        total_km:        0,
-        total_time_secs: 0,
-        updated_at:      new Date().toISOString(),
-      });
-    }
-
-    const ids = attIdsByUser.get(email) ?? [];
-    if (ids.length) {
-      await db.from("session_attendance").update({ points_synced: true }).in("id", ids);
-    }
-
-    updated++;
+    upsertRows.push({
+      user_email:      email,
+      user_name:       `${user.first_name} ${user.last_name}`,
+      location:        user.location ?? "",
+      goal:            user.goal ?? "",
+      month_points:    newMonthPts,
+      total_points:    newTotal,
+      points_month:    month,
+      // Preserve existing run/km data — only a separate Strava sync touches these
+      month_runs:      lb?.month_runs      ?? 0,
+      month_km:        lb?.month_km        ?? 0,
+      month_time_secs: lb?.month_time_secs ?? 0,
+      total_runs:      lb?.total_runs      ?? 0,
+      total_km:        lb?.total_km        ?? 0,
+      total_time_secs: lb?.total_time_secs ?? 0,
+      updated_at:      new Date().toISOString(),
+    });
   }
 
-  return { message: `Recalculated points for ${updated} user(s) — ${month}.`, updated };
+  if (upsertRows.length === 0) return { message: "No users to update.", updated: 0 };
+
+  // ── Single atomic upsert for all leaderboard rows ─────────────────────────
+  // One DB round-trip replaces the previous per-user UPDATE/INSERT loop.
+  // Concurrent calls compute the same scores and upsert the same values,
+  // so "last writer wins" is safe — no data corruption possible.
+  const { error: upsertErr } = await db
+    .from("leaderboard")
+    .upsert(upsertRows, { onConflict: "user_email" });
+
+  if (upsertErr) throw new Error(upsertErr.message);
+
+  // ── Single batch mark all month attendance as synced ─────────────────────
+  // Covers all sessions in the month, not just the one that triggered the sync.
+  if (allAttIds.length > 0) {
+    await db
+      .from("session_attendance")
+      .update({ points_synced: true })
+      .in("id", allAttIds);
+  }
+
+  return { message: `Recalculated points for ${upsertRows.length} user(s) — ${month}.`, updated: upsertRows.length };
 }

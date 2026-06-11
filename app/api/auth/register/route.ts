@@ -11,6 +11,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
     }
 
+    // Server-side password strength validation (mirrors client-side rules)
+    if ((password as string).length < 8) {
+      return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
+    }
+    if (!/[A-Z]/.test(password as string)) {
+      return NextResponse.json({ error: "Password must contain at least one uppercase letter." }, { status: 400 });
+    }
+    if (!/[0-9]/.test(password as string)) {
+      return NextResponse.json({ error: "Password must contain at least one number." }, { status: 400 });
+    }
+
     const supabaseServer = getSupabaseServer();
 
     // Check if email already registered

@@ -180,19 +180,18 @@ test.describe('POST /api/auth/forgot-password', () => {
 // ─── 8. Membership ────────────────────────────────────────────────────────────
 
 test.describe('GET /api/membership', () => {
-  test('returns membership null when no email provided', async ({ request }) => {
+  test('returns 401 when no user token is provided', async ({ request }) => {
     const res  = await request.get(`${BASE}/api/membership`);
-    expect(res.status()).toBe(200);
+    expect(res.status()).toBe(401);
     const body = await res.json();
-    expect(body.membership).toBeNull();
+    expect(body.error).toBeTruthy();
   });
 
-  test('returns membership object for known email', async ({ request }) => {
+  test('returns 401 for unauthenticated request with email but no token', async ({ request }) => {
     const res  = await request.get(`${BASE}/api/membership?email=connected.steps2106@gmail.com`);
-    expect(res.status()).toBe(200);
+    expect(res.status()).toBe(401);
     const body = await res.json();
-    // membership can be null or an object — just check it responds
-    expect(body).toHaveProperty('membership');
+    expect(body.error).toBeTruthy();
   });
 });
 

@@ -444,38 +444,54 @@ export default function Dashboard() {
       .catch(() => {});
   }, [upcomingSessions]);
 
-  // ── Supabase realtime: session_attendance changes ─────────────────────────
+  // ── Supabase realtime: current user's join/leave events ──────────────────────
+  //
+  // BEFORE (unfiltered): every INSERT/DELETE on session_attendance is broadcast
+  //   to all N connected subscribers. At N concurrent users:
+  //     N users × event = N messages per registration
+  //   At 1,000 users and 20 registrations/day → 20,000 messages.
+  //
+  // AFTER (server-side filter): Supabase only delivers events whose
+  //   user_email matches this user. One message per event, regardless of N:
+  //   1 × 20 = 20 messages/day — 99.9% reduction at 1,000 users.
+  //
+  // RSVP counts for other users' registrations are no longer real-time;
+  // they are correct on page load and updated for this user's own actions.
   useEffect(() => {
     if (!user) return;
     const supabase = getSupabase();
     const channel = supabase
-      .channel("dashboard-session-attendance")
+      .channel("dashboard-join-state")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "session_attendance" },
+        {
+          event:  "INSERT",
+          schema: "public",
+          table:  "session_attendance",
+          filter: `user_email=eq.${user.email}`,
+        },
         (payload) => {
-          const newRow = payload.new as Record<string, string> | null;
-          const oldRow = payload.old as Record<string, string> | null;
-          const sessionId = newRow?.session_id ?? oldRow?.session_id;
-          const email     = newRow?.user_email  ?? oldRow?.user_email;
+          const row = payload.new as Record<string, string> | null;
+          const sessionId = row?.session_id;
           if (!sessionId) return;
-
-          // Keep current user's join state in sync across tabs / devices
-          if (email === user.email) {
-            if (payload.eventType === "INSERT") {
-              setJoinedSessionIds(prev => new Set([...prev, sessionId]));
-            } else if (payload.eventType === "DELETE") {
-              setJoinedSessionIds(prev => { const n = new Set(prev); n.delete(sessionId); return n; });
-            }
-          }
-
-          // Update RSVP count for the session
-          setRsvpCounts(prev => {
-            const cur = prev[sessionId] ?? 0;
-            if (payload.eventType === "INSERT") return { ...prev, [sessionId]: cur + 1 };
-            if (payload.eventType === "DELETE") return { ...prev, [sessionId]: Math.max(0, cur - 1) };
-            return prev;
-          });
+          setJoinedSessionIds(prev => new Set([...prev, sessionId]));
+          setRsvpCounts(prev => ({ ...prev, [sessionId]: (prev[sessionId] ?? 0) + 1 }));
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event:  "DELETE",
+          schema: "public",
+          table:  "session_attendance",
+          filter: `user_email=eq.${user.email}`,
+        },
+        (payload) => {
+          const row = payload.old as Record<string, string> | null;
+          const sessionId = row?.session_id;
+          if (!sessionId) return;
+          setJoinedSessionIds(prev => { const n = new Set(prev); n.delete(sessionId); return n; });
+          setRsvpCounts(prev => ({ ...prev, [sessionId]: Math.max(0, (prev[sessionId] ?? 0) - 1) }));
         }
       )
       .subscribe();
@@ -484,7 +500,7 @@ export default function Dashboard() {
 
   // ── Supabase realtime: coach marks attendance for the current user ──────────
   // Filtered to user_email at the DB level — fires only on UPDATE (attendance
-  // marked by coach), not on INSERT/DELETE (handled by the channel above).
+  // marked by coach). INSERT/DELETE are handled by dashboard-join-state above.
   // One API call refreshes history + attendance state + streak in one shot.
   useEffect(() => {
     if (!user) return;

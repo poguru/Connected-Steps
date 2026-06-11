@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { paginateAll } from "@/lib/paginate";
 
 // Runs on the 1st of every month at 00:05 IST (18:35 UTC prev day) via Vercel Cron.
 // Snapshots current monthly ranks into prev_month_rank so movement indicators
@@ -10,16 +11,23 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const startMs = Date.now();
   const db = getSupabaseServer();
 
-  // Fetch all leaderboard entries ordered by month_points
-  const { data: entries, error } = await db
-    .from("leaderboard")
-    .select("user_email, month_points")
-    .order("month_points", { ascending: false });
+  // Paginated: leaderboard can exceed default row limit at scale.
+  const { rows: entries, pages } = await paginateAll<{ user_email: string; month_points: number }>(
+    (from, to) =>
+      db.from("leaderboard")
+        .select("user_email, month_points")
+        .order("month_points", { ascending: false })
+        .order("user_email")           // secondary sort for stable pagination
+        .range(from, to),
+  );
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  if (!entries?.length) return NextResponse.json({ ok: true, updated: 0 });
+  if (!entries.length) {
+    console.log(`[rank-snapshot] no entries found duration=${Date.now() - startMs}ms`);
+    return NextResponse.json({ ok: true, updated: 0 });
+  }
 
   // Assign competition ranks (tied scores share the same rank)
   const ranked: { user_email: string; rank: number }[] = [];
@@ -36,6 +44,9 @@ export async function GET(req: NextRequest) {
 
   await Promise.allSettled(updates);
 
-  console.log(`Rank snapshot: ${ranked.length} users updated`);
+  console.log(
+    `[rank-snapshot] users=${ranked.length} pages=${pages}` +
+    ` duration=${Date.now() - startMs}ms`,
+  );
   return NextResponse.json({ ok: true, updated: ranked.length });
 }

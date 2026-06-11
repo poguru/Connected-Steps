@@ -7,59 +7,16 @@ function auth(req: NextRequest) {
   return pw && pw === process.env.ADMIN_PASSWORD;
 }
 
-const ATTENDANCE_POINTS = 5;
-
-async function addPoints(db: ReturnType<typeof import("@/lib/supabase-server").getSupabaseServer>, email: string, pts: number) {
-  const currentMonth = new Date().toISOString().slice(0, 7); // "2026-05"
-
-  const { data: existing } = await db
-    .from("leaderboard")
-    .select("month_points, total_points, points_month")
-    .eq("user_email", email)
-    .single();
-
-  if (existing) {
-    // Reset month_points when a new month starts
-    const baseMonthPts = (existing.points_month ?? "") === currentMonth
-      ? (existing.month_points ?? 0)
-      : 0;
-
-    await db
-      .from("leaderboard")
-      .update({
-        month_points:  baseMonthPts + pts,
-        total_points:  (existing.total_points ?? 0) + pts,
-        points_month:  currentMonth,
-        updated_at:    new Date().toISOString(),
-      })
-      .eq("user_email", email);
-  } else {
-    // User has no leaderboard entry yet — create one
-    const { data: user } = await db
-      .from("users")
-      .select("first_name, last_name, location, goal")
-      .eq("email", email)
-      .single();
-
-    await db.from("leaderboard").insert({
-      user_email:      email,
-      user_name:       user ? `${user.first_name} ${user.last_name}` : email,
-      location:        user?.location ?? "",
-      goal:            user?.goal     ?? "",
-      month_points:    pts,
-      total_points:    pts,
-      points_month:    currentMonth,
-      month_runs:      0,
-      month_km:        0,
-      month_time_secs: 0,
-      total_runs:      0,
-      total_km:        0,
-      total_time_secs: 0,
-    });
-  }
-}
-
-// POST — sync unsynced attendance + bonus points to leaderboard
+// POST — sync attendance for a session to the leaderboard.
+//
+// Safety properties:
+//   Idempotent        — recalculateMonth reads all data and upserts; running
+//                       twice produces identical leaderboard state.
+//   Concurrent-safe   — both callers compute the same scores from the same
+//                       data and upsert the same values. "Last writer wins"
+//                       is safe because the writes are identical.
+//   Single authority  — recalculateMonth is the only code that touches
+//                       leaderboard points; no incremental delta is applied.
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -68,36 +25,36 @@ export async function POST(
   const { id } = await params;
   const db = getSupabaseServer();
 
-  // Fetch session date to determine the month for recalculation
-  const { data: session } = await db.from("sessions").select("date").eq("id", id).single();
-  const sessionMonth = session?.date ? (session.date as string).slice(0, 7) : new Date().toISOString().slice(0, 7);
+  // Fetch session date to determine which month to recalculate
+  const { data: session } = await db
+    .from("sessions")
+    .select("date")
+    .eq("id", id)
+    .single();
 
-  const { data: records, error } = await db
+  const sessionMonth = session?.date
+    ? (session.date as string).slice(0, 7)
+    : new Date().toISOString().slice(0, 7);
+
+  // Early-exit guard: if every record for this session is already synced,
+  // skip the recalculation entirely (no-op for re-clicks and concurrent calls
+  // that arrive after the first has finished).
+  const { count } = await db
     .from("session_attendance")
-    .select("*")
+    .select("id", { count: "exact", head: true })
     .eq("session_id", id)
     .eq("points_synced", false);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  if (!records || records.length === 0) {
+  if (!count || count === 0) {
     return NextResponse.json({ synced: 0, message: "Nothing to sync." });
   }
 
-  let synced = 0;
-  for (const rec of records) {
-    const pts = (rec.attended ? ATTENDANCE_POINTS : 0) + (rec.bonus_points ?? 0);
-    if (pts > 0) {
-      await addPoints(db, rec.user_email, pts);
-      synced++;
-    }
-    await db
-      .from("session_attendance")
-      .update({ points_synced: true })
-      .eq("id", rec.id);
-  }
+  // Recalculate the full month — single source of truth.
+  // Also marks all session_attendance rows for this month as points_synced = true.
+  const result = await recalculateMonth(sessionMonth);
 
-  // Recalculate month_points for all users in this month — keeps totals accurate
-  try { await recalculateMonth(sessionMonth); } catch { /* non-fatal */ }
-
-  return NextResponse.json({ synced, message: `Synced points for ${synced} participant(s).` });
+  return NextResponse.json({
+    synced:  result.updated,
+    message: result.message,
+  });
 }

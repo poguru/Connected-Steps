@@ -1,0 +1,25 @@
+{
+  "name": "connected-steps-playwright",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test":         "playwright test",
+    "test:smoke":   "playwright test --grep @smoke --project chromium",
+    "test:security":"playwright test --project security",
+    "test:admin":   "playwright test --project admin",
+    "test:mobile":  "playwright test --project mobile-safari",
+    "test:release": "playwright test --grep @release --project chromium",
+    "test:auth":    "playwright test specs/auth/ --project chromium",
+    "test:ui":      "playwright test --headed --project chromium",
+    "report":       "playwright show-report reports/html"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.45.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

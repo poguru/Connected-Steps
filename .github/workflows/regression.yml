@@ -1,0 +1,138 @@
+name: Full Regression Suite
+
+on:
+  schedule:
+    - cron: "0 2 * * *"   # Nightly at 2 AM UTC (7:30 AM IST)
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        default: local
+        type: choice
+        options: [local, staging]
+
+env:
+  NODE_VERSION: "20"
+  JAVA_VERSION: "17"
+
+jobs:
+  regression-api:
+    name: Full API Regression (Karate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start server
+        run: npm run dev &
+        env:
+          NEXT_PUBLIC_SUPABASE_URL:      ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY:     ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_RAZORPAY_KEY_ID:   ${{ secrets.NEXT_PUBLIC_RAZORPAY_KEY_ID }}
+          RAZORPAY_KEY_SECRET:           ${{ secrets.RAZORPAY_KEY_SECRET }}
+          ADMIN_PASSWORD:                ${{ secrets.ADMIN_PASSWORD }}
+          CRON_SECRET:                   ${{ secrets.CRON_SECRET }}
+          COACH_TOKEN_SECRET:            ${{ secrets.COACH_TOKEN_SECRET }}
+
+      - name: Wait for server
+        run: npx wait-on http://localhost:3000 --timeout 60000
+
+      - name: Run full Karate regression
+        working-directory: tests/automation/karate
+        run: mvn test -Dkarate.env=local -Dtest=RegressionRunner -pl .
+        env:
+          BASE_URL:       http://localhost:3000
+          TEST_EMAIL:     ${{ secrets.TEST_EMAIL }}
+          TEST_PASSWORD:  ${{ secrets.TEST_PASSWORD }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          CRON_SECRET:    ${{ secrets.CRON_SECRET }}
+
+      - name: Upload Karate regression report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: karate-regression-report-${{ github.run_number }}
+          path: tests/automation/karate/target/karate-reports/
+          retention-days: 30
+
+  regression-ui:
+    name: Full UI Regression (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install all dependencies
+        run: |
+          npm ci
+          cd tests/automation/playwright && npm ci
+
+      - name: Install Playwright browsers
+        working-directory: tests/automation/playwright
+        run: npx playwright install --with-deps
+
+      - name: Start server
+        run: npm run dev &
+        env:
+          NEXT_PUBLIC_SUPABASE_URL:      ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY:     ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_RAZORPAY_KEY_ID:   ${{ secrets.NEXT_PUBLIC_RAZORPAY_KEY_ID }}
+          RAZORPAY_KEY_SECRET:           ${{ secrets.RAZORPAY_KEY_SECRET }}
+          ADMIN_PASSWORD:                ${{ secrets.ADMIN_PASSWORD }}
+          CRON_SECRET:                   ${{ secrets.CRON_SECRET }}
+          COACH_TOKEN_SECRET:            ${{ secrets.COACH_TOKEN_SECRET }}
+
+      - name: Wait for server
+        run: npx wait-on http://localhost:3000 --timeout 60000
+
+      - name: Run full Playwright regression
+        working-directory: tests/automation/playwright
+        run: npx playwright test --reporter=html
+        env:
+          BASE_URL:                  http://localhost:3000
+          TEST_EMAIL:                ${{ secrets.TEST_EMAIL }}
+          TEST_PASSWORD:             ${{ secrets.TEST_PASSWORD }}
+          TEST_EMAIL_2:              ${{ secrets.TEST_EMAIL_2 }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL:  ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          ADMIN_PASSWORD:            ${{ secrets.ADMIN_PASSWORD }}
+          CRON_SECRET:               ${{ secrets.CRON_SECRET }}
+
+      - name: Upload Playwright regression report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-regression-report-${{ github.run_number }}
+          path: tests/automation/playwright/reports/
+          retention-days: 30
+
+  notify-on-failure:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: [regression-api, regression-ui]
+    if: failure()
+    steps:
+      - name: Regression failed
+        run: |
+          echo "❌ Nightly regression failed. Check artifacts for reports."
+          echo "Run: ${{ github.run_number }}"
+          echo "Branch: ${{ github.ref }}"
