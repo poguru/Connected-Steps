@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { requireActiveUser } from "@/lib/active-user";
 
 export type PostType = "general" | "run" | "achievement" | "race" | "question";
 
@@ -129,6 +130,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     if (body_text.length > 800)
       return NextResponse.json({ error: "Post must be under 800 characters" }, { status: 400 });
+
+    const blocked = await requireActiveUser(author_email);
+    if (blocked) return blocked;
 
     const db = getSupabaseServer();
     const { data, error } = await db.from("user_posts").insert({

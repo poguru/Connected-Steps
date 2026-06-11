@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
+import { calcHardBreakStreak } from "@/lib/streak-utils";
 
 export async function GET(req: NextRequest) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -52,12 +53,7 @@ export async function GET(req: NextRequest) {
     const attendancePct    = sessions.length > 0 ? Math.round((attendedIds.size / sessions.length) * 100) : 0;
 
     // Streak: consecutive attended from most recent session that has any record
-    let streak = 0;
-    for (const s of sessions) {
-      if (userAttend[s.id] === true)       { streak++; }
-      else if (userAttend[s.id] === false) { break; }
-      // no record → skip (don't break streak)
-    }
+    const streak = calcHardBreakStreak(sessions.map(s => ({ attended: userAttend[s.id] })));
 
     const lastDate   = lastSession ? new Date(lastSession.date) : null;
     const isAtRisk   = isActiveMember && (!lastDate || lastDate < twoWeeksAgo);

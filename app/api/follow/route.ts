@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { requireActiveUser } from "@/lib/active-user";
 
 // POST /api/follow — follow or unfollow
 export async function POST(req: NextRequest) {
@@ -11,6 +12,9 @@ export async function POST(req: NextRequest) {
     if (follower_email === following_email) {
       return NextResponse.json({ error: "Cannot follow yourself" }, { status: 400 });
     }
+
+    const blocked = await requireActiveUser(follower_email);
+    if (blocked) return blocked;
 
     const db = getSupabaseServer();
 

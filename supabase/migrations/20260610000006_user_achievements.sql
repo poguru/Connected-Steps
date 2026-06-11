@@ -7,3 +7,6 @@ CREATE TABLE IF NOT EXISTS user_achievements (
 );
 
 CREATE INDEX IF NOT EXISTS user_achievements_email_idx ON user_achievements (user_email);
+
+-- RLS: only the service role (server-side API) can read/write this table
+ALTER TABLE user_achievements ENABLE ROW LEVEL SECURITY;

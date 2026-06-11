@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { requireActiveUser } from "@/lib/active-user";
 
 export async function GET(
   req: NextRequest,
@@ -37,6 +38,9 @@ export async function POST(
   const { id } = await params;
   const { email } = await req.json();
   if (!email) return NextResponse.json({ error: "Email is required." }, { status: 400 });
+
+  const blocked = await requireActiveUser(email);
+  if (blocked) return blocked;
 
   const db = getSupabaseServer();
 
@@ -104,6 +108,9 @@ export async function DELETE(
   const { id } = await params;
   const { email } = await req.json();
   if (!email) return NextResponse.json({ error: "Email is required." }, { status: 400 });
+
+  const blocked = await requireActiveUser(email);
+  if (blocked) return blocked;
 
   const db = getSupabaseServer();
 

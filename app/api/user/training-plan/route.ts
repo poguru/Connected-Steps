@@ -14,6 +14,23 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ plan: null }, { status: 401 });
 
   const db = getSupabaseServer();
+
+  if (isOwner) {
+    const { data: membership } = await db
+      .from("memberships")
+      .select("status, expires_at")
+      .eq("user_email", email.toLowerCase())
+      .maybeSingle();
+
+    if (
+      !membership ||
+      membership.status !== "active" ||
+      new Date(membership.expires_at) <= new Date()
+    ) {
+      return NextResponse.json({ plan: null });
+    }
+  }
+
   const { data } = await db
     .from("training_plans")
     .select("id, title, coach_name, days, created_at")

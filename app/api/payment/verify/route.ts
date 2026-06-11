@@ -52,6 +52,19 @@ export async function POST(req: NextRequest) {
   expiresAt.setMonth(expiresAt.getMonth() + months);
 
   const db = getSupabaseServer();
+
+  // Idempotency guard: if this razorpay_payment_id was already recorded,
+  // return the stored expiry immediately without touching any data.
+  const { data: alreadyProcessed } = await db
+    .from("memberships")
+    .select("expires_at")
+    .eq("razorpay_payment_id", razorpay_payment_id)
+    .maybeSingle();
+
+  if (alreadyProcessed) {
+    return NextResponse.json({ success: true, expiresAt: alreadyProcessed.expires_at });
+  }
+
   const { error } = await db.from("memberships").upsert(
     {
       user_email:          email.toLowerCase(),

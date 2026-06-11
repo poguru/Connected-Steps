@@ -482,6 +482,34 @@ export default function Dashboard() {
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
+  // ── Supabase realtime: coach marks attendance for the current user ──────────
+  // Filtered to user_email at the DB level — fires only on UPDATE (attendance
+  // marked by coach), not on INSERT/DELETE (handled by the channel above).
+  // One API call refreshes history + attendance state + streak in one shot.
+  useEffect(() => {
+    if (!user) return;
+    const supabase = getSupabase();
+    const channel = supabase
+      .channel("dashboard-attendance-history")
+      .on(
+        "postgres_changes",
+        {
+          event:  "UPDATE",
+          schema: "public",
+          table:  "session_attendance",
+          filter: `user_email=eq.${user.email}`,
+        },
+        () => {
+          fetch(`/api/user/sessions?email=${encodeURIComponent(user.email)}`)
+            .then(r => r.json())
+            .then(d => { if (d.sessions) setSessions(d.sessions); })
+            .catch(() => {});
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
   // ── Supabase realtime: live points update when leaderboard row changes ────
   useEffect(() => {
     if (!user) return;

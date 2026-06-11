@@ -2,19 +2,23 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { getCoachBySlug, COACHES } from "@/lib/coach-data";
+import { fetchCoachBySlug, fetchCoachSlugs } from "@/lib/coach-db";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
-// Pre-generate all coach slugs at build time
-export function generateStaticParams() {
-  return COACHES.map(c => ({ slug: c.slug }));
+// Revalidate every hour so newly added coaches appear without a full redeploy
+export const revalidate = 3600;
+
+// Pre-generate all active coach slugs at build time (falls back to hardcoded list)
+export async function generateStaticParams() {
+  const slugs = await fetchCoachSlugs();
+  return slugs.map(slug => ({ slug }));
 }
 
 export async function generateMetadata(
   { params }: { params: Promise<{ slug: string }> }
 ): Promise<Metadata> {
   const { slug } = await params;
-  const coach    = getCoachBySlug(slug);
+  const coach    = await fetchCoachBySlug(slug);
   if (!coach) return { title: "Coach not found — Connected Steps" };
   return {
     title:       `${coach.name} — Connected Steps Coach`,
@@ -41,7 +45,7 @@ export default async function CoachProfilePage(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const coach    = getCoachBySlug(slug);
+  const coach    = await fetchCoachBySlug(slug);
   if (!coach) notFound();
 
   const rating = await getRating(coach.email);

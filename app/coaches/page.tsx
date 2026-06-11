@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { COACHES } from "@/lib/coach-data";
+import { fetchCoachProfiles } from "@/lib/coach-db";
 import CoachListCard from "@/components/coaches/CoachListCard";
 
 export const metadata: Metadata = {
@@ -9,7 +9,8 @@ export const metadata: Metadata = {
   description: "Meet Hyderabad's elite running coaches — national medallists, NIS-certified professionals dedicated to your personal running goals.",
 };
 
-export default function CoachesPage() {
+export default async function CoachesPage() {
+  const coaches = await fetchCoachProfiles();
   return (
     <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)" }}>
 
@@ -42,7 +43,7 @@ export default function CoachesPage() {
 
         {/* Coach cards */}
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-          {COACHES.map(coach => (
+          {coaches.map(coach => (
             <CoachListCard key={coach.slug} coach={coach} />
           ))}
         </div>

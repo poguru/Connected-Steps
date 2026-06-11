@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { calcMissToleranceStreak } from "@/lib/streak-utils";
 
 interface SessionRecord {
   attended: boolean;
@@ -40,18 +41,6 @@ const FALLBACK: PlanDay[] = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function calcStreak(sessions: SessionRecord[]): number {
-  const past = sessions
-    .filter(r => r.sessions !== null)
-    .sort((a, b) => new Date(b.sessions!.date).getTime() - new Date(a.sessions!.date).getTime());
-  let streak = 0, misses = 0;
-  for (const r of past) {
-    if (r.attended) { streak++; misses = 0; }
-    else { misses++; if (misses >= 2) break; }
-  }
-  return streak;
-}
-
 function calcMonthly(sessions: SessionRecord[]): number {
   const start = new Date(); start.setDate(1); start.setHours(0, 0, 0, 0);
   return sessions.filter(r => r.attended && r.sessions && new Date(r.sessions.date) >= start).length;
@@ -89,7 +78,11 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
     setPlan(p[(new Date().getDay() + 6) % 7]);
   }, [user.goal]);
 
-  const streak   = calcStreak(sessions);
+  const streak   = calcMissToleranceStreak(
+    sessions
+      .filter(r => r.sessions !== null)
+      .map(r => ({ attended: r.attended, date: r.sessions!.date }))
+  );
   const monthly  = calcMonthly(sessions);
   const nextSess = upcomingSessions[0] ?? null;
   const isRest   = plan?.type === "Rest";

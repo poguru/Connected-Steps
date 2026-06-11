@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   const db = getSupabaseServer();
 
   const [usersRes, membershipsRes, leaderboardRes, sessionsRes] = await Promise.all([
-    db.from("users").select("email, first_name, last_name, phone, goal, location, created_at").order("created_at", { ascending: false }),
+    db.from("users").select("email, first_name, last_name, phone, goal, location, created_at, is_active").order("created_at", { ascending: false }),
     db.from("memberships").select("user_email, plan, status, expires_at"),
     db.from("leaderboard").select("user_email, total_points, month_points, total_runs, total_km"),
     db.from("session_attendance").select("user_email, attended").eq("attended", true),
@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
       goal:          u.goal        ?? "",
       location:      u.location    ?? "",
       created_at:    u.created_at  ?? "",
+      is_active:     u.is_active   ?? true,
       membership:    isActive ? (m?.plan ?? null) : null,
       expires_at:    m?.expires_at ?? null,
       isActiveMember:isActive,
@@ -55,4 +56,23 @@ export async function GET(req: NextRequest) {
   };
 
   return NextResponse.json({ users, stats });
+}
+
+// PATCH /api/admin/users — { email, is_active: boolean }
+// Deactivates or re-enables a user account.
+export async function PATCH(req: NextRequest) {
+  if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { email, is_active } = await req.json().catch(() => ({})) as { email?: string; is_active?: boolean };
+  if (!email || typeof is_active !== "boolean")
+    return NextResponse.json({ error: "email and is_active (boolean) required" }, { status: 400 });
+
+  const db = getSupabaseServer();
+  const { error } = await db
+    .from("users")
+    .update({ is_active })
+    .eq("email", email.toLowerCase().trim());
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ success: true, email: email.toLowerCase().trim(), is_active });
 }

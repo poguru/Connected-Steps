@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { requireActiveUser } from "@/lib/active-user";
 
 const ADMIN_EMAIL = process.env.ADMIN_NOTIFY_EMAIL ?? "info@connectedsteps.in";
 
@@ -57,6 +58,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Title must be under 120 characters" }, { status: 400 });
     if (body.length > 600)
       return NextResponse.json({ error: "Post must be under 600 characters" }, { status: 400 });
+
+    const blocked = await requireActiveUser(user_email);
+    if (blocked) return blocked;
 
     const db = getSupabaseServer();
     await db.from("community_posts").insert({

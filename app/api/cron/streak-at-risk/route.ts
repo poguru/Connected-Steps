@@ -8,9 +8,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { createNotification } from "@/lib/notify-inapp";
+import { calcDateGapStreak, SESSION_GAP_DAYS } from "@/lib/streak-utils";
 
-// A gap larger than this between two consecutive sessions breaks the streak.
-const MAX_GAP_DAYS  = 14;
+const MAX_GAP_DAYS  = SESSION_GAP_DAYS;
 const MIN_STREAK    = 3;
 const INACTIVE_DAYS = 10;
 // Don't re-notify the same user within this many days.
@@ -61,17 +61,7 @@ export async function GET(req: NextRequest) {
     // Sort descending (most recent first)
     dates.sort((a, b) => b.getTime() - a.getTime());
 
-    let streak = 1;
-    for (let i = 1; i < dates.length; i++) {
-      const gapMs   = dates[i - 1].getTime() - dates[i].getTime();
-      const gapDays = gapMs / (1000 * 60 * 60 * 24);
-      if (gapDays <= MAX_GAP_DAYS) {
-        streak++;
-      } else {
-        break;
-      }
-    }
-
+    const streak = calcDateGapStreak(dates, MAX_GAP_DAYS);
     stats.set(email, { streak, lastAttended: dates[0] });
   }
 

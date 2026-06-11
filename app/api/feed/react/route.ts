@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { requireActiveUser } from "@/lib/active-user";
 
 // POST /api/feed/react
 // Body: { feed_event_id, user_email, reaction_type: "like" | "celebrate" }
@@ -17,6 +18,9 @@ export async function POST(req: NextRequest) {
 
     if (!feed_event_id || !user_email || !["like", "celebrate"].includes(reaction_type))
       return NextResponse.json({ error: "Missing or invalid fields" }, { status: 400 });
+
+    const blocked = await requireActiveUser(user_email);
+    if (blocked) return blocked;
 
     const db = getSupabaseServer();
 

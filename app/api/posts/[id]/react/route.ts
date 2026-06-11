@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { requireActiveUser } from "@/lib/active-user";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -13,6 +14,9 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   if (!user_email || !["like","celebrate"].includes(reaction_type))
     return NextResponse.json({ error: "Invalid fields" }, { status: 400 });
+
+  const blocked = await requireActiveUser(user_email);
+  if (blocked) return blocked;
 
   const db = getSupabaseServer();
   const { data: existing } = await db

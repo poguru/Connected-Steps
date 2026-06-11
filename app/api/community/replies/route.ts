@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { requireActiveUser } from "@/lib/active-user";
 
 export async function GET(req: NextRequest) {
   const post_id = req.nextUrl.searchParams.get("post_id");
@@ -24,6 +25,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     if (body.trim().length > 600)
       return NextResponse.json({ error: "Reply must be under 600 characters" }, { status: 400 });
+
+    const blocked = await requireActiveUser(user_email);
+    if (blocked) return blocked;
 
     const db = getSupabaseServer();
     const { error } = await db.from("community_replies").insert({

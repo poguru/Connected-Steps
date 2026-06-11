@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -12,7 +12,7 @@ const PLAN_LABELS: Record<string, string> = {
   monthly: "Monthly", quarterly: "3 Months", biannual: "6 Months", annual: "12 Months",
 };
 
-type MemberFilter = "all" | "active" | "inactive";
+type MemberFilter = "all" | "active" | "inactive" | "deactivated";
 
 interface AppUser {
   email:          string;
@@ -22,6 +22,7 @@ interface AppUser {
   goal:           string;
   location:       string;
   created_at:     string;
+  is_active:      boolean;
   membership:     string | null;
   expires_at:     string | null;
   isActiveMember: boolean;
@@ -42,17 +43,18 @@ function fmtDate(iso: string) {
 }
 
 export default function AdminUsersPage() {
-  const [pw,      setPw]      = useState("");
-  const [authed,  setAuthed]  = useState(false);
-  const [users,   setUsers]   = useState<AppUser[]>([]);
-  const [stats,   setStats]   = useState<Stats | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState("");
-  const [search,  setSearch]  = useState("");
-  const [filter,  setFilter]  = useState<MemberFilter>("all");
+  const [pw,        setPw]        = useState("");
+  const [authed,    setAuthed]    = useState(false);
+  const [users,     setUsers]     = useState<AppUser[]>([]);
+  const [stats,     setStats]     = useState<Stats | null>(null);
+  const [loading,   setLoading]   = useState(false);
+  const [error,     setError]     = useState("");
+  const [search,    setSearch]    = useState("");
+  const [filter,    setFilter]    = useState<MemberFilter>("all");
   const [goalFilter, setGoalFilter] = useState("all");
+  const [toggling,  setToggling]  = useState<Record<string, boolean>>({});
 
-  async function load(password: string) {
+  const load = useCallback(async (password: string) => {
     setLoading(true); setError("");
     try {
       const res  = await fetch("/api/admin/users", { headers: { "x-admin-password": password } });
@@ -64,16 +66,35 @@ export default function AdminUsersPage() {
       setAuthed(true);
     } catch { setError("Something went wrong."); }
     finally { setLoading(false); }
-  }
+  }, []);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { const s = localStorage.getItem("cs_admin_pw"); if (s) load(s); }, []);
+  useEffect(() => { const s = localStorage.getItem("cs_admin_pw"); if (s) load(s); }, [load]);
+
+  async function toggleActive(email: string, newState: boolean) {
+    const storedPw = localStorage.getItem("cs_admin_pw") ?? pw;
+    setToggling((t) => ({ ...t, [email]: true }));
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-admin-password": storedPw },
+        body: JSON.stringify({ email, is_active: newState }),
+      });
+      if (res.ok) {
+        setUsers((prev) =>
+          prev.map((u) => (u.email === email ? { ...u, is_active: newState } : u))
+        );
+      }
+    } finally {
+      setToggling((t) => ({ ...t, [email]: false }));
+    }
+  }
 
   const filtered = useMemo(() => {
     let list = users;
-    if (filter === "active")   list = list.filter((u) => u.isActiveMember);
-    if (filter === "inactive") list = list.filter((u) => !u.isActiveMember);
-    if (goalFilter !== "all")  list = list.filter((u) => u.goal === goalFilter);
+    if (filter === "active")      list = list.filter((u) => u.isActiveMember);
+    if (filter === "inactive")    list = list.filter((u) => !u.isActiveMember && u.is_active !== false);
+    if (filter === "deactivated") list = list.filter((u) => u.is_active === false);
+    if (goalFilter !== "all")     list = list.filter((u) => u.goal === goalFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter((u) =>
@@ -84,6 +105,8 @@ export default function AdminUsersPage() {
     }
     return list;
   }, [users, filter, goalFilter, search]);
+
+  const deactivatedCount = useMemo(() => users.filter((u) => u.is_active === false).length, [users]);
 
   if (!authed) {
     return (
@@ -124,6 +147,7 @@ export default function AdminUsersPage() {
               { label: "Active Members",   value: stats.activeMembers,  color: "#4ade80" },
               { label: "Strava Connected", value: stats.withStrava,     color: "#fc4c02" },
               { label: "Sessions Attended",value: stats.totalSessions,  color: "#e8620a" },
+              { label: "Deactivated",      value: deactivatedCount,     color: "#f09595" },
             ].map((s) => (
               <div key={s.label} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", padding: "1.25rem" }}>
                 <div style={{ fontSize: "1.6rem", fontWeight: 700, color: s.color }}>{s.value}</div>
@@ -136,10 +160,17 @@ export default function AdminUsersPage() {
         {/* Filters */}
         <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.25rem", flexWrap: "wrap", alignItems: "center" }}>
           <div style={{ display: "flex", gap: "4px", background: "rgba(255,255,255,0.04)", borderRadius: "6px", padding: "3px" }}>
-            {(["all", "active", "inactive"] as MemberFilter[]).map((f) => (
-              <button key={f} onClick={() => setFilter(f)}
-                style={{ padding: "5px 14px", borderRadius: "4px", fontSize: "0.8rem", fontWeight: 500, cursor: "pointer", fontFamily: "inherit", border: "none", background: filter === f ? "#e8620a" : "transparent", color: filter === f ? "#fff" : "#888", transition: "all 0.15s" }}>
-                {f === "inactive" ? "Non-members" : f.charAt(0).toUpperCase() + f.slice(1)}
+            {([
+              { key: "all",         label: "All" },
+              { key: "active",      label: "Members" },
+              { key: "inactive",    label: "Non-members" },
+              { key: "deactivated", label: "Deactivated" },
+            ] as { key: MemberFilter; label: string }[]).map((f) => (
+              <button key={f.key} onClick={() => setFilter(f.key)}
+                style={{ padding: "5px 14px", borderRadius: "4px", fontSize: "0.8rem", fontWeight: 500, cursor: "pointer", fontFamily: "inherit", border: "none",
+                  background: filter === f.key ? (f.key === "deactivated" ? "#7f1d1d" : "#e8620a") : "transparent",
+                  color: filter === f.key ? "#fff" : "#888", transition: "all 0.15s" }}>
+                {f.label}
               </button>
             ))}
           </div>
@@ -155,40 +186,60 @@ export default function AdminUsersPage() {
 
         {/* Table */}
         <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "10px", overflow: "auto" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1.6fr 100px 110px 80px 80px 80px 80px 110px", gap: "0", padding: "0.75rem 1.25rem", background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.06)", fontSize: "10px", color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", minWidth: "900px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1.6fr 100px 110px 80px 80px 80px 80px 110px 100px", gap: "0", padding: "0.75rem 1.25rem", background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.06)", fontSize: "10px", color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", minWidth: "1000px" }}>
             <div>Member</div><div>Email</div><div>Goal</div><div>Location</div>
-            <div>Sessions</div><div>Runs</div><div>Km</div><div>Points</div><div>Membership</div>
+            <div>Sessions</div><div>Runs</div><div>Km</div><div>Points</div><div>Membership</div><div>Account</div>
           </div>
 
           {filtered.length === 0 ? (
             <div style={{ padding: "3rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>No users found.</div>
-          ) : filtered.map((u) => (
-            <div key={u.email} style={{ display: "grid", gridTemplateColumns: "1.6fr 1.6fr 100px 110px 80px 80px 80px 80px 110px", gap: "0", padding: "0.85rem 1.25rem", borderBottom: "1px solid rgba(255,255,255,0.04)", fontSize: "0.82rem", alignItems: "center", minWidth: "900px" }}>
-              <div>
-                <div style={{ fontWeight: 600, color: "#fff" }}>{u.first_name} {u.last_name}</div>
-                <div style={{ fontSize: "11px", color: "#555", marginTop: "2px" }}>📞 {u.phone || "—"} · Joined {fmtDate(u.created_at)}</div>
-              </div>
-              <div style={{ color: "#888", wordBreak: "break-all", fontSize: "0.78rem" }}>{u.email}</div>
-              <div style={{ color: "#888" }}>{GOAL_LABELS[u.goal] ?? (u.goal || "—")}</div>
-              <div style={{ color: "#888", fontSize: "0.78rem" }}>📍 {u.location || "—"}</div>
-              <div style={{ color: "#e8620a", fontWeight: 600 }}>{u.session_count}</div>
-              <div style={{ color: "#888" }}>{u.total_runs}</div>
-              <div style={{ color: "#888" }}>{u.total_km.toFixed(0)}</div>
-              <div style={{ color: "#888" }}>{u.total_points}</div>
-              <div>
-                {u.isActiveMember ? (
-                  <div>
-                    <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "20px", background: "rgba(74,222,128,0.12)", color: "#4ade80" }}>
-                      {PLAN_LABELS[u.membership ?? ""] ?? u.membership}
-                    </span>
-                    <div style={{ fontSize: "10px", color: "#555", marginTop: "3px" }}>until {fmtDate(u.expires_at ?? "")}</div>
+          ) : filtered.map((u) => {
+            const isDeactivated = u.is_active === false;
+            const isPending     = toggling[u.email];
+            return (
+              <div key={u.email} style={{ display: "grid", gridTemplateColumns: "1.6fr 1.6fr 100px 110px 80px 80px 80px 80px 110px 100px", gap: "0", padding: "0.85rem 1.25rem", borderBottom: "1px solid rgba(255,255,255,0.04)", fontSize: "0.82rem", alignItems: "center", minWidth: "1000px", opacity: isDeactivated ? 0.55 : 1 }}>
+                <div>
+                  <div style={{ fontWeight: 600, color: "#fff", display: "flex", alignItems: "center", gap: 6 }}>
+                    {u.first_name} {u.last_name}
+                    {isDeactivated && <span style={{ fontSize: "9px", fontWeight: 700, padding: "1px 6px", borderRadius: "10px", background: "rgba(240,149,149,0.12)", color: "#f09595", letterSpacing: "0.05em" }}>DISABLED</span>}
                   </div>
-                ) : (
-                  <span style={{ fontSize: "10px", color: "#555" }}>No membership</span>
-                )}
+                  <div style={{ fontSize: "11px", color: "#555", marginTop: "2px" }}>📞 {u.phone || "—"} · Joined {fmtDate(u.created_at)}</div>
+                </div>
+                <div style={{ color: "#888", wordBreak: "break-all", fontSize: "0.78rem" }}>{u.email}</div>
+                <div style={{ color: "#888" }}>{GOAL_LABELS[u.goal] ?? (u.goal || "—")}</div>
+                <div style={{ color: "#888", fontSize: "0.78rem" }}>📍 {u.location || "—"}</div>
+                <div style={{ color: "#e8620a", fontWeight: 600 }}>{u.session_count}</div>
+                <div style={{ color: "#888" }}>{u.total_runs}</div>
+                <div style={{ color: "#888" }}>{u.total_km.toFixed(0)}</div>
+                <div style={{ color: "#888" }}>{u.total_points}</div>
+                <div>
+                  {u.isActiveMember ? (
+                    <div>
+                      <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "20px", background: "rgba(74,222,128,0.12)", color: "#4ade80" }}>
+                        {PLAN_LABELS[u.membership ?? ""] ?? u.membership}
+                      </span>
+                      <div style={{ fontSize: "10px", color: "#555", marginTop: "3px" }}>until {fmtDate(u.expires_at ?? "")}</div>
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: "10px", color: "#555" }}>No membership</span>
+                  )}
+                </div>
+                <div>
+                  <button
+                    disabled={isPending}
+                    onClick={() => toggleActive(u.email, !isDeactivated)}
+                    style={{
+                      fontSize: "10px", fontWeight: 600, padding: "4px 10px", borderRadius: "5px", cursor: isPending ? "default" : "pointer",
+                      border: "none", fontFamily: "inherit", opacity: isPending ? 0.5 : 1, transition: "opacity 0.15s",
+                      background: isDeactivated ? "rgba(74,222,128,0.12)" : "rgba(240,149,149,0.12)",
+                      color:      isDeactivated ? "#4ade80"               : "#f09595",
+                    }}>
+                    {isPending ? "…" : isDeactivated ? "Enable" : "Disable"}
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

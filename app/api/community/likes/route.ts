@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { requireActiveUser } from "@/lib/active-user";
 
 // GET /api/community/likes?email=...
 // Returns like counts for all posts + which ones this user has liked
@@ -29,6 +30,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const { post_id, email } = await req.json();
   if (!post_id || !email) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+
+  const blocked = await requireActiveUser(email);
+  if (blocked) return blocked;
 
   const db  = getSupabaseServer();
   const lc  = email.toLowerCase().trim();

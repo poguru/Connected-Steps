@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { requireActiveUser } from "@/lib/active-user";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -11,6 +12,9 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   if (!reporter_email)
     return NextResponse.json({ error: "reporter_email required" }, { status: 400 });
+
+  const blocked = await requireActiveUser(reporter_email);
+  if (blocked) return blocked;
 
   const db = getSupabaseServer();
 
