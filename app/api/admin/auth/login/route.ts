@@ -2,12 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { signCoachToken, COOKIE_NAME } from "@/lib/admin-auth";
+import { getClientIp, isRateLimited, recordFailure, MAX_FAILURES } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
     const { email, password } = await req.json();
     if (!email || !password) {
       return NextResponse.json({ error: "Email and password required" }, { status: 400 });
+    }
+
+    // Rate limit by IP before touching the database or running bcrypt.
+    const ip  = getClientIp(req);
+    const key = `coachlogin:${ip}`;
+
+    if (isRateLimited(key)) {
+      console.warn(`[rate-limit] BLOCKED IP=${ip} — exceeded ${MAX_FAILURES} failed coach-login attempts`);
+      return NextResponse.json(
+        { error: "Too many failed attempts. Try again in 15 minutes." },
+        { status: 429 },
+      );
     }
 
     const db = getSupabaseServer();
@@ -21,11 +34,15 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (!user) {
+      const count = recordFailure(key);
+      console.warn(`[rate-limit] FAILED coach-login (unknown email) IP=${ip} attempt=${count}/${MAX_FAILURES}`);
       return NextResponse.json({ error: "No coach account found for this email." }, { status: 401 });
     }
 
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) {
+      const count = recordFailure(key);
+      console.warn(`[rate-limit] FAILED coach-login email=${user.email} IP=${ip} attempt=${count}/${MAX_FAILURES}`);
       return NextResponse.json({ error: "Incorrect password." }, { status: 401 });
     }
 

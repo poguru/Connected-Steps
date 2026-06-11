@@ -6,7 +6,7 @@
  */
 
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { createNotification } from "@/lib/notify-inapp";
+import { createNotifications } from "@/lib/notify-inapp";
 import { triggerReferralReward } from "@/lib/referrals";
 
 type FeedPostType = "run" | "achievement" | "general";
@@ -30,6 +30,10 @@ async function insertPost(email: string, name: string, type: FeedPostType, body:
 // Called when attendance is marked attended=true for the first time.
 // Generates a "completed session" post and, if a milestone is crossed, a
 // milestone post — using user_achievements as a dedup guard.
+//
+// Batched to replace the N+1 pattern:
+//   Before: 1 + 2N + 5M queries  (N=attendees, M=milestone hits)
+//   After:  6 queries max, regardless of N
 
 export async function autoFeedSessionCompleted(
   sessionId: string,
@@ -38,7 +42,10 @@ export async function autoFeedSessionCompleted(
   if (!attendees.length) return;
 
   const db = getSupabaseServer();
+  const emails = attendees.map(a => a.email.toLowerCase());
+  const byEmail = Object.fromEntries(attendees.map(a => [a.email.toLowerCase(), a]));
 
+  // ── 1 query: session title ───────────────────────────────────────────────
   const { data: session } = await db
     .from("sessions")
     .select("title")
@@ -46,49 +53,78 @@ export async function autoFeedSessionCompleted(
     .single();
   const title = session?.title ?? "a session";
 
-  for (const a of attendees) {
-    const email = a.email.toLowerCase();
+  // ── 1 query: bulk "session completed" posts ──────────────────────────────
+  await db.from("user_posts").insert(
+    attendees.map(a => ({
+      author_email: a.email.toLowerCase(),
+      author_name:  a.name,
+      post_type:    "run" as FeedPostType,
+      body:         `🏃 ${a.name} completed ${title}`,
+      approved:     true,
+    })),
+  );
 
-    // Session completed post
-    await insertPost(email, a.name, "run", `🏃 ${a.name} completed ${title}`);
+  // ── 1 query: all attended counts in one shot (was N individual COUNTs) ───
+  const { data: allAttended } = await db
+    .from("session_attendance")
+    .select("user_email")
+    .in("user_email", emails)
+    .eq("attended", true);
 
-    // Check total attended count for milestone detection
-    const { count } = await db
-      .from("session_attendance")
-      .select("*", { count: "exact", head: true })
-      .eq("user_email", email)
-      .eq("attended", true);
-
-    const total = count ?? 0;
-    // First-session: trigger referral reward for the referrer (if this user was referred)
-    if (total === 1) {
-      triggerReferralReward(email).catch(() => {});
-    }
-
-    // First-session upgrade prompt notification (fires exactly once)
-    if (total === 1) {
-      createNotification({
-        user_email: email,
-        type:       "upgrade_prompt",
-        title:      "You completed your first session! 🎉",
-        body:       "Get a personalised training plan from your coach and run every weekend for free.",
-        action_url: "/pricing",
-      }).catch(() => {});
-    }
-
-    if (!MILESTONE_THRESHOLDS.includes(total)) continue;
-
-    // Use user_achievements as a dedup guard with a feed-specific badge_id.
-    // The unique(user_email, badge_id) constraint ensures we post exactly once.
-    const { error } = await db
-      .from("user_achievements")
-      .insert({ user_email: email, badge_id: `feed_milestone_${total}` });
-
-    if (!error) {
-      const label = total === 1 ? "1st session" : `${total} sessions`;
-      await insertPost(email, a.name, "run", `🔥 ${a.name} reached ${label}!`);
-    }
+  const countMap: Record<string, number> = {};
+  for (const row of allAttended ?? []) {
+    const e = row.user_email.toLowerCase();
+    countMap[e] = (countMap[e] ?? 0) + 1;
   }
+
+  // ── First-session side effects ───────────────────────────────────────────
+  const firstSessionEmails = emails.filter(e => (countMap[e] ?? 0) === 1);
+  if (firstSessionEmails.length) {
+    // Referral rewards: fire-and-forget, can't batch (external call per user)
+    firstSessionEmails.forEach(e => triggerReferralReward(e).catch(() => {}));
+
+    // ── 1 query: bulk upgrade-prompt notifications ───────────────────────
+    createNotifications(
+      firstSessionEmails.map(e => ({ email: e })),
+      "upgrade_prompt",
+      "You completed your first session! 🎉",
+      "Get a personalised training plan from your coach and run every weekend for free.",
+      "/pricing",
+    ).catch(() => {});
+  }
+
+  // ── Milestone posts ──────────────────────────────────────────────────────
+  const milestoneUsers = emails
+    .filter(e => MILESTONE_THRESHOLDS.includes(countMap[e] ?? 0))
+    .map(e => ({ email: e, name: byEmail[e]!.name, total: countMap[e] ?? 0 }));
+
+  if (!milestoneUsers.length) return;
+
+  // ── 1 query: upsert dedup records; ON CONFLICT DO NOTHING RETURNING *
+  //    returns only rows that were just inserted — existing ones are silently
+  //    skipped, so milestone posts fire exactly once per threshold crossed.
+  const { data: freshAchievements } = await db
+    .from("user_achievements")
+    .upsert(
+      milestoneUsers.map(m => ({ user_email: m.email, badge_id: `feed_milestone_${m.total}` })),
+      { onConflict: "user_email,badge_id", ignoreDuplicates: true },
+    )
+    .select("user_email");
+
+  if (!freshAchievements?.length) return;
+
+  // ── 1 query: bulk milestone posts for newly crossed thresholds ───────────
+  const freshSet = new Set(freshAchievements.map(r => r.user_email.toLowerCase()));
+  const milestonePosts = milestoneUsers
+    .filter(m => freshSet.has(m.email))
+    .map(m => ({
+      author_email: m.email,
+      author_name:  m.name,
+      post_type:    "run" as FeedPostType,
+      body:         `🔥 ${m.name} reached ${m.total === 1 ? "1st session" : `${m.total} sessions`}!`,
+      approved:     true,
+    }));
+  if (milestonePosts.length) await db.from("user_posts").insert(milestonePosts);
 }
 
 // ── 2. Badge earned ───────────────────────────────────────────────────────────

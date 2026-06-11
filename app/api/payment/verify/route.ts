@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail, sendWhatsApp, paymentEmailHTML, membershipWAParams } from "@/lib/notify";
 import { autoFeedMembershipActivated } from "@/lib/auto-feed";
+import { redeemCoupon } from "@/lib/coupon-redeem";
 
 const PLAN_MONTHS: Record<string, number> = {
   monthly:  1,
@@ -81,21 +82,10 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Record coupon usage (fire-and-forget — payment already succeeded)
+  // Record coupon usage — atomic conditional increment (fire-and-forget;
+  // payment already succeeded so we must not block or fail the response).
   if (coupon_id) {
-    const recordUsage = async () => {
-      try {
-        await db.from("coupon_uses").insert({ coupon_id, used_by_email: email.toLowerCase(), used_at: new Date().toISOString() });
-      } catch {}
-      try {
-        const { error: rpcErr } = await db.rpc("increment_coupon_use_count", { coupon_uuid: coupon_id });
-        if (rpcErr) {
-          const { data: c } = await db.from("coupons").select("use_count").eq("id", coupon_id).single();
-          if (c) await db.from("coupons").update({ use_count: c.use_count + 1 }).eq("id", coupon_id);
-        }
-      } catch {}
-    };
-    recordUsage().catch(console.error);
+    redeemCoupon(coupon_id, email.toLowerCase()).catch(console.error);
   }
 
   // Fetch user phone for WhatsApp

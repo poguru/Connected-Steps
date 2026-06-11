@@ -9,6 +9,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { createNotification } from "@/lib/notify-inapp";
 import { calcDateGapStreak, SESSION_GAP_DAYS } from "@/lib/streak-utils";
+import { paginateAll } from "@/lib/paginate";
+import { acquireCronLock } from "@/lib/cron-lock";
 
 const MAX_GAP_DAYS  = SESSION_GAP_DAYS;
 const MIN_STREAK    = 3;
@@ -22,29 +24,48 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const startMs = Date.now();
   const db  = getSupabaseServer();
   const now = new Date();
 
-  // ── 1. Fetch all attended sessions with their dates ───────────────────────
-  // We only need user_email and the session date to compute streaks.
-  const { data: rows, error } = await db
-    .from("session_attendance")
-    .select("user_email, sessions!inner(date)")
-    .eq("attended", true)
-    .order("user_email");
-
-  if (error) {
-    console.error("[streak-at-risk] query error:", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  // Execution-protection: one run per calendar day (UTC).
+  const executionDate = now.toISOString().slice(0, 10);
+  const acquired = await acquireCronLock("streak-at-risk", executionDate);
+  if (!acquired) {
+    console.log(`[streak-at-risk] already ran for ${executionDate} — skipping`);
+    return NextResponse.json({ skipped: true, reason: "already_ran", date: executionDate });
   }
-  if (!rows?.length) {
+
+  // ── 1. Fetch all attended sessions with their dates ───────────────────────
+  // Paginated: session_attendance can exceed the default row limit at scale.
+  let attPages = 0;
+  let rows: { user_email: string; sessions: unknown }[];
+  try {
+    const result = await paginateAll(
+      (from, to) => db
+        .from("session_attendance")
+        .select("user_email, sessions!inner(date)")
+        .eq("attended", true)
+        .order("user_email")
+        .range(from, to),
+    );
+    rows    = result.rows as typeof rows;
+    attPages = result.pages;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[streak-at-risk] query error:", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+
+  if (!rows.length) {
+    console.log(`[streak-at-risk] no attendance records found duration=${Date.now() - startMs}ms`);
     return NextResponse.json({ message: "No attendance records found", notified: 0 });
   }
 
   // ── 2. Group dates by user ────────────────────────────────────────────────
   const userDates = new Map<string, Date[]>();
   for (const row of rows) {
-    const session = row.sessions as unknown as { date: string } | null;
+    const session = row.sessions as { date: string } | null;
     if (!session?.date) continue;
     const d = new Date(session.date + "T00:00:00Z");
     if (isNaN(d.getTime())) continue;
@@ -58,9 +79,7 @@ export async function GET(req: NextRequest) {
   const stats = new Map<string, UserStat>();
 
   for (const [email, dates] of userDates) {
-    // Sort descending (most recent first)
     dates.sort((a, b) => b.getTime() - a.getTime());
-
     const streak = calcDateGapStreak(dates, MAX_GAP_DAYS);
     stats.set(email, { streak, lastAttended: dates[0] });
   }
@@ -76,6 +95,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (!atRisk.length) {
+    console.log(`[streak-at-risk] rows=${rows.length} pages=${attPages} users=${userDates.size} at_risk=0 duration=${Date.now() - startMs}ms`);
     return NextResponse.json({ message: "No at-risk streaks today", notified: 0 });
   }
 
@@ -91,7 +111,6 @@ export async function GET(req: NextRequest) {
     .gte("created_at", cooldownCutoff.toISOString());
 
   const alreadyNotified = new Set((recentNotifs ?? []).map(n => n.user_email.toLowerCase()));
-
   const toNotify = atRisk.filter(u => !alreadyNotified.has(u.email));
 
   // ── 6. Send notifications ─────────────────────────────────────────────────
@@ -110,7 +129,11 @@ export async function GET(req: NextRequest) {
   }
 
   const sent = results.filter(r => r.ok).length;
-  console.log(`[streak-at-risk] at-risk=${atRisk.length} skipped=${alreadyNotified.size} sent=${sent}`);
+  console.log(
+    `[streak-at-risk] rows=${rows.length} pages=${attPages} users=${userDates.size}` +
+    ` at_risk=${atRisk.length} skipped=${alreadyNotified.size} sent=${sent}` +
+    ` duration=${Date.now() - startMs}ms`,
+  );
 
   return NextResponse.json({
     at_risk:  atRisk.length,

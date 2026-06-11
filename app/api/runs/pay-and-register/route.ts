@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { redeemCoupon } from "@/lib/coupon-redeem";
 
 export async function POST(req: NextRequest) {
   try {
@@ -65,10 +66,9 @@ export async function POST(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // Record coupon usage
+    // Atomic coupon redemption: single conditional UPDATE guards max_uses.
     if (coupon_id && email) {
-      await db.from("coupon_uses").insert({ coupon_id, used_by_email: email.toLowerCase().trim() });
-      await db.rpc("increment_coupon_use_count", { coupon_id_arg: coupon_id });
+      await redeemCoupon(coupon_id, email.toLowerCase().trim());
     }
 
     return NextResponse.json({ success: true });

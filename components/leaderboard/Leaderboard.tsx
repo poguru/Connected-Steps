@@ -25,7 +25,8 @@ export default function Leaderboard() {
   const [followingSet,  setFollowingSet]  = useState<Set<string>>(new Set());
   const [followBusy,    setFollowBusy]    = useState<Set<string>>(new Set());
 
-  const tabRef = useRef(tab);
+  const tabRef  = useRef(tab);
+  const liveRef = useRef(false);               // true once first SUBSCRIBED fires
   useEffect(() => { tabRef.current = tab; }, [tab]);
 
   const fetchLeaderboard = useCallback(() => {
@@ -58,8 +59,37 @@ export default function Leaderboard() {
     const supabase = getSupabase();
     const channel = supabase
       .channel("leaderboard-live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "leaderboard" }, fetchLeaderboard)
-      .subscribe(status => { if (status === "SUBSCRIBED") setLive(true); });
+      .on("postgres_changes", { event: "*", schema: "public", table: "leaderboard" }, (payload) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { eventType, new: newRow } = payload as any;
+
+        // INSERT → new user needs photo/email from API; DELETE → row must be removed
+        if (eventType !== "UPDATE") { fetchLeaderboard(); return; }
+
+        // UPDATE → patch the affected row in-place, no API call needed
+        setEntries(prev => {
+          const idx = prev.findIndex(e => e.id === newRow?.id);
+          // Row missing from local state = inconsistency; fall back to full refetch
+          if (idx === -1) { fetchLeaderboard(); return prev; }
+          const updated = [...prev];
+          updated[idx] = {
+            ...updated[idx],  // preserve photo (users join) and user_email (column-restricted in anon realtime)
+            ...newRow,
+            user_email: updated[idx].user_email,
+            photo:      updated[idx].photo,
+          };
+          const key = tabRef.current === "month" ? "month_points" : "total_points";
+          return [...updated].sort((a, b) => (b[key] ?? 0) - (a[key] ?? 0));
+        });
+      })
+      .subscribe(status => {
+        if (status === "SUBSCRIBED") {
+          // Reconnect after a prior connection = data may have drifted; catch up
+          if (liveRef.current) fetchLeaderboard();
+          liveRef.current = true;
+          setLive(true);
+        }
+      });
     return () => { supabase.removeChannel(channel); };
   }, [fetchLeaderboard]);
 

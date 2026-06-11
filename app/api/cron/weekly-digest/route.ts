@@ -25,6 +25,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { createNotifications } from "@/lib/notify-inapp";
+import { paginateAll } from "@/lib/paginate";
+import { acquireCronLock } from "@/lib/cron-lock";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -202,8 +204,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const startMs = Date.now();
   const db  = getSupabaseServer();
   const now = new Date();
+
+  // Execution-protection: one run per calendar day (UTC).
+  // A duplicate scheduler trigger returns 200 immediately so Vercel
+  // does not keep retrying.
+  const executionDate = now.toISOString().slice(0, 10);
+  const acquired = await acquireCronLock("weekly-digest", executionDate);
+  if (!acquired) {
+    console.log(`[weekly-digest] already ran for ${executionDate} — skipping`);
+    return NextResponse.json({ skipped: true, reason: "already_ran", date: executionDate });
+  }
 
   // Week window: today → 7 days out (IST: UTC+5:30)
   const todayIST   = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);
@@ -211,26 +224,31 @@ export async function GET(req: NextRequest) {
   const weekEndIST = new Date(todayIST.getTime() + 7 * 24 * 60 * 60 * 1000);
   const weekEndStr = weekEndIST.toISOString().slice(0, 10);
 
-  // ── 1. Fetch all data upfront (single round-trip per resource) ──────────────
+  // ── 1. Fetch all data — paginated to handle 1000+ rows at scale ─────────────
+  // users, leaderboard, memberships run in parallel; each paginates internally.
+  // sessions is bounded by the week window — no pagination needed.
 
-  const [usersRes, sessionsRes, leaderboardRes, membershipsRes] = await Promise.all([
-    db.from("users").select("email, first_name, last_name, phone"),
+  const [usersResult, leaderboardResult, membershipsResult, sessionsRes] = await Promise.all([
+    paginateAll<UserRow>((from, to) =>
+      db.from("users").select("email, first_name, last_name, phone").order("email").range(from, to)
+    ),
+    paginateAll<{ user_email: string; month_points: number }>((from, to) =>
+      db.from("leaderboard").select("user_email, month_points").order("user_email").range(from, to)
+    ),
+    paginateAll<{ user_email: string }>((from, to) =>
+      db.from("memberships").select("user_email").eq("status", "active").gt("expires_at", now.toISOString()).order("user_email").range(from, to)
+    ),
     db.from("sessions")
       .select("id, title, date, time, location, venue")
       .gte("date", todayStr)
       .lte("date", weekEndStr)
       .order("date"),
-    db.from("leaderboard").select("user_email, month_points"),
-    db.from("memberships")
-      .select("user_email")
-      .eq("status", "active")
-      .gt("expires_at", now.toISOString()),
   ]);
 
-  const users       = (usersRes.data     ?? []) as UserRow[];
-  const sessions    = (sessionsRes.data  ?? []) as SessionRow[];
-  const leaderboard = leaderboardRes.data ?? [];
-  const premiumSet  = new Set((membershipsRes.data ?? []).map(m => m.user_email.toLowerCase()));
+  const users       = usersResult.rows;
+  const leaderboard = leaderboardResult.rows;
+  const premiumSet  = new Set(membershipsResult.rows.map(m => m.user_email.toLowerCase()));
+  const sessions    = (sessionsRes.data ?? []) as SessionRow[];
 
   if (!users.length) {
     return NextResponse.json({ message: "No users", sent: 0 });
@@ -247,13 +265,15 @@ export async function GET(req: NextRequest) {
   const plansMap = new Map<string, { title: string; coach_name: string; days: PlanDay[] }>();
 
   if (premiumEmails.length > 0) {
-    const { data: plans } = await db
-      .from("training_plans")
-      .select("user_email, title, coach_name, days")
-      .eq("active", true)
-      .in("user_email", premiumEmails);
+    // Fetch all active plans — avoids large IN() clause at scale
+    const { rows: allPlans } = await paginateAll<{ user_email: string; title: string; coach_name: string; days: PlanDay[] }>(
+      (from, to) =>
+        db.from("training_plans").select("user_email, title, coach_name, days").eq("active", true).order("user_email").range(from, to)
+    );
 
-    for (const p of plans ?? []) {
+    const premiumSet2 = new Set(premiumEmails);
+    for (const p of allPlans) {
+      if (!premiumSet2.has(p.user_email.toLowerCase())) continue;
       plansMap.set(p.user_email.toLowerCase(), {
         title:      p.title,
         coach_name: p.coach_name,
@@ -341,7 +361,13 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  console.log(`[weekly-digest] users=${users.length} sessions=${sessions.length} notified=${notifUsers.length} emails_sent=${emailSent} emails_failed=${emailFailed}`);
+  console.log(
+    `[weekly-digest] users=${users.length} pages_users=${usersResult.pages}` +
+    ` pages_lb=${leaderboardResult.pages} pages_mem=${membershipsResult.pages}` +
+    ` sessions=${sessions.length} premium=${premiumEmails.length}` +
+    ` notified=${notifUsers.length} email_sent=${emailSent} email_failed=${emailFailed}` +
+    ` duration=${Date.now() - startMs}ms`,
+  );
 
   return NextResponse.json({
     ok:            true,
