@@ -4,14 +4,14 @@ import { verifyUserToken, isAdminOrCoach } from "@/lib/admin-auth";
 
 export async function GET(req: NextRequest) {
   const email = req.nextUrl.searchParams.get("email");
-  if (!email) return NextResponse.json({ plan: null });
 
   // Accept either the user's own token or an admin/coach credential
   const tokenEmail = verifyUserToken(req.headers.get("x-user-token") ?? "");
   const isAdmin    = await isAdminOrCoach(req);
-  const isOwner    = tokenEmail?.toLowerCase() === email.toLowerCase();
-  if (!isOwner && !isAdmin)
-    return NextResponse.json({ plan: null }, { status: 401 });
+  const isOwner    = !!tokenEmail && tokenEmail.toLowerCase() === (email ?? "").toLowerCase();
+
+  if (!email || (!isOwner && !isAdmin))
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const db = getSupabaseServer();
 
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
       membership.status !== "active" ||
       new Date(membership.expires_at) <= new Date()
     ) {
-      return NextResponse.json({ plan: null });
+      return NextResponse.json({ error: "Active membership required" }, { status: 403 });
     }
   }
 

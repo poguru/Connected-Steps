@@ -1,18 +1,23 @@
 import { test, expect } from "../../fixtures/base";
 import { USERS } from "../../utils/test-data";
 
+// Dedicated throwaway addresses for rate-limit tests — avoids contaminating
+// the standard user's rate-limit window, which TC-OTP03 and TC-OTP05 depend on.
+const BRUTE_VERIFY_EMAIL = "brute-otp-verify@ratelimit.test";
+const BRUTE_SEND_EMAIL   = "brute-otp-send@ratelimit.test";
+
 test.describe("Authentication — OTP", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test("TC-OTP01 | OTP verify rate limiting blocks after repeated wrong codes", async ({ request, db }) => {
-    // Request an OTP so the identifier exists
+  test("TC-OTP01 | OTP verify rate limiting blocks after repeated wrong codes", async ({ request }) => {
+    // Seed a dummy OTP record so the identifier exists (send to throwaway address)
     await request.post("/api/auth/send-otp", {
-      data: { type: "email", value: USERS.standard.email, purpose: "login" },
+      data: { type: "email", value: BRUTE_VERIFY_EMAIL, purpose: "register" },
     });
     let got429 = false;
     for (let i = 0; i < 15; i++) {
       const res = await request.post("/api/auth/verify-otp", {
-        data: { email: USERS.standard.email, code: `00${i.toString().padStart(4, "0")}`, purpose: "login" },
+        data: { email: BRUTE_VERIFY_EMAIL, code: `00${i.toString().padStart(4, "0")}`, purpose: "register" },
       });
       if (res.status() === 429) { got429 = true; break; }
     }
@@ -23,7 +28,7 @@ test.describe("Authentication — OTP", () => {
     let got429 = false;
     for (let i = 0; i < 8; i++) {
       const res = await request.post("/api/auth/send-otp", {
-        data: { type: "email", value: USERS.standard.email, purpose: "login" },
+        data: { type: "email", value: BRUTE_SEND_EMAIL, purpose: "register" },
       });
       if (res.status() === 429) { got429 = true; break; }
     }
@@ -31,7 +36,7 @@ test.describe("Authentication — OTP", () => {
   });
 
   test("TC-OTP03 | used OTP cannot be replayed", async ({ request, db }) => {
-    // Get fresh OTP from DB (only works in test env with service role key)
+    // Request OTP for the standard user (different key from brute-force tests above)
     await request.post("/api/auth/send-otp", {
       data: { type: "email", value: USERS.standard.email, purpose: "login" },
     });
@@ -46,7 +51,7 @@ test.describe("Authentication — OTP", () => {
     });
     expect(r1.status()).toBe(200);
 
-    // Replay
+    // Replay must be rejected
     const r2 = await request.post("/api/auth/verify-otp", {
       data: { email: USERS.standard.email, code, purpose: "login" },
     });
@@ -61,12 +66,12 @@ test.describe("Authentication — OTP", () => {
     expect(res.status()).toBeGreaterThanOrEqual(400);
   });
 
-  test("TC-OTP05 | OTP for change_email delivered to NEW email only", async ({ page, db }) => {
-    // This test verifies the OTP send-otp endpoint rejects if new email is taken
+  test("TC-OTP05 | OTP for change_email rejected if new email is already taken", async ({ page }) => {
+    // USERS.standard.email is already registered; send-otp with purpose=change_email must return 400
     const res = await page.request.post("/api/auth/send-otp", {
       data: {
-        type: "email",
-        value: USERS.standard.email, // already registered
+        type:    "email",
+        value:   USERS.standard.email,
         purpose: "change_email",
       },
     });

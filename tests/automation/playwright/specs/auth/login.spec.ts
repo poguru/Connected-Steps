@@ -51,19 +51,25 @@ test.describe("Authentication — Login", () => {
     }
   });
 
+  // Use `identifier` (not `email`) to match the actual login API field name.
+  // Prior tests (TC-L02, TC-L03) each consume 1 of 5 failure quota; this loop
+  // fires up to 12 times and must trip the limiter within the same window.
   test("TC-L07 | login rate limiting triggers after repeated failures", async ({ request }) => {
     const attempts = 12;
     let got429 = false;
     for (let i = 0; i < attempts; i++) {
       const res = await request.post("/api/auth/login", {
-        data: { email: USERS.standard.email, password: `wrong${i}` },
+        data: { identifier: USERS.standard.email, password: `wrong${i}` },
       });
       if (res.status() === 429) { got429 = true; break; }
     }
     expect(got429, "Expected 429 after repeated login failures").toBe(true);
   });
 
-  test("TC-L08 | logout clears session and protected routes redirect to /auth", async ({ authPage, page }) => {
+  test("TC-L08 | logout clears session and protected routes redirect to /auth", async ({ authPage, page, request }) => {
+    // TC-L07 intentionally trips the rate limiter for the standard user.
+    // Reset it before attempting another sign-in in this test.
+    await request.delete("/api/test-utils/reset-rate-limits").catch(() => {});
     await authPage.signIn(USERS.standard.email, USERS.standard.password);
     await authPage.logout();
     await page.goto(ROUTES.dashboard);

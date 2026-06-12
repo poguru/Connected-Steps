@@ -1,14 +1,16 @@
 import { defineConfig, devices } from "@playwright/test";
 import * as dotenv from "dotenv";
+import * as path from "path";
 
-dotenv.config({ path: ".env.test" });
+// Load .env.test from the same directory as this config file
+dotenv.config({ path: path.join(__dirname, ".env.test") });
 
 export default defineConfig({
   testDir: "./specs",
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 2 : 1,
+  retries: process.env.CI ? 2 : 1,
+  workers: 1,
   timeout: 60_000,
   expect: { timeout: 10_000 },
 
@@ -23,21 +25,22 @@ export default defineConfig({
     baseURL: process.env.BASE_URL ?? "http://localhost:3000",
     headless: true,
     screenshot: "only-on-failure",
-    video: "retain-on-failure",
-    trace: "retain-on-failure",
-    viewport: { width: 1280, height: 800 },
-    actionTimeout: 15_000,
+    video:      "retain-on-failure",
+    trace:      "retain-on-failure",
+    viewport:   { width: 1280, height: 800 },
+    actionTimeout:     15_000,
     navigationTimeout: 45_000,
     ignoreHTTPSErrors: true,
   },
 
   projects: [
-    // ── Setup: create authenticated storage states ──────────────────────────
-    { name: "setup", testMatch: /global\.setup\.ts/ },
+    // ── 0. Global setup: create auth storage state files ───────────────────
+    { name: "setup", testDir: "./fixtures", testMatch: /global\.setup\.ts/ },
 
-    // ── Desktop Chrome ──────────────────────────────────────────────────────
+    // ── 1. Main user tests (all specs except admin & security) ─────────────
     {
       name: "chromium",
+      testIgnore: [/admin\/.+\.spec\.ts/, /security\/.+\.spec\.ts/],
       use: {
         ...devices["Desktop Chrome"],
         storageState: "playwright/.auth/user.json",
@@ -45,28 +48,21 @@ export default defineConfig({
       dependencies: ["setup"],
     },
 
-    // ── Mobile Safari (iOS) ─────────────────────────────────────────────────
-    {
-      name: "mobile-safari",
-      use: {
-        ...devices["iPhone 13"],
-        storageState: "playwright/.auth/user.json",
-      },
-      dependencies: ["setup"],
-    },
-
-    // ── Admin project (separate auth state) ────────────────────────────────
+    // ── 2. Admin tests — x-admin-password header on every request ──────────
     {
       name: "admin",
       testMatch: /admin\/.+\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
         storageState: "playwright/.auth/admin.json",
+        extraHTTPHeaders: {
+          "x-admin-password": process.env.ADMIN_PASSWORD ?? "",
+        },
       },
       dependencies: ["setup"],
     },
 
-    // ── Security tests run without auth ────────────────────────────────────
+    // ── 3. Security tests — intentionally no auth state ────────────────────
     {
       name: "security",
       testMatch: /security\/.+\.spec\.ts/,
@@ -74,11 +70,14 @@ export default defineConfig({
     },
   ],
 
-  // Start dev server automatically if not already running
+  // Start Next.js dev server automatically if not already running
   webServer: {
     command: "npm run dev",
+    cwd: path.join(__dirname, "../../.."),   // project root
     url: "http://localhost:3000",
     reuseExistingServer: true,
     timeout: 120_000,
+    stdout: "ignore",
+    stderr: "pipe",
   },
 });

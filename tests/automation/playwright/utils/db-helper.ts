@@ -105,7 +105,20 @@ export const DbHelper = {
     code: string; discount_type: "percent" | "fixed"; discount_value: number;
     max_uses: number; valid_from: string; valid_to: string;
   }) {
-    const { data: row, error } = await db().from("coupons").insert({ ...data, active: true }).select().single();
+    // Actual coupons table columns: code, discount_type, discount_value, max_uses, expires_at, use_count
+    // valid_from is not a column; valid_to maps to expires_at.
+    // DB constraint: discount_type must be "percentage" or "flat" (not "percent"/"fixed")
+    const dtype = data.discount_type === "percent" ? "percentage"
+                : data.discount_type === "fixed"   ? "flat"
+                : data.discount_type;
+    const { data: row, error } = await db().from("coupons").insert({
+      code:           data.code,
+      discount_type:  dtype,
+      discount_value: data.discount_value,
+      max_uses:       data.max_uses,
+      expires_at:     data.valid_to,
+      use_count:      0,
+    }).select().single();
     if (error) throw new Error(`createCoupon: ${error.message}`);
     return row;
   },

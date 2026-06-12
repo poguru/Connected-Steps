@@ -4,23 +4,24 @@ import { uniqueEmail, ROUTES } from "../../utils/test-data";
 test.describe("Authentication — Signup", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test("TC-SU01 | valid registration creates account and redirects away from /auth", async ({ authPage, db }) => {
+  // The signup form is multi-step (email OTP → details).
+  // TC-SU01 verifies the API path works end-to-end without needing to receive a real email.
+  test("TC-SU01 | valid registration creates account via API", async ({ request, db }) => {
     const email = uniqueEmail("signup");
     try {
-      await authPage.fillSignUpStep1({
-        firstName: "Test",
-        lastName: "User",
-        email,
-        password: "TestPass@123",
+      const res = await request.post("/api/auth/register", {
+        data: {
+          firstName: "Test",
+          lastName:  "User",
+          email,
+          password:  "TestPass@123",
+          goal:      "5K",
+          location:  "Hyderabad",
+        },
       });
-      // Complete remaining steps if multi-step
-      const continueBtn = authPage.page.getByRole("button", { name: /next|continue|finish|create/i });
-      for (let i = 0; i < 4 && await continueBtn.isVisible().catch(() => false); i++) {
-        await continueBtn.click();
-        await authPage.page.waitForTimeout(800);
-      }
-      await authPage.page.waitForURL((u) => !u.pathname.startsWith("/auth"), { timeout: 20_000 });
-      expect(authPage.page.url()).not.toContain("/auth");
+      expect(res.status()).toBe(200);
+      const body = await res.json();
+      expect(body.success).toBe(true);
     } finally {
       await db.deleteUser(email).catch(() => {});
     }
@@ -31,11 +32,11 @@ test.describe("Authentication — Signup", () => {
     const res = await request.post("/api/auth/register", {
       data: {
         firstName: "Dup",
-        lastName: "User",
-        email: USERS.standard.email,
-        password: "TestPass@123",
-        goal: "5K",
-        location: "Hyderabad",
+        lastName:  "User",
+        email:     USERS.standard.email,
+        password:  "TestPass@123",
+        goal:      "5K",
+        location:  "Hyderabad",
       },
     });
     expect(res.status()).toBeGreaterThanOrEqual(400);
@@ -47,14 +48,13 @@ test.describe("Authentication — Signup", () => {
     const res = await request.post("/api/auth/register", {
       data: {
         firstName: "Weak",
-        lastName: "Pass",
-        email: uniqueEmail("weakpwd"),
-        password: "1",
-        goal: "5K",
-        location: "Hyderabad",
+        lastName:  "Pass",
+        email:     uniqueEmail("weakpwd"),
+        password:  "1",
+        goal:      "5K",
+        location:  "Hyderabad",
       },
     });
-    // Expect validation error for weak password
     expect(res.status()).toBeGreaterThanOrEqual(400);
   });
 
@@ -64,12 +64,11 @@ test.describe("Authentication — Signup", () => {
       const res = await request.post("/api/auth/register", {
         data: {
           firstName: "No",
-          lastName: "Dob",
+          lastName:  "Dob",
           email,
-          password: "TestPass@123",
-          goal: "10K",
-          location: "Hyderabad",
-          // dob intentionally omitted
+          password:  "TestPass@123",
+          goal:      "10K",
+          location:  "Hyderabad",
         },
       });
       expect(res.status()).toBe(200);
@@ -78,12 +77,13 @@ test.describe("Authentication — Signup", () => {
     }
   });
 
-  test("TC-SU05 | registration form sign-up tab is accessible", async ({ page }) => {
+  // Signup form is multi-step: first step shows only the email field.
+  // Verify the first step is accessible and renders the email input.
+  test("TC-SU05 | registration form initial step is accessible", async ({ page }) => {
     await page.goto(ROUTES.signUp);
     await page.waitForLoadState("networkidle");
-    await expect(page.getByPlaceholder(/first name/i)).toBeVisible();
-    await expect(page.getByPlaceholder(/last name/i)).toBeVisible();
-    await expect(page.getByPlaceholder(/email/i)).toBeVisible();
-    await expect(page.getByPlaceholder(/password/i)).toBeVisible();
+    // First step of signup shows the email input and the send-OTP button
+    await expect(page.getByPlaceholder(/email/i).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /send|otp|next|continue/i }).first()).toBeVisible();
   });
 });

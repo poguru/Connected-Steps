@@ -13,7 +13,12 @@ export const WINDOW_MS    = 15 * 60 * 1000;  // 15 minutes
 export const MAX_FAILURES = 5;
 
 interface Entry { failures: number; windowStart: number; }
-const store = new Map<string, Entry>();
+
+// Pin the store to globalThis so all Next.js route modules share the exact
+// same Map instance, even when Turbopack runs each route in its own context.
+declare global { var __rateLimitStore: Map<string, Entry> | undefined; }
+const store: Map<string, Entry> = globalThis.__rateLimitStore
+  ?? (globalThis.__rateLimitStore = new Map<string, Entry>());
 
 /** Extract the real client IP from Vercel / reverse-proxy headers. */
 export function getClientIp(req: { headers: { get(name: string): string | null } }): string {
@@ -38,6 +43,18 @@ export function isRateLimited(key: string): boolean {
     return false;
   }
   return entry.failures >= MAX_FAILURES;
+}
+
+/**
+ * Clears all rate-limit entries whose key starts with the given prefix.
+ * Only intended for use in test/dev environments via the reset endpoint.
+ */
+export function clearRateLimitPrefix(prefix: string): number {
+  let cleared = 0;
+  for (const key of store.keys()) {
+    if (key.startsWith(prefix)) { store.delete(key); cleared++; }
+  }
+  return cleared;
 }
 
 /**

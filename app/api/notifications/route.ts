@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const before = searchParams.get("before") ?? new Date().toISOString();
   const limit  = Math.min(Number(searchParams.get("limit") ?? 20), 50);
 
-  if (!email) return NextResponse.json({ notifications: [], unread: 0 });
+  if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   // Ownership check: the token must belong to the email being queried.
   const caller = tokenEmail(req);

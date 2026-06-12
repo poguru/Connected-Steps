@@ -32,10 +32,12 @@ async function notifyAdmin(p: { user_name: string; user_email: string; category:
   });
 }
 
+// GET /api/coach-questions — requires auth (401 for missing email/token)
 export async function GET(req: NextRequest) {
+  const email = new URL(req.url).searchParams.get("email");
+  if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const db    = getSupabaseServer();
-    const email = new URL(req.url).searchParams.get("email");
+    const db = getSupabaseServer();
 
     let q = db
       .from("coach_questions")
@@ -52,6 +54,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
+// POST /api/coach-questions — requires active membership (403 for free users)
 export async function POST(req: NextRequest) {
   try {
     const { user_email, user_name, category, question } = await req.json();
@@ -60,6 +63,21 @@ export async function POST(req: NextRequest) {
     }
 
     const db = getSupabaseServer();
+
+    // Membership gate: coach Q&A is a paid-member feature
+    const { data: membership } = await db
+      .from("memberships")
+      .select("status, expires_at")
+      .eq("user_email", (user_email as string).toLowerCase())
+      .maybeSingle();
+    const hasActiveMembership =
+      membership?.status === "active" && new Date(membership.expires_at) > new Date();
+    if (!hasActiveMembership) {
+      return NextResponse.json(
+        { error: "Active membership required to submit coach questions." },
+        { status: 403 }
+      );
+    }
     const { data, error } = await db
       .from("coach_questions")
       .insert({ user_email, user_name, category: category || "General", question: question.trim(), status: "pending" })

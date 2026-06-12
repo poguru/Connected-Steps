@@ -1,14 +1,27 @@
 import { APIRequestContext } from "@playwright/test";
+import * as fs from "fs";
+import * as path from "path";
 import { ENV } from "./env";
 
+const TOKEN_FILE = path.join(__dirname, "../playwright/.auth/token.txt");
+
+/** Read the user JWT token saved by global.setup.ts */
+function readUserToken(): string {
+  try {
+    return fs.readFileSync(TOKEN_FILE, "utf8").trim();
+  } catch {
+    return "";
+  }
+}
+
 export class ApiHelper {
-  constructor(private request: APIRequestContext) {}
+  constructor(public readonly request: APIRequestContext) {}
 
   // ── Auth ─────────────────────────────────────────────────────────────────
 
-  async login(email: string, password: string) {
+  async login(identifier: string, password: string) {
     return this.request.post("/api/auth/login", {
-      data: { email, password },
+      data: { identifier, password },
     });
   }
 
@@ -38,11 +51,15 @@ export class ApiHelper {
   }
 
   async joinSession(sessionId: string) {
-    return this.request.post(`/api/sessions/${sessionId}/join`);
+    return this.request.post(`/api/sessions/${sessionId}/join`, {
+      data: { email: ENV.TEST_EMAIL },
+    });
   }
 
   async leaveSession(sessionId: string) {
-    return this.request.delete(`/api/sessions/${sessionId}/join`);
+    return this.request.delete(`/api/sessions/${sessionId}/join`, {
+      data: { email: ENV.TEST_EMAIL },
+    });
   }
 
   async getJoinedSessions() {
@@ -51,8 +68,10 @@ export class ApiHelper {
 
   // ── Membership ───────────────────────────────────────────────────────────
 
-  async getMembership() {
-    return this.request.get("/api/membership");
+  async getMembership(email = ENV.TEST_EMAIL) {
+    return this.request.get(`/api/membership?email=${encodeURIComponent(email)}`, {
+      headers: { "x-user-token": readUserToken() },
+    });
   }
 
   async createPaymentOrder(plan: string, couponCode?: string) {
@@ -67,24 +86,34 @@ export class ApiHelper {
     });
   }
 
+  // ── Training Plan ─────────────────────────────────────────────────────────
+
+  async getTrainingPlan(email = ENV.TEST_EMAIL) {
+    return this.request.get(`/api/user/training-plan?email=${encodeURIComponent(email)}`, {
+      headers: { "x-user-token": readUserToken() },
+    });
+  }
+
   // ── Leaderboard ───────────────────────────────────────────────────────────
 
   async getLeaderboard() {
     return this.request.get("/api/leaderboard");
   }
 
-  async getUserRank() {
-    return this.request.get("/api/leaderboard/user");
+  async getUserRank(email = ENV.TEST_EMAIL) {
+    return this.request.get(`/api/leaderboard/user?email=${encodeURIComponent(email)}`);
   }
 
-  async getLeaderboardBreakdown() {
-    return this.request.get("/api/leaderboard/breakdown");
+  async getLeaderboardBreakdown(email = ENV.TEST_EMAIL) {
+    return this.request.get(`/api/leaderboard/breakdown?email=${encodeURIComponent(email)}`);
   }
 
   // ── Notifications ─────────────────────────────────────────────────────────
 
-  async getNotifications() {
-    return this.request.get("/api/notifications");
+  async getNotifications(email = ENV.TEST_EMAIL) {
+    return this.request.get(`/api/notifications?email=${encodeURIComponent(email)}`, {
+      headers: { "x-user-token": readUserToken() },
+    });
   }
 
   // ── Referrals ─────────────────────────────────────────────────────────────
@@ -108,15 +137,28 @@ export class ApiHelper {
   }
 
   async createCommunityPost(data: { title: string; body: string; category: string }) {
-    return this.request.post("/api/community/posts", { data });
+    return this.request.post("/api/community/posts", {
+      data: {
+        ...data,
+        user_email: ENV.TEST_EMAIL,
+        user_name:  "QA User",
+      },
+    });
   }
 
-  async getFeed() {
-    return this.request.get("/api/feed");
+  async getFeed(email = ENV.TEST_EMAIL) {
+    return this.request.get(`/api/feed?email=${encodeURIComponent(email)}&scope=global`);
   }
 
   async createPost(data: { type: string; content: string }) {
-    return this.request.post("/api/posts", { data });
+    return this.request.post("/api/posts", {
+      data: {
+        post_type:    data.type,
+        body:         data.content,
+        author_email: ENV.TEST_EMAIL,
+        author_name:  "QA User",
+      },
+    });
   }
 
   // ── Admin ─────────────────────────────────────────────────────────────────
@@ -155,12 +197,8 @@ export class ApiHelper {
 
   // ── User ─────────────────────────────────────────────────────────────────
 
-  async getTrainingPlan() {
-    return this.request.get("/api/user/training-plan");
-  }
-
-  async getUserAchievements() {
-    return this.request.get("/api/user/achievements");
+  async getUserAchievements(email = ENV.TEST_EMAIL) {
+    return this.request.get(`/api/user/achievements?email=${encodeURIComponent(email)}`);
   }
 
   async changeEmail(currentEmail: string, newEmail: string, otp: string) {

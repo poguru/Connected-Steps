@@ -4,6 +4,9 @@
 /node_modules
 tests/automation/playwright/node_modules/
 tests/automation/playwright/test-results/
+tests/automation/playwright/playwright/
+tests/automation/playwright/reports/html/
+tests/automation/playwright/reports/screenshots/
 Connected-Steps/
 .expo/
 app.json

@@ -5,8 +5,14 @@ import { signCoachToken, signUserToken } from "@/lib/admin-auth";
 import { isRateLimited, recordFailure, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
+  // Parse body first so identifier is available for the per-account rate-limit key.
+  const body       = await req.json().catch(() => ({})) as Record<string, unknown>;
+  const identifier = body.identifier as string | undefined;
+  const password   = body.password   as string | undefined;
+
   const ip  = getClientIp(req);
-  const key = `login:${ip}`;
+  // Per-account key prevents one account's failures from blocking another account.
+  const key = `login:${ip}:${String(identifier ?? "").toLowerCase().trim()}`;
 
   if (isRateLimited(key)) {
     return NextResponse.json(
@@ -14,8 +20,6 @@ export async function POST(req: NextRequest) {
       { status: 429, headers: { "Retry-After": "900" } }
     );
   }
-
-  const { identifier, password } = await req.json();
 
   if (!identifier || !password) {
     return NextResponse.json({ error: "Please enter your email or phone number and password." }, { status: 400 });

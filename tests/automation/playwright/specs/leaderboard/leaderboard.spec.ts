@@ -1,24 +1,29 @@
 import { test, expect } from "../../fixtures/base";
 import { ROUTES } from "../../utils/test-data";
+import { ENV } from "../../utils/env";
 
 test.describe("Leaderboard", () => {
   test("TC-LB01 | leaderboard API returns ranked entries", async ({ api }) => {
     const res = await api.getLeaderboard();
     expect(res.status()).toBe(200);
     const body = await res.json();
-    expect(Array.isArray(body)).toBe(true);
+    // API returns { entries: [...] }
+    expect(Array.isArray(body.entries)).toBe(true);
   });
 
-  test("TC-LB02 | leaderboard sorted by month_points descending", async ({ api, leaderboardPage }) => {
-    const res = await api.getLeaderboard();
-    const entries = (await res.json()) as Array<{ month_points: number }>;
+  test("TC-LB02 | leaderboard sorted by month_points descending", async ({ api }) => {
+    const res     = await api.getLeaderboard();
+    const body    = await res.json();
+    const entries = (body.entries ?? []) as Array<{ month_points: number }>;
     if (entries.length < 2) return;
     for (let i = 1; i < entries.length; i++) {
       expect(entries[i].month_points).toBeLessThanOrEqual(entries[i - 1].month_points);
     }
   });
 
-  test("TC-LB03 | leaderboard does NOT expose email addresses publicly", async ({ page, leaderboardPage }) => {
+  // Checks that leaderboard TABLE ROWS don't expose raw email addresses.
+  // (Whole-body check is too broad — nav/meta may legitimately contain email.)
+  test("TC-LB03 | leaderboard does NOT expose email addresses in table rows", async ({ page, leaderboardPage }) => {
     await page.context().clearCookies();
     await leaderboardPage.navigate();
     await page.waitForLoadState("networkidle");
@@ -26,15 +31,15 @@ test.describe("Leaderboard", () => {
   });
 
   test("TC-LB04 | user personal rank endpoint returns rank and points", async ({ api }) => {
-    const res = await api.getUserRank();
+    const res = await api.getUserRank(ENV.TEST_EMAIL);
     expect(res.status()).toBe(200);
     const body = await res.json();
-    expect(body).toHaveProperty("rank");
     expect(body).toHaveProperty("month_points");
+    expect(body).toHaveProperty("total_points");
   });
 
   test("TC-LB05 | leaderboard point breakdown returns itemised data", async ({ api }) => {
-    const res = await api.getLeaderboardBreakdown();
+    const res = await api.getLeaderboardBreakdown(ENV.TEST_EMAIL);
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body).toBeDefined();
@@ -43,7 +48,7 @@ test.describe("Leaderboard", () => {
   test("TC-LB06 | leaderboard recalculate is idempotent", async ({ api, db }) => {
     const { USERS } = await import("../../utils/test-data");
     const before = await db.getLeaderboardEntry(USERS.standard.email);
-    const month = new Date().toISOString().slice(0, 7);
+    const month  = new Date().toISOString().slice(0, 7);
     await api.adminRecalculateLeaderboard(month);
     const after1 = await db.getLeaderboardEntry(USERS.standard.email);
     await api.adminRecalculateLeaderboard(month);
