@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Eye, EyeOff, Camera, CheckCircle2 } from "lucide-react";
+import OtpInput from "./OtpInput";
 
 const GOALS = [
   { id: "5k",       label: "First 5K"            },
