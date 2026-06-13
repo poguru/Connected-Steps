@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import CoachCarouselSection from "@/components/coaches/CoachCarouselSection";
 
 export const metadata = {
   title: "Running Club Hyderabad",
@@ -96,20 +97,16 @@ export default function RunningClubHyderabadPage() {
         </div>
       </section>
 
-      {/* Coach highlight */}
+      {/* Coaching team */}
       <section style={{ padding: "4rem 2rem", background: "rgba(232,98,10,0.04)", borderTop: "1px solid rgba(232,98,10,0.1)", borderBottom: "1px solid rgba(232,98,10,0.1)" }}>
-        <div style={{ maxWidth: "680px", margin: "0 auto", textAlign: "center" }}>
-          <div style={{ fontSize: "11px", color: "var(--cs-orange)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: "1rem" }}>Your Coach</div>
-          <h2 style={{ fontSize: "1.75rem", fontWeight: 300, marginBottom: "1rem" }}>
-            Train with a{" "}
-            <em style={{ color: "var(--cs-orange)", fontStyle: "normal" }}>National Gold Medallist</em>
-          </h2>
-          <p style={{ fontSize: "0.9rem", color: "var(--cs-muted)", lineHeight: 1.7, marginBottom: "2rem" }}>
-            Ashokan K — NIS Patiala certified, former Army athlete, 25+ years of coaching experience, and coach to a CWG Bronze medallist. He coaches Connected Steps runners in Hyderabad with the same precision he applied on the national stage.
-          </p>
-          <Link href="/auth" style={{ display: "inline-block", padding: "13px 30px", background: "var(--cs-orange)", color: "#fff", borderRadius: "6px", textDecoration: "none", fontWeight: 700, fontSize: "0.9rem" }}>
-            Train with Ashokan →
-          </Link>
+        <div style={{ maxWidth: "960px", margin: "0 auto" }}>
+          <CoachCarouselSection
+            sectionLabel="MEET OUR COACHING TEAM"
+            title="Trained by champions"
+            subtitle="Our coaches are national-level athletes and certified professionals who've competed at the highest levels — now coaching Connected Steps runners in Hyderabad."
+            ctaLabel="Start Training"
+            ctaHref="/auth?tab=register"
+          />
         </div>
       </section>
 
