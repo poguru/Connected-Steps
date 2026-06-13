@@ -104,7 +104,7 @@ export default function Hero() {
               <span className="animate-pulse-ring" style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "var(--accent)" }} />
               <span style={{ position: "relative", display: "inline-flex", width: 7, height: 7, borderRadius: "50%", background: "var(--accent)" }} />
             </span>
-            Hyderabad&rsquo;s coached running club
+            NIS-certified coaching, Hyderabad
           </div>
 
           {/* Headline */}
