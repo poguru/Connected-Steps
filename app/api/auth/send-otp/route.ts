@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { sendEmail, sendWhatsAppOTP } from "@/lib/notify";
+import { sendEmail, sendSMSOTP } from "@/lib/notify";
 import {
   isRateLimited, recordFailure, getClientIp,
   isRateLimitedCustom, recordFailureCustom,
@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
         otpEmailHTML(displayName, code)
       );
     } else {
-      await sendWhatsAppOTP(identifier, displayName, code);
+      await sendSMSOTP(identifier, code);
     }
 
     return NextResponse.json({ success: true });

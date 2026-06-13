@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Eye, EyeOff, Camera, CheckCircle2 } from "lucide-react";
-import OtpInput from "./OtpInput";
 
 const GOALS = [
   { id: "5k",       label: "First 5K"            },
@@ -38,8 +37,8 @@ const focusHandlers = {
   },
 };
 
-// email → email-otp → details → phone-otp → done (account created)
-type Step = "email" | "email-otp" | "details" | "phone-otp";
+// email → email-otp → details → done (account created)
+type Step = "email" | "email-otp" | "details";
 
 interface Props { onSwitchToLogin: () => void; }
 
@@ -51,7 +50,6 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
   const [email,      setEmail]      = useState("");
   const [emailOtp,   setEmailOtp]   = useState("");
   const [phone,      setPhone]      = useState("");
-  const [phoneOtp,   setPhoneOtp]   = useState("");
   const [sending,    setSending]    = useState(false);
   const [verifying,  setVerifying]  = useState(false);
   const [otpError,   setOtpError]   = useState("");
@@ -76,11 +74,9 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
     reader.readAsDataURL(file);
   };
 
-  // ── Progress (3 visible steps: Email, Details, Mobile) ───────────────────
-  const stepIndex = step === "email" || step === "email-otp" ? 0
-                  : step === "details"                        ? 1
-                  : 2;
-  const progress = Math.round(((stepIndex + 1) / 3) * 100);
+  // ── Progress (2 visible steps: Email, Details) ───────────────────────────
+  const stepIndex = step === "email" || step === "email-otp" ? 0 : 1;
+  const progress  = Math.round(((stepIndex + 1) / 2) * 100);
 
   // ── Send OTP ──────────────────────────────────────────────────────────────
   async function sendOtp(type: "email" | "phone", value: string, purpose: string, isResend = false) {
@@ -93,10 +89,7 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
       });
       const data = await res.json();
       if (!res.ok) { setOtpError(data.error ?? "Failed to send OTP."); return false; }
-      if (!isResend) {
-        if (type === "email") setStep("email-otp");
-        else setStep("phone-otp");
-      }
+      if (!isResend && type === "email") setStep("email-otp");
       return true;
     } catch { setOtpError("Network error. Please try again."); return false; }
     finally { setSending(false); }
@@ -119,7 +112,6 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
   }
 
   // ── Submit registration ───────────────────────────────────────────────────
-  // Only called after phone OTP is verified — phone_verified is always true here.
   async function handleSubmit() {
     setSubmitting(true);
     try {
@@ -131,7 +123,7 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
           firstName: form.firstName, lastName: form.lastName,
           email, phone, password: form.password,
           goal, location: finalLocation, dob: form.dob,
-          phoneVerified: true,
+          phoneVerified: false,
         }),
       });
       const data = await res.json();
@@ -142,14 +134,15 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
     finally { setSubmitting(false); }
   }
 
-  // ── Validate details before advancing to phone step ───────────────────────
+  // ── Validate details before submitting ───────────────────────────────────
   function validateDetails(): boolean {
     if (!form.firstName || !form.lastName) { setFormError("Please enter your full name."); return false; }
     if (form.password.length < 8)          { setFormError("Password must be at least 8 characters."); return false; }
     if (form.password !== form.confirm)    { setFormError("Passwords do not match."); return false; }
     if (!location)                         { setFormError("Please select your training location."); return false; }
     if (location === "Others" && !customLoc.trim()) { setFormError("Please enter your training location."); return false; }
-    if (!phone.trim())                     { setFormError("Mobile number is required for account security."); return false; }
+    const phoneDigits = phone.replace(/\D/g, "");
+    if (phoneDigits.length !== 10)         { setFormError("Please enter a valid 10-digit mobile number."); return false; }
     return true;
   }
 
@@ -164,7 +157,7 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
   const ProgressBar = () => (
     <div style={{ marginBottom: 20 }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-        {["Email", "Details", "Mobile"].map((label, i) => {
+        {["Email", "Details"].map((label, i) => {
           const done   = i < stepIndex;
           const active = i === stepIndex;
           return (
@@ -280,9 +273,9 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
         <label style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5 }}>
           WhatsApp / Mobile number <span style={{ color: "var(--primary)", fontWeight: 600 }}>*</span>
         </label>
-        <input style={inputStyle} type="tel" placeholder="e.g. 9876543210" value={phone} onChange={e => setPhone(e.target.value)} autoComplete="tel" {...focusHandlers} />
+        <input style={inputStyle} type="tel" placeholder="e.g. 9876543210" maxLength={10} value={phone} onChange={e => { setPhone(e.target.value.replace(/\D/g, "").slice(0, 10)); setFormError(""); }} autoComplete="tel" {...focusHandlers} />
         <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--muted-foreground)" }}>
-          We&apos;ll send a one-time code to verify this number.
+          10-digit Indian mobile number. Used for session updates.
         </p>
       </div>
 
@@ -320,56 +313,14 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
         onClick={async () => {
           setFormError("");
           if (!validateDetails()) return;
-          // Send phone OTP, then advance to phone-otp step
-          await sendOtp("phone", phone, "register");
+          await handleSubmit();
         }}
-        disabled={sending}
-        style={{ width: "100%", padding: "13px", borderRadius: 999, background: "var(--gradient-accent)", color: "var(--accent-foreground)", border: "none", cursor: sending ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem", boxShadow: "var(--shadow-orange)" }}
+        disabled={submitting}
+        style={{ width: "100%", padding: "13px", borderRadius: 999, background: "var(--gradient-accent)", color: "var(--accent-foreground)", border: "none", cursor: submitting ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem", boxShadow: "var(--shadow-orange)" }}
       >
-        {sending ? "Sending OTP…" : "Continue — Verify Mobile →"}
+        {submitting ? "Creating account…" : "Create Account →"}
       </button>
     </div>
   );
 
-  // ══ STEP: phone-otp ══════════════════════════════════════════════════════
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <ProgressBar />
-      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Step 3 — Verify your mobile number</p>
-      <p style={{ margin: 0, fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.6 }}>
-        OTP sent to <strong style={{ color: "var(--foreground)" }}>{phone}</strong> via WhatsApp. It expires in <strong>5 minutes</strong>.
-      </p>
-      <OtpInput value={phoneOtp} onChange={v => { setPhoneOtp(v); setOtpError(""); }} />
-      {otpError && <ErrorBlock msg={otpError} />}
-
-      <button
-        type="button"
-        onClick={async () => {
-          const ok = await verifyOtp("phone", phone, phoneOtp);
-          if (ok) {
-            setPhoneOtp("");
-            setOtpError("");
-            await handleSubmit();
-          }
-        }}
-        disabled={verifying || submitting || phoneOtp.length !== 6}
-        style={{ width: "100%", padding: "13px", borderRadius: 999, background: phoneOtp.length === 6 ? "var(--gradient-accent)" : "oklch(0.72 0.19 49 / 30%)", color: "var(--accent-foreground)", border: "none", cursor: phoneOtp.length === 6 ? "pointer" : "not-allowed", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem", boxShadow: phoneOtp.length === 6 ? "var(--shadow-orange)" : "none" }}
-      >
-        {verifying ? "Verifying…" : submitting ? "Creating account…" : "Verify & Create Account →"}
-      </button>
-
-      {formError && <ErrorBlock msg={formError} />}
-
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <button type="button" onClick={() => { setStep("details"); setPhoneOtp(""); setOtpError(""); }}
-          style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--muted-foreground)", fontFamily: "var(--font-body)" }}>
-          ← Change details
-        </button>
-        <button type="button" onClick={() => sendOtp("phone", phone, "register", true)} disabled={sending}
-          style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--muted-foreground)", fontFamily: "var(--font-body)", textDecoration: "underline" }}>
-          {sending ? "Sending…" : "Resend OTP"}
-        </button>
-      </div>
-    </div>
-  );
 }

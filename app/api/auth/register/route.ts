@@ -9,8 +9,13 @@ export async function POST(req: NextRequest) {
     // through the phone OTP step before calling this endpoint.
     const { firstName, lastName, email, phone, goal, location, password, phoneVerified } = await req.json();
 
-    if (!email || !password || !firstName || !lastName) {
+    if (!email || !password || !firstName || !lastName || !phone) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
+    }
+
+    const phoneDigits = (phone as string).replace(/\D/g, "");
+    if (phoneDigits.length !== 10) {
+      return NextResponse.json({ error: "Please enter a valid 10-digit mobile number." }, { status: 400 });
     }
 
     // Server-side password strength validation (mirrors client-side rules)

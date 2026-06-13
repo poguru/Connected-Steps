@@ -188,6 +188,51 @@ export async function sendWhatsAppOTP(phone: string, _name: string, code: string
   return sendWhatsApp(phone, [code], template);
 }
 
+// ── SMS OTP ───────────────────────────────────────────────────────────────────
+// MSG91 dedicated OTP API — simpler than transactional SMS.
+// Requires a DLT-registered template in MSG91 → SMS → Templates with ##OTP## placeholder.
+// Set MSG91_DLT_TEMPLATE_ID to the template ID from your MSG91 dashboard.
+//
+// Example DLT template body:
+//   Your Connected Steps verification code is ##OTP##. Do not share this code. - Connected Steps
+
+export async function sendSMSOTP(phone: string, code: string): Promise<NotifyResult> {
+  if (NOTIFICATIONS_PAUSED) return { to: phone, channel: "sms", ok: true };
+
+  const authKey    = process.env.MSG91_AUTH_KEY;
+  const templateId = process.env.MSG91_DLT_TEMPLATE_ID;
+  const senderId   = process.env.MSG91_SENDER_ID;
+
+  if (!authKey || !templateId) {
+    console.error("[MSG91 OTP SMS] SKIPPED — MSG91_AUTH_KEY or MSG91_DLT_TEMPLATE_ID not set");
+    return { to: phone, channel: "sms", ok: false, error: "MSG91 OTP SMS not configured." };
+  }
+
+  const to = normalisePhone(phone);
+
+  try {
+    const res = await fetch("https://api.msg91.com/api/v5/otp", {
+      method: "POST",
+      headers: { authkey: authKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mobile:      to,
+        otp:         code,
+        template_id: templateId,
+        ...(senderId ? { sender: senderId } : {}),
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.type === "error") {
+      const errMsg = data.message ?? JSON.stringify(data) ?? String(res.status);
+      console.error("[MSG91 OTP SMS] error:", errMsg);
+      return { to: phone, channel: "sms", ok: false, error: errMsg };
+    }
+    return { to: phone, channel: "sms", ok: true };
+  } catch (e: unknown) {
+    return { to: phone, channel: "sms", ok: false, error: String(e) };
+  }
+}
+
 // ── Message builders ──────────────────────────────────────────────────────────
 
 function formatDate(date: string): string {
