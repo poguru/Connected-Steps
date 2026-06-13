@@ -6,7 +6,8 @@
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
       "Bash(git show *)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(npx tsc *)"
     ]
   }
 }

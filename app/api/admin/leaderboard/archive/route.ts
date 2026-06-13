@@ -1,14 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-
-function auth(req: NextRequest) {
-  const pw = req.headers.get("x-admin-password");
-  return pw && pw === process.env.ADMIN_PASSWORD;
-}
+import { isAdminOrCoach } from "@/lib/admin-auth";
 
 // GET — live leaderboard + all archived months
 export async function GET(req: NextRequest) {
-  if (!auth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const db = getSupabaseServer();
 
   const [liveRes, archiveRes] = await Promise.all([
@@ -29,7 +25,7 @@ export async function GET(req: NextRequest) {
 
 // POST — snapshot current month's leaderboard into the archive
 export async function POST(req: NextRequest) {
-  if (!auth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
   const month: string = body.month ?? new Date().toISOString().slice(0, 7); // "2026-05"
