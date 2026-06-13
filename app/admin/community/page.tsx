@@ -66,50 +66,64 @@ export default function AdminCommunityPage() {
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { const s = localStorage.getItem("cs_admin_pw"); if (s) load(s); }, []);
+  useEffect(() => { const s = localStorage.getItem("cs_admin_pw"); if (s) { setPw(s); load(s); } }, []);
 
   async function approveAll() {
     setApprovingAll(true);
     try {
-      await fetch("/api/admin/community", {
+      const res = await fetch("/api/admin/community", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", "x-admin-password": pw },
         body: JSON.stringify({ action: "approve_all" }),
       });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error ?? `Approve failed (${res.status})`); return; }
       setPosts((prev) => prev.map((p) => ({ ...p, approved: true })));
-    } finally { setApprovingAll(false); }
+    } catch { setError("Network error during approve all."); }
+    finally { setApprovingAll(false); }
   }
 
   async function actPost(id: number, action: "approve" | "reject") {
     setActingPost(id);
     try {
-      await fetch("/api/admin/community", {
+      const res = await fetch("/api/admin/community", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", "x-admin-password": pw },
         body: JSON.stringify({ id, action }),
       });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error ?? `Action failed (${res.status}) — session may have expired, refresh the page.`);
+        return;
+      }
       setPosts((prev) =>
         action === "reject"
           ? prev.filter((p) => p.id !== id)
           : prev.map((p) => p.id === id ? { ...p, approved: true } : p)
       );
-    } finally { setActingPost(null); }
+    } catch { setError("Network error. Please try again."); }
+    finally { setActingPost(null); }
   }
 
   async function actReply(id: number, action: "approve" | "reject") {
     setActingReply(id);
     try {
-      await fetch("/api/admin/community/replies", {
+      const res = await fetch("/api/admin/community/replies", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", "x-admin-password": pw },
         body: JSON.stringify({ id, action }),
       });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error ?? `Action failed (${res.status}) — session may have expired, refresh the page.`);
+        return;
+      }
       setReplies((prev) =>
         action === "reject"
           ? prev.filter((r) => r.id !== id)
           : prev.map((r) => r.id === id ? { ...r, approved: true } : r)
       );
-    } finally { setActingReply(null); }
+    } catch { setError("Network error. Please try again."); }
+    finally { setActingReply(null); }
   }
 
   if (!authed) {
@@ -147,10 +161,16 @@ export default function AdminCommunityPage() {
           <span style={{ fontSize: "0.78rem", color: "#555" }}>
             {pendingPosts.length} posts · {pendingReplies.length} replies pending
           </span>
-          <button onClick={() => load(pw)} style={{ fontSize: "0.75rem", color: "#888", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", padding: "4px 12px", cursor: "pointer", fontFamily: "inherit" }}>Refresh</button>
+          <button onClick={() => { setError(""); load(pw); }} style={{ fontSize: "0.75rem", color: "#888", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", padding: "4px 12px", cursor: "pointer", fontFamily: "inherit" }}>Refresh</button>
         </div>
       </header>
 
+      {error && (
+        <div style={{ background: "rgba(240,149,149,0.08)", borderBottom: "1px solid rgba(240,149,149,0.25)", padding: "10px 2rem", fontSize: "0.82rem", color: "#f09595", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>⚠ {error}</span>
+          <button onClick={() => setError("")} style={{ background: "none", border: "none", color: "#f09595", cursor: "pointer", fontSize: "1rem", lineHeight: 1, padding: 0 }}>×</button>
+        </div>
+      )}
       <div style={{ maxWidth: "860px", margin: "0 auto", padding: "2rem 1.5rem", display: "flex", flexDirection: "column", gap: "2.5rem" }}>
 
         {/* Pending Posts */}

@@ -26,18 +26,27 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const { id, action } = await req.json();
-    if (!id || !action) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    if (!id && action !== "approve_all") return NextResponse.json({ error: "Missing id" }, { status: 400 });
+    if (!action) return NextResponse.json({ error: "Missing action" }, { status: 400 });
 
     const db = getSupabaseServer();
+
     if (action === "approve_all") {
-      await db.from("community_posts").update({ approved: true }).eq("approved", false);
+      const { error } = await db.from("community_posts").update({ approved: true }).eq("approved", false);
+      if (error) { console.error("[admin/community] approve_all error:", error.message); return NextResponse.json({ error: error.message }, { status: 500 }); }
     } else if (action === "reject") {
-      await db.from("community_posts").delete().eq("id", id);
+      console.log("[admin/community] deleting post id:", id);
+      const { error, count } = await db.from("community_posts").delete({ count: "exact" }).eq("id", id);
+      if (error) { console.error("[admin/community] delete error:", error.message); return NextResponse.json({ error: error.message }, { status: 500 }); }
+      console.log("[admin/community] deleted", count, "row(s) for id:", id);
     } else {
-      await db.from("community_posts").update({ approved: true }).eq("id", id);
+      const { error } = await db.from("community_posts").update({ approved: true }).eq("id", id);
+      if (error) { console.error("[admin/community] approve error:", error.message); return NextResponse.json({ error: error.message }, { status: 500 }); }
     }
+
     return NextResponse.json({ success: true });
   } catch (e: unknown) {
+    console.error("[admin/community] PATCH exception:", String(e));
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }
