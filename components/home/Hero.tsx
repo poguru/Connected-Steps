@@ -4,10 +4,16 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Star } from "lucide-react";
 
+// ── Animated count-up (starts when scrolled into view) ───────────────────────
 function CountUp({ to, suffix = "", duration = 1800 }: { to: number; suffix?: string; duration?: number }) {
   const [count,   setCount]   = useState(0);
   const ref     = useRef<HTMLSpanElement>(null);
   const started = useRef(false);
+
+  useEffect(() => {
+    started.current = false;
+    setCount(0);
+  }, [to]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(([entry]) => {
@@ -29,15 +35,55 @@ function CountUp({ to, suffix = "", duration = 1800 }: { to: number; suffix?: st
   return <span ref={ref}>{count.toLocaleString()}{suffix}</span>;
 }
 
+// ── Skeleton shimmer block ────────────────────────────────────────────────────
+function Skeleton({ width = 48, height = 20 }: { width?: number; height?: number }) {
+  return (
+    <span style={{
+      display: "inline-block", width, height,
+      borderRadius: 4,
+      background: "linear-gradient(90deg, var(--border) 25%, var(--surface-elevated) 50%, var(--border) 75%)",
+      backgroundSize: "200% 100%",
+      animation: "cs-shimmer 1.4s infinite",
+      verticalAlign: "middle",
+    }} />
+  );
+}
+
+interface Stats {
+  totalRunners:       number;
+  activeThisMonth:    number;
+  trainingsConducted: number;
+  communityPosts:     number;
+  avgRating:          number | null;
+}
+
 export default function Hero() {
-  const [stats, setStats] = useState({ totalRunners: 0, trainingsConducted: 0, avgRating: 4.9 });
+  const [stats,   setStats]   = useState<Stats | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/stats").then(r => r.json()).then(d => setStats(d)).catch(() => {});
+    fetch("/api/stats")
+      .then(r => r.json())
+      .then(d => { setStats(d); setLoading(false); })
+      .catch(() => setLoading(false));
   }, []);
+
+  // Stat strip values — only show real data, never fake fallbacks
+  const stripStats = [
+    { val: stats?.totalRunners       ?? 0, suffix: "",  label: "Runners"        },
+    { val: stats?.trainingsConducted ?? 0, suffix: "+", label: "Sessions"       },
+    { val: stats?.activeThisMonth    ?? 0, suffix: "",  label: "Active / month" },
+  ];
 
   return (
     <section className="relative overflow-hidden bg-gradient-soft animate-fade-in">
+      <style>{`
+        @keyframes cs-shimmer {
+          0%   { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+      `}</style>
+
       <div className="dot-bg absolute inset-0 opacity-50" />
       <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full blur-3xl pointer-events-none"
         style={{ background: "oklch(0.74 0.2 50 / 18%)" }} />
@@ -47,6 +93,7 @@ export default function Hero() {
 
         {/* ── Left ─────────────────────────────────────────────────────── */}
         <div className="animate-fade-up">
+
           {/* Badge */}
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 999,
             border: "1px solid var(--border)", background: "var(--surface)",
@@ -60,14 +107,14 @@ export default function Hero() {
             Hyderabad&rsquo;s coached running club
           </div>
 
-          {/* Headline — product-first, benefit-second */}
+          {/* Headline */}
           <h1 className="font-display animate-fade-up-1"
             style={{ fontSize: "clamp(2.2rem, 6vw, 3.75rem)", fontWeight: 700, lineHeight: 1.05, letterSpacing: "-0.015em", color: "var(--foreground)", marginBottom: "1rem" }}>
             Your personal running coach.{" "}
             <span className="text-gradient-accent">Your next race. Your way.</span>
           </h1>
 
-          {/* Sub — answers "what is it" in one sentence */}
+          {/* Sub */}
           <p className="animate-fade-up-2" style={{ maxWidth: 500, fontSize: "1rem", color: "var(--muted-foreground)", lineHeight: 1.7, marginBottom: "1.75rem" }}>
             Connected Steps pairs you with a certified running coach in Hyderabad — for personalised training plans,
             weekend group runs, and real accountability from 5K to marathon.
@@ -93,22 +140,53 @@ export default function Hero() {
             </Link>
           </div>
 
-          {/* Trust row */}
+          {/* ── Trust row ── */}
           <div className="animate-fade-up-4" style={{ marginTop: "1.75rem", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "1.25rem", fontSize: "0.85rem", color: "var(--muted-foreground)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ display: "flex" }}>
-                {["A","B","C","D"].map((l, i) => (
-                  <div key={l} style={{ width: 26, height: 26, borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 9, fontWeight: 700, color: "#fff", marginLeft: i === 0 ? 0 : -7, border: "2px solid var(--background)", background: ["var(--gradient-primary)","var(--gradient-accent)","linear-gradient(135deg,oklch(0.72 0.14 210),oklch(0.6 0.18 210))","linear-gradient(135deg,oklch(0.55 0.18 300),oklch(0.45 0.22 300))"][i] }}>
-                    {l}
-                  </div>
-                ))}
+
+            {/* Runner count — only render when loaded and > 0 */}
+            {loading ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ display: "flex" }}>
+                  {["A","B","C","D"].map((l, i) => (
+                    <div key={l} style={{ width: 26, height: 26, borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 9, fontWeight: 700, color: "#fff", marginLeft: i === 0 ? 0 : -7, border: "2px solid var(--background)", background: ["var(--gradient-primary)","var(--gradient-accent)","linear-gradient(135deg,oklch(0.72 0.14 210),oklch(0.6 0.18 210))","linear-gradient(135deg,oklch(0.55 0.18 300),oklch(0.45 0.22 300))"][i] }}>
+                      {l}
+                    </div>
+                  ))}
+                </div>
+                <Skeleton width={90} height={16} />
               </div>
-              <span><span style={{ fontWeight: 600, color: "var(--foreground)" }}><CountUp to={stats.totalRunners || 500} suffix="+" /></span> runners joined</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              {[1,2,3,4,5].map(i => <Star key={i} size={13} style={{ fill: "var(--accent)", color: "var(--accent)" }} />)}
-              <span><span style={{ fontWeight: 600, color: "var(--foreground)" }}>{stats.avgRating ?? 4.9}</span> avg rating</span>
-            </div>
+            ) : stats && stats.totalRunners > 0 ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ display: "flex" }}>
+                  {["A","B","C","D"].map((l, i) => (
+                    <div key={l} style={{ width: 26, height: 26, borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 9, fontWeight: 700, color: "#fff", marginLeft: i === 0 ? 0 : -7, border: "2px solid var(--background)", background: ["var(--gradient-primary)","var(--gradient-accent)","linear-gradient(135deg,oklch(0.72 0.14 210),oklch(0.6 0.18 210))","linear-gradient(135deg,oklch(0.55 0.18 300),oklch(0.45 0.22 300))"][i] }}>
+                      {l}
+                    </div>
+                  ))}
+                </div>
+                <span>
+                  <span style={{ fontWeight: 600, color: "var(--foreground)" }}>
+                    <CountUp to={stats.totalRunners} />
+                  </span>{" "}
+                  runners joined
+                </span>
+              </div>
+            ) : null}
+
+            {/* Avg rating — only show when real ratings exist */}
+            {loading ? (
+              <Skeleton width={100} height={16} />
+            ) : stats?.avgRating != null ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                {[1,2,3,4,5].map(i => (
+                  <Star key={i} size={13} style={{ fill: "var(--accent)", color: "var(--accent)" }} />
+                ))}
+                <span>
+                  <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{stats.avgRating}</span> avg rating
+                </span>
+              </div>
+            ) : null}
+
           </div>
         </div>
 
@@ -122,20 +200,19 @@ export default function Hero() {
               <div style={{ textAlign: "center" }}>
                 <div style={{ fontSize: "4rem", marginBottom: "0.75rem" }}>🏃</div>
                 <div className="font-display" style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--foreground)" }}>Every step counts.</div>
-                <div style={{ fontSize: "0.8rem", color: "var(--muted-foreground)", marginTop: "0.35rem" }}>Join Hyderabad's running community</div>
+                <div style={{ fontSize: "0.8rem", color: "var(--muted-foreground)", marginTop: "0.35rem" }}>Join Hyderabad&apos;s running community</div>
               </div>
             </div>
 
-            {/* Stat strip */}
+            {/* Stat strip — real data only */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", borderTop: "1px solid var(--border)" }}>
-              {[
-                { val: stats.totalRunners || 500, suffix: "+", label: "Runners" },
-                { val: stats.trainingsConducted || 200, suffix: "+", label: "Sessions" },
-                { val: 25, suffix: "+", label: "Yrs experience" },
-              ].map((s, i) => (
+              {stripStats.map((s, i) => (
                 <div key={s.label} style={{ padding: "1rem", textAlign: "center", borderLeft: i > 0 ? "1px solid var(--border)" : "none" }}>
-                  <div className="font-display" style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--cs-orange)", lineHeight: 1 }}>
-                    <CountUp to={s.val} suffix={s.suffix} />
+                  <div className="font-display" style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--cs-orange)", lineHeight: 1, minHeight: 30, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {loading
+                      ? <Skeleton width={40} height={24} />
+                      : <CountUp to={s.val} suffix={s.val > 0 ? s.suffix : ""} />
+                    }
                   </div>
                   <div style={{ fontSize: "10px", color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 4 }}>{s.label}</div>
                 </div>
