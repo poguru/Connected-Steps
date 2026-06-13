@@ -25,7 +25,6 @@ function fmtDate(d: string) {
 }
 
 function StatusBadge({ status, payment }: { status: string; payment: string }) {
-  const isPast = false; // could check date but keep simple
   if (status === "cancelled") return <span style={badge("#ef4444")}>Cancelled</span>;
   if (payment === "paid")     return <span style={badge("#4ade80")}>Paid ✓</span>;
   if (payment === "free")     return <span style={badge("#60a5fa")}>Free</span>;
@@ -40,21 +39,26 @@ const badge = (c: string): React.CSSProperties => ({
 export default function MyEventRegistrations() {
   const [regs,    setRegs]    = useState<Reg[]>([]);
   const [loading, setLoading] = useState(true);
+  const [apiErr,  setApiErr]  = useState<string | null>(null);
   const [tab,     setTab]     = useState<"upcoming" | "past">("upcoming");
 
   useEffect(() => {
     const token = localStorage.getItem("cs_user_token") ?? "";
     if (!token) { setLoading(false); return; }
     fetch("/api/events/my-registrations", { headers: { "x-user-token": token } })
-      .then(r => r.json())
-      .then(d => setRegs(d.registrations ?? []))
-      .catch(() => {})
+      .then(async r => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error ?? `HTTP ${r.status}`);
+        setRegs(d.registrations ?? []);
+      })
+      .catch(err => setApiErr(String(err)))
       .finally(() => setLoading(false));
   }, []);
 
   const today = new Date().toISOString().split("T")[0];
-  const upcoming = regs.filter(r => r.events && r.events.start_date >= today && r.status !== "cancelled");
-  const past     = regs.filter(r => r.events && r.events.start_date < today);
+  // Defensive: include registration even if events join returned null (treat as upcoming)
+  const upcoming = regs.filter(r => r.status !== "cancelled" && (!r.events || r.events.start_date >= today));
+  const past     = regs.filter(r => r.status !== "cancelled" && r.events && r.events.start_date < today);
   const shown    = tab === "upcoming" ? upcoming : past;
 
   return (
@@ -78,7 +82,11 @@ export default function MyEventRegistrations() {
         ))}
       </div>
 
-      {loading ? (
+      {apiErr ? (
+        <div style={{ padding: "0.75rem", borderRadius: 8, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", color: "#f87171", fontSize: "0.78rem" }}>
+          Could not load registrations. Please refresh or try again.
+        </div>
+      ) : loading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
           {[0,1].map(i => <div key={i} style={{ height: "60px", borderRadius: "8px", background: "rgba(255,255,255,0.04)", animation: "pulse 1.4s infinite" }} />)}
         </div>
@@ -91,18 +99,18 @@ export default function MyEventRegistrations() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
           {shown.map(r => {
-            const ev = r.events!;
-            const href = ev.share_slug ? `/events/${ev.share_slug}` : "#";
+            const ev = r.events;
+            const href = ev?.share_slug ? `/events/${ev.share_slug}` : "#";
             return (
               <Link key={r.registration_code} href={href} style={{ textDecoration: "none" }}>
                 <div style={{ padding: "0.75rem 0.875rem", borderRadius: "10px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", display: "flex", alignItems: "center", gap: "0.75rem", transition: "border-color 0.2s" }}
                   onMouseEnter={e => (e.currentTarget.style.borderColor = "rgba(232,98,10,0.35)")}
                   onMouseLeave={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)")}>
-                  <div style={{ fontSize: "1.4rem", flexShrink: 0 }}>{TYPE_ICON[ev.event_type] ?? "🏃"}</div>
+                  <div style={{ fontSize: "1.4rem", flexShrink: 0 }}>{TYPE_ICON[ev?.event_type ?? ""] ?? "🏃"}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--foreground)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.title}</div>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--foreground)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev?.title ?? "Event"}</div>
                     <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
-                      {fmtDate(ev.start_date)} · {ev.location}
+                      {ev ? `${fmtDate(ev.start_date)} · ${ev.location}` : "Details loading…"}
                     </div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
