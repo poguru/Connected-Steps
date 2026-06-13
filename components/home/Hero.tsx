@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Star } from "lucide-react";
+import CommunityHighlights from "./CommunityHighlights";
 
 // ── Animated count-up (starts when scrolled into view) ───────────────────────
 function CountUp({ to, suffix = "", duration = 1800 }: { to: number; suffix?: string; duration?: number }) {
@@ -67,13 +68,6 @@ export default function Hero() {
       .then(d => { setStats(d); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
-
-  // Stat strip values — only show real data, never fake fallbacks
-  const stripStats = [
-    { val: stats?.totalRunners       ?? 0, suffix: "",  label: "Runners"        },
-    { val: stats?.trainingsConducted ?? 0, suffix: "+", label: "Sessions"       },
-    { val: stats?.activeThisMonth    ?? 0, suffix: "",  label: "Active / month" },
-  ];
 
   return (
     <section className="relative overflow-hidden bg-gradient-soft animate-fade-in">
@@ -189,34 +183,11 @@ export default function Hero() {
           </div>
         </div>
 
-        {/* ── Right — quick stats panel (desktop only) ─────────────────── */}
+        {/* ── Right — community highlights (desktop only) ──────────────── */}
         <div className="relative hidden lg:block animate-fade-up-2">
           <div style={{ position: "absolute", inset: -20, borderRadius: 28, background: "var(--gradient-accent)", opacity: 0.12, filter: "blur(28px)" }} />
-          <div style={{ position: "relative", borderRadius: 20, border: "1px solid var(--border)", background: "var(--surface)", boxShadow: "var(--shadow-card)", overflow: "hidden" }}>
-
-            {/* Hero visual */}
-            <div style={{ padding: "2rem", background: "linear-gradient(135deg, oklch(0.17 0.015 270) 0%, oklch(0.24 0.055 40) 100%)", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 200 }}>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: "4rem", marginBottom: "0.75rem" }}>🏃</div>
-                <div className="font-display" style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--foreground)" }}>Every step counts.</div>
-                <div style={{ fontSize: "0.8rem", color: "var(--muted-foreground)", marginTop: "0.35rem" }}>Join Hyderabad&apos;s running community</div>
-              </div>
-            </div>
-
-            {/* Stat strip — real data only */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", borderTop: "1px solid var(--border)" }}>
-              {stripStats.map((s, i) => (
-                <div key={s.label} style={{ padding: "1rem", textAlign: "center", borderLeft: i > 0 ? "1px solid var(--border)" : "none" }}>
-                  <div className="font-display" style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--cs-orange)", lineHeight: 1, minHeight: 30, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {loading
-                      ? <Skeleton width={40} height={24} />
-                      : <CountUp to={s.val} suffix={s.val > 0 ? s.suffix : ""} />
-                    }
-                  </div>
-                  <div style={{ fontSize: "10px", color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 4 }}>{s.label}</div>
-                </div>
-              ))}
-            </div>
+          <div style={{ position: "relative" }}>
+            <CommunityHighlights />
           </div>
         </div>
 
