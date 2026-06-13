@@ -36,7 +36,7 @@ SELECT
   id,
   name,
   description,
-  CASE WHEN date ~ '^\d{4}-\d{2}-\d{2}$' THEN date::date ELSE CURRENT_DATE END,
+  COALESCE(date, CURRENT_DATE),
   NULLIF(trim(time), ''),
   location,
   CASE WHEN is_live THEN 'published' ELSE 'draft' END,
