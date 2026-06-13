@@ -55,7 +55,12 @@ export async function POST(req: NextRequest) {
       })
       .eq("registration_code", registration_code);
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      const msg = error.message?.includes("fully booked")
+        ? "This event is now fully booked. Please contact support for a refund."
+        : error.message;
+      return NextResponse.json({ error: msg }, { status: error.message?.includes("fully booked") ? 409 : 500 });
+    }
 
     // Redeem coupon atomically (fire-and-forget)
     if (reg.coupon_id) {

@@ -63,23 +63,18 @@ export async function POST(req: NextRequest) {
     // ── Verify event ───────────────────────────────────────────────────────────
     const { data: ev } = await db
       .from("events")
-      .select("id, title, price, max_participants, start_date, start_time, location, status")
+      .select("id, title, price, max_participants, participant_count, start_date, start_time, location, status")
       .eq("id", event_id)
       .single();
     if (!ev || ev.status !== "published") {
       return NextResponse.json({ error: "Event not found." }, { status: 404 });
     }
 
-    // ── Slot check ─────────────────────────────────────────────────────────────
-    if (ev.max_participants) {
-      const { count } = await db
-        .from("event_registrations")
-        .select("id", { count: "exact", head: true })
-        .eq("event_id", event_id)
-        .eq("status", "confirmed");
-      if ((count ?? 0) >= ev.max_participants) {
-        return NextResponse.json({ error: "This event is fully booked." }, { status: 409 });
-      }
+    // ── Atomic slot check — uses participant_count maintained by DB trigger ────
+    // participant_count is incremented by the trigger on INSERT/UPDATE status='confirmed'.
+    // We still gate here as a fast early-exit; the trigger is the ground truth.
+    if (ev.max_participants && (ev.participant_count ?? 0) >= ev.max_participants) {
+      return NextResponse.json({ error: "This event is fully booked." }, { status: 409 });
     }
 
     // ── Duplicate check ────────────────────────────────────────────────────────
