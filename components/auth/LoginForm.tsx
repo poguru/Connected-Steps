@@ -75,9 +75,12 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
     localStorage.removeItem("cs_pending_photo");
     const savedStrava = localStorage.getItem(`cs_strava_${user.email}`);
     if (savedStrava) localStorage.setItem("cs_strava", savedStrava);
-    // Only allow relative paths to prevent open redirect
-    const raw = searchParams.get("redirect") ?? "";
-    const safe = raw.startsWith("/") && !raw.startsWith("//") ? raw : "/dashboard";
+    // Prefer sessionStorage redirect (set by Register buttons), then URL param
+    const stored = sessionStorage.getItem("cs_post_login_redirect") ?? "";
+    sessionStorage.removeItem("cs_post_login_redirect");
+    const param  = searchParams.get("redirect") ?? "";
+    const dest   = stored || param;
+    const safe   = dest.startsWith("/") && !dest.startsWith("//") ? dest : "/dashboard";
     router.push(safe);
   }
 

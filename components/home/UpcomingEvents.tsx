@@ -164,7 +164,8 @@ function EventCard({
     if (user) {
       router.push(dest);
     } else {
-      router.push(`/auth?tab=login&redirect=${encodeURIComponent(dest)}`);
+      sessionStorage.setItem("cs_post_login_redirect", dest);
+      router.push("/auth?tab=login");
     }
   }
 

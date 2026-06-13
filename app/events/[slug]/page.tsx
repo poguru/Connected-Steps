@@ -145,7 +145,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         )}
 
         {/* CTA */}
-        <RegisterButton slug={ev.share_slug ?? ev.id} />
+        <RegisterButton eventId={ev.id} slug={ev.share_slug ?? ev.id} />
 
         <Link href="/"
           style={{ display: "block", textAlign: "center", fontSize: "0.82rem", color: "rgba(255,255,255,0.4)", textDecoration: "none" }}>
