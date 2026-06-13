@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { autoFeedMemberJoined } from "@/lib/auto-feed";
+import { processReferral } from "@/lib/referrals";
 
 export async function POST(req: NextRequest) {
   try {
     // phoneVerified is set to true only when the signup form has already gone
     // through the phone OTP step before calling this endpoint.
-    const { firstName, lastName, email, phone, goal, location, password, phoneVerified } = await req.json();
+    const { firstName, lastName, email, phone, goal, location, password, phoneVerified, referralCode } = await req.json();
 
     if (!email || !password || !firstName || !lastName || !phone) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
@@ -66,6 +67,11 @@ export async function POST(req: NextRequest) {
 
     autoFeedMemberJoined(email.toLowerCase(), firstName, lastName, location ?? null)
       .catch(() => {});
+
+    if (referralCode && typeof referralCode === "string") {
+      processReferral(referralCode.trim(), email.toLowerCase(), firstName)
+        .catch(() => {});
+    }
 
     return NextResponse.json({ success: true });
   } catch (e: unknown) {

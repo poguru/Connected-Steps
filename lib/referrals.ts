@@ -1,6 +1,9 @@
 /**
  * Referral system utilities.
- * All functions are no-ops when ENABLE_REFERRALS !== "true".
+ * All public functions are no-ops when ENABLE_REFERRALS !== "true".
+ *
+ * Reward model: both users receive a 30-day membership extension
+ * immediately when the referred user completes registration.
  */
 
 import { getSupabaseServer } from "@/lib/supabase-server";
@@ -33,16 +36,12 @@ export async function getOrCreateCode(email: string): Promise<string> {
 
   if (existing?.code) return existing.code;
 
-  // Generate a collision-free code
   let code = generateCode();
   for (let attempt = 0; attempt < 5; attempt++) {
-    const { error } = await db
-      .from("referral_codes")
-      .insert({ user_email: key, code });
+    const { error } = await db.from("referral_codes").insert({ user_email: key, code });
     if (!error) return code;
-    code = generateCode(); // retry on collision
+    code = generateCode();
   }
-
   throw new Error("Failed to generate unique referral code");
 }
 
@@ -57,19 +56,137 @@ export async function getOwnerByCode(code: string): Promise<string | null> {
   return data?.user_email ?? null;
 }
 
-// ── Claim ─────────────────────────────────────────────────────────────────────
+// ── Membership extension ──────────────────────────────────────────────────────
+
+async function extendOrGrantMembership(email: string, days: number): Promise<void> {
+  const db  = getSupabaseServer();
+  const now = new Date();
+  const ms  = days * 24 * 60 * 60 * 1000;
+
+  // Look for any currently active membership
+  const { data: active } = await db
+    .from("memberships")
+    .select("user_email, expires_at")
+    .eq("user_email", email)
+    .eq("status", "active")
+    .gt("expires_at", now.toISOString())
+    .order("expires_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (active?.expires_at) {
+    // Extend existing membership by 30 days
+    const newExpiry = new Date(new Date(active.expires_at).getTime() + ms).toISOString();
+    await db
+      .from("memberships")
+      .update({ expires_at: newExpiry })
+      .eq("user_email", email)
+      .eq("status", "active");
+  } else {
+    // No active membership — grant a fresh 30-day referral membership
+    await db.from("memberships").insert({
+      user_email:  email,
+      plan:        "referral",
+      status:      "active",
+      started_at:  now.toISOString(),
+      expires_at:  new Date(now.getTime() + ms).toISOString(),
+      amount_paid: 0,
+    });
+  }
+}
+
+// ── Process referral at registration ─────────────────────────────────────────
 
 /**
- * Called after a referred user signs up and loads the dashboard.
- * Links the invitee email to the referral invite row.
- * Safe to call multiple times — the unique constraint prevents duplicates.
+ * Called immediately after a new user successfully registers.
+ * Inserts a referrals row, extends both memberships by 30 days,
+ * and sends in-app notifications to both users.
+ * Safe to call fire-and-forget — all errors are caught internally.
  */
+export async function processReferral(
+  referralCode:      string,
+  referredEmail:     string,
+  referredFirstName: string,
+): Promise<void> {
+  if (!referralsEnabled()) return;
+
+  try {
+    const referrerEmail = await getOwnerByCode(referralCode);
+    if (!referrerEmail) return;
+
+    const normalizedReferred = referredEmail.toLowerCase();
+    if (referrerEmail === normalizedReferred) return; // self-referral
+
+    const db = getSupabaseServer();
+
+    // Insert referral record — UNIQUE(referred_email) prevents duplicates
+    const { error: insertErr } = await db.from("referrals").insert({
+      referral_code:  referralCode.toUpperCase(),
+      referrer_email: referrerEmail,
+      referred_email: normalizedReferred,
+      status:         "completed",
+      reward_granted: false,
+    });
+
+    if (insertErr) {
+      if (insertErr.code === "23505") return; // already processed for this user
+      console.error("[referrals] insert error:", insertErr.message);
+      return;
+    }
+
+    // Extend / grant memberships for both users
+    await Promise.all([
+      extendOrGrantMembership(referrerEmail, 30),
+      extendOrGrantMembership(normalizedReferred, 30),
+    ]);
+
+    // Mark reward as granted
+    const rewarded_at = new Date().toISOString();
+    await db
+      .from("referrals")
+      .update({ status: "reward_issued", reward_granted: true, rewarded_at })
+      .eq("referred_email", normalizedReferred);
+
+    // Fetch referrer name for the referred user's notification
+    const { data: referrerUser } = await db
+      .from("users")
+      .select("first_name")
+      .eq("email", referrerEmail)
+      .single();
+    const referrerName = referrerUser?.first_name ?? "a friend";
+
+    // Send notifications to both users
+    const { createNotification } = await import("@/lib/notify-inapp");
+    await Promise.all([
+      createNotification({
+        user_email: referrerEmail,
+        type:       "achievement",
+        title:      "Referral reward! 🎉",
+        body:       `${referredFirstName} joined Connected Steps using your invite. 1 month has been added to your membership.`,
+        action_url: "/dashboard",
+      }),
+      createNotification({
+        user_email: normalizedReferred,
+        type:       "achievement",
+        title:      "Welcome bonus! 🎁",
+        body:       `You joined through ${referrerName}'s invite and received 1 free month of membership.`,
+        action_url: "/dashboard",
+      }),
+    ]);
+  } catch (e) {
+    console.error("[referrals] processReferral error:", e);
+  }
+}
+
+// ── Legacy: claim + reward (kept for backward compatibility) ──────────────────
+
+/** @deprecated Use processReferral() instead. Called at registration now. */
 export async function claimReferral(inviteeEmail: string, code: string): Promise<boolean> {
   if (!referralsEnabled()) return false;
 
   const referrerEmail = await getOwnerByCode(code);
   if (!referrerEmail) return false;
-  if (referrerEmail === inviteeEmail.toLowerCase()) return false; // can't self-refer
+  if (referrerEmail === inviteeEmail.toLowerCase()) return false;
 
   const db = getSupabaseServer();
   const { error } = await db.from("referral_invites").insert({
@@ -78,17 +195,10 @@ export async function claimReferral(inviteeEmail: string, code: string): Promise
     registered_at:  new Date().toISOString(),
   });
 
-  // Ignore unique-constraint violations (already claimed)
   return !error || error.code === "23505";
 }
 
-// ── Reward ────────────────────────────────────────────────────────────────────
-
-/**
- * Called when an invitee attends their first session.
- * Marks the invite as rewarded and notifies the referrer.
- * No-op if this user wasn't referred or was already rewarded.
- */
+/** @deprecated Reward now issued at registration via processReferral(). */
 export async function triggerReferralReward(inviteeEmail: string): Promise<void> {
   if (!referralsEnabled()) return;
 
@@ -102,43 +212,22 @@ export async function triggerReferralReward(inviteeEmail: string): Promise<void>
     .is("rewarded_at", null)
     .single();
 
-  if (!invite) return; // not referred, or already rewarded
+  if (!invite) return;
 
   const now = new Date().toISOString();
-
-  // Mark first session + reward timestamps
   await db
     .from("referral_invites")
     .update({ first_session_at: now, rewarded_at: now })
     .eq("id", invite.id);
-
-  // Notify the referrer (fire-and-forget — import inline to avoid circular deps)
-  try {
-    const { createNotification } = await import("@/lib/notify-inapp");
-    const { data: invitee } = await db
-      .from("users")
-      .select("first_name")
-      .eq("email", key)
-      .single();
-    const name = invitee?.first_name ?? "Your friend";
-
-    await createNotification({
-      user_email: invite.referrer_email,
-      type:       "achievement",
-      title:      "Referral reward unlocked! 🎉",
-      body:       `${name} attended their first session. You've earned a reward — contact us to redeem.`,
-      action_url: "/dashboard",
-    });
-  } catch {}
 }
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 
 export interface ReferralStats {
   code:       string;
-  invites:    number;  // total people who claimed this code
-  successful: number;  // those who attended first session
-  rewards:    number;  // rewards earned (= successful)
+  invites:    number;  // total who used your code
+  successful: number;  // joined (reward_issued)
+  rewards:    number;  // free months earned (= successful)
   shareUrl:   string;
 }
 
@@ -150,19 +239,20 @@ export async function getReferralStats(email: string): Promise<ReferralStats> {
   const appUrl   = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
   const shareUrl = `${appUrl}/invite/${code}`;
 
-  const { data: invites } = await db
-    .from("referral_invites")
-    .select("first_session_at, rewarded_at")
+  const { data: rows } = await db
+    .from("referrals")
+    .select("status, reward_granted")
     .eq("referrer_email", key);
 
-  const rows       = invites ?? [];
-  const successful = rows.filter(r => r.first_session_at !== null).length;
+  const all        = rows ?? [];
+  const successful = all.filter(r => r.status === "reward_issued").length;
+  const freeMonths = all.filter(r => r.reward_granted === true).length;
 
   return {
     code,
-    invites:    rows.length,
+    invites:    all.length,
     successful,
-    rewards:    successful,
+    rewards:    freeMonths,
     shareUrl,
   };
 }

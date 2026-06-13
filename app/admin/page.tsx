@@ -77,6 +77,12 @@ const cards = [
     desc:  "Athlete roster, attendance tracking, cohort management, bulk messaging, and plan templates.",
     icon:  "🎯",
   },
+  {
+    href:  "/admin/referrals",
+    title: "Referrals",
+    desc:  "Track all referrals, successful conversions, rewards issued, and top referrers.",
+    icon:  "🔗",
+  },
 ];
 
 export default function AdminHub() {

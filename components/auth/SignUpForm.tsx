@@ -117,6 +117,7 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
     setSubmitting(true);
     try {
       const finalLocation = location === "Others" ? customLoc : location;
+      const referralCode  = localStorage.getItem("cs_pending_referral") ?? undefined;
       const res  = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -125,10 +126,12 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
           email, phone, password: form.password,
           goal, location: finalLocation, dob: form.dob,
           phoneVerified: false,
+          referralCode,
         }),
       });
       const data = await res.json();
       if (!res.ok) { setFormError(data.error ?? "Registration failed."); return; }
+      localStorage.removeItem("cs_pending_referral");
       localStorage.setItem("cs_pending_photo", photo ?? "");
       router.push("/auth?tab=login&registered=true");
     } catch { setFormError("Network error. Please try again."); }
