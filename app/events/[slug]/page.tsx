@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import RegisterButton from "@/components/events/RegisterButton";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -144,10 +145,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         )}
 
         {/* CTA */}
-        <Link href={`/auth?tab=register`}
-          style={{ display: "block", textAlign: "center", padding: "14px 28px", borderRadius: "10px", background: "linear-gradient(135deg,#e8620a,#f07c2a)", color: "#fff", fontWeight: 700, fontSize: "1rem", textDecoration: "none", marginBottom: "1rem" }}>
-          Register for this event
-        </Link>
+        <RegisterButton slug={ev.share_slug ?? ev.id} />
 
         <Link href="/"
           style={{ display: "block", textAlign: "center", fontSize: "0.82rem", color: "rgba(255,255,255,0.4)", textDecoration: "none" }}>

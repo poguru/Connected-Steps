@@ -159,8 +159,13 @@ function EventCard({
   const time      = fmtTime(ev.start_time);
 
   function handleRegister() {
+    const dest = `/events/${ev.share_slug ?? ev.id}`;
     const user = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
-    router.push(user ? `/auth?redirect=/events/${ev.share_slug ?? ev.id}` : `/auth?tab=register`);
+    if (user) {
+      router.push(dest);
+    } else {
+      router.push(`/auth?tab=login&redirect=${encodeURIComponent(dest)}`);
+    }
   }
 
   return (
