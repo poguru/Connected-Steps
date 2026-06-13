@@ -36,7 +36,7 @@ export default function Footer() {
             <div style={{ marginTop: "1.25rem", display: "flex", gap: 8 }}>
               {[
                 { href: INSTAGRAM_URL,                                icon: <InstagramIcon />, label: "Instagram" },
-                { href: "mailto:hello@connectedsteps.in",            icon: <Mail size={16} />,    label: "Email"     },
+                { href: "mailto:training@connectedsteps.in",         icon: <Mail size={16} />,    label: "Email"     },
                 { href: "https://wa.me/9703620570",                  icon: <WhatsAppIcon />, label: "WhatsApp"  },
               ].map(({ href, icon, label }) => (
                 <a key={label} href={href} aria-label={label} target="_blank" rel="noopener noreferrer"
@@ -100,8 +100,8 @@ export default function Footer() {
               </div>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: "0.82rem", color: "var(--muted-foreground)" }}>
                 <Mail size={14} style={{ marginTop: 2, flexShrink: 0, color: "var(--accent)" }} />
-                <a href="mailto:hello@connectedsteps.in" style={{ color: "var(--muted-foreground)", textDecoration: "none" }}>
-                  hello@connectedsteps.in
+                <a href="mailto:training@connectedsteps.in" style={{ color: "var(--muted-foreground)", textDecoration: "none" }}>
+                  training@connectedsteps.in
                 </a>
               </div>
             </div>
