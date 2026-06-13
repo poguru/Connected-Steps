@@ -14,7 +14,6 @@ import ReferralCard from "@/components/dashboard/ReferralCard";
 import TrainingPlan from "@/components/dashboard/TrainingPlan";
 import AskCoachFab from "@/components/ui/AskCoachFab";
 import DashboardHero from "@/components/dashboard/DashboardHero";
-import PhoneVerifyBanner from "@/components/auth/PhoneVerifyBanner";
 import SessionPhotos from "@/components/dashboard/SessionPhotos";
 import FollowerFeed from "@/components/dashboard/FollowerFeed";
 import PeopleYouMayKnow from "@/components/dashboard/PeopleYouMayKnow";
@@ -769,9 +768,6 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-
-          {/* ── Phone verification banner (shown until user verifies mobile) ── */}
-          <PhoneVerifyBanner />
 
           {/* ── 1. Hero ── */}
           <DashboardHero

@@ -71,12 +71,7 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
     localStorage.setItem("cs_user", JSON.stringify(userData));
     if (userToken)  localStorage.setItem("cs_user_token",   userToken  as string);
     if (coachToken) localStorage.setItem("cs_coach_token",  coachToken as string);
-    // Signal to the dashboard to show the phone verification banner
-    if (requiresPhoneVerification) {
-      localStorage.setItem("cs_requires_phone_verification", "true");
-    } else {
-      localStorage.removeItem("cs_requires_phone_verification");
-    }
+    localStorage.removeItem("cs_requires_phone_verification");
     localStorage.removeItem("cs_pending_photo");
     const savedStrava = localStorage.getItem(`cs_strava_${user.email}`);
     if (savedStrava) localStorage.setItem("cs_strava", savedStrava);

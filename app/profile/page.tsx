@@ -173,7 +173,6 @@ export default function ProfilePage() {
       // Update localStorage and local state
       const updated = { ...user, phone: trimmed, phone_verified: true };
       localStorage.setItem("cs_user", JSON.stringify(updated));
-      localStorage.removeItem("cs_requires_phone_verification");
       setUser(updated);
       setPhoneVerified(true);
       setCurrentPhone(trimmed);
