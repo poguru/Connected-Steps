@@ -81,26 +81,33 @@ export default function TrainingPlansAdmin() {
   const [saveMsg,       setSaveMsg]      = useState("");
   const [errors,        setErrors]       = useState<boolean[]>(Array(7).fill(false));
 
-  const headers = { "x-admin-password": password, "Content-Type": "application/json" };
+  const headers = { "Content-Type": "application/json" };
 
   const monday    = getMonday(weekOffset);
   const weekRange = formatWeekRange(monday);
 
   const login = () => {
     if (!password) return;
-    fetch("/api/admin/training-plans", { headers: { "x-admin-password": password } })
+    fetch("/api/admin/auth", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    })
       .then((r) => { if (r.ok) { setAuthed(true); setAuthErr(""); } else setAuthErr("Wrong password."); })
       .catch(() => setAuthErr("Network error."));
   };
 
+  useEffect(() => {
+    fetch("/api/admin/auth").then(r => { if (r.ok) setAuthed(true); }).catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const loadUsers = useCallback(() => {
-    fetch("/api/admin/users", { headers }).then((r) => r.json()).then((d) => setUsers(d.users ?? [])).catch(() => {});
-  }, [password]); // eslint-disable-line react-hooks/exhaustive-deps
+    fetch("/api/admin/users").then((r) => r.json()).then((d) => setUsers(d.users ?? [])).catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadPlans = useCallback(() => {
-    fetch("/api/admin/training-plans", { headers: { "x-admin-password": password } })
+    fetch("/api/admin/training-plans")
       .then((r) => r.json()).then((d) => setPlans(d.plans ?? [])).catch(() => {});
-  }, [password]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (authed) { loadUsers(); loadPlans(); } }, [authed]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -110,7 +117,6 @@ export default function TrainingPlansAdmin() {
     setSaveMsg("");
     setErrors(Array(7).fill(false));
     fetch(`/api/user/training-plan?email=${encodeURIComponent(u.email)}`, {
-      headers: { "x-admin-password": password },
     })
       .then((r) => r.json())
       .then((d) => {

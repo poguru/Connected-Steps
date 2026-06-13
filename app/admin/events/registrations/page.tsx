@@ -39,28 +39,37 @@ export default function AdminRegistrationsPage() {
   const [search,  setSearch]  = useState("");
   const [filter,  setFilter]  = useState<"all" | "paid" | "free" | "pending">("all");
 
-  const headers = { "Content-Type": "application/json", "x-admin-password": password };
+  const headers = { "Content-Type": "application/json" };
+
+  async function load() {
+    setLoading(true); setAuthErr("");
+    try {
+      const res = await fetch("/api/admin/events/registrations");
+      const json = await res.json();
+      if (!res.ok) { setAuthErr(json.error ?? "Failed to load"); return; }
+      setRegs(json.registrations ?? []);
+      setSummary(json.summary ?? null);
+    } catch { setAuthErr("Network error."); }
+    finally { setLoading(false); }
+  }
 
   async function login(e: React.SyntheticEvent) {
     e.preventDefault(); setLoading(true); setAuthErr("");
-    const res = await fetch("/api/admin/events/registrations", { headers: { "x-admin-password": password } });
-    if (res.status === 401) { setAuthErr("Incorrect password."); setLoading(false); return; }
-    const json = await res.json();
-    setRegs(json.registrations ?? []);
-    setSummary(json.summary ?? null);
-    localStorage.setItem("cs_admin_pw", password);
-    setAuthed(true); setLoading(false);
+    try {
+      const res = await fetch("/api/admin/auth", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) { setAuthErr("Incorrect password."); return; }
+      setAuthed(true);
+    } catch { setAuthErr("Network error."); }
+    finally { setLoading(false); }
   }
 
   useEffect(() => {
-    const s = localStorage.getItem("cs_admin_pw");
-    if (!s) return;
-    setPassword(s);
-    fetch("/api/admin/events/registrations", { headers: { "x-admin-password": s } })
-      .then(r => r.json())
-      .then(j => { if (j.registrations) { setRegs(j.registrations); setSummary(j.summary); setAuthed(true); } })
-      .catch(() => {});
-  }, []);
+    fetch("/api/admin/auth").then(r => { if (r.ok) setAuthed(true); }).catch(() => {});
+  }, []); // eslint-disable-line
+  useEffect(() => { if (authed) load(); }, [authed]); // eslint-disable-line
 
   async function cancel(id: string) {
     if (!confirm("Cancel this registration?")) return;

@@ -56,19 +56,27 @@ export default function AdminMembershipPage() {
   const [search,   setSearch]   = useState("");
   const [error,    setError]    = useState("");
 
-  async function load(password: string) {
-    setLoading(true);
-    setError("");
+  async function login(password: string) {
+    setLoading(true); setError("");
     try {
-      const res = await fetch("/api/admin/memberships", {
-        headers: { "x-admin-password": password },
+      const res = await fetch("/api/admin/auth", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
       });
+      if (!res.ok) { setError("Incorrect password."); return; }
+      setAuthed(true);
+    } catch { setError("Network error."); }
+    finally { setLoading(false); }
+  }
+
+  async function load() {
+    setLoading(true); setError("");
+    try {
+      const res = await fetch("/api/admin/memberships");
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Failed to load"); return; }
       setMembers(data.memberships);
       setStats(data.stats);
-      localStorage.setItem("cs_admin_pw", password);
-      setAuthed(true);
     } catch {
       setError("Something went wrong.");
     } finally {
@@ -76,8 +84,11 @@ export default function AdminMembershipPage() {
     }
   }
 
+  useEffect(() => {
+    fetch("/api/admin/auth").then(r => { if (r.ok) setAuthed(true); }).catch(() => {});
+  }, []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { const s = localStorage.getItem("cs_admin_pw"); if (s) load(s); }, []);
+  useEffect(() => { if (authed) load(); }, [authed]);
 
   const filtered = useMemo(() => {
     let list = members;
@@ -105,12 +116,12 @@ export default function AdminMembershipPage() {
             placeholder="Admin password"
             value={pw}
             onChange={(e) => setPw(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && load(pw)}
+            onKeyDown={(e) => e.key === "Enter" && login(pw)}
             style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "#fff", fontSize: "0.875rem", outline: "none", boxSizing: "border-box", marginBottom: "0.75rem", fontFamily: "inherit" }}
           />
           {error && <div style={{ fontSize: "0.8rem", color: "#f09595", marginBottom: "0.75rem" }}>{error}</div>}
           <button
-            onClick={() => load(pw)}
+            onClick={() => login(pw)}
             disabled={loading}
             style={{ width: "100%", padding: "10px", background: "#e8620a", color: "#fff", border: "none", borderRadius: "6px", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
           >
@@ -134,7 +145,7 @@ export default function AdminMembershipPage() {
           <span style={{ fontSize: "0.95rem", fontWeight: 600, color: "#fff" }}>Memberships</span>
         </div>
         <button
-          onClick={() => load(pw)}
+          onClick={() => load()}
           style={{ fontSize: "0.75rem", color: "#888", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", padding: "4px 12px", cursor: "pointer", fontFamily: "inherit" }}
         >
           Refresh

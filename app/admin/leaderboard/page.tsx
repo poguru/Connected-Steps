@@ -68,21 +68,19 @@ export default function AdminLeaderboardPage() {
   const [recalculating,setRecalculating]= useState(false);
   const [recalcMsg,    setRecalcMsg]    = useState("");
 
-  const headers = { "Content-Type": "application/json", "x-admin-password": password };
+  const headers = { "Content-Type": "application/json" };
 
   const login = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setAuthLoad(true); setAuthErr("");
     try {
-      const res  = await fetch("/api/admin/leaderboard/archive", { headers: { "x-admin-password": password } });
-      const json = await res.json();
-      if (res.status === 401) { setAuthErr("Incorrect password."); return; }
-      if (!res.ok) { setAuthErr(json.error ?? "Server error."); return; }
-      setLive(json.live ?? []);
-      setArchives(json.archives ?? []);
-      localStorage.setItem("cs_admin_pw", password);
+      const res = await fetch("/api/admin/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) { setAuthErr("Incorrect password."); return; }
       setAuthed(true);
-      if (json.archives?.length > 0) setExpanded(json.archives[0].month);
     } catch {
       setAuthErr("Network error. Try again.");
     } finally {
@@ -91,27 +89,19 @@ export default function AdminLeaderboardPage() {
   };
 
   useEffect(() => {
-    const s = localStorage.getItem("cs_admin_pw");
-    if (!s) return;
-    setPassword(s);
-    fetch("/api/admin/leaderboard/archive", { headers: { "x-admin-password": s } })
-      .then((r) => r.json())
-      .then((j) => {
-        if (j.live) {
-          setLive(j.live); setArchives(j.archives ?? []);
-          if (j.archives?.length > 0) setExpanded(j.archives[0].month);
-          setAuthed(true);
-        } else localStorage.removeItem("cs_admin_pw");
-      })
-      .catch(() => localStorage.removeItem("cs_admin_pw"));
+    fetch("/api/admin/auth")
+      .then(r => { if (r.ok) setAuthed(true); })
+      .catch(() => {});
   }, []); // eslint-disable-line
+
+  useEffect(() => { if (authed) reload(); }, [authed]); // eslint-disable-line
 
   const reload = useCallback(async () => {
     const res  = await fetch("/api/admin/leaderboard/archive", { headers });
     const json = await res.json();
     if (json.live)     setLive(json.live);
-    if (json.archives) setArchives(json.archives);
-  }, [password]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (json.archives) { setArchives(json.archives); if (json.archives.length > 0) setExpanded(json.archives[0].month); }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const recalculate = async () => {
     setRecalculating(true); setRecalcMsg("");

@@ -51,25 +51,13 @@ export default function AdminRunsPage() {
 
   const login = async (e: React.SyntheticEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setAuthError("");
+    setLoading(true); setAuthError("");
     try {
-      const res = await fetch("/api/admin/runs", {
-        headers: { "x-admin-password": password },
+      const res = await fetch("/api/admin/auth", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
       });
-      if (res.status === 401) {
-        setAuthError("Incorrect password.");
-        setLoading(false);
-        return;
-      }
-      const json = await res.json();
-      if (!res.ok) {
-        setAuthError(json.error ?? "Server error. Please try again.");
-        setLoading(false);
-        return;
-      }
-      setData(json.data ?? []);
-      localStorage.setItem("cs_admin_pw", password);
+      if (!res.ok) { setAuthError("Incorrect password."); return; }
       setAuthed(true);
     } catch {
       setAuthError("Network error. Check your connection and try again.");
@@ -79,14 +67,16 @@ export default function AdminRunsPage() {
   };
 
   useEffect(() => {
-    const s = localStorage.getItem("cs_admin_pw");
-    if (!s) return;
-    setPassword(s);
-    fetch("/api/admin/runs", { headers: { "x-admin-password": s } })
-      .then((r) => r.json())
-      .then((j) => { if (j.data) { setData(j.data); setAuthed(true); } else localStorage.removeItem("cs_admin_pw"); })
-      .catch(() => localStorage.removeItem("cs_admin_pw"));
+    fetch("/api/admin/auth").then(r => { if (r.ok) setAuthed(true); }).catch(() => {});
   }, []); // eslint-disable-line
+
+  useEffect(() => {
+    if (!authed) return;
+    fetch("/api/admin/runs")
+      .then(r => r.json())
+      .then(j => { if (j.data) setData(j.data); })
+      .catch(() => {});
+  }, [authed]); // eslint-disable-line
 
   const eventDates = useMemo(() => {
     const dates = [...new Set(data.map((r) => r.event_date))].sort((a, b) =>

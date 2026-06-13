@@ -26,28 +26,42 @@ export default function AdminStoriesPage() {
   const [error,   setError]   = useState("");
   const [acting,  setActing]  = useState<number | null>(null);
 
-  async function load(password: string) {
+  async function login(password: string) {
     setLoading(true); setError("");
     try {
-      const res  = await fetch("/api/admin/stories", { headers: { "x-admin-password": password } });
+      const res = await fetch("/api/admin/auth", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) { setError("Incorrect password."); return; }
+      setAuthed(true);
+    } catch { setError("Network error."); }
+    finally { setLoading(false); }
+  }
+
+  async function load() {
+    setLoading(true); setError("");
+    try {
+      const res  = await fetch("/api/admin/stories");
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Failed"); return; }
       setStories(data.stories);
-      localStorage.setItem("cs_admin_pw", password);
-      setAuthed(true);
     } catch { setError("Something went wrong."); }
     finally { setLoading(false); }
   }
 
+  useEffect(() => {
+    fetch("/api/admin/auth").then(r => { if (r.ok) setAuthed(true); }).catch(() => {});
+  }, []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { const s = localStorage.getItem("cs_admin_pw"); if (s) load(s); }, []);
+  useEffect(() => { if (authed) load(); }, [authed]);
 
-  async function act(id: number, action: "approve" | "reject", password: string) {
+  async function act(id: number, action: "approve" | "reject") {
     setActing(id);
     try {
       await fetch("/api/admin/stories", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-admin-password": password },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, action }),
       });
       setStories((prev) =>
@@ -64,10 +78,10 @@ export default function AdminStoriesPage() {
         <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "2rem", width: "320px" }}>
           <div style={{ fontSize: "1rem", fontWeight: 600, color: "#fff", marginBottom: "1.25rem" }}>Admin — Stories</div>
           <input type="password" placeholder="Admin password" value={pw}
-            onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && load(pw)}
+            onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && login(pw)}
             style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "#fff", fontSize: "0.875rem", outline: "none", boxSizing: "border-box", marginBottom: "0.75rem", fontFamily: "inherit" }} />
           {error && <div style={{ fontSize: "0.8rem", color: "#f09595", marginBottom: "0.75rem" }}>{error}</div>}
-          <button onClick={() => load(pw)} disabled={loading}
+          <button onClick={() => login(pw)} disabled={loading}
             style={{ width: "100%", padding: "10px", background: "#e8620a", color: "#fff", border: "none", borderRadius: "6px", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
             {loading ? "Loading…" : "Access"}
           </button>
@@ -89,7 +103,7 @@ export default function AdminStoriesPage() {
         </div>
         <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
           <span style={{ fontSize: "0.78rem", color: "#555" }}>{pending.length} pending · {approved.length} live</span>
-          <button onClick={() => load(pw)} style={{ fontSize: "0.75rem", color: "#888", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", padding: "4px 12px", cursor: "pointer", fontFamily: "inherit" }}>Refresh</button>
+          <button onClick={() => load()} style={{ fontSize: "0.75rem", color: "#888", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", padding: "4px 12px", cursor: "pointer", fontFamily: "inherit" }}>Refresh</button>
         </div>
       </header>
 
@@ -117,14 +131,14 @@ export default function AdminStoriesPage() {
                     </div>
                     <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
                       <button
-                        onClick={() => act(s.id, "approve", pw)}
+                        onClick={() => act(s.id, "approve")}
                         disabled={acting === s.id}
                         style={{ padding: "7px 16px", background: "#4ade80", color: "#000", border: "none", borderRadius: "6px", fontSize: "0.8rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
                       >
                         {acting === s.id ? "…" : "Approve"}
                       </button>
                       <button
-                        onClick={() => act(s.id, "reject", pw)}
+                        onClick={() => act(s.id, "reject")}
                         disabled={acting === s.id}
                         style={{ padding: "7px 16px", background: "transparent", color: "#f09595", border: "1px solid rgba(240,149,149,0.3)", borderRadius: "6px", fontSize: "0.8rem", cursor: "pointer", fontFamily: "inherit" }}
                       >
@@ -158,7 +172,7 @@ export default function AdminStoriesPage() {
                     <div style={{ fontSize: "11px", color: "#555", marginTop: "0.5rem" }}>{s.user_email} · {fmtDate(s.created_at)}</div>
                   </div>
                   <button
-                    onClick={() => act(s.id, "reject", pw)}
+                    onClick={() => act(s.id, "reject")}
                     disabled={acting === s.id}
                     style={{ padding: "6px 14px", background: "transparent", color: "#555", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", fontSize: "0.78rem", cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}
                   >

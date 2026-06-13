@@ -97,19 +97,19 @@ export default function AdminHub() {
   const [error,  setError]  = useState("");
 
   useEffect(() => {
-    const stored = localStorage.getItem("cs_admin_pw");
-    if (stored) verify(stored);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetch("/api/admin/auth").then(r => { if (r.ok) setAuthed(true); }).catch(() => {});
   }, []);
 
   async function verify(password: string) {
-    const res = await fetch("/api/admin/sessions", { headers: { "x-admin-password": password } });
-    if (res.ok || res.status === 200) {
-      localStorage.setItem("cs_admin_pw", password);
+    const res = await fetch("/api/admin/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+    if (res.ok) {
       setAuthed(true);
     } else {
       setError("Incorrect password.");
-      localStorage.removeItem("cs_admin_pw");
     }
   }
 

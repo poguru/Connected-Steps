@@ -59,11 +59,10 @@ function fmtDate(iso: string | null) {
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
 
-// Credential is either a raw admin password or "__token__<coachToken>"
+// Credential is either "" (admin session cookie) or "__token__<coachToken>"
 function makeAuthHeaders(credential: string): Record<string, string> {
-  return credential.startsWith("__token__")
-    ? { "x-coach-token": credential.slice(9) }
-    : { "x-admin-password": credential };
+  if (credential.startsWith("__token__")) return { "x-coach-token": credential.slice(9) };
+  return {}; // admin session cookie sent automatically
 }
 
 function emptyDays() {
@@ -72,28 +71,41 @@ function emptyDays() {
 
 // ── Auth gate ─────────────────────────────────────────────────────────────────
 
-function AuthGate({ onAuth }: { onAuth: (pw: string) => void }) {
+function AuthGate({ onAuth }: { onAuth: (credential: string) => void }) {
   const [pw, setPw]     = useState("");
   const [err, setErr]   = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function verify(credential: string) {
-    if (!credential) return;
+  async function verifyCoach(credential: string) {
     setBusy(true); setErr("");
     const res = await fetch("/api/admin/coach-ops/athletes", { headers: makeAuthHeaders(credential) });
-    if (res.ok) { localStorage.setItem("cs_admin_pw", credential); onAuth(credential); }
-    else { setErr("Incorrect password."); localStorage.removeItem("cs_admin_pw"); }
     setBusy(false);
+    if (res.ok) onAuth(credential);
+    else setErr("Coach token is invalid or expired.");
+  }
+
+  async function loginAdmin() {
+    if (!pw) return;
+    setBusy(true); setErr("");
+    const res = await fetch("/api/admin/auth", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: pw }),
+    });
+    setBusy(false);
+    if (res.ok) onAuth("");
+    else setErr("Incorrect password.");
   }
 
   useEffect(() => {
-    const saved = localStorage.getItem("cs_admin_pw");
-    if (saved) { verify(saved); return; }
-    // Auto-login coaches who are already signed in
-    try {
-      const user = JSON.parse(localStorage.getItem("cs_user") ?? "{}");
-      if (user.coachToken) verify(`__token__${user.coachToken}`);
-    } catch {}
+    // Check admin session cookie first
+    fetch("/api/admin/auth").then(r => {
+      if (r.ok) { onAuth(""); return; }
+      // Not an admin — try coach token from user session
+      try {
+        const user = JSON.parse(localStorage.getItem("cs_user") ?? "{}");
+        if (user.coachToken) verifyCoach(`__token__${user.coachToken}`);
+      } catch {}
+    }).catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
@@ -108,10 +120,10 @@ function AuthGate({ onAuth }: { onAuth: (pw: string) => void }) {
         </div>
         <input type="password" placeholder="Admin password" value={pw}
           onChange={e => { setPw(e.target.value); setErr(""); }}
-          onKeyDown={e => e.key === "Enter" && verify(pw)}
+          onKeyDown={e => e.key === "Enter" && loginAdmin()}
           style={{ ...S.inp, marginBottom: "0.75rem" }} />
         {err && <div style={{ fontSize: "0.8rem", color: "#f09595", marginBottom: "0.75rem" }}>{err}</div>}
-        <button onClick={() => verify(pw)} disabled={busy} style={{ ...S.btn(), width: "100%", padding: "10px" }}>
+        <button onClick={loginAdmin} disabled={busy} style={{ ...S.btn(), width: "100%", padding: "10px" }}>
           {busy ? "Checking…" : "Access Dashboard"}
         </button>
         <Link href="/admin" style={{ display: "block", textAlign: "center", marginTop: "1rem", fontSize: "0.75rem", color: "#555", textDecoration: "none" }}>← Back to admin</Link>
@@ -282,7 +294,7 @@ export default function CoachOpsDashboard() {
   }
 
   async function loadCohortMembers(id: string) {
-    const res  = await fetch(`/api/admin/cohorts/${id}`, { headers: { "x-admin-password": pw } });
+    const res  = await fetch(`/api/admin/cohorts/${id}`, { headers: h(pw) });
     const data = await res.json().catch(() => ({}));
     setCohMembers(data.members ?? []);
   }

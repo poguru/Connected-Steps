@@ -73,40 +73,38 @@ export default function AdminSessionsPage() {
   const [addMsg,      setAddMsg]      = useState("");
   const [adding,      setAdding]      = useState(false);
 
-  const headers = { "Content-Type": "application/json", "x-admin-password": password };
+  const headers = { "Content-Type": "application/json" };
 
   /* ── Auth ── */
   const login = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setAuthLoad(true); setAuthErr("");
     try {
-      const res  = await fetch("/api/admin/sessions", { headers: { "x-admin-password": password } });
-      const json = await res.json();
-      if (res.status === 401) { setAuthErr("Incorrect password."); return; }
-      if (!res.ok)            { setAuthErr(json.error ?? "Server error."); return; }
-      setSessions(json.data ?? []);
-      localStorage.setItem("cs_admin_pw", password);
+      const res = await fetch("/api/admin/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) { setAuthErr("Incorrect password."); return; }
       setAuthed(true);
     } catch { setAuthErr("Network error."); }
     finally  { setAuthLoad(false); }
   };
 
   useEffect(() => {
-    const s = localStorage.getItem("cs_admin_pw");
-    if (!s) return;
-    setPassword(s);
-    fetch("/api/admin/sessions", { headers: { "x-admin-password": s } })
-      .then((r) => r.json())
-      .then((j) => { if (j.data) { setSessions(j.data); setAuthed(true); } else localStorage.removeItem("cs_admin_pw"); })
-      .catch(() => localStorage.removeItem("cs_admin_pw"));
+    fetch("/api/admin/auth")
+      .then(r => { if (r.ok) setAuthed(true); })
+      .catch(() => {});
   }, []); // eslint-disable-line
+
+  useEffect(() => { if (authed) loadSessions(); }, [authed]); // eslint-disable-line
 
   /* ── Load sessions ── */
   const loadSessions = useCallback(async () => {
-    const res  = await fetch("/api/admin/sessions", { headers: { "x-admin-password": password } });
+    const res  = await fetch("/api/admin/sessions", { headers });
     const json = await res.json();
     setSessions(json.data ?? []);
-  }, [password]);
+  }, []);
 
   /* ── Create session ── */
   const createSession = async (e: React.SyntheticEvent) => {
@@ -213,7 +211,7 @@ export default function AdminSessionsPage() {
   const openSession = async (s: Session) => {
     setSelected(s); setAttendees([]); setSaveMsg(""); setLastSavedAt(null);
     setSessionLoad(true);
-    const res  = await fetch(`/api/admin/sessions/${s.id}/attendance`, { headers: { "x-admin-password": password } });
+    const res  = await fetch(`/api/admin/sessions/${s.id}/attendance`, { headers });
     const json = await res.json();
     setAttendees(json.users ?? []);
     setSessionLoad(false);
@@ -280,7 +278,7 @@ export default function AdminSessionsPage() {
     setPhotoUploading(true); setPhotoMsg("");
     const form = new FormData();
     form.append("photo", photoFile);
-    const res  = await fetch(`/api/admin/sessions/${selected.id}/photo`, { method: "POST", headers: { "x-admin-password": password }, body: form });
+    const res  = await fetch(`/api/admin/sessions/${selected.id}/photo`, { method: "POST", body: form });
     const json = await res.json();
     if (res.ok) {
       setPhotoMsg("Photo uploaded!");

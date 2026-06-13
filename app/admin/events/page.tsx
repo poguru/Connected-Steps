@@ -76,17 +76,19 @@ export default function AdminEventsPage() {
   // Coupon form
   const [cf, setCf] = useState({ type: "shared", code: "", prefix: "CS", emails: "", description: "", discount_type: "percentage", discount_value: "", max_uses: "999", event_id: "", expires_at: "" });
 
-  const headers = { "Content-Type": "application/json", "x-admin-password": password };
+  const headers = { "Content-Type": "application/json" };
 
   async function login(e: React.SyntheticEvent) {
     e.preventDefault(); setLoading(true); setAuthErr("");
-    const res = await fetch("/api/admin/events", { headers: { "x-admin-password": password } });
-    if (res.status === 401) { setAuthErr("Incorrect password."); setLoading(false); return; }
-    const json = await res.json();
-    setEvents(json.data ?? []);
-    localStorage.setItem("cs_admin_pw", password);
-    setAuthed(true); setLoading(false);
-    loadCoupons();
+    try {
+      const res = await fetch("/api/admin/auth", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) { setAuthErr("Incorrect password."); return; }
+      setAuthed(true);
+    } catch { setAuthErr("Network error."); }
+    finally { setLoading(false); }
   }
 
   async function loadEvents() {
@@ -100,20 +102,9 @@ export default function AdminEventsPage() {
 
   useEffect(() => { if (authed && tab === "coupons") loadCoupons(); }, [tab]); // eslint-disable-line
   useEffect(() => {
-    const s = localStorage.getItem("cs_admin_pw");
-    if (!s) return;
-    setPassword(s);
-    fetch("/api/admin/events", { headers: { "x-admin-password": s } })
-      .then(r => r.json())
-      .then(j => {
-        if (j.data) {
-          setEvents(j.data); setAuthed(true);
-          fetch("/api/admin/coupons", { headers: { "Content-Type": "application/json", "x-admin-password": s } })
-            .then(r => r.json()).then(c => setCoupons(c.data ?? []));
-        } else localStorage.removeItem("cs_admin_pw");
-      })
-      .catch(() => localStorage.removeItem("cs_admin_pw"));
+    fetch("/api/admin/auth").then(r => { if (r.ok) setAuthed(true); }).catch(() => {});
   }, []); // eslint-disable-line
+  useEffect(() => { if (authed) loadEvents(); }, [authed]); // eslint-disable-line
 
   async function createEvent(e: React.SyntheticEvent) {
     e.preventDefault(); setLoading(true); setMsg("");

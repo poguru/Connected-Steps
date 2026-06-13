@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 function genCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -16,6 +17,12 @@ function calcDiscount(price: number, type: string, value: number): number {
 
 export async function POST(req: NextRequest) {
   try {
+    // Require a valid user session token
+    const token = req.headers.get("x-user-token");
+    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const tokenEmail = verifyUserToken(token);
+    if (!tokenEmail) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const {
       event_id, email, name, phone, gender, date_of_birth,
       blood_group, emergency_contact, special_notes, coupon_code,
@@ -23,6 +30,11 @@ export async function POST(req: NextRequest) {
 
     if (!event_id || !email || !name) {
       return NextResponse.json({ error: "event_id, email, and name are required." }, { status: 400 });
+    }
+
+    // Ensure the caller can only register for their own email
+    if (tokenEmail.toLowerCase() !== email.toLowerCase().trim()) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
     // Backend field validation

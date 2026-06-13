@@ -54,29 +54,42 @@ export default function AdminUsersPage() {
   const [goalFilter, setGoalFilter] = useState("all");
   const [toggling,  setToggling]  = useState<Record<string, boolean>>({});
 
-  const load = useCallback(async (password: string) => {
+  async function login(password: string) {
     setLoading(true); setError("");
     try {
-      const res  = await fetch("/api/admin/users", { headers: { "x-admin-password": password } });
+      const res = await fetch("/api/admin/auth", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) { setError("Incorrect password."); return; }
+      setAuthed(true);
+    } catch { setError("Network error."); }
+    finally { setLoading(false); }
+  }
+
+  const load = useCallback(async () => {
+    setLoading(true); setError("");
+    try {
+      const res  = await fetch("/api/admin/users");
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Failed"); return; }
       setUsers(data.users);
       setStats(data.stats);
-      localStorage.setItem("cs_admin_pw", password);
-      setAuthed(true);
     } catch { setError("Something went wrong."); }
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { const s = localStorage.getItem("cs_admin_pw"); if (s) load(s); }, [load]);
+  useEffect(() => {
+    fetch("/api/admin/auth").then(r => { if (r.ok) setAuthed(true); }).catch(() => {});
+  }, []);
+  useEffect(() => { if (authed) load(); }, [authed, load]);
 
   async function toggleActive(email: string, newState: boolean) {
-    const storedPw = localStorage.getItem("cs_admin_pw") ?? pw;
     setToggling((t) => ({ ...t, [email]: true }));
     try {
       const res = await fetch("/api/admin/users", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-admin-password": storedPw },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, is_active: newState }),
       });
       if (res.ok) {
@@ -114,10 +127,10 @@ export default function AdminUsersPage() {
         <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "2rem", width: "320px" }}>
           <div style={{ fontSize: "1rem", fontWeight: 600, color: "#fff", marginBottom: "1.25rem" }}>Admin — Users</div>
           <input type="password" placeholder="Admin password" value={pw}
-            onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && load(pw)}
+            onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && login(pw)}
             style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "#fff", fontSize: "0.875rem", outline: "none", boxSizing: "border-box", marginBottom: "0.75rem", fontFamily: "inherit" }} />
           {error && <div style={{ fontSize: "0.8rem", color: "#f09595", marginBottom: "0.75rem" }}>{error}</div>}
-          <button onClick={() => load(pw)} disabled={loading}
+          <button onClick={() => login(pw)} disabled={loading}
             style={{ width: "100%", padding: "10px", background: "#e8620a", color: "#fff", border: "none", borderRadius: "6px", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
             {loading ? "Loading…" : "Access"}
           </button>
@@ -134,7 +147,7 @@ export default function AdminUsersPage() {
           <Link href="/admin"><Image src="/logo.png" alt="" width={28} height={28} className="rounded-full" /></Link>
           <span style={{ fontSize: "0.95rem", fontWeight: 600 }}>Users</span>
         </div>
-        <button onClick={() => load(pw)} style={{ fontSize: "0.75rem", color: "#888", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", padding: "4px 12px", cursor: "pointer", fontFamily: "inherit" }}>Refresh</button>
+        <button onClick={() => load()} style={{ fontSize: "0.75rem", color: "#888", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", padding: "4px 12px", cursor: "pointer", fontFamily: "inherit" }}>Refresh</button>
       </header>
 
       <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "2rem 1.5rem" }}>

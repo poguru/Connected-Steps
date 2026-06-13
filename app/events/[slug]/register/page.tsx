@@ -209,7 +209,7 @@ export default function RegisterPage() {
     try {
       const res  = await fetch("/api/events/register", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-user-token": userToken },
         body: JSON.stringify({
           event_id:          ev.id,
           email:             form.email,

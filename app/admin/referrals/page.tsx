@@ -50,21 +50,34 @@ export default function AdminReferralsPage() {
   const [search,      setSearch]      = useState("");
 
   useEffect(() => {
-    const stored = localStorage.getItem("cs_admin_pw");
-    if (stored) load(stored);
+    fetch("/api/admin/auth").then(r => { if (r.ok) setAuthed(true); }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function load(password: string) {
+  useEffect(() => { if (authed) load(); }, [authed]); // eslint-disable-line
+
+  async function login(password: string) {
+    setLoading(true); setAuthError("");
+    try {
+      const res = await fetch("/api/admin/auth", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) { setAuthError("Incorrect password."); return; }
+      setAuthed(true);
+    } catch { setAuthError("Network error."); }
+    finally { setLoading(false); }
+  }
+
+  async function load() {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/referrals", { headers: { "x-admin-password": password } });
-      if (!res.ok) { setAuthError("Incorrect password."); return; }
+      const res = await fetch("/api/admin/referrals");
+      if (!res.ok) { setAuthError("Failed to load."); return; }
       const d = await res.json();
       setSummary(d.summary);
       setReferrals(d.referrals ?? []);
       setTopRefs(d.topReferrers ?? []);
-      setAuthed(true);
     } catch { setAuthError("Failed to load data."); }
     finally { setLoading(false); }
   }
@@ -88,11 +101,11 @@ export default function AdminReferralsPage() {
         </div>
         <input type="password" placeholder="Admin password" value={pw}
           onChange={e => { setPw(e.target.value); setAuthError(""); }}
-          onKeyDown={e => e.key === "Enter" && load(pw)}
+          onKeyDown={e => e.key === "Enter" && login(pw)}
           style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#fff", fontSize: "0.875rem", outline: "none", boxSizing: "border-box", marginBottom: "0.75rem", fontFamily: "inherit" }}
         />
         {authError && <div style={{ fontSize: "0.8rem", color: "#f09595", marginBottom: "0.75rem" }}>{authError}</div>}
-        <button onClick={() => load(pw)} disabled={loading}
+        <button onClick={() => login(pw)} disabled={loading}
           style={{ width: "100%", padding: 10, background: "#e8620a", color: "#fff", border: "none", borderRadius: 6, fontSize: "0.875rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
           {loading ? "Loading…" : "Access Admin"}
         </button>
