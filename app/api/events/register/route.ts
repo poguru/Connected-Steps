@@ -25,6 +25,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "event_id, email, and name are required." }, { status: 400 });
     }
 
+    // Backend field validation
+    const errs: string[] = [];
+    if (!name || name.trim().length < 3)           errs.push("Full name must be at least 3 characters.");
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.push("Valid email is required.");
+    if (!phone || !/^\d{10}$/.test(phone.replace(/\s/g, ""))) errs.push("Phone must be exactly 10 digits.");
+    if (!gender)                                    errs.push("Gender is required.");
+    if (!date_of_birth)                             errs.push("Date of birth is required.");
+    if (date_of_birth && new Date(date_of_birth) >= new Date()) errs.push("Date of birth must be in the past.");
+    if (!blood_group)                               errs.push("Blood group is required.");
+    if (!emergency_contact)                         errs.push("Emergency contact is required.");
+    if (!special_notes || !special_notes.trim())    errs.push("Special notes are required (enter NA if none).");
+    if (errs.length > 0) return NextResponse.json({ error: errs[0] }, { status: 400 });
+
     const db = getSupabaseServer();
 
     // ── Verify user ────────────────────────────────────────────────────────────
@@ -64,9 +77,11 @@ export async function POST(req: NextRequest) {
       .eq("event_id", event_id)
       .eq("user_email", email.toLowerCase().trim())
       .maybeSingle();
-    if (existing && existing.payment_status !== "failed") {
+    // If already confirmed (free or paid), return existing code
+    if (existing && (existing.payment_status === "free" || existing.payment_status === "paid")) {
       return NextResponse.json({ already: true, registration_code: existing.registration_code });
     }
+    // If pending payment, allow them to re-attempt payment (fall through to paid flow below)
 
     // ── Coupon validation ──────────────────────────────────────────────────────
     let couponId: string | null = null;
@@ -154,7 +169,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, free: true, registration_code: reg?.registration_code ?? code });
     }
 
-    // ── Paid event: create pending registration, caller creates Razorpay order ─
+    // ── Paid event: create pending_payment registration, caller creates Razorpay order ─
+    // status = "pending_payment" so slot count (which only counts "confirmed") is not affected
+    // until payment succeeds and verify-payment sets status = "confirmed"
     const code = existing?.registration_code ?? genCode();
     const { error: regErr2 } = await db
       .from("event_registrations")
@@ -175,7 +192,7 @@ export async function POST(req: NextRequest) {
         original_price:    originalPrice,
         final_price:       finalPrice,
         payment_status:    "pending",
-        status:            "confirmed",
+        status:            "pending_payment",
       }, { onConflict: "event_id,user_email", ignoreDuplicates: false });
 
     if (regErr2) return NextResponse.json({ error: regErr2.message }, { status: 500 });

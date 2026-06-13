@@ -78,8 +78,12 @@ export default function RegisterPage() {
   const [form, setForm] = useState({
     name: "", email: "", phone: "",
     gender: "", date_of_birth: "",
-    blood_group: "", emergency_contact: "", special_notes: "",
+    blood_group: "",
+    emergency_contact_name: "", emergency_contact_phone: "",
+    special_notes: "",
   });
+  const [errors,        setErrors]        = useState<Record<string, string>>({});
+  const [submitted,     setSubmitted]     = useState(false);
   const [coupon,        setCoupon]        = useState("");
   const [couponApplied, setCouponApplied] = useState<{ id: string; discount: number; label: string } | null>(null);
   const [couponErr,     setCouponErr]     = useState("");
@@ -133,15 +137,35 @@ export default function RegisterPage() {
       .then(d => {
         const reg = (d.registrations ?? []).find(
           (r: { events: { id: string } | null; payment_status: string; registration_code: string }) =>
-            r.events?.id === ev.id && r.payment_status !== "failed"
+            r.events?.id === ev.id &&
+            (r.payment_status === "free" || r.payment_status === "paid")
         );
         if (reg) setAlreadyReg(reg.registration_code);
       })
       .catch(() => {});
   }, [ev, userToken]);
 
-  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-    setForm(f => ({ ...f, [k]: e.target.value }));
+  function validate(f: typeof form) {
+    const e: Record<string, string> = {};
+    if (!f.name.trim() || f.name.trim().length < 3)   e.name = "Full name must be at least 3 characters.";
+    if (!f.phone.trim() || !/^\d{10}$/.test(f.phone.replace(/\s/g, ""))) e.phone = "Phone must be exactly 10 digits.";
+    if (!f.gender)                                     e.gender = "Please select your gender.";
+    if (!f.date_of_birth)                              e.date_of_birth = "Date of birth is required.";
+    else if (new Date(f.date_of_birth) >= new Date())  e.date_of_birth = "Date of birth must be in the past.";
+    if (!f.blood_group)                                e.blood_group = "Please select your blood group.";
+    if (!f.emergency_contact_name.trim())              e.emergency_contact_name = "Emergency contact name is required.";
+    if (!f.emergency_contact_phone.trim() || !/^\d{10}$/.test(f.emergency_contact_phone.replace(/\s/g, ""))) e.emergency_contact_phone = "Emergency contact number must be 10 digits.";
+    if (!f.special_notes.trim())                       e.special_notes = "Required — enter NA if no medical conditions.";
+    return e;
+  }
+
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    setForm(f => {
+      const next = { ...f, [k]: e.target.value };
+      if (submitted) setErrors(validate(next));
+      return next;
+    });
+  };
 
   // ── Coupon validation ──────────────────────────────────────────────────────
 
@@ -171,8 +195,14 @@ export default function RegisterPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!ev) return;
-    if (!form.name.trim() || !form.email.trim()) {
-      setSubmitErr("Name and email are required."); return;
+    setSubmitted(true);
+    const errs = validate(form);
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      const firstKey = Object.keys(errs)[0];
+      const el = document.getElementById(`field-${firstKey}`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
     }
     setSubmitting(true); setSubmitErr("");
 
@@ -188,7 +218,7 @@ export default function RegisterPage() {
           gender:            form.gender,
           date_of_birth:     form.date_of_birth || null,
           blood_group:       form.blood_group,
-          emergency_contact: form.emergency_contact,
+          emergency_contact: `${form.emergency_contact_name} / ${form.emergency_contact_phone}`,
           special_notes:     form.special_notes,
           coupon_code:       couponApplied ? coupon : undefined,
         }),
@@ -325,31 +355,41 @@ export default function RegisterPage() {
           <section style={{ marginBottom: "1.5rem" }}>
             <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>Personal Details</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-              <div style={{ gridColumn: "1/-1" }}>
+
+              <div style={{ gridColumn: "1/-1" }} id="field-name">
                 <label style={LABEL}>Full Name *</label>
-                <input style={INPUT} value={form.name} onChange={set("name")} required placeholder="Your full name" />
+                <input style={{ ...INPUT, borderColor: errors.name ? "rgba(239,68,68,0.6)" : undefined }} value={form.name} onChange={set("name")} placeholder="Your full name" />
+                {errors.name && <Err>{errors.name}</Err>}
               </div>
+
               <div>
                 <label style={LABEL}>Email *</label>
                 <input style={{ ...INPUT, background: "rgba(255,255,255,0.03)", color: "rgba(255,255,255,0.5)" }} value={form.email} readOnly />
               </div>
-              <div>
-                <label style={LABEL}>Phone</label>
-                <input style={INPUT} value={form.phone} onChange={set("phone")} placeholder="+91 00000 00000" type="tel" />
+
+              <div id="field-phone">
+                <label style={LABEL}>Phone Number *</label>
+                <input style={{ ...INPUT, borderColor: errors.phone ? "rgba(239,68,68,0.6)" : undefined }} value={form.phone} onChange={set("phone")} placeholder="10-digit mobile number" type="tel" maxLength={10} />
+                {errors.phone && <Err>{errors.phone}</Err>}
               </div>
-              <div>
-                <label style={LABEL}>Gender</label>
-                <select style={{ ...INPUT, cursor: "pointer", colorScheme: "dark" }} value={form.gender} onChange={set("gender")}>
-                  <option value="" style={{ background: "#1a1a1a" }}>Select</option>
+
+              <div id="field-gender">
+                <label style={LABEL}>Gender *</label>
+                <select style={{ ...INPUT, cursor: "pointer", colorScheme: "dark", borderColor: errors.gender ? "rgba(239,68,68,0.6)" : undefined }} value={form.gender} onChange={set("gender")}>
+                  <option value="" style={{ background: "#1a1a1a" }}>Select gender</option>
                   <option value="male"   style={{ background: "#1a1a1a" }}>Male</option>
                   <option value="female" style={{ background: "#1a1a1a" }}>Female</option>
                   <option value="other"  style={{ background: "#1a1a1a" }}>Other</option>
                 </select>
+                {errors.gender && <Err>{errors.gender}</Err>}
               </div>
-              <div>
-                <label style={LABEL}>Date of Birth</label>
-                <input style={{ ...INPUT, colorScheme: "dark" }} type="date" value={form.date_of_birth} onChange={set("date_of_birth")} />
+
+              <div id="field-date_of_birth">
+                <label style={LABEL}>Date of Birth *</label>
+                <input style={{ ...INPUT, colorScheme: "dark", borderColor: errors.date_of_birth ? "rgba(239,68,68,0.6)" : undefined }} type="date" value={form.date_of_birth} onChange={set("date_of_birth")} max={new Date().toISOString().split("T")[0]} />
+                {errors.date_of_birth && <Err>{errors.date_of_birth}</Err>}
               </div>
+
             </div>
           </section>
 
@@ -357,21 +397,36 @@ export default function RegisterPage() {
           <section style={{ marginBottom: "1.5rem" }}>
             <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>Event Information</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-              <div>
-                <label style={LABEL}>Blood Group</label>
-                <select style={{ ...INPUT, cursor: "pointer", colorScheme: "dark" }} value={form.blood_group} onChange={set("blood_group")}>
-                  <option value="" style={{ background: "#1a1a1a" }}>Select</option>
+
+              <div id="field-blood_group">
+                <label style={LABEL}>Blood Group *</label>
+                <select style={{ ...INPUT, cursor: "pointer", colorScheme: "dark", borderColor: errors.blood_group ? "rgba(239,68,68,0.6)" : undefined }} value={form.blood_group} onChange={set("blood_group")}>
+                  <option value="" style={{ background: "#1a1a1a" }}>Select blood group</option>
                   {["A+","A-","B+","B-","AB+","AB-","O+","O-"].map(g => <option key={g} value={g} style={{ background: "#1a1a1a" }}>{g}</option>)}
                 </select>
+                {errors.blood_group && <Err>{errors.blood_group}</Err>}
               </div>
-              <div>
-                <label style={LABEL}>Emergency Contact</label>
-                <input style={INPUT} value={form.emergency_contact} onChange={set("emergency_contact")} placeholder="Name & phone number" />
+
+              <div /> {/* spacer */}
+
+              <div id="field-emergency_contact_name">
+                <label style={LABEL}>Emergency Contact Name *</label>
+                <input style={{ ...INPUT, borderColor: errors.emergency_contact_name ? "rgba(239,68,68,0.6)" : undefined }} value={form.emergency_contact_name} onChange={set("emergency_contact_name")} placeholder="Contact person's name" />
+                {errors.emergency_contact_name && <Err>{errors.emergency_contact_name}</Err>}
               </div>
-              <div style={{ gridColumn: "1/-1" }}>
-                <label style={LABEL}>Special Notes</label>
-                <textarea style={{ ...INPUT, minHeight: "70px", resize: "vertical" } as React.CSSProperties} value={form.special_notes} onChange={set("special_notes")} placeholder="Any medical conditions, dietary needs, or questions…" />
+
+              <div id="field-emergency_contact_phone">
+                <label style={LABEL}>Emergency Contact Number *</label>
+                <input style={{ ...INPUT, borderColor: errors.emergency_contact_phone ? "rgba(239,68,68,0.6)" : undefined }} value={form.emergency_contact_phone} onChange={set("emergency_contact_phone")} placeholder="10-digit number" type="tel" maxLength={10} />
+                {errors.emergency_contact_phone && <Err>{errors.emergency_contact_phone}</Err>}
               </div>
+
+              <div style={{ gridColumn: "1/-1" }} id="field-special_notes">
+                <label style={LABEL}>Special Notes *</label>
+                <textarea style={{ ...INPUT, minHeight: "70px", resize: "vertical", borderColor: errors.special_notes ? "rgba(239,68,68,0.6)" : undefined } as React.CSSProperties} value={form.special_notes} onChange={set("special_notes")} placeholder="Medical conditions, dietary needs, or questions. Enter NA if none." />
+                {errors.special_notes && <Err>{errors.special_notes}</Err>}
+              </div>
+
             </div>
           </section>
 
@@ -422,10 +477,15 @@ export default function RegisterPage() {
           )}
 
           {/* Submit */}
+          {submitted && Object.keys(errors).length > 0 && (
+            <div style={{ padding: "10px 14px", borderRadius: "8px", marginBottom: "1rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", fontSize: "0.82rem" }}>
+              Please fix {Object.keys(errors).length} error{Object.keys(errors).length > 1 ? "s" : ""} above before continuing.
+            </div>
+          )}
           <button
             type="submit"
-            disabled={submitting}
-            style={{ width: "100%", padding: "14px", borderRadius: "10px", background: submitting ? "rgba(232,98,10,0.5)" : "linear-gradient(135deg,#e8620a,#f07c2a)", border: "none", color: "#fff", fontWeight: 700, fontSize: "1rem", cursor: submitting ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: submitting ? "none" : "0 4px 20px rgba(232,98,10,0.35)" }}>
+            disabled={submitting || (submitted && Object.keys(errors).length > 0)}
+            style={{ width: "100%", padding: "14px", borderRadius: "10px", background: (submitting || (submitted && Object.keys(errors).length > 0)) ? "rgba(232,98,10,0.45)" : "linear-gradient(135deg,#e8620a,#f07c2a)", border: "none", color: "#fff", fontWeight: 700, fontSize: "1rem", cursor: (submitting || (submitted && Object.keys(errors).length > 0)) ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: submitting ? "none" : "0 4px 20px rgba(232,98,10,0.35)" }}>
             {submitting ? "Processing…" : final > 0 ? `Pay ₹${final} & Register` : "Complete Registration →"}
           </button>
 
@@ -436,6 +496,10 @@ export default function RegisterPage() {
       </div>
     </div>
   );
+}
+
+function Err({ children }: { children: React.ReactNode }) {
+  return <div style={{ fontSize: "0.75rem", color: "#f87171", marginTop: "4px" }}>{children}</div>;
 }
 
 function PriceLine({ label, value, muted, bold }: { label: string; value: string; muted?: boolean; bold?: boolean }) {
