@@ -86,6 +86,7 @@ export default function RegisterPage() {
   const [couponLoading, setCouponLoading] = useState(false);
   const [submitting,    setSubmitting]    = useState(false);
   const [submitErr,     setSubmitErr]     = useState("");
+  const [alreadyReg,    setAlreadyReg]    = useState<string | null>(null);
 
   // Guard: must be logged in
   const [userEmail, setUserEmail] = useState("");
@@ -112,23 +113,32 @@ export default function RegisterPage() {
     } catch { router.replace("/auth?tab=login"); }
   }, [slug, router]);
 
-  // Fetch event details
+  // Fetch event details via by-slug (returns all columns including price)
   useEffect(() => {
     if (!slug) return;
-    fetch(`/api/events/upcoming`)
+    fetch(`/api/events/by-slug?slug=${slug}`)
       .then(r => r.json())
       .then(d => {
-        // Try from upcoming list first (fastest)
-        const found = (d.events ?? []).find((e: EventInfo) => e.share_slug === slug || e.id === slug);
-        if (found) { setEv(found); setLoading(false); return; }
-        // Fallback: by-slug endpoint
-        return fetch(`/api/events/by-slug?slug=${slug}`).then(r => r.json()).then(d2 => {
-          if (d2.event) { setEv(d2.event); } else { setEvErr(true); }
-          setLoading(false);
-        });
+        if (d.event) { setEv(d.event); } else { setEvErr(true); }
+        setLoading(false);
       })
       .catch(() => { setEvErr(true); setLoading(false); });
   }, [slug]);
+
+  // Check if already registered for this event
+  useEffect(() => {
+    if (!ev || !userToken) return;
+    fetch("/api/events/my-registrations", { headers: { "x-user-token": userToken } })
+      .then(r => r.json())
+      .then(d => {
+        const reg = (d.registrations ?? []).find(
+          (r: { events: { id: string } | null; payment_status: string; registration_code: string }) =>
+            r.events?.id === ev.id && r.payment_status !== "failed"
+        );
+        if (reg) setAlreadyReg(reg.registration_code);
+      })
+      .catch(() => {});
+  }, [ev, userToken]);
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }));
@@ -296,7 +306,20 @@ export default function RegisterPage() {
 
         <h1 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1.75rem", color: "#fff" }}>Registration Form</h1>
 
-        <form onSubmit={handleSubmit} noValidate>
+        {/* Already registered banner */}
+        {alreadyReg && (
+          <div style={{ padding: "1.25rem 1.5rem", borderRadius: "12px", background: "rgba(74,222,128,0.07)", border: "1px solid rgba(74,222,128,0.3)", marginBottom: "1.5rem", textAlign: "center" }}>
+            <div style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>✅</div>
+            <div style={{ fontWeight: 700, color: "#4ade80", marginBottom: "0.25rem" }}>You&apos;re already registered!</div>
+            <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)", marginBottom: "1rem", fontFamily: "monospace" }}>{alreadyReg}</div>
+            <Link href={`/events/${slug}/register/success?code=${alreadyReg}`}
+              style={{ display: "inline-block", padding: "10px 24px", borderRadius: "8px", background: "linear-gradient(135deg,#e8620a,#f07c2a)", color: "#fff", fontWeight: 700, fontSize: "0.875rem", textDecoration: "none" }}>
+              View Registration Details →
+            </Link>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} noValidate style={{ opacity: alreadyReg ? 0.4 : 1, pointerEvents: alreadyReg ? "none" : "auto" }}>
 
           {/* ── Personal details ────────────────────────────────────────────── */}
           <section style={{ marginBottom: "1.5rem" }}>

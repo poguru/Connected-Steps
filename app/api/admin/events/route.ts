@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
     start_date, start_time, end_date, end_time,
     location, organizer, max_participants,
     registration_required,
+    price, featured, terms_conditions, maps_url,
   } = body;
 
   if (!title || !location || !start_date) {
@@ -71,6 +72,10 @@ export async function POST(req: NextRequest) {
       organizer:            organizer || null,
       max_participants:     max_participants ? Number(max_participants) : null,
       registration_required: registration_required !== false,
+      price:                Number(price) || 0,
+      featured:             featured === true,
+      terms_conditions:     terms_conditions || null,
+      maps_url:             maps_url || null,
       status:               "draft",
       share_slug:           slug,
     })
@@ -102,6 +107,12 @@ export async function DELETE(req: NextRequest) {
   const { id } = await req.json();
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   const db = getSupabaseServer();
+
+  // Delete registrations first — event_registrations has ON DELETE RESTRICT so
+  // Supabase would block the event delete if any registrations exist.
+  // event_rsvp has ON DELETE CASCADE so it cleans itself up automatically.
+  await db.from("event_registrations").delete().eq("event_id", id);
+
   const { error } = await db.from("events").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });

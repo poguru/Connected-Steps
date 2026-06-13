@@ -20,6 +20,10 @@ interface Event {
   organizer:             string | null;
   max_participants:      number | null;
   registration_required: boolean;
+  price:                 number;
+  featured:              boolean;
+  terms_conditions:      string | null;
+  maps_url:              string | null;
   status:                string;
   share_slug:            string | null;
   view_count:            number;
@@ -144,9 +148,16 @@ export default function AdminEventsPage() {
   }
 
   async function deleteEvent(id: string) {
-    if (!confirm("Delete this event? This cannot be undone.")) return;
-    await fetch("/api/admin/events", { method: "DELETE", headers, body: JSON.stringify({ id }) });
-    loadEvents();
+    if (!confirm("Delete this event? All registrations will also be deleted.")) return;
+    setMsg("");
+    const res = await fetch("/api/admin/events", { method: "DELETE", headers, body: JSON.stringify({ id }) });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      setMsg("❌ Delete failed: " + (json.error ?? "Unknown error"));
+    } else {
+      setMsg("✅ Event deleted.");
+      loadEvents();
+    }
   }
 
   async function createCoupon(e: React.SyntheticEvent) {
@@ -379,9 +390,9 @@ export default function AdminEventsPage() {
                       </div>
                       {ev.organizer && <div style={{ fontSize: "0.75rem", color: "#666" }}>Organizer: {ev.organizer}</div>}
                       {ev.max_participants && <div style={{ fontSize: "0.75rem", color: "#666" }}>Max: {ev.max_participants} participants</div>}
-                      {"price" in ev && <div style={{ fontSize: "0.75rem", color: (ev as Event & { price?: number }).price ? "#e8620a" : "#555" }}>
-                        {(ev as Event & { price?: number }).price ? `₹${(ev as Event & { price?: number }).price}` : "Free"}{(ev as Event & { featured?: boolean }).featured ? " · Featured" : ""}
-                      </div>}
+                      <div style={{ fontSize: "0.75rem", color: ev.price ? "#e8620a" : "#555" }}>
+                        {ev.price ? `₹${ev.price}` : "Free"}{ev.featured ? " · ★ Featured" : ""}
+                      </div>
                       <div style={{ fontSize: "0.72rem", color: "#444", marginTop: "4px" }}>
                         {ev.view_count} views · {ev.share_count} shares
                         {ev.share_slug ? ` · /events/${ev.share_slug}` : ""}
