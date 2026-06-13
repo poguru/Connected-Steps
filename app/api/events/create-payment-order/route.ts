@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Razorpay from "razorpay";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 function getRazorpay() {
   const key_id     = process.env.RAZORPAY_KEY_ID;
@@ -13,9 +14,18 @@ function getRazorpay() {
 // Body: { event_id, email, registration_code }
 export async function POST(req: NextRequest) {
   try {
+    const token = req.headers.get("x-user-token");
+    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const tokenEmail = verifyUserToken(token);
+    if (!tokenEmail) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const { event_id, email, registration_code } = await req.json();
     if (!event_id || !email || !registration_code) {
       return NextResponse.json({ error: "event_id, email, and registration_code are required." }, { status: 400 });
+    }
+
+    if (tokenEmail.toLowerCase() !== email.toLowerCase().trim()) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
     const db = getSupabaseServer();

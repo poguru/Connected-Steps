@@ -243,7 +243,7 @@ export default function RegisterPage() {
       await loadRazorpay();
       const orderRes  = await fetch("/api/events/create-payment-order", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-user-token": userToken },
         body: JSON.stringify({ event_id: ev.id, email: form.email, registration_code: data.registration_code }),
       });
       const orderData = await orderRes.json();
