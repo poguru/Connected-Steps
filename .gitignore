@@ -48,6 +48,11 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Capacitor native projects (generated — add android/ ios/ after `npx cap add android/ios`)
+/android/
+/ios/
+release.keystore
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
