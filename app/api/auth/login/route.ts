@@ -53,17 +53,25 @@ export async function POST(req: NextRequest) {
   const coachToken = role === "coach" ? signCoachToken(user.email) : undefined;
   const userToken  = signUserToken(user.email);
 
+  // phone_verified may be null on old rows before the migration runs.
+  const phoneVerified = user.phone_verified ?? false;
+  // Prompt the user to verify their phone if they don't have one verified yet.
+  // We do NOT block login — existing users must not be locked out.
+  const requiresPhoneVerification = !phoneVerified;
+
   return NextResponse.json({
     success: true,
+    requiresPhoneVerification,
     user: {
-      firstName:  user.first_name,
-      lastName:   user.last_name,
-      email:      user.email,
-      phone:      user.phone,
-      goal:       user.goal,
-      location:   user.location,
-      photo:      user.photo ?? null,
+      firstName:     user.first_name,
+      lastName:      user.last_name,
+      email:         user.email,
+      phone:         user.phone,
+      goal:          user.goal,
+      location:      user.location,
+      photo:         user.photo ?? null,
       role,
+      phone_verified: phoneVerified,
       coachToken,
       userToken,
     },

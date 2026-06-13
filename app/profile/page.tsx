@@ -7,13 +7,14 @@ import Image from "next/image";
 import ConnectedApps from "@/components/settings/ConnectedApps";
 
 interface AppUser {
-  firstName: string;
-  lastName:  string;
-  email:     string;
-  phone:     string;
-  goal:      string;
-  location:  string;
-  photo:     string | null;
+  firstName:     string;
+  lastName:      string;
+  email:         string;
+  phone:         string;
+  goal:          string;
+  location:      string;
+  photo:         string | null;
+  phone_verified?: boolean;
 }
 
 const GOAL_OPTIONS = [
@@ -46,11 +47,22 @@ export default function ProfilePage() {
   const [photoFile,  setPhotoFile]  = useState<string | null>(null);
   const [photoError, setPhotoError] = useState("");
 
-  // info form
-  const [info,      setInfo]      = useState({ firstName: "", lastName: "", phone: "", location: "", goal: "5k" });
+  // info form — phone is no longer part of the generic save; it has its own OTP flow
+  const [info,      setInfo]      = useState({ firstName: "", lastName: "", location: "", goal: "5k" });
   const [infoSaving, setInfoSaving] = useState(false);
   const [infoMsg,    setInfoMsg]    = useState("");
   const [infoError,  setInfoError]  = useState("");
+
+  // phone verification / change flow — idle → edit → otp_sent
+  type PhoneStep = "idle" | "edit" | "otp_sent";
+  const [phoneVerified,  setPhoneVerified]  = useState(false);
+  const [currentPhone,   setCurrentPhone]   = useState("");
+  const [phoneStep,      setPhoneStep]      = useState<PhoneStep>("idle");
+  const [newPhone,       setNewPhone]       = useState("");
+  const [phoneOtp,       setPhoneOtp]       = useState("");
+  const [phoneBusy,      setPhoneBusy]      = useState(false);
+  const [phoneError,     setPhoneError]     = useState("");
+  const [phoneSuccess,   setPhoneSuccess]   = useState("");
 
   // email change flow  — idle → editing → otp_sent
   type EmailStep = "idle" | "editing" | "otp_sent";
@@ -73,7 +85,9 @@ export default function ProfilePage() {
     const u: AppUser = JSON.parse(raw);
     setUser(u);
     setPhoto(u.photo ?? null);
-    setInfo({ firstName: u.firstName, lastName: u.lastName, phone: u.phone ?? "", location: u.location ?? "", goal: u.goal ?? "5k" });
+    setInfo({ firstName: u.firstName, lastName: u.lastName, location: u.location ?? "", goal: u.goal ?? "5k" });
+    setPhoneVerified(u.phone_verified ?? false);
+    setCurrentPhone(u.phone ?? "");
   }, [router]);
 
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -112,16 +126,61 @@ export default function ProfilePage() {
     try {
       const res  = await fetch("/api/user/update", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: user.email, ...info }),
+        // phone is intentionally excluded — phone changes go through the OTP flow
+        body: JSON.stringify({ email: user.email, firstName: info.firstName, lastName: info.lastName, location: info.location, goal: info.goal }),
       });
       const data = await res.json();
       if (!res.ok) { setInfoError(data.error || "Failed to save."); return; }
-      const updated = { ...user, ...info };
+      const updated = { ...user, firstName: info.firstName, lastName: info.lastName, location: info.location, goal: info.goal };
       localStorage.setItem("cs_user", JSON.stringify(updated));
       setUser(updated);
       setInfoMsg("Profile updated.");
     } catch { setInfoError("Something went wrong."); }
     finally { setInfoSaving(false); }
+  }
+
+  async function sendPhoneOtp() {
+    const trimmed = newPhone.trim();
+    if (!trimmed) { setPhoneError("Please enter a mobile number."); return; }
+    if (trimmed === currentPhone && phoneVerified) { setPhoneError("This is already your verified number."); return; }
+    setPhoneBusy(true); setPhoneError("");
+    try {
+      const purpose = trimmed !== currentPhone ? "change_phone" : "verify_phone";
+      const res  = await fetch("/api/auth/send-otp", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "phone", value: trimmed, purpose }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setPhoneError(data.error || "Failed to send code."); return; }
+      setPhoneStep("otp_sent");
+    } catch { setPhoneError("Something went wrong."); }
+    finally { setPhoneBusy(false); }
+  }
+
+  async function verifyAndSavePhone() {
+    if (!phoneOtp.trim() || !user) { setPhoneError("Enter the 6-digit code."); return; }
+    setPhoneBusy(true); setPhoneError("");
+    try {
+      const trimmed = newPhone.trim();
+      const purpose = trimmed !== currentPhone ? "change_phone" : "verify_phone";
+      const userToken = localStorage.getItem("cs_user_token") ?? "";
+      const res  = await fetch("/api/auth/verify-phone", {
+        method: "POST", headers: { "Content-Type": "application/json", "x-user-token": userToken },
+        body: JSON.stringify({ email: user.email, phone: trimmed, code: phoneOtp.trim(), purpose }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setPhoneError(data.error || "Verification failed."); return; }
+      // Update localStorage and local state
+      const updated = { ...user, phone: trimmed, phone_verified: true };
+      localStorage.setItem("cs_user", JSON.stringify(updated));
+      localStorage.removeItem("cs_requires_phone_verification");
+      setUser(updated);
+      setPhoneVerified(true);
+      setCurrentPhone(trimmed);
+      setPhoneStep("idle"); setNewPhone(""); setPhoneOtp("");
+      setPhoneSuccess("Mobile number verified successfully. ✓");
+    } catch { setPhoneError("Something went wrong."); }
+    finally { setPhoneBusy(false); }
   }
 
   async function sendEmailOtp() {
@@ -322,7 +381,98 @@ export default function ProfilePage() {
               {emailError   && <div style={{ fontSize: "0.78rem", color: "#f09595", marginTop: 4 }}>{emailError}</div>}
               {emailSuccess && <div style={{ fontSize: "0.78rem", color: "#4ade80", marginTop: 4 }}>{emailSuccess}</div>}
             </div>
-            <div><label style={labelStyle}>Phone</label><input value={info.phone} onChange={e => setInfo(p => ({ ...p, phone: e.target.value }))} placeholder="+91 00000 00000" style={newInputStyle} /></div>
+            {/* ── Phone — dedicated verify / change flow ── */}
+            <div>
+              <label style={labelStyle}>
+                Mobile number{" "}
+                {phoneVerified
+                  ? <span style={{ color: "#4ade80", fontWeight: 600 }}>✓ Verified</span>
+                  : <span style={{ color: "#fca5a5", fontWeight: 600 }}>⚠ Not verified</span>}
+              </label>
+
+              {/* idle: show current phone + action buttons */}
+              {phoneStep === "idle" && (
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <input
+                    value={currentPhone || "No number added"}
+                    readOnly
+                    style={{ ...newInputStyle, flex: 1, color: "var(--muted-foreground)", cursor: "not-allowed" }}
+                  />
+                  <button
+                    onClick={() => { setPhoneStep("edit"); setNewPhone(currentPhone); setPhoneError(""); setPhoneSuccess(""); }}
+                    style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface-elevated)", color: "var(--foreground)", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                    {phoneVerified ? "Change number" : (currentPhone ? "Verify" : "Add & Verify")}
+                  </button>
+                </div>
+              )}
+
+              {/* edit: enter phone + send OTP */}
+              {phoneStep === "edit" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      value={newPhone}
+                      onChange={e => { setNewPhone(e.target.value); setPhoneError(""); }}
+                      placeholder="e.g. 9876543210"
+                      type="tel"
+                      autoFocus
+                      style={{ ...newInputStyle, flex: 1 }}
+                    />
+                    <button
+                      onClick={() => { setPhoneStep("idle"); setNewPhone(""); setPhoneError(""); }}
+                      style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border)", background: "transparent", color: "var(--muted-foreground)", fontSize: "0.8rem", cursor: "pointer", fontFamily: "inherit" }}>
+                      Cancel
+                    </button>
+                  </div>
+                  <button
+                    onClick={sendPhoneOtp}
+                    disabled={phoneBusy || !newPhone.trim()}
+                    style={{ padding: "10px 16px", borderRadius: 10, border: "none", background: phoneBusy ? "oklch(0.72 0.19 49 / 50%)" : "var(--gradient-accent)", color: "#fff", fontSize: "0.82rem", fontWeight: 700, cursor: phoneBusy ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: phoneBusy ? "none" : "var(--shadow-orange)" }}>
+                    {phoneBusy ? "Sending…" : "Send OTP via WhatsApp"}
+                  </button>
+                  <p style={{ margin: 0, fontSize: 11, color: "var(--muted-foreground)" }}>OTP expires in 5 minutes · Max 3 resends per hour.</p>
+                </div>
+              )}
+
+              {/* otp_sent: enter OTP + verify */}
+              {phoneStep === "otp_sent" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ fontSize: "0.78rem", color: "var(--muted-foreground)" }}>
+                    OTP sent to <strong style={{ color: "var(--foreground)" }}>{newPhone}</strong> via WhatsApp.
+                  </div>
+                  <input
+                    value={phoneOtp}
+                    onChange={e => { setPhoneOtp(e.target.value.replace(/\D/g, "").slice(0, 6)); setPhoneError(""); }}
+                    placeholder="6-digit code"
+                    inputMode="numeric"
+                    autoFocus
+                    style={{ ...newInputStyle, letterSpacing: "0.2em", fontSize: "1.1rem", textAlign: "center" }}
+                  />
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      onClick={verifyAndSavePhone}
+                      disabled={phoneBusy || phoneOtp.length < 6}
+                      style={{ flex: 1, padding: "10px 16px", borderRadius: 10, border: "none", background: phoneBusy || phoneOtp.length < 6 ? "oklch(0.72 0.19 49 / 50%)" : "var(--gradient-accent)", color: "#fff", fontSize: "0.82rem", fontWeight: 700, cursor: phoneBusy || phoneOtp.length < 6 ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: phoneBusy || phoneOtp.length < 6 ? "none" : "var(--shadow-orange)" }}>
+                      {phoneBusy ? "Verifying…" : "Verify & Save"}
+                    </button>
+                    <button
+                      onClick={() => { setPhoneStep("edit"); setPhoneOtp(""); setPhoneError(""); }}
+                      style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "transparent", color: "var(--muted-foreground)", fontSize: "0.8rem", cursor: "pointer", fontFamily: "inherit" }}>
+                      ← Back
+                    </button>
+                  </div>
+                  <button
+                    onClick={sendPhoneOtp}
+                    disabled={phoneBusy}
+                    style={{ background: "none", border: "none", padding: 0, fontSize: "0.75rem", color: "var(--muted-foreground)", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}>
+                    Didn&apos;t receive it? Resend OTP
+                  </button>
+                </div>
+              )}
+
+              {phoneError   && <div style={{ fontSize: "0.78rem", color: "#f09595", marginTop: 4 }}>{phoneError}</div>}
+              {phoneSuccess && <div style={{ fontSize: "0.78rem", color: "#4ade80", marginTop: 4 }}>{phoneSuccess}</div>}
+            </div>
             <div><label style={labelStyle}>Training location</label><input value={info.location} onChange={e => setInfo(p => ({ ...p, location: e.target.value }))} placeholder="e.g. Kondapur" style={newInputStyle} /></div>
             <div>
               <label style={labelStyle}>Goal</label>

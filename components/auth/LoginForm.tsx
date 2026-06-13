@@ -45,7 +45,7 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
       const res  = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier: form.identifier, password: form.password }) });
       const data = await res.json();
       if (!res.ok) { setPwError(data.error); return; }
-      saveAndRedirect(data.user);
+      saveAndRedirect(data.user, data.requiresPhoneVerification);
     } catch { setPwError("Something went wrong. Please try again."); }
     finally   { setPwLoading(false); }
   };
@@ -59,15 +59,28 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
   const [verifying,  setVerifying]  = useState(false);
   const [otpError,   setOtpError]   = useState("");
 
-  function saveAndRedirect(user: Record<string, unknown>) {
+  function saveAndRedirect(user: Record<string, unknown>, requiresPhoneVerification?: boolean) {
     const photo = localStorage.getItem("cs_pending_photo") ?? null;
-    const { userToken, ...userWithoutToken } = user;
-    localStorage.setItem("cs_user", JSON.stringify({ ...userWithoutToken, photo: photo || null }));
-    if (userToken) localStorage.setItem("cs_user_token", userToken as string);
+    const { userToken, coachToken, ...rest } = user;
+    // Persist phone_verified so the banner and profile page can read it
+    const userData = {
+      ...rest,
+      photo:         photo || rest.photo || null,
+      phone_verified: rest.phone_verified ?? false,
+    };
+    localStorage.setItem("cs_user", JSON.stringify(userData));
+    if (userToken)  localStorage.setItem("cs_user_token",   userToken  as string);
+    if (coachToken) localStorage.setItem("cs_coach_token",  coachToken as string);
+    // Signal to the dashboard to show the phone verification banner
+    if (requiresPhoneVerification) {
+      localStorage.setItem("cs_requires_phone_verification", "true");
+    } else {
+      localStorage.removeItem("cs_requires_phone_verification");
+    }
     localStorage.removeItem("cs_pending_photo");
     const savedStrava = localStorage.getItem(`cs_strava_${user.email}`);
     if (savedStrava) localStorage.setItem("cs_strava", savedStrava);
-    // Validate redirect to prevent open redirect attacks — only allow relative paths
+    // Only allow relative paths to prevent open redirect
     const raw = searchParams.get("redirect") ?? "";
     const safe = raw.startsWith("/") && !raw.startsWith("//") ? raw : "/dashboard";
     router.push(safe);
@@ -100,7 +113,7 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
       });
       const data = await res.json();
       if (!res.ok) { setOtpError(data.error ?? "Verification failed."); return; }
-      saveAndRedirect(data.user);
+      saveAndRedirect(data.user, data.requiresPhoneVerification);
     } catch { setOtpError("Something went wrong. Please try again."); }
     finally { setVerifying(false); }
   }

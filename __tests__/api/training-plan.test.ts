@@ -89,40 +89,32 @@ describe("GET /api/user/training-plan — membership enforcement", () => {
     expect(body.plan.id).toBe(1);
   });
 
-  test("expired membership — returns plan: null", async () => {
+  // Route now returns 403 (not 200/null) when membership is absent or expired —
+  // this is intentional: it gives the frontend a clear signal to show an upgrade prompt.
+  test("expired membership — returns 403", async () => {
     mockGetSupabaseServer.mockReturnValue(
       makeDbMock({ status: "active", expires_at: past }, MOCK_PLAN)
     );
-
-    const res  = await GET(makeRequest(USER_EMAIL));
+    const res = await GET(makeRequest(USER_EMAIL));
+    expect(res.status).toBe(403);
     const body = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(body.plan).toBeNull();
+    expect(body.error).toMatch(/membership/i);
   });
 
-  test("inactive membership — returns plan: null", async () => {
+  test("inactive membership — returns 403", async () => {
     mockGetSupabaseServer.mockReturnValue(
       makeDbMock({ status: "inactive", expires_at: future }, MOCK_PLAN)
     );
-
-    const res  = await GET(makeRequest(USER_EMAIL));
-    const body = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(body.plan).toBeNull();
+    const res = await GET(makeRequest(USER_EMAIL));
+    expect(res.status).toBe(403);
   });
 
-  test("missing membership — returns plan: null", async () => {
+  test("missing membership — returns 403", async () => {
     mockGetSupabaseServer.mockReturnValue(
       makeDbMock(null, MOCK_PLAN)
     );
-
-    const res  = await GET(makeRequest(USER_EMAIL));
-    const body = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(body.plan).toBeNull();
+    const res = await GET(makeRequest(USER_EMAIL));
+    expect(res.status).toBe(403);
   });
 
   test("admin/coach bypasses membership check", async () => {

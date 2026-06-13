@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail, sendWhatsAppOTP } from "@/lib/notify";
-import { isRateLimited, recordFailure, getClientIp } from "@/lib/rate-limit";
+import {
+  isRateLimited, recordFailure, getClientIp,
+  isRateLimitedCustom, recordFailureCustom,
+} from "@/lib/rate-limit";
+
+const PHONE_RESEND_MAX    = 3;
+const PHONE_RESEND_WINDOW = 60 * 60 * 1000; // 1 hour
 
 function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -39,11 +45,22 @@ function otpEmailHTML(name: string, code: string): string {
 </body></html>`;
 }
 
-// POST /api/auth/send-otp
-// Body: { type: "email" | "phone", value: string, name?: string, purpose: "register" | "login" | "change_email" }
-// purpose "register"     → rejects if already registered
-// purpose "login"        → rejects if no account found
-// purpose "change_email" → rejects if already taken by another account (same as register)
+/**
+ * POST /api/auth/send-otp
+ *
+ * Body: { type, value, name?, purpose }
+ *
+ * purpose values:
+ *   "register"      – email/phone must NOT already exist
+ *   "login"         – email/phone MUST exist
+ *   "change_email"  – new email must NOT already exist
+ *   "verify_phone"  – no existence check; used by logged-in users to verify/re-verify their phone
+ *   "change_phone"  – new phone must NOT already exist (user is changing to a different number)
+ *
+ * Phone OTPs expire in 5 minutes.
+ * Email OTPs expire in 10 minutes.
+ * Phone sends are additionally limited to 3 per hour per number (anti-spam).
+ */
 export async function POST(req: NextRequest) {
   try {
     const { type, value, name, purpose = "register" } = await req.json();
@@ -51,43 +68,64 @@ export async function POST(req: NextRequest) {
     if (!type || !value) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     if (type !== "email" && type !== "phone") return NextResponse.json({ error: "Invalid type" }, { status: 400 });
 
-    const ip  = getClientIp(req);
-    const key = `send-otp:${ip}:${String(value).toLowerCase().trim()}`;
+    const ip         = getClientIp(req);
+    const identifier = type === "email"
+      ? (value as string).toLowerCase().trim()
+      : (value as string).trim();
 
-    if (isRateLimited(key)) {
+    // ── General send-rate limit (shared across all purposes) ──────────────────
+    const sendKey = `send-otp:${ip}:${identifier}`;
+    if (isRateLimited(sendKey)) {
       return NextResponse.json(
         { error: "Too many OTP requests. Please wait 15 minutes before requesting a new code." },
         { status: 429, headers: { "Retry-After": "900" } }
       );
     }
-    recordFailure(key); // count every send (not just failures) to prevent SMS spam
+    recordFailure(sendKey);
+
+    // ── Extra phone resend limit: max 3 per hour ───────────────────────────────
+    if (type === "phone") {
+      const phoneKey = `phone-otp-resend:${ip}:${identifier}`;
+      if (isRateLimitedCustom(phoneKey, PHONE_RESEND_MAX, PHONE_RESEND_WINDOW)) {
+        return NextResponse.json(
+          { error: "You have reached the maximum of 3 OTP requests per hour for this number. Please try again later." },
+          { status: 429, headers: { "Retry-After": "3600" } }
+        );
+      }
+      recordFailureCustom(phoneKey, PHONE_RESEND_WINDOW);
+    }
 
     const db = getSupabaseServer();
-    const identifier = type === "email" ? (value as string).toLowerCase().trim() : (value as string).trim();
 
-    // ── Existence check ───────────────────────────────────────────────────────
-    if (type === "email") {
-      const { data: existing } = await db.from("users").select("id").eq("email", identifier).single();
-      if ((purpose === "register" || purpose === "change_email") && existing) {
-        // 400 (not 409) so clients handle this as a validation error, not a conflict
-        return NextResponse.json({ error: "This email is already in use by another account." }, { status: 400 });
-      }
-      if (purpose === "login" && !existing) {
-        return NextResponse.json({ error: "No account found with this email." }, { status: 404 });
-      }
-    } else {
-      const { data: existing } = await db.from("users").select("id").eq("phone", identifier).single();
-      if (purpose === "register" && existing) {
-        return NextResponse.json({ error: "An account with this phone number already exists." }, { status: 409 });
-      }
-      if (purpose === "login" && !existing) {
-        return NextResponse.json({ error: "No account found with this phone number." }, { status: 404 });
+    // ── Existence check (skipped for verify_phone — caller is already logged in) ──
+    if (purpose !== "verify_phone") {
+      if (type === "email") {
+        const { data: existing } = await db.from("users").select("id").eq("email", identifier).single();
+        if ((purpose === "register" || purpose === "change_email") && existing) {
+          return NextResponse.json({ error: "This email is already in use by another account." }, { status: 400 });
+        }
+        if (purpose === "login" && !existing) {
+          return NextResponse.json({ error: "No account found with this email." }, { status: 404 });
+        }
+      } else {
+        const { data: existing } = await db.from("users").select("id").eq("phone", identifier).single();
+        if (purpose === "register" && existing) {
+          return NextResponse.json({ error: "An account with this phone number already exists." }, { status: 409 });
+        }
+        if (purpose === "change_phone" && existing) {
+          return NextResponse.json({ error: "This phone number is already in use by another account." }, { status: 400 });
+        }
+        if (purpose === "login" && !existing) {
+          return NextResponse.json({ error: "No account found with this phone number." }, { status: 404 });
+        }
       }
     }
 
     // ── Generate & store OTP ──────────────────────────────────────────────────
-    const code      = generateOTP();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 min
+    const code = generateOTP();
+    // Phone OTPs expire in 5 minutes; email OTPs in 10 minutes (per security spec)
+    const expiryMs  = type === "phone" ? 5 * 60 * 1000 : 10 * 60 * 1000;
+    const expiresAt = new Date(Date.now() + expiryMs).toISOString();
 
     await db.from("otp_verifications").delete().eq("identifier", identifier).eq("type", type);
     const { error: insertErr } = await db.from("otp_verifications").insert({
@@ -95,11 +133,11 @@ export async function POST(req: NextRequest) {
       type,
       code,
       expires_at: expiresAt,
-      verified: false,
+      verified:   false,
     });
     if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
 
-    // ── Send ──────────────────────────────────────────────────────────────────
+    // ── Dispatch ──────────────────────────────────────────────────────────────
     const displayName = (name as string | undefined)?.trim() || "there";
     if (type === "email") {
       await sendEmail(

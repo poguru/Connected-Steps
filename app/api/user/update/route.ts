@@ -11,7 +11,10 @@ export async function POST(req: NextRequest) {
     const updateFields: Record<string, unknown> = {};
     if (firstName !== undefined) updateFields.first_name = firstName;
     if (lastName  !== undefined) updateFields.last_name  = lastName;
-    if (phone     !== undefined) updateFields.phone      = phone;
+    if (phone     !== undefined) {
+      updateFields.phone         = phone;
+      updateFields.phone_verified = false; // reset verification when number changes via profile update
+    }
     if (location  !== undefined) updateFields.location   = location;
     if (goal      !== undefined) updateFields.goal       = goal;
     if (photo     !== undefined) updateFields.photo      = photo;

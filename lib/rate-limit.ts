@@ -72,3 +72,25 @@ export function recordFailure(key: string): number {
   entry.failures += 1;
   return entry.failures;
 }
+
+// ── Custom-window variants ─────────────────────────────────────────────────
+// Used for phone OTP resend limiting: max 3 sends per 60-minute window.
+
+export function isRateLimitedCustom(key: string, maxAllowed: number, windowMs: number): boolean {
+  const now   = Date.now();
+  const entry = store.get(key);
+  if (!entry) return false;
+  if (now - entry.windowStart >= windowMs) { store.delete(key); return false; }
+  return entry.failures >= maxAllowed;
+}
+
+export function recordFailureCustom(key: string, windowMs: number): number {
+  const now   = Date.now();
+  const entry = store.get(key);
+  if (!entry || now - entry.windowStart >= windowMs) {
+    store.set(key, { failures: 1, windowStart: now });
+    return 1;
+  }
+  entry.failures += 1;
+  return entry.failures;
+}

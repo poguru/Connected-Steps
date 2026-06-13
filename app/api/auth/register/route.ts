@@ -5,7 +5,9 @@ import { autoFeedMemberJoined } from "@/lib/auto-feed";
 
 export async function POST(req: NextRequest) {
   try {
-    const { firstName, lastName, email, phone, goal, location, password } = await req.json();
+    // phoneVerified is set to true only when the signup form has already gone
+    // through the phone OTP step before calling this endpoint.
+    const { firstName, lastName, email, phone, goal, location, password, phoneVerified } = await req.json();
 
     if (!email || !password || !firstName || !lastName) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
@@ -42,13 +44,14 @@ export async function POST(req: NextRequest) {
     const hashed = await bcrypt.hash(password, 12);
 
     const { error } = await supabaseServer.from("users").insert({
-      first_name: firstName,
-      last_name:  lastName,
-      email:      email.toLowerCase(),
+      first_name:    firstName,
+      last_name:     lastName,
+      email:         email.toLowerCase(),
       phone,
       goal,
       location,
-      password:   hashed,
+      password:      hashed,
+      phone_verified: phoneVerified === true,
     });
 
     if (error) {
