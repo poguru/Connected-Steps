@@ -37,7 +37,7 @@ export default function Navbar() {
       position: "sticky", top: 0, zIndex: 50,
       transition: "all 0.3s",
       ...(scrolled
-        ? { background: "oklch(0.18 0.015 270 / 70%)", backdropFilter: "blur(18px) saturate(140%)", borderBottom: "1px solid var(--border)", boxShadow: "var(--shadow-md)" }
+        ? { background: "oklch(0.16 0.006 250 / 88%)", backdropFilter: "blur(20px) saturate(140%)", borderBottom: "1px solid var(--border)", boxShadow: "var(--shadow-md)" }
         : { background: "transparent", borderBottom: "1px solid transparent" }),
     }}>
       <div style={{ maxWidth: 1280, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", height: 64, padding: "0 1.5rem" }}>

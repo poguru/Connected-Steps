@@ -47,7 +47,7 @@ export default function PaymentHistoryPage() {
     <div style={{ minHeight: "100vh", background: "var(--cs-black)", color: "var(--cs-white)" }}>
 
       {/* Navbar */}
-      <header style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(8,28,45,0.97)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(56,189,248,0.08)", height: "64px", display: "flex", alignItems: "center", padding: "0 2rem", gap: "0.75rem" }}>
+      <header style={{ position: "sticky", top: 0, zIndex: 50, background: "var(--bg-overlay)", backdropFilter: "blur(20px) saturate(140%)", borderBottom: "1px solid var(--border)", height: "64px", display: "flex", alignItems: "center", padding: "0 2rem", gap: "0.75rem" }}>
         <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none" }}>
           <Image src="/logo.png" alt="Connected Steps" width={32} height={32} className="rounded-full" />
           <span style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--cs-white)" }}>Connected Steps</span>
@@ -76,7 +76,7 @@ export default function PaymentHistoryPage() {
               <div key={i} style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "10px", padding: "1.1rem 1.25rem", display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
 
                 {/* Icon */}
-                <div style={{ width: "42px", height: "42px", borderRadius: "10px", background: t.type === "membership" ? "rgba(255,122,0,0.12)" : "rgba(56,189,248,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem", flexShrink: 0 }}>
+                <div style={{ width: "42px", height: "42px", borderRadius: "10px", background: "rgba(232,98,10,0.10)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem", flexShrink: 0 }}>
                   {t.type === "membership" ? "🏃" : "🎽"}
                 </div>
 

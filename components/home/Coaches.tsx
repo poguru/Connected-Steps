@@ -69,7 +69,7 @@ function CoachModal({
           width: isMobile ? "100%" : "min(860px, 96vw)",
           maxHeight: isMobile ? "92vh" : "90vh",
           height: isMobile ? "92vh" : undefined,
-          background: "#0b0e15",
+          background: "var(--cs-black)",
           borderRadius: isMobile ? "20px 20px 0 0" : 16,
           overflow: "hidden",
           display: "flex",
@@ -93,7 +93,7 @@ function CoachModal({
             </div>
           )}
           {/* Gradient overlay */}
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 30%, #0b0e15 100%)" }} />
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 30%, var(--cs-black) 100%)" }} />
 
           {/* Name / role overlay */}
           <div style={{ position: "absolute", bottom: 20, left: 24, right: 56 }}>

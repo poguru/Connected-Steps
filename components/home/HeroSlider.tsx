@@ -164,7 +164,7 @@ export default function HeroSlider() {
                   style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 30%" }} />
               )}
               {/* Gradient overlay */}
-              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(8,28,45,0.97) 0%, rgba(8,28,45,0.55) 50%, rgba(8,28,45,0.2) 100%)" }} />
+              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(13,13,16,0.97) 0%, rgba(13,13,16,0.55) 50%, rgba(13,13,16,0.2) 100%)" }} />
 
               {/* Content */}
               <div className="container relative z-10" style={{ paddingTop: "8rem", paddingBottom: "7rem", height: "100%", minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
@@ -208,21 +208,21 @@ export default function HeroSlider() {
           <button onClick={prev} aria-label="Previous" className="hero-slider-arrow"
             style={{ position: "absolute", left: "1.5rem", top: "50%", transform: "translateY(-50%)", zIndex: 20,
               width: "44px", height: "44px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.2)",
-              background: "rgba(8,28,45,0.7)", color: "#fff", cursor: "pointer", fontSize: "1.1rem",
+              background: "rgba(13,13,16,0.7)", color: "#fff", cursor: "pointer", fontSize: "1.1rem",
               display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(6px)",
               transition: "border-color 0.15s, background 0.15s" }}
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(232,98,10,0.6)"; e.currentTarget.style.background = "rgba(232,98,10,0.2)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; e.currentTarget.style.background = "rgba(8,28,45,0.7)"; }}>
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; e.currentTarget.style.background = "rgba(13,13,16,0.7)"; }}>
             ←
           </button>
           <button onClick={next} aria-label="Next" className="hero-slider-arrow"
             style={{ position: "absolute", right: "1.5rem", top: "50%", transform: "translateY(-50%)", zIndex: 20,
               width: "44px", height: "44px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.2)",
-              background: "rgba(8,28,45,0.7)", color: "#fff", cursor: "pointer", fontSize: "1.1rem",
+              background: "rgba(13,13,16,0.7)", color: "#fff", cursor: "pointer", fontSize: "1.1rem",
               display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(6px)",
               transition: "border-color 0.15s, background 0.15s" }}
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(232,98,10,0.6)"; e.currentTarget.style.background = "rgba(232,98,10,0.2)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; e.currentTarget.style.background = "rgba(8,28,45,0.7)"; }}>
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; e.currentTarget.style.background = "rgba(13,13,16,0.7)"; }}>
             →
           </button>
         </>

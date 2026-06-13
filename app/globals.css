@@ -8,46 +8,53 @@
   --nav-h:     72px;
   --nav-total: calc(var(--nav-h) + env(safe-area-inset-top));
 
-  /* Colours — dark premium fitness, orange as the soul */
-  --background:           oklch(0.14 0.012 270);
-  --foreground:           oklch(0.97 0.005 250);
-  --surface:              oklch(0.19 0.015 270);
-  --surface-elevated:     oklch(0.235 0.018 270);
-  --card:                 oklch(0.19 0.015 270);
-  --border:               oklch(0.3 0.02 270 / 70%);
-  --muted:                oklch(0.26 0.015 270);
-  --muted-foreground:     oklch(0.68 0.015 260);
-  --primary:              oklch(0.72 0.19 49);
-  --primary-foreground:   oklch(0.14 0.012 270);
-  --accent:               oklch(0.74 0.2 50);
-  --accent-foreground:    oklch(0.14 0.012 270);
-  --secondary-color:      oklch(0.78 0.13 220);
-  --ring:                 oklch(0.72 0.19 49);
-  --destructive:          oklch(0.62 0.22 22);
+  /* ── Unified colour system — deep charcoal + orange soul ── */
+  --background:        oklch(0.13 0.005 250);   /* deep charcoal page bg  */
+  --foreground:        oklch(0.97 0.005 250);   /* near-white text        */
+  --surface:           oklch(0.18 0.006 250);   /* card / section surface */
+  --surface-elevated:  oklch(0.23 0.007 250);   /* raised surface         */
+  --card:              oklch(0.18 0.006 250);
+  --border:            oklch(0.30 0.008 250 / 65%);
+  --muted:             oklch(0.24 0.006 250);
+  --muted-foreground:  oklch(0.65 0.008 250);   /* secondary text         */
+  --primary:           oklch(0.72 0.19 49);     /* brand orange           */
+  --primary-foreground:oklch(0.13 0.005 250);
+  --accent:            oklch(0.74 0.20 50);     /* orange accent          */
+  --accent-foreground: oklch(0.13 0.005 250);
+  --secondary-color:   oklch(0.65 0.010 250);   /* neutral warm gray      */
+  --ring:              oklch(0.72 0.19 49);
+  --destructive:       oklch(0.62 0.22 22);
 
-  /* Legacy aliases kept for existing components */
-  --cs-black:        oklch(0.14 0.012 270);
-  --cs-dark:         oklch(0.19 0.015 270);
-  --cs-charcoal:     oklch(0.235 0.018 270);
+  /* Glass / overlay — for sticky headers and backdrop panels */
+  --bg-glass:    oklch(0.16 0.006 250 / 0.92);
+  --bg-overlay:  oklch(0.13 0.005 250 / 0.97);
+
+  /* Legacy aliases — kept for component backward-compat */
+  --cs-black:        oklch(0.13 0.005 250);
+  --cs-dark:         oklch(0.18 0.006 250);
+  --cs-charcoal:     oklch(0.23 0.007 250);
   --cs-orange:       oklch(0.72 0.19 49);
   --cs-orange-light: oklch(0.78 0.17 55);
-  --cs-blue:         oklch(0.78 0.13 220);
-  --cs-blue-dim:     oklch(0.78 0.13 220 / 12%);
+  --cs-blue:         oklch(0.65 0.010 250);   /* repurposed → neutral cool */
+  --cs-blue-dim:     oklch(0.65 0.010 250 / 12%);
   --cs-white:        oklch(0.97 0.005 250);
   --cs-off-white:    oklch(0.97 0.005 250);
-  --cs-cream:        oklch(0.90 0.01 260);
-  --cs-muted:        oklch(0.68 0.015 260);
+  --cs-cream:        oklch(0.90 0.01 255);
+  --cs-muted:        oklch(0.65 0.008 250);
 
   /* Gradients */
   --gradient-primary: linear-gradient(135deg, oklch(0.72 0.19 49), oklch(0.78 0.17 35));
   --gradient-accent:  linear-gradient(135deg, oklch(0.72 0.19 49), oklch(0.66 0.22 30));
-  --gradient-cyan:    linear-gradient(135deg, oklch(0.78 0.13 220), oklch(0.65 0.18 250));
-  --gradient-soft:    linear-gradient(180deg, oklch(0.14 0.012 270) 0%, oklch(0.18 0.025 280) 100%);
+  --gradient-warm:    linear-gradient(135deg, oklch(0.68 0.14 55), oklch(0.58 0.10 35));
+  --gradient-soft:    linear-gradient(180deg, oklch(0.13 0.005 250) 0%, oklch(0.17 0.018 40) 100%);
+  /* gradient-cyan kept as warm amber for backward-compat */
+  --gradient-cyan:    linear-gradient(135deg, oklch(0.68 0.14 55), oklch(0.58 0.10 35));
 
   /* Shadows */
-  --shadow-sm:     0 1px 2px 0 oklch(0 0 0 / 30%);
-  --shadow-md:     0 8px 24px -8px oklch(0 0 0 / 50%);
+  --shadow-sm:     0 1px 2px 0 oklch(0 0 0 / 35%);
+  --shadow-md:     0 8px 24px -8px oklch(0 0 0 / 55%);
   --shadow-lg:     0 30px 70px -20px oklch(0 0 0 / 65%);
+  --shadow-card:   0 30px 70px -20px oklch(0 0 0 / 65%);
   --shadow-glow:   0 20px 60px -15px oklch(0.72 0.19 49 / 45%);
   --shadow-orange: 0 14px 40px -10px oklch(0.72 0.19 49 / 55%);
 
@@ -65,7 +72,7 @@
   /* Card */
   --card-radius: 12px;
 
-  /* Section padding — reduced 40% from original 5rem */
+  /* Section padding */
   --section-pad: 3rem;
 }
 
@@ -278,6 +285,29 @@ h1, h2, h3 {
 }
 .btn-sm:hover  { opacity: 0.88; }
 
+/* WhatsApp CTA — dark surface, green icon only, matches design system */
+.btn-whatsapp {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 20px;
+  background: var(--surface);
+  color: var(--muted-foreground);
+  font-family: var(--font-body), sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+.btn-whatsapp:hover {
+  border-color: oklch(0.72 0.19 49 / 40%);
+  background: var(--surface-elevated);
+  color: var(--foreground);
+}
+
 /* ─── Layout ─────────────────────────────────────────── */
 .section { padding: var(--section-pad) 0; }
 
@@ -292,7 +322,7 @@ h1, h2, h3 {
   display: block;
   width: 48px;
   height: 2px;
-  background: linear-gradient(90deg, var(--cs-blue), var(--cs-orange));
+  background: linear-gradient(90deg, oklch(0.72 0.19 49), oklch(0.66 0.22 30));
   margin-bottom: 1.5rem;
 }
 
@@ -300,10 +330,10 @@ h1, h2, h3 {
 .section-label {
   font-family: var(--font-body), sans-serif;
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: var(--cs-blue);
+  color: var(--cs-orange);
   margin-bottom: 1rem;
 }
 
@@ -375,7 +405,7 @@ h1, h2, h3 {
 /* ─── Testimonial ────────────────────────────────────── */
 .testimonial-card {
   background: var(--cs-charcoal);
-  border: 1px solid rgba(56,189,248,0.1);
+  border: 1px solid rgba(232,98,10,0.15);
   border-top: 2px solid var(--cs-orange);
   border-radius: 4px;
   padding: 2rem;
@@ -474,7 +504,7 @@ select.auth-input option {
 @media (max-width: 768px) {
   :root { --section-pad: 2rem; }
   .container { padding: 0 1.25rem; }
-  .cs-mobile-menu { background: rgba(8,28,45,0.99) !important; }
+  .cs-mobile-menu { background: var(--background) !important; }
 }
 
 @media (max-width: 480px) {
@@ -524,7 +554,7 @@ select.auth-input option {
 /* ─── App pages (Dashboard / Leaderboard / Community) ── */
 .cs-app-nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 50;
-  background: oklch(0.18 0.015 270 / 85%);
+  background: var(--bg-glass);
   backdrop-filter: blur(20px) saturate(150%);
   border-bottom: 1px solid var(--border);
   /* Push content below notch / status bar */

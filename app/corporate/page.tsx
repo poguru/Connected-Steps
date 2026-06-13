@@ -78,7 +78,7 @@ export default function CorporatePage() {
     <div style={{ minHeight: "100vh", background: "var(--cs-black)", color: "var(--cs-white)" }}>
 
       {/* Navbar */}
-      <header style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(8,28,45,0.97)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(56,189,248,0.08)", padding: "0 2rem", height: "64px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <header style={{ position: "sticky", top: 0, zIndex: 50, background: "var(--bg-overlay)", backdropFilter: "blur(20px) saturate(140%)", borderBottom: "1px solid var(--border)", padding: "0 2rem", height: "64px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none" }}>
           <Image src="/logo.png" alt="Connected Steps" width={36} height={36} className="rounded-full" />
           <span style={{ fontSize: "1rem", fontWeight: 600, color: "var(--cs-white)" }}>Connected Steps</span>
@@ -90,7 +90,7 @@ export default function CorporatePage() {
       </header>
 
       {/* Hero */}
-      <section style={{ padding: "5rem 2rem 4rem", textAlign: "center", background: "linear-gradient(135deg, rgba(232,98,10,0.1) 0%, rgba(56,189,248,0.05) 100%)" }}>
+      <section style={{ padding: "5rem 2rem 4rem", textAlign: "center", background: "linear-gradient(135deg, rgba(232,98,10,0.10) 0%, transparent 70%)" }}>
         <div style={{ maxWidth: "780px", margin: "0 auto" }}>
           <div style={{ fontSize: "11px", color: "var(--cs-orange)", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700, marginBottom: "1rem" }}>
             Connected Steps — Corporate Wellness
@@ -107,8 +107,9 @@ export default function CorporatePage() {
               Book a free demo session →
             </a>
             <a href="https://wa.me/9703620570?text=Hi%2C%20I%27m%20interested%20in%20a%20corporate%20wellness%20programme%20for%20my%20company." target="_blank" rel="noopener noreferrer"
-              style={{ padding: "14px 28px", background: "rgba(37,211,102,0.1)", color: "#4ade80", border: "1px solid rgba(37,211,102,0.3)", borderRadius: "6px", textDecoration: "none", fontWeight: 600, fontSize: "0.875rem" }}>
-              💬 WhatsApp us
+              style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "14px 24px", background: "rgba(255,255,255,0.05)", color: "var(--cs-muted)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", textDecoration: "none", fontWeight: 500, fontSize: "0.875rem" }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.125.556 4.122 1.528 5.855L.057 23.882a.5.5 0 00.61.61l6.086-1.461A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.9 0-3.7-.51-5.25-1.4l-.38-.22-3.9.94.97-3.82-.25-.4A9.96 9.96 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+              WhatsApp us
             </a>
           </div>
         </div>
@@ -182,8 +183,8 @@ export default function CorporatePage() {
         <div style={{ maxWidth: "900px", margin: "0 auto" }}>
           <h2 style={{ fontSize: "1.5rem", fontWeight: 300, textAlign: "center", marginBottom: "2.5rem" }}>The Impact</h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 380px), 1fr))", gap: "2rem" }}>
-            <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(74,222,128,0.15)", borderRadius: "12px", padding: "1.75rem" }}>
-              <div style={{ fontSize: "0.8rem", color: "#4ade80", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700, marginBottom: "1.25rem" }}>For Employees</div>
+            <div style={{ background: "var(--cs-dark)", border: "1px solid rgba(232,98,10,0.18)", borderRadius: "12px", padding: "1.75rem" }}>
+              <div style={{ fontSize: "0.8rem", color: "var(--cs-orange)", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700, marginBottom: "1.25rem" }}>For Employees</div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 {employeeBenefits.map((b) => (
                   <div key={b.text} style={{ display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.875rem", color: "var(--cs-muted)" }}>

@@ -59,7 +59,7 @@ function CoachModal({ coach, rating, onClose, isMobile }: {
         width: isMobile ? "100%" : "min(860px, 96vw)",
         maxHeight: isMobile ? "92vh" : "90vh",
         height: isMobile ? "92vh" : undefined,
-        background: "#0b0e15", borderRadius: isMobile ? "20px 20px 0 0" : 16,
+        background: "var(--cs-black)", borderRadius: isMobile ? "20px 20px 0 0" : 16,
         overflow: "hidden", display: "flex", flexDirection: "column",
         animation: isMobile ? "csSlideUp 0.35s cubic-bezier(0.32,0.72,0,1)" : "csFadeScale 0.25s ease",
         boxShadow: "0 32px 80px rgba(0,0,0,0.6)",
@@ -76,7 +76,7 @@ function CoachModal({ coach, rating, onClose, isMobile }: {
               </div>
             </div>
           )}
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 30%, #0b0e15 100%)" }} />
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 30%, var(--cs-black) 100%)" }} />
           <div style={{ position: "absolute", bottom: 20, left: 24, right: 56 }}>
             <div style={{ fontSize: 10, color: "var(--cs-orange)", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 5, fontWeight: 600 }}>
               {coach.role}
