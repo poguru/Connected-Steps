@@ -110,14 +110,13 @@ export default function Hero() {
           {/* Headline */}
           <h1 className="font-display animate-fade-up-1"
             style={{ fontSize: "clamp(2.2rem, 6vw, 3.75rem)", fontWeight: 700, lineHeight: 1.05, letterSpacing: "-0.015em", color: "var(--foreground)", marginBottom: "1rem" }}>
-            Your personal running coach.{" "}
-            <span className="text-gradient-accent">Your next race. Your way.</span>
+            First 5K. First marathon.{" "}
+            <span className="text-gradient-accent">One community.</span>
           </h1>
 
           {/* Sub */}
           <p className="animate-fade-up-2" style={{ maxWidth: 500, fontSize: "1rem", color: "var(--muted-foreground)", lineHeight: 1.7, marginBottom: "1.75rem" }}>
-            Connected Steps pairs you with a certified running coach in Hyderabad — for personalised training plans,
-            weekend group runs, and real accountability from 5K to marathon.
+            Structured marathon prep, weekly group runs, and coaching that doesn&apos;t stop when the session ends.
           </p>
 
           {/* CTAs */}
