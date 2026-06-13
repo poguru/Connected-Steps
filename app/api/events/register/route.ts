@@ -1,0 +1,196 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getSupabaseServer } from "@/lib/supabase-server";
+
+function genCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let s = "";
+  for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return `CS-EVT-${s}`;
+}
+
+function calcDiscount(price: number, type: string, value: number): number {
+  if (type === "percentage") return Math.min(price, Math.round(price * value / 100));
+  if (type === "fixed")      return Math.min(price, value);
+  return 0;
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const {
+      event_id, email, name, phone, gender, date_of_birth,
+      blood_group, emergency_contact, special_notes, coupon_code,
+    } = await req.json();
+
+    if (!event_id || !email || !name) {
+      return NextResponse.json({ error: "event_id, email, and name are required." }, { status: 400 });
+    }
+
+    const db = getSupabaseServer();
+
+    // ── Verify user ────────────────────────────────────────────────────────────
+    const { data: user } = await db
+      .from("users")
+      .select("email, first_name, last_name")
+      .eq("email", email.toLowerCase().trim())
+      .single();
+    if (!user) return NextResponse.json({ error: "Account not found. Please sign up first." }, { status: 404 });
+
+    // ── Verify event ───────────────────────────────────────────────────────────
+    const { data: ev } = await db
+      .from("events")
+      .select("id, title, price, max_participants, start_date, start_time, location, status")
+      .eq("id", event_id)
+      .single();
+    if (!ev || ev.status !== "published") {
+      return NextResponse.json({ error: "Event not found." }, { status: 404 });
+    }
+
+    // ── Slot check ─────────────────────────────────────────────────────────────
+    if (ev.max_participants) {
+      const { count } = await db
+        .from("event_registrations")
+        .select("id", { count: "exact", head: true })
+        .eq("event_id", event_id)
+        .eq("status", "confirmed");
+      if ((count ?? 0) >= ev.max_participants) {
+        return NextResponse.json({ error: "This event is fully booked." }, { status: 409 });
+      }
+    }
+
+    // ── Duplicate check ────────────────────────────────────────────────────────
+    const { data: existing } = await db
+      .from("event_registrations")
+      .select("id, registration_code, payment_status")
+      .eq("event_id", event_id)
+      .eq("user_email", email.toLowerCase().trim())
+      .maybeSingle();
+    if (existing && existing.payment_status !== "failed") {
+      return NextResponse.json({ already: true, registration_code: existing.registration_code });
+    }
+
+    // ── Coupon validation ──────────────────────────────────────────────────────
+    let couponId: string | null = null;
+    let discount   = 0;
+    let discountType = "";
+    let discountValue = 0;
+
+    if (coupon_code && ev.price > 0) {
+      const { data: coupon, error: cpErr } = await db
+        .from("coupons")
+        .select("id, discount_type, discount_value, expires_at, use_count, max_uses, event_id, assigned_to_email")
+        .eq("code", coupon_code.toUpperCase().trim())
+        .single();
+
+      if (cpErr || !coupon) {
+        return NextResponse.json({ error: "Invalid coupon code." }, { status: 400 });
+      }
+      if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
+        return NextResponse.json({ error: "This coupon has expired." }, { status: 400 });
+      }
+      if (coupon.use_count >= coupon.max_uses) {
+        return NextResponse.json({ error: "This coupon has reached its usage limit." }, { status: 400 });
+      }
+      if (coupon.event_id && coupon.event_id !== event_id) {
+        return NextResponse.json({ error: "This coupon is not valid for this event." }, { status: 400 });
+      }
+      if (coupon.assigned_to_email && coupon.assigned_to_email.toLowerCase() !== email.toLowerCase()) {
+        return NextResponse.json({ error: "This coupon is not assigned to your account." }, { status: 400 });
+      }
+      // Check already used
+      const { data: uses } = await db
+        .from("coupon_uses")
+        .select("id")
+        .eq("coupon_id", coupon.id)
+        .eq("used_by_email", email.toLowerCase())
+        .limit(1);
+      if (uses && uses.length > 0) {
+        return NextResponse.json({ error: "You have already used this coupon." }, { status: 400 });
+      }
+
+      couponId     = coupon.id;
+      discountType = coupon.discount_type;
+      discountValue = coupon.discount_value;
+      discount = calcDiscount(ev.price, discountType, discountValue);
+    }
+
+    const originalPrice = ev.price;
+    const finalPrice    = Math.max(0, originalPrice - discount);
+
+    // ── Free event: create confirmed registration immediately ──────────────────
+    if (finalPrice === 0) {
+      const code = genCode();
+      const { data: reg, error: regErr } = await db
+        .from("event_registrations")
+        .upsert({
+          registration_code: code,
+          event_id,
+          user_email:        email.toLowerCase().trim(),
+          user_name:         name.trim(),
+          phone:             phone || null,
+          gender:            gender || null,
+          date_of_birth:     date_of_birth || null,
+          blood_group:       blood_group || null,
+          emergency_contact: emergency_contact || null,
+          special_notes:     special_notes || null,
+          coupon_code:       coupon_code?.toUpperCase().trim() || null,
+          coupon_id:         couponId,
+          coupon_discount:   discount,
+          original_price:    originalPrice,
+          final_price:       finalPrice,
+          payment_status:    "free",
+          status:            "confirmed",
+        }, { onConflict: "event_id,user_email", ignoreDuplicates: false })
+        .select("registration_code")
+        .single();
+
+      if (regErr) return NextResponse.json({ error: regErr.message }, { status: 500 });
+
+      // Redeem coupon atomically (fire-and-forget)
+      if (couponId) {
+        const { redeemCoupon } = await import("@/lib/coupon-redeem");
+        redeemCoupon(couponId, email.toLowerCase()).catch(console.error);
+      }
+
+      return NextResponse.json({ success: true, free: true, registration_code: reg?.registration_code ?? code });
+    }
+
+    // ── Paid event: create pending registration, caller creates Razorpay order ─
+    const code = existing?.registration_code ?? genCode();
+    const { error: regErr2 } = await db
+      .from("event_registrations")
+      .upsert({
+        registration_code: code,
+        event_id,
+        user_email:        email.toLowerCase().trim(),
+        user_name:         name.trim(),
+        phone:             phone || null,
+        gender:            gender || null,
+        date_of_birth:     date_of_birth || null,
+        blood_group:       blood_group || null,
+        emergency_contact: emergency_contact || null,
+        special_notes:     special_notes || null,
+        coupon_code:       coupon_code?.toUpperCase().trim() || null,
+        coupon_id:         couponId,
+        coupon_discount:   discount,
+        original_price:    originalPrice,
+        final_price:       finalPrice,
+        payment_status:    "pending",
+        status:            "confirmed",
+      }, { onConflict: "event_id,user_email", ignoreDuplicates: false });
+
+    if (regErr2) return NextResponse.json({ error: regErr2.message }, { status: 500 });
+
+    return NextResponse.json({
+      success: true,
+      free: false,
+      requires_payment: true,
+      registration_code: code,
+      original_price: originalPrice,
+      coupon_discount: discount,
+      final_price: finalPrice,
+    });
+
+  } catch (e: unknown) {
+    return NextResponse.json({ error: String(e) }, { status: 500 });
+  }
+}

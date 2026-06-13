@@ -72,6 +72,12 @@ const cards = [
     icon:  "🎟️",
   },
   {
+    href:  "/admin/events/registrations",
+    title: "Event Registrations",
+    desc:  "View all event registrations, payment status, revenue summary. Export participants list as CSV.",
+    icon:  "📝",
+  },
+  {
     href:  "/admin/coach-ops",
     title: "Coach Operations",
     desc:  "Athlete roster, attendance tracking, cohort management, bulk messaging, and plan templates.",

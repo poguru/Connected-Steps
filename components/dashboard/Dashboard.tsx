@@ -17,6 +17,7 @@ import DashboardHero from "@/components/dashboard/DashboardHero";
 import SessionPhotos from "@/components/dashboard/SessionPhotos";
 import FollowerFeed from "@/components/dashboard/FollowerFeed";
 import PeopleYouMayKnow from "@/components/dashboard/PeopleYouMayKnow";
+import MyEventRegistrations from "@/components/dashboard/MyEventRegistrations";
 
 interface SessionRecord {
   attended:      boolean;
@@ -862,6 +863,9 @@ export default function Dashboard() {
 
         {/* ── Right sidebar ── */}
         <aside className="cs-db-right">
+
+          {/* Event registrations */}
+          <MyEventRegistrations />
 
           {/* People you may know */}
           <PeopleYouMayKnow userEmail={user.email} />

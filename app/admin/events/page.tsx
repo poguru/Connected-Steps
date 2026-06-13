@@ -66,7 +66,7 @@ export default function AdminEventsPage() {
   const [msg,     setMsg]     = useState("");
 
   // Event form
-  const blankEf = { title: "", description: "", event_type: "running", cover_image: "", start_date: "", start_time: "", end_date: "", end_time: "", location: "", organizer: "", max_participants: "", registration_required: true };
+  const blankEf = { title: "", description: "", event_type: "running", cover_image: "", start_date: "", start_time: "", end_date: "", end_time: "", location: "", organizer: "", max_participants: "", registration_required: true, price: "0", featured: false, terms_conditions: "", maps_url: "" };
   const [ef, setEf] = useState(blankEf);
 
   // Coupon form
@@ -126,6 +126,10 @@ export default function AdminEventsPage() {
       organizer:            ef.organizer || null,
       max_participants:     ef.max_participants ? Number(ef.max_participants) : null,
       registration_required: ef.registration_required,
+      price:                Number(ef.price) || 0,
+      featured:             ef.featured,
+      terms_conditions:     ef.terms_conditions || null,
+      maps_url:             ef.maps_url || null,
     };
     const res = await fetch("/api/admin/events", { method: "POST", headers, body: JSON.stringify(body) });
     const json = await res.json();
@@ -307,6 +311,33 @@ export default function AdminEventsPage() {
                   </div>
 
                   <div>
+                    <label style={S.label}>Registration Price (₹)</label>
+                    <input style={S.input} type="number" min="0" value={ef.price} onChange={e => setEf(f => ({ ...f, price: e.target.value }))} placeholder="0 for free events" />
+                    {Number(ef.price) === 0 && <div style={{ fontSize: "11px", color: "#555", marginTop: "4px" }}>Free event — no payment required</div>}
+                  </div>
+
+                  <div>
+                    <label style={S.label}>Google Maps URL</label>
+                    <input style={S.input} value={ef.maps_url} onChange={e => setEf(f => ({ ...f, maps_url: e.target.value }))} placeholder="https://maps.google.com/…" />
+                  </div>
+
+                  <div style={{ gridColumn: "1/-1" }}>
+                    <label style={S.label}>Terms &amp; Conditions</label>
+                    <textarea style={{ ...S.input, minHeight: "80px", resize: "vertical" } as React.CSSProperties} value={ef.terms_conditions} onChange={e => setEf(f => ({ ...f, terms_conditions: e.target.value }))} placeholder="e.g. Participants must carry their own water. No refunds after 48 hours..." />
+                  </div>
+
+                  <div>
+                    <label style={{ ...S.label, marginBottom: 0 }}>Featured Event</label>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
+                      <button type="button" onClick={() => setEf(f => ({ ...f, featured: !f.featured }))}
+                        style={{ width: "40px", height: "22px", borderRadius: "11px", border: "none", cursor: "pointer", background: ef.featured ? "#e8620a" : "rgba(255,255,255,0.15)", transition: "background 0.2s", position: "relative" }}>
+                        <span style={{ position: "absolute", top: "3px", width: "16px", height: "16px", borderRadius: "50%", background: "#fff", transition: "left 0.2s", left: ef.featured ? "21px" : "3px" }} />
+                      </button>
+                      <span style={{ fontSize: "0.8rem", color: "#888" }}>{ef.featured ? "Yes — shown prominently" : "No"}</span>
+                    </div>
+                  </div>
+
+                  <div>
                     <label style={{ ...S.label, marginBottom: 0 }}>Registration Required</label>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
                       <button type="button" onClick={() => setEf(f => ({ ...f, registration_required: !f.registration_required }))}
@@ -348,6 +379,9 @@ export default function AdminEventsPage() {
                       </div>
                       {ev.organizer && <div style={{ fontSize: "0.75rem", color: "#666" }}>Organizer: {ev.organizer}</div>}
                       {ev.max_participants && <div style={{ fontSize: "0.75rem", color: "#666" }}>Max: {ev.max_participants} participants</div>}
+                      {"price" in ev && <div style={{ fontSize: "0.75rem", color: (ev as Event & { price?: number }).price ? "#e8620a" : "#555" }}>
+                        {(ev as Event & { price?: number }).price ? `₹${(ev as Event & { price?: number }).price}` : "Free"}{(ev as Event & { featured?: boolean }).featured ? " · Featured" : ""}
+                      </div>}
                       <div style={{ fontSize: "0.72rem", color: "#444", marginTop: "4px" }}>
                         {ev.view_count} views · {ev.share_count} shares
                         {ev.share_slug ? ` · /events/${ev.share_slug}` : ""}

@@ -1,0 +1,425 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface EventInfo {
+  id: string; title: string; event_type: string; start_date: string;
+  start_time: string | null; location: string; price: number;
+  max_participants: number | null; share_slug: string | null;
+}
+
+interface StoredUser {
+  firstName?: string; lastName?: string; email?: string; phone?: string;
+}
+
+const INPUT: React.CSSProperties = {
+  width: "100%", padding: "11px 14px",
+  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+  borderRadius: "10px", color: "#fff", fontFamily: "inherit",
+  fontSize: "0.875rem", outline: "none", boxSizing: "border-box",
+};
+const LABEL: React.CSSProperties = {
+  display: "block", fontSize: "11px", color: "rgba(255,255,255,0.5)",
+  letterSpacing: "0.07em", textTransform: "uppercase" as const, marginBottom: "5px",
+};
+
+const TYPE: Record<string, { label: string; icon: string; color: string }> = {
+  running: { label: "Running", icon: "🏃", color: "#e8620a" },
+  cycling: { label: "Cycling", icon: "🚴", color: "#3b82f6" },
+  training: { label: "Training", icon: "💪", color: "#a855f7" },
+  race: { label: "Race", icon: "🏆", color: "#ef4444" },
+  community: { label: "Community", icon: "🤝", color: "#22c55e" },
+  workshop: { label: "Workshop", icon: "📚", color: "#eab308" },
+};
+
+function fmtDate(d: string) {
+  return new Date(d + "T12:00:00").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+}
+function fmtTime(t: string | null) {
+  if (!t) return null;
+  const [h, m] = t.split(":").map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+}
+
+// ── Razorpay loader ───────────────────────────────────────────────────────────
+
+declare global {
+  interface Window {
+    Razorpay: new (opts: Record<string, unknown>) => { open(): void };
+  }
+}
+
+function loadRazorpay(): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof window !== "undefined" && window.Razorpay) { resolve(); return; }
+    const s = document.createElement("script");
+    s.src = "https://checkout.razorpay.com/v1/checkout.js";
+    s.onload = () => resolve();
+    document.head.appendChild(s);
+  });
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
+export default function RegisterPage() {
+  const params = useParams<{ slug: string }>();
+  const router = useRouter();
+  const slug   = params.slug;
+
+  const [ev,     setEv]     = useState<EventInfo | null>(null);
+  const [evErr,  setEvErr]  = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Form state
+  const [form, setForm] = useState({
+    name: "", email: "", phone: "",
+    gender: "", date_of_birth: "",
+    blood_group: "", emergency_contact: "", special_notes: "",
+  });
+  const [coupon,        setCoupon]        = useState("");
+  const [couponApplied, setCouponApplied] = useState<{ id: string; discount: number; label: string } | null>(null);
+  const [couponErr,     setCouponErr]     = useState("");
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [submitting,    setSubmitting]    = useState(false);
+  const [submitErr,     setSubmitErr]     = useState("");
+
+  // Guard: must be logged in
+  const [userEmail, setUserEmail] = useState("");
+  const [userToken, setUserToken] = useState("");
+
+  useEffect(() => {
+    const raw = localStorage.getItem("cs_user");
+    if (!raw) {
+      sessionStorage.setItem("cs_post_login_redirect", `/events/${slug}/register`);
+      router.replace("/auth?tab=login");
+      return;
+    }
+    try {
+      const u: StoredUser = JSON.parse(raw);
+      if (!u.email) { router.replace("/auth?tab=login"); return; }
+      setUserEmail(u.email);
+      setUserToken(localStorage.getItem("cs_user_token") ?? "");
+      setForm(f => ({
+        ...f,
+        name:  `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim(),
+        email: u.email ?? "",
+        phone: u.phone ?? "",
+      }));
+    } catch { router.replace("/auth?tab=login"); }
+  }, [slug, router]);
+
+  // Fetch event details
+  useEffect(() => {
+    if (!slug) return;
+    fetch(`/api/events/upcoming`)
+      .then(r => r.json())
+      .then(d => {
+        // Try from upcoming list first (fastest)
+        const found = (d.events ?? []).find((e: EventInfo) => e.share_slug === slug || e.id === slug);
+        if (found) { setEv(found); setLoading(false); return; }
+        // Fallback: by-slug endpoint
+        return fetch(`/api/events/by-slug?slug=${slug}`).then(r => r.json()).then(d2 => {
+          if (d2.event) { setEv(d2.event); } else { setEvErr(true); }
+          setLoading(false);
+        });
+      })
+      .catch(() => { setEvErr(true); setLoading(false); });
+  }, [slug]);
+
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    setForm(f => ({ ...f, [k]: e.target.value }));
+
+  // ── Coupon validation ──────────────────────────────────────────────────────
+
+  const applyCoupon = useCallback(async () => {
+    if (!coupon.trim()) return;
+    setCouponLoading(true); setCouponErr(""); setCouponApplied(null);
+    try {
+      const res  = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: coupon, email: userEmail, event_id: ev?.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setCouponErr(data.error ?? "Invalid coupon."); return; }
+
+      const price    = ev?.price ?? 0;
+      const disc     = data.discount_type === "percentage"
+        ? Math.min(price, Math.round(price * data.discount_value / 100))
+        : Math.min(price, data.discount_value);
+      setCouponApplied({ id: data.coupon_id, discount: disc, label: data.description ?? coupon.toUpperCase() });
+    } catch { setCouponErr("Could not validate coupon. Please try again."); }
+    finally   { setCouponLoading(false); }
+  }, [coupon, userEmail, ev?.id, ev?.price]);
+
+  // ── Submit ─────────────────────────────────────────────────────────────────
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!ev) return;
+    if (!form.name.trim() || !form.email.trim()) {
+      setSubmitErr("Name and email are required."); return;
+    }
+    setSubmitting(true); setSubmitErr("");
+
+    try {
+      const res  = await fetch("/api/events/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event_id:          ev.id,
+          email:             form.email,
+          name:              form.name,
+          phone:             form.phone,
+          gender:            form.gender,
+          date_of_birth:     form.date_of_birth || null,
+          blood_group:       form.blood_group,
+          emergency_contact: form.emergency_contact,
+          special_notes:     form.special_notes,
+          coupon_code:       couponApplied ? coupon : undefined,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) { setSubmitErr(data.error ?? "Registration failed."); return; }
+
+      // Already registered
+      if (data.already) {
+        router.push(`/events/${slug}/register/success?code=${data.registration_code}`);
+        return;
+      }
+
+      // Free event
+      if (data.free) {
+        router.push(`/events/${slug}/register/success?code=${data.registration_code}`);
+        return;
+      }
+
+      // Paid event — open Razorpay
+      await loadRazorpay();
+      const orderRes  = await fetch("/api/events/create-payment-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event_id: ev.id, email: form.email, registration_code: data.registration_code }),
+      });
+      const orderData = await orderRes.json();
+      if (!orderRes.ok) { setSubmitErr(orderData.error ?? "Could not create payment order."); return; }
+
+      const rzp = new window.Razorpay({
+        key:         orderData.key,
+        amount:      orderData.amount,
+        currency:    "INR",
+        name:        "Connected Steps",
+        description: ev.title,
+        order_id:    orderData.orderId,
+        prefill:     { name: form.name, email: form.email, contact: form.phone },
+        theme:       { color: "#e8620a" },
+        handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
+          const vRes  = await fetch("/api/events/verify-payment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...response, registration_code: data.registration_code }),
+          });
+          const vData = await vRes.json();
+          if (vData.success) {
+            router.push(`/events/${slug}/register/success?code=${data.registration_code}&paid=1`);
+          } else {
+            setSubmitErr("Payment verification failed. Please contact support.");
+            setSubmitting(false);
+          }
+        },
+        modal: {
+          ondismiss: () => setSubmitting(false),
+        },
+      });
+      rzp.open();
+
+    } catch (err: unknown) {
+      setSubmitErr(String(err));
+      setSubmitting(false);
+    }
+  }
+
+  // ── Price display ──────────────────────────────────────────────────────────
+
+  const price    = ev?.price ?? 0;
+  const discount = couponApplied?.discount ?? 0;
+  const final    = Math.max(0, price - discount);
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#0d0d10", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.3)" }}>
+        Loading event…
+      </div>
+    );
+  }
+
+  if (evErr || !ev) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#0d0d10", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "1rem", color: "rgba(255,255,255,0.4)" }}>
+        <div style={{ fontSize: "2rem" }}>😕</div>
+        <div>Event not found.</div>
+        <Link href="/events" style={{ color: "#e8620a", textDecoration: "none", fontSize: "0.875rem" }}>← View all events</Link>
+      </div>
+    );
+  }
+
+  const conf = TYPE[ev.event_type] ?? TYPE.running;
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#0d0d10", color: "#fff" }}>
+
+      {/* Nav */}
+      <nav style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(13,13,16,0.97)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 1.5rem", height: "56px", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+        <Link href={`/events/${slug}`} style={{ fontSize: "0.875rem", color: "rgba(255,255,255,0.6)", textDecoration: "none" }}>← Event Details</Link>
+      </nav>
+
+      <div style={{ maxWidth: "600px", margin: "0 auto", padding: "2rem 1.5rem 5rem" }}>
+
+        {/* Event summary */}
+        <div style={{ padding: "1rem 1.25rem", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "12px", marginBottom: "1.75rem", display: "flex", gap: "0.875rem", alignItems: "flex-start" }}>
+          <div style={{ fontSize: "1.75rem", flexShrink: 0 }}>{conf.icon}</div>
+          <div>
+            <div style={{ fontSize: "0.75rem", fontWeight: 700, color: conf.color, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "2px" }}>{conf.label}</div>
+            <div style={{ fontSize: "1rem", fontWeight: 700, color: "#fff", marginBottom: "4px" }}>{ev.title}</div>
+            <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.5)" }}>
+              📅 {fmtDate(ev.start_date)}{ev.start_time ? ` · ${fmtTime(ev.start_time)}` : ""}  · 📍 {ev.location}
+            </div>
+          </div>
+        </div>
+
+        <h1 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1.75rem", color: "#fff" }}>Registration Form</h1>
+
+        <form onSubmit={handleSubmit} noValidate>
+
+          {/* ── Personal details ────────────────────────────────────────────── */}
+          <section style={{ marginBottom: "1.5rem" }}>
+            <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>Personal Details</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              <div style={{ gridColumn: "1/-1" }}>
+                <label style={LABEL}>Full Name *</label>
+                <input style={INPUT} value={form.name} onChange={set("name")} required placeholder="Your full name" />
+              </div>
+              <div>
+                <label style={LABEL}>Email *</label>
+                <input style={{ ...INPUT, background: "rgba(255,255,255,0.03)", color: "rgba(255,255,255,0.5)" }} value={form.email} readOnly />
+              </div>
+              <div>
+                <label style={LABEL}>Phone</label>
+                <input style={INPUT} value={form.phone} onChange={set("phone")} placeholder="+91 00000 00000" type="tel" />
+              </div>
+              <div>
+                <label style={LABEL}>Gender</label>
+                <select style={{ ...INPUT, cursor: "pointer", colorScheme: "dark" }} value={form.gender} onChange={set("gender")}>
+                  <option value="" style={{ background: "#1a1a1a" }}>Select</option>
+                  <option value="male"   style={{ background: "#1a1a1a" }}>Male</option>
+                  <option value="female" style={{ background: "#1a1a1a" }}>Female</option>
+                  <option value="other"  style={{ background: "#1a1a1a" }}>Other</option>
+                </select>
+              </div>
+              <div>
+                <label style={LABEL}>Date of Birth</label>
+                <input style={{ ...INPUT, colorScheme: "dark" }} type="date" value={form.date_of_birth} onChange={set("date_of_birth")} />
+              </div>
+            </div>
+          </section>
+
+          {/* ── Event-specific ─────────────────────────────────────────────── */}
+          <section style={{ marginBottom: "1.5rem" }}>
+            <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>Event Information</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              <div>
+                <label style={LABEL}>Blood Group</label>
+                <select style={{ ...INPUT, cursor: "pointer", colorScheme: "dark" }} value={form.blood_group} onChange={set("blood_group")}>
+                  <option value="" style={{ background: "#1a1a1a" }}>Select</option>
+                  {["A+","A-","B+","B-","AB+","AB-","O+","O-"].map(g => <option key={g} value={g} style={{ background: "#1a1a1a" }}>{g}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={LABEL}>Emergency Contact</label>
+                <input style={INPUT} value={form.emergency_contact} onChange={set("emergency_contact")} placeholder="Name & phone number" />
+              </div>
+              <div style={{ gridColumn: "1/-1" }}>
+                <label style={LABEL}>Special Notes</label>
+                <textarea style={{ ...INPUT, minHeight: "70px", resize: "vertical" } as React.CSSProperties} value={form.special_notes} onChange={set("special_notes")} placeholder="Any medical conditions, dietary needs, or questions…" />
+              </div>
+            </div>
+          </section>
+
+          {/* ── Coupon ─────────────────────────────────────────────────────── */}
+          {price > 0 && (
+            <section style={{ marginBottom: "1.5rem" }}>
+              <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>Coupon Code</div>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <input
+                  style={{ ...INPUT, flex: 1, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "monospace" }}
+                  value={coupon}
+                  onChange={e => { setCoupon(e.target.value.toUpperCase()); setCouponErr(""); setCouponApplied(null); }}
+                  placeholder="ENTER CODE"
+                  disabled={!!couponApplied}
+                />
+                <button
+                  type="button"
+                  onClick={couponApplied ? () => { setCouponApplied(null); setCoupon(""); } : applyCoupon}
+                  disabled={couponLoading || (!couponApplied && !coupon.trim())}
+                  style={{ padding: "0 1.25rem", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.15)", background: couponApplied ? "rgba(239,68,68,0.1)" : "rgba(255,255,255,0.06)", color: couponApplied ? "#f87171" : "#fff", cursor: "pointer", fontSize: "0.8rem", fontWeight: 700, fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                  {couponLoading ? "…" : couponApplied ? "Remove" : "Apply"}
+                </button>
+              </div>
+              {couponErr && <div style={{ fontSize: "0.78rem", color: "#f87171", marginTop: "0.5rem" }}>{couponErr}</div>}
+              {couponApplied && <div style={{ fontSize: "0.78rem", color: "#4ade80", marginTop: "0.5rem" }}>✓ {couponApplied.label} — saves ₹{couponApplied.discount}</div>}
+            </section>
+          )}
+
+          {/* ── Price summary ───────────────────────────────────────────────── */}
+          <div style={{ padding: "1rem 1.25rem", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "12px", marginBottom: "1.5rem" }}>
+            {price > 0 ? (
+              <>
+                <PriceLine label="Registration Fee" value={`₹${price}`} />
+                {discount > 0 && <PriceLine label={`Coupon Discount (${coupon})`} value={`−₹${discount}`} muted />}
+                <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "0.75rem 0" }} />
+                <PriceLine label="Total" value={final === 0 ? "Free" : `₹${final}`} bold />
+              </>
+            ) : (
+              <PriceLine label="Registration Fee" value="Free Entry" bold />
+            )}
+          </div>
+
+          {/* Error */}
+          {submitErr && (
+            <div style={{ padding: "10px 14px", borderRadius: "8px", marginBottom: "1rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", fontSize: "0.82rem" }}>
+              {submitErr}
+            </div>
+          )}
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={submitting}
+            style={{ width: "100%", padding: "14px", borderRadius: "10px", background: submitting ? "rgba(232,98,10,0.5)" : "linear-gradient(135deg,#e8620a,#f07c2a)", border: "none", color: "#fff", fontWeight: 700, fontSize: "1rem", cursor: submitting ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: submitting ? "none" : "0 4px 20px rgba(232,98,10,0.35)" }}>
+            {submitting ? "Processing…" : final > 0 ? `Pay ₹${final} & Register` : "Complete Registration →"}
+          </button>
+
+          <p style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.3)", textAlign: "center", marginTop: "0.75rem" }}>
+            By registering you agree to our terms &amp; conditions.
+          </p>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function PriceLine({ label, value, muted, bold }: { label: string; value: string; muted?: boolean; bold?: boolean }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.375rem" }}>
+      <span style={{ fontSize: "0.82rem", color: muted ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.65)", fontStyle: muted ? "italic" : undefined }}>{label}</span>
+      <span style={{ fontSize: bold ? "1rem" : "0.82rem", fontWeight: bold ? 700 : 500, color: muted ? "#4ade80" : bold ? "#fff" : "rgba(255,255,255,0.8)" }}>{value}</span>
+    </div>
+  );
+}
