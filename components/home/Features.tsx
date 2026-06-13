@@ -1,68 +1,192 @@
 "use client";
 
-const features = [
-  {
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><polyline points="16 7 22 7 22 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-    title: "Adaptive training plans",
-    desc: "Your plan adjusts every week based on your performance, recovery, and life.",
-  },
-  {
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.5"/><path d="M4 20c0-4 3.58-7 8-7s8 3 8 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
-    title: "Expert coaches",
-    desc: "Matched with a certified running coach who knows your goals, your pace, and your limits.",
-  },
-  {
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M3 12h4l3-9 4 18 3-9h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-    title: "Real-time analytics",
-    desc: "Pace, heart rate, cadence, training load — all in one dashboard.",
-  },
-  {
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.5"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
-    title: "Accountable community",
-    desc: "Group challenges, run clubs, and runners who celebrate every kilometre with you.",
-  },
-  {
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-    title: "Achievements & milestones",
-    desc: "Earn badges for streaks, personal bests, and distances.",
-  },
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { ArrowRight } from "lucide-react";
+
+// ── Check icon ────────────────────────────────────────────────────────────────
+function Check() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+      <circle cx="8" cy="8" r="7.25" fill="rgba(232,98,10,0.12)" stroke="rgba(232,98,10,0.3)" strokeWidth="0.75" />
+      <polyline points="4.5,8 7,10.5 11.5,5.5" stroke="var(--cs-orange)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+const programs = [
+  "Beginner Running Program",
+  "5K & 10K Training",
+  "Half Marathon Preparation",
+  "Marathon Coaching",
+  "Strength & Conditioning",
 ];
 
+const activities = [
+  "Weekly Long Runs",
+  "Track Workouts",
+  "Recovery Runs",
+  "Race Day Support",
+  "Community Challenges",
+];
+
+interface Session {
+  id: string;
+  title: string;
+  date: string;
+  venue: string | null;
+  location: string | null;
+  photo_url: string | null;
+}
+
+function fmtDate(d: string) {
+  return new Date(d + "T12:00:00Z").toLocaleDateString("en-IN", {
+    day: "numeric", month: "short",
+  });
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function Features() {
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    fetch("/api/sessions/recent")
+      .then(r => r.json())
+      .then(d => {
+        const s: Session[] = (d.sessions ?? []).slice(0, 3);
+        setSessions(s);
+        const ids = s.map(x => x.id).join(",");
+        if (ids) {
+          fetch(`/api/sessions/rsvp-counts?ids=${ids}`)
+            .then(r => r.json())
+            .then(cd => setCounts(cd.counts ?? {}))
+            .catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <section className="section" style={{ background: "var(--cs-black)" }}>
+      <style>{`
+        @media (min-width: 1024px) {
+          .cs-features-grid  { grid-template-columns: 2fr 3fr; gap: 5rem; align-items: start; }
+          .cs-features-left  { position: sticky; top: 7rem; }
+        }
+        @media (min-width: 600px) {
+          .cs-programs-cols  { grid-template-columns: 1fr 1fr; }
+        }
+      `}</style>
+
       <div className="container">
-        <div className="grid lg:grid-cols-2 gap-20 items-start">
-          <div className="lg:sticky lg:top-32">
+        <div style={{ display: "grid", gap: "2.5rem" }} className="cs-features-grid">
+
+          {/* ── Left ─────────────────────────────────────────────────────── */}
+          <div className="cs-features-left">
             <span className="gold-line" />
             <div className="section-label">Why Connected Steps</div>
-            <h2 className="font-display mt-2 mb-6"
-              style={{ fontSize: "clamp(2.2rem, 4vw, 3.5rem)", fontWeight: 300, color: "var(--cs-cream)" }}>
-              Training that{" "}
-              <em className="not-italic" style={{ color: "var(--cs-orange)" }}>moves</em>{" "}with you.
+
+            <h2 className="font-display mt-3 mb-5"
+              style={{ fontSize: "clamp(1.9rem, 3.5vw, 2.9rem)", fontWeight: 300, lineHeight: 1.12, color: "var(--cs-cream)" }}>
+              Why Runners Choose{" "}
+              <em className="not-italic" style={{ color: "var(--cs-orange)" }}>Connected Steps</em>
             </h2>
-            <p className="text-base leading-relaxed" style={{ color: "var(--cs-muted)", maxWidth: "400px" }}>
-              We built Connected Steps for the runner who is serious about getting better — not just
-              logging kilometres, but running with purpose and a plan behind every step.
+
+            <p style={{ fontSize: "0.95rem", lineHeight: 1.8, color: "var(--cs-muted)", maxWidth: 380, marginBottom: "0.9rem" }}>
+              From your first group run to your first marathon, we give you structure,
+              NIS-certified coaching, and a community that shows up every weekend — rain or shine.
             </p>
+            <p style={{ fontSize: "0.875rem", lineHeight: 1.75, color: "var(--cs-muted)", maxWidth: 380, marginBottom: "1.75rem" }}>
+              We are not an app. We are a club. Real coaches. Real routes. Real accountability.
+            </p>
+
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              <Link href="/auth?tab=register"
+                style={{ display: "inline-flex", alignItems: "center", gap: 7, borderRadius: 8, background: "var(--gradient-accent)", padding: "11px 22px", fontSize: "0.875rem", fontWeight: 600, color: "var(--accent-foreground)", textDecoration: "none", boxShadow: "var(--shadow-orange)" }}>
+                Join the community <ArrowRight size={14} />
+              </Link>
+              <Link href="/running-club-hyderabad"
+                style={{ display: "inline-flex", alignItems: "center", gap: 7, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", padding: "11px 22px", fontSize: "0.875rem", fontWeight: 500, color: "var(--cs-muted)", textDecoration: "none" }}>
+                Explore programs
+              </Link>
+            </div>
           </div>
 
-          <div className="grid gap-6">
-            {features.map((f) => (
-              <div key={f.title} className="flex gap-5 p-6 rounded"
-                style={{ background: "var(--cs-charcoal)", border: "1px solid rgba(255,255,255,0.05)", transition: "border-color 0.2s" }}
-                onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.borderColor = "rgba(232,98,10,0.3)")}
-                onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.05)")}>
-                <div className="flex-shrink-0 w-10 h-10 rounded flex items-center justify-center"
-                  style={{ background: "rgba(232,98,10,0.1)", color: "var(--cs-orange)", border: "1px solid rgba(232,98,10,0.2)" }}>
-                  {f.icon}
+          {/* ── Right ────────────────────────────────────────────────────── */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+
+            {/* Programs + Activities — side-by-side on sm+ */}
+            <div style={{ display: "grid", gap: "1rem" }} className="cs-programs-cols">
+
+              {/* Training Programs */}
+              <div style={{ padding: "1.5rem", borderRadius: 14, background: "var(--cs-charcoal)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--cs-orange)", marginBottom: "1rem" }}>
+                  Training Programs
                 </div>
-                <div>
-                  <h3 className="font-display text-lg font-medium mb-1" style={{ color: "var(--cs-cream)" }}>{f.title}</h3>
-                  <p className="text-sm leading-relaxed" style={{ color: "var(--cs-muted)" }}>{f.desc}</p>
+                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+                  {programs.map(p => (
+                    <li key={p} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "0.875rem", color: "var(--cs-cream)" }}>
+                      <Check /> {p}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Weekly Activities */}
+              <div style={{ padding: "1.5rem", borderRadius: 14, background: "var(--cs-charcoal)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--cs-orange)", marginBottom: "1rem" }}>
+                  Every Week
+                </div>
+                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+                  {activities.map(a => (
+                    <li key={a} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "0.875rem", color: "var(--cs-cream)" }}>
+                      <Check /> {a}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* Recent Sessions — only shows when real data exists */}
+            {sessions.length > 0 && (
+              <div style={{ padding: "1.25rem 1.5rem", borderRadius: 14, background: "var(--cs-charcoal)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--cs-orange)", marginBottom: "1rem" }}>
+                  Recent Community Sessions
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+                  {sessions.map((s, i) => (
+                    <div key={s.id}
+                      style={{ display: "flex", alignItems: "center", gap: "0.875rem", padding: "0.625rem 0", borderBottom: i < sessions.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                      {/* Thumbnail */}
+                      <div style={{ width: 44, height: 44, borderRadius: 8, overflow: "hidden", flexShrink: 0, background: "rgba(232,98,10,0.07)" }}>
+                        {s.photo_url ? (
+                          <img src={s.photo_url} alt={s.title} loading="lazy"
+                            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                        ) : (
+                          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem" }}>🏃</div>
+                        )}
+                      </div>
+                      {/* Details */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: "0.825rem", fontWeight: 600, color: "var(--cs-cream)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {s.title}
+                        </div>
+                        <div style={{ fontSize: "0.72rem", color: "var(--cs-muted)", marginTop: 2 }}>
+                          {fmtDate(s.date)} · {s.venue || s.location || "Hyderabad"}
+                          {(counts[s.id] ?? 0) > 0 && (
+                            <span style={{ color: "var(--cs-orange)", fontWeight: 600, marginLeft: 6 }}>
+                              · {counts[s.id]} runners
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>
