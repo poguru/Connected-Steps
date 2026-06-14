@@ -354,14 +354,21 @@ export default function Dashboard() {
   useEffect(() => {
     const stored = localStorage.getItem("cs_user");
     if (!stored) { router.push("/auth"); return; }
-    const u: User = JSON.parse(stored);
+    let u: User;
+    try {
+      u = JSON.parse(stored);
+    } catch {
+      localStorage.removeItem("cs_user");
+      router.push("/auth");
+      return;
+    }
     setUser(u);
 
     const storedStrava = localStorage.getItem("cs_strava") || localStorage.getItem(`cs_strava_${u.email}`);
     if (storedStrava) {
       localStorage.setItem("cs_strava", storedStrava);
       localStorage.setItem(`cs_strava_${u.email}`, storedStrava);
-      setStrava(JSON.parse(storedStrava));
+      try { setStrava(JSON.parse(storedStrava)); } catch { localStorage.removeItem("cs_strava"); }
     }
 
     fetch(`/api/leaderboard/user?email=${encodeURIComponent(u.email)}`)
@@ -420,8 +427,10 @@ export default function Dashboard() {
       localStorage.setItem("cs_strava", JSON.stringify(tokens));
       const currentUser = localStorage.getItem("cs_user");
       if (currentUser) {
-        const email = JSON.parse(currentUser).email;
-        localStorage.setItem(`cs_strava_${email}`, JSON.stringify(tokens));
+        try {
+          const email = JSON.parse(currentUser).email;
+          localStorage.setItem(`cs_strava_${email}`, JSON.stringify(tokens));
+        } catch { /* ignore corrupted user data */ }
       }
       setStrava(tokens);
       setStravaMsg("Strava connected successfully!");

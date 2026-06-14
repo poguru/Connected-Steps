@@ -43,16 +43,20 @@ function fmtTime(t: string | null) {
 // ── Data ──────────────────────────────────────────────────────────────────────
 
 async function getEvents(): Promise<Event[]> {
-  const db    = getSupabaseServer();
-  const today = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().split("T")[0];
-  const { data } = await db
-    .from("events")
-    .select("id, title, description, event_type, cover_image, start_date, start_time, location, price, featured, max_participants, share_slug")
-    .eq("status", "published")
-    .gte("start_date", today)
-    .order("featured", { ascending: false })
-    .order("start_date", { ascending: true });
-  return (data ?? []) as Event[];
+  try {
+    const db    = getSupabaseServer();
+    const today = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().split("T")[0];
+    const { data } = await db
+      .from("events")
+      .select("id, title, description, event_type, cover_image, start_date, start_time, location, price, featured, max_participants, share_slug")
+      .eq("status", "published")
+      .gte("start_date", today)
+      .order("featured", { ascending: false })
+      .order("start_date", { ascending: true });
+    return (data ?? []) as Event[];
+  } catch {
+    return [];
+  }
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────

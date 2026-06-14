@@ -32,28 +32,36 @@ const TYPE: Record<string, { label: string; icon: string; color: string }> = {
 // ── Data ──────────────────────────────────────────────────────────────────────
 
 async function getEvent(slug: string): Promise<Event | null> {
-  const db = getSupabaseServer();
-  const { data } = await db
-    .from("events")
-    .select("*")
-    .eq("share_slug", slug)
-    .eq("status", "published")
-    .single();
+  try {
+    const db = getSupabaseServer();
+    const { data } = await db
+      .from("events")
+      .select("*")
+      .eq("share_slug", slug)
+      .eq("status", "published")
+      .single();
 
-  if (data) {
-    db.from("events").update({ view_count: (data.view_count ?? 0) + 1 }).eq("share_slug", slug).then(() => {});
+    if (data) {
+      db.from("events").update({ view_count: (data.view_count ?? 0) + 1 }).eq("share_slug", slug).then(() => {});
+    }
+    return data ?? null;
+  } catch {
+    return null;
   }
-  return data ?? null;
 }
 
 async function getSlotCount(eventId: string): Promise<number> {
-  const db = getSupabaseServer();
-  const { count } = await db
-    .from("event_registrations")
-    .select("id", { count: "exact", head: true })
-    .eq("event_id", eventId)
-    .eq("status", "confirmed");
-  return count ?? 0;
+  try {
+    const db = getSupabaseServer();
+    const { count } = await db
+      .from("event_registrations")
+      .select("id", { count: "exact", head: true })
+      .eq("event_id", eventId)
+      .eq("status", "confirmed");
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
 }
 
 // ── Metadata ──────────────────────────────────────────────────────────────────

@@ -44,7 +44,8 @@ export default function Achievements() {
   useEffect(() => {
     const stored = localStorage.getItem("cs_user");
     if (!stored) { router.push("/auth"); return; }
-    const u: User = JSON.parse(stored);
+    let u: User;
+    try { u = JSON.parse(stored); } catch { localStorage.removeItem("cs_user"); router.push("/auth"); return; }
     setUser(u);
     fetch(`/api/user/achievements?email=${encodeURIComponent(u.email)}`)
       .then(r => r.json()).then(d => setServerData(d)).catch(() => {}).finally(() => setLoading(false));

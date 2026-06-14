@@ -25,7 +25,12 @@ export default function FeedPageClient() {
   useEffect(() => {
     const stored = localStorage.getItem("cs_user");
     if (!stored) { router.push("/auth"); return; }
-    setUser(JSON.parse(stored) as AppUser);
+    try {
+      setUser(JSON.parse(stored) as AppUser);
+    } catch {
+      localStorage.removeItem("cs_user");
+      router.push("/auth");
+    }
   }, [router]);
 
   function handlePosted(_post: UserPost) {

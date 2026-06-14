@@ -96,7 +96,8 @@ export default function Leaderboard() {
   useEffect(() => {
     const stored = localStorage.getItem("cs_user");
     if (!stored) { router.push("/auth"); return; }
-    const u: User = JSON.parse(stored);
+    let u: User;
+    try { u = JSON.parse(stored); } catch { localStorage.removeItem("cs_user"); router.push("/auth"); return; }
     setUser(u);
     fetch(`/api/follow?email=${encodeURIComponent(u.email)}&type=following`)
       .then(r => r.json())
