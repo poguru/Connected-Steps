@@ -11,7 +11,8 @@ interface Reg {
   created_at: string;
   events: {
     title: string; event_type: string; start_date: string;
-    start_time: string | null; location: string; share_slug: string | null;
+    start_time: string | null; end_date: string | null; end_time: string | null;
+    location: string; share_slug: string | null;
   } | null;
 }
 
@@ -55,10 +56,20 @@ export default function MyEventRegistrations() {
       .finally(() => setLoading(false));
   }, []);
 
-  const today = new Date().toISOString().split("T")[0];
-  // Defensive: include registration even if events join returned null (treat as upcoming)
-  const upcoming = regs.filter(r => r.status !== "cancelled" && (!r.events || r.events.start_date >= today));
-  const past     = regs.filter(r => r.status !== "cancelled" && r.events && r.events.start_date < today);
+  const ist     = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+  const today   = ist.toISOString().split("T")[0];
+  const nowTime = ist.toTimeString().split(" ")[0].substring(0, 5);
+
+  function isEventOver(ev: Reg["events"]): boolean {
+    if (!ev) return false;
+    const endDate = ev.end_date ?? ev.start_date;
+    if (endDate < today) return true;
+    if (endDate === today && ev.end_time != null && ev.end_time.substring(0, 5) <= nowTime) return true;
+    return false;
+  }
+
+  const upcoming = regs.filter(r => r.status !== "cancelled" && !isEventOver(r.events));
+  const past     = regs.filter(r => r.status !== "cancelled" && isEventOver(r.events));
   const shown    = tab === "upcoming" ? upcoming : past;
 
   return (

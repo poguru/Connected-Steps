@@ -1,20 +1,30 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
-export const revalidate = 60; // 1-minute cache so unpublished events disappear quickly
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const db = getSupabaseServer();
 
-  // Use IST (UTC+5:30) for today's cutoff
-  const istNow = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
-  const today  = istNow.toISOString().split("T")[0];
+  const istNow  = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+  const today   = istNow.toISOString().split("T")[0];
+  const nowTime = istNow.toTimeString().split(" ")[0].substring(0, 5); // "HH:MM"
 
+  // Show events that haven't ended yet (in IST):
+  //   1. end_date is a future date
+  //   2. end_date is today but end_time hasn't passed
+  //   3. end_date is today with no end_time (all-day / unknown end — keep showing)
+  //   4. no end_date set — fall back to start_date >= today
   const { data, error } = await db
     .from("events")
-    .select("id, title, description, event_type, cover_image, start_date, start_time, end_date, end_time, location, organizer, max_participants, participant_count, registration_required, price, featured, share_slug, share_count")
+    .select("id, title, description, event_type, cover_image, start_date, start_time, end_date, end_time, registration_close_time, location, organizer, max_participants, participant_count, registration_required, price, featured, share_slug, share_count")
     .eq("status", "published")
-    .gte("start_date", today)
+    .or(
+      `end_date.gt.${today},` +
+      `and(end_date.eq.${today},end_time.gt.${nowTime}),` +
+      `and(end_date.eq.${today},end_time.is.null),` +
+      `and(end_date.is.null,start_date.gte.${today})`
+    )
     .order("featured", { ascending: false })
     .order("start_date", { ascending: true })
     .limit(4);

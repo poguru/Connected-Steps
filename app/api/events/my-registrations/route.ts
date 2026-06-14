@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const eventIds = [...new Set(regs.map(r => r.event_id))];
   const { data: events } = await db
     .from("events")
-    .select("id, title, event_type, cover_image, start_date, start_time, location, share_slug")
+    .select("id, title, event_type, cover_image, start_date, start_time, end_date, end_time, location, share_slug")
     .in("id", eventIds);
 
   type EvRow = NonNullable<typeof events>[number];

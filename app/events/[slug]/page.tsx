@@ -11,6 +11,7 @@ interface Event {
   event_type: string; cover_image: string | null;
   start_date: string; start_time: string | null;
   end_date: string | null; end_time: string | null;
+  registration_close_time: string | null;
   location: string; organizer: string | null;
   max_participants: number | null; registration_required: boolean;
   price: number; featured: boolean;
@@ -177,7 +178,15 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
             This event is fully booked
           </div>
         ) : (
-          <RegisterButton eventId={ev.id} slug={ev.share_slug ?? ev.id} price={ev.price} />
+          <RegisterButton
+            eventId={ev.id}
+            slug={ev.share_slug ?? ev.id}
+            price={ev.price}
+            startDate={ev.start_date}
+            endDate={ev.end_date}
+            endTime={ev.end_time}
+            registrationCloseTime={ev.registration_close_time}
+          />
         )}
 
         <div style={{ textAlign: "center", marginBottom: "2rem" }}>

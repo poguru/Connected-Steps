@@ -1,20 +1,26 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 // GET /api/events — all published future events for the listing page
 export async function GET() {
   const db = getSupabaseServer();
 
-  const istNow = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
-  const today  = istNow.toISOString().split("T")[0];
+  const istNow  = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+  const today   = istNow.toISOString().split("T")[0];
+  const nowTime = istNow.toTimeString().split(" ")[0].substring(0, 5); // "HH:MM"
 
   const { data, error } = await db
     .from("events")
-    .select("id, title, description, event_type, cover_image, start_date, start_time, end_date, end_time, location, organizer, max_participants, participant_count, registration_required, price, featured, share_slug, view_count, share_count, status")
+    .select("id, title, description, event_type, cover_image, start_date, start_time, end_date, end_time, registration_close_time, location, organizer, max_participants, participant_count, registration_required, price, featured, share_slug, view_count, share_count, status")
     .eq("status", "published")
-    .gte("start_date", today)
+    .or(
+      `end_date.gt.${today},` +
+      `and(end_date.eq.${today},end_time.gt.${nowTime}),` +
+      `and(end_date.eq.${today},end_time.is.null),` +
+      `and(end_date.is.null,start_date.gte.${today})`
+    )
     .order("featured", { ascending: false })
     .order("start_date", { ascending: true });
 

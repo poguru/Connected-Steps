@@ -16,6 +16,7 @@ interface Event {
   start_time:            string | null;
   end_date:              string | null;
   end_time:              string | null;
+  registration_close_time: string | null;
   location:              string;
   organizer:             string | null;
   max_participants:      number | null;
@@ -70,7 +71,7 @@ export default function AdminEventsPage() {
   const [msg,     setMsg]     = useState("");
 
   // Event form
-  const blankEf = { title: "", description: "", event_type: "running", cover_image: "", start_date: "", start_time: "", end_date: "", end_time: "", location: "", organizer: "", max_participants: "", registration_required: true, price: "0", featured: false, terms_conditions: "", maps_url: "" };
+  const blankEf = { title: "", description: "", event_type: "running", cover_image: "", start_date: "", start_time: "", end_date: "", end_time: "", registration_close_time: "", location: "", organizer: "", max_participants: "", registration_required: true, price: "0", featured: false, terms_conditions: "", maps_url: "" };
   const [ef, setEf] = useState(blankEf);
 
   // Coupon form
@@ -117,6 +118,7 @@ export default function AdminEventsPage() {
       start_time:           ef.start_time || null,
       end_date:             ef.end_date || null,
       end_time:             ef.end_time || null,
+      registration_close_time: ef.registration_close_time || null,
       location:             ef.location,
       organizer:            ef.organizer || null,
       max_participants:     ef.max_participants ? Number(ef.max_participants) : null,
@@ -290,6 +292,12 @@ export default function AdminEventsPage() {
                   <div>
                     <label style={S.label}>End Time</label>
                     <input style={{ ...S.input, colorScheme: "dark" }} type="time" value={ef.end_time} onChange={e => setEf(f => ({ ...f, end_time: e.target.value }))} />
+                  </div>
+
+                  <div>
+                    <label style={S.label}>Registration Closes At</label>
+                    <input style={{ ...S.input, colorScheme: "dark" }} type="time" value={ef.registration_close_time} onChange={e => setEf(f => ({ ...f, registration_close_time: e.target.value }))} />
+                    <div style={{ fontSize: "11px", color: "#555", marginTop: "4px" }}>Time on Start Date after which registration is no longer accepted</div>
                   </div>
 
                   <div>
