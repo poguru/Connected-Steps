@@ -69,7 +69,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     openGraph: {
       title: ev.title,
       description: ev.description ?? `${conf.icon} ${conf.label} · ${date} · ${ev.location}`,
-      images: ev.cover_image ? [{ url: ev.cover_image }] : [],
+      images: ev.cover_image
+        ? [{ url: ev.cover_image }]
+        : [{ url: "https://www.connectedsteps.in/logo.png", width: 512, height: 512, alt: "Connected Steps" }],
     },
   };
 }
