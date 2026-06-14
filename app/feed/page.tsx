@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import FeedPageClient from "./FeedPageClient";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Community Feed — Connected Steps",
   description: "See what runners are up to. Sessions, achievements, and photos from the Connected Steps community.",

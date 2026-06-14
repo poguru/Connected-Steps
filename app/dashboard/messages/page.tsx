@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import CoachInbox from "@/components/dashboard/CoachInbox";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Messages | Connected Steps",
   description: "Coach inbox — view and reply to athlete messages.",
