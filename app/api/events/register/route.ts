@@ -61,20 +61,11 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Account not found. Please sign up first." }, { status: 404 });
 
     // ── Verify event ───────────────────────────────────────────────────────────
-    let { data: ev } = await db
+    const { data: ev } = await db
       .from("events")
       .select("id, title, price, max_participants, participant_count, start_date, start_time, location, status")
       .eq("id", event_id)
       .single();
-    // participant_count column added by migration 20260613000007 — fall back if not yet applied
-    if (!ev) {
-      const { data: evFallback } = await db
-        .from("events")
-        .select("id, title, price, max_participants, start_date, start_time, location, status")
-        .eq("id", event_id)
-        .single();
-      if (evFallback) ev = { ...evFallback, participant_count: 0 };
-    }
     if (!ev || ev.status !== "published") {
       return NextResponse.json({ error: "Event not found." }, { status: 404 });
     }
