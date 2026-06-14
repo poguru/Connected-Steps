@@ -239,7 +239,9 @@ export default function ProfilePage() {
 
   if (!user) return null;
 
-  const ini = `${user.firstName[0] ?? ""}${user.lastName[0] ?? ""}`.toUpperCase();
+  const _f  = user.firstName ?? "";
+  const _l  = user.lastName  ?? "";
+  const ini = `${_f[0] ?? ""}${_l[0] ?? ""}`.toUpperCase() || "?";
   const displayPhoto = photoFile ?? photo;
 
   const sectionStyle: React.CSSProperties = { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: "1.5rem", boxShadow: "var(--shadow-md)" };

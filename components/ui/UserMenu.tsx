@@ -46,8 +46,10 @@ export default function UserMenu({ user }: Props) {
     router.push("/auth?tab=signin");
   };
 
-  const fullName = `${user.firstName} ${user.lastName}`;
-  const initials = `${user.firstName[0] ?? ""}${user.lastName[0] ?? ""}`.toUpperCase();
+  const first    = user.firstName ?? "";
+  const last     = user.lastName  ?? "";
+  const fullName = `${first} ${last}`.trim() || user.email;
+  const initials = `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase() || "?";
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
