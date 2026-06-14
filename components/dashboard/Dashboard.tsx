@@ -677,7 +677,10 @@ export default function Dashboard() {
 
   if (!user) return null;
 
-  const fullName     = `${user.firstName} ${user.lastName}`;
+  const _ufirst      = user.firstName ?? "";
+  const _ulast       = user.lastName  ?? "";
+  const userInitials = `${_ufirst[0] ?? ""}${_ulast[0] ?? ""}`.toUpperCase() || "?";
+  const fullName     = `${_ufirst} ${_ulast}`.trim() || user.email;
   const totalAttended = sessions.filter(r => r.attended).length;
   const monthStart    = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
   const monthAttended = sessions.filter(r => r.attended && r.sessions && new Date(r.sessions.date + "T00:00") >= monthStart).length;
@@ -709,7 +712,7 @@ export default function Dashboard() {
               <img src={user.photo} alt={fullName} style={{ width: "76px", height: "76px", borderRadius: "50%", objectFit: "cover", border: "3px solid var(--cs-orange)", margin: "0 auto 1rem", display: "block" }} />
             ) : (
               <div style={{ width: "76px", height: "76px", borderRadius: "50%", background: "oklch(0.72 0.19 49 / 12%)", border: "3px solid var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.6rem", fontWeight: 800, color: "var(--cs-orange)", margin: "0 auto 1rem" }}>
-                {user.firstName[0]}{user.lastName[0]}
+                {userInitials}
               </div>
             )}
             <div className="font-display" style={{ fontSize: "1.15rem", fontWeight: 700, color: "var(--cs-white)", marginBottom: "0.2rem" }}>{fullName}</div>
@@ -759,7 +762,7 @@ export default function Dashboard() {
                 <img src={user.photo} alt={fullName} style={{ width: "44px", height: "44px", borderRadius: "50%", objectFit: "cover", border: "2px solid var(--cs-orange)", flexShrink: 0 }} />
               ) : (
                 <div style={{ width: "44px", height: "44px", borderRadius: "50%", background: "oklch(0.72 0.19 49 / 12%)", border: "2px solid var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.9rem", fontWeight: 800, color: "var(--cs-orange)", flexShrink: 0 }}>
-                  {user.firstName[0]}{user.lastName[0]}
+                  {userInitials}
                 </div>
               )}
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -974,7 +977,7 @@ export default function Dashboard() {
                 followModalUsers.map((u, i) => (
                   <div key={u.email} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.75rem 1.25rem", borderTop: i > 0 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
                     <div style={{ width: 36, height: 36, borderRadius: "50%", background: "oklch(0.72 0.19 49 / 15%)", border: "1px solid oklch(0.72 0.19 49 / 25%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem", fontWeight: 700, color: "var(--cs-orange)", flexShrink: 0 }}>
-                      {u.name[0]?.toUpperCase() ?? "?"}
+                      {u.name?.[0]?.toUpperCase() ?? "?"}
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--cs-white)" }}>{u.name}</div>

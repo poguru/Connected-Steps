@@ -57,7 +57,7 @@ export default function PeopleYouMayKnow({ userEmail }: { userEmail: string }) {
             <div key={u.email} style={{ display: "flex", alignItems: "center", gap: "0.65rem", padding: "0.65rem 1.1rem", borderTop: i > 0 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
               {/* Avatar */}
               <div style={{ width: 32, height: 32, borderRadius: "50%", background: "oklch(0.72 0.19 49 / 15%)", border: "1px solid oklch(0.72 0.19 49 / 25%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", fontWeight: 700, color: "var(--cs-orange)", flexShrink: 0 }}>
-                {u.name[0]?.toUpperCase() ?? "?"}
+                {u.name?.[0]?.toUpperCase() ?? "?"}
               </div>
 
               {/* Name + location */}
