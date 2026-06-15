@@ -281,6 +281,27 @@ export function membershipWAParams(
   return [name, plan, amountINR.toLocaleString("en-IN"), expiry];
 }
 
+/** WhatsApp params for birthday_wishes template
+ *  MSG91 template body (create in MSG91 → WhatsApp → Templates):
+ *    Name:     birthday_wishes
+ *    Category: Utility
+ *    Body:
+ *      🎉 Happy Birthday, {{1}}!
+ *
+ *      The Connected Steps team wishes you a fantastic year ahead filled with
+ *      good health, strong runs, personal bests, and memorable races.
+ *
+ *      Thank you for being part of our community.
+ *
+ *      Keep running and keep inspiring!
+ *
+ *      🏃‍♂️ Team Connected Steps
+ *  {{1}} = first name
+ */
+export function birthdayWAParams(firstName: string): string[] {
+  return [firstName];
+}
+
 /** Short SMS text (DLT-registered template content) */
 export function sessionSMSText(
   name: string, title: string, date: string, location: string
@@ -539,4 +560,161 @@ export function sessionEmailHTML(
 </table>
 </body>
 </html>`;
+}
+
+// ── EMAIL HEADER / FOOTER helpers (shared across templates) ──────────────────
+
+function emailHeader(tagline = "Your Goal, Our Plan") {
+  return `
+  <tr><td style="background:#0a0a0a;padding:28px 40px;text-align:center;">
+    <div style="font-size:22px;font-weight:700;color:#fff;letter-spacing:-0.3px;">Connected Steps</div>
+    <div style="font-size:11px;color:#e8620a;letter-spacing:0.12em;text-transform:uppercase;margin-top:4px;">${tagline}</div>
+  </td></tr>
+  <tr><td style="height:4px;background:#e8620a;"></td></tr>`;
+}
+
+function emailFooter() {
+  return `
+  <tr><td style="background:#f9f9f9;border-top:1px solid #e5e5e5;padding:20px 40px;text-align:center;">
+    <p style="margin:0 0 6px;font-size:12px;color:#aaa;">Connected Steps · Hyderabad, India</p>
+    <p style="margin:0;font-size:11px;color:#ccc;">Questions? <a href="https://wa.me/9703620570" style="color:#e8620a;text-decoration:none;">WhatsApp us</a> · <a href="https://www.connectedsteps.in" style="color:#e8620a;text-decoration:none;">connectedsteps.in</a></p>
+  </td></tr>`;
+}
+
+function emailWrapper(rows: string) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+      ${rows}
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
+}
+
+// ── Welcome email (sent to new user on successful registration) ───────────────
+
+export function welcomeEmailHTML(firstName: string): string {
+  return emailWrapper(`
+    ${emailHeader()}
+    <tr><td style="padding:40px 40px 32px;">
+      <p style="margin:0 0 8px;font-size:16px;color:#555;">Hi <strong>${firstName}</strong>, welcome to Connected Steps! 🎉</p>
+      <p style="margin:0 0 24px;font-size:15px;color:#555;line-height:1.7;">
+        You've just joined a community of passionate runners in Hyderabad. Whether you're chasing your first 5K or your next marathon PB, we run with you every step of the way.
+      </p>
+
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border:1px solid #e5e5e5;border-radius:10px;margin-bottom:28px;">
+        <tr><td style="padding:20px 24px;border-bottom:1px solid #e5e5e5;">
+          <div style="font-size:11px;color:#e8620a;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">Get started</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="font-size:14px;color:#333;line-height:1.6;">
+              🏃 <a href="https://www.connectedsteps.in/weekend-run" style="color:#e8620a;text-decoration:none;">Join a Weekend Run</a> — show up, run together<br/>
+              📅 <a href="https://www.connectedsteps.in/events" style="color:#e8620a;text-decoration:none;">Upcoming Events</a> — races, community runs and more<br/>
+              💪 <a href="https://www.connectedsteps.in/pricing" style="color:#e8620a;text-decoration:none;">Training Programs</a> — structured plans with a coach<br/>
+              🏆 <a href="https://www.connectedsteps.in/leaderboard" style="color:#e8620a;text-decoration:none;">Leaderboard</a> — earn points, climb the ranks<br/>
+              🤝 <a href="https://www.connectedsteps.in/community" style="color:#e8620a;text-decoration:none;">Community</a> — meet fellow runners
+            </div>
+          </div>
+        </td></tr>
+      </table>
+
+      <table cellpadding="0" cellspacing="0" style="margin:0 auto 32px;">
+        <tr><td style="background:#e8620a;border-radius:6px;">
+          <a href="https://www.connectedsteps.in/dashboard" style="display:block;padding:14px 36px;font-size:15px;font-weight:700;color:#fff;text-decoration:none;">Go to My Dashboard →</a>
+        </td></tr>
+      </table>
+
+      <p style="margin:0 0 8px;font-size:14px;color:#888;line-height:1.6;text-align:center;">Need help? We're one WhatsApp message away.</p>
+      <p style="margin:0;font-size:14px;text-align:center;">
+        <a href="https://wa.me/9703620570" style="color:#e8620a;text-decoration:none;font-weight:600;">💬 WhatsApp Support</a>
+      </p>
+    </td></tr>
+    ${emailFooter()}
+  `);
+}
+
+// ── Admin new-user notification (sent to info@connectedsteps.in) ──────────────
+
+export function adminNewUserEmailHTML(user: {
+  firstName:    string;
+  lastName:     string;
+  email:        string;
+  phone:        string;
+  dob:          string | null;
+  location:     string | null;
+  referralCode: string | null;
+  registeredAt: string;          // ISO string
+}): string {
+  const dob      = user.dob ? new Date(user.dob + "T12:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "Not provided";
+  const regDate  = new Date(user.registeredAt).toLocaleString("en-IN", { dateStyle: "long", timeStyle: "short" });
+
+  function row(label: string, value: string) {
+    return `<tr>
+      <td style="padding:10px 20px;border-bottom:1px solid #f0f0f0;font-size:12px;color:#888;width:140px;vertical-align:top;">${label}</td>
+      <td style="padding:10px 20px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#333;font-weight:600;">${value}</td>
+    </tr>`;
+  }
+
+  return emailWrapper(`
+    ${emailHeader("Admin Notification")}
+    <tr><td style="padding:32px 40px 8px;">
+      <p style="margin:0 0 4px;font-size:18px;font-weight:700;color:#0a0a0a;">New User Registration</p>
+      <p style="margin:0;font-size:13px;color:#888;">A new member just joined Connected Steps.</p>
+    </td></tr>
+    <tr><td style="padding:16px 40px 32px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border:1px solid #e5e5e5;border-radius:10px;overflow:hidden;">
+        ${row("Full Name",       `${user.firstName} ${user.lastName}`)}
+        ${row("Email",           user.email)}
+        ${row("Mobile",          user.phone || "Not provided")}
+        ${row("Gender",          "Not provided")}
+        ${row("Date of Birth",   dob)}
+        ${row("Location",        user.location || "Not provided")}
+        ${row("Registered At",   regDate)}
+        ${row("Referral Code",   user.referralCode || "None")}
+      </table>
+      <table cellpadding="0" cellspacing="0" style="margin:20px auto 0;">
+        <tr><td style="background:#0a0a0a;border-radius:6px;">
+          <a href="https://www.connectedsteps.in/admin/users" style="display:block;padding:12px 28px;font-size:13px;font-weight:700;color:#fff;text-decoration:none;">View All Users →</a>
+        </td></tr>
+      </table>
+    </td></tr>
+    ${emailFooter()}
+  `);
+}
+
+// ── Birthday email (sent to user on their birthday) ───────────────────────────
+
+export function birthdayEmailHTML(firstName: string): string {
+  return emailWrapper(`
+    <tr><td style="background:linear-gradient(135deg,#0a0a0a 0%,#1a0a00 100%);padding:36px 40px;text-align:center;">
+      <div style="font-size:44px;margin-bottom:12px;">🎉</div>
+      <div style="font-size:22px;font-weight:700;color:#fff;letter-spacing:-0.3px;">Connected Steps</div>
+      <div style="font-size:11px;color:#e8620a;letter-spacing:0.12em;text-transform:uppercase;margin-top:4px;">Your Goal, Our Plan</div>
+    </td></tr>
+    <tr><td style="height:4px;background:linear-gradient(90deg,#e8620a,#fbbf24,#e8620a);"></td></tr>
+    <tr><td style="padding:40px 40px 32px;text-align:center;">
+      <p style="margin:0 0 6px;font-size:28px;font-weight:800;color:#0a0a0a;letter-spacing:-0.5px;">Happy Birthday, ${firstName}! 🎂</p>
+      <p style="margin:0 0 28px;font-size:15px;color:#555;line-height:1.8;">
+        The entire Connected Steps team wishes you a fantastic year ahead — filled with good health, strong runs, personal bests, and unforgettable races.
+      </p>
+      <div style="background:linear-gradient(135deg,#fff8f0,#fff3e0);border:1px solid #fde0bc;border-radius:12px;padding:24px;margin-bottom:28px;text-align:left;">
+        <p style="margin:0 0 12px;font-size:15px;color:#555;line-height:1.7;">
+          🏅 <strong>Keep running.</strong> Every kilometre you log brings you closer to the version of yourself you're training to become.<br/><br/>
+          🤝 <strong>Thank you</strong> for being part of our community and inspiring everyone around you.<br/><br/>
+          🎯 <strong>This is your year</strong> — go chase those goals!
+        </p>
+      </div>
+      <table cellpadding="0" cellspacing="0" style="margin:0 auto 28px;">
+        <tr><td style="background:#e8620a;border-radius:6px;">
+          <a href="https://www.connectedsteps.in/events" style="display:block;padding:14px 36px;font-size:15px;font-weight:700;color:#fff;text-decoration:none;">View Upcoming Events 🏃</a>
+        </td></tr>
+      </table>
+      <p style="margin:0;font-size:14px;color:#888;line-height:1.6;">With love from the Connected Steps team ❤️</p>
+    </td></tr>
+    ${emailFooter()}
+  `);
 }

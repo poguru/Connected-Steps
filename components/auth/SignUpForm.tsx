@@ -147,6 +147,16 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
     if (location === "Others" && !customLoc.trim()) { setFormError("Please enter your training location."); return false; }
     const phoneDigits = phone.replace(/\D/g, "");
     if (phoneDigits.length !== 10)         { setFormError("Please enter a valid 10-digit mobile number."); return false; }
+
+    // DOB — mandatory, must be a past date, user must be ≥ 13 years old
+    if (!form.dob) { setFormError("Date of Birth is required."); return false; }
+    const dob = new Date(form.dob + "T12:00:00");
+    if (isNaN(dob.getTime()))              { setFormError("Please enter a valid date of birth."); return false; }
+    if (dob >= new Date())                 { setFormError("Date of birth cannot be in the future."); return false; }
+    const ageCutoff = new Date();
+    ageCutoff.setFullYear(ageCutoff.getFullYear() - 13);
+    if (dob > ageCutoff)                   { setFormError("You must be at least 13 years old to register."); return false; }
+
     return true;
   }
 
@@ -257,8 +267,15 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
 
       {/* DOB */}
       <div>
-        <label style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5 }}>Date of Birth <span style={{ opacity: 0.6 }}>(optional)</span></label>
-        <input style={{ ...inputStyle, colorScheme: "dark" }} name="dob" type="date" value={form.dob} onChange={handleFormChange} {...focusHandlers} />
+        <label style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5 }}>
+          Date of Birth <span style={{ color: "var(--primary)", fontWeight: 600 }}>*</span>
+        </label>
+        <input
+          style={{ ...inputStyle, colorScheme: "dark" }}
+          name="dob" type="date"
+          max={new Date().toISOString().split("T")[0]}
+          value={form.dob} onChange={handleFormChange} {...focusHandlers}
+        />
       </div>
 
       {/* Password */}

@@ -3,16 +3,33 @@ import bcrypt from "bcryptjs";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { autoFeedMemberJoined } from "@/lib/auto-feed";
 import { processReferral } from "@/lib/referrals";
+import { sendEmail, welcomeEmailHTML, adminNewUserEmailHTML } from "@/lib/notify";
 
 export async function POST(req: NextRequest) {
   try {
     // phoneVerified is set to true only when the signup form has already gone
     // through the phone OTP step before calling this endpoint.
-    const { firstName, lastName, email, phone, goal, location, password, phoneVerified, referralCode } = await req.json();
+    const { firstName, lastName, email, phone, goal, location, password, phoneVerified, referralCode, dob } = await req.json();
 
     if (!email || !password || !firstName || !lastName || !phone) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
     }
+
+    // DOB validation
+    if (!dob) {
+      return NextResponse.json({ error: "Date of Birth is required." }, { status: 400 });
+    }
+    const dobDate = new Date((dob as string) + "T12:00:00");
+    if (isNaN(dobDate.getTime()) || dobDate >= new Date()) {
+      return NextResponse.json({ error: "Please provide a valid date of birth." }, { status: 400 });
+    }
+    const ageCutoff = new Date();
+    ageCutoff.setFullYear(ageCutoff.getFullYear() - 13);
+    if (dobDate > ageCutoff) {
+      return NextResponse.json({ error: "You must be at least 13 years old to register." }, { status: 400 });
+    }
+    const birthDay   = dobDate.getDate();
+    const birthMonth = dobDate.getMonth() + 1;
 
     const phoneDigits = (phone as string).replace(/\D/g, "");
     if (phoneDigits.length !== 10) {
@@ -49,6 +66,8 @@ export async function POST(req: NextRequest) {
 
     const hashed = await bcrypt.hash(password, 12);
 
+    const registeredAt = new Date().toISOString();
+
     const { error } = await supabaseServer.from("users").insert({
       first_name:    firstName,
       last_name:     lastName,
@@ -58,6 +77,9 @@ export async function POST(req: NextRequest) {
       location,
       password:      hashed,
       phone_verified: phoneVerified === true,
+      date_of_birth:  dob,
+      birth_day:      birthDay,
+      birth_month:    birthMonth,
     });
 
     if (error) {
@@ -72,6 +94,28 @@ export async function POST(req: NextRequest) {
       processReferral(referralCode.trim(), email.toLowerCase(), firstName)
         .catch(() => {});
     }
+
+    // Welcome email to new user (non-blocking)
+    sendEmail(
+      email.toLowerCase(), firstName,
+      "Welcome to Connected Steps! 🎉",
+      welcomeEmailHTML(firstName),
+    ).catch(() => {});
+
+    // Admin notification to info@connectedsteps.in (non-blocking)
+    sendEmail(
+      "info@connectedsteps.in", "Connected Steps Admin",
+      `New Registration: ${firstName} ${lastName}`,
+      adminNewUserEmailHTML({
+        firstName, lastName,
+        email:        email.toLowerCase(),
+        phone,
+        dob:          dob ?? null,
+        location:     location ?? null,
+        referralCode: referralCode ?? null,
+        registeredAt,
+      }),
+    ).catch(() => {});
 
     return NextResponse.json({ success: true });
   } catch (e: unknown) {

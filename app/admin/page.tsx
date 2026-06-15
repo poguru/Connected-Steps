@@ -89,6 +89,12 @@ const cards = [
     desc:  "Track all referrals, successful conversions, rewards issued, and top referrers.",
     icon:  "🔗",
   },
+  {
+    href:  "/admin/birthday-settings",
+    title: "Birthday Settings",
+    desc:  "Enable/disable automated birthday emails and WhatsApp messages. Configure the MSG91 template name.",
+    icon:  "🎂",
+  },
 ];
 
 export default function AdminHub() {
