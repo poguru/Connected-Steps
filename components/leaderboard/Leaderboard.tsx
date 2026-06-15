@@ -10,7 +10,7 @@ import { getSupabase } from "@/lib/supabase";
 interface User  { firstName: string; lastName: string; email: string; phone: string; photo: string | null; goal: string; location: string; }
 interface Entry { id: string; user_email: string; user_name: string; location: string; month_points: number; total_points: number; photo: string | null; }
 
-function initials(name: string) { return name.split(" ").map(n => n[0] ?? "").join("").slice(0, 2).toUpperCase(); }
+function initials(name: string | null | undefined) { return (name ?? "").split(" ").map(n => n[0] ?? "").join("").slice(0, 2).toUpperCase() || "?"; }
 
 const MEDAL = ["🥇", "🥈", "🥉"];
 
@@ -228,7 +228,7 @@ export default function Leaderboard() {
                       {initials(r.user_name)}
                     </div>
                     <div style={{ fontSize:"0.8rem", fontWeight:700, color: isMe ? "var(--cs-orange)" : "var(--foreground)", marginBottom:2 }}>
-                      {r.user_name.split(" ")[0]}{isMe ? " ★" : ""}
+                      {(r.user_name ?? "Runner").split(" ")[0] || "Runner"}{isMe ? " ★" : ""}
                     </div>
                     <div style={{ fontSize:"1rem", fontWeight:800, color:"var(--cs-orange)", letterSpacing:"-0.3px" }}>{r[pointsKey] ?? 0}</div>
                     <div style={{ fontSize:9, color:"var(--muted-foreground)", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:8 }}>pts</div>

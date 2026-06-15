@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+
 export default function Error({
   error,
   unstable_retry,
@@ -7,6 +9,10 @@ export default function Error({
   error: Error & { digest?: string };
   unstable_retry: () => void;
 }) {
+  useEffect(() => {
+    console.error("[CS Error Boundary]", error.name, error.message, error.stack);
+  }, [error]);
+
   return (
     <div
       style={{
@@ -49,14 +55,28 @@ export default function Error({
           }}
         >
           A temporary error occurred. Tap retry to try again.
-          {error.digest && (
+          {error.message && (
             <span
               style={{
                 display: "block",
                 marginTop: "0.5rem",
-                fontSize: "0.75rem",
+                fontSize: "0.72rem",
                 fontFamily: "monospace",
-                color: "rgba(255,255,255,0.25)",
+                color: "rgba(255,255,255,0.35)",
+                wordBreak: "break-all",
+              }}
+            >
+              {error.message}
+            </span>
+          )}
+          {error.digest && (
+            <span
+              style={{
+                display: "block",
+                marginTop: "0.25rem",
+                fontSize: "0.65rem",
+                fontFamily: "monospace",
+                color: "rgba(255,255,255,0.2)",
               }}
             >
               ID: {error.digest}

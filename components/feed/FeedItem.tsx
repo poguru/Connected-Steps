@@ -19,8 +19,8 @@ export function timeAgo(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
 
-function initials(name: string) {
-  return name.split(" ").map(n => n[0] ?? "").join("").slice(0, 2).toUpperCase() || "?";
+function initials(name: string | null | undefined) {
+  return (name ?? "").split(" ").map(n => n[0] ?? "").join("").slice(0, 2).toUpperCase() || "?";
 }
 
 function eventMeta(event: FeedEvent): { verb: string; icon: string; accent: string } {
@@ -68,7 +68,7 @@ export default function FeedItem({ event, currentUserEmail, compact = false }: P
   const { verb, icon, accent } = eventMeta(event);
   const photoUrl  = event.payload.photo_url  as string | undefined;
   const hasPhoto  = !!photoUrl;
-  const firstName = event.actor_name.split(" ")[0];
+  const firstName = (event.actor_name ?? "Member").split(" ")[0] || "Member";
 
   async function react(type: "like" | "celebrate") {
     if (busy) return;

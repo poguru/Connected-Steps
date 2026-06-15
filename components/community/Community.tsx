@@ -20,7 +20,7 @@ const goalLabel: Record<string, string> = {
   "ultra": "Ultra", "fitness": "General Fitness", "speed": "Speed", "weight": "Weight Loss", "strength": "Strength",
 };
 
-function initials(name: string) { return name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase(); }
+function initials(name: string | null | undefined) { return (name ?? "").split(" ").map(n => n[0] ?? "").join("").slice(0, 2).toUpperCase() || "?"; }
 
 // ── Runner card ───────────────────────────────────────────────────────────────
 

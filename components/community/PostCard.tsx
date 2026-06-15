@@ -17,8 +17,8 @@ function timeAgo(iso: string) {
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
 
-function initials(name: string) {
-  return name.split(" ").map(n => n[0] ?? "").join("").slice(0, 2).toUpperCase() || "?";
+function initials(name: string | null | undefined) {
+  return (name ?? "").split(" ").map(n => n[0] ?? "").join("").slice(0, 2).toUpperCase() || "?";
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -164,7 +164,7 @@ export default function PostCard({ post, currentUserEmail, onDeleted }: Props) {
           {initials(post.author_name)}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: "0.83rem", fontWeight: 700 }}>{post.author_name.split(" ")[0]}</div>
+          <div style={{ fontSize: "0.83rem", fontWeight: 700 }}>{(post.author_name ?? "Member").split(" ")[0] || "Member"}</div>
           <div style={{ fontSize: "10px", color: "var(--muted-foreground)", marginTop: 1 }}>
             {timeAgo(post.created_at)}
             {typeLabel && <span style={{ marginLeft: 6, color: typeColor, fontWeight: 600 }}>{typeLabel}</span>}
@@ -241,7 +241,7 @@ export default function PostCard({ post, currentUserEmail, onDeleted }: Props) {
                   </div>
                   <div style={{ flex: 1, background: "rgba(255,255,255,0.03)", borderRadius: 8, padding: "6px 10px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 4 }}>
-                      <span style={{ fontSize: "0.75rem", fontWeight: 700 }}>{c.author_name.split(" ")[0]}</span>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 700 }}>{(c.author_name ?? "Member").split(" ")[0] || "Member"}</span>
                       <span style={{ fontSize: "9px", color: "var(--muted-foreground)" }}>{timeAgo(c.created_at)}</span>
                     </div>
                     <div style={{ fontSize: "0.78rem", color: "var(--muted-foreground)", marginTop: 2, lineHeight: 1.5 }}>{c.body}</div>
