@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { getSupabase } from "@/lib/supabase";
+import { getSupabaseSafe } from "@/lib/supabase";
 
 interface Coach {
   id:   string;
@@ -107,7 +107,8 @@ export default function CoachInbox() {
   // Supabase Realtime: watch for new messages in active conversation
   useEffect(() => {
     if (!activeConv) return;
-    const sb = getSupabase();
+    const sb = getSupabaseSafe();
+    if (!sb) return;
     const channel = sb
       .channel(`coach-inbox:${activeConv.id}`)
       .on("postgres_changes", {

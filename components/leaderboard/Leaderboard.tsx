@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Flame, TrendingUp } from "lucide-react";
 import { MenuUser } from "@/components/ui/UserMenu";
 import AppNav from "@/components/layout/AppNav";
-import { getSupabase } from "@/lib/supabase";
+import { getSupabaseSafe } from "@/lib/supabase";
 
 interface User  { firstName: string; lastName: string; email: string; phone: string; photo: string | null; goal: string; location: string; }
 interface Entry { id: string; user_email: string; user_name: string; location: string; month_points: number; total_points: number; photo: string | null; }
@@ -56,7 +56,8 @@ export default function Leaderboard() {
   }, [tab]);
 
   useEffect(() => {
-    const supabase = getSupabase();
+    const supabase = getSupabaseSafe();
+    if (!supabase) return;
     const channel = supabase
       .channel("leaderboard-live")
       .on("postgres_changes", { event: "*", schema: "public", table: "leaderboard" }, (payload) => {

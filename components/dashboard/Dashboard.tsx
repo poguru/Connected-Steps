@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import UserMenu, { MenuUser } from "@/components/ui/UserMenu";
 import AppNav from "@/components/layout/AppNav";
-import { getSupabase } from "@/lib/supabase";
+import { getSupabaseSafe } from "@/lib/supabase";
 import MembershipCard from "@/components/ui/MembershipCard";
 import UpgradeBanner from "@/components/ui/UpgradeBanner";
 import PostSessionUpgradePrompt from "@/components/dashboard/PostSessionUpgradePrompt";
@@ -469,7 +469,8 @@ export default function Dashboard() {
   // they are correct on page load and updated for this user's own actions.
   useEffect(() => {
     if (!user) return;
-    const supabase = getSupabase();
+    const supabase = getSupabaseSafe();
+    if (!supabase) return;
     const channel = supabase
       .channel("dashboard-join-state")
       .on(
@@ -514,7 +515,8 @@ export default function Dashboard() {
   // One API call refreshes history + attendance state + streak in one shot.
   useEffect(() => {
     if (!user) return;
-    const supabase = getSupabase();
+    const supabase = getSupabaseSafe();
+    if (!supabase) return;
     const channel = supabase
       .channel("dashboard-attendance-history")
       .on(
@@ -539,7 +541,8 @@ export default function Dashboard() {
   // ── Supabase realtime: live points update when leaderboard row changes ────
   useEffect(() => {
     if (!user) return;
-    const supabase = getSupabase();
+    const supabase = getSupabaseSafe();
+    if (!supabase) return;
     const channel = supabase
       .channel("dashboard-user-points")
       .on(
