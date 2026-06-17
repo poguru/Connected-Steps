@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "in.connectedsteps.app",
+      "sha256_cert_fingerprints": [
+        "B6:DC:4C:4A:D7:84:77:60:85:35:6B:69:75:EA:11:DF:8D:7D:B6:B7:78:5A:57:4C:2C:B6:D9:79:C6:C7:44:AD"
+      ]
+    }
+  }
+]
