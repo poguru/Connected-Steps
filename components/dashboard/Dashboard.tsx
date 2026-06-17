@@ -12,13 +12,12 @@ import UpgradeBanner from "@/components/ui/UpgradeBanner";
 import PostSessionUpgradePrompt from "@/components/dashboard/PostSessionUpgradePrompt";
 import ReferralCard from "@/components/dashboard/ReferralCard";
 import TrainingPlan from "@/components/dashboard/TrainingPlan";
-import AskCoachFab from "@/components/ui/AskCoachFab";
 import DashboardHero from "@/components/dashboard/DashboardHero";
 import SessionPhotos from "@/components/dashboard/SessionPhotos";
 import FollowerFeed from "@/components/dashboard/FollowerFeed";
-import PeopleYouMayKnow from "@/components/dashboard/PeopleYouMayKnow";
-import MyEventRegistrations from "@/components/dashboard/MyEventRegistrations";
 import CoachChatCard from "@/components/dashboard/CoachChatCard";
+import ProgressCard from "@/components/dashboard/ProgressCard";
+import SessionPopup from "@/components/dashboard/SessionPopup";
 
 interface SessionRecord {
   attended:      boolean;
@@ -700,6 +699,9 @@ export default function Dashboard() {
   return (
     <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)" }}>
 
+      {/* Upcoming session popup — shows once per day if session within 24h */}
+      <SessionPopup sessions={upcomingSessions} joinedSessionIds={joinedSessionIds} />
+
       <AppNav
         user={user as MenuUser}
         onUserUpdate={(u) => { setUser(u as User); localStorage.setItem("cs_user", JSON.stringify(u)); }}
@@ -797,97 +799,29 @@ export default function Dashboard() {
           {/* ── Coach Chat ── */}
           <CoachChatCard userEmail={user.email} />
 
-          {/* ── Upgrade prompt — post-session (once, permanent) or generic (daily) ── */}
+          {/* ── Progress (stats + badges merged) ── */}
+          <ProgressCard
+            totalPoints={points?.total_points ?? 0}
+            monthPoints={points?.month_points ?? 0}
+            monthSessions={monthAttended}
+            totalSessions={totalAttended}
+            achievements={ACHIEVEMENTS}
+            loading={sessionsLoading}
+          />
+
+          {/* ── Upgrade prompt ── */}
           <PostSessionUpgradePrompt
             totalAttended={totalAttended}
             userEmail={user.email}
             fallback={<UpgradeBanner userEmail={user.email} />}
           />
 
-          {/* ── 2. Compact stat row ── */}
-          <div className="stat-row" style={{ marginBottom: "1rem" }}>
-            {[
-              { label: "Month Pts",     value: points?.month_points ?? 0, orange: true  },
-              { label: "All-Time Pts",  value: points?.total_points ?? 0, orange: false },
-              { label: "This Month",    value: monthAttended,              orange: false },
-              { label: "Total Sessions",value: totalAttended,              orange: false },
-            ].map(s => (
-              <div key={s.label} className="stat-cell">
-                <div className="stat-cell-val" style={s.orange ? { color:"var(--cs-orange)" } : {}}>
-                  {typeof s.value === "number" ? s.value.toLocaleString() : s.value}
-                </div>
-                <div className="stat-cell-label">{s.label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* ── 3. Achievements — compact icon grid ── */}
-          {!sessionsLoading && (
-            <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12, padding:"0.75rem 1rem", marginBottom:"1rem", display:"flex", alignItems:"center", gap:"0.75rem", flexWrap:"wrap" }}>
-              <span style={{ fontSize:"10px", color:"var(--muted-foreground)", textTransform:"uppercase", letterSpacing:"0.1em", fontWeight:600, flexShrink:0 }}>Badges</span>
-              {ACHIEVEMENTS.map(a => (
-                <div key={a.label} title={a.label} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:2, opacity: a.earned ? 1 : 0.3 }}>
-                  <span style={{ fontSize:"1.2rem" }}>{a.earned ? a.icon : "🔒"}</span>
-                  <span style={{ fontSize:"9px", color: a.earned ? "var(--cs-orange)" : "var(--muted-foreground)", whiteSpace:"nowrap" }}>{a.label}</span>
-                </div>
-              ))}
-              <div style={{ marginLeft:"auto", fontSize:"11px", color:"var(--muted-foreground)" }}>
-                {ACHIEVEMENTS.filter(a => a.earned).length}/{ACHIEVEMENTS.length} earned
-              </div>
-            </div>
-          )}
-
-          {/* ── 4. Follower activity feed ── */}
+          {/* ── Community activity ── */}
           <FollowerFeed userEmail={user.email} />
-
-          {/* ── 5. Session history ── */}
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"0.5rem" }}>
-            <span style={{ fontSize:"10px", color:"var(--muted-foreground)", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:600 }}>Session History</span>
-            {!sessionsLoading && sessions.length > 0 && (
-              <span style={{ fontSize:"11px", color:"var(--muted-foreground)" }}>{sessions.filter(r=>r.attended).length} attended · click to expand</span>
-            )}
-          </div>
-          {sessionsLoading ? (
-            <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12 }}>
-              {[1,2,3,4].map((i, idx) => (
-                <div key={i} style={{ display:"flex", alignItems:"center", gap:"0.75rem", padding:"0.7rem 1rem", borderTop: idx > 0 ? "1px solid var(--border)" : "none" }}>
-                  <div style={{ width:8, height:8, borderRadius:"50%", background:"rgba(255,255,255,0.08)", flexShrink:0 }} />
-                  <div style={{ width:42, height:10, background:"rgba(255,255,255,0.06)", borderRadius:4, flexShrink:0 }} />
-                  <div style={{ flex:1, height:12, background:"rgba(255,255,255,0.05)", borderRadius:4 }} />
-                  <div style={{ width:36, height:10, background:"rgba(255,255,255,0.04)", borderRadius:4, flexShrink:0 }} />
-                </div>
-              ))}
-            </div>
-          ) : sessions.length === 0 ? (
-            <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12, padding:"1.5rem", textAlign:"center" }}>
-              <div style={{ fontSize:"1.75rem", marginBottom:"0.5rem" }}>🏃</div>
-              <div style={{ fontSize:"0.9rem", fontWeight:700, color:"var(--foreground)", marginBottom:"0.35rem" }}>No sessions yet</div>
-              <p style={{ fontSize:"0.8rem", color:"var(--muted-foreground)", maxWidth:300, margin:"0 auto 1rem", lineHeight:1.6 }}>
-                Attend a session and your coach will log your attendance. Points appear here automatically.
-              </p>
-              <Link href="/weekend-run" style={{ display:"inline-block", padding:"8px 20px", background:"var(--gradient-accent)", color:"#fff", borderRadius:8, textDecoration:"none", fontSize:"0.8rem", fontWeight:700, boxShadow:"var(--shadow-orange)" }}>
-                Register for next run →
-              </Link>
-            </div>
-          ) : (
-            <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12, overflow:"hidden" }}>
-              {sessions.map((rec, i) => (
-                <div key={i} style={{ borderTop: i > 0 ? "1px solid var(--border)" : "none" }}>
-                  <SessionCard rec={rec} userEmail={user.email} userName={fullName} />
-                </div>
-              ))}
-            </div>
-          )}
         </main>
 
         {/* ── Right sidebar ── */}
         <aside className="cs-db-right">
-
-          {/* Event registrations */}
-          <MyEventRegistrations />
-
-          {/* People you may know */}
-          <PeopleYouMayKnow userEmail={user.email} />
 
           {/* Referral card */}
           <ReferralCard userEmail={user.email} />
@@ -960,8 +894,6 @@ export default function Dashboard() {
 
         </aside>
       </div>
-
-      <AskCoachFab />
 
       {/* Followers / Following modal */}
       {followModal && (

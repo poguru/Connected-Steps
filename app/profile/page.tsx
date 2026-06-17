@@ -237,6 +237,13 @@ export default function ProfilePage() {
     finally { setPwSaving(false); }
   }
 
+  function logout() {
+    localStorage.removeItem("cs_user");
+    localStorage.removeItem("cs_user_token");
+    localStorage.removeItem("cs_strava");
+    router.replace("/auth");
+  }
+
   if (!user) return null;
 
   const _f  = user.firstName ?? "";
@@ -251,14 +258,14 @@ export default function ProfilePage() {
   return (
     <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)" }}>
 
-      <header style={{ background: "oklch(0.18 0.015 270 / 80%)", backdropFilter: "blur(18px)", borderBottom: "1px solid var(--border)", padding: "0 1.5rem", height: "60px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 10 }}>
+      <header style={{ background: "oklch(0.18 0.015 270 / 80%)", backdropFilter: "blur(18px)", borderBottom: "1px solid var(--border)", padding: "0 1.5rem", height: "60px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 10, paddingTop: "env(safe-area-inset-top)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <Link href="/dashboard">
             <Image src="/logo.png" alt="" width={28} height={28} className="rounded-full" />
           </Link>
-          <span className="font-display" style={{ fontSize: "1rem", fontWeight: 600, color: "var(--foreground)" }}>Edit Profile</span>
+          <span className="font-display" style={{ fontSize: "1rem", fontWeight: 600, color: "var(--foreground)" }}>Profile</span>
         </div>
-        <Link href="/dashboard" style={{ fontSize: "0.78rem", color: "var(--muted-foreground)", textDecoration: "none" }}>← Dashboard</Link>
+        <Link href="/dashboard" style={{ fontSize: "0.78rem", color: "var(--muted-foreground)", textDecoration: "none" }}>← Home</Link>
       </header>
 
       <div style={{ maxWidth: "560px", margin: "0 auto", padding: "2rem 1.25rem", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
@@ -509,6 +516,37 @@ export default function ProfilePage() {
           <div style={{ fontSize: 11, color: "var(--muted-foreground)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1.25rem", fontWeight: 600 }}>Connected Apps</div>
           <ConnectedApps userEmail={user.email} />
         </section>
+
+        {/* Quick links */}
+        <section style={sectionStyle}>
+          <div style={{ fontSize: 11, color: "var(--muted-foreground)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1rem", fontWeight: 600 }}>Account</div>
+          {[
+            { label: "My Membership",        href: "/membership",      icon: "🏅" },
+            { label: "My Event Registrations",href: "/events",         icon: "📅" },
+            { label: "Referral Rewards",      href: "/referrals",      icon: "🎁" },
+            { label: "My Coach Q&A",          href: "/my-questions",   icon: "💬" },
+          ].map(item => (
+            <Link
+              key={item.href}
+              href={item.href}
+              style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.75rem 0", borderBottom: "1px solid rgba(255,255,255,0.05)", textDecoration: "none", color: "var(--foreground)" }}
+            >
+              <span style={{ fontSize: "1.1rem", width: 26, textAlign: "center" }}>{item.icon}</span>
+              <span style={{ flex: 1, fontSize: "0.875rem", fontWeight: 500 }}>{item.label}</span>
+              <span style={{ color: "var(--muted-foreground)", fontSize: "0.8rem" }}>→</span>
+            </Link>
+          ))}
+        </section>
+
+        {/* Logout */}
+        <button
+          onClick={logout}
+          style={{ width: "100%", padding: "14px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 12, color: "#f87171", fontSize: "0.9rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.02em" }}
+        >
+          Log out
+        </button>
+
+        <div style={{ height: "env(safe-area-inset-bottom)" }} />
 
       </div>
     </div>

@@ -843,9 +843,15 @@ select.auth-input option {
     padding: 12px;
     border-radius: 50%;
     bottom: 18px;
-    right: 72px; /* offset left to avoid FloatingContact cluster */
+    right: 18px;
   }
   .cs-ask-fab-label { display: none; }
+}
+
+/* In native-app, push FAB above the bottom nav */
+.native-app .cs-ask-fab-btn {
+  bottom: calc(64px + env(safe-area-inset-bottom) + 14px);
+  right: 16px;
 }
 
 /* ─── UserMenu — hide name + chevron on mobile ──────────  */

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import MyEventRegistrations from "@/components/dashboard/MyEventRegistrations";
 
 export const metadata: Metadata = {
   title: "Upcoming Events | Connected Steps",
@@ -76,6 +77,11 @@ export default async function EventsPage() {
       </nav>
 
       <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "2.5rem 1.5rem 4rem" }}>
+
+        {/* My Registrations — only shown when user is logged in (client component) */}
+        <div style={{ marginBottom: "2rem" }}>
+          <MyEventRegistrations />
+        </div>
 
         {/* Heading */}
         <div style={{ marginBottom: "2rem" }}>
