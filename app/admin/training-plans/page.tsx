@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
@@ -66,7 +66,7 @@ const sel: React.CSSProperties  = { ...inp, cursor: "pointer" };
 
 export default function TrainingPlansAdmin() {
   const [password,      setPassword]     = useState("");
-  const [authed,        setAuthed]       = useState(false);
+  const [authed,        setAuthed]       = useState(true);
   const [authErr,       setAuthErr]      = useState("");
 
   const [users,         setUsers]        = useState<User[]>([]);

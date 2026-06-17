@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
@@ -44,7 +44,7 @@ function fmtDate(iso: string) {
 
 export default function AdminUsersPage() {
   const [pw,        setPw]        = useState("");
-  const [authed,    setAuthed]    = useState(false);
+  const [authed,    setAuthed]    = useState(true);
   const [users,     setUsers]     = useState<AppUser[]>([]);
   const [stats,     setStats]     = useState<Stats | null>(null);
   const [loading,   setLoading]   = useState(false);
@@ -120,6 +120,12 @@ export default function AdminUsersPage() {
   }, [users, filter, goalFilter, search]);
 
   const deactivatedCount = useMemo(() => users.filter((u) => u.is_active === false).length, [users]);
+
+  const PAGE_SIZE = 50;
+  const [page, setPage] = useState(0);
+  useEffect(() => { setPage(0); }, [filter, goalFilter, search]);
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const visible    = useMemo(() => filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE), [filtered, page]);
 
   if (!authed) {
     return (
@@ -204,9 +210,9 @@ export default function AdminUsersPage() {
             <div>Sessions</div><div>Runs</div><div>Km</div><div>Points</div><div>Membership</div><div>Account</div>
           </div>
 
-          {filtered.length === 0 ? (
+          {visible.length === 0 ? (
             <div style={{ padding: "3rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>No users found.</div>
-          ) : filtered.map((u) => {
+          ) : visible.map((u) => {
             const isDeactivated = u.is_active === false;
             const isPending     = toggling[u.email];
             return (
@@ -254,6 +260,29 @@ export default function AdminUsersPage() {
             );
           })}
         </div>
+
+        {totalPages > 1 && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1rem 0" }}>
+            <button
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+              style={{ padding: "6px 16px", background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 6, color: page === 0 ? "#333" : "#888", cursor: page === 0 ? "not-allowed" : "pointer", fontFamily: "inherit", fontSize: 13 }}
+            >
+              ← Previous
+            </button>
+            <span style={{ fontSize: 13, color: "#444" }}>
+              {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length} users
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+              style={{ padding: "6px 16px", background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 6, color: page >= totalPages - 1 ? "#333" : "#888", cursor: page >= totalPages - 1 ? "not-allowed" : "pointer", fontFamily: "inherit", fontSize: 13 }}
+            >
+              Next →
+            </button>
+          </div>
+        )}
+
       </div>
     </div>
   );

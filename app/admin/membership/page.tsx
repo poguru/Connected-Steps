@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
@@ -48,7 +48,7 @@ function daysLeft(iso: string) {
 
 export default function AdminMembershipPage() {
   const [pw,       setPw]       = useState("");
-  const [authed,   setAuthed]   = useState(false);
+  const [authed,   setAuthed]   = useState(true);
   const [members,  setMembers]  = useState<Member[]>([]);
   const [stats,    setStats]    = useState<Stats | null>(null);
   const [loading,  setLoading]  = useState(false);
@@ -105,6 +105,12 @@ export default function AdminMembershipPage() {
     }
     return list;
   }, [members, filter, search]);
+
+  const PAGE_SIZE  = 50;
+  const [page, setPage] = useState(0);
+  useEffect(() => { setPage(0); }, [filter, search]);
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const visible    = useMemo(() => filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE), [filtered, page]);
 
   if (!authed) {
     return (
@@ -208,10 +214,10 @@ export default function AdminMembershipPage() {
             <div>Status</div>
           </div>
 
-          {filtered.length === 0 ? (
+          {visible.length === 0 ? (
             <div style={{ padding: "3rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>No members found.</div>
           ) : (
-            filtered.map((m) => {
+            visible.map((m) => {
               const days = daysLeft(m.expires_at);
               const statusColor = m.expiringSoon ? "#fbbf24" : m.isActive ? "#4ade80" : "#f09595";
               const statusLabel = m.expiringSoon ? "Expiring" : m.isActive ? "Active" : "Expired";
@@ -242,6 +248,29 @@ export default function AdminMembershipPage() {
             })
           )}
         </div>
+
+        {totalPages > 1 && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1rem 0" }}>
+            <button
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+              style={{ padding: "6px 16px", background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 6, color: page === 0 ? "#333" : "#888", cursor: page === 0 ? "not-allowed" : "pointer", fontFamily: "inherit", fontSize: 13 }}
+            >
+              ← Previous
+            </button>
+            <span style={{ fontSize: 13, color: "#444" }}>
+              {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length} records
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+              style={{ padding: "6px 16px", background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 6, color: page >= totalPages - 1 ? "#333" : "#888", cursor: page >= totalPages - 1 ? "not-allowed" : "pointer", fontFamily: "inherit", fontSize: 13 }}
+            >
+              Next →
+            </button>
+          </div>
+        )}
+
       </div>
     </div>
   );

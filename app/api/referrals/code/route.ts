@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { referralsEnabled, getOrCreateCode } from "@/lib/referrals";
+import { getOrCreateCode } from "@/lib/referrals";
 import { verifyUserToken } from "@/lib/admin-auth";
 
 // GET /api/referrals/code?email=
 export async function GET(req: NextRequest) {
-  if (!referralsEnabled()) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
   const email      = req.nextUrl.searchParams.get("email") ?? "";
   const tokenEmail = verifyUserToken(req.headers.get("x-user-token") ?? "");
   if (!tokenEmail || tokenEmail.toLowerCase() !== email.toLowerCase()) {

@@ -1,16 +1,10 @@
 /**
  * Referral system utilities.
- * All public functions are no-ops when ENABLE_REFERRALS !== "true".
- *
  * Reward model: both users receive a 30-day membership extension
  * immediately when the referred user completes registration.
  */
 
 import { getSupabaseServer } from "@/lib/supabase-server";
-
-export function referralsEnabled(): boolean {
-  return process.env.ENABLE_REFERRALS === "true";
-}
 
 // ── Code generation ───────────────────────────────────────────────────────────
 
@@ -108,8 +102,6 @@ export async function processReferral(
   referredEmail:     string,
   referredFirstName: string,
 ): Promise<void> {
-  if (!referralsEnabled()) return;
-
   try {
     const referrerEmail = await getOwnerByCode(referralCode);
     if (!referrerEmail) return;
@@ -182,8 +174,6 @@ export async function processReferral(
 
 /** @deprecated Use processReferral() instead. Called at registration now. */
 export async function claimReferral(inviteeEmail: string, code: string): Promise<boolean> {
-  if (!referralsEnabled()) return false;
-
   const referrerEmail = await getOwnerByCode(code);
   if (!referrerEmail) return false;
   if (referrerEmail === inviteeEmail.toLowerCase()) return false;
@@ -200,8 +190,6 @@ export async function claimReferral(inviteeEmail: string, code: string): Promise
 
 /** @deprecated Reward now issued at registration via processReferral(). */
 export async function triggerReferralReward(inviteeEmail: string): Promise<void> {
-  if (!referralsEnabled()) return;
-
   const db  = getSupabaseServer();
   const key = inviteeEmail.toLowerCase();
 

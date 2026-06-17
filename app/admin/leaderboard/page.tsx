@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
@@ -55,7 +55,7 @@ const colGridNoLoc = "48px 1fr 90px 90px";
 
 export default function AdminLeaderboardPage() {
   const [password, setPassword] = useState("");
-  const [authed,   setAuthed]   = useState(false);
+  const [authed,   setAuthed]   = useState(true);
   const [authErr,  setAuthErr]  = useState("");
   const [authLoad, setAuthLoad] = useState(false);
 

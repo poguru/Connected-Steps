@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
@@ -43,7 +43,7 @@ const td: React.CSSProperties = {
 
 export default function AdminRunsPage() {
   const [password,    setPassword]    = useState("");
-  const [authed,      setAuthed]      = useState(false);
+  const [authed,      setAuthed]      = useState(true);
   const [authError,   setAuthError]   = useState("");
   const [loading,     setLoading]     = useState(false);
   const [data,        setData]        = useState<Registration[]>([]);

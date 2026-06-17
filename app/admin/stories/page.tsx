@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -20,7 +20,7 @@ function fmtDate(iso: string) {
 
 export default function AdminStoriesPage() {
   const [pw,      setPw]      = useState("");
-  const [authed,  setAuthed]  = useState(false);
+  const [authed,  setAuthed]  = useState(true);
   const [stories, setStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");

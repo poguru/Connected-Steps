@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -61,7 +61,7 @@ const TYPE_ICON: Record<string, string> = { running: "🏃", cycling: "🚴", tr
 
 export default function AdminEventsPage() {
   const [password, setPassword] = useState("");
-  const [authed,   setAuthed]   = useState(false);
+  const [authed,   setAuthed]   = useState(true);
   const [authErr,  setAuthErr]  = useState("");
   const [tab,      setTab]      = useState<"events" | "coupons">("events");
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { autoFeedMemberJoined } from "@/lib/auto-feed";
-import { processReferral } from "@/lib/referrals";
+import { processReferral, getOrCreateCode } from "@/lib/referrals";
 import { sendEmail, welcomeEmailHTML, adminNewUserEmailHTML } from "@/lib/notify";
 
 export async function POST(req: NextRequest) {
@@ -89,6 +89,9 @@ export async function POST(req: NextRequest) {
 
     autoFeedMemberJoined(email.toLowerCase(), firstName, lastName, location ?? null)
       .catch(() => {});
+
+    // Pre-generate referral code so the user can share immediately from the dashboard
+    getOrCreateCode(email.toLowerCase()).catch(() => {});
 
     if (referralCode && typeof referralCode === "string") {
       processReferral(referralCode.trim(), email.toLowerCase(), firstName)

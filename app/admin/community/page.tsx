@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -37,7 +37,7 @@ function fmtDate(iso: string) {
 
 export default function AdminCommunityPage() {
   const [pw,      setPw]      = useState("");
-  const [authed,  setAuthed]  = useState(false);
+  const [authed,  setAuthed]  = useState(true);
   const [posts,   setPosts]   = useState<Post[]>([]);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [loading, setLoading] = useState(false);

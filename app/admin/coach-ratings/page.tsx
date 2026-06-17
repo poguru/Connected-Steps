@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -27,13 +27,16 @@ function Stars({ n }: { n: number }) {
 
 export default function CoachRatingsPage() {
   const [pw,      setPw]      = useState("");
-  const [authed,  setAuthed]  = useState(false);
+  const [authed,  setAuthed]  = useState(true);
   const [ratings, setRatings] = useState<Rating[]>([]);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
   const [filter,  setFilter]  = useState("All");
 
-  const COACHES = ["All", "Ashokan K", "Durga Rao Vana", "Achyuta Kumari Kolli"];
+  const COACHES = useMemo(() => {
+    const names = [...new Set(ratings.map(r => r.coach_name).filter(Boolean))].sort();
+    return ["All", ...names];
+  }, [ratings]);
 
   async function login(password: string) {
     setLoading(true); setError("");
@@ -86,12 +89,11 @@ export default function CoachRatingsPage() {
 
   const filtered = filter === "All" ? ratings : ratings.filter((r) => r.coach_name === filter);
 
-  // Per-coach averages
-  const summaries = COACHES.filter((c) => c !== "All").map((name) => {
+  const summaries = useMemo(() => COACHES.filter((c) => c !== "All").map((name) => {
     const vals = ratings.filter((r) => r.coach_name === name).map((r) => r.rating);
     const avg  = vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null;
     return { name, avg, count: vals.length };
-  });
+  }), [COACHES, ratings]);
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff" }}>

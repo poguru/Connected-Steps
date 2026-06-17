@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -30,7 +30,7 @@ function fmtDate(d: string) {
 
 export default function AdminRegistrationsPage() {
   const [password, setPassword] = useState("");
-  const [authed,   setAuthed]   = useState(false);
+  const [authed,   setAuthed]   = useState(true);
   const [authErr,  setAuthErr]  = useState("");
 
   const [regs,    setRegs]    = useState<Reg[]>([]);

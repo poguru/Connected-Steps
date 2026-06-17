@@ -885,10 +885,8 @@ export default function Dashboard() {
           {/* People you may know */}
           <PeopleYouMayKnow userEmail={user.email} />
 
-          {/* Referral card — shown only when NEXT_PUBLIC_ENABLE_REFERRALS=true */}
-          {process.env.NEXT_PUBLIC_ENABLE_REFERRALS === "true" && (
-            <ReferralCard userEmail={user.email} />
-          )}
+          {/* Referral card */}
+          <ReferralCard userEmail={user.email} />
 
           {/* Training Plan */}
           <div id="training-plan">

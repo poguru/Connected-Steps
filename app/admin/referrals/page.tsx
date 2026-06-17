@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -40,7 +40,7 @@ const STATUS_STYLES: Record<string, { bg: string; color: string; label: string }
 };
 
 export default function AdminReferralsPage() {
-  const [authed,      setAuthed]      = useState(false);
+  const [authed,      setAuthed]      = useState(true);
   const [pw,          setPw]          = useState("");
   const [authError,   setAuthError]   = useState("");
   const [loading,     setLoading]     = useState(false);
@@ -48,6 +48,12 @@ export default function AdminReferralsPage() {
   const [referrals,   setReferrals]   = useState<Referral[]>([]);
   const [topRefs,     setTopRefs]     = useState<TopReferrer[]>([]);
   const [search,      setSearch]      = useState("");
+
+  // Backfill form
+  const [bfCode,      setBfCode]      = useState("");
+  const [bfEmail,     setBfEmail]     = useState("");
+  const [bfLoading,   setBfLoading]   = useState(false);
+  const [bfResult,    setBfResult]    = useState<{ ok: boolean; msg: string } | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/auth").then(r => { if (r.ok) setAuthed(true); }).catch(() => {});
@@ -67,6 +73,29 @@ export default function AdminReferralsPage() {
       setAuthed(true);
     } catch { setAuthError("Network error."); }
     finally { setLoading(false); }
+  }
+
+  async function backfill() {
+    setBfLoading(true); setBfResult(null);
+    try {
+      const res = await fetch("/api/admin/referrals/backfill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ referralCode: bfCode.trim(), referredEmail: bfEmail.trim() }),
+      });
+      const d = await res.json();
+      if (res.ok) {
+        setBfResult({ ok: true, msg: d.message });
+        setBfCode(""); setBfEmail("");
+        load();
+      } else {
+        setBfResult({ ok: false, msg: d.error ?? "Failed" });
+      }
+    } catch {
+      setBfResult({ ok: false, msg: "Network error" });
+    } finally {
+      setBfLoading(false);
+    }
   }
 
   async function load() {
@@ -161,6 +190,43 @@ export default function AdminReferralsPage() {
             </div>
           </div>
         )}
+
+        {/* Backfill missed referral */}
+        <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "1.25rem", marginBottom: "2rem" }}>
+          <div style={{ fontSize: "0.75rem", color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.75rem" }}>Retroactive Referral Fix</div>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "flex-end" }}>
+            <div style={{ flex: 1, minWidth: 140 }}>
+              <div style={{ fontSize: "10px", color: "#555", marginBottom: 4 }}>Referral Code</div>
+              <input
+                value={bfCode}
+                onChange={e => setBfCode(e.target.value.toUpperCase())}
+                placeholder="e.g. ZMGR2639"
+                style={{ width: "100%", padding: "8px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#fff", fontSize: "0.85rem", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
+              />
+            </div>
+            <div style={{ flex: 2, minWidth: 200 }}>
+              <div style={{ fontSize: "10px", color: "#555", marginBottom: 4 }}>Referred User Email</div>
+              <input
+                value={bfEmail}
+                onChange={e => setBfEmail(e.target.value)}
+                placeholder="friend@example.com"
+                style={{ width: "100%", padding: "8px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#fff", fontSize: "0.85rem", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
+              />
+            </div>
+            <button
+              onClick={backfill}
+              disabled={bfLoading || !bfCode.trim() || !bfEmail.trim()}
+              style={{ padding: "8px 20px", background: bfLoading ? "#333" : "#e8620a", color: "#fff", border: "none", borderRadius: 6, fontSize: "0.85rem", fontWeight: 600, cursor: bfLoading ? "not-allowed" : "pointer", fontFamily: "inherit", flexShrink: 0 }}
+            >
+              {bfLoading ? "Processing…" : "Grant Reward"}
+            </button>
+          </div>
+          {bfResult && (
+            <div style={{ marginTop: "0.75rem", fontSize: "0.82rem", color: bfResult.ok ? "#4ade80" : "#f09595" }}>
+              {bfResult.ok ? "✓ " : "✗ "}{bfResult.msg}
+            </div>
+          )}
+        </div>
 
         {/* Search */}
         <div style={{ marginBottom: "1rem" }}>

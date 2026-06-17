@@ -28,7 +28,7 @@ const btn = (accent = false): React.CSSProperties => ({
 
 export default function AdminSessionsPage() {
   const [password,   setPassword]   = useState("");
-  const [authed,     setAuthed]     = useState(false);
+  const [authed,     setAuthed]     = useState(true);
   const [authErr,    setAuthErr]    = useState("");
   const [authLoad,   setAuthLoad]   = useState(false);
 

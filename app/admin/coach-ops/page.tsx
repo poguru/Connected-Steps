@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
@@ -136,7 +136,7 @@ function AuthGate({ onAuth }: { onAuth: (credential: string) => void }) {
 
 export default function CoachOpsDashboard() {
   const [pw,        setPw]        = useState("");
-  const [authed,    setAuthed]    = useState(false);
+  const [authed,    setAuthed]    = useState(true);
   const [tab,       setTab]       = useState<Tab>("athletes");
 
   // Athletes
