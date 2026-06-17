@@ -860,20 +860,17 @@ select.auth-input option {
   .cs-usermenu-chevron { display: none; }
 }
 
-/* ─── Mobile profile card — visible only on mobile ────── */
-.cs-mobile-profile-card {
+/* ─── Responsive visibility helpers ─────────────────────── */
+.cs-mobile-only {
+  display: block;
+}
+.cs-desktop-only {
   display: none;
 }
 
-@media (max-width: 900px) {
-  .cs-mobile-profile-card {
-    display: block;
-    background: var(--cs-dark);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 8px;
-    padding: 0.9rem 1rem;
-    margin-bottom: 1rem;
-  }
+@media (min-width: 901px) {
+  .cs-mobile-only  { display: none; }
+  .cs-desktop-only { display: block; }
 }
 
 /* ═══════════════════════════════════════════════════════

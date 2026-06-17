@@ -761,36 +761,9 @@ export default function Dashboard() {
         {/* ── Main feed ── */}
         <main className="cs-db-main">
 
-          {/* Mobile-only compact profile card */}
-          <div className="cs-mobile-profile-card">
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-              {user.photo ? (
-                <img src={user.photo} alt={fullName} style={{ width: "44px", height: "44px", borderRadius: "50%", objectFit: "cover", border: "2px solid var(--cs-orange)", flexShrink: 0 }} />
-              ) : (
-                <div style={{ width: "44px", height: "44px", borderRadius: "50%", background: "oklch(0.72 0.19 49 / 12%)", border: "2px solid var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.9rem", fontWeight: 800, color: "var(--cs-orange)", flexShrink: 0 }}>
-                  {userInitials}
-                </div>
-              )}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--cs-white)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{fullName}</div>
-                <div style={{ fontSize: "0.7rem", color: "var(--cs-orange)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}>{goalLabel[user.goal] ?? user.goal}</div>
-              </div>
-              <div style={{ display: "flex", gap: "1.25rem", flexShrink: 0 }}>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "1rem", fontWeight: 800, color: "var(--cs-orange)" }}>{points?.month_points ?? 0}</div>
-                  <div style={{ fontSize: "9px", color: "var(--cs-muted)", textTransform: "uppercase", letterSpacing: "0.03em" }}>This Month</div>
-                </div>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "1rem", fontWeight: 800, color: "var(--cs-white)" }}>{points?.total_points ?? 0}</div>
-                  <div style={{ fontSize: "9px", color: "var(--cs-muted)", textTransform: "uppercase", letterSpacing: "0.03em" }}>All-Time</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* ── 1. Hero ── */}
+          {/* ── 1. Hero (with avatar built in) ── */}
           <DashboardHero
-            user={{ firstName: user.firstName, goal: user.goal, location: user.location }}
+            user={{ firstName: user.firstName, goal: user.goal, location: user.location, photo: user.photo, initials: userInitials }}
             sessions={sessions}
             upcomingSessions={upcomingSessions}
             joinedSessionIds={joinedSessionIds}
@@ -798,6 +771,11 @@ export default function Dashboard() {
 
           {/* ── Coach Chat ── */}
           <CoachChatCard userEmail={user.email} />
+
+          {/* ── Training Plan — mobile feed (hidden on desktop where sidebar shows it) ── */}
+          <div className="cs-mobile-only">
+            <TrainingPlan goal={user.goal} email={user.email} />
+          </div>
 
           {/* ── Progress (stats + badges merged) ── */}
           <ProgressCard
@@ -826,24 +804,25 @@ export default function Dashboard() {
           {/* Referral card */}
           <ReferralCard userEmail={user.email} />
 
-          {/* Training Plan */}
-          <div id="training-plan">
+          {/* Training Plan (desktop sidebar only — mobile sees it in main feed) */}
+          <div id="training-plan" className="cs-desktop-only">
             <TrainingPlan goal={user.goal} email={user.email} />
           </div>
 
-          {/* Leaderboard */}
-          <div
-            onClick={() => router.push("/leaderboard")}
-            style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "0.9rem 1.1rem", marginBottom: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", boxShadow: "var(--shadow-md)", transition: "opacity 0.15s" }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = "0.82"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
-          >
-            <div>
-              <div style={{ fontSize: "10px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "2px" }}>Leaderboard</div>
-              <div style={{ fontSize: "0.85rem", color: "var(--cs-white)", fontWeight: 600 }}>View rankings</div>
+          {/* Leaderboard + Community links (desktop sidebar only) */}
+          <div className="cs-desktop-only">
+            <div
+              onClick={() => router.push("/leaderboard")}
+              style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "0.9rem 1.1rem", marginBottom: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", boxShadow: "var(--shadow-md)", transition: "opacity 0.15s" }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = "0.82"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
+            >
+              <div>
+                <div style={{ fontSize: "10px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "2px" }}>Leaderboard</div>
+                <div style={{ fontSize: "0.85rem", color: "var(--cs-white)", fontWeight: 600 }}>View rankings</div>
+              </div>
+              <span style={{ fontSize: "1.25rem" }}>🏆</span>
             </div>
-            <span style={{ fontSize: "1.25rem" }}>🏆</span>
-          </div>
 
           {/* Community — one card replaces Ask/Story/QA forms */}
           <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, marginBottom: "0.75rem", overflow: "hidden", boxShadow: "var(--shadow-md)" }}>
@@ -866,6 +845,8 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+
+          </div>{/* end cs-desktop-only: leaderboard + community */}
 
           {/* Push Notifications (compact) */}
           {pushSupported && (

@@ -15,7 +15,7 @@ interface UpcomingSession {
 interface PlanDay { type: string; detail: string; emoji: string; }
 
 export interface Props {
-  user: { firstName: string; goal: string; location: string };
+  user: { firstName: string; goal: string; location: string; photo?: string | null; initials?: string };
   sessions: SessionRecord[];
   upcomingSessions: UpcomingSession[];
   joinedSessionIds: Set<string>;
@@ -98,28 +98,38 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
       {/* Ambient glow */}
       <div style={{ position:"absolute", top:-60, right:-40, width:200, height:200, borderRadius:"50%", background:"oklch(0.72 0.19 49 / 8%)", filter:"blur(50px)", pointerEvents:"none" }} />
 
-      {/* ── Top: greeting + streak chips ─────────────────────────────── */}
-      <div style={{ padding:"1rem 1.25rem 0.75rem", display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, flexWrap:"wrap", position:"relative" }}>
-        <div>
-          <div style={{ fontSize:"0.7rem", color:"var(--muted-foreground)", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:2 }}>
+      {/* ── Top: avatar + greeting + chips ──────────────────────────── */}
+      <div style={{ padding:"1rem 1.25rem 0.75rem", display:"flex", alignItems:"center", gap:"0.75rem", position:"relative" }}>
+        {/* Avatar */}
+        {user.photo ? (
+          <img src={user.photo} alt={user.firstName} style={{ width:42, height:42, borderRadius:"50%", objectFit:"cover", border:"2px solid var(--cs-orange)", flexShrink:0, display:"block" }} />
+        ) : (
+          <div style={{ width:42, height:42, borderRadius:"50%", background:"oklch(0.72 0.19 49 / 15%)", border:"2px solid var(--cs-orange)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"0.88rem", fontWeight:800, color:"var(--cs-orange)", flexShrink:0 }}>
+            {user.initials ?? user.firstName[0]?.toUpperCase()}
+          </div>
+        )}
+
+        {/* Greeting text */}
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:"0.65rem", color:"var(--muted-foreground)", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:1 }}>
             {new Date().toLocaleDateString("en-IN", { weekday:"long", day:"numeric", month:"long" })}
           </div>
-          <div style={{ fontSize:"1.1rem", fontWeight:700, color:"var(--foreground)" }}>
+          <div style={{ fontSize:"1rem", fontWeight:700, color:"var(--foreground)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
             {greeting()}, <span style={{ color:"var(--cs-orange)" }}>{user.firstName}</span>
           </div>
         </div>
-        <div style={{ display:"flex", gap:8, flexShrink:0 }}>
+
+        {/* Chips */}
+        <div style={{ display:"flex", gap:6, flexShrink:0 }}>
           {streak > 0 && (
-            <div style={{ display:"flex", alignItems:"center", gap:5, background:"rgba(232,98,10,0.1)", border:"1px solid rgba(232,98,10,0.25)", borderRadius:20, padding:"4px 10px" }}>
-              <span style={{ fontSize:"0.85rem" }}>🔥</span>
-              <span style={{ fontSize:"12px", fontWeight:700, color:"var(--cs-orange)" }}>{streak}</span>
-              <span style={{ fontSize:"11px", color:"var(--muted-foreground)" }}>streak</span>
+            <div style={{ display:"flex", alignItems:"center", gap:4, background:"rgba(232,98,10,0.1)", border:"1px solid rgba(232,98,10,0.25)", borderRadius:20, padding:"4px 8px" }}>
+              <span style={{ fontSize:"0.8rem" }}>🔥</span>
+              <span style={{ fontSize:"11px", fontWeight:700, color:"var(--cs-orange)" }}>{streak}</span>
             </div>
           )}
-          <div style={{ display:"flex", alignItems:"center", gap:5, background:"rgba(255,255,255,0.05)", border:"1px solid var(--border)", borderRadius:20, padding:"4px 10px" }}>
-            <span style={{ fontSize:"0.85rem" }}>📅</span>
-            <span style={{ fontSize:"12px", fontWeight:700, color:"var(--foreground)" }}>{monthly}</span>
-            <span style={{ fontSize:"11px", color:"var(--muted-foreground)" }}>this month</span>
+          <div style={{ display:"flex", alignItems:"center", gap:4, background:"rgba(255,255,255,0.05)", border:"1px solid var(--border)", borderRadius:20, padding:"4px 8px" }}>
+            <span style={{ fontSize:"0.8rem" }}>📅</span>
+            <span style={{ fontSize:"11px", fontWeight:700, color:"var(--foreground)" }}>{monthly}</span>
           </div>
         </div>
       </div>
