@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, DM_Sans } from "next/font/google";
 import "./globals.css";
 import CookieBanner from "@/components/ui/CookieBanner";
+import NativeShell from "@/components/mobile/NativeShell";
 
 const cormorant = Cormorant_Garamond({
   subsets: ["latin"],
@@ -62,7 +63,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${cormorant.variable} ${dmSans.variable}`}>
       <body className="antialiased">
-        {children}
+        <NativeShell>
+          {children}
+        </NativeShell>
         <CookieBanner />
       </body>
     </html>

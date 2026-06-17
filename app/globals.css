@@ -869,3 +869,87 @@ select.auth-input option {
     margin-bottom: 1rem;
   }
 }
+
+/* ═══════════════════════════════════════════════════════
+   NATIVE APP SHELL  (Capacitor — body.native-app)
+   ═══════════════════════════════════════════════════════ */
+
+/* 1. Hide the desktop top nav entirely */
+.native-app .cs-app-nav,
+.native-app .cs-mobile-menu,
+.native-app .cs-mobile-nav-toggle {
+  display: none !important;
+}
+
+/* 2. Remove top-nav space from dashboard; use status-bar safe area instead */
+.native-app .cs-dashboard-body {
+  padding-top: calc(env(safe-area-inset-top) + 16px) !important;
+  padding-bottom: calc(72px + env(safe-area-inset-bottom)) !important;
+}
+
+/* 3. Any page that sets its own top padding needs bottom clearance for the tab bar */
+.native-app main,
+.native-app [class*="min-h-screen"] {
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
+}
+
+/* 4. Remove hover effects on touch — prevents sticky :hover states on mobile */
+@media (hover: none) {
+  .btn-primary:hover  { opacity: 1; transform: none; }
+  .cs-lb-row:hover    { background: transparent; }
+  a:hover, button:hover { opacity: 1; }
+}
+
+/* 5. Disable text selection in the app shell */
+.native-app { -webkit-user-select: none; user-select: none; }
+.native-app input,
+.native-app textarea { -webkit-user-select: text; user-select: text; }
+
+/* ─── Bottom Navigation Bar ─────────────────────────── */
+.cs-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  height: calc(64px + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: oklch(0.13 0.005 250 / 0.97);
+  backdrop-filter: blur(20px) saturate(150%);
+  border-top: 1px solid oklch(1 0 0 / 8%);
+  display: flex;
+  align-items: flex-start;
+  padding-top: 6px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cs-bottom-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-decoration: none;
+  color: oklch(0.55 0.008 250);
+  padding: 4px 0;
+  min-height: 44px;
+  transition: color 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cs-bottom-tab--active {
+  color: oklch(0.72 0.19 49); /* --cs-orange */
+}
+
+.cs-bottom-tab:active {
+  opacity: 0.65;
+  transition: opacity 0.05s;
+}
+
+.cs-bottom-tab-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  font-family: var(--font-body), sans-serif;
+  line-height: 1;
+}
