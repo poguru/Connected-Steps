@@ -982,3 +982,17 @@ select.auth-input option {
 .native-app .cs-messages-list {
   padding-bottom: calc(80px + 64px + env(safe-area-inset-bottom));
 }
+
+/* ─── Leaderboard sticky rank card ──────────────────────── */
+.cs-lb-sticky-rank {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  padding: 0 1.5rem 0.75rem;
+}
+
+.native-app .cs-lb-sticky-rank {
+  bottom: calc(56px + env(safe-area-inset-bottom));
+}
