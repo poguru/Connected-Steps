@@ -953,3 +953,29 @@ select.auth-input option {
   font-family: var(--font-body), sans-serif;
   line-height: 1;
 }
+
+/* ─── Messages page ──────────────────────────────────── */
+.cs-messages-list {
+  padding-bottom: 80px; /* clears fixed input bar on desktop */
+}
+
+.cs-messages-input-bar {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding-bottom: max(0.65rem, env(safe-area-inset-bottom));
+  z-index: 20;
+}
+
+/* In native-app, input bar sits above the bottom nav */
+.native-app .cs-messages-input-bar {
+  position: fixed;
+  bottom: calc(64px + env(safe-area-inset-bottom));
+  padding-bottom: 0.65rem;
+}
+
+/* Extra padding so messages don't hide behind input + bottom nav */
+.native-app .cs-messages-list {
+  padding-bottom: calc(80px + 64px + env(safe-area-inset-bottom));
+}

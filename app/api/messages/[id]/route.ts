@@ -109,6 +109,6 @@ async function notifyRecipient({
     type:       "coach_message",
     title:      `${coachName} sent you a message`,
     body:       body.slice(0, 120),
-    action_url: "/dashboard/messages",
+    action_url: "/messages",
   });
 }

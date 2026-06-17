@@ -18,6 +18,7 @@ import SessionPhotos from "@/components/dashboard/SessionPhotos";
 import FollowerFeed from "@/components/dashboard/FollowerFeed";
 import PeopleYouMayKnow from "@/components/dashboard/PeopleYouMayKnow";
 import MyEventRegistrations from "@/components/dashboard/MyEventRegistrations";
+import CoachChatCard from "@/components/dashboard/CoachChatCard";
 
 interface SessionRecord {
   attended:      boolean;
@@ -792,6 +793,9 @@ export default function Dashboard() {
             upcomingSessions={upcomingSessions}
             joinedSessionIds={joinedSessionIds}
           />
+
+          {/* ── Coach Chat ── */}
+          <CoachChatCard userEmail={user.email} />
 
           {/* ── Upgrade prompt — post-session (once, permanent) or generic (daily) ── */}
           <PostSessionUpgradePrompt
