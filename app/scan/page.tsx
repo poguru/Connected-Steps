@@ -6,13 +6,9 @@ import Link from "next/link";
 
 type ScanState = "idle" | "processing" | "success" | "error" | "scanning";
 
+// Token is stored separately from the user object — key is cs_user_token
 function getUserToken(): string | null {
-  try {
-    const raw = localStorage.getItem("cs_user");
-    if (!raw) return null;
-    const user = JSON.parse(raw);
-    return user?.token ?? null;
-  } catch { return null; }
+  try { return localStorage.getItem("cs_user_token") ?? null; } catch { return null; }
 }
 
 function ScanPageInner() {
@@ -20,31 +16,38 @@ function ScanPageInner() {
   const router   = useRouter();
   const urlToken = params.get("token");
 
-  const [state,   setState]   = useState<ScanState>("idle");
-  const [message, setMessage] = useState("");
-  const [session, setSession] = useState<{ title?: string; date?: string } | null>(null);
+  const [state,     setState]     = useState<ScanState>("idle");
+  const [message,   setMessage]   = useState("");
+  const [session,   setSession]   = useState<{ title?: string; date?: string } | null>(null);
   const [alreadyIn, setAlreadyIn] = useState(false);
+  // Initialise as false — read from localStorage after mount to avoid SSR mismatch
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   // Camera scanner state
-  const videoRef   = useRef<HTMLVideoElement>(null);
-  const canvasRef  = useRef<HTMLCanvasElement>(null);
-  const streamRef  = useRef<MediaStream | null>(null);
-  const rafRef     = useRef<number>(0);
-  const jsQRRef    = useRef<((data: Uint8ClampedArray, width: number, height: number) => { data: string } | null) | null>(null);
+  const videoRef  = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const rafRef    = useRef<number>(0);
+  const jsQRRef   = useRef<((data: Uint8ClampedArray, width: number, height: number) => { data: string } | null) | null>(null);
+
+  // Resolve auth state from localStorage after hydration
+  useEffect(() => {
+    setIsLoggedIn(!!getUserToken());
+  }, []);
 
   async function processToken(token: string) {
     setState("processing");
     const userToken = getUserToken();
     if (!userToken) {
-      setMessage("Please log in first to record attendance.");
+      setMessage("Please log in to record your attendance.");
       setState("error");
       return;
     }
     try {
       const res  = await fetch("/api/attendance/scan", {
-        method: "POST",
+        method:  "POST",
         headers: { "Content-Type": "application/json", "x-user-token": userToken },
-        body: JSON.stringify({ token }),
+        body:    JSON.stringify({ token }),
       });
       const json = await res.json();
       if (!res.ok) { setMessage(json.error ?? "Failed to record attendance"); setState("error"); return; }
@@ -58,7 +61,7 @@ function ScanPageInner() {
     }
   }
 
-  // Auto-process token from URL on mount
+  // Auto-process token from URL on mount (user opened URL from phone camera)
   useEffect(() => {
     if (urlToken) processToken(urlToken);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -74,13 +77,10 @@ function ScanPageInner() {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
-
-      // Lazy-load jsQR
       if (!jsQRRef.current) {
         const mod = await import("jsqr");
         jsQRRef.current = mod.default;
       }
-
       const tick = () => {
         const video  = videoRef.current;
         const canvas = canvasRef.current;
@@ -94,12 +94,11 @@ function ScanPageInner() {
         const result    = jsQRRef.current?.(imageData.data, imageData.width, imageData.height);
         if (result?.data) {
           stopCamera();
-          // Extract token from URL or use raw data
           try {
-            const u     = new URL(result.data);
-            const t     = u.searchParams.get("token");
+            const u = new URL(result.data);
+            const t = u.searchParams.get("token");
             if (t) { processToken(t); return; }
-          } catch { /* not a URL */ }
+          } catch { /* raw token */ }
           processToken(result.data);
           return;
         }
@@ -119,14 +118,12 @@ function ScanPageInner() {
     if (videoRef.current) videoRef.current.srcObject = null;
   }
 
-  useEffect(() => () => stopCamera(), []); // cleanup on unmount
-
-  const isLoggedIn = typeof window !== "undefined" && !!getUserToken();
+  useEffect(() => () => stopCamera(), []);
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "1.5rem" }}>
 
-      {/* Logo / back */}
+      {/* Header */}
       <div style={{ position: "fixed", top: 0, left: 0, right: 0, padding: "1rem 1.5rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
         <button onClick={() => router.back()} style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: "1.2rem", lineHeight: 1 }}>←</button>
         <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#fff" }}>Scan Attendance</span>
@@ -171,7 +168,7 @@ function ScanPageInner() {
               <div style={{ fontSize: "0.85rem", color: "#aaa" }}>{message}</div>
             </div>
             {!isLoggedIn ? (
-              <Link href="/auth" style={{ padding: "12px 32px", background: "#e8620a", color: "#fff", borderRadius: "10px", fontWeight: 700, textDecoration: "none", fontSize: "0.9rem" }}>
+              <Link href="/auth?redirect=/scan" style={{ padding: "12px 32px", background: "#e8620a", color: "#fff", borderRadius: "10px", fontWeight: 700, textDecoration: "none", fontSize: "0.9rem" }}>
                 Log in
               </Link>
             ) : (
@@ -189,9 +186,10 @@ function ScanPageInner() {
             <div style={{ position: "relative", width: "100%", maxWidth: "320px", aspectRatio: "1", borderRadius: "16px", overflow: "hidden", border: "2px solid #e8620a" }}>
               <video ref={videoRef} playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               {/* Corner guides */}
-              {[["0","0","0"], ["0","auto","90deg"], ["auto","0","270deg"], ["auto","auto","180deg"]].map(([t, b, r], i) => (
-                <div key={i} style={{ position: "absolute", top: t === "0" ? 16 : "auto", bottom: b === "0" ? 16 : "auto", left: t === "0" && b !== "0" ? "auto" : t === "0" ? 16 : "auto", right: b === "0" ? 16 : "auto", width: 28, height: 28, borderTop: i < 2 ? "3px solid #e8620a" : "none", borderBottom: i >= 2 ? "3px solid #e8620a" : "none", borderLeft: (i === 0 || i === 2) ? "3px solid #e8620a" : "none", borderRight: (i === 1 || i === 3) ? "3px solid #e8620a" : "none" }} />
-              ))}
+              <div style={{ position: "absolute", top: 16, left: 16, width: 28, height: 28, borderTop: "3px solid #e8620a", borderLeft: "3px solid #e8620a" }} />
+              <div style={{ position: "absolute", top: 16, right: 16, width: 28, height: 28, borderTop: "3px solid #e8620a", borderRight: "3px solid #e8620a" }} />
+              <div style={{ position: "absolute", bottom: 16, left: 16, width: 28, height: 28, borderBottom: "3px solid #e8620a", borderLeft: "3px solid #e8620a" }} />
+              <div style={{ position: "absolute", bottom: 16, right: 16, width: 28, height: 28, borderBottom: "3px solid #e8620a", borderRight: "3px solid #e8620a" }} />
             </div>
             <canvas ref={canvasRef} style={{ display: "none" }} />
             <button onClick={() => { stopCamera(); setState("idle"); }} style={{ padding: "10px 24px", background: "rgba(255,255,255,0.08)", border: "none", borderRadius: "8px", color: "#fff", cursor: "pointer", fontWeight: 600 }}>
@@ -200,7 +198,7 @@ function ScanPageInner() {
           </div>
         )}
 
-        {/* Idle — no token in URL */}
+        {/* Idle — show camera button or login prompt */}
         {state === "idle" && !urlToken && (
           <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "1.25rem" }}>
             <div style={{ width: 80, height: 80, borderRadius: "50%", background: "rgba(232,98,10,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2.5rem" }}>📱</div>
@@ -210,17 +208,17 @@ function ScanPageInner() {
                 Point your camera at the QR code displayed at your session to record attendance automatically.
               </div>
             </div>
-            {!isLoggedIn ? (
-              <Link href="/auth" style={{ padding: "14px 36px", background: "#e8620a", color: "#fff", borderRadius: "12px", fontWeight: 700, textDecoration: "none", fontSize: "0.95rem" }}>
-                Log in to scan
-              </Link>
-            ) : (
-              <button onClick={startCamera} style={{ padding: "14px 36px", background: "#e8620a", color: "#fff", borderRadius: "12px", fontWeight: 700, border: "none", cursor: "pointer", fontSize: "0.95rem", width: "100%" }}>
+            {isLoggedIn ? (
+              <button onClick={startCamera} style={{ padding: "14px 36px", background: "#e8620a", color: "#fff", borderRadius: "12px", fontWeight: 700, border: "none", cursor: "pointer", fontSize: "0.95rem", width: "100%", fontFamily: "inherit" }}>
                 Open Camera
               </button>
+            ) : (
+              <Link href="/auth?redirect=/scan" style={{ padding: "14px 36px", background: "#e8620a", color: "#fff", borderRadius: "12px", fontWeight: 700, textDecoration: "none", fontSize: "0.95rem", display: "block", width: "100%", boxSizing: "border-box" }}>
+                Log in to scan
+              </Link>
             )}
             <div style={{ fontSize: "0.75rem", color: "#555" }}>
-              Or ask your coach to show you the QR code to scan with your phone camera
+              Or use your phone camera to scan — it opens this page automatically.
             </div>
           </div>
         )}

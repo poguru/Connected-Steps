@@ -9,7 +9,7 @@ import BottomNav from "@/components/mobile/BottomNav";
 const EXIT_ROUTES = new Set(["/dashboard", "/events", "/community", "/leaderboard", "/profile"]);
 
 // Non-authed users are allowed on these routes without being redirected
-const PUBLIC_PREFIX = ["/", "/auth", "/pricing", "/events"];
+const PUBLIC_PREFIX = ["/", "/auth", "/pricing", "/events", "/scan"];
 
 function getCapNative(): boolean {
   const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
