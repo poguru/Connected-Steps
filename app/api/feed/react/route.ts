@@ -1,22 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireActiveUser } from "@/lib/active-user";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 // POST /api/feed/react
-// Body: { feed_event_id, user_email, reaction_type: "like" | "celebrate" }
+// Body: { feed_event_id, reaction_type: "like" | "celebrate" }
 // Toggles the reaction: if already set to same type → remove it.
 // If set to different type → switch it.
 // Returns: { action: "added" | "removed" | "switched", reaction_type, counts: {like, celebrate} }
 
 export async function POST(req: NextRequest) {
   try {
-    const { feed_event_id, user_email, reaction_type } = await req.json() as {
+    const user_email = verifyUserToken(req.headers.get("x-user-token") ?? "");
+    if (!user_email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { feed_event_id, reaction_type } = await req.json() as {
       feed_event_id: string;
-      user_email:    string;
       reaction_type: "like" | "celebrate";
     };
 
-    if (!feed_event_id || !user_email || !["like", "celebrate"].includes(reaction_type))
+    if (!feed_event_id || !["like", "celebrate"].includes(reaction_type))
       return NextResponse.json({ error: "Missing or invalid fields" }, { status: 400 });
 
     const blocked = await requireActiveUser(user_email);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireActiveUser } from "@/lib/active-user";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 export type PostType = "general" | "run" | "achievement" | "race" | "question";
 
@@ -85,18 +86,20 @@ export async function GET(req: NextRequest) {
   });
 }
 
-// POST /api/posts  — multipart/form-data: body, post_type, author_email, author_name, photo (optional)
+// POST /api/posts  — multipart/form-data: body, post_type, author_name, photo (optional)
 export async function POST(req: NextRequest) {
   try {
+    const author_email = verifyUserToken(req.headers.get("x-user-token") ?? "");
+    if (!author_email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const ct = req.headers.get("content-type") ?? "";
-    let body_text = "", post_type = "general", author_email = "", author_name = "";
+    let body_text = "", post_type = "general", author_name = "";
     let photoUrl: string | null = null;
 
     if (ct.includes("multipart/form-data")) {
       const form = await req.formData();
       body_text    = (form.get("body")         as string) ?? "";
       post_type    = (form.get("post_type")    as string) ?? "general";
-      author_email = (form.get("author_email") as string) ?? "";
       author_name  = (form.get("author_name")  as string) ?? "";
 
       const photo = form.get("photo") as File | null;
@@ -122,11 +125,10 @@ export async function POST(req: NextRequest) {
       const json = await req.json().catch(() => ({}));
       body_text    = json.body         ?? "";
       post_type    = json.post_type    ?? "general";
-      author_email = json.author_email ?? "";
       author_name  = json.author_name  ?? "";
     }
 
-    if (!author_email || !author_name || !body_text.trim())
+    if (!author_name || !body_text.trim())
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     if (body_text.length > 800)
       return NextResponse.json({ error: "Post must be under 800 characters" }, { status: 400 });

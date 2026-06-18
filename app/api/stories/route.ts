@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 // GET /api/stories — fetch approved stories + avg rating
 export async function GET() {
@@ -25,8 +26,11 @@ export async function GET() {
 // POST /api/stories — submit a story with optional rating
 export async function POST(req: NextRequest) {
   try {
-    const { user_email, user_name, quote, achievement, rating } = await req.json();
-    if (!user_email || !user_name || !quote?.trim() || !achievement?.trim())
+    const user_email = verifyUserToken(req.headers.get("x-user-token") ?? "");
+    if (!user_email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { user_name, quote, achievement, rating } = await req.json();
+    if (!user_name || !quote?.trim() || !achievement?.trim())
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     if (quote.length > 1000)
       return NextResponse.json({ error: "Story must be under 1000 characters" }, { status: 400 });

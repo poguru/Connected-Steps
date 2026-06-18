@@ -55,20 +55,20 @@ export default function CreatePost({ currentUserEmail, currentUserName, onPosted
     setSubmitting(true); setError("");
 
     try {
+      const token = typeof window !== "undefined" ? (localStorage.getItem("cs_user_token") ?? "") : "";
       let res: Response;
       if (photo) {
         const form = new FormData();
-        form.append("body",         body.trim());
-        form.append("post_type",    postType);
-        form.append("author_email", currentUserEmail);
-        form.append("author_name",  currentUserName);
-        form.append("photo",        photo);
-        res = await fetch("/api/posts", { method: "POST", body: form });
+        form.append("body",        body.trim());
+        form.append("post_type",   postType);
+        form.append("author_name", currentUserName);
+        form.append("photo",       photo);
+        res = await fetch("/api/posts", { method: "POST", headers: { "x-user-token": token }, body: form });
       } else {
         res = await fetch("/api/posts", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ body: body.trim(), post_type: postType, author_email: currentUserEmail, author_name: currentUserName }),
+          headers: { "Content-Type": "application/json", "x-user-token": token },
+          body: JSON.stringify({ body: body.trim(), post_type: postType, author_name: currentUserName }),
         });
       }
 

@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireActiveUser } from "@/lib/active-user";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 type Params = { params: Promise<{ id: string }> };
 
-// POST /api/posts/[id]/report  { reporter_email, reason?, content_type? }
+// POST /api/posts/[id]/report  { reason?, content_type? }
 export async function POST(req: NextRequest, { params }: Params) {
   const { id }           = await params;
-  const { reporter_email, reason = "inappropriate", content_type = "user_post" } =
-    await req.json().catch(() => ({} as { reporter_email?: string; reason?: string; content_type?: string }));
+  const reporter_email   = verifyUserToken(req.headers.get("x-user-token") ?? "");
+  if (!reporter_email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  if (!reporter_email)
-    return NextResponse.json({ error: "reporter_email required" }, { status: 400 });
+  const { reason = "inappropriate", content_type = "user_post" } =
+    await req.json().catch(() => ({} as { reason?: string; content_type?: string }));
 
   const blocked = await requireActiveUser(reporter_email);
   if (blocked) return blocked;

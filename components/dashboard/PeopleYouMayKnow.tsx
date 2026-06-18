@@ -25,10 +25,11 @@ export default function PeopleYouMayKnow({ userEmail }: { userEmail: string }) {
   async function toggleFollow(targetEmail: string) {
     setBusySet(prev => new Set(prev).add(targetEmail));
     try {
+      const token = typeof window !== "undefined" ? (localStorage.getItem("cs_user_token") ?? "") : "";
       const res  = await fetch("/api/follow", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ follower_email: userEmail, following_email: targetEmail }),
+        headers: { "Content-Type": "application/json", "x-user-token": token },
+        body: JSON.stringify({ following_email: targetEmail }),
       });
       const data = await res.json();
       if (res.ok) {

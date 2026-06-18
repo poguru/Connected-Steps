@@ -84,8 +84,8 @@ export default function PostCard({ post, currentUserEmail, onDeleted }: Props) {
     setReactBusy(true);
     try {
       const res = await fetch(`/api/posts/${post.id}/react`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_email: currentUserEmail, reaction_type: type }),
+        method: "POST", headers: userAuthHeaders(),
+        body: JSON.stringify({ reaction_type: type }),
       });
       if (!res.ok) setReactions(prev);
     } catch { setReactions(prev); }
@@ -109,8 +109,8 @@ export default function PostCard({ post, currentUserEmail, onDeleted }: Props) {
     setSendingCom(true);
     try {
       const res  = await fetch(`/api/posts/${post.id}/comments`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ author_email: currentUserEmail, author_name: "You", body }),
+        method: "POST", headers: userAuthHeaders(),
+        body: JSON.stringify({ author_name: getCurrentUserName(), body }),
       });
       const data = await res.json();
       if (res.ok) { setComments(prev => [...prev, data.comment]); setCommentCount(c => c + 1); }
@@ -120,6 +120,15 @@ export default function PostCard({ post, currentUserEmail, onDeleted }: Props) {
   function userAuthHeaders(): Record<string, string> {
     const token = typeof window !== "undefined" ? localStorage.getItem("cs_user_token") : null;
     return token ? { "Content-Type": "application/json", "x-user-token": token } : { "Content-Type": "application/json" };
+  }
+
+  function getCurrentUserName(): string {
+    try {
+      const raw = localStorage.getItem("cs_user");
+      if (!raw) return "Member";
+      const u = JSON.parse(raw);
+      return `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.name || "Member";
+    } catch { return "Member"; }
   }
 
   function alertRelogin() {
@@ -145,8 +154,8 @@ export default function PostCard({ post, currentUserEmail, onDeleted }: Props) {
 
   async function reportPost() {
     await fetch(`/api/posts/${post.id}/report`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reporter_email: currentUserEmail }),
+      method: "POST", headers: userAuthHeaders(),
+      body: JSON.stringify({}),
     });
     setReported(true);
     setShowMenu(false);

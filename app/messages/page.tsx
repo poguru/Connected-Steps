@@ -50,10 +50,10 @@ export default function MessagesPage() {
   useEffect(() => {
     try {
       const stored = localStorage.getItem("cs_user");
-      if (!stored) { router.push("/login"); return; }
+      if (!stored) { router.replace("/auth?redirect=/messages"); return; }
       setUserEmail(JSON.parse(stored).email);
     } catch {
-      router.push("/login");
+      router.replace("/auth?redirect=/messages");
     }
   }, [router]);
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 // GET — avg rating per coach (public)
 export async function GET() {
@@ -29,8 +30,11 @@ export async function GET() {
 // POST — submit or update a rating (one per user per coach)
 export async function POST(req: NextRequest) {
   try {
-    const { user_email, coach_name, rating, feedback } = await req.json();
-    if (!user_email || !coach_name || !rating)
+    const user_email = verifyUserToken(req.headers.get("x-user-token") ?? "");
+    if (!user_email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { coach_name, rating, feedback } = await req.json();
+    if (!coach_name || !rating)
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     if (rating < 1 || rating > 5)
       return NextResponse.json({ error: "Rating must be 1–5" }, { status: 400 });

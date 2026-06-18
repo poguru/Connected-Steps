@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireActiveUser } from "@/lib/active-user";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 // POST /api/follow — follow or unfollow
 export async function POST(req: NextRequest) {
   try {
-    const { follower_email, following_email } = await req.json();
-    if (!follower_email || !following_email) {
-      return NextResponse.json({ error: "Missing emails" }, { status: 400 });
+    const follower_email = verifyUserToken(req.headers.get("x-user-token") ?? "");
+    if (!follower_email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { following_email } = await req.json();
+    if (!following_email) {
+      return NextResponse.json({ error: "Missing following_email" }, { status: 400 });
     }
     if (follower_email === following_email) {
       return NextResponse.json({ error: "Cannot follow yourself" }, { status: 400 });

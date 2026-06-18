@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireActiveUser } from "@/lib/active-user";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -19,12 +20,15 @@ export async function GET(req: NextRequest, { params }: Params) {
   return NextResponse.json({ comments: data ?? [] });
 }
 
-// POST /api/posts/[id]/comments  { author_email, author_name, body }
+// POST /api/posts/[id]/comments  { author_name, body }
 export async function POST(req: NextRequest, { params }: Params) {
-  const { id } = await params;
-  const { author_email, author_name, body } = await req.json().catch(() => ({}));
+  const { id }         = await params;
+  const author_email   = verifyUserToken(req.headers.get("x-user-token") ?? "");
+  if (!author_email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  if (!author_email || !author_name || !body?.trim())
+  const { author_name, body } = await req.json().catch(() => ({}));
+
+  if (!author_name || !body?.trim())
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   if (body.length > 400)
     return NextResponse.json({ error: "Comment must be under 400 characters" }, { status: 400 });

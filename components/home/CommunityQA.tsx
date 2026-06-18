@@ -43,18 +43,18 @@ function ReplyForm({ postId, onDone }: { postId: number; onDone: () => void }) {
     if (!body.trim()) return;
     setSaving(true); setMsg("");
     try {
-      const raw  = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
-      const user = raw ? JSON.parse(raw) : null;
-      if (!user?.email) { setMsg("Please log in to reply."); return; }
+      const raw   = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
+      const token = typeof window !== "undefined" ? (localStorage.getItem("cs_user_token") ?? "") : "";
+      const user  = raw ? JSON.parse(raw) : null;
+      if (!user?.email || !token) { setMsg("Please log in to reply."); return; }
 
       const res  = await fetch("/api/community/replies", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-user-token": token },
         body: JSON.stringify({
-          post_id:    postId,
-          user_email: user.email,
-          user_name:  user.name || user.email.split("@")[0],
-          body:       body.trim(),
+          post_id:   postId,
+          user_name: user.name || user.firstName || user.email.split("@")[0],
+          body:      body.trim(),
         }),
       });
       const data = await res.json();
@@ -263,19 +263,19 @@ function AskModal({ onClose, onPosted }: { onClose: () => void; onPosted: () => 
     setErrors({ title: false, body: false });
     setSaving(true); setMsg("");
     try {
-      const raw  = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
-      const user = raw ? JSON.parse(raw) : null;
-      if (!user?.email) { setMsg("Please log in to post."); return; }
+      const raw   = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
+      const token = typeof window !== "undefined" ? (localStorage.getItem("cs_user_token") ?? "") : "";
+      const user  = raw ? JSON.parse(raw) : null;
+      if (!user?.email || !token) { setMsg("Please log in to post."); return; }
 
       const res  = await fetch("/api/community/posts", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-user-token": token },
         body: JSON.stringify({
-          user_email: user.email,
-          user_name:  user.name || user.email.split("@")[0],
-          category:   form.category,
-          title:      form.title.trim(),
-          body:       form.body.trim(),
+          user_name: user.name || user.firstName || user.email.split("@")[0],
+          category:  form.category,
+          title:     form.title.trim(),
+          body:      form.body.trim(),
         }),
       });
       const data = await res.json();
@@ -404,11 +404,11 @@ export default function CommunityQA() {
     setLikedByMe((prev) => { const s = new Set(prev); wasLiked ? s.delete(postId) : s.add(postId); return s; });
     setLikeCounts((prev) => ({ ...prev, [postId]: Math.max(0, (prev[postId] ?? 0) + (wasLiked ? -1 : 1)) }));
 
-    const raw   = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
-    const email = raw ? (JSON.parse(raw).email ?? "") : "";
+    const token = typeof window !== "undefined" ? (localStorage.getItem("cs_user_token") ?? "") : "";
+    if (!token) return;
     const res   = await fetch("/api/community/likes", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ post_id: postId, email }),
+      method: "POST", headers: { "Content-Type": "application/json", "x-user-token": token },
+      body: JSON.stringify({ post_id: postId }),
     }).catch(() => null);
     if (!res?.ok) return;
     const data = await res.json();

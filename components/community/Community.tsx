@@ -112,7 +112,8 @@ export default function Community() {
     if (!user) return;
     setFollowBusy(prev => new Set(prev).add(targetEmail));
     try {
-      const res  = await fetch("/api/follow", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ follower_email: user.email, following_email: targetEmail }) });
+      const token = localStorage.getItem("cs_user_token") ?? "";
+      const res  = await fetch("/api/follow", { method: "POST", headers: { "Content-Type": "application/json", "x-user-token": token }, body: JSON.stringify({ following_email: targetEmail }) });
       const data = await res.json();
       if (res.ok) setFollowingSet(prev => { const n = new Set(prev); data.action === "followed" ? n.add(targetEmail) : n.delete(targetEmail); return n; });
     } finally {

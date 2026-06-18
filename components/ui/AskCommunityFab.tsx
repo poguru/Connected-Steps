@@ -21,18 +21,18 @@ function AskModal({ onClose }: { onClose: () => void }) {
     if (!form.title.trim() || !form.body.trim()) { setMsg("Please fill in both the title and description."); return; }
     setSaving(true); setMsg("");
     try {
-      const raw  = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
-      const user = raw ? JSON.parse(raw) : null;
-      if (!user?.email) { setMsg("Please log in to post."); return; }
+      const raw   = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
+      const token = typeof window !== "undefined" ? (localStorage.getItem("cs_user_token") ?? "") : "";
+      const user  = raw ? JSON.parse(raw) : null;
+      if (!user?.email || !token) { setMsg("Please log in to post."); return; }
       const res  = await fetch("/api/community/posts", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-user-token": token },
         body: JSON.stringify({
-          user_email: user.email,
-          user_name:  `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email.split("@")[0],
-          category:   form.category,
-          title:      form.title.trim(),
-          body:       form.body.trim(),
+          user_name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email.split("@")[0],
+          category:  form.category,
+          title:     form.title.trim(),
+          body:      form.body.trim(),
         }),
       });
       const data = await res.json();

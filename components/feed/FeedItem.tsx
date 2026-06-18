@@ -90,10 +90,11 @@ export default function FeedItem({ event, currentUserEmail, compact = false }: P
 
     setBusy(true);
     try {
+      const token = typeof window !== "undefined" ? (localStorage.getItem("cs_user_token") ?? "") : "";
       const res = await fetch("/api/feed/react", {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ feed_event_id: event.id, user_email: currentUserEmail, reaction_type: type }),
+        headers: { "Content-Type": "application/json", "x-user-token": token },
+        body: JSON.stringify({ feed_event_id: event.id, reaction_type: type }),
       });
       if (!res.ok) setReactions(prev);
     } catch {

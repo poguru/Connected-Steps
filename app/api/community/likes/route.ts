@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireActiveUser } from "@/lib/active-user";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 // GET /api/community/likes?email=...
 // Returns like counts for all posts + which ones this user has liked
@@ -25,11 +26,14 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ likeCounts, likedByMe });
 }
 
-// POST /api/community/likes  { post_id, email }
+// POST /api/community/likes  { post_id }
 // Toggles like — inserts if not liked, deletes if already liked
 export async function POST(req: NextRequest) {
-  const { post_id, email } = await req.json();
-  if (!post_id || !email) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+  const email = verifyUserToken(req.headers.get("x-user-token") ?? "");
+  if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { post_id } = await req.json();
+  if (!post_id) return NextResponse.json({ error: "Missing post_id" }, { status: 400 });
 
   const blocked = await requireActiveUser(email);
   if (blocked) return blocked;

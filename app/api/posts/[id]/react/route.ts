@@ -1,18 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireActiveUser } from "@/lib/active-user";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 type Params = { params: Promise<{ id: string }> };
 
-// POST /api/posts/[id]/react  { user_email, reaction_type: "like"|"celebrate" }
+// POST /api/posts/[id]/react  { reaction_type: "like"|"celebrate" }
 // Same toggle logic as /api/feed/react
 export async function POST(req: NextRequest, { params }: Params) {
-  const { id }                          = await params;
-  const { user_email, reaction_type }   = await req.json().catch(() => ({})) as {
-    user_email: string; reaction_type: "like" | "celebrate";
+  const { id }            = await params;
+  const user_email        = verifyUserToken(req.headers.get("x-user-token") ?? "");
+  if (!user_email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { reaction_type } = await req.json().catch(() => ({})) as {
+    reaction_type: "like" | "celebrate";
   };
 
-  if (!user_email || !["like","celebrate"].includes(reaction_type))
+  if (!["like","celebrate"].includes(reaction_type))
     return NextResponse.json({ error: "Invalid fields" }, { status: 400 });
 
   const blocked = await requireActiveUser(user_email);

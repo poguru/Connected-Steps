@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireActiveUser } from "@/lib/active-user";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 export async function GET(req: NextRequest) {
   const post_id = req.nextUrl.searchParams.get("post_id");
@@ -20,8 +21,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { post_id, user_email, user_name, body } = await req.json();
-    if (!post_id || !user_email || !user_name || !body?.trim())
+    const user_email = verifyUserToken(req.headers.get("x-user-token") ?? "");
+    if (!user_email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { post_id, user_name, body } = await req.json();
+    if (!post_id || !user_name || !body?.trim())
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     if (body.trim().length > 600)
       return NextResponse.json({ error: "Reply must be under 600 characters" }, { status: 400 });

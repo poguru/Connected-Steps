@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireActiveUser } from "@/lib/active-user";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 const ADMIN_EMAIL = process.env.ADMIN_NOTIFY_EMAIL ?? "info@connectedsteps.in";
 
@@ -51,8 +52,11 @@ export async function GET() {
 // POST — submit a question/post
 export async function POST(req: NextRequest) {
   try {
-    const { user_email, user_name, category, title, body } = await req.json();
-    if (!user_email || !user_name || !category || !title?.trim() || !body?.trim())
+    const user_email = verifyUserToken(req.headers.get("x-user-token") ?? "");
+    if (!user_email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { user_name, category, title, body } = await req.json();
+    if (!user_name || !category || !title?.trim() || !body?.trim())
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     if (title.length > 120)
       return NextResponse.json({ error: "Title must be under 120 characters" }, { status: 400 });

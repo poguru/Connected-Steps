@@ -122,10 +122,11 @@ function RateCoachWidget({ userEmail, hasAttended }: { userEmail: string; hasAtt
   async function submit() {
     setSaving(true); setMsg("");
     try {
+      const token = typeof window !== "undefined" ? (localStorage.getItem("cs_user_token") ?? "") : "";
       const res  = await fetch("/api/coach-rating", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_email: userEmail, coach_name: coach, rating, feedback }),
+        headers: { "Content-Type": "application/json", "x-user-token": token },
+        body: JSON.stringify({ coach_name: coach, rating, feedback }),
       });
       const data = await res.json();
       if (!res.ok) { setMsg(data.error ?? "Something went wrong."); return; }
