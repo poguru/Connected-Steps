@@ -7,7 +7,7 @@ const corsOptions = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const origin = request.headers.get("origin") ?? "";
   const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 
@@ -28,7 +28,7 @@ export function proxy(request: NextRequest) {
       const ip  = getClientIp(request);
       const key = `adminpw:${ip}`;
 
-      if (isRateLimited(key)) {
+      if (await isRateLimited(key)) {
         console.warn(
           `[rate-limit] BLOCKED IP=${ip} path=${request.nextUrl.pathname} — exceeded ${MAX_FAILURES} failed admin-password attempts`,
         );
@@ -39,7 +39,7 @@ export function proxy(request: NextRequest) {
       }
 
       if (pw !== process.env.ADMIN_PASSWORD) {
-        const count = recordFailure(key);
+        const count = await recordFailure(key);
         console.warn(
           `[rate-limit] FAILED admin-password IP=${ip} path=${request.nextUrl.pathname} attempt=${count}/${MAX_FAILURES}`,
         );
