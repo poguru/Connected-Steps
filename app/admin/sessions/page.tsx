@@ -294,6 +294,31 @@ export default function AdminSessionsPage() {
   const [copiedId,    setCopiedId]    = useState<string | null>(null);
   const [shareSession, setShareSession] = useState<Session | null>(null);
 
+  // QR modal state
+  interface QRData { token: string; expires_at: string; data_url: string; scan_url: string; }
+  const [qrSession,  setQrSession]  = useState<Session | null>(null);
+  const [qrData,     setQrData]     = useState<QRData | null>(null);
+  const [qrLoading,  setQrLoading]  = useState(false);
+  const [qrMsg,      setQrMsg]      = useState("");
+
+  const openQRModal = async (s: Session) => {
+    setQrSession(s); setQrData(null); setQrMsg(""); setQrLoading(true);
+    const res  = await fetch(`/api/admin/sessions/${s.id}/qr`, { headers });
+    const json = await res.json();
+    setQrData(json.qr ?? null);
+    setQrLoading(false);
+  };
+
+  const generateQR = async () => {
+    if (!qrSession) return;
+    setQrLoading(true); setQrMsg("");
+    const res  = await fetch(`/api/admin/sessions/${qrSession.id}/qr`, { method: "POST", headers });
+    const json = await res.json();
+    if (res.ok) { setQrData(json.qr); setQrMsg("New QR generated!"); }
+    else         { setQrMsg(json.error ?? "Failed to generate QR"); }
+    setQrLoading(false);
+  };
+
   function copyJoinLink(sessionId: string) {
     const url = `${window.location.origin}/join/${sessionId}`;
     navigator.clipboard.writeText(url).then(() => {
@@ -412,6 +437,10 @@ export default function AdminSessionsPage() {
                       <button onClick={(e) => { e.stopPropagation(); setShareSession(s); }}
                         title="Share session" style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 5px", color: "#e8620a", fontSize: "0.8rem", flexShrink: 0 }}>
                         ↗
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); openQRModal(s); }}
+                        title="Attendance QR" style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 5px", color: "#60a5fa", fontSize: "0.8rem", flexShrink: 0 }}>
+                        📱
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(deleteConfirmId === s.id ? null : s.id); setEditingId(null); setReschedulingId(null); }}
                         title="Delete" style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 6px", color: deleteConfirmId === s.id ? "#f09595" : "#555", fontSize: "0.8rem", flexShrink: 0 }}>🗑️</button>
@@ -651,6 +680,61 @@ export default function AdminSessionsPage() {
         session={{ id: shareSession.id, title: shareSession.title, date: shareSession.date, time: shareSession.time, venue: shareSession.venue || shareSession.location }}
         onClose={() => setShareSession(null)}
       />
+    )}
+
+    {/* QR Modal */}
+    {qrSession && (
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: "1.5rem" }}>
+        <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "14px", padding: "2rem", width: "100%", maxWidth: "420px", position: "relative" }}>
+          <button onClick={() => { setQrSession(null); setQrData(null); setQrMsg(""); }}
+            style={{ position: "absolute", top: "1rem", right: "1rem", background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: "1.2rem", lineHeight: 1 }}>✕</button>
+
+          <div style={{ fontSize: "10px", color: "#60a5fa", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.4rem" }}>Attendance QR Code</div>
+          <div style={{ fontSize: "1rem", fontWeight: 600, color: "#fff", marginBottom: "1.5rem" }}>{qrSession.title}</div>
+
+          {qrLoading ? (
+            <div style={{ textAlign: "center", padding: "3rem 0", color: "#666" }}>Loading…</div>
+          ) : qrData ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+              <div style={{ background: "#fff", borderRadius: "12px", padding: "12px", display: "inline-block" }}>
+                <img src={qrData.data_url} alt="QR Code" style={{ width: 240, height: 240, display: "block" }} />
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "0.78rem", color: "#888", marginBottom: "4px" }}>Expires</div>
+                <div style={{ fontSize: "0.9rem", color: new Date(qrData.expires_at) < new Date() ? "#f09595" : "#4ade80", fontWeight: 600 }}>
+                  {new Date(qrData.expires_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {new Date(qrData.expires_at).toLocaleDateString()}
+                </div>
+                {new Date(qrData.expires_at) < new Date() && (
+                  <div style={{ fontSize: "0.75rem", color: "#f09595", marginTop: "4px" }}>This QR has expired — generate a new one</div>
+                )}
+              </div>
+              <div style={{ width: "100%", background: "rgba(255,255,255,0.04)", borderRadius: "8px", padding: "8px 12px", display: "flex", alignItems: "center", gap: "8px", justifyContent: "space-between" }}>
+                <span style={{ fontSize: "0.7rem", color: "#666", wordBreak: "break-all" }}>{qrData.scan_url}</span>
+                <button onClick={() => navigator.clipboard.writeText(qrData.scan_url)}
+                  style={{ background: "none", border: "none", color: "#60a5fa", cursor: "pointer", fontSize: "0.75rem", flexShrink: 0 }}>Copy</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ textAlign: "center", padding: "2rem 0" }}>
+              <div style={{ fontSize: "0.85rem", color: "#888", marginBottom: "1.5rem" }}>No QR generated yet for this session.</div>
+            </div>
+          )}
+
+          {qrMsg && (
+            <div style={{ marginTop: "1rem", fontSize: "0.8rem", color: qrMsg.includes("failed") || qrMsg.includes("Failed") ? "#f09595" : "#4ade80", textAlign: "center" }}>{qrMsg}</div>
+          )}
+
+          <div style={{ marginTop: "1.5rem", display: "flex", gap: "0.75rem" }}>
+            <button onClick={generateQR} disabled={qrLoading}
+              style={{ ...btn(true), flex: 1, padding: "10px" }}>
+              {qrLoading ? "Generating…" : qrData ? "Regenerate QR" : "Generate QR"}
+            </button>
+          </div>
+          <div style={{ marginTop: "0.75rem", fontSize: "10px", color: "#555", textAlign: "center" }}>
+            QR is valid for 90 minutes. Members scan with their phone camera to auto-record attendance.
+          </div>
+        </div>
+      </div>
     )}
     </>
   );

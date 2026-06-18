@@ -199,6 +199,18 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
         </div>
       )}
 
+      {/* ── Scan Attendance QR ── */}
+      <button
+        onClick={() => router.push("/scan")}
+        style={{ display: "flex", alignItems: "center", gap: "0.875rem", width: "100%", background: "rgba(96,165,250,0.07)", border: "1px solid rgba(96,165,250,0.18)", borderRadius: 16, padding: "1rem 1.25rem", cursor: "pointer", textAlign: "left", marginBottom: "0.625rem", fontFamily: "inherit" }}>
+        <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: "rgba(96,165,250,0.12)", border: "1px solid rgba(96,165,250,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem" }}>📱</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--foreground)" }}>Scan Attendance QR</div>
+          <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginTop: 2 }}>Auto-record your session attendance</div>
+        </div>
+        <div style={{ fontSize: "1rem", color: "rgba(96,165,250,0.7)", flexShrink: 0 }}>→</div>
+      </button>
+
       {/* Streak reset nudge */}
       {streak === 0 && sessions.some(r => r.sessions !== null) && (
         <div style={{ padding: "0.6rem 0.875rem", fontSize: "0.72rem", color: "oklch(0.7 0.15 30)", display: "flex", alignItems: "center", gap: 4 }}>
