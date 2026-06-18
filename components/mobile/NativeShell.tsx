@@ -5,8 +5,14 @@ import { usePathname, useRouter } from "next/navigation";
 import { App } from "@capacitor/app";
 import BottomNav from "@/components/mobile/BottomNav";
 
-// Back-twice-to-exit on these routes (top-level tabs with no "parent" screen)
-const EXIT_ROUTES = new Set(["/dashboard", "/events", "/community", "/leaderboard", "/profile"]);
+// Only the home screen triggers the double-back-to-exit flow
+const HOME = "/dashboard";
+
+// Tab-level destinations: back button goes HOME, not browser-back (because
+// the user may have visited multiple tabs in sequence — history.back() would
+// return to the previous tab, not home, which is confusing).
+// Keep this in sync with BottomNav.tsx TABS array.
+const TAB_ROOTS = new Set(["/events", "/community", "/leaderboard", "/profile"]);
 
 // Non-authed users are allowed on these routes without being redirected
 const PUBLIC_PREFIX = ["/", "/auth", "/pricing", "/events", "/scan"];
@@ -46,13 +52,18 @@ export default function NativeShell({ children }: { children: React.ReactNode })
   const pathname      = usePathname();
   const router        = useRouter();
   const pathnameRef   = useRef(pathname);
+  const routerRef     = useRef(router);
   const lastBackPress = useRef(0);
   const [isNative,    setIsNative] = useState(false);
 
-  // Keep ref in sync so the back-button closure always has the latest path
+  // Keep refs in sync so the back-button closure always has the latest values
   useEffect(() => {
     pathnameRef.current = pathname;
   }, [pathname]);
+
+  useEffect(() => {
+    routerRef.current = router;
+  }, [router]);
 
   useEffect(() => {
     if (!getCapNative()) return;
@@ -81,7 +92,8 @@ export default function NativeShell({ children }: { children: React.ReactNode })
     const listenerPromise = App.addListener("backButton", () => {
       const p = pathnameRef.current;
 
-      if (EXIT_ROUTES.has(p)) {
+      if (p === HOME) {
+        // Double-press to exit (only from Home)
         const now = Date.now();
         if (now - lastBackPress.current < 2000) {
           App.exitApp();
@@ -89,7 +101,12 @@ export default function NativeShell({ children }: { children: React.ReactNode })
           lastBackPress.current = now;
           showToast("Press back again to exit");
         }
+      } else if (TAB_ROOTS.has(p)) {
+        // Top-level tab → always go Home (not browser-back, which could
+        // land on another tab if the user has been tab-hopping)
+        routerRef.current.replace(HOME);
       } else {
+        // Nested page → go up one level in history
         window.history.back();
       }
     });

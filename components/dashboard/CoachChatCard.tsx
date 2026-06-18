@@ -23,7 +23,7 @@ export default function CoachChatCard({ userEmail }: { userEmail: string }) {
   const [conv, setConv] = useState<Conversation | null | undefined>(undefined);
   const [coach, setCoach] = useState<Coach | null>(null);
 
-  useEffect(() => {
+  function loadConversation() {
     const token = (typeof localStorage !== "undefined" ? localStorage.getItem("cs_user_token") : null) ?? "";
     fetch("/api/messages/conversations", { headers: { "x-user-token": token } })
       .then(r => r.json())
@@ -41,7 +41,20 @@ export default function CoachChatCard({ userEmail }: { userEmail: string }) {
         }
       })
       .catch(() => setConv(null));
-  }, [userEmail]);
+  }
+
+  useEffect(() => {
+    loadConversation();
+  }, [userEmail]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-fetch when the user returns to this tab/page after reading messages
+  useEffect(() => {
+    function onVisible() {
+      if (!document.hidden) loadConversation();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (conv === undefined) return null;
 

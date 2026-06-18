@@ -19,6 +19,7 @@ const QUICK_ACTIONS = [
   { label: "Write Training Plans",    href: "/admin/training-plans",        desc: "Weekly plans for members" },
   { label: "Event Registrations",     href: "/admin/events/registrations",  desc: "View registrations & revenue" },
   { label: "Coach Operations",        href: "/admin/coach-ops",             desc: "Athlete roster & bulk actions" },
+  { label: "Coach Assignments",       href: "/admin/coach-assignments",     desc: "Assign coaches to users" },
 ];
 
 function fmt(n: number) {

@@ -77,7 +77,7 @@ export default function ProgressCard({ totalPoints, monthSessions, totalSessions
       </div>
       <div style={{ fontSize: "10px", color: "var(--muted-foreground)", marginBottom: "1rem" }}>
         {tier.max === Infinity
-          ? "🏆 Maximum tier reached"
+          ? "Maximum tier reached"
           : remaining === 0
           ? `${nextTier?.name ?? "next tier"} unlocked!`
           : `${remaining} session${remaining !== 1 ? "s" : ""} to ${nextTier?.name ?? "next tier"}`}
@@ -113,8 +113,18 @@ export default function ProgressCard({ totalPoints, monthSessions, totalSessions
       {/* Achievements strip */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", overflowX: "auto", paddingBottom: 2 }}>
         {achievements.map(a => (
-          <div key={a.label} title={a.label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, opacity: a.earned ? 1 : 0.3, flexShrink: 0 }}>
-            <span style={{ fontSize: "1.25rem" }}>{a.earned ? a.icon : "🔒"}</span>
+          <div key={a.label} title={a.label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, opacity: a.earned ? 1 : 0.28, flexShrink: 0 }}>
+            <div style={{ width: 28, height: 28, borderRadius: "50%", background: a.earned ? tier.color : "rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {a.earned ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              ) : (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+              )}
+            </div>
             <span style={{ fontSize: "9px", color: a.earned ? tier.color : "var(--muted-foreground)", whiteSpace: "nowrap", fontWeight: a.earned ? 700 : 400 }}>{a.label}</span>
           </div>
         ))}

@@ -20,7 +20,11 @@ const GOAL_LABELS: Record<string, string> = {
   "ultra": "Ultra", "fitness": "General Fitness", "speed": "Speed", "weight": "Weight Loss", "strength": "Strength",
 };
 
-const MEDAL      = ["🥇", "🥈", "🥉"];
+const MEDAL_COLORS = [
+  { bg: "#f6cc4a", text: "#5a3a00" },  // gold
+  { bg: "#c0c7d4", text: "#3d4049" },  // silver
+  { bg: "#d4845a", text: "#5a2a0a" },  // bronze
+];
 // display order: #2 left, #1 center, #3 right
 const PODIUM_IDX = [1, 0, 2];
 const PLATFORM_H = [44, 76, 30]; // heights for display positions 0/1/2
@@ -78,6 +82,21 @@ export default function Leaderboard() {
   const tabRef  = useRef(tab);
   const liveRef = useRef(false);
   useEffect(() => { tabRef.current = tab; }, [tab]);
+
+  // Lock body scroll while the profile sheet is open
+  useEffect(() => {
+    if (preview) {
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+    } else {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+    };
+  }, [preview]);
 
   const fetchLeaderboard = useCallback(() => {
     fetch("/api/leaderboard")
@@ -329,7 +348,15 @@ export default function Leaderboard() {
                           textAlign: "center",
                           display: "flex", flexDirection: "column", alignItems: "center",
                         }}>
-                          <div style={{ fontSize: isFirst ? "1.5rem" : "1.2rem", marginBottom: 6 }}>{MEDAL[entryIdx]}</div>
+                          <div style={{
+                            width: isFirst ? 26 : 22, height: isFirst ? 26 : 22,
+                            borderRadius: "50%",
+                            background: MEDAL_COLORS[entryIdx].bg,
+                            color: MEDAL_COLORS[entryIdx].text,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: isFirst ? "0.8rem" : "0.68rem", fontWeight: 800,
+                            marginBottom: 6, flexShrink: 0,
+                          }}>#{rank}</div>
                           <Avatar
                             photo={r.photo} name={r.user_name}
                             size={isFirst ? 54 : 42}
@@ -398,7 +425,11 @@ export default function Leaderboard() {
 
             {filtered.length === 0 && (
               <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "2.5rem 1.5rem", textAlign: "center" }}>
-                <div style={{ fontSize: "2rem", marginBottom: 8 }}>🏆</div>
+                <div style={{ marginBottom: 8, display: "flex", justifyContent: "center" }}>
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 9H4.5a2.5 2.5 0 0 0 0 5H6M18 9h1.5a2.5 2.5 0 0 1 0 5H18M8 9h8M8 15h8M12 3v2M12 19v2M9 21h6"/>
+                  </svg>
+                </div>
                 <div style={{ fontSize: "0.9rem", fontWeight: 600, marginBottom: 4 }}>No runners found</div>
                 <div style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>Try adjusting the filters above.</div>
               </div>
@@ -447,78 +478,133 @@ export default function Leaderboard() {
         const rank = idx >= 0 ? ranks[idx] : null;
         const isMe = preview.user_email === user.email;
         return (
-          <div
-            style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.72)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
-            onClick={() => setPreview(null)}>
+          <>
+            {/* Backdrop — blocks background clicks & scroll */}
             <div
-              style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "16px 16px 0 0", padding: "1.5rem", width: "100%", maxWidth: 500, paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
-              onClick={e => e.stopPropagation()}>
-              {/* Top bar */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.25rem" }}>
-                {rank != null ? (
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "oklch(0.72 0.19 49 / 10%)", border: "1px solid oklch(0.72 0.19 49 / 25%)", borderRadius: 20, padding: "4px 12px" }}>
-                    <span style={{ fontSize: "0.72rem", color: "var(--muted-foreground)" }}>Rank</span>
-                    <span style={{ fontSize: "0.95rem", fontWeight: 800, color: "var(--cs-orange)" }}>
-                      {rank <= 3 ? MEDAL[rank - 1] + " " : ""}#{rank}
-                    </span>
-                  </div>
-                ) : <div />}
-                <button onClick={() => setPreview(null)} style={{ background: "none", border: "none", color: "var(--muted-foreground)", cursor: "pointer", display: "flex", padding: 4 }}>
-                  <X size={20} />
-                </button>
-              </div>
+              style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.75)" }}
+              onClick={() => setPreview(null)}
+            />
 
-              {/* Avatar + name */}
-              <div style={{ textAlign: "center", marginBottom: "1.25rem" }}>
-                <div style={{ display: "inline-block", marginBottom: "0.75rem" }}>
-                  <Avatar photo={preview.photo} name={preview.user_name} size={72} border="3px solid var(--cs-orange)" />
+            {/* Bottom sheet */}
+            <div
+              style={{
+                position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 51,
+                display: "flex", justifyContent: "center",
+              }}
+              onClick={() => setPreview(null)}
+            >
+              <div
+                style={{
+                  background: "var(--surface)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "20px 20px 0 0",
+                  width: "100%",
+                  maxWidth: 500,
+                  // 90dvh cap so sheet never overflows; content scrolls inside
+                  maxHeight: "90dvh",
+                  display: "flex",
+                  flexDirection: "column",
+                  boxShadow: "0 -8px 40px rgba(0,0,0,0.6)",
+                }}
+                onClick={e => e.stopPropagation()}
+              >
+                {/* Drag handle */}
+                <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 4px", flexShrink: 0 }}>
+                  <div style={{ width: 36, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.2)" }} />
                 </div>
-                <div style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: 6 }}>{preview.user_name}</div>
-                <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
-                  {preview.location && (
-                    <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "var(--surface-elevated)", color: "var(--muted-foreground)" }}>📍 {preview.location}</span>
+
+                {/* Scrollable content area */}
+                <div style={{ flex: 1, overflowY: "auto", padding: "0.75rem 1.5rem", paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}>
+
+                  {/* Top bar: rank + close */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.25rem" }}>
+                    {rank != null ? (
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "oklch(0.72 0.19 49 / 10%)", border: "1px solid oklch(0.72 0.19 49 / 25%)", borderRadius: 20, padding: "4px 12px" }}>
+                        <span style={{ fontSize: "0.72rem", color: "var(--muted-foreground)" }}>Rank</span>
+                        <span style={{ fontSize: "0.95rem", fontWeight: 800, color: "var(--cs-orange)" }}>
+                          {rank <= 3 && (
+                            <span style={{ display: "inline-block", width: 14, height: 14, borderRadius: "50%", background: MEDAL_COLORS[rank - 1].bg, verticalAlign: "middle", marginRight: 4 }} />
+                          )}
+                          #{rank}
+                        </span>
+                      </div>
+                    ) : <div />}
+                    <button
+                      onClick={() => setPreview(null)}
+                      aria-label="Close"
+                      style={{ background: "rgba(255,255,255,0.07)", border: "none", color: "var(--muted-foreground)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 6, borderRadius: 8 }}
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  {/* Avatar + name + tags */}
+                  <div style={{ textAlign: "center", marginBottom: "1.25rem" }}>
+                    <div style={{ display: "inline-block", marginBottom: "0.75rem" }}>
+                      <Avatar photo={preview.photo} name={preview.user_name} size={80} border="3px solid var(--cs-orange)" />
+                    </div>
+                    <div style={{ fontSize: "1.15rem", fontWeight: 700, marginBottom: 8 }}>{preview.user_name}</div>
+                    <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
+                      {preview.location && (
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, padding: "3px 10px", borderRadius: 20, background: "var(--surface-elevated)", color: "var(--muted-foreground)" }}>
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                          {preview.location}
+                        </span>
+                      )}
+                      {preview.goal && (
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, padding: "3px 10px", borderRadius: 20, background: "oklch(0.72 0.19 49 / 8%)", color: "var(--cs-orange)", fontWeight: 600 }}>
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                          {GOAL_LABELS[preview.goal] ?? preview.goal}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Stats strip */}
+                  <div style={{ display: "flex", gap: "1px", background: "var(--border)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", marginBottom: "1.25rem" }}>
+                    {[
+                      { val: preview.week_points  ?? 0, label: "This Week" },
+                      { val: preview.month_points ?? 0, label: "This Month" },
+                      { val: preview.total_points ?? 0, label: "All Time" },
+                    ].map(s => (
+                      <div key={s.label} style={{ flex: 1, background: "var(--background)", padding: "12px 8px", textAlign: "center" }}>
+                        <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--cs-orange)", letterSpacing: "-0.5px" }}>{s.val}</div>
+                        <div style={{ fontSize: 9, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Follow / Following button */}
+                  {!isMe && (
+                    <button
+                      onClick={() => toggleFollow(preview.user_email)}
+                      disabled={followBusy.has(preview.user_email)}
+                      style={{
+                        width: "100%", padding: "13px", borderRadius: 12,
+                        fontSize: "0.9rem", fontWeight: 700,
+                        cursor: followBusy.has(preview.user_email) ? "not-allowed" : "pointer",
+                        fontFamily: "var(--font-body)", border: "1px solid", transition: "all 0.15s",
+                        opacity: followBusy.has(preview.user_email) ? 0.6 : 1,
+                        background:  followingSet.has(preview.user_email) ? "transparent" : "var(--gradient-accent)",
+                        color:       followingSet.has(preview.user_email) ? "var(--muted-foreground)" : "#fff",
+                        borderColor: followingSet.has(preview.user_email) ? "var(--border)" : "transparent",
+                        boxShadow:   followingSet.has(preview.user_email) ? "none" : "var(--shadow-orange)",
+                      }}
+                    >
+                      {followBusy.has(preview.user_email) ? "…" : followingSet.has(preview.user_email) ? "Following" : "Follow"}
+                    </button>
                   )}
-                  {preview.goal && (
-                    <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "oklch(0.72 0.19 49 / 8%)", color: "var(--cs-orange)", fontWeight: 600 }}>🎯 {GOAL_LABELS[preview.goal] ?? preview.goal}</span>
+
+                  {/* If viewing own profile */}
+                  {isMe && (
+                    <div style={{ textAlign: "center", fontSize: "0.82rem", color: "var(--muted-foreground)", padding: "0.5rem 0" }}>
+                      This is you
+                    </div>
                   )}
                 </div>
               </div>
-
-              {/* Stats strip */}
-              <div style={{ display: "flex", gap: "1px", background: "var(--border)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden", marginBottom: "1.25rem" }}>
-                {[
-                  { val: preview.week_points  ?? 0, label: "This Week" },
-                  { val: preview.month_points ?? 0, label: "This Month" },
-                  { val: preview.total_points ?? 0, label: "All Time" },
-                ].map(s => (
-                  <div key={s.label} style={{ flex: 1, background: "var(--background)", padding: "10px 8px", textAlign: "center" }}>
-                    <div style={{ fontSize: "1rem", fontWeight: 800, color: "var(--cs-orange)" }}>{s.val}</div>
-                    <div style={{ fontSize: 9, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 2 }}>{s.label}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Follow button */}
-              {!isMe && (
-                <button
-                  onClick={() => toggleFollow(preview.user_email)}
-                  disabled={followBusy.has(preview.user_email)}
-                  style={{
-                    width: "100%", padding: "12px", borderRadius: 10,
-                    fontSize: "0.9rem", fontWeight: 700,
-                    cursor: followBusy.has(preview.user_email) ? "not-allowed" : "pointer",
-                    fontFamily: "var(--font-body)", border: "1px solid", transition: "all 0.15s",
-                    opacity: followBusy.has(preview.user_email) ? 0.6 : 1,
-                    background:  followingSet.has(preview.user_email) ? "transparent" : "var(--gradient-accent)",
-                    color:       followingSet.has(preview.user_email) ? "var(--muted-foreground)" : "#fff",
-                    borderColor: followingSet.has(preview.user_email) ? "var(--border)" : "transparent",
-                    boxShadow:   followingSet.has(preview.user_email) ? "none" : "var(--shadow-orange)",
-                  }}>
-                  {followBusy.has(preview.user_email) ? "…" : followingSet.has(preview.user_email) ? "Following" : "Follow"}
-                </button>
-              )}
             </div>
-          </div>
+          </>
         );
       })()}
     </div>

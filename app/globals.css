@@ -884,10 +884,14 @@ select.auth-input option {
   display: none !important;
 }
 
-/* 2. Remove top-nav space from dashboard; use status-bar safe area instead */
+/* 2. Remove top-nav space from dashboard; use status-bar safe area instead.
+      Use max() so content never sits under the status bar even on Android
+      devices that report env(safe-area-inset-top) = 0. */
 .native-app .cs-dashboard-body {
-  padding-top: calc(env(safe-area-inset-top) + 16px) !important;
+  padding-top: max(calc(env(safe-area-inset-top) + 16px), 48px) !important;
   padding-bottom: calc(72px + env(safe-area-inset-bottom)) !important;
+  padding-left:  max(0.75rem, env(safe-area-inset-left)) !important;
+  padding-right: max(0.75rem, env(safe-area-inset-right)) !important;
 }
 
 /* 3. Any page that sets its own top padding needs bottom clearance for the tab bar */

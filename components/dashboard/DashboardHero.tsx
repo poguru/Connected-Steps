@@ -19,6 +19,7 @@ export interface Props {
   sessions: SessionRecord[];
   upcomingSessions: UpcomingSession[];
   joinedSessionIds: Set<string>;
+  attendedSessionIds: Set<string>;
 }
 
 // ── Static plans ──────────────────────────────────────────────────────────────
@@ -69,7 +70,7 @@ function greeting() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function DashboardHero({ user, sessions, upcomingSessions, joinedSessionIds }: Props) {
+export default function DashboardHero({ user, sessions, upcomingSessions, joinedSessionIds, attendedSessionIds }: Props) {
   const router      = useRouter();
   const [plan, setPlan] = useState<PlanDay | null>(null);
 
@@ -84,9 +85,10 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
       .map(r => ({ attended: r.attended, date: r.sessions!.date }))
   );
   const monthly  = calcMonthly(sessions);
-  const nextSess = upcomingSessions[0] ?? null;
+  // Skip sessions the user has already attended — those move to past sessions
+  const nextSess = upcomingSessions.find(s => !attendedSessionIds.has(s.id)) ?? null;
   const isRest   = plan?.type === "Rest";
-  const joined   = nextSess ? joinedSessionIds.has(nextSess.id) : false;
+  const joined = nextSess ? joinedSessionIds.has(nextSess.id) : false;
 
   return (
     <div style={{ marginBottom: "0.25rem" }}>
@@ -115,7 +117,9 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
               </div>
             )}
             <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 20, padding: "4px 10px" }}>
-              <span style={{ fontSize: "0.8rem" }}>📅</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--foreground)", flexShrink: 0 }}>
+                <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
               <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--foreground)" }}>{monthly} this month</span>
             </div>
           </div>
@@ -165,29 +169,46 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
           background: "var(--surface)",
           borderRadius: 16,
           padding: "1.25rem",
-          border: joined ? "1px solid oklch(0.74 0.22 150 / 20%)" : "1px solid rgba(255,255,255,0.06)",
+          border: joined
+            ? "1px solid oklch(0.74 0.22 150 / 20%)"
+            : "1px solid rgba(255,255,255,0.06)",
           marginBottom: "0.625rem",
         }}>
           <div className="cs-label" style={{ marginBottom: 10, color: joined ? "#4ade80" : "var(--cs-orange)" }}>
-            {joined ? "You&apos;re Registered" : "Up Next"}
+            {joined ? "Your Upcoming Session" : "Up Next"}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.875rem" }}>
             <div style={{
               width: 46, height: 46, borderRadius: 12, flexShrink: 0,
               background: joined ? "oklch(0.74 0.22 150 / 8%)" : "rgba(255,255,255,0.04)",
               border: joined ? "1px solid oklch(0.74 0.22 150 / 20%)" : "1px solid var(--border)",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem",
+              display: "flex", alignItems: "center", justifyContent: "center",
             }}>
-              {joined ? "✅" : "📅"}
+              {joined ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted-foreground)" }}>
+                  <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+              )}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--foreground)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nextSess.title}</div>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginTop: 3 }}>
+              <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {dayLabel(nextSess.date)}{fmtTime(nextSess.time)}{nextSess.venue ? ` · ${nextSess.venue}` : ""}
               </div>
             </div>
             {joined ? (
-              <div style={{ flexShrink: 0, fontSize: "12px", fontWeight: 700, color: "#4ade80" }}>✓ Joined</div>
+              <button
+                onClick={() => router.push("/scan")}
+                style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 5, padding: "9px 14px", background: "rgba(96,165,250,0.12)", color: "rgba(147,197,253,1)", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 10, fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)", whiteSpace: "nowrap" }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                </svg>
+                Scan QR
+              </button>
             ) : (
               <button
                 onClick={() => router.push(`/join/${nextSess.id}`)}
@@ -199,17 +220,23 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
         </div>
       )}
 
-      {/* ── Scan Attendance QR ── */}
-      <button
-        onClick={() => router.push("/scan")}
-        style={{ display: "flex", alignItems: "center", gap: "0.875rem", width: "100%", background: "rgba(96,165,250,0.07)", border: "1px solid rgba(96,165,250,0.18)", borderRadius: 16, padding: "1rem 1.25rem", cursor: "pointer", textAlign: "left", marginBottom: "0.625rem", fontFamily: "inherit" }}>
-        <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: "rgba(96,165,250,0.12)", border: "1px solid rgba(96,165,250,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem" }}>📱</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--foreground)" }}>Scan Attendance QR</div>
-          <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginTop: 2 }}>Auto-record your session attendance</div>
-        </div>
-        <div style={{ fontSize: "1rem", color: "rgba(96,165,250,0.7)", flexShrink: 0 }}>→</div>
-      </button>
+      {/* ── Scan Attendance QR — shown when user has no registered upcoming session ── */}
+      {!joined && (
+        <button
+          onClick={() => router.push("/scan")}
+          style={{ display: "flex", alignItems: "center", gap: "0.875rem", width: "100%", background: "rgba(96,165,250,0.07)", border: "1px solid rgba(96,165,250,0.18)", borderRadius: 16, padding: "1rem 1.25rem", cursor: "pointer", textAlign: "left", marginBottom: "0.625rem", fontFamily: "inherit" }}>
+          <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: "rgba(96,165,250,0.12)", border: "1px solid rgba(96,165,250,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(147,197,253,0.9)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+            </svg>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--foreground)" }}>Scan Attendance QR</div>
+            <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginTop: 2 }}>Auto-record your session attendance</div>
+          </div>
+          <div style={{ fontSize: "1rem", color: "rgba(96,165,250,0.7)", flexShrink: 0 }}>→</div>
+        </button>
+      )}
 
       {/* Streak reset nudge */}
       {streak === 0 && sessions.some(r => r.sessions !== null) && (

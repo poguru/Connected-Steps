@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
+import { recalculateMonth } from "@/lib/recalculate-leaderboard";
 
 // POST /api/attendance/scan
 // Header: x-user-token
@@ -91,6 +92,13 @@ export async function POST(req: NextRequest) {
       });
 
     if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
+  }
+
+  // Fire-and-forget leaderboard recalculation — do not block the scan response.
+  // This replaces the manual admin "Sync" step for QR-scanned attendance.
+  if (session?.date) {
+    const month = (session.date as string).slice(0, 7);
+    recalculateMonth(month).catch(() => {});
   }
 
   return NextResponse.json({

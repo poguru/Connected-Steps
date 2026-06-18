@@ -21,16 +21,23 @@ interface Props {
 }
 
 export default function CreatePost({ currentUserEmail, currentUserName, onPosted, onClose }: Props) {
-  const [postType,   setPostType]   = useState<PostType>("general");
-  const [body,       setBody]       = useState("");
-  const [photo,      setPhoto]      = useState<File | null>(null);
+  const [postType,     setPostType]     = useState<PostType>("general");
+  const [body,         setBody]         = useState("");
+  const [photo,        setPhoto]        = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [error,      setError]      = useState("");
-  const fileRef   = useRef<HTMLInputElement>(null);
-  const textaRef  = useRef<HTMLTextAreaElement>(null);
+  const [submitting,   setSubmitting]   = useState(false);
+  const [error,        setError]        = useState("");
+  const fileRef  = useRef<HTMLInputElement>(null);
+  const textaRef = useRef<HTMLTextAreaElement>(null);
 
   const selectedType = POST_TYPES.find(t => t.id === postType)!;
+  const charCount    = body.length;
+  const canPost      = body.trim().length > 0 && charCount <= 800;
+
+  const counterColor =
+    charCount >= 800 ? "#f09595" :
+    charCount >= 700 ? "#f59e0b" :
+    "var(--muted-foreground)";
 
   function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -79,90 +86,184 @@ export default function CreatePost({ currentUserEmail, currentUserName, onPosted
     finally  { setSubmitting(false); }
   }
 
-  const charCount  = body.length;
-  const remaining  = 800 - charCount;
-  const counterColor =
-    charCount >= 800 ? "#f09595" :
-    charCount >= 700 ? "#f59e0b" :
-    "var(--muted-foreground)";
-
   return (
     <>
-      {/* Overlay */}
-      <div onClick={onClose}
-        style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 90, backdropFilter: "blur(2px)" }} />
+      {/* Overlay — z-index 200 sits above bottom nav (z-index 100) */}
+      <div
+        onClick={onClose}
+        style={{
+          position: "fixed", inset: 0,
+          background: "rgba(0,0,0,0.72)",
+          zIndex: 200,
+          backdropFilter: "blur(4px)",
+        }}
+      />
 
-      {/* Sheet */}
-      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 91, background: "var(--background)", borderRadius: "20px 20px 0 0", border: "1px solid var(--border)", borderBottom: "none", maxWidth: 640, margin: "0 auto", padding: "1.25rem 1.25rem 1.5rem" }}>
+      {/* Sheet — flex column so footer never scrolls away */}
+      <div style={{
+        position: "fixed", left: 0, right: 0, bottom: 0,
+        zIndex: 201,
+        background: "var(--background)",
+        borderRadius: "20px 20px 0 0",
+        border: "1px solid var(--border)",
+        borderBottom: "none",
+        maxWidth: 640,
+        margin: "0 auto",
+        display: "flex",
+        flexDirection: "column",
+        maxHeight: "85dvh",
+      }}>
 
-        {/* Handle */}
-        <div style={{ width: 36, height: 4, borderRadius: 2, background: "var(--border)", margin: "0 auto 1rem" }} />
+        {/* Drag handle */}
+        <div style={{ width: 36, height: 4, borderRadius: 2, background: "var(--border)", margin: "12px auto 0", flexShrink: 0 }} />
 
-        {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-          <span style={{ fontSize: "0.9rem", fontWeight: 700 }}>New Post</span>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted-foreground)", fontSize: "1.2rem", lineHeight: 1, padding: 4 }}>✕</button>
+        {/* ── Header: title + Post CTA ── */}
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "0.75rem 1.25rem 0.625rem",
+          flexShrink: 0,
+          borderBottom: "1px solid rgba(255,255,255,0.06)",
+        }}>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted-foreground)", fontSize: "1.1rem", padding: 4, lineHeight: 1, fontFamily: "inherit" }}>✕</button>
+          <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--foreground)" }}>New Post</span>
+          <button
+            onClick={submit}
+            disabled={submitting || !canPost}
+            style={{
+              padding: "8px 20px",
+              background: canPost ? "var(--gradient-accent)" : "rgba(255,255,255,0.06)",
+              border: "none",
+              borderRadius: 20,
+              color: canPost ? "#fff" : "var(--muted-foreground)",
+              fontSize: "0.85rem",
+              fontWeight: 700,
+              cursor: canPost ? "pointer" : "not-allowed",
+              fontFamily: "inherit",
+              boxShadow: canPost ? "var(--shadow-orange)" : "none",
+              transition: "all 0.15s",
+              minWidth: 68,
+            }}>
+            {submitting ? "Posting…" : "Post"}
+          </button>
         </div>
 
-        {/* Post type tabs */}
-        <div style={{ display: "flex", gap: "4px", marginBottom: "0.875rem", overflowX: "auto", paddingBottom: 2 }}>
-          {POST_TYPES.map(t => (
-            <button key={t.id} onClick={() => setPostType(t.id)}
-              style={{ flexShrink: 0, padding: "6px 12px", borderRadius: 20, border: "1px solid", cursor: "pointer", fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 600, transition: "all 0.15s", background: postType === t.id ? "oklch(0.72 0.19 49 / 15%)" : "transparent", borderColor: postType === t.id ? "oklch(0.72 0.19 49 / 50%)" : "var(--border)", color: postType === t.id ? "var(--cs-orange)" : "var(--muted-foreground)", whiteSpace: "nowrap" }}>
-              {t.emoji} {t.label}
-            </button>
-          ))}
-        </div>
+        {/* ── Scrollable body ── */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "1rem 1.25rem", WebkitOverflowScrolling: "touch" } as React.CSSProperties}>
 
-        {/* Author row */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.75rem" }}>
-          <div style={{ width: 34, height: 34, borderRadius: "50%", background: "oklch(0.72 0.19 49 / 15%)", border: "1px solid oklch(0.72 0.19 49 / 25%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", fontWeight: 700, color: "var(--cs-orange)", flexShrink: 0 }}>
-            {currentUserName.charAt(0).toUpperCase()}
+          {/* Post type chips */}
+          <div style={{ display: "flex", gap: "6px", marginBottom: "1rem", overflowX: "auto", paddingBottom: 2 }}>
+            {POST_TYPES.map(t => (
+              <button key={t.id} onClick={() => setPostType(t.id)}
+                style={{
+                  flexShrink: 0, padding: "6px 12px", borderRadius: 20, border: "1px solid",
+                  cursor: "pointer", fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 600,
+                  transition: "all 0.15s",
+                  background:   postType === t.id ? "oklch(0.72 0.19 49 / 15%)" : "transparent",
+                  borderColor:  postType === t.id ? "oklch(0.72 0.19 49 / 50%)" : "var(--border)",
+                  color:        postType === t.id ? "var(--cs-orange)" : "var(--muted-foreground)",
+                  whiteSpace: "nowrap",
+                }}>
+                {t.emoji} {t.label}
+              </button>
+            ))}
           </div>
-          <div style={{ fontSize: "0.82rem", fontWeight: 600 }}>{currentUserName}</div>
-        </div>
 
-        {/* Text area */}
-        <textarea
-          ref={textaRef}
-          value={body}
-          onChange={e => { setBody(e.target.value); setError(""); }}
-          placeholder={selectedType.placeholder}
-          rows={4}
-          maxLength={800}
-          style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px", color: "var(--foreground)", fontSize: "0.875rem", fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.6 }}
-          onFocus={e => (e.currentTarget.style.borderColor = "oklch(0.72 0.19 49 / 60%)")}
-          onBlur={e  => (e.currentTarget.style.borderColor = "var(--border)")}
-          autoFocus
-        />
-        <div style={{ fontSize: "10px", color: counterColor, textAlign: "right", marginBottom: "0.75rem", fontWeight: charCount >= 700 ? 600 : 400, transition: "color 0.15s" }}>
-          {charCount} / 800
-        </div>
-
-        {/* Photo preview */}
-        {photoPreview && (
-          <div style={{ position: "relative", marginBottom: "0.75rem" }}>
-            <img src={photoPreview} alt="Preview" style={{ width: "100%", maxHeight: 200, objectFit: "cover", borderRadius: 8 }} />
-            <button onClick={removePhoto}
-              style={{ position: "absolute", top: 6, right: 6, width: 26, height: 26, borderRadius: "50%", background: "rgba(0,0,0,0.6)", border: "none", cursor: "pointer", color: "#fff", fontSize: "0.7rem", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              ✕
-            </button>
+          {/* Author row */}
+          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.875rem" }}>
+            <div style={{ width: 34, height: 34, borderRadius: "50%", background: "oklch(0.72 0.19 49 / 15%)", border: "1px solid oklch(0.72 0.19 49 / 25%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", fontWeight: 700, color: "var(--cs-orange)", flexShrink: 0 }}>
+              {currentUserName.charAt(0).toUpperCase()}
+            </div>
+            <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--foreground)" }}>{currentUserName}</div>
           </div>
-        )}
 
-        {error && <div style={{ fontSize: "0.78rem", color: "#f09595", marginBottom: "0.75rem" }}>{error}</div>}
+          {/* Textarea */}
+          <textarea
+            ref={textaRef}
+            value={body}
+            onChange={e => { setBody(e.target.value); setError(""); }}
+            placeholder={selectedType.placeholder}
+            rows={5}
+            maxLength={800}
+            style={{
+              width: "100%", background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)",
+              borderRadius: 10, padding: "10px 12px", color: "var(--foreground)", fontSize: "0.875rem",
+              fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.6,
+            }}
+            onFocus={e => (e.currentTarget.style.borderColor = "oklch(0.72 0.19 49 / 60%)")}
+            onBlur={e  => (e.currentTarget.style.borderColor = "var(--border)")}
+            autoFocus
+          />
 
-        {/* Action row */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          <button onClick={() => fileRef.current?.click()}
-            style={{ display: "flex", alignItems: "center", gap: 4, padding: "8px 14px", background: "transparent", border: "1px solid var(--border)", borderRadius: 8, cursor: "pointer", fontSize: "0.8rem", color: "var(--muted-foreground)", fontFamily: "inherit" }}>
+          {/* Character counter — subtle, below textarea */}
+          <div style={{ fontSize: "11px", color: counterColor, textAlign: "right", marginTop: 4, marginBottom: "0.875rem", fontWeight: charCount >= 700 ? 600 : 400, transition: "color 0.15s" }}>
+            {charCount} / 800 characters
+          </div>
+
+          {/* Photo preview */}
+          {photoPreview && (
+            <div style={{ position: "relative", marginBottom: "0.875rem" }}>
+              <img src={photoPreview} alt="Preview" style={{ width: "100%", maxHeight: 200, objectFit: "cover", borderRadius: 8 }} />
+              <button onClick={removePhoto}
+                style={{ position: "absolute", top: 6, right: 6, width: 26, height: 26, borderRadius: "50%", background: "rgba(0,0,0,0.6)", border: "none", cursor: "pointer", color: "#fff", fontSize: "0.7rem", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                ✕
+              </button>
+            </div>
+          )}
+
+          {error && (
+            <div style={{ fontSize: "0.78rem", color: "#f09595", marginBottom: "0.75rem" }}>{error}</div>
+          )}
+        </div>
+
+        {/* ── Sticky footer action row ── */}
+        <div style={{
+          flexShrink: 0,
+          borderTop: "1px solid rgba(255,255,255,0.06)",
+          padding: "0.75rem 1.25rem",
+          paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))",
+          display: "flex",
+          alignItems: "center",
+          gap: "0.75rem",
+          background: "var(--background)",
+        }}>
+          <button
+            onClick={() => fileRef.current?.click()}
+            style={{
+              display: "flex", alignItems: "center", gap: 5,
+              padding: "9px 14px",
+              background: photo ? "oklch(0.72 0.19 49 / 12%)" : "transparent",
+              border: `1px solid ${photo ? "oklch(0.72 0.19 49 / 40%)" : "var(--border)"}`,
+              borderRadius: 8, cursor: "pointer", fontSize: "0.8rem",
+              color: photo ? "var(--cs-orange)" : "var(--muted-foreground)",
+              fontFamily: "inherit", transition: "all 0.15s",
+            }}>
             📷 Photo
           </button>
           <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhoto} />
 
-          <button onClick={submit} disabled={submitting || !body.trim()}
-            style={{ marginLeft: "auto", padding: "9px 24px", background: body.trim() ? "var(--gradient-accent)" : "transparent", border: `1px solid ${body.trim() ? "transparent" : "var(--border)"}`, borderRadius: 8, color: body.trim() ? "#fff" : "var(--muted-foreground)", fontSize: "0.85rem", fontWeight: 700, cursor: body.trim() ? "pointer" : "not-allowed", fontFamily: "inherit", boxShadow: body.trim() ? "var(--shadow-orange)" : "none", transition: "all 0.15s" }}>
-            {submitting ? "Posting…" : "Post"}
+          <div style={{ flex: 1 }} />
+
+          <button onClick={onClose}
+            style={{ padding: "9px 16px", background: "transparent", border: "1px solid var(--border)", borderRadius: 8, color: "var(--muted-foreground)", fontSize: "0.85rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            Cancel
+          </button>
+
+          <button
+            onClick={submit}
+            disabled={submitting || !canPost}
+            style={{
+              padding: "9px 22px",
+              background: canPost ? "var(--gradient-accent)" : "rgba(255,255,255,0.06)",
+              border: "none",
+              borderRadius: 8,
+              color: canPost ? "#fff" : "var(--muted-foreground)",
+              fontSize: "0.85rem", fontWeight: 700,
+              cursor: canPost ? "pointer" : "not-allowed",
+              fontFamily: "inherit",
+              boxShadow: canPost ? "var(--shadow-orange)" : "none",
+              transition: "all 0.15s",
+            }}>
+            {submitting ? "Posting…" : "Post →"}
           </button>
         </div>
       </div>

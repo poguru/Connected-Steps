@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -340,7 +340,8 @@ export default function Dashboard() {
   const [sessions,          setSessions]          = useState<SessionRecord[]>([]);
   const [sessionsLoading,   setSessLoading]        = useState(true);
   const [upcomingSessions,  setUpcomingSessions]   = useState<{ id: string; title: string; date: string; time: string | null; venue: string | null; location: string }[]>([]);
-  const [joinedSessionIds,  setJoinedSessionIds]   = useState<Set<string>>(new Set());
+  const [joinedSessionIds,   setJoinedSessionIds]   = useState<Set<string>>(new Set());
+  const [attendedSessionIds, setAttendedSessionIds] = useState<Set<string>>(new Set());
   const [leaveConfirmId,    setLeaveConfirmId]     = useState<string | null>(null);
   const [leavingId,         setLeavingId]          = useState<string | null>(null);
   const [leaveError,        setLeaveError]         = useState<string>("");
@@ -385,7 +386,10 @@ export default function Dashboard() {
 
     fetch("/api/user/joined-sessions", { headers: { "x-user-token": userToken } })
       .then((r) => r.json())
-      .then((d) => { if (d.session_ids) setJoinedSessionIds(new Set(d.session_ids)); })
+      .then((d) => {
+        if (d.session_ids)  setJoinedSessionIds(new Set(d.session_ids));
+        if (d.attended_ids) setAttendedSessionIds(new Set(d.attended_ids));
+      })
       .catch(() => {});
 
     fetch("/api/user/sessions", { headers: { "x-user-token": userToken } })
@@ -529,7 +533,11 @@ export default function Dashboard() {
           table:  "session_attendance",
           filter: `user_email=eq.${user.email}`,
         },
-        () => {
+        (payload) => {
+          const row = payload.new as { session_id?: string; attended?: boolean } | null;
+          if (row?.attended && row?.session_id) {
+            setAttendedSessionIds(prev => new Set([...prev, row.session_id!]));
+          }
           const tok = localStorage.getItem("cs_user_token") ?? "";
           fetch("/api/user/sessions", { headers: { "x-user-token": tok } })
             .then(r => r.json())
@@ -770,6 +778,7 @@ export default function Dashboard() {
             sessions={sessions}
             upcomingSessions={upcomingSessions}
             joinedSessionIds={joinedSessionIds}
+            attendedSessionIds={attendedSessionIds}
           />
 
           {/* ── Coach Chat ── */}
@@ -824,17 +833,19 @@ export default function Dashboard() {
                 <div style={{ fontSize: "10px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "2px" }}>Leaderboard</div>
                 <div style={{ fontSize: "0.85rem", color: "var(--cs-white)", fontWeight: 600 }}>View rankings</div>
               </div>
-              <span style={{ fontSize: "1.25rem" }}>🏆</span>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--cs-orange)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 9H4.5a2.5 2.5 0 0 0 0 5H6M18 9h1.5a2.5 2.5 0 0 1 0 5H18M8 9h8M8 15h8M12 3v2M12 19v2M9 21h6"/>
+              </svg>
             </div>
 
           {/* Community — one card replaces Ask/Story/QA forms */}
           <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, marginBottom: "0.75rem", overflow: "hidden", boxShadow: "var(--shadow-md)" }}>
             <div style={{ padding: "0.9rem 1.1rem 0.5rem", fontSize: "10px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600 }}>Community</div>
-            {[
-              { icon: "📝", label: "Share Your Story",    href: "/community"    },
-              { icon: "❓", label: "Ask a Question",      href: "/community"    },
-              { icon: "💬", label: "My Coach Q&A",        href: "/my-questions" },
-            ].map((item, i, arr) => (
+            {([
+              { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>, label: "Share Your Story",    href: "/community"    },
+              { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>, label: "Ask a Question",      href: "/community"    },
+              { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>, label: "My Coach Q&A",        href: "/my-questions" },
+            ] as { icon: React.ReactNode; label: string; href: string }[]).map((item, i) => (
               <div
                 key={item.label}
                 onClick={() => router.push(item.href)}
@@ -842,7 +853,7 @@ export default function Dashboard() {
                 onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)"; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
               >
-                <span style={{ fontSize: "1rem" }}>{item.icon}</span>
+                <span style={{ color: "var(--muted-foreground)", display: "flex", alignItems: "center" }}>{item.icon}</span>
                 <span style={{ fontSize: "0.82rem", color: "var(--cs-white)", fontWeight: 500, flex: 1 }}>{item.label}</span>
                 <span style={{ fontSize: "0.75rem", color: "var(--cs-orange)", fontWeight: 600 }}>→</span>
               </div>

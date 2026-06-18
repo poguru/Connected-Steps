@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppNav from "@/components/layout/AppNav";
 import type { MenuUser } from "@/components/ui/UserMenu";
@@ -21,14 +21,21 @@ interface Notification {
 
 // ── Icon per type ─────────────────────────────────────────────────────────────
 
-function typeIcon(type: string): string {
+function typeIcon(type: string): React.ReactNode {
+  const s = { width: 18, height: 18, stroke: "var(--cs-orange)", fill: "none", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
   switch (type) {
-    case "session_reminder":  return "🏃";
-    case "coach_message":     return "💬";
-    case "achievement":       return "🏅";
-    case "membership_expiry": return "💳";
-    case "new_session":       return "📅";
-    default:                  return "🔔";
+    case "session_reminder":
+      return <svg viewBox="0 0 24 24" style={s}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+    case "coach_message":
+      return <svg viewBox="0 0 24 24" style={s}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>;
+    case "achievement":
+      return <svg viewBox="0 0 24 24" style={s}><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>;
+    case "membership_expiry":
+      return <svg viewBox="0 0 24 24" style={s}><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>;
+    case "new_session":
+      return <svg viewBox="0 0 24 24" style={s}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
+    default:
+      return <svg viewBox="0 0 24 24" style={s}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>;
   }
 }
 
@@ -230,7 +237,11 @@ export default function NotificationsPage() {
         {/* Content */}
         {loading ? <Skeleton /> : notifs.length === 0 ? (
           <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "3rem 1.5rem", textAlign: "center" }}>
-            <div style={{ fontSize: "2rem", marginBottom: 8 }}>🔔</div>
+            <div style={{ marginBottom: 8, display: "flex", justifyContent: "center" }}>
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+              </svg>
+            </div>
             <div style={{ fontSize: "0.9rem", fontWeight: 600, marginBottom: 4 }}>All caught up</div>
             <div style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>Session reminders, coach messages, and achievements will appear here.</div>
           </div>
@@ -263,7 +274,7 @@ export default function NotificationsPage() {
                         onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
                       >
                         {/* Icon */}
-                        <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem", flexShrink: 0 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: "50%", background: typeAccent(n.type), display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                           {typeIcon(n.type)}
                         </div>
 

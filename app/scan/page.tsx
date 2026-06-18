@@ -216,7 +216,12 @@ function ScanPageInner() {
         {/* Requesting permission spinner */}
         {state === "requesting-perm" && (
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>📷</div>
+            <div style={{ width: 64, height: 64, margin: "0 auto 1rem", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#e8620a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+            </div>
             <p style={{ color: "#aaa", fontSize: "0.9rem" }}>Requesting camera permission…</p>
           </div>
         )}
@@ -321,7 +326,13 @@ function ScanPageInner() {
         {/* Idle */}
         {state === "idle" && !urlToken && (
           <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "1.25rem" }}>
-            <div style={{ width: 80, height: 80, borderRadius: "50%", background: "rgba(232,98,10,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2.5rem" }}>📱</div>
+            <div style={{ width: 80, height: 80, borderRadius: "50%", background: "rgba(232,98,10,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#e8620a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+                <rect x="5" y="5" width="3" height="3"/><rect x="16" y="5" width="3" height="3"/><rect x="5" y="16" width="3" height="3"/>
+                <path d="M14 14h3v3M17 14v3h3M14 17h3"/>
+              </svg>
+            </div>
             <div>
               <div style={{ fontSize: "1.25rem", fontWeight: 700, marginBottom: "0.4rem" }}>Scan Attendance QR</div>
               <div style={{ fontSize: "0.85rem", color: "#888" }}>

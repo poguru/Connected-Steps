@@ -12,10 +12,14 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await db
     .from("session_attendance")
-    .select("session_id")
+    .select("session_id, attended")
     .eq("user_email", email.toLowerCase());
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ session_ids: (data ?? []).map((r) => r.session_id) });
+  const rows = data ?? [];
+  return NextResponse.json({
+    session_ids:  rows.map((r) => r.session_id),
+    attended_ids: rows.filter((r) => r.attended).map((r) => r.session_id),
+  });
 }

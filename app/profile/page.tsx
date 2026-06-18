@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import ConnectedApps from "@/components/settings/ConnectedApps";
 
 interface AppUser {
   firstName:     string;
@@ -105,8 +104,9 @@ export default function ProfilePage() {
     ]).then(([lb, sess, board]) => {
       const totalPoints   = lb.total_points   ?? 0;
       const totalSessions = (sess.sessions ?? []).filter((s: { attended: boolean }) => s.attended).length;
-      const entries: { user_email: string; total_points: number }[] = board.entries ?? [];
-      const sorted = [...entries].sort((a, b) => (b.total_points ?? 0) - (a.total_points ?? 0));
+      const entries: { user_email: string; month_points: number }[] = board.entries ?? [];
+      // Sort by month_points — same ordering the leaderboard page uses
+      const sorted = [...entries].sort((a, b) => (b.month_points ?? 0) - (a.month_points ?? 0));
       const rank   = sorted.findIndex(e => e.user_email === u.email);
       setStats({ totalPoints, totalSessions, rank: rank >= 0 ? rank + 1 : null });
     });
@@ -352,14 +352,30 @@ export default function ProfilePage() {
 
         {/* ── Quick links ── */}
         <div className="cs-menu-card">
-          {[
-            { label: "My Registrations",  href: "/events",       icon: "📅" },
-            { label: "Membership",         href: "/membership",   icon: "🏅" },
-            { label: "Referral Rewards",   href: "/referrals",    icon: "🎁" },
-            { label: "Coach Q&A",          href: "/my-questions", icon: "💬" },
-          ].map(item => (
+          {([
+            { label: "My Registrations", href: "/events",       icon: (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+            )},
+            { label: "Membership",        href: "/membership",   icon: (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
+              </svg>
+            )},
+            { label: "Referral Rewards",  href: "/referrals",    icon: (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+              </svg>
+            )},
+            { label: "Coach Q&A",         href: "/my-questions", icon: (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+            )},
+          ] as { label: string; href: string; icon: React.ReactNode }[]).map(item => (
             <Link key={item.href} href={item.href} className="cs-menu-row">
-              <span style={{ fontSize: "1.1rem", width: 24, textAlign: "center", flexShrink: 0 }}>{item.icon}</span>
+              <span style={{ width: 24, textAlign: "center", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted-foreground)" }}>{item.icon}</span>
               <span style={{ flex: 1 }}>{item.label}</span>
               <span style={{ color: "var(--muted-foreground)", fontSize: "0.8rem" }}>›</span>
             </Link>
@@ -503,11 +519,6 @@ export default function ProfilePage() {
               </div>
             </section>
 
-            {/* Connected Apps */}
-            <section style={{ background: "var(--surface)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "1.25rem" }}>
-              <div className="cs-label" style={{ marginBottom: "1rem" }}>Connected Apps</div>
-              <ConnectedApps userEmail={user.email} />
-            </section>
           </>
         )}
 
