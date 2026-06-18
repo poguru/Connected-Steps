@@ -185,15 +185,21 @@ function ScanPageInner() {
   }
 
   async function openAppSettings() {
-    if (isNativePlatform()) {
-      try {
-        const { App } = await import("@capacitor/app");
-        // Open app's own settings page on Android via intent URL
-        await (App as unknown as { openUrl?: (o: { url: string }) => Promise<void> }).openUrl?.({
-          url: "app-settings:",
-        });
-      } catch { /* ignore */ }
-    }
+    try {
+      // Android: open this app's permission settings via intent URI
+      // iOS: app-settings: URL scheme
+      const { App } = await import("@capacitor/app");
+      const appId = "in.connectedsteps.app";
+      const androidUri = `android.settings.APPLICATION_DETAILS_SETTINGS&package=${appId}`;
+      const iosUri = "app-settings:";
+      const { Capacitor } = await import("@capacitor/core");
+      const platform = Capacitor.getPlatform();
+      if (platform === "android") {
+        await App.openUrl({ url: `intent:#Intent;action=${androidUri};end` });
+      } else {
+        await App.openUrl({ url: iosUri });
+      }
+    } catch { /* ignore — user sees the manual instructions already on screen */ }
   }
 
   function stopCamera() {
