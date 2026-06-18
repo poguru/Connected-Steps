@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { verifyUserToken } from "@/lib/admin-auth";
 import { sendEmail, sendWhatsApp, paymentEmailHTML, membershipWAParams } from "@/lib/notify";
 import { autoFeedMembershipActivated } from "@/lib/auto-feed";
 
@@ -19,16 +20,26 @@ const PLAN_LABELS: Record<string, string> = {
 };
 
 export async function POST(req: NextRequest) {
+  // Authenticate the request — email MUST come from the verified token,
+  // not the request body, to prevent a user claiming payment for another account.
+  const userToken = req.headers.get("x-user-token");
+  const verifiedEmail = userToken ? verifyUserToken(userToken) : null;
+  if (!verifiedEmail) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const {
     razorpay_order_id,
     razorpay_payment_id,
     razorpay_signature,
     plan,
-    email,
     name,
     amount,
     coupon_id,
   } = await req.json();
+
+  // Always use the token-verified email — ignore any email in the request body
+  const email = verifiedEmail.toLowerCase();
 
   // Verify Razorpay signature
   const razorpaySecret = process.env.RAZORPAY_KEY_SECRET;

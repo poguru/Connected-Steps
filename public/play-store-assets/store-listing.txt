@@ -1,0 +1,140 @@
+═══════════════════════════════════════════════════════════════
+  CONNECTED STEPS — GOOGLE PLAY STORE LISTING COPY
+  Paste each section exactly as shown into Play Console.
+═══════════════════════════════════════════════════════════════
+
+APP TITLE  (30 chars max)
+──────────────────────────
+Connected Steps
+
+
+SHORT DESCRIPTION  (80 chars max)
+──────────────────────────────────
+Run with Hyderabad's community. Track sessions, earn points & chat with coaches.
+
+Character count: 80 ✓
+
+
+FULL DESCRIPTION  (4000 chars max)
+────────────────────────────────────
+Connected Steps is Hyderabad's community running app — built for serious runners who want to train together, stay accountable, and push each other further.
+
+Whether you're chasing your first 5K or training for a full marathon, Connected Steps gives you everything you need in one place.
+
+━━━ WHAT YOU GET ━━━
+
+🏃 Group Training Sessions
+Join scheduled morning runs 3× a week. RSVP in the app, scan a QR code to mark attendance, and earn points every session you show up to.
+
+🏆 Live Leaderboard
+See how you rank against the community — by week, month, or all-time. Compete with friends or follow the top runners for motivation.
+
+💬 Direct Coach Chat
+Message your assigned running coach directly inside the app. Ask about your training plan, your next race, or anything running-related.
+
+📊 Progress Tracking
+Your attendance history, total sessions, total points, and personal bests — all in one place. Link your Strava account to sync runs automatically.
+
+🎯 Milestone Badges
+Earn badges for your 1st session, 5th, 10th, 25th, and 50th. See your community's achievements in the activity feed.
+
+📅 Events
+Register for upcoming races and community events without leaving the app.
+
+🤝 Community Feed
+Stay connected between sessions — see who attended, who uploaded photos, and who just crossed a milestone.
+
+👥 Referral Rewards
+Invite friends and earn bonus points for every person who joins and attends their first session.
+
+━━━ HOW IT WORKS ━━━
+
+1. Sign up with your email
+2. Get assigned to a coach
+3. Join sessions and scan in with your phone's camera
+4. Watch your points and rank grow
+5. Stay connected with your coach and community
+
+━━━ FOR WHOM ━━━
+
+Connected Steps is for runners in Hyderabad who want more than just a solo training app. It's for people who believe running is better together — and that showing up for your community makes you a better athlete.
+
+Sessions currently run at Kondapur and surrounding areas of Hyderabad.
+
+━━━ MEMBERSHIP ━━━
+
+A Connected Steps membership gives you access to all group training sessions, coach support, and community features. Monthly, quarterly, and annual plans are available.
+
+━━━ PRIVACY ━━━
+
+We collect only what we need: your name, email, phone number, and training data. We never sell your data. Full privacy policy at connectedsteps.in/privacy.
+
+━━━ CONTACT ━━━
+
+Questions? Email us at connected.steps2106@gmail.com or message your coach directly in the app.
+
+Run further. Together.
+
+
+KEYWORDS / TAGS  (for search optimisation — add in Play Console)
+──────────────────────────────────────────────────────────────────
+running app, running community, Hyderabad running, group running, marathon training,
+running coach, running tracker, 5k training, 10k training, half marathon, fitness app,
+running club, training plan, run tracking, community fitness
+
+
+CONTENT RATING QUESTIONNAIRE ANSWERS  (Play Console → Content Rating)
+───────────────────────────────────────────────────────────────────────
+App type:          Utility / Health & Fitness
+Violence:          No
+Sexual content:    No
+Profanity:         No
+Controlled subs:   No
+User interaction:  Yes (chat between users and coaches)
+Personal info:     Yes (name, email, phone — disclosed in privacy policy)
+Location:          No (training location is user-entered text, not GPS)
+Recommended age:   13+  (minimum age enforced in registration)
+
+
+DATA SAFETY FORM ANSWERS  (Play Console → Data Safety)
+────────────────────────────────────────────────────────
+Data collected:
+  • Name          — used for account, not shared with third parties
+  • Email         — required for account, used for notifications
+  • Phone number  — optional, used for WhatsApp OTP verification
+  • User content  — photos uploaded by user, messages to coaches
+  • App activity  — session attendance, points, leaderboard data
+
+Data shared with third parties:
+  • Razorpay      — payment processing (amount, plan — no card data stored)
+  • Strava        — optional integration (user-initiated, OAuth)
+
+Data encrypted in transit: Yes (HTTPS/TLS)
+Data can be deleted:       Yes (contact connected.steps2106@gmail.com)
+
+
+TEST ACCOUNT FOR GOOGLE REVIEW TEAM
+──────────────────────────────────────
+Create a dedicated reviewer account before submitting:
+  Email:    reviewer@connectedsteps.in  (or any test email you control)
+  Password: (set a simple, memorable password)
+  Notes:    Account should have an active membership pre-activated
+            so the reviewer can see all features without purchasing.
+Add these credentials in Play Console → App content → Test account.
+
+
+SCREENSHOTS REQUIRED  (capture on a real device or emulator)
+─────────────────────────────────────────────────────────────
+Minimum 2, recommend 6-8. Suggested screens to capture:
+
+  1. Dashboard / Home  (show upcoming session + points)
+  2. Leaderboard       (show top 3 podium)
+  3. Community Feed    (show activity cards)
+  4. Coach Chat        (show message thread)
+  5. Session detail    (show QR scan prompt or attendance)
+  6. Profile           (show stats strip: points, sessions, rank)
+  7. Events            (show event cards)
+  8. Membership        (show pricing plans)
+
+Device size:  Phone screenshots must be at least 320px wide.
+              1080×1920 or 1080×2400 recommended.
