@@ -1,7 +1,7 @@
 -- QR code tokens for session attendance
 CREATE TABLE IF NOT EXISTS session_qr_codes (
   id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id  INTEGER     NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  session_id  UUID        NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
   token       UUID        NOT NULL UNIQUE DEFAULT gen_random_uuid(),
   expires_at  TIMESTAMPTZ NOT NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
