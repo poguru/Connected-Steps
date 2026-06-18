@@ -78,7 +78,7 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
     setPlan(p[(new Date().getDay() + 6) % 7]);
   }, [user.goal]);
 
-  const streak   = calcMissToleranceStreak(
+  const streak  = calcMissToleranceStreak(
     sessions
       .filter(r => r.sessions !== null)
       .map(r => ({ attended: r.attended, date: r.sessions!.date }))
@@ -89,124 +89,119 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
   const joined   = nextSess ? joinedSessionIds.has(nextSess.id) : false;
 
   return (
-    <div style={{
-      background: "linear-gradient(135deg, oklch(0.17 0.018 270) 0%, oklch(0.21 0.025 290) 100%)",
-      border: "1px solid var(--border)", borderRadius: 16,
-      overflow: "hidden", marginBottom: "1rem",
-      boxShadow: "var(--shadow-md)", position: "relative",
-    }}>
-      {/* Ambient glow */}
-      <div style={{ position:"absolute", top:-60, right:-40, width:200, height:200, borderRadius:"50%", background:"oklch(0.72 0.19 49 / 8%)", filter:"blur(50px)", pointerEvents:"none" }} />
+    <div style={{ marginBottom: "0.25rem" }}>
 
-      {/* ── Top: avatar + greeting + chips ──────────────────────────── */}
-      <div style={{ padding:"1rem 1.25rem 0.75rem", display:"flex", alignItems:"center", gap:"0.75rem", position:"relative" }}>
+      {/* ── Greeting (open layout, no card) ── */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "1.5rem" }}>
+        <div style={{ flex: 1, minWidth: 0, paddingRight: "0.75rem" }}>
+          <div style={{ fontSize: "0.8rem", color: "var(--muted-foreground)", marginBottom: 4 }}>
+            {greeting()},
+          </div>
+          <h1 style={{
+            fontSize: "clamp(1.75rem, 6vw, 2.25rem)",
+            fontWeight: 800,
+            color: "var(--foreground)",
+            margin: "0 0 8px",
+            lineHeight: 1.1,
+            letterSpacing: "-0.025em",
+          }}>
+            {user.firstName}
+          </h1>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {streak > 0 && (
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(232,98,10,0.12)", border: "1px solid rgba(232,98,10,0.25)", borderRadius: 20, padding: "4px 10px" }}>
+                <span style={{ fontSize: "0.8rem" }}>🔥</span>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--cs-orange)" }}>{streak}-session streak</span>
+              </div>
+            )}
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 20, padding: "4px 10px" }}>
+              <span style={{ fontSize: "0.8rem" }}>📅</span>
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--foreground)" }}>{monthly} this month</span>
+            </div>
+          </div>
+        </div>
+
         {/* Avatar */}
         {user.photo ? (
-          <img src={user.photo} alt={user.firstName} style={{ width:42, height:42, borderRadius:"50%", objectFit:"cover", border:"2px solid var(--cs-orange)", flexShrink:0, display:"block" }} />
+          <img src={user.photo} alt={user.firstName} style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover", border: "2.5px solid var(--cs-orange)", flexShrink: 0 }} />
         ) : (
-          <div style={{ width:42, height:42, borderRadius:"50%", background:"oklch(0.72 0.19 49 / 15%)", border:"2px solid var(--cs-orange)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"0.88rem", fontWeight:800, color:"var(--cs-orange)", flexShrink:0 }}>
+          <div style={{ width: 52, height: 52, borderRadius: "50%", background: "oklch(0.72 0.19 49 / 15%)", border: "2.5px solid var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem", fontWeight: 800, color: "var(--cs-orange)", flexShrink: 0 }}>
             {user.initials ?? user.firstName[0]?.toUpperCase()}
           </div>
         )}
-
-        {/* Greeting text */}
-        <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:"0.65rem", color:"var(--muted-foreground)", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:1 }}>
-            {new Date().toLocaleDateString("en-IN", { weekday:"long", day:"numeric", month:"long" })}
-          </div>
-          <div style={{ fontSize:"1rem", fontWeight:700, color:"var(--foreground)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-            {greeting()}, <span style={{ color:"var(--cs-orange)" }}>{user.firstName}</span>
-          </div>
-        </div>
-
-        {/* Chips */}
-        <div style={{ display:"flex", gap:6, flexShrink:0 }}>
-          {streak > 0 && (
-            <div style={{ display:"flex", alignItems:"center", gap:4, background:"rgba(232,98,10,0.1)", border:"1px solid rgba(232,98,10,0.25)", borderRadius:20, padding:"4px 8px" }}>
-              <span style={{ fontSize:"0.8rem" }}>🔥</span>
-              <span style={{ fontSize:"11px", fontWeight:700, color:"var(--cs-orange)" }}>{streak}</span>
-            </div>
-          )}
-          <div style={{ display:"flex", alignItems:"center", gap:4, background:"rgba(255,255,255,0.05)", border:"1px solid var(--border)", borderRadius:20, padding:"4px 8px" }}>
-            <span style={{ fontSize:"0.8rem" }}>📅</span>
-            <span style={{ fontSize:"11px", fontWeight:700, color:"var(--foreground)" }}>{monthly}</span>
-          </div>
-        </div>
       </div>
 
-      {/* ── Divider ───────────────────────────────────────────────────── */}
-      <div style={{ height:"1px", background:"var(--border)", margin:"0 1.25rem" }} />
-
-      {/* ── Today's workout row ───────────────────────────────────────── */}
-      <div style={{ padding:"0.75rem 1.25rem", display:"flex", alignItems:"center", gap:"0.75rem", position:"relative" }}>
-        <div style={{
-          width:40, height:40, borderRadius:10, flexShrink:0,
-          background: isRest ? "rgba(255,255,255,0.04)" : "oklch(0.72 0.19 49 / 10%)",
-          border: isRest ? "1px solid rgba(255,255,255,0.06)" : "1px solid oklch(0.72 0.19 49 / 20%)",
-          display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1.3rem",
-        }}>
-          {plan?.emoji ?? "🏃"}
-        </div>
-        <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:"9px", color: isRest ? "var(--muted-foreground)" : "var(--primary)", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:700, marginBottom:1 }}>
-            Today's Workout
-          </div>
-          <div style={{ fontSize:"0.9rem", fontWeight:700, color:"var(--foreground)", display:"flex", alignItems:"center", gap:6 }}>
-            {plan?.type ?? "Loading…"}
-          </div>
-          {plan?.detail && (
-            <div style={{ fontSize:"0.75rem", color:"var(--muted-foreground)", marginTop:1 }}>{plan.detail}</div>
-          )}
-        </div>
-        {!isRest && (
-          <button
-            onClick={() => router.push("/weekend-run")}
-            style={{ flexShrink:0, padding:"7px 14px", background:"var(--gradient-accent)", color:"var(--accent-foreground)", border:"none", borderRadius:8, fontSize:"12px", fontWeight:700, cursor:"pointer", fontFamily:"var(--font-body)", boxShadow:"var(--shadow-orange)", whiteSpace:"nowrap" }}>
-            Register →
-          </button>
-        )}
-      </div>
-
-      {/* ── Next session row (only if exists) ────────────────────────── */}
-      {nextSess && (
-        <>
-          <div style={{ height:"1px", background:"var(--border)", margin:"0 1.25rem" }} />
-          <div style={{ padding:"0.65rem 1.25rem", display:"flex", alignItems:"center", gap:"0.75rem" }}>
+      {/* ── Today's Workout card ── */}
+      {plan && (
+        <div className="cs-clean-card" style={{ marginBottom: "0.625rem" }}>
+          <div className="cs-label" style={{ marginBottom: 10 }}>Today&apos;s Workout</div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.875rem" }}>
             <div style={{
-              width:40, height:40, borderRadius:10, flexShrink:0,
+              width: 46, height: 46, borderRadius: 12, flexShrink: 0,
+              background: isRest ? "rgba(255,255,255,0.04)" : "oklch(0.72 0.19 49 / 10%)",
+              border: isRest ? "1px solid rgba(255,255,255,0.06)" : "1px solid oklch(0.72 0.19 49 / 20%)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.35rem",
+            }}>
+              {plan.emoji}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--foreground)", lineHeight: 1.2 }}>{plan.type}</div>
+              <div style={{ fontSize: "0.78rem", color: "var(--muted-foreground)", marginTop: 3 }}>{plan.detail}</div>
+            </div>
+            {!isRest && (
+              <button
+                onClick={() => router.push("/weekend-run")}
+                style={{ flexShrink: 0, padding: "9px 16px", background: "var(--gradient-accent)", color: "#fff", border: "none", borderRadius: 10, fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)", boxShadow: "var(--shadow-orange)", whiteSpace: "nowrap" }}>
+                Register →
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Next session card ── */}
+      {nextSess && (
+        <div style={{
+          background: "var(--surface)",
+          borderRadius: 16,
+          padding: "1.25rem",
+          border: joined ? "1px solid oklch(0.74 0.22 150 / 20%)" : "1px solid rgba(255,255,255,0.06)",
+          marginBottom: "0.625rem",
+        }}>
+          <div className="cs-label" style={{ marginBottom: 10, color: joined ? "#4ade80" : "var(--cs-orange)" }}>
+            {joined ? "You&apos;re Registered" : "Up Next"}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.875rem" }}>
+            <div style={{
+              width: 46, height: 46, borderRadius: 12, flexShrink: 0,
               background: joined ? "oklch(0.74 0.22 150 / 8%)" : "rgba(255,255,255,0.04)",
               border: joined ? "1px solid oklch(0.74 0.22 150 / 20%)" : "1px solid var(--border)",
-              display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1.1rem",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem",
             }}>
               {joined ? "✅" : "📅"}
             </div>
-            <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:"9px", color: joined ? "#4ade80" : "var(--muted-foreground)", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:700, marginBottom:1 }}>
-                {joined ? "You're registered" : "Up Next"}
-              </div>
-              <div style={{ fontSize:"0.85rem", fontWeight:600, color:"var(--foreground)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                {nextSess.title}
-              </div>
-              <div style={{ fontSize:"0.72rem", color:"var(--muted-foreground)" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--foreground)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nextSess.title}</div>
+              <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginTop: 3 }}>
                 {dayLabel(nextSess.date)}{fmtTime(nextSess.time)}{nextSess.venue ? ` · ${nextSess.venue}` : ""}
               </div>
             </div>
             {joined ? (
-              <div style={{ flexShrink:0, fontSize:"12px", fontWeight:700, color:"#4ade80" }}>✓ Joined</div>
+              <div style={{ flexShrink: 0, fontSize: "12px", fontWeight: 700, color: "#4ade80" }}>✓ Joined</div>
             ) : (
               <button
                 onClick={() => router.push(`/join/${nextSess.id}`)}
-                style={{ flexShrink:0, padding:"7px 14px", background:"var(--gradient-accent)", color:"var(--accent-foreground)", border:"none", borderRadius:8, fontSize:"12px", fontWeight:700, cursor:"pointer", fontFamily:"var(--font-body)", boxShadow:"var(--shadow-orange)", whiteSpace:"nowrap" }}>
+                style={{ flexShrink: 0, padding: "9px 16px", background: "var(--gradient-accent)", color: "#fff", border: "none", borderRadius: 10, fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)", boxShadow: "var(--shadow-orange)", whiteSpace: "nowrap" }}>
                 Join →
               </button>
             )}
           </div>
-        </>
+        </div>
       )}
 
-      {/* ── Streak reset nudge ────────────────────────────────────────── */}
+      {/* Streak reset nudge */}
       {streak === 0 && sessions.some(r => r.sessions !== null) && (
-        <div style={{ padding:"0 1.25rem 0.75rem", fontSize:"0.72rem", color:"oklch(0.7 0.15 30)", display:"flex", alignItems:"center", gap:4 }}>
+        <div style={{ padding: "0.6rem 0.875rem", fontSize: "0.72rem", color: "oklch(0.7 0.15 30)", display: "flex", alignItems: "center", gap: 4 }}>
           <span>⚠️</span> Two missed sessions reset your streak. Come back strong!
         </div>
       )}

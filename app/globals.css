@@ -996,3 +996,87 @@ select.auth-input option {
 .native-app .cs-lb-sticky-rank {
   bottom: calc(56px + env(safe-area-inset-bottom));
 }
+
+/* ─── Premium design system ──────────────────────────────── */
+
+/* Section micro-label (orange, all-caps, matches reference app) */
+.cs-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--cs-orange);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+/* Clean card: no border, just dark surface + radius */
+.cs-clean-card {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Menu list container (profile, settings) */
+.cs-menu-card {
+  background: var(--surface);
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Menu row inside cs-menu-card */
+.cs-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 1rem 1.25rem;
+  color: var(--foreground);
+  text-decoration: none;
+  transition: background 0.12s;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+.cs-menu-row:not(:first-child) {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+.cs-menu-row:hover,
+.cs-menu-row:active {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Stats strip used in profile header + leaderboard */
+.cs-stats-strip {
+  display: flex;
+  gap: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.cs-stats-col {
+  flex: 1;
+  background: var(--surface);
+  padding: 10px 8px;
+  text-align: center;
+}
+.cs-stats-val {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--cs-orange);
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+.cs-stats-lbl {
+  font-size: 9px;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 3px;
+}
