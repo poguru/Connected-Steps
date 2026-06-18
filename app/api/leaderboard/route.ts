@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     q = q.in("user_email", emails);
   }
 
-  const { data: entries, error } = await q.order("month_points", { ascending: false });
+  const { data: entries, error } = await q.order("month_points", { ascending: false }).limit(500);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!entries?.length) return NextResponse.json({ entries: [] });
 
@@ -54,7 +54,13 @@ export async function GET(req: NextRequest) {
     photo:           photoMap[e.user_email] ?? null,
   }));
 
-  return NextResponse.json({ entries: enriched });
+  return NextResponse.json({ entries: enriched }, {
+    headers: {
+      // Cache at CDN for 30s; serve stale while revalidating for up to 60s.
+      // Keeps the leaderboard fresh without hammering the DB on every page load.
+      "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
+    },
+  });
 }
 
 function getISOWeekStart(): string {

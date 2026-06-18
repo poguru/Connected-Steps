@@ -10,6 +10,15 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      // Supabase storage (project URL varies — match any project)
+      { protocol: "https", hostname: "*.supabase.co",  pathname: "/storage/v1/object/**" },
+      { protocol: "https", hostname: "*.supabase.in",  pathname: "/storage/v1/object/**" },
+      // Google user photos (OAuth profile pictures)
+      { protocol: "https", hostname: "lh3.googleusercontent.com" },
+    ],
+  },
   async headers() {
     return [
       {

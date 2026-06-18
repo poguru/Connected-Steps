@@ -94,21 +94,16 @@ export default function ProfilePage() {
     setPhoneVerified(u.phone_verified ?? false);
     setCurrentPhone(u.phone ?? "");
 
-    // Fetch stats
+    // Fetch stats — rank comes directly from /api/leaderboard/user (no full leaderboard fetch)
     const tok = localStorage.getItem("cs_user_token") ?? "";
     const authH = { "x-user-token": tok };
     Promise.all([
       fetch("/api/leaderboard/user", { headers: authH }).then(r => r.json()).catch(() => ({})),
       fetch("/api/user/sessions",    { headers: authH }).then(r => r.json()).catch(() => ({})),
-      fetch("/api/leaderboard").then(r => r.json()).catch(() => ({})),
-    ]).then(([lb, sess, board]) => {
+    ]).then(([lb, sess]) => {
       const totalPoints   = lb.total_points   ?? 0;
       const totalSessions = (sess.sessions ?? []).filter((s: { attended: boolean }) => s.attended).length;
-      const entries: { user_email: string; month_points: number }[] = board.entries ?? [];
-      // Sort by month_points — same ordering the leaderboard page uses
-      const sorted = [...entries].sort((a, b) => (b.month_points ?? 0) - (a.month_points ?? 0));
-      const rank   = sorted.findIndex(e => e.user_email === u.email);
-      setStats({ totalPoints, totalSessions, rank: rank >= 0 ? rank + 1 : null });
+      setStats({ totalPoints, totalSessions, rank: lb.rank ?? null });
     });
   }, [router]);
 

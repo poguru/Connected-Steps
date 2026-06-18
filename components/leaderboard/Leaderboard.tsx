@@ -79,8 +79,9 @@ export default function Leaderboard() {
   const [followBusy,   setFollowBusy]   = useState<Set<string>>(new Set());
   const [preview,      setPreview]      = useState<Entry | null>(null);
 
-  const tabRef  = useRef(tab);
-  const liveRef = useRef(false);
+  const tabRef     = useRef(tab);
+  const liveRef    = useRef(false);
+  const rawRef     = useRef<Entry[]>([]); // cached raw entries so tab switches don't re-fetch
   useEffect(() => { tabRef.current = tab; }, [tab]);
 
   // Lock body scroll while the profile sheet is open
@@ -103,6 +104,7 @@ export default function Leaderboard() {
       .then(r => r.json())
       .then(d => {
         if (d.entries) {
+          rawRef.current = d.entries;
           const key = ptsKey(tabRef.current);
           setEntries([...d.entries].sort((a: Entry, b: Entry) => (b[key] ?? 0) - (a[key] ?? 0)));
         }
@@ -110,18 +112,28 @@ export default function Leaderboard() {
       .catch(() => {});
   }, []);
 
+  // Fetch once on mount — do NOT re-fetch on tab change
   useEffect(() => {
     setLoading(true);
     fetch("/api/leaderboard")
       .then(r => r.json())
       .then(d => {
         if (d.entries) {
-          const key = ptsKey(tab);
+          rawRef.current = d.entries;
+          const key = ptsKey(tabRef.current);
           setEntries([...d.entries].sort((a: Entry, b: Entry) => (b[key] ?? 0) - (a[key] ?? 0)));
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Tab change: re-sort already-fetched data — no network request
+  useEffect(() => {
+    if (rawRef.current.length > 0) {
+      const key = ptsKey(tab);
+      setEntries([...rawRef.current].sort((a, b) => (b[key] ?? 0) - (a[key] ?? 0)));
+    }
   }, [tab]);
 
   useEffect(() => {

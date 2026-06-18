@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { getSupabaseSafe } from "@/lib/supabase";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -90,7 +91,6 @@ export default function MessagesPage() {
   const [messagesLoading,setMessagesLoading]= useState(false);
 
   const bottomRef   = useRef<HTMLDivElement>(null);
-  const pollRef     = useRef<ReturnType<typeof setInterval> | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // ── Auth check ──────────────────────────────────────────────────────────────
@@ -231,19 +231,49 @@ export default function MessagesPage() {
     });
     markRead(convId);
 
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(() => {
-      fetchMessages(convId).then(msgs => {
-        setMessages(prev => {
-          if (msgs.length === prev.length && msgs[msgs.length - 1]?.id === prev[prev.length - 1]?.id) return prev;
-          requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }));
-          markRead(convId);
-          return msgs;
-        });
-      });
-    }, 5000);
+    // Prefer Supabase realtime; fall back to 15s polling if unavailable.
+    const supabase = getSupabaseSafe();
+    let fallbackPoll: ReturnType<typeof setInterval> | null = null;
 
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    const startFallback = () => {
+      if (fallbackPoll) return;
+      fallbackPoll = setInterval(() => {
+        fetchMessages(convId).then(msgs => {
+          setMessages(prev => {
+            if (msgs.length === prev.length && msgs[msgs.length - 1]?.id === prev[prev.length - 1]?.id) return prev;
+            requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }));
+            markRead(convId);
+            return msgs;
+          });
+        });
+      }, 15000);
+    };
+
+    if (!supabase) { startFallback(); return () => { if (fallbackPoll) clearInterval(fallbackPoll); }; }
+
+    const channel = supabase
+      .channel(`conv-${convId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${convId}` },
+        (payload) => {
+          const msg = payload.new as Message;
+          setMessages(prev => {
+            if (prev.some(m => m.id === msg.id)) return prev; // deduplicate
+            requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }));
+            return [...prev, msg];
+          });
+          markRead(convId);
+        }
+      )
+      .subscribe(status => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") startFallback();
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+      if (fallbackPoll) clearInterval(fallbackPoll);
+    };
   }, [activeContact?.conversation?.id, fetchMessages, markRead]); // eslint-disable-line
 
   // ── Send message ────────────────────────────────────────────────────────────
@@ -330,7 +360,7 @@ export default function MessagesPage() {
         {activeContact && (
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.85rem 1rem" }}>
             <button
-              onClick={() => { setActiveContact(null); setMessages([]); if (pollRef.current) clearInterval(pollRef.current); }}
+              onClick={() => { setActiveContact(null); setMessages([]); }}
               aria-label="Back to inbox"
               style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted-foreground)", padding: "6px", borderRadius: 8, display: "flex", alignItems: "center", flexShrink: 0 }}
             >

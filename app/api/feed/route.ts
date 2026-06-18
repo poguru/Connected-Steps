@@ -49,15 +49,13 @@ export async function GET(req: NextRequest) {
 
     const db = getSupabaseServer();
 
-    // ── Build the pool of emails to include in the feed ───────────────────────
-    let emailPool: string[] = [];
+    // ── Build the email pool (following scope only) ───────────────────────────
+    // Global scope: no email filter needed — query all events directly.
+    // Following scope: filter by the set of people this user follows.
 
-    if (scope === "global") {
-      // All users on the platform
-      const { data: allUsers } = await db.from("users").select("email");
-      emailPool = (allUsers ?? []).map(u => u.email);
-    } else {
-      // Only people the current user follows
+    let emailPool: string[] | null = null; // null = global (no filter)
+
+    if (scope === "following") {
       const { data: followRows } = await db
         .from("follows")
         .select("following_email")
@@ -70,44 +68,41 @@ export async function GET(req: NextRequest) {
 
     const fetchSize = limit * 3; // over-fetch to allow for deduplication and sorting
 
+    const attendanceQ = db
+      .from("session_attendance")
+      .select("user_email, user_name, sessions(id, title, date, venue, photo_url)")
+      .eq("attended", true)
+      .lt("sessions(date)", before.slice(0, 10))
+      .order("sessions(date)", { ascending: false })
+      .limit(fetchSize);
+
+    const photosQ = db
+      .from("session_photos")
+      .select("id, uploader_email, uploader_name, session_id, photo_url, caption, created_at, sessions(title)")
+      .lt("created_at", before)
+      .order("created_at", { ascending: false })
+      .limit(fetchSize);
+
+    const newMembersQ = db
+      .from("users")
+      .select("email, first_name, last_name, created_at")
+      .lt("created_at", before)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    const postsQ = db
+      .from("user_posts")
+      .select("id, author_email, author_name, post_type, body, photo_url, created_at")
+      .eq("approved", true)
+      .lt("created_at", before)
+      .order("created_at", { ascending: false })
+      .limit(fetchSize);
+
     const [attendanceRes, photosRes, newMembersRes, userPostsRes] = await Promise.all([
-      // Session attendance events
-      db
-        .from("session_attendance")
-        .select("user_email, user_name, sessions(id, title, date, venue, photo_url)")
-        .in("user_email", emailPool)
-        .eq("attended", true)
-        .lt("sessions(date)", before.slice(0, 10))
-        .order("sessions(date)", { ascending: false })
-        .limit(fetchSize),
-
-      // Photo upload events
-      db
-        .from("session_photos")
-        .select("id, uploader_email, uploader_name, session_id, photo_url, caption, created_at, sessions(title)")
-        .in("uploader_email", emailPool)
-        .lt("created_at", before)
-        .order("created_at", { ascending: false })
-        .limit(fetchSize),
-
-      // New member join events
-      db
-        .from("users")
-        .select("email, first_name, last_name, created_at")
-        .in("email", emailPool)
-        .lt("created_at", before)
-        .order("created_at", { ascending: false })
-        .limit(20),
-
-      // User-generated posts
-      db
-        .from("user_posts")
-        .select("id, author_email, author_name, post_type, body, photo_url, created_at")
-        .in("author_email", emailPool)
-        .eq("approved", true)
-        .lt("created_at", before)
-        .order("created_at", { ascending: false })
-        .limit(fetchSize),
+      emailPool ? attendanceQ.in("user_email", emailPool) : attendanceQ,
+      emailPool ? photosQ.in("uploader_email", emailPool) : photosQ,
+      emailPool ? newMembersQ.in("email", emailPool) : newMembersQ,
+      emailPool ? postsQ.in("author_email", emailPool) : postsQ,
     ]);
 
     // ── Build event objects ───────────────────────────────────────────────────
@@ -187,8 +182,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Badge earned: for each user in the pool, compute which session milestone
-    // they've most recently crossed and synthesise a badge event.
+    // Badge earned: synthesise milestone badge events from session counts.
     await appendBadgeEvents(db, emailPool, before, events);
 
     // ── Sort descending, paginate ─────────────────────────────────────────────
@@ -227,57 +221,52 @@ export async function GET(req: NextRequest) {
 }
 
 // ── Badge event synthesis ─────────────────────────────────────────────────────
+// Single query replaces the previous N+1 pattern (one per-user query for the nth session date).
 
 async function appendBadgeEvents(
   db: ReturnType<typeof getSupabaseServer>,
-  emailPool: string[],
+  emailPool: string[] | null, // null = global scope
   before: string,
   events: Omit<FeedEvent, "reactions">[]
 ) {
-  if (emailPool.length === 0) return;
-
-  // For each user, count their total attended sessions
-  const { data: counts } = await db
+  // One query: all attended sessions with dates for the relevant users.
+  // emailPool=null means global; no IN filter needed.
+  let q = db
     .from("session_attendance")
-    .select("user_email, user_name")
-    .in("user_email", emailPool)
+    .select("user_email, user_name, sessions(date)")
     .eq("attended", true);
 
-  if (!counts?.length) return;
-
-  // Group by user_email and count
-  const userCounts: Record<string, { name: string; count: number }> = {};
-  for (const row of counts) {
-    if (!userCounts[row.user_email]) userCounts[row.user_email] = { name: row.user_name ?? "", count: 0 };
-    userCounts[row.user_email].count++;
+  if (emailPool !== null) {
+    if (emailPool.length === 0) return;
+    q = q.in("user_email", emailPool);
   }
 
-  // For each user whose count hits a milestone, find the date of that nth session
-  // and emit a badge event (only for milestones reached within the past 60 days)
+  const { data: allRows } = await q;
+  if (!allRows?.length) return;
+
+  // Build per-user list of sorted session dates in one pass.
+  const userMap: Record<string, { name: string; dates: string[] }> = {};
+  for (const row of allRows) {
+    const raw  = row.sessions as unknown;
+    const sess = (Array.isArray(raw) ? raw[0] : raw) as { date: string } | null;
+    if (!sess?.date) continue;
+    if (!userMap[row.user_email]) userMap[row.user_email] = { name: row.user_name ?? "", dates: [] };
+    userMap[row.user_email].dates.push(sess.date);
+  }
+
   const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
 
-  for (const [userEmail, { name, count }] of Object.entries(userCounts)) {
-    // Find the highest milestone this user has crossed
-    const milestones = MILESTONE_COUNTS.filter(m => count >= m);
+  for (const [userEmail, { name, dates }] of Object.entries(userMap)) {
+    dates.sort(); // ISO date strings sort correctly as strings
+    const count       = dates.length;
+    const milestones  = MILESTONE_COUNTS.filter(m => count >= m);
     if (milestones.length === 0) continue;
     const topMilestone = milestones[milestones.length - 1];
 
-    // Get the date of their nth (topMilestone-th) session to use as the badge timestamp
-    const { data: nthSession } = await db
-      .from("session_attendance")
-      .select("sessions(date)")
-      .eq("user_email", userEmail)
-      .eq("attended", true)
-      .order("sessions(date)", { ascending: true })
-      .range(topMilestone - 1, topMilestone - 1)
-      .single();
+    const nthDate = dates[topMilestone - 1]; // 0-indexed into sorted array
+    if (!nthDate) continue;
 
-    if (!nthSession) continue;
-    const raw  = nthSession.sessions as unknown;
-    const sess = (Array.isArray(raw) ? raw[0] : raw) as { date: string } | null;
-    if (!sess) continue;
-
-    const badgeDate = sess.date + "T07:00:00.000Z";
+    const badgeDate = nthDate + "T07:00:00.000Z";
     if (badgeDate >= before || badgeDate < sixtyDaysAgo) continue;
 
     const badge = SESSION_BADGES[topMilestone];
