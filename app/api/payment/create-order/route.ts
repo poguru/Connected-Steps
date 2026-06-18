@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Razorpay from "razorpay";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { redeemCoupon } from "@/lib/coupon-redeem";
 
 function getRazorpay() {
   const key_id     = process.env.RAZORPAY_KEY_ID;
@@ -42,12 +43,31 @@ export async function POST(req: NextRequest) {
       .eq("id", coupon_id)
       .single();
 
-    if (
-      coupon &&
-      coupon.use_count < coupon.max_uses &&
-      (!coupon.expires_at || new Date(coupon.expires_at) > new Date())
-    ) {
-      amount         = applyDiscount(originalAmount, coupon.discount_type, coupon.discount_value);
+    if (!coupon || coupon.use_count >= coupon.max_uses || (coupon.expires_at && new Date(coupon.expires_at) <= new Date())) {
+      return NextResponse.json({ error: "This coupon is no longer valid." }, { status: 410 });
+    }
+
+    // Check if this user already has a coupon_use entry for this coupon
+    // (e.g. they refreshed during checkout — avoid double-claiming).
+    const { data: existingUse } = await db
+      .from("coupon_uses")
+      .select("id")
+      .eq("coupon_id", coupon_id)
+      .eq("used_by_email", email.toLowerCase())
+      .maybeSingle();
+
+    if (existingUse) {
+      // Already claimed in a prior order — re-apply the discount without re-claiming.
+      amount          = applyDiscount(originalAmount, coupon.discount_type, coupon.discount_value);
+      discountApplied = originalAmount - amount;
+    } else {
+      // Atomically claim the coupon use now. This prevents two concurrent users
+      // both getting a discount from the last available use of a coupon.
+      const claimed = await redeemCoupon(coupon_id, email.toLowerCase());
+      if (!claimed) {
+        return NextResponse.json({ error: "This coupon has reached its usage limit." }, { status: 410 });
+      }
+      amount          = applyDiscount(originalAmount, coupon.discount_type, coupon.discount_value);
       discountApplied = originalAmount - amount;
     }
   }

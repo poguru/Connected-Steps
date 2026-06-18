@@ -23,12 +23,16 @@ export async function GET(
     return NextResponse.redirect(`${profileUrl}&integration=error&provider=${providerId}`);
   }
 
-  // Decode state → email
+  // Decode state → email + timestamp; reject stale states (replay / CSRF)
   let email: string;
   try {
     const decoded = JSON.parse(Buffer.from(state, "base64url").toString());
     email = decoded.email;
     if (!email) throw new Error("no email in state");
+    const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+    if (!decoded.ts || Date.now() - Number(decoded.ts) > STATE_TTL_MS) {
+      throw new Error("state expired");
+    }
   } catch {
     return NextResponse.redirect(`${profileUrl}&integration=error&provider=${providerId}`);
   }

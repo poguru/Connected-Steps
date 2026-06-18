@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   // Per-account key prevents one account's failures from blocking another account.
   const key = `login:${ip}:${String(identifier ?? "").toLowerCase().trim()}`;
 
-  if (isRateLimited(key)) {
+  if (await isRateLimited(key)) {
     return NextResponse.json(
       { error: "Too many failed login attempts. Please try again in 15 minutes." },
       { status: 429, headers: { "Retry-After": "900" } }
@@ -35,13 +35,13 @@ export async function POST(req: NextRequest) {
   const user = byEmail.data?.[0] ?? byPhone.data?.[0] ?? null;
 
   if (!user) {
-    recordFailure(key);
+    await recordFailure(key);
     return NextResponse.json({ error: "Invalid credentials. Please check and try again." }, { status: 401 });
   }
 
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) {
-    recordFailure(key);
+    await recordFailure(key);
     return NextResponse.json({ error: "Invalid credentials. Please check and try again." }, { status: 401 });
   }
 

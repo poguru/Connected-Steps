@@ -75,24 +75,24 @@ export async function POST(req: NextRequest) {
 
     // ── General send-rate limit (shared across all purposes) ──────────────────
     const sendKey = `send-otp:${ip}:${identifier}`;
-    if (isRateLimited(sendKey)) {
+    if (await isRateLimited(sendKey)) {
       return NextResponse.json(
         { error: "Too many OTP requests. Please wait 15 minutes before requesting a new code." },
         { status: 429, headers: { "Retry-After": "900" } }
       );
     }
-    recordFailure(sendKey);
+    await recordFailure(sendKey);
 
     // ── Extra phone resend limit: max 3 per hour ───────────────────────────────
     if (type === "phone") {
       const phoneKey = `phone-otp-resend:${ip}:${identifier}`;
-      if (isRateLimitedCustom(phoneKey, PHONE_RESEND_MAX, PHONE_RESEND_WINDOW)) {
+      if (await isRateLimitedCustom(phoneKey, PHONE_RESEND_MAX, PHONE_RESEND_WINDOW)) {
         return NextResponse.json(
           { error: "You have reached the maximum of 3 OTP requests per hour for this number. Please try again later." },
           { status: 429, headers: { "Retry-After": "3600" } }
         );
       }
-      recordFailureCustom(phoneKey, PHONE_RESEND_WINDOW);
+      await recordFailureCustom(phoneKey, PHONE_RESEND_WINDOW);
     }
 
     const db = getSupabaseServer();

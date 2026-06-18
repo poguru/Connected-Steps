@@ -3,7 +3,6 @@ import crypto from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail, sendWhatsApp, paymentEmailHTML, membershipWAParams } from "@/lib/notify";
 import { autoFeedMembershipActivated } from "@/lib/auto-feed";
-import { redeemCoupon } from "@/lib/coupon-redeem";
 
 const PLAN_MONTHS: Record<string, number> = {
   monthly:  1,
@@ -82,11 +81,8 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Record coupon usage — atomic conditional increment (fire-and-forget;
-  // payment already succeeded so we must not block or fail the response).
-  if (coupon_id) {
-    redeemCoupon(coupon_id, email.toLowerCase()).catch(console.error);
-  }
+  // Coupon was already atomically claimed at create-order time to prevent
+  // race conditions. No second redemption needed here.
 
   // Fetch user phone for WhatsApp
   const { data: userRow } = await db.from("users").select("phone").eq("email", email.toLowerCase()).single();

@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     const ip  = getClientIp(req);
     const key = `otp-verify:${ip}:${identifier}`;
 
-    if (isRateLimited(key)) {
+    if (await isRateLimited(key)) {
       return NextResponse.json(
         { error: "Too many verification attempts. Please request a new code and try again." },
         { status: 429, headers: { "Retry-After": "900" } }
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error || !data) {
-      recordFailure(key);
+      await recordFailure(key);
       return NextResponse.json({ error: "OTP not found. Please request a new one." }, { status: 400 });
     }
     if (data.verified) {
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "OTP expired. Please request a new one." }, { status: 400 });
     }
     if (data.code !== String(code).trim()) {
-      recordFailure(key);
+      await recordFailure(key);
       return NextResponse.json({ error: "Incorrect OTP. Please try again." }, { status: 400 });
     }
 

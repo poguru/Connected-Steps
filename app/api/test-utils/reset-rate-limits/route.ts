@@ -8,6 +8,6 @@ export async function DELETE() {
   if (process.env.NODE_ENV === "production") {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const cleared = clearRateLimitPrefix("");   // "" prefix = clear all keys
+  const cleared = await clearRateLimitPrefix("");   // "" prefix = clear all keys
   return NextResponse.json({ ok: true, cleared });
 }

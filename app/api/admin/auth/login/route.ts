@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     const ip  = getClientIp(req);
     const key = `coachlogin:${ip}`;
 
-    if (isRateLimited(key)) {
+    if (await isRateLimited(key)) {
       console.warn(`[rate-limit] BLOCKED IP=${ip} — exceeded ${MAX_FAILURES} failed coach-login attempts`);
       return NextResponse.json(
         { error: "Too many failed attempts. Try again in 15 minutes." },
@@ -34,14 +34,14 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (!user) {
-      const count = recordFailure(key);
+      const count = await recordFailure(key);
       console.warn(`[rate-limit] FAILED coach-login (unknown email) IP=${ip} attempt=${count}/${MAX_FAILURES}`);
       return NextResponse.json({ error: "No coach account found for this email." }, { status: 401 });
     }
 
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) {
-      const count = recordFailure(key);
+      const count = await recordFailure(key);
       console.warn(`[rate-limit] FAILED coach-login email=${user.email} IP=${ip} attempt=${count}/${MAX_FAILURES}`);
       return NextResponse.json({ error: "Incorrect password." }, { status: 401 });
     }

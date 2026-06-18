@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     // ── OTP verification rate limit ───────────────────────────────────────────
     const ip  = getClientIp(req);
     const key = `otp-verify:${ip}:${normalizedPhone}`;
-    if (isRateLimited(key)) {
+    if (await isRateLimited(key)) {
       return NextResponse.json(
         { error: "Too many verification attempts. Please request a new code and try again." },
         { status: 429, headers: { "Retry-After": "900" } }
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (otpErr || !otpRecord) {
-      recordFailure(key);
+      await recordFailure(key);
       return NextResponse.json({ error: "OTP not found. Please request a new code." }, { status: 400 });
     }
     if (otpRecord.verified) {
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "OTP expired. Please request a new one." }, { status: 400 });
     }
     if (otpRecord.code !== String(code).trim()) {
-      recordFailure(key);
+      await recordFailure(key);
       return NextResponse.json({ error: "Incorrect OTP. Please try again." }, { status: 400 });
     }
 

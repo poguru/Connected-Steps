@@ -1,24 +1,43 @@
 /**
- * Edge-compatible in-memory rate limiter.
- *
- * State lives in the module-level Map, which persists across requests
- * within a warm isolate (Vercel Edge Middleware or Node.js API route).
- * Cold starts reset the store — acceptable for this use case; the
- * alternative would require external KV storage.
+ * Supabase-backed rate limiter — state persists across cold starts and
+ * serverless function instances. Falls back to an in-process Map if
+ * Supabase is unreachable (fail-open: never block legitimate users due
+ * to an infra outage).
  *
  * Window: 15 minutes | Max failures before block: 5
  */
 
+import { getSupabaseServer } from "@/lib/supabase-server";
+
 export const WINDOW_MS    = 15 * 60 * 1000;  // 15 minutes
 export const MAX_FAILURES = 5;
 
+// ── In-process fallback ────────────────────────────────────────────────────
 interface Entry { failures: number; windowStart: number; }
-
-// Pin the store to globalThis so all Next.js route modules share the exact
-// same Map instance, even when Turbopack runs each route in its own context.
 declare global { var __rateLimitStore: Map<string, Entry> | undefined; }
-const store: Map<string, Entry> = globalThis.__rateLimitStore
+const fallback: Map<string, Entry> = globalThis.__rateLimitStore
   ?? (globalThis.__rateLimitStore = new Map<string, Entry>());
+
+function fbCheck(key: string, max: number, win: number): boolean {
+  const now = Date.now();
+  const e   = fallback.get(key);
+  if (!e) return false;
+  if (now - e.windowStart >= win) { fallback.delete(key); return false; }
+  return e.failures >= max;
+}
+
+function fbRecord(key: string, win: number): number {
+  const now = Date.now();
+  const e   = fallback.get(key);
+  if (!e || now - e.windowStart >= win) {
+    fallback.set(key, { failures: 1, windowStart: now });
+    return 1;
+  }
+  e.failures += 1;
+  return e.failures;
+}
+
+// ── Public API ─────────────────────────────────────────────────────────────
 
 /** Extract the real client IP from Vercel / reverse-proxy headers. */
 export function getClientIp(req: { headers: { get(name: string): string | null } }): string {
@@ -30,67 +49,80 @@ export function getClientIp(req: { headers: { get(name: string): string | null }
 }
 
 /**
- * Returns true if this key has exceeded MAX_FAILURES within the current
- * window and further requests should be blocked.
- * Expired entries are evicted lazily on read.
+ * Returns true if this key has exceeded maxFail failures within the
+ * current window and further requests should be blocked.
  */
-export function isRateLimited(key: string): boolean {
-  const now   = Date.now();
-  const entry = store.get(key);
-  if (!entry) return false;
-  if (now - entry.windowStart >= WINDOW_MS) {
-    store.delete(key);
-    return false;
+export async function isRateLimited(
+  key: string,
+  maxFail = MAX_FAILURES,
+  winMs   = WINDOW_MS,
+): Promise<boolean> {
+  try {
+    const db = getSupabaseServer();
+    const { data } = await db
+      .from("rate_limit_store")
+      .select("failures, window_start")
+      .eq("key", key)
+      .maybeSingle();
+    if (!data) return false;
+    const expired = Date.now() - new Date(data.window_start as string).getTime() >= winMs;
+    if (expired) return false;
+    return (data.failures as number) >= maxFail;
+  } catch {
+    return fbCheck(key, maxFail, winMs);
   }
-  return entry.failures >= MAX_FAILURES;
+}
+
+/**
+ * Records one failed attempt. Returns the updated failure count.
+ * Resets the window automatically if it has expired.
+ */
+export async function recordFailure(key: string, winMs = WINDOW_MS): Promise<number> {
+  try {
+    const db = getSupabaseServer();
+    const { data } = await db.rpc("record_rate_limit_failure", {
+      p_key:       key,
+      p_window_ms: winMs,
+    });
+    fbRecord(key, winMs); // mirror to in-process cache
+    return (data as number) ?? 1;
+  } catch {
+    return fbRecord(key, winMs);
+  }
+}
+
+/** Custom-window variant — used for phone OTP resend limiting. */
+export async function isRateLimitedCustom(
+  key:        string,
+  maxAllowed: number,
+  windowMs:   number,
+): Promise<boolean> {
+  return isRateLimited(key, maxAllowed, windowMs);
+}
+
+/** Custom-window variant — used for phone OTP resend limiting. */
+export async function recordFailureCustom(key: string, windowMs: number): Promise<number> {
+  return recordFailure(key, windowMs);
 }
 
 /**
  * Clears all rate-limit entries whose key starts with the given prefix.
- * Only intended for use in test/dev environments via the reset endpoint.
+ * Clears both the Supabase table and the in-process fallback cache.
+ * Used by the test-utils reset endpoint.
  */
-export function clearRateLimitPrefix(prefix: string): number {
+export async function clearRateLimitPrefix(prefix: string): Promise<number> {
   let cleared = 0;
-  for (const key of store.keys()) {
-    if (key.startsWith(prefix)) { store.delete(key); cleared++; }
+  for (const key of fallback.keys()) {
+    if (key.startsWith(prefix)) { fallback.delete(key); cleared++; }
   }
+  try {
+    const db = getSupabaseServer();
+    const { data } = await db
+      .from("rate_limit_store")
+      .delete()
+      .like("key", `${prefix}%`)
+      .select("key");
+    cleared = Math.max(cleared, (data ?? []).length);
+  } catch { /* ignore — best effort */ }
   return cleared;
-}
-
-/**
- * Records one failed attempt for this key.
- * Returns the updated failure count so callers can log "n / MAX_FAILURES".
- * Resets the window if the previous one has expired.
- */
-export function recordFailure(key: string): number {
-  const now   = Date.now();
-  const entry = store.get(key);
-  if (!entry || now - entry.windowStart >= WINDOW_MS) {
-    store.set(key, { failures: 1, windowStart: now });
-    return 1;
-  }
-  entry.failures += 1;
-  return entry.failures;
-}
-
-// ── Custom-window variants ─────────────────────────────────────────────────
-// Used for phone OTP resend limiting: max 3 sends per 60-minute window.
-
-export function isRateLimitedCustom(key: string, maxAllowed: number, windowMs: number): boolean {
-  const now   = Date.now();
-  const entry = store.get(key);
-  if (!entry) return false;
-  if (now - entry.windowStart >= windowMs) { store.delete(key); return false; }
-  return entry.failures >= maxAllowed;
-}
-
-export function recordFailureCustom(key: string, windowMs: number): number {
-  const now   = Date.now();
-  const entry = store.get(key);
-  if (!entry || now - entry.windowStart >= windowMs) {
-    store.set(key, { failures: 1, windowStart: now });
-    return 1;
-  }
-  entry.failures += 1;
-  return entry.failures;
 }
