@@ -5,8 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { App } from "@capacitor/app";
 import BottomNav from "@/components/mobile/BottomNav";
 
-// Back-twice-to-exit on these routes
-const EXIT_ROUTES = new Set(["/dashboard"]);
+// Back-twice-to-exit on these routes (top-level tabs with no "parent" screen)
+const EXIT_ROUTES = new Set(["/dashboard", "/events", "/community", "/leaderboard", "/profile"]);
 
 // Non-authed users are allowed on these routes without being redirected
 const PUBLIC_PREFIX = ["/", "/auth", "/pricing", "/events"];
