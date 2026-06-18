@@ -48,7 +48,8 @@ export default function MembershipCard({ email, name }: Props) {
 
   useEffect(() => {
     if (!email) return;
-    fetch(`/api/membership?email=${encodeURIComponent(email)}`)
+    const token = (typeof localStorage !== "undefined" ? localStorage.getItem("cs_user_token") : null) ?? "";
+    fetch(`/api/membership?email=${encodeURIComponent(email)}`, { headers: { "x-user-token": token } })
       .then((r) => r.json())
       .then((d) => setMembership(d.membership ?? null))
       .catch(() => setMembership(null));

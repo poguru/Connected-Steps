@@ -47,7 +47,8 @@ export default function Achievements() {
     let u: User;
     try { u = JSON.parse(stored); } catch { localStorage.removeItem("cs_user"); router.push("/auth"); return; }
     setUser(u);
-    fetch(`/api/user/achievements?email=${encodeURIComponent(u.email)}`)
+    const token = localStorage.getItem("cs_user_token") ?? "";
+    fetch("/api/user/achievements", { headers: { "x-user-token": token } })
       .then(r => r.json()).then(d => setServerData(d)).catch(() => {}).finally(() => setLoading(false));
   }, [router]);
 

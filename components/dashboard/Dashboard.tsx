@@ -371,7 +371,8 @@ export default function Dashboard() {
       try { setStrava(JSON.parse(storedStrava)); } catch { localStorage.removeItem("cs_strava"); }
     }
 
-    fetch(`/api/leaderboard/user?email=${encodeURIComponent(u.email)}`)
+    const userToken = localStorage.getItem("cs_user_token") ?? "";
+    fetch("/api/leaderboard/user", { headers: { "x-user-token": userToken } })
       .then((r) => r.json())
       .then((d) => { if (d.month_points !== undefined) setPoints(d); })
       .catch(() => {});
@@ -381,12 +382,12 @@ export default function Dashboard() {
       .then((d) => setUpcomingSessions(d.data ?? []))
       .catch(() => {});
 
-    fetch(`/api/user/joined-sessions?email=${encodeURIComponent(u.email)}`)
+    fetch("/api/user/joined-sessions", { headers: { "x-user-token": userToken } })
       .then((r) => r.json())
       .then((d) => { if (d.session_ids) setJoinedSessionIds(new Set(d.session_ids)); })
       .catch(() => {});
 
-    fetch(`/api/user/sessions?email=${encodeURIComponent(u.email)}`)
+    fetch("/api/user/sessions", { headers: { "x-user-token": userToken } })
       .then((r) => r.json())
       .then((d) => { setSessions(d.sessions ?? []); })
       .catch(() => {})
@@ -528,7 +529,8 @@ export default function Dashboard() {
           filter: `user_email=eq.${user.email}`,
         },
         () => {
-          fetch(`/api/user/sessions?email=${encodeURIComponent(user.email)}`)
+          const tok = localStorage.getItem("cs_user_token") ?? "";
+          fetch("/api/user/sessions", { headers: { "x-user-token": tok } })
             .then(r => r.json())
             .then(d => { if (d.sessions) setSessions(d.sessions); })
             .catch(() => {});

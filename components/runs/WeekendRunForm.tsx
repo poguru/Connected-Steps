@@ -92,7 +92,8 @@ export default function WeekendRunForm() {
         phone:      u.phone     ?? "",
       }));
 
-      fetch(`/api/membership?email=${encodeURIComponent(u.email)}`)
+      const memberToken = localStorage.getItem("cs_user_token") ?? "";
+      fetch(`/api/membership?email=${encodeURIComponent(u.email)}`, { headers: { "x-user-token": memberToken } })
         .then((r) => r.json())
         .then((d) => { if (d.membership?.isActive) setIsActiveMember(true); })
         .catch(() => {});

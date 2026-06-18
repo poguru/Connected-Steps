@@ -57,8 +57,9 @@ export default function MessagesPage() {
     }
   }, [router]);
 
-  const fetchConversations = useCallback(async (email: string) => {
-    const res = await fetch(`/api/messages/conversations?email=${encodeURIComponent(email)}`);
+  const fetchConversations = useCallback(async (_email: string) => {
+    const token = localStorage.getItem("cs_user_token") ?? "";
+    const res = await fetch("/api/messages/conversations", { headers: { "x-user-token": token } });
     const data = await res.json();
     return (data.conversations ?? []) as Conversation[];
   }, []);

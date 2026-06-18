@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { createNotification } from "@/lib/notify-inapp";
 import { autoFeedBadgeEarned } from "@/lib/auto-feed";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 const SESSION_BADGES = [
   { id: "first_session",  threshold: 1,  label: "First Session 🎯" },
@@ -18,8 +19,10 @@ const LEADERBOARD_BADGES = [
 ];
 
 export async function GET(req: NextRequest) {
-  const email = req.nextUrl.searchParams.get("email");
-  if (!email) return NextResponse.json({ error: "email required" }, { status: 400 });
+  const token = req.headers.get("x-user-token");
+  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const email = verifyUserToken(token);
+  if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const db  = getSupabaseServer();
   const key = email.toLowerCase();

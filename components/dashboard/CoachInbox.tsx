@@ -68,7 +68,10 @@ export default function CoachInbox() {
     setActiveConv(null);
     setMessages([]);
     try {
-      const res  = await fetch(`/api/messages/conversations?coach_email=${encodeURIComponent(activeCoach.email)}`);
+      const coachToken = (typeof localStorage !== "undefined" ? localStorage.getItem("cs_coach_token") : null) ?? "";
+      const res  = await fetch(`/api/messages/conversations?coach_email=${encodeURIComponent(activeCoach.email)}`, {
+        headers: { "x-coach-token": coachToken },
+      });
       const data = await res.json();
       setConvos(data.conversations ?? []);
     } finally {

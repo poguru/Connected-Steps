@@ -28,7 +28,8 @@ export default function PostSessionUpgradePrompt({ totalAttended, userEmail, fal
     if (totalAttended < 1) { setState("hidden"); return; }
 
     // Already a member — don't show
-    fetch(`/api/membership?email=${encodeURIComponent(userEmail)}`)
+    const token = localStorage.getItem("cs_user_token") ?? "";
+    fetch(`/api/membership?email=${encodeURIComponent(userEmail)}`, { headers: { "x-user-token": token } })
       .then(r => r.json())
       .then(d => { setState(d.membership?.isActive ? "hidden" : "show"); })
       .catch(() => setState("show")); // show on error — better to show than miss

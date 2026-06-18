@@ -50,11 +50,8 @@ export default function JoinClient({ id }: { id: string }) {
       return;
     }
 
-    const url = userEmail
-      ? `/api/sessions/${id}/join?email=${encodeURIComponent(userEmail)}`
-      : `/api/sessions/${id}/join`;
-
-    fetch(url)
+    const token = localStorage.getItem("cs_user_token") ?? "";
+    fetch(`/api/sessions/${id}/join`, { headers: { "x-user-token": token } })
       .then((r) => r.json())
       .then((d) => {
         if (d.session) {
@@ -71,10 +68,11 @@ export default function JoinClient({ id }: { id: string }) {
   const handleJoin = async () => {
     setSubmitting(true); setError("");
     try {
+      const token = localStorage.getItem("cs_user_token") ?? "";
       const res  = await fetch(`/api/sessions/${id}/join`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim() }),
+        headers: { "Content-Type": "application/json", "x-user-token": token },
+        body: JSON.stringify({}),
       });
       const data = await res.json();
       if (res.status === 410) { setResult("closed"); return; }
@@ -90,10 +88,11 @@ export default function JoinClient({ id }: { id: string }) {
   const handleLeave = async () => {
     setLeaving(true); setError("");
     try {
+      const token = localStorage.getItem("cs_user_token") ?? "";
       const res  = await fetch(`/api/sessions/${id}/join`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim() }),
+        headers: { "Content-Type": "application/json", "x-user-token": token },
+        body: JSON.stringify({}),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Something went wrong."); setConfirmLeave(false); return; }

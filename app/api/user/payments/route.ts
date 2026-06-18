@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 export async function GET(req: NextRequest) {
-  const email = req.nextUrl.searchParams.get("email");
-  if (!email) return NextResponse.json({ error: "email required" }, { status: 400 });
+  const token = req.headers.get("x-user-token");
+  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userEmail = verifyUserToken(token);
+  if (!userEmail) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const db  = getSupabaseServer();
-  const lc  = email.toLowerCase().trim();
+  const db = getSupabaseServer();
+  const lc = userEmail.toLowerCase();
 
   const [{ data: membership }, { data: runs }] = await Promise.all([
     db.from("memberships")
@@ -45,7 +48,6 @@ export async function GET(req: NextRequest) {
   }
 
   transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
   return NextResponse.json({ transactions });
 }
 

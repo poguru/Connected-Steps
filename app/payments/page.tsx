@@ -36,7 +36,8 @@ export default function PaymentHistoryPage() {
 
     if (!email) { router.replace("/auth?tab=signin&redirect=/payments"); return; }
 
-    fetch(`/api/user/payments?email=${encodeURIComponent(email)}`)
+    const token = localStorage.getItem("cs_user_token") ?? "";
+    fetch("/api/user/payments", { headers: { "x-user-token": token } })
       .then((r) => r.json())
       .then((d) => setTransactions(d.transactions ?? []))
       .catch(() => {})

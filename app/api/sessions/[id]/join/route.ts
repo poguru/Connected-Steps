@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireActiveUser } from "@/lib/active-user";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const email = req.nextUrl.searchParams.get("email");
   const db = getSupabaseServer();
 
   const { data: session } = await db
@@ -17,15 +17,20 @@ export async function GET(
     .single();
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
+  // Check join status only for authenticated users
   let already_joined = false;
-  if (email) {
-    const { data: existing } = await db
-      .from("session_attendance")
-      .select("id")
-      .eq("session_id", id)
-      .eq("user_email", email.toLowerCase().trim())
-      .single();
-    already_joined = !!existing;
+  const userToken = req.headers.get("x-user-token");
+  if (userToken) {
+    const userEmail = verifyUserToken(userToken);
+    if (userEmail) {
+      const { data: existing } = await db
+        .from("session_attendance")
+        .select("id")
+        .eq("session_id", id)
+        .eq("user_email", userEmail.toLowerCase())
+        .single();
+      already_joined = !!existing;
+    }
   }
 
   return NextResponse.json({ session, already_joined });
@@ -36,8 +41,12 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const { email } = await req.json();
-  if (!email) return NextResponse.json({ error: "Email is required." }, { status: 400 });
+
+  // Require authenticated user — email comes from token, not request body
+  const userToken = req.headers.get("x-user-token");
+  if (!userToken) return NextResponse.json({ error: "Please log in to join a session." }, { status: 401 });
+  const email = verifyUserToken(userToken);
+  if (!email) return NextResponse.json({ error: "Session expired — please log in again." }, { status: 401 });
 
   const blocked = await requireActiveUser(email);
   if (blocked) return blocked;
@@ -106,8 +115,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const { email } = await req.json();
-  if (!email) return NextResponse.json({ error: "Email is required." }, { status: 400 });
+
+  const userToken = req.headers.get("x-user-token");
+  if (!userToken) return NextResponse.json({ error: "Please log in to leave a session." }, { status: 401 });
+  const email = verifyUserToken(userToken);
+  if (!email) return NextResponse.json({ error: "Session expired — please log in again." }, { status: 401 });
 
   const blocked = await requireActiveUser(email);
   if (blocked) return blocked;

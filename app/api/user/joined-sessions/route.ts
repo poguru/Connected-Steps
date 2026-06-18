@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 export async function GET(req: NextRequest) {
-  const email = req.nextUrl.searchParams.get("email");
-  if (!email) return NextResponse.json({ error: "email required" }, { status: 400 });
+  const token = req.headers.get("x-user-token");
+  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const email = verifyUserToken(token);
+  if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const db = getSupabaseServer();
 

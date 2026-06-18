@@ -40,7 +40,8 @@ export default function MyQuestionsPage() {
 
     if (!email) { router.replace("/auth?tab=signin&redirect=/my-questions"); return; }
 
-    fetch(`/api/coach-questions?email=${encodeURIComponent(email)}`)
+    const token = localStorage.getItem("cs_user_token") ?? "";
+    fetch("/api/coach-questions", { headers: { "x-user-token": token } })
       .then((r) => r.json())
       .then((d) => setQuestions(d.questions ?? []))
       .catch(() => {})

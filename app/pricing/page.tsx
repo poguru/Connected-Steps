@@ -91,7 +91,8 @@ export default function PricingPage() {
       const u = JSON.parse(stored);
       setUserEmail(u.email);
       setUserName(`${u.firstName} ${u.lastName}`.trim());
-      fetch(`/api/membership?email=${encodeURIComponent(u.email)}`)
+      const pricingToken = localStorage.getItem("cs_user_token") ?? "";
+      fetch(`/api/membership?email=${encodeURIComponent(u.email)}`, { headers: { "x-user-token": pricingToken } })
         .then(r => r.json())
         .then(d => { if (d.membership?.isActive) setIsMember(true); })
         .catch(() => {});

@@ -96,9 +96,11 @@ export default function ProfilePage() {
     setCurrentPhone(u.phone ?? "");
 
     // Fetch stats
+    const tok = localStorage.getItem("cs_user_token") ?? "";
+    const authH = { "x-user-token": tok };
     Promise.all([
-      fetch(`/api/leaderboard/user?email=${encodeURIComponent(u.email)}`).then(r => r.json()).catch(() => ({})),
-      fetch(`/api/user/sessions?email=${encodeURIComponent(u.email)}`).then(r => r.json()).catch(() => ({})),
+      fetch("/api/leaderboard/user", { headers: authH }).then(r => r.json()).catch(() => ({})),
+      fetch("/api/user/sessions",    { headers: authH }).then(r => r.json()).catch(() => ({})),
       fetch("/api/leaderboard").then(r => r.json()).catch(() => ({})),
     ]).then(([lb, sess, board]) => {
       const totalPoints   = lb.total_points   ?? 0;
@@ -131,9 +133,10 @@ export default function ProfilePage() {
     setUser(updated);
     setPhoto(photoFile);
     setPhotoFile(null);
+    const tok = localStorage.getItem("cs_user_token") ?? "";
     await fetch("/api/user/update", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: user.email, photo: photoFile }),
+      method: "POST", headers: { "Content-Type": "application/json", "x-user-token": tok },
+      body: JSON.stringify({ photo: photoFile }),
     }).catch(() => {});
   }
 
@@ -142,9 +145,10 @@ export default function ProfilePage() {
     if (!info.firstName.trim() || !info.lastName.trim()) { setInfoError("Name is required."); return; }
     setInfoSaving(true); setInfoError(""); setInfoMsg("");
     try {
+      const tok  = localStorage.getItem("cs_user_token") ?? "";
       const res  = await fetch("/api/user/update", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: user.email, firstName: info.firstName, lastName: info.lastName, location: info.location, goal: info.goal }),
+        method: "POST", headers: { "Content-Type": "application/json", "x-user-token": tok },
+        body: JSON.stringify({ firstName: info.firstName, lastName: info.lastName, location: info.location, goal: info.goal }),
       });
       const data = await res.json();
       if (!res.ok) { setInfoError(data.error || "Failed to save."); return; }

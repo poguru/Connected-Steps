@@ -24,7 +24,8 @@ export default function CoachChatCard({ userEmail }: { userEmail: string }) {
   const [coach, setCoach] = useState<Coach | null>(null);
 
   useEffect(() => {
-    fetch(`/api/messages/conversations?email=${encodeURIComponent(userEmail)}`)
+    const token = (typeof localStorage !== "undefined" ? localStorage.getItem("cs_user_token") : null) ?? "";
+    fetch("/api/messages/conversations", { headers: { "x-user-token": token } })
       .then(r => r.json())
       .then(d => {
         const convs: Conversation[] = d.conversations ?? [];

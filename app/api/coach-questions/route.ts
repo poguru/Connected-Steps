@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 const ADMIN_EMAIL = process.env.ADMIN_NOTIFY_EMAIL ?? "info@connectedsteps.in";
 
@@ -32,21 +33,21 @@ async function notifyAdmin(p: { user_name: string; user_email: string; category:
   });
 }
 
-// GET /api/coach-questions — requires auth (401 for missing email/token)
+// GET /api/coach-questions — requires valid user token
 export async function GET(req: NextRequest) {
-  const email = new URL(req.url).searchParams.get("email");
+  const token = req.headers.get("x-user-token");
+  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const email = verifyUserToken(token);
   if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const db = getSupabaseServer();
 
-    let q = db
+    const { data, error } = await db
       .from("coach_questions")
       .select("id, user_email, user_name, category, question, answer, answered_at, status, created_at")
+      .eq("user_email", email.toLowerCase())
       .order("created_at", { ascending: false });
 
-    if (email) q = q.eq("user_email", email);
-
-    const { data, error } = await q;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ questions: data ?? [] });
   } catch (e: unknown) {
@@ -54,11 +55,16 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/coach-questions — requires active membership (403 for free users)
+// POST /api/coach-questions — requires valid user token + active membership
 export async function POST(req: NextRequest) {
+  const token = req.headers.get("x-user-token");
+  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const tokenEmail = verifyUserToken(token);
+  if (!tokenEmail) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const { user_email, user_name, category, question } = await req.json();
-    if (!user_email || !question?.trim()) {
+    const { user_name, category, question } = await req.json();
+    const user_email = tokenEmail.toLowerCase();
+    if (!question?.trim()) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
     }
 
@@ -68,7 +74,7 @@ export async function POST(req: NextRequest) {
     const { data: membership } = await db
       .from("memberships")
       .select("status, expires_at")
-      .eq("user_email", (user_email as string).toLowerCase())
+      .eq("user_email", user_email)
       .maybeSingle();
     const hasActiveMembership =
       membership?.status === "active" && new Date(membership.expires_at) > new Date();

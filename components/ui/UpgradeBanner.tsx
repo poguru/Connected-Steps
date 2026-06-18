@@ -24,7 +24,8 @@ export default function UpgradeBanner({ userEmail }: Props) {
     if (dismissed === new Date().toDateString()) return;
 
     // Don't show if already a member
-    fetch(`/api/membership?email=${encodeURIComponent(userEmail)}`)
+    const token = localStorage.getItem("cs_user_token") ?? "";
+    fetch(`/api/membership?email=${encodeURIComponent(userEmail)}`, { headers: { "x-user-token": token } })
       .then(r => r.json())
       .then(d => { if (!d.membership?.isActive) setShow(true); })
       .catch(() => {});

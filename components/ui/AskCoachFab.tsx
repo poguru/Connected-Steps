@@ -34,7 +34,8 @@ export default function AskCoachFab() {
   function loadHistory() {
     const user = getUser();
     if (!user?.email) return;
-    fetch(`/api/coach-questions?email=${encodeURIComponent(user.email)}`)
+    const token = (typeof localStorage !== "undefined" ? localStorage.getItem("cs_user_token") : null) ?? "";
+    fetch("/api/coach-questions", { headers: { "x-user-token": token } })
       .then((r) => r.json())
       .then((d) => { if (d.questions) setHistory(d.questions); })
       .catch(() => {});
@@ -50,14 +51,14 @@ export default function AskCoachFab() {
     try {
       const user = getUser();
       if (!user?.email) { setMsg("Please log in."); return; }
+      const token = (typeof localStorage !== "undefined" ? localStorage.getItem("cs_user_token") : null) ?? "";
       const res = await fetch("/api/coach-questions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-user-token": token },
         body: JSON.stringify({
-          user_email: user.email,
-          user_name:  `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email.split("@")[0],
-          category:   form.category,
-          question:   form.question.trim(),
+          user_name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email.split("@")[0],
+          category:  form.category,
+          question:  form.question.trim(),
         }),
       });
       const data = await res.json();
