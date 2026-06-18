@@ -169,66 +169,91 @@ export default function MessagesPage() {
     <div style={{ minHeight: "100dvh", background: "var(--background)", color: "var(--foreground)", display: "flex", flexDirection: "column", maxWidth: 680, margin: "0 auto" }}>
 
       {/* ── Header ── */}
-      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.85rem 1rem", borderBottom: "1px solid var(--border)", background: "var(--surface)", position: "sticky", top: 0, zIndex: 10, backdropFilter: "blur(12px)", paddingTop: "calc(0.85rem + env(safe-area-inset-top))" }}>
-        <button
-          onClick={() => router.back()}
-          aria-label="Go back"
-          style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted-foreground)", padding: "6px", borderRadius: 8, display: "flex", alignItems: "center", flexShrink: 0 }}
-        >
-          <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
+      <div style={{
+        position: "sticky", top: 0, zIndex: 10,
+        background: "var(--bg-glass)", backdropFilter: "blur(18px)",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        paddingTop: "env(safe-area-inset-top)",
+      }}>
+        {/* Top label bar */}
+        {!activeConv && (
+          <div style={{ padding: "1rem 1.25rem 0" }}>
+            <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--cs-orange)", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 2 }}>Messages</div>
+            <div style={{ fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.02em", paddingBottom: "0.875rem", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>Inbox</div>
+          </div>
+        )}
 
-        {coach ? (
-          <>
-            {coach.avatar_url ? (
-              <img src={coach.avatar_url} alt={coach.name} style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--cs-orange)", flexShrink: 0 }} />
+        {/* Coach thread header */}
+        {activeConv && (
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.85rem 1rem" }}>
+            <button
+              onClick={() => router.back()}
+              aria-label="Go back"
+              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted-foreground)", padding: "6px", borderRadius: 8, display: "flex", alignItems: "center", flexShrink: 0 }}
+            >
+              <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+
+            {coach ? (
+              <>
+                {coach.avatar_url ? (
+                  <img src={coach.avatar_url} alt={coach.name} style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--cs-orange)", flexShrink: 0 }} />
+                ) : (
+                  <div style={{ width: 38, height: 38, borderRadius: "50%", background: "oklch(0.72 0.19 49 / 15%)", border: "2px solid var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.82rem", fontWeight: 800, color: "var(--cs-orange)", flexShrink: 0 }}>
+                    {initials(coach.name)}
+                  </div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--foreground)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{coach.name}</div>
+                  <div style={{ fontSize: "0.7rem", color: "var(--cs-orange)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>{coach.specialization ?? "Running Coach"}</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+                  <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#4ade80" }} />
+                  <span style={{ fontSize: "11px", color: "#4ade80", fontWeight: 600 }}>Active</span>
+                </div>
+              </>
             ) : (
-              <div style={{ width: 38, height: 38, borderRadius: "50%", background: "oklch(0.72 0.19 49 / 15%)", border: "2px solid var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.82rem", fontWeight: 800, color: "var(--cs-orange)", flexShrink: 0 }}>
-                {initials(coach.name)}
-              </div>
+              <div style={{ fontSize: "1rem", fontWeight: 700, color: "var(--foreground)" }}>Chat with Your Coach</div>
             )}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--foreground)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{coach.name}</div>
-              <div style={{ fontSize: "0.7rem", color: "var(--cs-orange)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>{coach.specialization ?? "Running Coach"}</div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
-              <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#4ade80" }} />
-              <span style={{ fontSize: "11px", color: "#4ade80", fontWeight: 600 }}>Active</span>
-            </div>
-          </>
-        ) : (
-          <div style={{ fontSize: "1rem", fontWeight: 700, color: "var(--foreground)" }}>Chat with Your Coach</div>
+          </div>
         )}
       </div>
 
-      {/* ── No conversation: pick a coach ── */}
+      {/* ── No conversation: pick a coach (inbox style) ── */}
       {!activeConv && coaches.length > 0 && (
-        <div style={{ flex: 1, padding: "1.5rem 1rem" }}>
-          <p style={{ color: "var(--muted-foreground)", fontSize: "0.85rem", marginBottom: "1.25rem", lineHeight: 1.6 }}>
-            Choose a coach to start a conversation:
-          </p>
-          {coaches.map(c => (
-            <button
-              key={c.id}
-              onClick={() => startConversation(c)}
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: "0.875rem", padding: "0.9rem 1rem", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, cursor: "pointer", marginBottom: "0.75rem", textAlign: "left", fontFamily: "var(--font-body)", transition: "border-color 0.15s" }}
-            >
-              {c.avatar_url ? (
-                <img src={c.avatar_url} alt={c.name} style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--cs-orange)", flexShrink: 0 }} />
-              ) : (
-                <div style={{ width: 48, height: 48, borderRadius: "50%", background: "oklch(0.72 0.19 49 / 15%)", border: "2px solid var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem", fontWeight: 800, color: "var(--cs-orange)", flexShrink: 0 }}>
-                  {initials(c.name)}
+        <div style={{ flex: 1, padding: "1rem 1.25rem" }}>
+          <div style={{ fontSize: "10px", color: "var(--muted-foreground)", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.75rem" }}>Available Coaches</div>
+          <div style={{ background: "var(--surface)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, overflow: "hidden" }}>
+            {coaches.map((c, i) => (
+              <button
+                key={c.id}
+                onClick={() => startConversation(c)}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: "0.875rem", padding: "1rem 1.25rem", background: "transparent", border: "none", borderTop: i > 0 ? "1px solid rgba(255,255,255,0.05)" : "none", cursor: "pointer", textAlign: "left", fontFamily: "var(--font-body)", transition: "background 0.12s" }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+              >
+                <div style={{ position: "relative", flexShrink: 0 }}>
+                  {c.avatar_url ? (
+                    <img src={c.avatar_url} alt={c.name} style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--cs-orange)" }} />
+                  ) : (
+                    <div style={{ width: 48, height: 48, borderRadius: "50%", background: "oklch(0.72 0.19 49 / 15%)", border: "2px solid var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem", fontWeight: 800, color: "var(--cs-orange)" }}>
+                      {initials(c.name)}
+                    </div>
+                  )}
+                  <div style={{ position: "absolute", bottom: 1, right: 1, width: 10, height: 10, borderRadius: "50%", background: "#4ade80", border: "2px solid var(--background)" }} />
                 </div>
-              )}
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--foreground)" }}>{c.name}</div>
-                <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginTop: 2 }}>{c.specialization ?? "Running Coach"}</div>
-              </div>
-              <span style={{ color: "var(--cs-orange)", fontSize: "0.85rem", fontWeight: 700, flexShrink: 0 }}>Chat →</span>
-            </button>
-          ))}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--foreground)" }}>{c.name}</div>
+                  <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginTop: 2 }}>{c.specialization ?? "Running Coach"}</div>
+                </div>
+                <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--cs-orange)", background: "rgba(232,98,10,0.1)", border: "1px solid rgba(232,98,10,0.2)", padding: "4px 10px", borderRadius: 999, flexShrink: 0 }}>
+                  Start Chat
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

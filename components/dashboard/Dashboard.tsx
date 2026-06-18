@@ -864,14 +864,18 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Rate Your Coach */}
-          <RateCoachWidget
-            userEmail={user.email}
-            hasAttended={sessionsLoading ? null : sessions.some((r) => r.attended)}
-          />
+          {/* Rate Your Coach — desktop only to reduce mobile scroll */}
+          <div className="cs-desktop-only">
+            <RateCoachWidget
+              userEmail={user.email}
+              hasAttended={sessionsLoading ? null : sessions.some((r) => r.attended)}
+            />
+          </div>
 
-          {/* Membership */}
-          <MembershipCard email={user.email} name={`${user.firstName} ${user.lastName}`.trim()} />
+          {/* Membership — desktop only to reduce mobile scroll */}
+          <div className="cs-desktop-only">
+            <MembershipCard email={user.email} name={`${user.firstName} ${user.lastName}`.trim()} />
+          </div>
 
         </aside>
       </div>
