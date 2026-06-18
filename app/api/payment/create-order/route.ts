@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Razorpay from "razorpay";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { redeemCoupon } from "@/lib/coupon-redeem";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 function getRazorpay() {
   const key_id     = process.env.RAZORPAY_KEY_ID;
@@ -25,10 +26,13 @@ function applyDiscount(amount: number, type: string, value: number): number {
 }
 
 export async function POST(req: NextRequest) {
-  const { plan, email, coupon_id } = await req.json();
+  const email = verifyUserToken(req.headers.get("x-user-token") ?? "");
+  if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  if (!plan || !email || !PLAN_AMOUNTS[plan]) {
-    return NextResponse.json({ error: "Invalid plan or missing email" }, { status: 400 });
+  const { plan, coupon_id } = await req.json();
+
+  if (!plan || !PLAN_AMOUNTS[plan]) {
+    return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
   }
 
   const originalAmount = PLAN_AMOUNTS[plan];

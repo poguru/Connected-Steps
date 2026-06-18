@@ -132,9 +132,10 @@ export default function PricingPage() {
     if (!userEmail) { router.push(`/auth?redirect=/pricing`); return; }
     setPaying(planId);
     try {
+      const userToken = localStorage.getItem("cs_user_token") ?? "";
       const orderRes = await fetch("/api/payment/create-order", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: planId, email: userEmail, coupon_id: couponData?.coupon_id ?? null }),
+        method: "POST", headers: { "Content-Type": "application/json", "x-user-token": userToken },
+        body: JSON.stringify({ plan: planId, coupon_id: couponData?.coupon_id ?? null }),
       });
       const order = await orderRes.json();
       if (!orderRes.ok) throw new Error(order.error ?? "Order creation failed");
