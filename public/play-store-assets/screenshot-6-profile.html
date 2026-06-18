@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<!-- SCREENSHOT 6: Profile  |  390×844 in Chrome DevTools -->
+<html lang="en"><head><meta charset="UTF-8"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:390px;height:844px;overflow:hidden;background:#0a0a0a;color:#e5e5e5;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;position:relative}
+.bar{background:rgba(10,10,10,0.92);padding:52px 20px 14px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:space-between}
+.bar-title{font-size:17px;font-weight:800;color:#fff}
+.gear{color:#444;font-size:18px}
+.profile-hero{padding:20px 20px 0;display:flex;flex-direction:column;align-items:center;text-align:center}
+.av-large{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#e8620a,#ff8c42);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:#fff;margin-bottom:10px;position:relative}
+.av-badge{position:absolute;bottom:-2px;right:-2px;width:24px;height:24px;background:#1c1c1c;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;border:2px solid #0a0a0a}
+.p-name{font-size:20px;font-weight:900;color:#fff;margin-bottom:2px}
+.p-handle{font-size:13px;color:#555;margin-bottom:6px}
+.mem-chip{display:inline-flex;align-items:center;gap:5px;background:rgba(232,98,10,0.1);border:1px solid rgba(232,98,10,0.25);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;color:#e8620a;margin-bottom:16px}
+.stats-strip{display:flex;border:1px solid rgba(255,255,255,0.07);border-radius:16px;background:#111;margin:0 16px;overflow:hidden}
+.stat{flex:1;padding:14px 8px;text-align:center;border-right:1px solid rgba(255,255,255,0.07)}
+.stat:last-child{border-right:none}
+.stat-val{font-size:20px;font-weight:900;color:#fff;line-height:1}
+.stat-val span{color:#e8620a}
+.stat-lbl{font-size:9px;color:#444;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;margin-top:4px}
+.badges-section{padding:16px}
+.sec-label{font-size:10px;color:#444;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:12px}
+.badges-row{display:flex;gap:10px;flex-wrap:wrap}
+.badge-item{display:flex;flex-direction:column;align-items:center;gap:5px}
+.badge-circle{width:52px;height:52px;border-radius:50%;background:rgba(232,98,10,0.12);border:2px solid rgba(232,98,10,0.3);display:flex;align-items:center;justify-content:center;font-size:22px}
+.badge-circle.locked{background:#1a1a1a;border-color:rgba(255,255,255,0.08);opacity:0.4}
+.badge-lbl{font-size:9px;color:#555;font-weight:600;text-align:center;max-width:52px}
+.badge-lbl.earned{color:#e8620a}
+.activity-section{padding:0 16px 100px}
+.act-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
+.act-icon{width:36px;height:36px;border-radius:10px;background:rgba(232,98,10,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.act-name{flex:1;font-size:13px;font-weight:600;color:#ccc}
+.act-meta{font-size:11px;color:#444;margin-top:2px}
+.act-pts{font-size:12px;font-weight:700;color:#e8620a}
+.nav{position:absolute;bottom:0;left:0;right:0;height:80px;background:rgba(10,10,10,0.95);border-top:1px solid rgba(255,255,255,0.06);display:flex;align-items:flex-start;justify-content:space-around;padding:10px 0 0}
+.nav-item{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;padding-top:4px}
+.nav-dot{width:4px;height:4px;border-radius:50%;background:#e8620a}
+.nav-lbl{font-size:9px;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:0.06em}
+.nav-lbl.active{color:#e8620a}
+</style></head><body>
+<div class="bar"><span class="bar-title">Profile</span><span class="gear">⚙</span></div>
+<div class="profile-hero">
+  <div class="av-large">RK<div class="av-badge">🏅</div></div>
+  <div class="p-name">Rajesh Kumar</div>
+  <div class="p-handle">rajesh.kumar@gmail.com</div>
+  <div class="mem-chip">⭐ Pro Member</div>
+</div>
+<div class="stats-strip">
+  <div class="stat"><div class="stat-val"><span>142</span></div><div class="stat-lbl">Points</div></div>
+  <div class="stat"><div class="stat-val">18</div><div class="stat-lbl">Sessions</div></div>
+  <div class="stat"><div class="stat-val"><span>#3</span></div><div class="stat-lbl">Rank</div></div>
+  <div class="stat"><div class="stat-val">4</div><div class="stat-lbl">Badges</div></div>
+</div>
+<div class="badges-section">
+  <div class="sec-label">Badges Earned</div>
+  <div class="badges-row">
+    <div class="badge-item"><div class="badge-circle">🎯</div><div class="badge-lbl earned">1 Session</div></div>
+    <div class="badge-item"><div class="badge-circle">🔥</div><div class="badge-lbl earned">5 Sessions</div></div>
+    <div class="badge-item"><div class="badge-circle">⚡</div><div class="badge-lbl earned">10 Sessions</div></div>
+    <div class="badge-item"><div class="badge-circle">🏅</div><div class="badge-lbl earned">25 Sessions</div></div>
+    <div class="badge-item"><div class="badge-circle locked">🏆</div><div class="badge-lbl">50 Sessions</div></div>
+    <div class="badge-item"><div class="badge-circle locked">💎</div><div class="badge-lbl">100 Sessions</div></div>
+  </div>
+</div>
+<div class="activity-section">
+  <div class="sec-label">Recent Activity</div>
+  <div class="act-row"><div class="act-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e8620a" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div><div class="act-name">Morning Long Run</div><div class="act-meta">Today · Attended</div></div><div class="act-pts">+10 pts</div></div>
+  <div class="act-row"><div class="act-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e8620a" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div><div class="act-name">Interval Training</div><div class="act-meta">Thu · Attended</div></div><div class="act-pts">+10 pts</div></div>
+  <div class="act-row"><div class="act-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e8620a" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div><div class="act-name">Easy Tempo Run</div><div class="act-meta">Tue · Attended</div></div><div class="act-pts">+10 pts</div></div>
+</div>
+<nav class="nav">
+  <div class="nav-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><div class="nav-lbl">Home</div></div>
+  <div class="nav-item"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#444" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><div class="nav-lbl">Sessions</div></div>
+  <div class="nav-item"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#444" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><div class="nav-lbl">Ranks</div></div>
+  <div class="nav-item"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#444" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><div class="nav-lbl">Community</div></div>
+  <div class="nav-item"><svg width="20" height="20" fill="#e8620a" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" fill="#e8620a"/><circle cx="12" cy="7" r="4" fill="#e8620a"/></svg><div class="nav-dot"></div><div class="nav-lbl active">Profile</div></div>
+</nav>
+</body></html>

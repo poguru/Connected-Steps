@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<!-- SCREENSHOT 8: Membership Pricing  |  390×844 in Chrome DevTools -->
+<html lang="en"><head><meta charset="UTF-8"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:390px;height:844px;overflow:hidden;background:#0a0a0a;color:#e5e5e5;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;position:relative}
+.bar{background:rgba(10,10,10,0.92);padding:52px 20px 14px;border-bottom:1px solid rgba(255,255,255,0.06);text-align:center}
+.bar-title{font-size:22px;font-weight:900;color:#fff;margin-bottom:4px}
+.bar-sub{font-size:13px;color:#555;line-height:1.4}
+.scroll{padding:14px 16px 20px;overflow:hidden;display:flex;flex-direction:column;gap:10px}
+.plan{border-radius:20px;padding:18px;position:relative;overflow:hidden}
+.plan-basic{background:#111;border:1px solid rgba(255,255,255,0.08)}
+.plan-pro{background:linear-gradient(135deg,#1a0d00,#2a1500);border:2px solid #e8620a}
+.plan-annual{background:#0f0f0f;border:1px solid rgba(255,255,255,0.1)}
+.popular-badge{position:absolute;top:0;right:0;background:#e8620a;color:#fff;font-size:9px;font-weight:800;padding:4px 12px;border-radius:0 18px 0 12px;text-transform:uppercase;letter-spacing:0.1em}
+.plan-name{font-size:12px;font-weight:700;color:#e8620a;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px}
+.plan-name-basic{color:#888}
+.plan-name-annual{color:#b0b8c8}
+.plan-price{display:flex;align-items:baseline;gap:4px;margin-bottom:4px}
+.price-val{font-size:32px;font-weight:900;color:#fff;line-height:1}
+.price-val span{font-size:18px;font-weight:700}
+.price-per{font-size:12px;color:#555;font-weight:600}
+.plan-save{font-size:11px;color:#22c55e;font-weight:700;margin-bottom:12px}
+.plan-desc{font-size:12px;color:#666;margin-bottom:12px;line-height:1.4}
+.features{display:flex;flex-direction:column;gap:7px;margin-bottom:14px}
+.feat{display:flex;align-items:center;gap:8px;font-size:12px;color:#ccc}
+.feat svg{flex-shrink:0}
+.feat.dim{color:#555}
+.feat.dim svg{opacity:0.3}
+.plan-btn{width:100%;border-radius:12px;padding:12px;font-size:14px;font-weight:800;text-align:center}
+.btn-pro{background:#e8620a;color:#fff;border:none}
+.btn-basic{background:transparent;color:#e8620a;border:2px solid rgba(232,98,10,0.4)}
+.btn-annual{background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.12)}
+.money-back{text-align:center;font-size:11px;color:#444;padding-top:8px;padding-bottom:4px}
+</style></head><body>
+<div class="bar">
+  <div class="bar-title">Get Membership</div>
+  <div class="bar-sub">Access all sessions, coaching & features</div>
+</div>
+<div class="scroll">
+  <!-- Monthly Pro (most popular) -->
+  <div class="plan plan-pro">
+    <div class="popular-badge">Most Popular</div>
+    <div class="plan-name">Monthly</div>
+    <div class="plan-price"><div class="price-val"><span>₹</span>999</div><div class="price-per">/month</div></div>
+    <div class="plan-desc">Perfect for active runners. Full access, cancel any time.</div>
+    <div class="features">
+      <div class="feat"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e8620a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Unlimited group sessions</div>
+      <div class="feat"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e8620a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Direct coach messaging</div>
+      <div class="feat"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e8620a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Points & leaderboard</div>
+      <div class="feat"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e8620a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Event priority registration</div>
+    </div>
+    <div class="plan-btn btn-pro">Get Monthly Plan</div>
+  </div>
+  <!-- Annual -->
+  <div class="plan plan-annual">
+    <div class="plan-name plan-name-annual">Annual · Best Value</div>
+    <div class="plan-price"><div class="price-val"><span>₹</span>799</div><div class="price-per">/month</div></div>
+    <div class="plan-save">Save ₹2,400 vs monthly</div>
+    <div class="features">
+      <div class="feat"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e8620a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Everything in Monthly</div>
+      <div class="feat"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e8620a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>2 months free</div>
+      <div class="feat"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e8620a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Exclusive annual badge</div>
+    </div>
+    <div class="plan-btn btn-annual">Get Annual Plan  ₹9,588/yr</div>
+  </div>
+  <!-- Basic -->
+  <div class="plan plan-basic">
+    <div class="plan-name plan-name-basic">Free</div>
+    <div class="plan-price"><div class="price-val"><span>₹</span>0</div><div class="price-per">/forever</div></div>
+    <div class="features">
+      <div class="feat"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e8620a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>View sessions & feed</div>
+      <div class="feat"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span style="color:#444">Attend sessions</span></div>
+      <div class="feat"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span style="color:#444">Coach access</span></div>
+    </div>
+    <div class="plan-btn btn-basic">Continue Free</div>
+  </div>
+  <div class="money-back">🔒 Secure payment via Razorpay · Cancel any time</div>
+</div>
+</body></html>

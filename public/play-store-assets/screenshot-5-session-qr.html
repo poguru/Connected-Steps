@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<!-- SCREENSHOT 5: Session / QR Scan  |  390×844 in Chrome DevTools -->
+<html lang="en"><head><meta charset="UTF-8"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:390px;height:844px;overflow:hidden;background:#0a0a0a;color:#e5e5e5;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;position:relative}
+.bar{background:rgba(10,10,10,0.92);padding:52px 20px 14px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:space-between}
+.back-btn{color:#e8620a;font-size:20px;line-height:1}
+.bar-title{font-size:16px;font-weight:800;color:#fff}
+.bar-ph{width:24px}
+.scroll{padding:16px;overflow:hidden}
+.session-hero{background:linear-gradient(135deg,#1a0d00,#0f0700);border:1px solid rgba(232,98,10,0.2);border-radius:20px;padding:20px;margin-bottom:16px}
+.hero-label{font-size:10px;color:#e8620a;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px}
+.hero-title{font-size:22px;font-weight:900;color:#fff;margin-bottom:6px}
+.hero-meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.meta-chip{background:rgba(255,255,255,0.06);border-radius:8px;padding:5px 10px;font-size:11px;color:#888;display:flex;align-items:center;gap:5px}
+.meta-chip svg{color:#e8620a}
+.attendance-row{display:flex;align-items:center;gap:10px}
+.att-avatars{display:flex}
+.att-av{width:26px;height:26px;border-radius:50%;border:2px solid #1a0d00;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff;margin-right:-8px}
+.att-count{font-size:12px;color:#888;margin-left:14px}
+.att-count strong{color:#e8620a}
+.qr-section{background:#111;border:1px solid rgba(255,255,255,0.07);border-radius:20px;padding:20px;display:flex;flex-direction:column;align-items:center;gap:14px}
+.qr-label{font-size:12px;color:#888;text-align:center;line-height:1.4}
+.qr-box{width:170px;height:170px;background:#fff;border-radius:16px;padding:12px;display:flex;align-items:center;justify-content:center;position:relative}
+.qr-inner{width:100%;height:100%;display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(7,1fr);gap:1px}
+.q{background:#000;border-radius:1px}
+.q0{background:transparent}
+.qr-corner{position:absolute;width:40px;height:40px;border:4px solid #000;border-radius:6px}
+.qr-c1{top:12px;left:12px}
+.qr-c2{top:12px;right:12px}
+.qr-c3{bottom:12px;left:12px}
+.qr-c-inner{position:absolute;width:20px;height:20px;background:#000;border-radius:2px;top:50%;left:50%;transform:translate(-50%,-50%)}
+.scan-btn{width:100%;background:#e8620a;border:none;border-radius:14px;padding:15px;font-size:16px;font-weight:800;color:#fff;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer}
+.pts-note{font-size:12px;color:#555;text-align:center}
+.nav{position:absolute;bottom:0;left:0;right:0;height:80px;background:rgba(10,10,10,0.95);border-top:1px solid rgba(255,255,255,0.06);display:flex;align-items:flex-start;justify-content:space-around;padding:10px 0 0}
+.nav-item{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;padding-top:4px}
+.nav-lbl{font-size:9px;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:0.06em}
+</style></head><body>
+<div class="bar">
+  <span class="back-btn">‹</span>
+  <span class="bar-title">Session Details</span>
+  <span class="bar-ph"></span>
+</div>
+<div class="scroll">
+  <div class="session-hero">
+    <div class="hero-label">Upcoming · Sat, 21 Jun</div>
+    <div class="hero-title">Morning Long Run</div>
+    <div class="hero-meta">
+      <div class="meta-chip"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#e8620a" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>6:00 AM</div>
+      <div class="meta-chip"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#e8620a" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Kondapur</div>
+      <div class="meta-chip">🏃 10K Long Run</div>
+    </div>
+    <div class="attendance-row">
+      <div class="att-avatars">
+        <div class="att-av" style="background:linear-gradient(135deg,#e8620a,#ff8c42)">PM</div>
+        <div class="att-av" style="background:linear-gradient(135deg,#555,#888)">AS</div>
+        <div class="att-av" style="background:linear-gradient(135deg,#2a6,#4c9)">NK</div>
+        <div class="att-av" style="background:#333">+</div>
+      </div>
+      <div class="att-count"><strong>18</strong> runners registered</div>
+    </div>
+  </div>
+  <div class="qr-section">
+    <div class="qr-label">Scan this QR code at the session start to mark your attendance and earn points</div>
+    <div class="qr-box">
+      <!-- Simple QR-like pattern -->
+      <svg width="146" height="146" viewBox="0 0 146 146" fill="none">
+        <!-- Top-left finder -->
+        <rect x="0" y="0" width="42" height="42" rx="4" fill="black"/>
+        <rect x="6" y="6" width="30" height="30" rx="2" fill="white"/>
+        <rect x="12" y="12" width="18" height="18" rx="1" fill="black"/>
+        <!-- Top-right finder -->
+        <rect x="104" y="0" width="42" height="42" rx="4" fill="black"/>
+        <rect x="110" y="6" width="30" height="30" rx="2" fill="white"/>
+        <rect x="116" y="12" width="18" height="18" rx="1" fill="black"/>
+        <!-- Bottom-left finder -->
+        <rect x="0" y="104" width="42" height="42" rx="4" fill="black"/>
+        <rect x="6" y="110" width="30" height="30" rx="2" fill="white"/>
+        <rect x="12" y="116" width="18" height="18" rx="1" fill="black"/>
+        <!-- Data modules (stylised) -->
+        <rect x="50" y="4" width="8" height="8" rx="1" fill="black"/>
+        <rect x="62" y="4" width="8" height="8" rx="1" fill="black"/>
+        <rect x="74" y="4" width="8" height="8" rx="1" fill="black"/>
+        <rect x="86" y="4" width="8" height="8" rx="1" fill="black"/>
+        <rect x="50" y="16" width="8" height="8" rx="1" fill="black"/>
+        <rect x="74" y="16" width="8" height="8" rx="1" fill="black"/>
+        <rect x="86" y="16" width="8" height="8" rx="1" fill="black"/>
+        <rect x="50" y="28" width="8" height="8" rx="1" fill="black"/>
+        <rect x="62" y="28" width="8" height="8" rx="1" fill="black"/>
+        <rect x="86" y="28" width="8" height="8" rx="1" fill="black"/>
+        <rect x="4" y="50" width="8" height="8" rx="1" fill="black"/>
+        <rect x="16" y="50" width="8" height="8" rx="1" fill="black"/>
+        <rect x="28" y="50" width="8" height="8" rx="1" fill="black"/>
+        <rect x="50" y="50" width="8" height="8" rx="1" fill="black"/>
+        <rect x="62" y="50" width="8" height="8" rx="1" fill="black"/>
+        <rect x="74" y="50" width="8" height="8" rx="1" fill="black"/>
+        <rect x="98" y="50" width="8" height="8" rx="1" fill="black"/>
+        <rect x="110" y="50" width="8" height="8" rx="1" fill="black"/>
+        <rect x="134" y="50" width="8" height="8" rx="1" fill="black"/>
+        <rect x="4" y="62" width="8" height="8" rx="1" fill="black"/>
+        <rect x="28" y="62" width="8" height="8" rx="1" fill="black"/>
+        <rect x="50" y="62" width="8" height="8" rx="1" fill="black"/>
+        <rect x="74" y="62" width="8" height="8" rx="1" fill="black"/>
+        <rect x="98" y="62" width="8" height="8" rx="1" fill="black"/>
+        <rect x="122" y="62" width="8" height="8" rx="1" fill="black"/>
+        <rect x="4" y="74" width="8" height="8" rx="1" fill="black"/>
+        <rect x="16" y="74" width="8" height="8" rx="1" fill="black"/>
+        <rect x="38" y="74" width="8" height="8" rx="1" fill="black"/>
+        <rect x="62" y="74" width="8" height="8" rx="1" fill="black"/>
+        <rect x="86" y="74" width="8" height="8" rx="1" fill="black"/>
+        <rect x="110" y="74" width="8" height="8" rx="1" fill="black"/>
+        <rect x="134" y="74" width="8" height="8" rx="1" fill="black"/>
+        <rect x="50" y="98" width="8" height="8" rx="1" fill="black"/>
+        <rect x="74" y="98" width="8" height="8" rx="1" fill="black"/>
+        <rect x="98" y="98" width="8" height="8" rx="1" fill="black"/>
+        <rect x="122" y="98" width="8" height="8" rx="1" fill="black"/>
+        <rect x="50" y="110" width="8" height="8" rx="1" fill="black"/>
+        <rect x="62" y="110" width="8" height="8" rx="1" fill="black"/>
+        <rect x="86" y="110" width="8" height="8" rx="1" fill="black"/>
+        <rect x="110" y="110" width="8" height="8" rx="1" fill="black"/>
+        <rect x="134" y="110" width="8" height="8" rx="1" fill="black"/>
+        <rect x="50" y="122" width="8" height="8" rx="1" fill="black"/>
+        <rect x="74" y="122" width="8" height="8" rx="1" fill="black"/>
+        <rect x="98" y="122" width="8" height="8" rx="1" fill="black"/>
+        <rect x="122" y="122" width="8" height="8" rx="1" fill="black"/>
+      </svg>
+    </div>
+    <button class="scan-btn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+      Scan to Check In
+    </button>
+    <div class="pts-note">Earn 10 points for attending this session</div>
+  </div>
+</div>
+<nav class="nav">
+  <div class="nav-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><div class="nav-lbl">Home</div></div>
+  <div class="nav-item"><svg width="20" height="20" fill="#e8620a" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" fill="#e8620a"/><line x1="16" y1="2" x2="16" y2="6" stroke="white" stroke-width="2"/><line x1="8" y1="2" x2="8" y2="6" stroke="white" stroke-width="2"/><line x1="3" y1="10" x2="21" y2="10" stroke="white" stroke-width="2"/></svg><div class="nav-lbl" style="color:#e8620a">Sessions</div></div>
+  <div class="nav-item"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#444" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><div class="nav-lbl">Ranks</div></div>
+  <div class="nav-item"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#444" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><div class="nav-lbl">Community</div></div>
+  <div class="nav-item"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#444" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><div class="nav-lbl">Profile</div></div>
+</nav>
+</body></html>

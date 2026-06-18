@@ -115,11 +115,12 @@ Data can be deleted:       Yes (contact connected.steps2106@gmail.com)
 
 TEST ACCOUNT FOR GOOGLE REVIEW TEAM
 ──────────────────────────────────────
-Create a dedicated reviewer account before submitting:
-  Email:    reviewer@connectedsteps.in  (or any test email you control)
-  Password: (set a simple, memorable password)
-  Notes:    Account should have an active membership pre-activated
-            so the reviewer can see all features without purchasing.
+Account already created — use these credentials:
+  Email:    reviewer@connectedsteps.in
+  Password: ReviewCS2026!
+  Notes:    Account exists in production DB. Activate a free membership
+            for this account from the admin panel at /admin so the reviewer
+            can see all features without purchasing.
 Add these credentials in Play Console → App content → Test account.
 
 
