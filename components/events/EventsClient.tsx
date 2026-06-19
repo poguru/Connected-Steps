@@ -47,9 +47,11 @@ export default function EventsClient({ events }: { events: Event[] }) {
         position: "sticky", top: 0, zIndex: 40,
         background: "var(--bg-glass)", backdropFilter: "blur(18px)",
         borderBottom: "1px solid rgba(255,255,255,0.06)",
-        padding: "0 1.25rem", height: 56,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        paddingTop: "env(safe-area-inset-top)",
+        padding: "env(safe-area-inset-top) 1.25rem 0",
+        minHeight: "calc(56px + env(safe-area-inset-top))",
+        height: "calc(56px + env(safe-area-inset-top))",
+        display: "flex", alignItems: "flex-end", justifyContent: "space-between",
+        paddingBottom: "0.5rem",
       }}>
         <Link href="/dashboard" style={{ fontSize: "0.82rem", color: "var(--muted-foreground)", textDecoration: "none" }}>
           ← Back

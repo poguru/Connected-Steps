@@ -256,7 +256,7 @@ export default function Leaderboard() {
         activeLabel="Leaderboard"
       />
 
-      <div style={{ maxWidth: 860, margin: "0 auto", padding: `calc(var(--nav-total) + 1.5rem) 1.5rem ${showStickyRank ? "6rem" : "3rem"}` }}>
+      <div style={{ maxWidth: 860, margin: "0 auto", padding: `var(--page-top-pad) 1.5rem ${showStickyRank ? "6rem" : "var(--page-bottom-pad)"}` }}>
 
         {/* ── Header ── */}
         <div style={{ marginBottom: "1.25rem" }}>

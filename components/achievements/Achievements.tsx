@@ -69,7 +69,7 @@ export default function Achievements() {
         activeLabel="Achievements"
       />
 
-      <div style={{ maxWidth: 860, margin: "0 auto", padding: "calc(var(--nav-total) + 1.5rem) 1.5rem 3rem" }}>
+      <div style={{ maxWidth: 860, margin: "0 auto", padding: "var(--page-top-pad) 1.5rem var(--page-bottom-pad)" }}>
 
         {/* ── Page header ── */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: "1.5rem", flexWrap: "wrap" }}>

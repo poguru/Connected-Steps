@@ -48,7 +48,7 @@ export default function FeedPageClient() {
         activeLabel="Feed"
       />
 
-      <div style={{ maxWidth: 640, margin: "0 auto", padding: "calc(var(--nav-total) + 1.25rem) 1rem 4rem" }}>
+      <div style={{ maxWidth: 640, margin: "0 auto", padding: "var(--page-top-pad) 1rem var(--page-bottom-pad)" }}>
 
         {/* ── Header ── */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.25rem" }}>

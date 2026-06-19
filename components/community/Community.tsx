@@ -131,7 +131,7 @@ export default function Community() {
     <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)" }}>
       <AppNav user={user as MenuUser} onUserUpdate={u => { setUser(u as User); localStorage.setItem("cs_user", JSON.stringify(u)); }} activeLabel="Community" />
 
-      <div style={{ maxWidth: 860, margin: "0 auto", padding: "calc(var(--nav-total) + 1.5rem) 1.5rem 3rem" }}>
+      <div style={{ maxWidth: 860, margin: "0 auto", padding: "var(--page-top-pad) 1.5rem var(--page-bottom-pad)" }}>
 
         {/* Header */}
         <div style={{ marginBottom: "1.25rem" }}>

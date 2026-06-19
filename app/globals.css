@@ -228,6 +228,7 @@ h1, h2, h3 {
   align-items: center;
   gap: 8px;
   padding: 12px 28px;
+  min-height: 44px;
   background: var(--gradient-accent);
   color: var(--cs-white);
   font-family: var(--font-body), sans-serif;
@@ -242,13 +243,14 @@ h1, h2, h3 {
   box-shadow: var(--shadow-orange);
 }
 .btn-primary:hover  { opacity: 0.9; transform: translateY(-1px); }
-.btn-primary:active { transform: scale(0.98); }
+.btn-primary:active { transform: scale(0.97); opacity: 0.85; }
 
 .btn-outline {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 11px 27px;
+  min-height: 44px;
   background: var(--surface);
   color: var(--cs-white);
   font-family: var(--font-body), sans-serif;
@@ -344,11 +346,11 @@ h1, h2, h3 {
   border-radius: var(--card-radius);
   padding: 1.25rem;
   transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.25), var(--shadow-md);
 }
 .card-dark:hover {
   border-color: oklch(0.72 0.19 49 / 30%);
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.35), var(--shadow-lg);
   transform: translateY(-2px);
 }
 
@@ -528,6 +530,32 @@ select.auth-input option {
 
   /* App nav — tighter padding */
   .cs-app-nav-inner { padding: 0 0.75rem; }
+}
+
+/* ─── Page body padding helpers ─────────────────────────────── */
+/* These vars let pages use correct top/bottom padding regardless of nav state.
+   In native mode AppNav is hidden, so --page-top-pad collapses to safe-area only. */
+:root {
+  --page-top-pad:    calc(var(--nav-total) + 1.5rem);
+  --page-bottom-pad: 3rem;
+}
+.native-app {
+  --page-top-pad:    max(calc(env(safe-area-inset-top) + 1rem), 1.5rem);
+  --page-bottom-pad: calc(80px + env(safe-area-inset-bottom));
+}
+
+/* ─── Ultra-small screens (360px and below, e.g. Galaxy A01) ── */
+@media (max-width: 360px) {
+  .cs-bottom-tab-label { font-size: 9px; letter-spacing: 0; }
+  .cs-bottom-tab--active::before { width: 22px; }
+  .cs-stats-val { font-size: 0.95rem; }
+  .cs-stats-lbl { font-size: 8px; }
+  .cs-clean-card { padding: 1rem; border-radius: 12px; }
+  .cs-menu-row  { padding: 0.85rem 1rem; font-size: 0.85rem; }
+  .native-app .cs-dashboard-body {
+    padding-left:  max(0.625rem, env(safe-area-inset-left)) !important;
+    padding-right: max(0.625rem, env(safe-area-inset-right)) !important;
+  }
 }
 
 /* ─── Home Navbar ────────────────────────────────────── */
@@ -903,7 +931,10 @@ select.auth-input option {
 /* 4. Remove hover effects on touch — prevents sticky :hover states on mobile */
 @media (hover: none) {
   .btn-primary:hover  { opacity: 1; transform: none; }
+  .btn-outline:hover  { background: var(--surface); border-color: var(--border); }
   .cs-lb-row:hover    { background: transparent; }
+  .card-dark:hover    { transform: none; box-shadow: 0 2px 12px rgba(0,0,0,0.25), var(--shadow-md); }
+  .cs-clean-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.25); }
   a:hover, button:hover { opacity: 1; }
 }
 
@@ -932,25 +963,46 @@ select.auth-input option {
 
 .cs-bottom-tab {
   flex: 1;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
   text-decoration: none;
   color: oklch(0.55 0.008 250);
-  padding: 4px 0;
+  padding: 6px 0 4px;
   min-height: 44px;
-  transition: color 0.12s;
+  transition: color 0.18s ease;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Orange pill indicator at top of active tab */
+.cs-bottom-tab--active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 3px;
+  border-radius: 0 0 4px 4px;
+  background: oklch(0.72 0.19 49);
+  box-shadow: 0 0 8px oklch(0.72 0.19 49 / 60%);
 }
 
 .cs-bottom-tab--active {
   color: oklch(0.72 0.19 49); /* --cs-orange */
 }
 
+/* Subtle glow on active icon */
+.cs-bottom-tab--active svg {
+  filter: drop-shadow(0 1px 5px oklch(0.72 0.19 49 / 40%));
+}
+
 .cs-bottom-tab:active {
-  opacity: 0.65;
-  transition: opacity 0.05s;
+  opacity: 0.6;
+  transform: scale(0.92);
+  transition: opacity 0.06s, transform 0.06s;
 }
 
 .cs-bottom-tab-label {
@@ -959,6 +1011,10 @@ select.auth-input option {
   letter-spacing: 0.02em;
   font-family: var(--font-body), sans-serif;
   line-height: 1;
+}
+
+.cs-bottom-tab--active .cs-bottom-tab-label {
+  font-weight: 700;
 }
 
 /* ─── Messages page ──────────────────────────────────── */
@@ -1018,7 +1074,9 @@ select.auth-input option {
   background: var(--surface);
   border-radius: 16px;
   padding: 1.25rem;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+  transition: box-shadow 0.2s;
 }
 
 /* Menu list container (profile, settings) */
@@ -1026,7 +1084,8 @@ select.auth-input option {
   background: var(--surface);
   border-radius: 16px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.25);
 }
 
 /* Menu row inside cs-menu-card */
@@ -1035,6 +1094,7 @@ select.auth-input option {
   align-items: center;
   gap: 0.875rem;
   padding: 1rem 1.25rem;
+  min-height: 52px;
   color: var(--foreground);
   text-decoration: none;
   transition: background 0.12s;
