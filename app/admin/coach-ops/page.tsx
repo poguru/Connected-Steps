@@ -212,6 +212,13 @@ export default function CoachOpsDashboard() {
     setTemplates(data.templates ?? []);
   }, []);
 
+  // Auto-load on mount — admin layout already verified the session cookie
+  useEffect(() => {
+    loadAthletes("");
+    loadCohorts("");
+    loadTemplates("");
+  }, [loadAthletes, loadCohorts, loadTemplates]);
+
   function onAuth(password: string) {
     setPw(password);
     setAuthed(true);
