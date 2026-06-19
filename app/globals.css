@@ -623,8 +623,8 @@ select.auth-input option {
 
 /* Dashboard section ordering — desktop default (grid handles layout) */
 .cs-db-left  { order: 0; }
-.cs-db-main  { order: 0; }
-.cs-db-right { order: 0; }
+.cs-db-main  { order: 0; min-width: 0; }  /* min-width:0 prevents grid track expansion beyond 1fr */
+.cs-db-right { order: 0; min-width: 0; }
 
 /* Admin sessions 2-panel layout */
 .admin-sessions-wrap  { display: flex; flex: 1; overflow: hidden; }
@@ -1077,6 +1077,12 @@ select.auth-input option {
   border: 1px solid rgba(255, 255, 255, 0.07);
   box-shadow: 0 2px 12px rgba(0,0,0,0.25);
   transition: box-shadow 0.2s;
+  /* Prevent any child from bleeding outside the card boundary */
+  overflow: hidden;
+  /* Constrain the card to its grid/flex container width */
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Menu list container (profile, settings) */

@@ -141,7 +141,8 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
       {plan && (
         <div className="cs-clean-card" style={{ marginBottom: "0.625rem" }}>
           <div className="cs-label" style={{ marginBottom: 10 }}>Today&apos;s Workout</div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.875rem" }}>
+          {/* Row 1: icon + text info */}
+          <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", minWidth: 0 }}>
             <div style={{
               width: 46, height: 46, borderRadius: 12, flexShrink: 0,
               background: isRest ? "rgba(255,255,255,0.04)" : "oklch(0.72 0.19 49 / 10%)",
@@ -150,18 +151,19 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
             }}>
               {plan.emoji}
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--foreground)", lineHeight: 1.2 }}>{plan.type}</div>
-              <div style={{ fontSize: "0.78rem", color: "var(--muted-foreground)", marginTop: 3 }}>{plan.detail}</div>
+            <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+              <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--foreground)", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{plan.type}</div>
+              <div style={{ fontSize: "0.78rem", color: "var(--muted-foreground)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{plan.detail}</div>
             </div>
-            {!isRest && (
-              <button
-                onClick={() => router.push("/weekend-run")}
-                style={{ flexShrink: 0, padding: "9px 16px", background: "var(--gradient-accent)", color: "#fff", border: "none", borderRadius: 10, fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)", boxShadow: "var(--shadow-orange)", whiteSpace: "nowrap" }}>
-                Register →
-              </button>
-            )}
           </div>
+          {/* Row 2: CTA button — full width so it never overflows on any screen width */}
+          {!isRest && (
+            <button
+              onClick={() => router.push("/weekend-run")}
+              style={{ display: "block", width: "100%", marginTop: "0.75rem", padding: "10px", background: "var(--gradient-accent)", color: "#fff", border: "none", borderRadius: 10, fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)", boxShadow: "var(--shadow-orange)", textAlign: "center" }}>
+              Register for a Session →
+            </button>
+          )}
         </div>
       )}
 
@@ -175,11 +177,16 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
             ? "1px solid oklch(0.74 0.22 150 / 20%)"
             : "1px solid rgba(255,255,255,0.06)",
           marginBottom: "0.625rem",
+          minWidth: 0,
+          overflow: "hidden",
+          boxSizing: "border-box",
+          width: "100%",
         }}>
           <div className="cs-label" style={{ marginBottom: 10, color: joined ? "#4ade80" : "var(--cs-orange)" }}>
             {joined ? "Your Upcoming Session" : "Up Next"}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.875rem" }}>
+          {/* Row 1: icon + session title + date */}
+          <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", minWidth: 0 }}>
             <div style={{
               width: 46, height: 46, borderRadius: 12, flexShrink: 0,
               background: joined ? "oklch(0.74 0.22 150 / 8%)" : "rgba(255,255,255,0.04)",
@@ -196,29 +203,40 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
                 </svg>
               )}
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--foreground)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nextSess.title}</div>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {dayLabel(nextSess.date)}{fmtTime(nextSess.time)}{nextSess.venue ? ` · ${nextSess.venue}` : ""}
+            <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+              {/* Session title — truncates gracefully for any length name */}
+              <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--foreground)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {nextSess.title}
               </div>
+              {/* Date + time on one line */}
+              <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {dayLabel(nextSess.date)}{fmtTime(nextSess.time)}
+              </div>
+              {/* Venue on its own line so long names don't force overflow */}
+              {nextSess.venue && (
+                <div style={{ fontSize: "0.72rem", color: "var(--muted-foreground)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  📍 {nextSess.venue}
+                </div>
+              )}
             </div>
-            {joined ? (
-              <button
-                onClick={() => router.push("/scan")}
-                style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 5, padding: "9px 14px", background: "rgba(96,165,250,0.12)", color: "rgba(147,197,253,1)", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 10, fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)", whiteSpace: "nowrap" }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-                </svg>
-                Scan QR
-              </button>
-            ) : (
-              <button
-                onClick={() => router.push(`/join/${nextSess.id}`)}
-                style={{ flexShrink: 0, padding: "9px 16px", background: "var(--gradient-accent)", color: "#fff", border: "none", borderRadius: 10, fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)", boxShadow: "var(--shadow-orange)", whiteSpace: "nowrap" }}>
-                Join →
-              </button>
-            )}
           </div>
+          {/* Row 2: CTA button — full width so it is always fully visible */}
+          {joined ? (
+            <button
+              onClick={() => router.push("/scan")}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginTop: "0.75rem", padding: "10px", background: "rgba(96,165,250,0.12)", color: "rgba(147,197,253,1)", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 10, fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)", boxSizing: "border-box" }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+              </svg>
+              Scan QR to Mark Attendance
+            </button>
+          ) : (
+            <button
+              onClick={() => router.push(`/join/${nextSess.id}`)}
+              style={{ display: "block", width: "100%", marginTop: "0.75rem", padding: "10px", background: "var(--gradient-accent)", color: "#fff", border: "none", borderRadius: 10, fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)", boxShadow: "var(--shadow-orange)", textAlign: "center", boxSizing: "border-box" }}>
+              Join Session →
+            </button>
+          )}
         </div>
       )}
 
