@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
 
-const FREE_LIMIT = 3;
+const FREE_LIMIT = parseInt(process.env.FOOD_FREE_ANALYSES_LIMIT ?? "3", 10);
 
 export async function GET(req: NextRequest) {
   const token = req.headers.get("x-user-token");

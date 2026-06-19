@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
 
-const FREE_LIMIT = 3;
+const FREE_LIMIT = parseInt(process.env.FOOD_FREE_ANALYSES_LIMIT ?? "3", 10);
 
 const GOAL_CONTEXTS: Record<string, string> = {
   "5k":       "The user is training for a 5K run. Prioritise carbohydrate timing for energy, lean protein for muscle repair, and hydration.",
@@ -120,7 +120,7 @@ Rules:
         "x-api-key":         apiKey,
       },
       body: JSON.stringify({
-        model:      "claude-haiku-4-5-20251001",
+        model:      process.env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001",
         max_tokens: 1024,
         messages: [{
           role: "user",
@@ -137,8 +137,25 @@ Rules:
 
     if (!aiResponse.ok) {
       const errText = await aiResponse.text();
-      console.error("[food/analyze] Anthropic error:", aiResponse.status, errText);
-      return NextResponse.json({ error: "AI analysis failed" }, { status: 500 });
+      let anthropicType = "";
+      let anthropicMsg  = "";
+      try {
+        const j   = JSON.parse(errText) as { error?: { type?: string; message?: string } };
+        anthropicType = j?.error?.type    ?? "";
+        anthropicMsg  = j?.error?.message ?? "";
+      } catch { /* non-JSON error body */ }
+      console.error("[food/analyze] Anthropic error:", { status: aiResponse.status, type: anthropicType, message: anthropicMsg });
+
+      if (aiResponse.status === 401) {
+        return NextResponse.json({ error: "AI service key is invalid or expired. Please contact support." }, { status: 500 });
+      }
+      if (aiResponse.status === 429) {
+        return NextResponse.json({ error: "AI service is temporarily overloaded. Please try again in a few seconds." }, { status: 503 });
+      }
+      if (aiResponse.status === 400 || aiResponse.status === 404) {
+        return NextResponse.json({ error: "Unable to process this image. Please try a clearer, well-lit photo." }, { status: 422 });
+      }
+      return NextResponse.json({ error: `AI analysis unavailable (${aiResponse.status}). Please try again shortly.` }, { status: 502 });
     }
 
     const aiData = await aiResponse.json() as {
