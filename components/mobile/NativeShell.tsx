@@ -72,14 +72,23 @@ export default function NativeShell({ children }: { children: React.ReactNode })
     document.body.classList.add("native-app");
 
     // ── Session check: redirect on startup ─────────────────────────────────
-    const user = localStorage.getItem("cs_user");
-    const path = window.location.pathname;
+    const user      = localStorage.getItem("cs_user");
+    const hasCookie = document.cookie.split(";").some(c => c.trim().startsWith("cs_auth="));
+    const path      = window.location.pathname;
 
-    if (user) {
-      // Authenticated user landed on marketing or auth page → send to dashboard
+    if (user && hasCookie) {
+      // Authenticated — send to dashboard if on a public entry page
       if (path === "/" || path === "/auth" || path === "") {
         router.replace("/dashboard");
       }
+    } else if (user && !hasCookie) {
+      // localStorage present but session cookie is gone (expired or first deploy).
+      // Clear stale localStorage to avoid redirect loops with middleware, then
+      // send to auth so the user can log in and get a fresh cookie.
+      localStorage.removeItem("cs_user");
+      localStorage.removeItem("cs_user_token");
+      localStorage.removeItem("cs_strava");
+      if (path !== "/auth") router.replace("/auth");
     } else {
       // Unauthenticated → only allow public routes
       const isPublic = PUBLIC_PREFIX.some(p => path === p || path.startsWith(p + "/"));

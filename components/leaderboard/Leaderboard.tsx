@@ -78,6 +78,7 @@ export default function Leaderboard() {
   const [followingSet, setFollowingSet] = useState<Set<string>>(new Set());
   const [followBusy,   setFollowBusy]   = useState<Set<string>>(new Set());
   const [preview,      setPreview]      = useState<Entry | null>(null);
+  const [visibleCount, setVisibleCount] = useState(47); // 3 podium + 47 = 50 total visible
 
   const tabRef     = useRef(tab);
   const liveRef    = useRef(false);
@@ -134,7 +135,11 @@ export default function Leaderboard() {
       const key = ptsKey(tab);
       setEntries([...rawRef.current].sort((a, b) => (b[key] ?? 0) - (a[key] ?? 0)));
     }
+    setVisibleCount(47);
   }, [tab]);
+
+  // Reset visible count when filters change
+  useEffect(() => { setVisibleCount(47); }, [locFilter, goalFilter]);
 
   useEffect(() => {
     const supabase = getSupabaseSafe();
@@ -219,6 +224,8 @@ export default function Leaderboard() {
   const myEntry        = myIndex >= 0 ? filtered[myIndex] : null;
   const podium         = filtered.slice(0, 3);
   const rest           = filtered.slice(3);
+  const restVisible    = rest.slice(0, visibleCount);
+  const showLoadMore   = rest.length > visibleCount;
   const showStickyRank = myRank !== null && myRank > 10;
 
   function followBtn(email: string, compact = false) {
@@ -395,7 +402,7 @@ export default function Leaderboard() {
             {/* ── Rank list (4+) ── */}
             {rest.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginBottom: "1rem" }}>
-                {rest.map((r, i) => {
+                {restVisible.map((r, i) => {
                   const rank = ranks[i + 3];
                   const isMe = r.user_email === user.email;
 
@@ -432,6 +439,23 @@ export default function Leaderboard() {
                     </div>
                   );
                 })}
+
+                {showLoadMore && (
+                  <button
+                    onClick={() => setVisibleCount(c => c + 50)}
+                    style={{
+                      width: "100%", padding: "12px", marginTop: "0.25rem",
+                      background: "var(--surface)", border: "1px solid var(--border)",
+                      borderRadius: 12, color: "var(--muted-foreground)",
+                      fontSize: "0.82rem", fontWeight: 600, cursor: "pointer",
+                      fontFamily: "var(--font-body)", transition: "border-color 0.15s",
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--primary)"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)"; }}
+                  >
+                    Show {Math.min(50, rest.length - visibleCount)} more runners
+                  </button>
+                )}
               </div>
             )}
 

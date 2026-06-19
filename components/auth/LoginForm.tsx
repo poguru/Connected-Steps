@@ -71,6 +71,11 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
     localStorage.setItem("cs_user", JSON.stringify(userData));
     if (userToken)  localStorage.setItem("cs_user_token",   userToken  as string);
     if (coachToken) localStorage.setItem("cs_coach_token",  coachToken as string);
+    // Set auth cookie for server-side middleware route protection (90 days, matches token TTL)
+    if (userToken) {
+      const secure = window.location.protocol === "https:" ? "; Secure" : "";
+      document.cookie = `cs_auth=${userToken as string}; path=/; max-age=7776000; SameSite=Lax${secure}`;
+    }
     localStorage.removeItem("cs_requires_phone_verification");
     localStorage.removeItem("cs_pending_photo");
     const savedStrava = localStorage.getItem(`cs_strava_${user.email}`);

@@ -257,6 +257,7 @@ export default function ProfilePage() {
     localStorage.removeItem("cs_user");
     localStorage.removeItem("cs_user_token");
     localStorage.removeItem("cs_strava");
+    document.cookie = "cs_auth=; path=/; max-age=0; SameSite=Lax";
     router.replace("/auth");
   }
 

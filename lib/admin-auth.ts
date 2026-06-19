@@ -37,17 +37,25 @@ export const COOKIE_NAME = "cs_coach_session";
 
 // ── User token ────────────────────────────────────────────────────────────────
 
+const USER_TOKEN_TTL = 90 * 24 * 60 * 60; // 90 days in seconds
+
 export function signUserToken(email: string): string {
-  const hmac = crypto.createHmac("sha256", SECRET()).update(`user:${email.toLowerCase()}`).digest("hex");
-  return `${Buffer.from(email.toLowerCase()).toString("base64url")}.${hmac}`;
+  const exp     = Math.floor(Date.now() / 1000) + USER_TOKEN_TTL;
+  const payload = `user:${email.toLowerCase()}:${exp}`;
+  const hmac    = crypto.createHmac("sha256", SECRET()).update(payload).digest("hex");
+  return `${Buffer.from(email.toLowerCase()).toString("base64url")}.${exp}.${hmac}`;
 }
 
 export function verifyUserToken(token: string): string | null {
-  const [emailB64, hmac] = token.split(".");
-  if (!emailB64 || !hmac) return null;
+  const parts = token.split(".");
+  // Tokens must be 3-part (email.exp.hmac). Old 2-part tokens are rejected.
+  if (parts.length !== 3) return null;
+  const [emailB64, expStr, hmac] = parts;
   try {
     const email    = Buffer.from(emailB64, "base64url").toString("utf8");
-    const expected = crypto.createHmac("sha256", SECRET()).update(`user:${email}`).digest("hex");
+    const exp      = parseInt(expStr, 10);
+    if (!Number.isFinite(exp) || Math.floor(Date.now() / 1000) > exp) return null;
+    const expected = crypto.createHmac("sha256", SECRET()).update(`user:${email.toLowerCase()}:${exp}`).digest("hex");
     if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(hmac))) return null;
     return email;
   } catch {
