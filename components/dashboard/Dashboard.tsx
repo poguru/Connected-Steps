@@ -862,6 +862,23 @@ export default function Dashboard() {
 
           </div>{/* end cs-desktop-only: leaderboard + community */}
 
+          {/* AI Food Analyzer */}
+          <div
+            onClick={() => router.push("/food-analyzer")}
+            style={{ background: "var(--surface)", border: "1px solid rgba(232,98,10,0.2)", borderRadius: 14, padding: "0.9rem 1.1rem", marginBottom: "0.75rem", cursor: "pointer", boxShadow: "var(--shadow-md)", transition: "opacity 0.15s" }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = "0.82"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontSize: "10px", color: "var(--cs-orange)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 3 }}>✨ Premium Feature</div>
+                <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "var(--cs-white)", marginBottom: 2 }}>AI Food Analyzer</div>
+                <div style={{ fontSize: "0.72rem", color: "var(--cs-muted)" }}>Snap a meal → get macros &amp; goal tips</div>
+              </div>
+              <span style={{ fontSize: "1.4rem", flexShrink: 0 }}>🍽️</span>
+            </div>
+          </div>
+
           {/* Push Notifications (compact) */}
           {pushSupported && (
             <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "0.9rem 1.1rem", marginBottom: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", boxShadow: "var(--shadow-md)" }}>

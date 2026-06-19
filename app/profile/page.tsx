@@ -375,6 +375,11 @@ export default function ProfilePage() {
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
               </svg>
             )},
+            { label: "AI Food Analyzer ✨", href: "/food-analyzer", icon: (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/><path d="M12 8v4l3 3"/>
+              </svg>
+            )},
           ] as { label: string; href: string; icon: React.ReactNode }[]).map(item => (
             <Link key={item.href} href={item.href} className="cs-menu-row">
               <span style={{ width: 24, textAlign: "center", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted-foreground)" }}>{item.icon}</span>
