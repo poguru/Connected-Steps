@@ -15,6 +15,7 @@ interface Event {
   start_date: string; start_time: string | null;
   end_date: string | null; end_time: string | null;
   registration_closes_at: string | null;
+  distance_categories:    string[] | null;
   location: string; price: number; featured: boolean;
   max_participants: number | null; share_slug: string | null;
 }

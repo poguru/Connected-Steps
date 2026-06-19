@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { getEventLifecycleStatus, LIFECYCLE_LABEL, LIFECYCLE_COLOR, type EventLifecycleStatus } from "@/lib/event-status";
+import { DISTANCE_OPTIONS, getDistanceOption } from "@/lib/event-distances";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -18,6 +19,7 @@ interface Event {
   end_date:                string | null;
   end_time:                string | null;
   registration_closes_at:  string | null;
+  distance_categories:     string[];
   location:                string;
   organizer:               string | null;
   max_participants:         number | null;
@@ -101,6 +103,7 @@ export default function AdminEventsPage() {
     location: "", organizer: "", max_participants: "",
     registration_required: true, price: "0", featured: false,
     terms_conditions: "", maps_url: "",
+    distance_categories: [] as string[],
   };
   const [ef, setEf] = useState(blankEf);
 
@@ -166,6 +169,7 @@ export default function AdminEventsPage() {
       featured:               ef.featured,
       terms_conditions:       ef.terms_conditions || null,
       maps_url:               ef.maps_url || null,
+      distance_categories:    ef.distance_categories,
     };
     const res  = await fetch("/api/admin/events", { method: "POST", headers, body: JSON.stringify(body) });
     const json = await res.json();
@@ -361,6 +365,43 @@ export default function AdminEventsPage() {
                     </div>
                   </div>
 
+                  {/* ── Distance Categories ── */}
+                  <div style={{ gridColumn: "1/-1" }}>
+                    <div style={{ fontSize: "11px", color: "#e8620a", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.75rem", paddingTop: "0.25rem", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                      Distance Categories
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                      {DISTANCE_OPTIONS.map(opt => {
+                        const selected = ef.distance_categories.includes(opt.code);
+                        return (
+                          <button key={opt.code} type="button"
+                            onClick={() => setEf(f => ({
+                              ...f,
+                              distance_categories: selected
+                                ? f.distance_categories.filter(c => c !== opt.code)
+                                : [...f.distance_categories, opt.code],
+                            }))}
+                            style={{
+                              padding: "5px 14px", borderRadius: "20px", border: "1px solid",
+                              cursor: "pointer", fontSize: "0.78rem", fontWeight: 700, fontFamily: "inherit",
+                              transition: "all 0.15s",
+                              background: selected ? opt.bg : "transparent",
+                              borderColor: selected ? opt.border : "rgba(255,255,255,0.12)",
+                              color: selected ? opt.color : "#666",
+                            }}>
+                            {selected ? "✓ " : ""}{opt.code}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {ef.distance_categories.length > 0 && (
+                      <div style={{ fontSize: "11px", color: "#555", marginTop: "8px" }}>
+                        Selected: {ef.distance_categories.join(", ")}
+                        {ef.distance_categories.length > 1 ? " — users will pick one during registration" : ""}
+                      </div>
+                    )}
+                  </div>
+
                   {/* ── Rest of fields ── */}
                   <div>
                     <label style={S.label}>Organizer</label>
@@ -478,6 +519,14 @@ export default function AdminEventsPage() {
                           <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "12px", background: "rgba(255,255,255,0.05)", color: "#aaa" }}>
                             {TYPE_ICON[ev.event_type] ?? ""} {ev.event_type}
                           </span>
+                          {(ev.distance_categories ?? []).map(cat => {
+                            const d = getDistanceOption(cat);
+                            return (
+                              <span key={cat} style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "12px", background: d.bg, border: `1px solid ${d.border}`, color: d.color, fontWeight: 700 }}>
+                                {cat}
+                              </span>
+                            );
+                          })}
                         </div>
                         <div style={{ fontSize: "0.78rem", color: "#888", marginBottom: "2px" }}>
                           📅 {fmtDate(ev.start_date)}{ev.start_time ? ` · ${fmtTime(ev.start_time)}` : ""}

@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
     location, organizer, max_participants,
     registration_required,
     price, featured, terms_conditions, maps_url,
+    distance_categories,
   } = body;
 
   if (!title || !location || !start_date) {
@@ -74,6 +75,7 @@ export async function POST(req: NextRequest) {
       featured:               featured === true,
       terms_conditions:       terms_conditions || null,
       maps_url:               maps_url || null,
+      distance_categories:    Array.isArray(distance_categories) ? distance_categories : [],
       status:                 "draft",
       share_slug:             slug,
     })

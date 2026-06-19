@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { isTokenValid, handleAuthExpiry } from "@/lib/client-auth";
+import { getDistanceOption } from "@/lib/event-distances";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -11,6 +12,7 @@ interface EventInfo {
   id: string; title: string; event_type: string; start_date: string;
   start_time: string | null; location: string; price: number;
   max_participants: number | null; share_slug: string | null;
+  distance_categories: string[] | null;
 }
 
 interface StoredUser {
@@ -85,10 +87,11 @@ export default function RegisterPage() {
   });
   const [errors,        setErrors]        = useState<Record<string, string>>({});
   const [submitted,     setSubmitted]     = useState(false);
-  const [coupon,        setCoupon]        = useState("");
-  const [couponApplied, setCouponApplied] = useState<{ id: string; discount: number; label: string } | null>(null);
-  const [couponErr,     setCouponErr]     = useState("");
-  const [couponLoading, setCouponLoading] = useState(false);
+  const [coupon,           setCoupon]           = useState("");
+  const [couponApplied,    setCouponApplied]    = useState<{ id: string; discount: number; label: string } | null>(null);
+  const [couponErr,        setCouponErr]        = useState("");
+  const [couponLoading,    setCouponLoading]    = useState(false);
+  const [distanceCategory, setDistanceCategory] = useState("");
   const [submitting,    setSubmitting]    = useState(false);
   const [submitErr,     setSubmitErr]     = useState("");
   const [alreadyReg,    setAlreadyReg]    = useState<string | null>(null);
@@ -203,6 +206,14 @@ export default function RegisterPage() {
     if (!ev) return;
     setSubmitted(true);
     const errs = validate(form);
+    // Require category selection when event has multiple categories
+    const cats = ev.distance_categories ?? [];
+    if (cats.length > 1 && !distanceCategory) {
+      setSubmitErr("Please select a distance category.");
+      const el = document.getElementById("field-distance_category");
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     setErrors(errs);
     if (Object.keys(errs).length > 0) {
       const firstKey = Object.keys(errs)[0];
@@ -227,6 +238,7 @@ export default function RegisterPage() {
           emergency_contact: `${form.emergency_contact_name} / ${form.emergency_contact_phone}`,
           special_notes:     form.special_notes,
           coupon_code:       couponApplied ? coupon : undefined,
+          distance_category: distanceCategory || undefined,
         }),
       });
       const data = await res.json();
@@ -340,6 +352,44 @@ export default function RegisterPage() {
             </div>
           </div>
         </div>
+
+        {/* ── Distance category selector (multi-category events) ─────────── */}
+        {(ev.distance_categories ?? []).length > 0 && (
+          <div id="field-distance_category" style={{ marginBottom: "1.75rem" }}>
+            <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.875rem" }}>
+              Select Distance *
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+              {(ev.distance_categories ?? []).map(cat => {
+                const d   = getDistanceOption(cat);
+                const sel = distanceCategory === cat;
+                return (
+                  <button key={cat} type="button"
+                    onClick={() => { setDistanceCategory(cat); setSubmitErr(""); }}
+                    style={{
+                      padding: "10px 22px", borderRadius: "10px",
+                      border: `2px solid ${sel ? d.color : "rgba(255,255,255,0.12)"}`,
+                      cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
+                      background: sel ? d.bg : "transparent",
+                      color: sel ? d.color : "rgba(255,255,255,0.55)",
+                      fontWeight: sel ? 800 : 500, fontSize: "1rem",
+                      boxShadow: sel ? `0 0 0 1px ${d.border}` : "none",
+                    }}>
+                    {cat}
+                    <div style={{ fontSize: "11px", fontWeight: 400, opacity: 0.75, marginTop: "1px" }}>
+                      {getDistanceOption(cat).label !== cat ? getDistanceOption(cat).label : ""}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {(ev.distance_categories ?? []).length === 1 && !distanceCategory && (
+              <div style={{ fontSize: "11px", color: "#555", marginTop: "6px" }}>
+                Tap to confirm your category
+              </div>
+            )}
+          </div>
+        )}
 
         <h1 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1.75rem", color: "#fff" }}>Registration Form</h1>
 

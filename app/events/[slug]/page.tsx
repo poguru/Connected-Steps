@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import RegisterButton from "@/components/events/RegisterButton";
 import { getEventLifecycleStatus, LIFECYCLE_LABEL, LIFECYCLE_COLOR } from "@/lib/event-status";
+import { getDistanceOption } from "@/lib/event-distances";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -13,6 +14,7 @@ interface Event {
   start_date: string; start_time: string | null;
   end_date: string | null; end_time: string | null;
   registration_closes_at: string | null;
+  distance_categories:    string[] | null;
   location: string; organizer: string | null;
   max_participants: number | null; registration_required: boolean;
   price: number; featured: boolean;
@@ -150,6 +152,14 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
           <span style={{ fontSize: "10px", fontWeight: 700, color: lsCol.text, background: lsCol.bg, border: `1px solid ${lsCol.border}`, padding: "4px 10px", borderRadius: 999 }}>
             {LIFECYCLE_LABEL[ls].toUpperCase()}
           </span>
+          {(ev.distance_categories ?? []).map(cat => {
+            const d = getDistanceOption(cat);
+            return (
+              <span key={cat} style={{ fontSize: "10px", fontWeight: 700, color: d.color, background: d.bg, border: `1px solid ${d.border}`, padding: "4px 10px", borderRadius: 999 }}>
+                {cat}
+              </span>
+            );
+          })}
         </div>
 
         <h1 style={{ fontSize: "clamp(1.75rem, 5vw, 2.5rem)", fontWeight: 700, lineHeight: 1.15, marginBottom: "1.5rem", color: "#fff" }}>

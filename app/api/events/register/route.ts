@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
     const {
       event_id, email, name, phone, gender, date_of_birth,
       blood_group, emergency_contact, special_notes, coupon_code,
+      distance_category,
     } = await req.json();
 
     if (!event_id || !email || !name) {
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
     // ── Verify event ───────────────────────────────────────────────────────────
     const { data: ev } = await db
       .from("events")
-      .select("id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status")
+      .select("id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories")
       .eq("id", event_id)
       .single();
     if (!ev || ev.status !== "published") {
@@ -83,6 +84,16 @@ export async function POST(req: NextRequest) {
     if (endDate < today || (endDate === today && endTime <= nowTime)) {
       return NextResponse.json({ error: "This event has already ended." }, { status: 403 });
     }
+
+    // ── Distance category validation ──────────────────────────────────────────
+    const cats = (ev as { distance_categories?: string[] }).distance_categories ?? [];
+    if (cats.length > 1 && !distance_category) {
+      return NextResponse.json({ error: "Please select a distance category." }, { status: 400 });
+    }
+    if (distance_category && cats.length > 0 && !cats.includes(distance_category)) {
+      return NextResponse.json({ error: "Invalid distance category for this event." }, { status: 400 });
+    }
+    const chosenCategory: string | null = cats.length > 0 ? (distance_category || cats[0]) : null;
 
     // ── Atomic slot check — uses participant_count maintained by DB trigger ────
     // participant_count is incremented by the trigger on INSERT/UPDATE status='confirmed'.
@@ -175,6 +186,7 @@ export async function POST(req: NextRequest) {
           final_price:       finalPrice,
           payment_status:    "free",
           status:            "confirmed",
+          distance_category: chosenCategory,
         }, { onConflict: "event_id,user_email", ignoreDuplicates: false })
         .select("registration_code")
         .single();
@@ -214,6 +226,7 @@ export async function POST(req: NextRequest) {
         final_price:       finalPrice,
         payment_status:    "pending",
         status:            "pending_payment",
+        distance_category: chosenCategory,
       }, { onConflict: "event_id,user_email", ignoreDuplicates: false });
 
     if (regErr2) return NextResponse.json({ error: regErr2.message }, { status: 500 });

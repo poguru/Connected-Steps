@@ -15,7 +15,7 @@ export async function GET() {
   // Completed = end_date in the past, OR end_date is today and end_time has passed
   const { data, error } = await db
     .from("events")
-    .select("id, title, description, event_type, cover_image, start_date, start_time, end_date, end_time, registration_closes_at, location, organizer, price, share_slug, status")
+    .select("id, title, description, event_type, cover_image, start_date, start_time, end_date, end_time, registration_closes_at, location, organizer, price, share_slug, status, distance_categories")
     .eq("status", "published")
     .or(
       `end_date.lt.${today},` +

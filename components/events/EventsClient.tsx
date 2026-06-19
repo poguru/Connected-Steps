@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import MyEventRegistrations from "@/components/dashboard/MyEventRegistrations";
 import { getEventLifecycleStatus, LIFECYCLE_LABEL, LIFECYCLE_COLOR } from "@/lib/event-status";
+import { getDistanceOption } from "@/lib/event-distances";
 
 interface Event {
   id: string; title: string; description: string | null;
@@ -11,6 +12,7 @@ interface Event {
   start_date: string; start_time: string | null;
   end_date: string | null; end_time: string | null;
   registration_closes_at: string | null;
+  distance_categories:    string[] | null;
   location: string; price: number; featured: boolean;
   max_participants: number | null; share_slug: string | null;
 }
@@ -76,6 +78,15 @@ function EventCard({ ev }: { ev: Event }) {
                 {LIFECYCLE_LABEL[ls].toUpperCase()}
               </span>
             )}
+            {/* Distance badges */}
+            {(ev.distance_categories ?? []).map(cat => {
+              const d = getDistanceOption(cat);
+              return (
+                <span key={cat} style={{ fontSize: "10px", fontWeight: 700, color: d.color, background: d.bg, border: `1px solid ${d.border}`, padding: "1px 7px", borderRadius: 999 }}>
+                  {cat}
+                </span>
+              );
+            })}
           </div>
           <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--foreground)", lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.title}</div>
           <div style={{ fontSize: "0.73rem", color: "var(--muted-foreground)" }}>📅 {fmtDate(ev.start_date)}{ev.start_time ? ` · ${fmtTime(ev.start_time)}` : ""}</div>
@@ -203,10 +214,18 @@ export default function EventsClient({ events }: { events: Event[] }) {
                           ) : null;
                         })()}
                         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "1.25rem" }}>
-                          <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                          <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
                             <span style={{ fontSize: "10px", fontWeight: 700, color: t(featured.event_type).color, background: t(featured.event_type).bg, border: `1px solid ${t(featured.event_type).color}30`, padding: "2px 8px", borderRadius: 999 }}>
                               {t(featured.event_type).icon} {t(featured.event_type).label.toUpperCase()}
                             </span>
+                            {(featured.distance_categories ?? []).map(cat => {
+                              const d = getDistanceOption(cat);
+                              return (
+                                <span key={cat} style={{ fontSize: "10px", fontWeight: 700, color: d.color, background: d.bg, border: `1px solid ${d.border}`, padding: "2px 8px", borderRadius: 999 }}>
+                                  {cat}
+                                </span>
+                              );
+                            })}
                           </div>
                           <h2 style={{ fontSize: "clamp(1.2rem, 4vw, 1.75rem)", fontWeight: 800, color: "#fff", margin: "0 0 6px", lineHeight: 1.15 }}>{featured.title}</h2>
                           <div style={{ display: "flex", gap: "0.875rem", flexWrap: "wrap" }}>
