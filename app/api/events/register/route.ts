@@ -63,11 +63,25 @@ export async function POST(req: NextRequest) {
     // ── Verify event ───────────────────────────────────────────────────────────
     const { data: ev } = await db
       .from("events")
-      .select("id, title, price, max_participants, participant_count, start_date, start_time, location, status")
+      .select("id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status")
       .eq("id", event_id)
       .single();
     if (!ev || ev.status !== "published") {
       return NextResponse.json({ error: "Event not found." }, { status: 404 });
+    }
+
+    // ── Registration deadline enforcement (IST-aware) ──────────────────────────
+    if (ev.registration_closes_at && new Date() >= new Date(ev.registration_closes_at)) {
+      return NextResponse.json({ error: "Registration for this event is now closed." }, { status: 403 });
+    }
+    // Also block if event has already started or ended
+    const istNow  = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+    const today   = istNow.toISOString().split("T")[0];
+    const nowTime = istNow.toTimeString().substring(0, 5);
+    const endDate = ev.end_date ?? ev.start_date;
+    const endTime = (ev.end_time ?? "23:59").substring(0, 5);
+    if (endDate < today || (endDate === today && endTime <= nowTime)) {
+      return NextResponse.json({ error: "This event has already ended." }, { status: 403 });
     }
 
     // ── Atomic slot check — uses participant_count maintained by DB trigger ────

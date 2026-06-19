@@ -15,16 +15,17 @@ export async function GET() {
   // Completed = end_date in the past, OR end_date is today and end_time has passed
   const { data, error } = await db
     .from("events")
-    .select("id, title, description, event_type, cover_image, start_date, start_time, end_date, end_time, location, organizer, share_slug, status")
+    .select("id, title, description, event_type, cover_image, start_date, start_time, end_date, end_time, registration_closes_at, location, organizer, price, share_slug, status")
     .eq("status", "published")
     .or(
       `end_date.lt.${today},` +
-      `and(end_date.eq.${today},end_time.lte.${nowTime})`
+      `and(end_date.eq.${today},end_time.lte.${nowTime}),` +
+      // Events with no end_date whose start_date was yesterday or earlier
+      `and(end_date.is.null,start_date.lt.${today})`
     )
     .gte("start_date", cutoff)
-    .order("end_date", { ascending: false })
     .order("start_date", { ascending: false })
-    .limit(10);
+    .limit(20);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ events: data ?? [] });

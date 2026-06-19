@@ -1,35 +1,36 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { getEventLifecycleStatus, LIFECYCLE_LABEL, LIFECYCLE_COLOR, type EventLifecycleStatus } from "@/lib/event-status";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Event {
-  id:                    string;
-  title:                 string;
-  description:           string | null;
-  event_type:            string;
-  cover_image:           string | null;
-  start_date:            string;
-  start_time:            string | null;
-  end_date:              string | null;
-  end_time:              string | null;
-  registration_close_time: string | null;
-  location:              string;
-  organizer:             string | null;
-  max_participants:      number | null;
-  registration_required: boolean;
-  price:                 number;
-  featured:              boolean;
-  terms_conditions:      string | null;
-  maps_url:              string | null;
-  status:                string;
-  share_slug:            string | null;
-  view_count:            number;
-  share_count:           number;
-  created_at:            string;
+  id:                      string;
+  title:                   string;
+  description:             string | null;
+  event_type:              string;
+  cover_image:             string | null;
+  start_date:              string;
+  start_time:              string | null;
+  end_date:                string | null;
+  end_time:                string | null;
+  registration_closes_at:  string | null;
+  location:                string;
+  organizer:               string | null;
+  max_participants:         number | null;
+  registration_required:   boolean;
+  price:                   number;
+  featured:                boolean;
+  terms_conditions:        string | null;
+  maps_url:                string | null;
+  status:                  string;
+  share_slug:              string | null;
+  view_count:              number;
+  share_count:             number;
+  created_at:              string;
 }
 
 interface Coupon {
@@ -57,6 +58,27 @@ const S: Record<string, React.CSSProperties> = {
 const EVENT_TYPES = ["running", "cycling", "training", "race", "community", "workshop"];
 const TYPE_ICON: Record<string, string> = { running: "🏃", cycling: "🚴", training: "💪", race: "🏆", community: "🤝", workshop: "📚" };
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function fmtDate(d: string) {
+  if (!d) return "—";
+  return new Date(d + "T12:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+function fmtTime(t: string | null) {
+  if (!t) return null;
+  const [h, m] = t.split(":").map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+}
+function fmtDatetime(iso: string | null) {
+  if (!iso) return null;
+  return new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+// Convert a local IST date + time string into an ISO TIMESTAMPTZ string (UTC)
+function toIST_ISO(date: string, time: string): string {
+  return `${date}T${time}:00+05:30`;
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function AdminEventsPage() {
@@ -65,13 +87,21 @@ export default function AdminEventsPage() {
   const [authErr,  setAuthErr]  = useState("");
   const [tab,      setTab]      = useState<"events" | "coupons">("events");
 
-  const [events,  setEvents]  = useState<Event[]>([]);
-  const [coupons, setCoupons] = useState<Coupon[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [msg,     setMsg]     = useState("");
+  const [events,       setEvents]       = useState<Event[]>([]);
+  const [coupons,      setCoupons]      = useState<Coupon[]>([]);
+  const [loading,      setLoading]      = useState(false);
+  const [msg,          setMsg]          = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | EventLifecycleStatus>("all");
 
   // Event form
-  const blankEf = { title: "", description: "", event_type: "running", cover_image: "", start_date: "", start_time: "", end_date: "", end_time: "", registration_close_time: "", location: "", organizer: "", max_participants: "", registration_required: true, price: "0", featured: false, terms_conditions: "", maps_url: "" };
+  const blankEf = {
+    title: "", description: "", event_type: "running", cover_image: "",
+    start_date: "", start_time: "", end_date: "", end_time: "",
+    registration_close_date: "", registration_close_time: "",
+    location: "", organizer: "", max_participants: "",
+    registration_required: true, price: "0", featured: false,
+    terms_conditions: "", maps_url: "",
+  };
   const [ef, setEf] = useState(blankEf);
 
   // Coupon form
@@ -109,26 +139,35 @@ export default function AdminEventsPage() {
 
   async function createEvent(e: React.SyntheticEvent) {
     e.preventDefault(); setLoading(true); setMsg("");
+
+    // Build registration_closes_at from the two separate date+time inputs
+    let registration_closes_at: string | null = null;
+    if (ef.registration_close_date && ef.registration_close_time) {
+      registration_closes_at = toIST_ISO(ef.registration_close_date, ef.registration_close_time);
+    } else if (ef.registration_close_date) {
+      registration_closes_at = toIST_ISO(ef.registration_close_date, "23:59");
+    }
+
     const body = {
-      title:                ef.title,
-      description:          ef.description || null,
-      event_type:           ef.event_type,
-      cover_image:          ef.cover_image || null,
-      start_date:           ef.start_date,
-      start_time:           ef.start_time || null,
-      end_date:             ef.end_date || null,
-      end_time:             ef.end_time || null,
-      registration_close_time: ef.registration_close_time || null,
-      location:             ef.location,
-      organizer:            ef.organizer || null,
-      max_participants:     ef.max_participants ? Number(ef.max_participants) : null,
-      registration_required: ef.registration_required,
-      price:                Number(ef.price) || 0,
-      featured:             ef.featured,
-      terms_conditions:     ef.terms_conditions || null,
-      maps_url:             ef.maps_url || null,
+      title:                  ef.title,
+      description:            ef.description || null,
+      event_type:             ef.event_type,
+      cover_image:            ef.cover_image || null,
+      start_date:             ef.start_date,
+      start_time:             ef.start_time || null,
+      end_date:               ef.end_date || null,
+      end_time:               ef.end_time || null,
+      registration_closes_at,
+      location:               ef.location,
+      organizer:              ef.organizer || null,
+      max_participants:       ef.max_participants ? Number(ef.max_participants) : null,
+      registration_required:  ef.registration_required,
+      price:                  Number(ef.price) || 0,
+      featured:               ef.featured,
+      terms_conditions:       ef.terms_conditions || null,
+      maps_url:               ef.maps_url || null,
     };
-    const res = await fetch("/api/admin/events", { method: "POST", headers, body: JSON.stringify(body) });
+    const res  = await fetch("/api/admin/events", { method: "POST", headers, body: JSON.stringify(body) });
     const json = await res.json();
     if (!res.ok) { setMsg("❌ " + json.error); } else { setMsg("✅ Event created as draft!"); setEf(blankEf); await loadEvents(); }
     setLoading(false);
@@ -163,7 +202,7 @@ export default function AdminEventsPage() {
     };
     if (cf.type === "shared") { payload.code = cf.code; }
     else { payload.prefix = cf.prefix; payload.emails = cf.emails.split(/[\n,]+/).map(s => s.trim()).filter(Boolean); }
-    const res = await fetch("/api/admin/coupons", { method: "POST", headers, body: JSON.stringify(payload) });
+    const res  = await fetch("/api/admin/coupons", { method: "POST", headers, body: JSON.stringify(payload) });
     const json = await res.json();
     if (!res.ok) { setMsg("❌ " + json.error); }
     else {
@@ -179,17 +218,6 @@ export default function AdminEventsPage() {
     if (!confirm("Delete this coupon?")) return;
     await fetch("/api/admin/coupons", { method: "DELETE", headers, body: JSON.stringify({ id }) });
     loadCoupons();
-  }
-
-  function fmtDate(d: string) {
-    if (!d) return "—";
-    return new Date(d + "T12:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-  }
-
-  function fmtTime(t: string | null) {
-    if (!t) return null;
-    const [h, m] = t.split(":").map(Number);
-    return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
   }
 
   // ── Login screen ─────────────────────────────────────────────────────────────
@@ -214,6 +242,21 @@ export default function AdminEventsPage() {
       </div>
     </div>
   );
+
+  // ── Filter events by lifecycle status ────────────────────────────────────────
+
+  const filteredEvents = events.filter(ev => {
+    if (statusFilter === "all") return true;
+    return getEventLifecycleStatus(ev) === statusFilter;
+  });
+
+  const statusCounts = {
+    all:                  events.length,
+    UPCOMING:             events.filter(ev => getEventLifecycleStatus(ev) === "UPCOMING").length,
+    REGISTRATION_CLOSED:  events.filter(ev => getEventLifecycleStatus(ev) === "REGISTRATION_CLOSED").length,
+    ONGOING:              events.filter(ev => getEventLifecycleStatus(ev) === "ONGOING").length,
+    COMPLETED:            events.filter(ev => getEventLifecycleStatus(ev) === "COMPLETED").length,
+  };
 
   // ── Dashboard ─────────────────────────────────────────────────────────────────
 
@@ -274,32 +317,51 @@ export default function AdminEventsPage() {
                     <input style={S.input} value={ef.location} onChange={e => setEf(f => ({ ...f, location: e.target.value }))} placeholder="e.g. Kondapur, Hyderabad" required />
                   </div>
 
+                  {/* ── Event Start ── */}
                   <div>
-                    <label style={S.label}>Start Date *</label>
+                    <label style={S.label}>Event Start Date *</label>
                     <input style={{ ...S.input, colorScheme: "dark" }} type="date" value={ef.start_date} onChange={e => setEf(f => ({ ...f, start_date: e.target.value }))} required />
                   </div>
 
                   <div>
-                    <label style={S.label}>Start Time</label>
+                    <label style={S.label}>Event Start Time (IST)</label>
                     <input style={{ ...S.input, colorScheme: "dark" }} type="time" value={ef.start_time} onChange={e => setEf(f => ({ ...f, start_time: e.target.value }))} />
                   </div>
 
+                  {/* ── Event End ── */}
                   <div>
-                    <label style={S.label}>End Date</label>
+                    <label style={S.label}>Event End Date</label>
                     <input style={{ ...S.input, colorScheme: "dark" }} type="date" value={ef.end_date} onChange={e => setEf(f => ({ ...f, end_date: e.target.value }))} />
                   </div>
 
                   <div>
-                    <label style={S.label}>End Time</label>
+                    <label style={S.label}>Event End Time (IST)</label>
                     <input style={{ ...S.input, colorScheme: "dark" }} type="time" value={ef.end_time} onChange={e => setEf(f => ({ ...f, end_time: e.target.value }))} />
                   </div>
 
-                  <div>
-                    <label style={S.label}>Registration Closes At</label>
-                    <input style={{ ...S.input, colorScheme: "dark" }} type="time" value={ef.registration_close_time} onChange={e => setEf(f => ({ ...f, registration_close_time: e.target.value }))} />
-                    <div style={{ fontSize: "11px", color: "#555", marginTop: "4px" }}>Time on Start Date after which registration is no longer accepted</div>
+                  {/* ── Registration Close — two fields ── */}
+                  <div style={{ gridColumn: "1/-1" }}>
+                    <div style={{ fontSize: "11px", color: "#e8620a", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.75rem", paddingTop: "0.25rem", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                      Registration Deadline
+                    </div>
                   </div>
 
+                  <div>
+                    <label style={S.label}>Registration Closes — Date</label>
+                    <input style={{ ...S.input, colorScheme: "dark" }} type="date" value={ef.registration_close_date} onChange={e => setEf(f => ({ ...f, registration_close_date: e.target.value }))} />
+                  </div>
+
+                  <div>
+                    <label style={S.label}>Registration Closes — Time (IST)</label>
+                    <input style={{ ...S.input, colorScheme: "dark" }} type="time" value={ef.registration_close_time} onChange={e => setEf(f => ({ ...f, registration_close_time: e.target.value }))} />
+                    <div style={{ fontSize: "11px", color: "#555", marginTop: "4px" }}>
+                      {ef.registration_close_date && ef.registration_close_time
+                        ? `Closes: ${ef.registration_close_date} at ${fmtTime(ef.registration_close_time)} IST`
+                        : "Leave blank for no deadline"}
+                    </div>
+                  </div>
+
+                  {/* ── Rest of fields ── */}
                   <div>
                     <label style={S.label}>Organizer</label>
                     <input style={S.input} value={ef.organizer} onChange={e => setEf(f => ({ ...f, organizer: e.target.value }))} placeholder="e.g. Kalyan" />
@@ -363,53 +425,100 @@ export default function AdminEventsPage() {
               </form>
             </div>
 
-            {/* Events list */}
+            {/* Status filter */}
             <div>
-              <div style={{ fontSize: "11px", color: "#888", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1rem" }}>All Events ({events.length})</div>
-              {events.length === 0 ? (
-                <div style={{ ...S.card, textAlign: "center", color: "#555" }}>No events yet.</div>
-              ) : events.map(ev => (
-                <div key={ev.id} style={{ ...S.card, marginBottom: "1rem" }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
-                    {ev.cover_image && (
-                      <img src={ev.cover_image} alt="" style={{ width: "72px", height: "56px", objectFit: "cover", borderRadius: "6px", flexShrink: 0 }} />
-                    )}
-                    <div style={{ flex: 1, minWidth: "200px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px", flexWrap: "wrap" }}>
-                        <span style={{ fontSize: "0.95rem", fontWeight: 700, color: "#fff" }}>{ev.title}</span>
-                        <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "12px", background: ev.status === "published" ? "rgba(74,222,128,0.12)" : "rgba(255,255,255,0.06)", color: ev.status === "published" ? "#4ade80" : "#888", fontWeight: 700 }}>
-                          {ev.status === "published" ? "LIVE" : "DRAFT"}
-                        </span>
-                        <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "12px", background: "rgba(255,255,255,0.05)", color: "#aaa" }}>
-                          {TYPE_ICON[ev.event_type] ?? ""} {ev.event_type}
-                        </span>
+              <div style={{ fontSize: "11px", color: "#888", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>
+                Filter by Status
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: "1.25rem" }}>
+                {([
+                  { key: "all",                 label: `All (${statusCounts.all})` },
+                  { key: "UPCOMING",            label: `Upcoming (${statusCounts.UPCOMING})` },
+                  { key: "REGISTRATION_CLOSED", label: `Reg. Closed (${statusCounts.REGISTRATION_CLOSED})` },
+                  { key: "ONGOING",             label: `Ongoing (${statusCounts.ONGOING})` },
+                  { key: "COMPLETED",           label: `Completed (${statusCounts.COMPLETED})` },
+                ] as { key: string; label: string }[]).map(({ key, label }) => (
+                  <button key={key} onClick={() => setStatusFilter(key as typeof statusFilter)}
+                    style={{ padding: "6px 14px", borderRadius: "20px", border: "1px solid", cursor: "pointer", fontSize: "0.78rem", fontWeight: 600, fontFamily: "inherit", transition: "all 0.15s",
+                      background: statusFilter === key ? "#e8620a" : "transparent",
+                      borderColor: statusFilter === key ? "#e8620a" : "rgba(255,255,255,0.12)",
+                      color: statusFilter === key ? "#fff" : "#888" }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Events list */}
+              <div style={{ fontSize: "11px", color: "#888", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1rem" }}>
+                {filteredEvents.length} event{filteredEvents.length !== 1 ? "s" : ""}
+              </div>
+              {filteredEvents.length === 0 ? (
+                <div style={{ ...S.card, textAlign: "center", color: "#555" }}>No events in this category.</div>
+              ) : filteredEvents.map(ev => {
+                const ls    = getEventLifecycleStatus(ev);
+                const lsCol = LIFECYCLE_COLOR[ls];
+                const closeAt = fmtDatetime(ev.registration_closes_at);
+                return (
+                  <div key={ev.id} style={{ ...S.card, marginBottom: "1rem" }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
+                      {ev.cover_image && (
+                        <img src={ev.cover_image} alt="" style={{ width: "72px", height: "56px", objectFit: "cover", borderRadius: "6px", flexShrink: 0 }} />
+                      )}
+                      <div style={{ flex: 1, minWidth: "200px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: "0.95rem", fontWeight: 700, color: "#fff" }}>{ev.title}</span>
+                          {/* Publish status */}
+                          <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "12px", background: ev.status === "published" ? "rgba(74,222,128,0.12)" : "rgba(255,255,255,0.06)", color: ev.status === "published" ? "#4ade80" : "#888", fontWeight: 700 }}>
+                            {ev.status === "published" ? "LIVE" : "DRAFT"}
+                          </span>
+                          {/* Lifecycle status */}
+                          <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "12px", background: lsCol.bg, border: `1px solid ${lsCol.border}`, color: lsCol.text, fontWeight: 700 }}>
+                            {LIFECYCLE_LABEL[ls]}
+                          </span>
+                          <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "12px", background: "rgba(255,255,255,0.05)", color: "#aaa" }}>
+                            {TYPE_ICON[ev.event_type] ?? ""} {ev.event_type}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: "0.78rem", color: "#888", marginBottom: "2px" }}>
+                          📅 {fmtDate(ev.start_date)}{ev.start_time ? ` · ${fmtTime(ev.start_time)}` : ""}
+                          {ev.end_date ? ` → ${fmtDate(ev.end_date)}${ev.end_time ? ` ${fmtTime(ev.end_time)}` : ""}` : ""}
+                        </div>
+                        <div style={{ fontSize: "0.78rem", color: "#888", marginBottom: "2px" }}>📍 {ev.location}</div>
+                        {closeAt && (
+                          <div style={{ fontSize: "0.72rem", color: "#e8620a", marginBottom: "2px" }}>
+                            🔒 Reg. closes: {closeAt} IST
+                          </div>
+                        )}
+                        {ev.organizer && <div style={{ fontSize: "0.75rem", color: "#666" }}>Organizer: {ev.organizer}</div>}
+                        {ev.max_participants && <div style={{ fontSize: "0.75rem", color: "#666" }}>Max: {ev.max_participants} participants</div>}
+                        <div style={{ fontSize: "0.75rem", color: ev.price ? "#e8620a" : "#555" }}>
+                          {ev.price ? `₹${ev.price}` : "Free"}{ev.featured ? " · ★ Featured" : ""}
+                        </div>
+                        <div style={{ fontSize: "0.72rem", color: "#444", marginTop: "4px" }}>
+                          {ev.view_count} views · {ev.share_count} shares
+                          {ev.share_slug ? ` · /events/${ev.share_slug}` : ""}
+                        </div>
                       </div>
-                      <div style={{ fontSize: "0.78rem", color: "#888", marginBottom: "2px" }}>
-                        📅 {fmtDate(ev.start_date)}{ev.start_time ? ` · ${fmtTime(ev.start_time)}` : ""} · 📍 {ev.location}
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px", flexShrink: 0, alignItems: "flex-end" }}>
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <button onClick={() => togglePublish(ev)}
+                            style={{ padding: "7px 14px", borderRadius: "6px", border: "none", cursor: "pointer", fontSize: "0.78rem", fontWeight: 700, background: ev.status === "published" ? "rgba(74,222,128,0.12)" : "rgba(232,98,10,0.12)", color: ev.status === "published" ? "#4ade80" : "#e8620a" }}>
+                            {ev.status === "published" ? "Unpublish" : "Publish"}
+                          </button>
+                          <button onClick={() => deleteEvent(ev.id)}
+                            style={{ padding: "7px 12px", borderRadius: "6px", border: "1px solid rgba(226,75,74,0.3)", cursor: "pointer", fontSize: "0.78rem", background: "transparent", color: "#f09595" }}>
+                            Delete
+                          </button>
+                        </div>
+                        <Link href="/admin/events/registrations"
+                          style={{ fontSize: "0.72rem", color: "#888", textDecoration: "none", textAlign: "right" }}>
+                          View registrations →
+                        </Link>
                       </div>
-                      {ev.organizer && <div style={{ fontSize: "0.75rem", color: "#666" }}>Organizer: {ev.organizer}</div>}
-                      {ev.max_participants && <div style={{ fontSize: "0.75rem", color: "#666" }}>Max: {ev.max_participants} participants</div>}
-                      <div style={{ fontSize: "0.75rem", color: ev.price ? "#e8620a" : "#555" }}>
-                        {ev.price ? `₹${ev.price}` : "Free"}{ev.featured ? " · ★ Featured" : ""}
-                      </div>
-                      <div style={{ fontSize: "0.72rem", color: "#444", marginTop: "4px" }}>
-                        {ev.view_count} views · {ev.share_count} shares
-                        {ev.share_slug ? ` · /events/${ev.share_slug}` : ""}
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: "8px", flexShrink: 0, alignItems: "flex-start" }}>
-                      <button onClick={() => togglePublish(ev)}
-                        style={{ padding: "7px 14px", borderRadius: "6px", border: "none", cursor: "pointer", fontSize: "0.78rem", fontWeight: 700, background: ev.status === "published" ? "rgba(74,222,128,0.12)" : "rgba(232,98,10,0.12)", color: ev.status === "published" ? "#4ade80" : "#e8620a" }}>
-                        {ev.status === "published" ? "Unpublish" : "Publish"}
-                      </button>
-                      <button onClick={() => deleteEvent(ev.id)}
-                        style={{ padding: "7px 12px", borderRadius: "6px", border: "1px solid rgba(226,75,74,0.3)", cursor: "pointer", fontSize: "0.78rem", background: "transparent", color: "#f09595" }}>
-                        Delete
-                      </button>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

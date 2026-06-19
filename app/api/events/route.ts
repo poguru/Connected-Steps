@@ -13,7 +13,7 @@ export async function GET() {
 
   const { data, error } = await db
     .from("events")
-    .select("id, title, description, event_type, cover_image, start_date, start_time, end_date, end_time, registration_close_time, location, organizer, max_participants, participant_count, registration_required, price, featured, share_slug, view_count, share_count, status")
+    .select("id, title, description, event_type, cover_image, start_date, start_time, end_date, end_time, registration_closes_at, location, organizer, max_participants, participant_count, registration_required, price, featured, share_slug, view_count, share_count, status")
     .eq("status", "published")
     .or(
       `end_date.gt.${today},` +
