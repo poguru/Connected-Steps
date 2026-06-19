@@ -33,56 +33,37 @@ function fmtDate(iso: string) {
 }
 
 export default function CoachAssignmentsPage() {
-  const [pw,           setPw]          = useState("");
-  const [authed,       setAuthed]      = useState(false);
-  const [error,        setError]       = useState("");
-
   const [assignments,  setAssignments] = useState<Assignment[]>([]);
   const [coaches,      setCoaches]     = useState<Coach[]>([]);
   const [users,        setUsers]       = useState<User[]>([]);
-  const [loading,      setLoading]     = useState(false);
+  const [loading,      setLoading]     = useState(true);
   const [msg,          setMsg]         = useState("");
 
   // New assignment form
-  const [selUser,  setSelUser]  = useState("");
-  const [selCoach, setSelCoach] = useState("");
+  const [selUser,   setSelUser]   = useState("");
+  const [selCoach,  setSelCoach]  = useState("");
   const [assigning, setAssigning] = useState(false);
 
   // Search/filter
   const [search, setSearch] = useState("");
 
-  // ── Auth ──────────────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    const saved = sessionStorage.getItem("cs_admin_pw");
-    if (saved) { setPw(saved); setAuthed(true); }
-  }, []);
-
-  function login() {
-    fetch("/api/admin/coach-assignments", {
-      headers: { "x-admin-password": pw },
-    }).then(r => {
-      if (r.ok) { sessionStorage.setItem("cs_admin_pw", pw); setAuthed(true); load(pw); }
-      else setError("Wrong password");
-    });
-  }
-
   // ── Data ──────────────────────────────────────────────────────────────────
+  // Auth is handled by AdminLayout — cs_admin_session cookie sent automatically.
 
-  function load(password?: string) {
-    const p = password ?? pw;
+  function load() {
     setLoading(true);
-    fetch("/api/admin/coach-assignments", { headers: { "x-admin-password": p } })
+    fetch("/api/admin/coach-assignments")
       .then(r => r.json())
       .then(d => {
         setAssignments(d.assignments ?? []);
         setCoaches(d.coaches ?? []);
         setUsers(d.users ?? []);
-        setLoading(false);
-      });
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }
 
-  useEffect(() => { if (authed) load(); }, [authed]); // eslint-disable-line
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Assign ────────────────────────────────────────────────────────────────
 
@@ -92,7 +73,7 @@ export default function CoachAssignmentsPage() {
     setMsg("");
     const res = await fetch("/api/admin/coach-assignments", {
       method:  "POST",
-      headers: { "Content-Type": "application/json", "x-admin-password": pw },
+      headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ user_email: selUser, coach_id: selCoach }),
     });
     const data = await res.json();
@@ -113,7 +94,7 @@ export default function CoachAssignmentsPage() {
     setMsg("");
     const res = await fetch("/api/admin/coach-assignments", {
       method:  "DELETE",
-      headers: { "Content-Type": "application/json", "x-admin-password": pw },
+      headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ user_email, coach_id }),
     });
     if (res.ok) { setMsg("Assignment removed."); load(); }
@@ -122,7 +103,6 @@ export default function CoachAssignmentsPage() {
 
   // ── Derived ───────────────────────────────────────────────────────────────
 
-  // Group assignments by user
   const byUser = useMemo(() => {
     const map = new Map<string, Assignment[]>();
     for (const a of assignments) {
@@ -132,17 +112,16 @@ export default function CoachAssignmentsPage() {
     return map;
   }, [assignments]);
 
-  // Users who have NO assignment yet
   const unassignedUsers = useMemo(() => {
     return users.filter(u => !byUser.has(u.email));
   }, [users, byUser]);
 
-  // All users sorted: assigned first, then unassigned
   const allUserRows = useMemo(() => {
     const q = search.toLowerCase();
-    const assigned   = users.filter(u => byUser.has(u.email));
-    const unassigned = users.filter(u => !byUser.has(u.email));
-    const sorted     = [...assigned, ...unassigned];
+    const sorted = [
+      ...users.filter(u =>  byUser.has(u.email)),
+      ...users.filter(u => !byUser.has(u.email)),
+    ];
     if (!q) return sorted;
     return sorted.filter(u =>
       u.email.toLowerCase().includes(q) ||
@@ -151,7 +130,6 @@ export default function CoachAssignmentsPage() {
     );
   }, [users, byUser, search]);
 
-  // Non-admin coaches for the assignment dropdown
   const assignableCoaches = useMemo(() => coaches.filter(c => !c.is_admin), [coaches]);
 
   // ── Styles ────────────────────────────────────────────────────────────────
@@ -162,28 +140,11 @@ export default function CoachAssignmentsPage() {
   const select: React.CSSProperties = { ...input, cursor: "pointer" };
   const btn:    React.CSSProperties = { padding: "9px 20px", borderRadius: 8, background: "#e8620a", color: "#fff", border: "none", cursor: "pointer", fontWeight: 700, fontSize: "0.85rem", fontFamily: "inherit" };
 
-  // ── Login gate ────────────────────────────────────────────────────────────
-
-  if (!authed) {
-    return (
-      <div style={{ minHeight: "100vh", background: "#0d0d0d", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
-        <div style={{ ...card, width: "100%", maxWidth: 360 }}>
-          <div style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "1.5rem" }}>Coach Assignments — Admin</div>
-          <label style={label}>Admin Password</label>
-          <input type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === "Enter" && login()} style={{ ...input, marginBottom: "1rem" }} placeholder="••••••••" />
-          {error && <div style={{ color: "#f09595", fontSize: "0.8rem", marginBottom: "0.75rem" }}>{error}</div>}
-          <button onClick={login} style={{ ...btn, width: "100%" }}>Sign In</button>
-        </div>
-      </div>
-    );
-  }
-
   // ── Main UI ───────────────────────────────────────────────────────────────
 
   return (
     <div style={{ minHeight: "100vh", background: "#0d0d0d", color: "#fff", padding: "2rem 1.5rem" }}>
 
-      {/* Header */}
       <div style={{ maxWidth: 860, margin: "0 auto" }}>
         <div style={{ marginBottom: "1.75rem" }}>
           <div style={{ fontSize: "10px", color: "#e8620a", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700, marginBottom: 4 }}>Admin</div>
@@ -196,10 +157,10 @@ export default function CoachAssignmentsPage() {
         {/* Stats strip */}
         <div style={{ display: "flex", gap: 12, marginBottom: "1.75rem", flexWrap: "wrap" }}>
           {[
-            { label: "Total Users",      val: users.length },
-            { label: "Assigned",         val: byUser.size },
-            { label: "Unassigned",       val: unassignedUsers.length },
-            { label: "Active Coaches",   val: assignableCoaches.length },
+            { label: "Total Users",    val: users.length },
+            { label: "Assigned",       val: byUser.size },
+            { label: "Unassigned",     val: unassignedUsers.length },
+            { label: "Active Coaches", val: assignableCoaches.length },
           ].map(s => (
             <div key={s.label} style={{ background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "12px 18px", minWidth: 110 }}>
               <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "#e8620a", letterSpacing: "-0.5px" }}>{s.val}</div>
@@ -276,7 +237,6 @@ export default function CoachAssignmentsPage() {
                   const userAssignments = byUser.get(user.email) ?? [];
                   const fullName = `${user.first_name} ${user.last_name}`.trim() || user.email;
 
-                  // One row per assignment; if none, show unassigned row
                   if (userAssignments.length === 0) {
                     return (
                       <tr key={user.email} style={{ borderTop: i > 0 ? "1px solid rgba(255,255,255,0.04)" : "none", opacity: 0.55 }}>
@@ -349,7 +309,7 @@ export default function CoachAssignmentsPage() {
 
         <div style={{ marginTop: "1.25rem", fontSize: "0.75rem", color: "#555", lineHeight: 1.6 }}>
           <strong style={{ color: "#888" }}>Note:</strong> Admin and Training Team coaches are always visible to all users and do not need to be assigned.
-          Only non-admin coaches (Ashokan K, Durga Rao Vana, Achyuta Kumari Kolli) appear in this assignment list.
+          Only non-admin coaches appear in this assignment list.
         </div>
       </div>
     </div>

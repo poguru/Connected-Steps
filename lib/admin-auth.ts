@@ -101,11 +101,15 @@ export async function isAdminOrCoach(req: NextRequest): Promise<boolean> {
   const adminSession = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
   if (adminSession && verifyAdminSession(adminSession)) return true;
 
-  // 2. Raw admin password header (kept for backward compatibility / scripts)
+  // 2. Raw admin password header — legacy fallback, kept for Playwright tests and scripts.
+  //    Log every use so remaining callers can be identified and migrated to session cookies.
   const pw      = req.headers.get("x-admin-password");
   const adminPw = process.env.ADMIN_PASSWORD;
   if (pw && adminPw && pw.length === adminPw.length &&
-    crypto.timingSafeEqual(Buffer.from(pw), Buffer.from(adminPw))) return true;
+    crypto.timingSafeEqual(Buffer.from(pw), Buffer.from(adminPw))) {
+    console.warn(`[admin-auth] legacy x-admin-password used — route: ${req.nextUrl?.pathname ?? req.url}`);
+    return true;
+  }
 
   // 3. Coach token (mobile header or web cookie)
   const token = req.headers.get("x-coach-token") ?? req.cookies.get(COOKIE_NAME)?.value;
