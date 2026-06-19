@@ -5,6 +5,10 @@ import { verifyUserToken } from "@/lib/admin-auth";
 const FREE_LIMIT = parseInt(process.env.FOOD_FREE_ANALYSES_LIMIT ?? "3", 10);
 
 export async function GET(req: NextRequest) {
+  if (process.env.FOOD_ANALYZER_ENABLED !== "true") {
+    return NextResponse.json({ disabled: true, analyses: [], usage: { used: 0, limit: FREE_LIMIT, is_premium: false } });
+  }
+
   const token = req.headers.get("x-user-token");
   if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const userEmail = verifyUserToken(token);
@@ -45,6 +49,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  if (process.env.FOOD_ANALYZER_ENABLED !== "true") {
+    return NextResponse.json({ error: "AI Food Analyzer is coming soon.", code: "DISABLED" }, { status: 503 });
+  }
+
   const token = req.headers.get("x-user-token");
   if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const userEmail = verifyUserToken(token);

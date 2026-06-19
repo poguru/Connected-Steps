@@ -196,7 +196,8 @@ export default function FoodAnalyzerPage() {
   const [usage,      setUsage]      = useState<UsageInfo | null>(null);
   const [history,    setHistory]    = useState<HistoryItem[]>([]);
   const [histLoading,setHistLoading]= useState(false);
-  const [goal,       setGoal]       = useState("fitness");
+  const [goal,            setGoal]           = useState("fitness");
+  const [featureDisabled, setFeatureDisabled] = useState(false);
 
   // Load usage + goal from localStorage on mount
   useEffect(() => {
@@ -210,6 +211,7 @@ export default function FoodAnalyzerPage() {
     fetch("/api/food/history", { headers: { "x-user-token": tok } })
       .then(r => r.json())
       .then(d => {
+        if (d.disabled) { setFeatureDisabled(true); return; }
         if (d.usage)    setUsage(d.usage);
         if (d.analyses) setHistory(d.analyses);
       })
@@ -358,7 +360,23 @@ export default function FoodAnalyzerPage() {
 
       <div style={{ maxWidth: 540, margin: "0 auto", padding: "1.25rem 1.25rem 6rem" }}>
 
+        {/* ── Feature disabled: Coming Soon ── */}
+        {featureDisabled && (
+          <div style={{ textAlign: "center", padding: "4rem 1.5rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+            <div style={{ fontSize: "3rem" }}>🍽️</div>
+            <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--foreground)" }}>AI Food Analyzer</div>
+            <div style={{ fontSize: "0.85rem", color: "var(--cs-orange)", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>Coming Soon</div>
+            <div style={{ fontSize: "0.82rem", color: "var(--muted-foreground)", lineHeight: 1.7, maxWidth: 300 }}>
+              Snap a meal and instantly get macros, a health score, and personalised recommendations for your fitness goal.
+            </div>
+            <Link href="/dashboard" style={{ marginTop: "0.5rem", padding: "10px 22px", background: "var(--gradient-accent)", borderRadius: 10, color: "#fff", fontSize: "0.85rem", fontWeight: 700, textDecoration: "none", boxShadow: "var(--shadow-orange)" }}>
+              Back to Dashboard
+            </Link>
+          </div>
+        )}
+
         {/* ── Free tier usage bar ── */}
+        {!featureDisabled && (<>
         {usage && !usage.is_premium && (
           <div style={{ background: "var(--surface)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: "0.875rem 1rem", marginBottom: "1rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
@@ -673,6 +691,8 @@ export default function FoodAnalyzerPage() {
             )}
           </div>
         )}
+
+        </>)}
 
       </div>
 

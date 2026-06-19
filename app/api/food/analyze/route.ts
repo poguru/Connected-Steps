@@ -17,6 +17,10 @@ const GOAL_CONTEXTS: Record<string, string> = {
 };
 
 export async function POST(req: NextRequest) {
+  if (process.env.FOOD_ANALYZER_ENABLED !== "true") {
+    return NextResponse.json({ error: "AI Food Analyzer is coming soon.", code: "DISABLED" }, { status: 503 });
+  }
+
   const token = req.headers.get("x-user-token");
   if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const userEmail = verifyUserToken(token);
