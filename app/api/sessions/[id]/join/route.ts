@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireActiveUser } from "@/lib/active-user";
 import { verifyUserToken } from "@/lib/admin-auth";
+import { createNotification } from "@/lib/notify-inapp";
 
 export async function GET(
   req: NextRequest,
@@ -97,7 +98,7 @@ export async function POST(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Fire-and-forget confirmation email
+  // Fire-and-forget: confirmation email + in-app notification
   sendJoinConfirmationEmail({
     email:     user.email,
     firstName: user.first_name,
@@ -106,6 +107,15 @@ export async function POST(
     time:      session.time,
     venue:     session.venue || session.location,
   }).catch(e => console.error("Join confirmation email failed:", e));
+
+  const dateLabel = new Date(session.date + "T12:00:00Z").toLocaleDateString("en-IN", { day: "numeric", month: "short", weekday: "short" });
+  createNotification({
+    user_email: user.email,
+    type:       "session_reminder",
+    title:      "You're registered! ✅",
+    body:       `${session.title} · ${dateLabel}${session.time ? ` at ${session.time}` : ""}${session.venue ? ` · ${session.venue}` : ""}`,
+    action_url: `/join/${id}`,
+  }).catch(() => {});
 
   return NextResponse.json({ success: true, already: false, session });
 }

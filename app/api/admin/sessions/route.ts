@@ -3,6 +3,7 @@ import webpush from "web-push";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendWhatsApp, sessionWAParams } from "@/lib/notify";
 import { isAdminOrCoach } from "@/lib/admin-auth";
+import { createNotifications } from "@/lib/notify-inapp";
 
 // Lazy VAPID init — only called when push is actually needed,
 // so missing env vars don't crash the module at build time.
@@ -60,13 +61,7 @@ async function sendSessionAnnouncementEmails(
   db: ReturnType<typeof getSupabaseServer>,
   session: { id: string; title: string; date: string; time: string | null; venue: string | null; location: string }
 ) {
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) {
-    console.log("RESEND_API_KEY not set — skipping session announcement emails");
-    return;
-  }
-
-  // Fetch all registered users
+  // Fetch all registered users — needed for both in-app notifications and emails
   const { data: users, error } = await db
     .from("users")
     .select("email, first_name, last_name")
@@ -74,6 +69,27 @@ async function sendSessionAnnouncementEmails(
 
   if (error || !users || users.length === 0) {
     console.log("No users found for session announcement");
+    return;
+  }
+
+  const displayVenueInApp = session.venue || session.location;
+  const dateStrShort = new Date(session.date + "T12:00:00Z").toLocaleDateString("en-IN", {
+    day: "numeric", month: "short", weekday: "short",
+  });
+
+  // In-app + push notifications for all users (always runs, independent of email config)
+  createNotifications(
+    users.map(u => ({ email: u.email })),
+    "new_session",
+    `New Session: ${session.title}`,
+    `${displayVenueInApp} · ${dateStrShort}${session.time ? ` at ${session.time}` : ""}. Tap to register!`,
+    `/join/${session.id}`,
+  ).catch(e => console.error("[admin/sessions] in-app notification error:", e));
+
+  // Email announcements — only if RESEND_API_KEY is configured
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey) {
+    console.log("RESEND_API_KEY not set — skipping session announcement emails");
     return;
   }
 

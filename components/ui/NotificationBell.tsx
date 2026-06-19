@@ -13,7 +13,10 @@ export default function NotificationBell({ userEmail }: Props) {
 
   const fetchUnread = useCallback(async () => {
     try {
-      const res  = await fetch(`/api/notifications?email=${encodeURIComponent(userEmail)}&limit=1`);
+      const token = typeof window !== "undefined" ? (localStorage.getItem("cs_user_token") ?? "") : "";
+      const res  = await fetch(`/api/notifications?email=${encodeURIComponent(userEmail)}&limit=1`, {
+        headers: { "x-user-token": token },
+      });
       const data = await res.json();
       setUnread(data.unread ?? 0);
     } catch { /* silent */ }
