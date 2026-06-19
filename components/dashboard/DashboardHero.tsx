@@ -85,8 +85,10 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
       .map(r => ({ attended: r.attended, date: r.sessions!.date }))
   );
   const monthly  = calcMonthly(sessions);
-  // Skip sessions the user has already attended — those move to past sessions
-  const nextSess = upcomingSessions.find(s => !attendedSessionIds.has(s.id)) ?? null;
+  // Prefer a session the user is registered for (and not yet attended).
+  // Fall back to the first upcoming session (unregistered) so there's always something to join.
+  const registeredNext = upcomingSessions.find(s => joinedSessionIds.has(s.id) && !attendedSessionIds.has(s.id)) ?? null;
+  const nextSess = registeredNext ?? (upcomingSessions.find(s => !attendedSessionIds.has(s.id)) ?? null);
   const isRest   = plan?.type === "Rest";
   const joined = nextSess ? joinedSessionIds.has(nextSess.id) : false;
 
@@ -220,23 +222,6 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
         </div>
       )}
 
-      {/* ── Scan Attendance QR — shown when user has no registered upcoming session ── */}
-      {!joined && (
-        <button
-          onClick={() => router.push("/scan")}
-          style={{ display: "flex", alignItems: "center", gap: "0.875rem", width: "100%", background: "rgba(96,165,250,0.07)", border: "1px solid rgba(96,165,250,0.18)", borderRadius: 16, padding: "1rem 1.25rem", cursor: "pointer", textAlign: "left", marginBottom: "0.625rem", fontFamily: "inherit" }}>
-          <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: "rgba(96,165,250,0.12)", border: "1px solid rgba(96,165,250,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(147,197,253,0.9)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-            </svg>
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--foreground)" }}>Scan Attendance QR</div>
-            <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginTop: 2 }}>Auto-record your session attendance</div>
-          </div>
-          <div style={{ fontSize: "1rem", color: "rgba(96,165,250,0.7)", flexShrink: 0 }}>→</div>
-        </button>
-      )}
 
       {/* Streak reset nudge */}
       {streak === 0 && sessions.some(r => r.sessions !== null) && (
