@@ -87,7 +87,8 @@ export default function ProfilePage() {
   useEffect(() => {
     const raw = localStorage.getItem("cs_user");
     if (!raw) { router.replace("/auth"); return; }
-    const u: AppUser = JSON.parse(raw);
+    let u: AppUser;
+    try { u = JSON.parse(raw); } catch { localStorage.removeItem("cs_user"); router.replace("/auth"); return; }
     setUser(u);
     setPhoto(u.photo ?? null);
     setInfo({ firstName: u.firstName, lastName: u.lastName, location: u.location ?? "", goal: u.goal ?? "5k" });
@@ -341,7 +342,7 @@ export default function ProfilePage() {
           </div>
           <div className="cs-stats-col">
             <div className="cs-stats-val">{stats?.rank ? `#${stats.rank}` : "—"}</div>
-            <div className="cs-stats-lbl">Rank</div>
+            <div className="cs-stats-lbl">Monthly Rank</div>
           </div>
         </div>
 

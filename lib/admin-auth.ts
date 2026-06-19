@@ -94,8 +94,10 @@ export async function isAdminOrCoach(req: NextRequest): Promise<boolean> {
   if (adminSession && verifyAdminSession(adminSession)) return true;
 
   // 2. Raw admin password header (kept for backward compatibility / scripts)
-  const pw = req.headers.get("x-admin-password");
-  if (pw && pw === process.env.ADMIN_PASSWORD) return true;
+  const pw      = req.headers.get("x-admin-password");
+  const adminPw = process.env.ADMIN_PASSWORD;
+  if (pw && adminPw && pw.length === adminPw.length &&
+    crypto.timingSafeEqual(Buffer.from(pw), Buffer.from(adminPw))) return true;
 
   // 3. Coach token (mobile header or web cookie)
   const token = req.headers.get("x-coach-token") ?? req.cookies.get(COOKIE_NAME)?.value;

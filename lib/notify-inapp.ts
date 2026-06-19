@@ -67,7 +67,7 @@ export async function createNotification(n: InAppNotification): Promise<string |
   }
 
   // Fire push in background — don't block the caller
-  sendPush(n).catch(() => {});
+  sendPush(n).catch(e => console.error("[notify-inapp] push failed:", e?.message ?? e));
 
   return data.id as string;
 }
@@ -95,9 +95,10 @@ export async function createNotifications(
   const { error } = await db.from("notifications").insert(rows);
   if (error) console.error("[notify-inapp] bulk insert error:", error.message);
 
-  // Push each user in background
+  // Push each user in background (all fired in parallel, errors logged)
   for (const u of users) {
-    sendPush({ user_email: u.email, type, title, body, action_url: actionUrl }).catch(() => {});
+    sendPush({ user_email: u.email, type, title, body, action_url: actionUrl })
+      .catch(e => console.error("[notify-inapp] bulk push failed:", u.email, e?.message ?? e));
   }
 }
 
@@ -147,6 +148,6 @@ async function sendPush(n: InAppNotification): Promise<void> {
           data:  { url: n.action_url ?? "/notifications" },
         }))
       ),
-    }).catch(() => {});
+    }).catch(e => console.error("[notify-inapp] expo push failed:", e?.message ?? e));
   }
 }

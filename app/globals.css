@@ -1054,7 +1054,7 @@ select.auth-input option {
 }
 
 .native-app .cs-lb-sticky-rank {
-  bottom: calc(56px + env(safe-area-inset-bottom));
+  bottom: calc(64px + env(safe-area-inset-bottom));
 }
 
 /* ─── Premium design system ──────────────────────────────── */

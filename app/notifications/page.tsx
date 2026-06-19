@@ -122,7 +122,8 @@ export default function NotificationsPage() {
   useEffect(() => {
     const stored = localStorage.getItem("cs_user");
     if (!stored) { router.push("/auth"); return; }
-    const u = JSON.parse(stored) as AppUser;
+    let u: AppUser;
+    try { u = JSON.parse(stored); } catch { localStorage.removeItem("cs_user"); router.push("/auth"); return; }
     setUser(u);
 
     fetchPage(u.email)

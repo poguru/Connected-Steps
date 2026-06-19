@@ -27,7 +27,7 @@ function showToast(msg: string) {
   el.textContent = msg;
   Object.assign(el.style, {
     position:       "fixed",
-    bottom:         "90px",
+    bottom:         "calc(80px + env(safe-area-inset-bottom, 0px))",
     left:           "50%",
     transform:      "translateX(-50%)",
     background:     "rgba(20,20,20,0.93)",
