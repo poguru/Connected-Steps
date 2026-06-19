@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { isTokenValid, handleAuthExpiry } from "@/lib/client-auth";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -106,8 +107,13 @@ export default function RegisterPage() {
     try {
       const u: StoredUser = JSON.parse(raw);
       if (!u.email) { router.replace("/auth?tab=login"); return; }
+      const storedToken = localStorage.getItem("cs_user_token") ?? "";
+      if (!isTokenValid(storedToken)) {
+        handleAuthExpiry(`/events/${slug}/register`);
+        return;
+      }
       setUserEmail(u.email);
-      setUserToken(localStorage.getItem("cs_user_token") ?? "");
+      setUserToken(storedToken);
       setForm(f => ({
         ...f,
         name:  `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim(),
@@ -225,6 +231,7 @@ export default function RegisterPage() {
       });
       const data = await res.json();
 
+      if (res.status === 401) { handleAuthExpiry(`/events/${slug}/register`); return; }
       if (!res.ok) { setSubmitErr(data.error ?? "Registration failed."); return; }
 
       // Already registered

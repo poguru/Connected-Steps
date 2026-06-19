@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import SessionShareSheet from "@/components/ui/SessionShareSheet";
+import { isTokenValid, handleAuthExpiry } from "@/lib/client-auth";
 
 interface SessionInfo {
   id: string;
@@ -51,6 +52,13 @@ export default function JoinClient({ id }: { id: string }) {
     }
 
     const token = localStorage.getItem("cs_user_token") ?? "";
+    // Detect missing, old-format (2-part), or expired tokens before hitting the API.
+    // This catches users who logged in before the 3-part token format was deployed.
+    if (!isTokenValid(token)) {
+      handleAuthExpiry(`/join/${id}`);
+      return;
+    }
+
     fetch(`/api/sessions/${id}/join`, { headers: { "x-user-token": token } })
       .then((r) => r.json())
       .then((d) => {
@@ -69,12 +77,14 @@ export default function JoinClient({ id }: { id: string }) {
     setSubmitting(true); setError("");
     try {
       const token = localStorage.getItem("cs_user_token") ?? "";
+      if (!isTokenValid(token)) { handleAuthExpiry(`/join/${id}`); return; }
       const res  = await fetch(`/api/sessions/${id}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-user-token": token },
         body: JSON.stringify({}),
       });
       const data = await res.json();
+      if (res.status === 401) { handleAuthExpiry(`/join/${id}`); return; }
       if (res.status === 410) { setResult("closed"); return; }
       if (!res.ok) { setError(data.error ?? "Something went wrong."); return; }
       setResult(data.already ? "already" : "joined");
@@ -89,12 +99,14 @@ export default function JoinClient({ id }: { id: string }) {
     setLeaving(true); setError("");
     try {
       const token = localStorage.getItem("cs_user_token") ?? "";
+      if (!isTokenValid(token)) { handleAuthExpiry(`/join/${id}`); return; }
       const res  = await fetch(`/api/sessions/${id}/join`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json", "x-user-token": token },
         body: JSON.stringify({}),
       });
       const data = await res.json();
+      if (res.status === 401) { handleAuthExpiry(`/join/${id}`); return; }
       if (!res.ok) { setError(data.error ?? "Something went wrong."); setConfirmLeave(false); return; }
       setResult("left");
       setConfirmLeave(false);
