@@ -22,6 +22,18 @@ function formatDate(date: string) {
   });
 }
 
+// Returns true when a session is over (past date, or today but >2h after start)
+function isSessionOver(s: { date: string; time: string | null }): boolean {
+  const istNow = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+  const today  = istNow.toISOString().split("T")[0];
+  if (s.date < today) return true;
+  if (s.date > today) return false;
+  if (!s.time) return false;
+  const [sh, sm] = s.time.split(":").map(Number);
+  const nowMins  = istNow.getUTCHours() * 60 + istNow.getUTCMinutes();
+  return nowMins >= sh * 60 + sm + 120; // 2-hour grace matches /api/sessions
+}
+
 export default function JoinClient({ id }: { id: string }) {
   const router = useRouter();
   const [session, setSession]   = useState<SessionInfo | null>(null);
@@ -64,7 +76,11 @@ export default function JoinClient({ id }: { id: string }) {
       .then((d) => {
         if (d.session) {
           setSession(d.session);
-          if (d.already_joined) setResult("already");
+          if (d.already_joined) {
+            setResult("already");
+          } else if (isSessionOver(d.session)) {
+            setResult("closed"); // Past session — show "Registration Closed" immediately
+          }
         } else {
           setNotFound(true);
         }
