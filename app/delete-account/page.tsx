@@ -30,7 +30,7 @@ export default function DeleteAccountPage() {
 
         {/* Steps */}
         <section style={{ marginBottom: "2.5rem" }}>
-          <h2 style={{ fontSize: "1rem", fontWeight: 700, color: "#fff", marginBottom: "1.25rem", textTransform: "uppercase", letterSpacing: "0.08em", fontSize: "0.8rem", color: "#e8620a" }}>
+          <h2 style={{ fontSize: "0.8rem", fontWeight: 700, color: "#e8620a", marginBottom: "1.25rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
             How to request account deletion
           </h2>
 
