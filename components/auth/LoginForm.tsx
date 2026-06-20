@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent, ChangeEvent } from "react";
+import { useState, useRef, FormEvent, ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
@@ -31,6 +31,9 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
   const [showPw, setShowPw]   = useState(false);
   const [pwLoading, setPwLoading] = useState(false);
   const [pwError,   setPwError]   = useState("");
+  // Ref-based guard prevents double-fire from onTouchEnd + onClick both firing
+  // on Android tablets (React state updates are batched — refs update synchronously)
+  const submittingRef = useRef(false);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     setForm(p => ({ ...p, [e.target.name]: e.target.value }));
@@ -38,8 +41,13 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
   };
 
   const submitLogin = async () => {
-    if (pwLoading) return;
-    if (!form.identifier || !form.password) { setPwError("Please enter your email and password."); return; }
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    if (!form.identifier || !form.password) {
+      setPwError("Please enter your email and password.");
+      submittingRef.current = false;
+      return;
+    }
     setPwLoading(true);
     try {
       const res  = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier: form.identifier, password: form.password }) });
@@ -47,7 +55,7 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
       if (!res.ok) { setPwError(data.error); return; }
       saveAndRedirect(data.user, data.requiresPhoneVerification);
     } catch { setPwError("Something went wrong. Please try again."); }
-    finally   { setPwLoading(false); }
+    finally   { setPwLoading(false); submittingRef.current = false; }
   };
 
   const handlePasswordSubmit = (e: FormEvent) => { e.preventDefault(); submitLogin(); };
