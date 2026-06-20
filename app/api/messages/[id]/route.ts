@@ -1,16 +1,76 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { createNotification } from "@/lib/notify-inapp";
+import { verifyUserToken, verifyCoachToken, COOKIE_NAME } from "@/lib/admin-auth";
 
-// GET /api/messages/[id]?limit=50&before=<iso>  → paginated messages, oldest-first
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+// ── Auth helper ───────────────────────────────────────────────────────────────
+
+type Caller = { email: string; type: "user" | "coach" };
+
+async function resolveCaller(req: NextRequest): Promise<Caller | null> {
+  const userToken = req.headers.get("x-user-token");
+  if (userToken) {
+    const email = verifyUserToken(userToken);
+    if (email) return { email: email.toLowerCase(), type: "user" };
+  }
+  const coachToken =
+    req.headers.get("x-coach-token") ?? req.cookies.get(COOKIE_NAME)?.value;
+  if (coachToken) {
+    const email = verifyCoachToken(coachToken);
+    if (email) return { email: email.toLowerCase(), type: "coach" };
+  }
+  return null;
+}
+
+// Verify that the caller owns one side of the conversation.
+// Returns the conversation row or null if access is denied.
+async function getConvIfAuthorized(
+  db: ReturnType<typeof getSupabaseServer>,
+  conversationId: string,
+  caller: Caller,
+) {
+  const { data: conv } = await db
+    .from("conversations")
+    .select("id, user_email, coach_id, coaches(email)")
+    .eq("id", conversationId)
+    .single<{
+      id: string;
+      user_email: string;
+      coach_id: string;
+      coaches: { email: string } | null;
+    }>();
+
+  if (!conv) return null;
+
+  if (caller.type === "user") {
+    return conv.user_email.toLowerCase() === caller.email ? conv : null;
+  } else {
+    // Coach: match by the coach email stored in the coaches table
+    const coachEmail = conv.coaches?.email?.toLowerCase() ?? "";
+    return coachEmail === caller.email ? conv : null;
+  }
+}
+
+// ── GET /api/messages/[id] — paginated messages ───────────────────────────────
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+
+  const db     = getSupabaseServer();
+  const caller = await resolveCaller(req);
+  if (!caller) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const conv = await getConvIfAuthorized(db, id, caller);
+  if (!conv) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
   try {
-    const { id }  = await params;
     const { searchParams } = new URL(req.url);
-    const limit   = Math.min(Number(searchParams.get("limit") ?? 50), 100);
-    const before  = searchParams.get("before");
+    const limit  = Math.min(Number(searchParams.get("limit") ?? 50), 100);
+    const before = searchParams.get("before");
 
-    const db = getSupabaseServer();
     let q = db
       .from("messages")
       .select("id, sender_email, sender_type, body, created_at, read_at")
@@ -29,20 +89,31 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 }
 
-// POST /api/messages/[id]
-// Body: { sender_email, sender_type: 'user'|'coach', body }
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
-    const { id }                              = await params;
-    const { sender_email, sender_type, body } = await req.json();
+// ── POST /api/messages/[id] — send a message ─────────────────────────────────
 
-    if (!sender_email || !sender_type || !body?.trim()) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+
+  const db     = getSupabaseServer();
+  const caller = await resolveCaller(req);
+  if (!caller) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const conv = await getConvIfAuthorized(db, id, caller);
+  if (!conv) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  try {
+    const { body } = await req.json();
+    if (!body?.trim()) {
+      return NextResponse.json({ error: "Message body is required" }, { status: 400 });
     }
 
-    const db = getSupabaseServer();
+    // Derive sender identity from the verified token — never trust the request body
+    const sender_email = caller.email;
+    const sender_type  = caller.type;
 
-    // Insert message
     const { data: msg, error: msgErr } = await db
       .from("messages")
       .insert({ conversation_id: id, sender_email, sender_type, body: body.trim() })
@@ -51,27 +122,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     if (msgErr) return NextResponse.json({ error: msgErr.message }, { status: 500 });
 
-    // Read current unread counter then increment — avoids needing a DB function
-    const unreadField = sender_type === "user" ? "coach_unread" : "user_unread";
-    const { data: conv } = await db
+    const unreadField    = sender_type === "user" ? "coach_unread" : "user_unread";
+    const { data: conv2 } = await db
       .from("conversations")
       .select(`id, ${unreadField}`)
       .eq("id", id)
       .single();
 
-    const currentUnread = (conv as Record<string, number> | null)?.[unreadField] ?? 0;
+    const currentUnread = (conv2 as Record<string, number> | null)?.[unreadField] ?? 0;
 
-    await db
-      .from("conversations")
-      .update({
-        last_message_at:      new Date().toISOString(),
-        last_message_preview: body.trim().slice(0, 80),
-        [unreadField]:        currentUnread + 1,
-      })
-      .eq("id", id);
+    await db.from("conversations").update({
+      last_message_at:      new Date().toISOString(),
+      last_message_preview: body.trim().slice(0, 80),
+      [unreadField]:        currentUnread + 1,
+    }).eq("id", id);
 
-    // In-app notification + push — non-blocking
-    notifyRecipient({ db, conversationId: id, senderEmail: sender_email, senderType: sender_type, body: body.trim() }).catch(() => {});
+    notifyRecipient({ db, conversationId: id, senderEmail: sender_email, senderType: sender_type, body: body.trim() })
+      .catch(() => {});
 
     return NextResponse.json({ message: msg });
   } catch (e: unknown) {
@@ -79,10 +146,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 }
 
+// ── Notification helper ───────────────────────────────────────────────────────
+
 type ConvRow = { user_email: string; coaches: { name: string } | null };
 
-// Creates an in-app notification and fires push to the recipient.
-// notify-inapp handles push internally, so we only need to call createNotification.
 async function notifyRecipient({
   db, conversationId, senderEmail, senderType, body,
 }: {
@@ -92,7 +159,7 @@ async function notifyRecipient({
   senderType:     string;
   body:           string;
 }) {
-  if (senderType !== "coach") return; // only notify user when coach sends
+  if (senderType !== "coach") return;
 
   const { data: conv } = await db
     .from("conversations")
