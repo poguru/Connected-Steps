@@ -118,14 +118,12 @@ export async function POST(
     const sessionTitle = sess?.title ?? "today's session";
 
     for (const u of bonusUsers) {
-      // Replace existing bonus ledger entry for this user+session
+      // Replace existing bonus ledger entry for this user+session (errors ignored)
       await db2.from("points_ledger")
         .delete()
         .eq("user_email", u.user_email)
         .eq("session_id", id)
-        .eq("category", "bonus")
-        .then(() => {})
-        .catch(() => {});
+        .eq("category", "bonus");
 
       await db2.from("points_ledger").insert({
         user_email: u.user_email,
@@ -134,7 +132,7 @@ export async function POST(
         reason:     u.bonus_reason || "Bonus Points",
         category:   "bonus",
         awarded_by: null,
-      }).then(() => {}).catch(() => {});
+      });
 
       // Push notification to the user
       createNotification({
