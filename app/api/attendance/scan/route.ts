@@ -95,14 +95,14 @@ export async function POST(req: NextRequest) {
   }
 
   // Write attendance ledger entry (fire-and-forget — failure must not block the scan).
-  db.from("points_ledger").insert({
+  void db.from("points_ledger").insert({
     user_email: userEmail.toLowerCase(),
     session_id: qr.session_id,
     points:     5,
     reason:     "Attendance",
     category:   "attendance",
     awarded_by: null,
-  }).then(() => {}).catch(() => {});
+  });
 
   // Fire-and-forget leaderboard recalculation — do not block the scan response.
   if (session?.date) {
