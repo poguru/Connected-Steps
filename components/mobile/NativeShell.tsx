@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { App } from "@capacitor/app";
 import BottomNav from "@/components/mobile/BottomNav";
+import { isTokenValid } from "@/lib/client-auth";
 
 // Only the home screen triggers the double-back-to-exit flow
 const HOME = "/dashboard";
@@ -72,30 +73,50 @@ export default function NativeShell({ children }: { children: React.ReactNode })
     document.body.classList.add("native-app");
 
     // ── Session check: redirect on startup ─────────────────────────────────
-    const user      = localStorage.getItem("cs_user");
-    const hasCookie = document.cookie.split(";").some(c => c.trim().startsWith("cs_auth="));
-    const path      = window.location.pathname;
+    // Validate against the embedded expiry in the token itself — NOT the cookie.
+    // Android/iOS WebViews clear cookies under memory pressure while localStorage
+    // survives, so cookie-based checks cause spurious logouts on mobile.
+    const user  = localStorage.getItem("cs_user");
+    const token = localStorage.getItem("cs_user_token");
+    const path  = window.location.pathname;
 
-    if (user && hasCookie) {
-      // Authenticated — send to dashboard if on a public entry page
-      if (path === "/" || path === "/auth" || path === "") {
-        router.replace("/dashboard");
-      }
-    } else if (user && !hasCookie) {
-      // localStorage present but session cookie is gone (expired or first deploy).
-      // Clear stale localStorage to avoid redirect loops with middleware, then
-      // send to auth so the user can log in and get a fresh cookie.
+    function clearAuthAndRedirect() {
       localStorage.removeItem("cs_user");
       localStorage.removeItem("cs_user_token");
       localStorage.removeItem("cs_strava");
+      document.cookie = "cs_auth=; path=/; max-age=0; SameSite=Lax";
       if (path !== "/auth") router.replace("/auth");
+    }
+
+    if (user && isTokenValid(token)) {
+      // Valid session — re-stamp the cookie in case the WebView cleared it
+      const secure = location.protocol === "https:" ? "; Secure" : "";
+      document.cookie = `cs_auth=${token}; path=/; max-age=7776000; SameSite=Lax${secure}`;
+      if (path === "/" || path === "/auth" || path === "") {
+        router.replace("/dashboard");
+      }
+    } else if (user) {
+      // User data present but token expired or missing → real expired session
+      clearAuthAndRedirect();
     } else {
       // Unauthenticated → only allow public routes
       const isPublic = PUBLIC_PREFIX.some(p => path === p || path.startsWith(p + "/"));
-      if (!isPublic) {
-        router.replace("/auth");
-      }
+      if (!isPublic) router.replace("/auth");
     }
+
+    // ── Resume listener: re-check token when app comes back to foreground ──
+    const resumePromise = App.addListener("resume", () => {
+      const t   = localStorage.getItem("cs_user_token");
+      const p   = window.location.pathname;
+      const pub = PUBLIC_PREFIX.some(pre => p === pre || p.startsWith(pre + "/"));
+      if (!pub && !isTokenValid(t)) {
+        localStorage.removeItem("cs_user");
+        localStorage.removeItem("cs_user_token");
+        localStorage.removeItem("cs_strava");
+        document.cookie = "cs_auth=; path=/; max-age=0; SameSite=Lax";
+        routerRef.current.replace("/auth");
+      }
+    });
 
     // ── Back button ────────────────────────────────────────────────────────
     const listenerPromise = App.addListener("backButton", () => {
@@ -123,6 +144,7 @@ export default function NativeShell({ children }: { children: React.ReactNode })
     return () => {
       document.body.classList.remove("native-app");
       listenerPromise.then(l => l.remove());
+      resumePromise.then(l => l.remove());
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // runs exactly once on mount

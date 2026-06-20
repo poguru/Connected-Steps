@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 import { autoFeedSessionCompleted } from "@/lib/auto-feed";
+import { createNotification } from "@/lib/notify-inapp";
 
 // GET — session info + users who joined via link + their attendance status
 export async function GET(
@@ -98,7 +99,6 @@ export async function POST(
   }
 
   // Auto-feed: generate posts for users newly marked as attended (false → true).
-  // Fire-and-forget — failure must not affect this response.
   const newlyAttended = toUpsert.filter(
     u => u.attended && !previouslyAttended.has(u.user_email)
   );
@@ -107,6 +107,44 @@ export async function POST(
       id,
       newlyAttended.map(u => ({ email: u.user_email, name: u.user_name })),
     ).catch(() => {});
+  }
+
+  // Bonus points: update ledger + send notification for each user with bonus_points > 0
+  const bonusUsers = toUpsert.filter(u => u.bonus_points > 0);
+  if (bonusUsers.length) {
+    const db2 = getSupabaseServer();
+    // Fetch session title for the notification
+    const { data: sess } = await db2.from("sessions").select("title").eq("id", id).single();
+    const sessionTitle = sess?.title ?? "today's session";
+
+    for (const u of bonusUsers) {
+      // Replace existing bonus ledger entry for this user+session
+      await db2.from("points_ledger")
+        .delete()
+        .eq("user_email", u.user_email)
+        .eq("session_id", id)
+        .eq("category", "bonus")
+        .then(() => {})
+        .catch(() => {});
+
+      await db2.from("points_ledger").insert({
+        user_email: u.user_email,
+        session_id: id,
+        points:     u.bonus_points,
+        reason:     u.bonus_reason || "Bonus Points",
+        category:   "bonus",
+        awarded_by: null,
+      }).then(() => {}).catch(() => {});
+
+      // Push notification to the user
+      createNotification({
+        user_email: u.user_email,
+        type:       "achievement",
+        title:      `You earned ${u.bonus_points} bonus points! 🏆`,
+        body:       `${u.bonus_reason || "Bonus points"} — ${sessionTitle}`,
+        action_url: "/profile#points",
+      }).catch(() => {});
+    }
   }
 
   return NextResponse.json({

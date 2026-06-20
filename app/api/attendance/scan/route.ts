@@ -94,8 +94,17 @@ export async function POST(req: NextRequest) {
     if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
   }
 
+  // Write attendance ledger entry (fire-and-forget — failure must not block the scan).
+  db.from("points_ledger").insert({
+    user_email: userEmail.toLowerCase(),
+    session_id: qr.session_id,
+    points:     5,
+    reason:     "Attendance",
+    category:   "attendance",
+    awarded_by: null,
+  }).then(() => {}).catch(() => {});
+
   // Fire-and-forget leaderboard recalculation — do not block the scan response.
-  // This replaces the manual admin "Sync" step for QR-scanned attendance.
   if (session?.date) {
     const month = (session.date as string).slice(0, 7);
     recalculateMonth(month).catch(() => {});

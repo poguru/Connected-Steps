@@ -84,6 +84,10 @@ export default function ProfilePage() {
   const [pwMsg,    setPwMsg]    = useState("");
   const [pwError,  setPwError]  = useState("");
 
+  interface PointsEntry { id: number; points: number; reason: string; category: string; session_title: string | null; date: string; }
+  const [pointsHistory, setPointsHistory] = useState<PointsEntry[]>([]);
+  const [pointsLoading, setPointsLoading] = useState(false);
+
   useEffect(() => {
     const raw = localStorage.getItem("cs_user");
     if (!raw) { router.replace("/auth"); return; }
@@ -106,6 +110,13 @@ export default function ProfilePage() {
       const totalSessions = (sess.sessions ?? []).filter((s: { attended: boolean }) => s.attended).length;
       setStats({ totalPoints, totalSessions, rank: lb.rank ?? null });
     });
+
+    setPointsLoading(true);
+    fetch("/api/user/points", { headers: authH })
+      .then(r => r.json())
+      .then(d => { if (d.entries) setPointsHistory(d.entries); })
+      .catch(() => {})
+      .finally(() => setPointsLoading(false));
   }, [router]);
 
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -524,6 +535,42 @@ export default function ProfilePage() {
 
           </>
         )}
+
+        {/* ── Points History ── */}
+        <section id="points" style={{ background: "var(--surface)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "1.25rem" }}>
+          <div className="cs-label" style={{ marginBottom: "1rem" }}>Points History</div>
+          {pointsLoading ? (
+            <div style={{ textAlign: "center", padding: "1.5rem", color: "var(--cs-muted)", fontSize: 13 }}>Loading…</div>
+          ) : pointsHistory.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "1.5rem", color: "var(--cs-muted)", fontSize: 13 }}>
+              No points recorded yet. Scan a QR code at your next session!
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {pointsHistory.map(e => {
+                const isBonus = e.category === "bonus";
+                const color   = isBonus ? "#e8620a" : e.category === "streak" ? "#facc15" : "#4ade80";
+                const d       = new Date(e.date + "T12:00:00");
+                const label   = d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+                return (
+                  <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: `${color}15`, border: `1px solid ${color}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>
+                      {isBonus ? "🏆" : e.category === "streak" ? "🔥" : "✅"}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--cs-white)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.reason}</div>
+                      {e.session_title && <div style={{ fontSize: 11, color: "var(--cs-muted)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.session_title}</div>}
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color }}>{e.points > 0 ? "+" : ""}{e.points}</div>
+                      <div style={{ fontSize: 10, color: "var(--cs-muted)" }}>{label}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
 
         {/* ── Log out ── */}
         <button
