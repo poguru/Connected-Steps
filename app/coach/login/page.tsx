@@ -1,14 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Suspense } from "react";
 
-function AdminLoginForm() {
-  const router       = useRouter();
-  const searchParams = useSearchParams();
+export default function CoachLoginPage() {
+  const router = useRouter();
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [error,    setError]    = useState("");
@@ -18,15 +16,14 @@ function AdminLoginForm() {
     e.preventDefault();
     setError(""); setLoading(true);
     try {
-      const res  = await fetch("/api/admin/auth", {
+      const res  = await fetch("/api/admin/auth/login", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ email: email.trim().toLowerCase(), password }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Login failed"); return; }
-      const redirect = searchParams.get("redirect") ?? "/admin";
-      router.push(redirect);
+      router.push("/coach");
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -47,7 +44,7 @@ function AdminLoginForm() {
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 36 }}>
           <Image src="/logo.png" alt="Connected Steps" width={56} height={56} style={{ borderRadius: "50%", marginBottom: 14 }} />
           <div style={{ fontSize: 22, fontWeight: 800, color: "#fff", letterSpacing: -0.5 }}>Connected Steps</div>
-          <div style={{ fontSize: 12, color: "#e8620a", marginTop: 4, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>Admin Portal</div>
+          <div style={{ fontSize: 12, color: "#e8620a", marginTop: 4, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>Coach Portal</div>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -55,7 +52,7 @@ function AdminLoginForm() {
             <label style={{ display: "block", fontSize: 11, color: "#666", marginBottom: 6, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em" }}>Email</label>
             <input
               type="email" value={email} onChange={e => setEmail(e.target.value)}
-              required placeholder="admin@connectedsteps.in"
+              required placeholder="coach@connectedsteps.in"
               style={inputStyle}
             />
           </div>
@@ -80,24 +77,16 @@ function AdminLoginForm() {
             type="submit" disabled={loading}
             style={{ background: loading ? "#1a1a1a" : "#e8620a", color: loading ? "#444" : "#fff", border: "none", borderRadius: 10, padding: "14px", fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", marginTop: 4, fontFamily: "inherit" }}
           >
-            {loading ? "Signing in…" : "Sign In →"}
+            {loading ? "Signing in…" : "Sign In as Coach →"}
           </button>
         </form>
 
         <div style={{ marginTop: 28, textAlign: "center" }}>
-          <Link href="/coach/login" style={{ fontSize: 12, color: "#333", textDecoration: "none" }}>
-            Coach? Sign in here →
+          <Link href="/admin/login" style={{ fontSize: 12, color: "#333", textDecoration: "none" }}>
+            Admin? Sign in here →
           </Link>
         </div>
       </div>
     </div>
-  );
-}
-
-export default function AdminLoginPage() {
-  return (
-    <Suspense>
-      <AdminLoginForm />
-    </Suspense>
   );
 }

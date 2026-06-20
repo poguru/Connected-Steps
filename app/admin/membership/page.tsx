@@ -56,6 +56,14 @@ export default function AdminMembershipPage() {
   const [search,   setSearch]   = useState("");
   const [error,    setError]    = useState("");
 
+  // Grant membership modal
+  const [grantModal, setGrantModal] = useState(false);
+  const [grantEmail, setGrantEmail] = useState("");
+  const [grantPlan,  setGrantPlan]  = useState("monthly");
+  const [granting,   setGranting]   = useState(false);
+  const [grantErr,   setGrantErr]   = useState("");
+  const [grantOk,    setGrantOk]    = useState("");
+
   async function login(password: string) {
     setLoading(true); setError("");
     try {
@@ -82,6 +90,25 @@ export default function AdminMembershipPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleGrant(e: React.FormEvent) {
+    e.preventDefault();
+    setGrantErr(""); setGrantOk(""); setGranting(true);
+    try {
+      const r = await fetch("/api/admin/memberships/grant", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ email: grantEmail.trim().toLowerCase(), plan: grantPlan }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setGrantErr(d.error ?? "Failed"); return; }
+      const exp = new Date(d.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+      setGrantOk(`Membership granted! Expires ${exp}`);
+      await load();
+      setTimeout(() => { setGrantModal(false); setGrantEmail(""); setGrantOk(""); }, 2000);
+    } catch { setGrantErr("Network error."); }
+    finally { setGranting(false); }
   }
 
   useEffect(() => {
@@ -150,12 +177,20 @@ export default function AdminMembershipPage() {
           </Link>
           <span style={{ fontSize: "0.95rem", fontWeight: 600, color: "#fff" }}>Memberships</span>
         </div>
-        <button
-          onClick={() => load()}
-          style={{ fontSize: "0.75rem", color: "#888", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", padding: "4px 12px", cursor: "pointer", fontFamily: "inherit" }}
-        >
-          Refresh
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => { setGrantEmail(""); setGrantPlan("monthly"); setGrantErr(""); setGrantOk(""); setGrantModal(true); }}
+            style={{ fontSize: "0.75rem", color: "#fff", background: "#e8620a", border: "none", borderRadius: "4px", padding: "5px 14px", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}
+          >
+            + Grant Membership
+          </button>
+          <button
+            onClick={() => load()}
+            style={{ fontSize: "0.75rem", color: "#888", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", padding: "4px 12px", cursor: "pointer", fontFamily: "inherit" }}
+          >
+            Refresh
+          </button>
+        </div>
       </header>
 
       <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "2rem 1.5rem" }}>
@@ -272,6 +307,79 @@ export default function AdminMembershipPage() {
         )}
 
       </div>
+
+      {/* Grant Membership Modal */}
+      {grantModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+          <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: "2rem", width: "100%", maxWidth: 420 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>Grant Membership</div>
+              <button onClick={() => setGrantModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#555", fontSize: 20, lineHeight: 1, padding: 0 }}>×</button>
+            </div>
+
+            <form onSubmit={handleGrant} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={{ display: "block", fontSize: 11, color: "#666", marginBottom: 6, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em" }}>
+                  User Email *
+                </label>
+                <input
+                  required type="email"
+                  placeholder="user@example.com"
+                  value={grantEmail}
+                  onChange={e => setGrantEmail(e.target.value)}
+                  style={{ width: "100%", background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "10px 12px", color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" as const }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: 11, color: "#666", marginBottom: 6, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em" }}>
+                  Plan *
+                </label>
+                <select
+                  value={grantPlan}
+                  onChange={e => setGrantPlan(e.target.value)}
+                  style={{ width: "100%", background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "10px 12px", color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none", cursor: "pointer", colorScheme: "dark" as const }}
+                >
+                  <option value="monthly">Monthly (1 month)</option>
+                  <option value="quarterly">Quarterly (3 months)</option>
+                  <option value="biannual">6 Months</option>
+                  <option value="annual">Annual (12 months)</option>
+                </select>
+              </div>
+
+              {grantErr && (
+                <div style={{ background: "rgba(220,50,50,0.1)", border: "1px solid rgba(220,50,50,0.3)", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#f87171" }}>
+                  {grantErr}
+                </div>
+              )}
+              {grantOk && (
+                <div style={{ background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.3)", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#4ade80" }}>
+                  {grantOk}
+                </div>
+              )}
+
+              <p style={{ fontSize: 11, color: "#444", margin: 0 }}>
+                Amount will be recorded as ₹0 (manual grant). Any existing active membership will be expired first.
+              </p>
+
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  type="button" onClick={() => setGrantModal(false)}
+                  style={{ flex: 1, padding: "10px", background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 8, color: "#aaa", fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit" disabled={granting}
+                  style={{ flex: 1, padding: "10px", background: granting ? "#1a1a1a" : "#e8620a", border: "none", borderRadius: 8, color: granting ? "#444" : "#fff", fontWeight: 600, fontSize: 13, cursor: granting ? "not-allowed" : "pointer", fontFamily: "inherit" }}
+                >
+                  {granting ? "Granting…" : "Grant Membership"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

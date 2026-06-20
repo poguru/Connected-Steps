@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -30,9 +30,10 @@ const NAV = [
   {
     section: "Coaching",
     links: [
-      { label: "Training Plans", href: "/admin/training-plans" },
-      { label: "Coach Operations", href: "/admin/coach-ops" },
-      { label: "Coach Ratings", href: "/admin/coach-ratings" },
+      { label: "Coaches",         href: "/admin/coaches" },
+      { label: "Training Plans",  href: "/admin/training-plans" },
+      { label: "Coach Operations",href: "/admin/coach-ops" },
+      { label: "Coach Ratings",   href: "/admin/coach-ratings" },
     ],
   },
   {
@@ -54,33 +55,25 @@ const NAV = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router   = useRouter();
   const [authed,   setAuthed]   = useState<boolean | null>(null);
-  const [pw,       setPw]       = useState("");
-  const [pwErr,    setPwErr]    = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const isCoachPage = pathname === "/admin/login";
+  const isLoginPage = pathname === "/admin/login";
 
   useEffect(() => {
-    if (isCoachPage) { setAuthed(true); return; }
+    if (isLoginPage) { setAuthed(true); return; }
     fetch("/api/admin/auth")
-      .then(r => setAuthed(r.ok))
-      .catch(() => setAuthed(false));
-  }, [isCoachPage]);
-
-  async function login() {
-    const res = await fetch("/api/admin/auth", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: pw }),
-    });
-    if (res.ok) { setAuthed(true); setPw(""); }
-    else setPwErr("Incorrect password.");
-  }
+      .then(r => {
+        if (r.ok) { setAuthed(true); }
+        else { router.push(`/admin/login?redirect=${encodeURIComponent(pathname)}`); }
+      })
+      .catch(() => router.push("/admin/login"));
+  }, [isLoginPage, pathname]); // eslint-disable-line
 
   async function logout() {
     await fetch("/api/admin/auth", { method: "DELETE" });
-    setAuthed(false);
+    router.push("/admin/login");
   }
 
   function isActive(href: string, exact?: boolean) {
@@ -100,38 +93,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (!authed) {
     return (
       <div style={{ minHeight: "100vh", background: "#080808", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: "2rem", width: 320 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: "1.75rem" }}>
-            <Image src="/logo.png" alt="Connected Steps" width={32} height={32} style={{ borderRadius: "50%" }} />
-            <div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>Connected Steps</div>
-              <div style={{ fontSize: 9, color: "#e8620a", letterSpacing: "0.12em", textTransform: "uppercase" }}>Admin</div>
-            </div>
-          </div>
-          <input
-            type="password" placeholder="Admin password"
-            value={pw} autoFocus
-            onChange={e => { setPw(e.target.value); setPwErr(""); }}
-            onKeyDown={e => e.key === "Enter" && login()}
-            style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 10, fontFamily: "inherit" }}
-          />
-          {pwErr && <p style={{ margin: "0 0 10px", fontSize: 12, color: "#f09595" }}>{pwErr}</p>}
-          <button
-            onClick={login}
-            style={{ width: "100%", padding: "10px 0", background: "#e8620a", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
-          >
-            Access Admin
-          </button>
-          <div style={{ marginTop: "1rem", display: "flex", justifyContent: "space-between" }}>
-            <Link href="/" style={{ fontSize: 12, color: "#444", textDecoration: "none" }}>← Back to site</Link>
-            <Link href="/admin/login" style={{ fontSize: 12, color: "#444", textDecoration: "none" }}>Coach login</Link>
-          </div>
-        </div>
+        <div className="cs-spin" style={{ width: 26, height: 26, borderRadius: "50%", border: "2px solid #1a1a1a", borderTopColor: "#e8620a" }} />
+        <style>{`@keyframes cs-spin-kf{to{transform:rotate(360deg)}}.cs-spin{animation:cs-spin-kf .7s linear infinite}`}</style>
       </div>
     );
   }
 
-  if (isCoachPage) return <>{children}</>;
+  if (isLoginPage) return <>{children}</>;
 
   const currentLabel = NAV.flatMap(g => g.links).find(l => isActive(l.href, l.exact))?.label ?? "Admin";
 
@@ -215,6 +183,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         <div style={{ padding: "10px 16px 16px", borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
           <Link href="/" target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "#3a3a3a", textDecoration: "none" }}>↗ View site</Link>
+          <Link href="/coach" target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "#3a3a3a", textDecoration: "none" }}>↗ Coach portal</Link>
           <button
             onClick={logout}
             style={{ fontSize: 12, color: "#3a3a3a", background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: 0, fontFamily: "inherit" }}

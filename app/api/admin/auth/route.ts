@@ -18,13 +18,23 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ ok: false }, { status: 401 });
 }
 
-// POST — validate password, issue httpOnly session cookie
+// POST — validate email+password, issue httpOnly session cookie
 export async function POST(req: NextRequest) {
   try {
-    const { password } = await req.json();
-    if (!password || password !== process.env.ADMIN_PASSWORD) {
-      return NextResponse.json({ error: "Incorrect password" }, { status: 401 });
+    const { email, password } = await req.json();
+    if (!password) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+
+    const adminPw    = process.env.ADMIN_PASSWORD;
+    const adminEmail = process.env.ADMIN_EMAIL;
+
+    if (!adminPw || password !== adminPw) {
+      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
+    // If ADMIN_EMAIL is configured, require it to match
+    if (adminEmail && (!email || email.toLowerCase().trim() !== adminEmail.toLowerCase())) {
+      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+    }
+
     const token = signAdminSession();
     const res   = NextResponse.json({ ok: true });
     res.cookies.set(ADMIN_SESSION_COOKIE, token, COOKIE_OPTS);

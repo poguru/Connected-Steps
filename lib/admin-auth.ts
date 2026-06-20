@@ -90,6 +90,21 @@ export function verifyAdminSession(token: string): boolean {
   }
 }
 
+// ── Coach email from cookie (server-side helper for coach portal routes) ──────
+
+export function getCoachEmailFromCookie(req: NextRequest): string | null {
+  const token = req.cookies.get(COOKIE_NAME)?.value;
+  if (!token) return null;
+  return verifyCoachToken(token);
+}
+
+// ── Check whether a request carries a valid admin session ─────────────────────
+
+export function isAdmin(req: NextRequest): boolean {
+  const adminSession = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+  return !!(adminSession && verifyAdminSession(adminSession));
+}
+
 // ── Unified admin / coach auth ────────────────────────────────────────────────
 // Returns true for:
 //   1. cs_admin_session cookie — short-lived signed admin session (preferred)

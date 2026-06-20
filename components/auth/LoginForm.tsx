@@ -37,8 +37,8 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
     setPwError("");
   };
 
-  const handlePasswordSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  const submitLogin = async () => {
+    if (pwLoading) return;
     if (!form.identifier || !form.password) { setPwError("Please enter your email and password."); return; }
     setPwLoading(true);
     try {
@@ -49,6 +49,8 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
     } catch { setPwError("Something went wrong. Please try again."); }
     finally   { setPwLoading(false); }
   };
+
+  const handlePasswordSubmit = (e: FormEvent) => { e.preventDefault(); submitLogin(); };
 
   // ── OTP mode ───────────────────────────────────────────────────────────────
   const [mode,       setMode]       = useState<Mode>("password");
@@ -170,7 +172,7 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
 
       {pwError && <div style={{ background: "oklch(0.62 0.22 22 / 10%)", border: "1px solid oklch(0.62 0.22 22 / 30%)", borderRadius: 8, padding: "10px 14px", fontSize: "0.8rem", color: "#f09595", textAlign: "center" }}>{pwError}</div>}
 
-      <button type="submit" disabled={pwLoading} style={{ width: "100%", padding: "13px", borderRadius: 999, background: pwLoading ? "oklch(0.72 0.19 49 / 60%)" : "var(--gradient-accent)", color: "var(--accent-foreground)", border: "none", cursor: pwLoading ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem", boxShadow: pwLoading ? "none" : "var(--shadow-orange)", transition: "opacity 0.2s" }}>
+      <button type="button" onClick={submitLogin} onTouchEnd={submitLogin} disabled={pwLoading} style={{ width: "100%", padding: "13px", borderRadius: 999, background: pwLoading ? "oklch(0.72 0.19 49 / 60%)" : "var(--gradient-accent)", color: "var(--accent-foreground)", border: "none", cursor: pwLoading ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem", boxShadow: pwLoading ? "none" : "var(--shadow-orange)", transition: "opacity 0.2s" }}>
         {pwLoading ? "Signing in…" : "Sign in"}
       </button>
     </form>
