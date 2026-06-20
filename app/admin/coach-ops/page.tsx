@@ -434,8 +434,10 @@ export default function CoachOpsDashboard() {
 
             {/* Table (desktop) / Cards (mobile) */}
             <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "10px", overflow: "hidden" }}>
+              {/* Scrollable wrapper — prevents right-side column clipping */}
+              <div style={{ overflowX: "auto" }}>
               {/* Desktop header */}
-              <div className="coach-ops-table-header" style={{ display: "grid", gridTemplateColumns: "1.8fr 80px 1.2fr 1fr 70px 60px 50px 80px", gap: 0, padding: "0.65rem 1rem", background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: "10px", color: "#444", textTransform: "uppercase", letterSpacing: "0.08em", minWidth: "720px" }}>
+              <div className="coach-ops-table-header" style={{ display: "grid", gridTemplateColumns: "minmax(160px,1.8fr) 90px minmax(130px,1.2fr) minmax(130px,1fr) 70px 60px 50px 90px", gap: 0, padding: "0.65rem 1rem", background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: "10px", color: "#444", textTransform: "uppercase", letterSpacing: "0.08em", minWidth: "820px" }}>
                 <div>Athlete</div><div>Membership</div><div>Training Plan</div>
                 <div>Last Session</div><div>Att %</div><div>Streak</div><div>Risk</div><div>Actions</div>
               </div>
@@ -447,7 +449,7 @@ export default function CoachOpsDashboard() {
                 return (
                   <div key={a.email} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
                     {/* Desktop row */}
-                    <div className="coach-ops-table-row" style={{ display: "grid", gridTemplateColumns: "1.8fr 80px 1.2fr 1fr 70px 60px 50px 80px", gap: 0, padding: "0.75rem 1rem", fontSize: "0.8rem", alignItems: "center", minWidth: "720px" }}>
+                    <div className="coach-ops-table-row" style={{ display: "grid", gridTemplateColumns: "minmax(160px,1.8fr) 90px minmax(130px,1.2fr) minmax(130px,1fr) 70px 60px 50px 90px", gap: 0, padding: "0.75rem 1rem", fontSize: "0.8rem", alignItems: "center", minWidth: "820px" }}>
                       <div>
                         <div style={{ fontWeight: 600, color: "#fff" }}>{name}</div>
                         <div style={{ fontSize: "11px", color: "#444", marginTop: "2px" }}>{a.goal?.toUpperCase()} · {a.location || "—"}</div>
@@ -570,6 +572,7 @@ export default function CoachOpsDashboard() {
                   </div>
                 );
               })}
+              </div>{/* end overflowX:auto */}
             </div>
           </div>
         )}
