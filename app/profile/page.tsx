@@ -265,9 +265,11 @@ export default function ProfilePage() {
   }
 
   function logout() {
+    const email = user?.email;
     localStorage.removeItem("cs_user");
     localStorage.removeItem("cs_user_token");
     localStorage.removeItem("cs_strava");
+    if (email) localStorage.removeItem(`cs_member_${email}`);
     document.cookie = "cs_auth=; path=/; max-age=0; SameSite=Lax";
     router.replace("/auth");
   }

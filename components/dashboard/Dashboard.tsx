@@ -352,7 +352,9 @@ export default function Dashboard() {
   const [followModal,    setFollowModal]    = useState<"followers" | "following" | null>(null);
   const [followModalUsers, setFollowModalUsers] = useState<{ email: string; name: string }[]>([]);
   const [followModalLoading, setFollowModalLoading] = useState(false);
-  const [isActiveMember, setIsActiveMember] = useState(false);
+  // null = unknown (loading), true/false = confirmed
+  // Initialised from localStorage cache to prevent flash-of-wrong-content
+  const [isActiveMember, setIsActiveMember] = useState<boolean | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem("cs_user");
@@ -385,10 +387,22 @@ export default function Dashboard() {
       .then((d) => setUpcomingSessions(d.data ?? []))
       .catch(() => {});
 
+    // Read cached membership status immediately (prevents flash-of-wrong-content)
+    const cachedMember = localStorage.getItem(`cs_member_${u.email}`);
+    if (cachedMember !== null) setIsActiveMember(cachedMember === "1");
+
+    // Verify with API in background and update cache
     fetch(`/api/membership?email=${encodeURIComponent(u.email)}`, { headers: { "x-user-token": userToken } })
       .then((r) => r.json())
-      .then((d) => { if (d.membership?.isActive) setIsActiveMember(true); })
-      .catch(() => {});
+      .then((d) => {
+        const active = !!(d.membership?.isActive);
+        setIsActiveMember(active);
+        localStorage.setItem(`cs_member_${u.email}`, active ? "1" : "0");
+      })
+      .catch(() => {
+        // If API fails and no cache, default to false (show upgrade CTA)
+        if (cachedMember === null) setIsActiveMember(false);
+      });
 
     fetch("/api/user/joined-sessions", { headers: { "x-user-token": userToken } })
       .then((r) => r.json())

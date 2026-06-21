@@ -116,7 +116,7 @@ function getIntensity(type: string): { label: string; color: string; bg: string 
   return                              { label: "Light",    color: "#4ade80",                 bg: "rgba(74,222,128,0.1)"   };
 }
 
-interface Props { goal: string; email?: string; isActiveMember?: boolean; }
+interface Props { goal: string; email?: string; isActiveMember?: boolean | null; }
 
 export default function TrainingPlan({ goal, email, isActiveMember }: Props) {
   const [plan,      setPlan]      = useState<Week | null>(null);
@@ -147,7 +147,7 @@ export default function TrainingPlan({ goal, email, isActiveMember }: Props) {
 
   const todayIdx = (new Date().getDay() + 6) % 7;
 
-  if (loading) return (
+  if (loading || isActiveMember === null) return (
     <div style={{ background: "var(--surface)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "1.25rem", marginBottom: "0.75rem", minHeight: 100, opacity: 0.5 }} />
   );
 

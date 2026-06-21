@@ -88,6 +88,8 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
     }
     localStorage.removeItem("cs_requires_phone_verification");
     localStorage.removeItem("cs_pending_photo");
+    // Clear stale membership cache — Dashboard will re-fetch and re-cache on next load
+    localStorage.removeItem(`cs_member_${user.email}`);
     const savedStrava = localStorage.getItem(`cs_strava_${user.email}`);
     if (savedStrava) localStorage.setItem("cs_strava", savedStrava);
     // Prefer sessionStorage redirect (set by Register buttons), then URL param

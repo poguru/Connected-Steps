@@ -20,7 +20,7 @@ export interface Props {
   upcomingSessions: UpcomingSession[];
   joinedSessionIds: Set<string>;
   attendedSessionIds: Set<string>;
-  isActiveMember?: boolean;
+  isActiveMember?: boolean | null;
 }
 
 // ── Static plans ──────────────────────────────────────────────────────────────
@@ -139,7 +139,7 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
       </div>
 
       {/* ── Today's Workout card ── */}
-      {isActiveMember ? (
+      {isActiveMember === null ? null : isActiveMember ? (
         plan && (
           <div className="cs-clean-card" style={{ marginBottom: "0.625rem" }}>
             <div className="cs-label" style={{ marginBottom: 10 }}>Today&apos;s Workout</div>
