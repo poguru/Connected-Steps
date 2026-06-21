@@ -116,16 +116,17 @@ function getIntensity(type: string): { label: string; color: string; bg: string 
   return                              { label: "Light",    color: "#4ade80",                 bg: "rgba(74,222,128,0.1)"   };
 }
 
-interface Props { goal: string; email?: string; }
+interface Props { goal: string; email?: string; isActiveMember?: boolean; }
 
-export default function TrainingPlan({ goal, email }: Props) {
+export default function TrainingPlan({ goal, email, isActiveMember }: Props) {
   const [plan,      setPlan]      = useState<Week | null>(null);
   const [planTitle, setPlanTitle] = useState<string | null>(null);
   const [coach,     setCoach]     = useState<string | null>(null);
   const [loading,   setLoading]   = useState(!!email);
+  const [noPlan,    setNoPlan]    = useState(false);
 
   useEffect(() => {
-    if (!email) { setLoading(false); return; }
+    if (!email || !isActiveMember) { setLoading(false); return; }
     const token = typeof window !== "undefined" ? localStorage.getItem("cs_user_token") : null;
     fetch(`/api/user/training-plan?email=${encodeURIComponent(email)}`, {
       headers: token ? { "x-user-token": token } : {},
@@ -136,22 +137,50 @@ export default function TrainingPlan({ goal, email }: Props) {
           setPlan(d.plan.days);
           setPlanTitle(d.plan.title ?? null);
           setCoach(d.plan.coach_name ?? null);
+        } else {
+          setNoPlan(true);
         }
       })
-      .catch(() => {})
+      .catch(() => { setNoPlan(true); })
       .finally(() => setLoading(false));
-  }, [email]);
+  }, [email, isActiveMember]);
 
-  const staticPlan = STATIC_PLANS[goal] ?? FALLBACK;
-  const activePlan = plan ?? staticPlan;
-  const isCustom   = !!plan;
-  const todayIdx   = (new Date().getDay() + 6) % 7;
+  const todayIdx = (new Date().getDay() + 6) % 7;
 
   if (loading) return (
     <div style={{ background: "var(--surface)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "1.25rem", marginBottom: "0.75rem", minHeight: 100, opacity: 0.5 }} />
   );
 
-  if (!activePlan) return null;
+  // Free users — show upgrade CTA, never show plan content
+  if (!isActiveMember) return (
+    <div style={{ background: "var(--surface)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "1.5rem", marginBottom: "0.75rem", textAlign: "center" }}>
+      <div className="cs-label" style={{ marginBottom: 12 }}>Weekly Plan</div>
+      <div style={{ fontSize: "1.75rem", marginBottom: 8 }}>🔒</div>
+      <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--foreground)", marginBottom: 8 }}>Unlock Your Training Plan</div>
+      <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", lineHeight: 1.7, marginBottom: 16 }}>
+        ✓ Personalized weekly plan<br />
+        ✓ Coach guidance<br />
+        ✓ Progress tracking
+      </div>
+      <a href="/pricing" style={{ display: "inline-block", padding: "9px 24px", background: "var(--gradient-accent)", color: "#fff", borderRadius: 999, fontSize: "13px", fontWeight: 700, textDecoration: "none" }}>
+        Upgrade →
+      </a>
+    </div>
+  );
+
+  // Premium user — no plan assigned yet
+  if (noPlan && !plan) return (
+    <div style={{ background: "var(--surface)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "1.5rem", marginBottom: "0.75rem" }}>
+      <div className="cs-label" style={{ marginBottom: 12 }}>Weekly Plan</div>
+      <div style={{ fontSize: "0.85rem", color: "var(--muted-foreground)", lineHeight: 1.6, textAlign: "center", padding: "0.5rem 0" }}>
+        No training plan assigned yet.<br />
+        <span style={{ color: "var(--foreground)", fontWeight: 500 }}>Your coach will assign one shortly.</span>
+      </div>
+    </div>
+  );
+
+  const activePlan = plan!;
+  const isCustom   = true;
 
   return (
     <div style={{ marginBottom: "0.75rem" }}>
@@ -166,16 +195,14 @@ export default function TrainingPlan({ goal, email }: Props) {
           )}
         </div>
         <span style={{ fontSize: "10px", color: "var(--cs-orange)", fontWeight: 700, letterSpacing: "0.06em", background: "rgba(232,98,10,0.08)", border: "1px solid rgba(232,98,10,0.2)", padding: "2px 8px", borderRadius: 999 }}>
-          {isCustom ? "Custom" : (GOAL_LABELS[goal] ?? goal)}
+          Custom
         </span>
       </div>
 
-      {!isCustom && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "rgba(232,98,10,0.06)", border: "1px solid rgba(232,98,10,0.15)", borderRadius: 10, marginBottom: "0.75rem" }}>
-          <span style={{ fontSize: "10px", color: "var(--muted-foreground)", lineHeight: 1.5, flex: 1 }}>
-            Sample plan · <span style={{ color: "var(--foreground)" }}>Premium members get a personalised plan from their coach</span>
-          </span>
-          <a href="/pricing" style={{ fontSize: "10px", color: "var(--cs-orange)", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0 }}>Upgrade →</a>
+      {/* Premium users with assigned plan — show coach/title info */}
+      {isCustom && (coach || planTitle) && (
+        <div style={{ fontSize: "0.72rem", color: "var(--muted-foreground)", marginBottom: "0.75rem", padding: "0 0.25rem" }}>
+          {coach && `By ${coach}`}{coach && planTitle && " · "}{planTitle}
         </div>
       )}
 

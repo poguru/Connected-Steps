@@ -352,6 +352,7 @@ export default function Dashboard() {
   const [followModal,    setFollowModal]    = useState<"followers" | "following" | null>(null);
   const [followModalUsers, setFollowModalUsers] = useState<{ email: string; name: string }[]>([]);
   const [followModalLoading, setFollowModalLoading] = useState(false);
+  const [isActiveMember, setIsActiveMember] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem("cs_user");
@@ -382,6 +383,11 @@ export default function Dashboard() {
     fetch("/api/sessions")
       .then((r) => r.json())
       .then((d) => setUpcomingSessions(d.data ?? []))
+      .catch(() => {});
+
+    fetch(`/api/membership?email=${encodeURIComponent(u.email)}`, { headers: { "x-user-token": userToken } })
+      .then((r) => r.json())
+      .then((d) => { if (d.membership?.isActive) setIsActiveMember(true); })
       .catch(() => {});
 
     fetch("/api/user/joined-sessions", { headers: { "x-user-token": userToken } })
@@ -779,6 +785,7 @@ export default function Dashboard() {
             upcomingSessions={upcomingSessions}
             joinedSessionIds={joinedSessionIds}
             attendedSessionIds={attendedSessionIds}
+            isActiveMember={isActiveMember}
           />
 
           {/* ── Coach Chat ── */}
@@ -786,7 +793,7 @@ export default function Dashboard() {
 
           {/* ── Training Plan — mobile feed (hidden on desktop where sidebar shows it) ── */}
           <div className="cs-mobile-only">
-            <TrainingPlan goal={user.goal} email={user.email} />
+            <TrainingPlan goal={user.goal} email={user.email} isActiveMember={isActiveMember} />
           </div>
 
           {/* ── Progress (stats + badges merged) ── */}
@@ -818,7 +825,7 @@ export default function Dashboard() {
 
           {/* Training Plan (desktop sidebar only — mobile sees it in main feed) */}
           <div id="training-plan" className="cs-desktop-only">
-            <TrainingPlan goal={user.goal} email={user.email} />
+            <TrainingPlan goal={user.goal} email={user.email} isActiveMember={isActiveMember} />
           </div>
 
           {/* Leaderboard + Community links (desktop sidebar only) */}

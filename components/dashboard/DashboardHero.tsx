@@ -20,6 +20,7 @@ export interface Props {
   upcomingSessions: UpcomingSession[];
   joinedSessionIds: Set<string>;
   attendedSessionIds: Set<string>;
+  isActiveMember?: boolean;
 }
 
 // ── Static plans ──────────────────────────────────────────────────────────────
@@ -70,7 +71,7 @@ function greeting() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function DashboardHero({ user, sessions, upcomingSessions, joinedSessionIds, attendedSessionIds }: Props) {
+export default function DashboardHero({ user, sessions, upcomingSessions, joinedSessionIds, attendedSessionIds, isActiveMember }: Props) {
   const router      = useRouter();
   const [plan, setPlan] = useState<PlanDay | null>(null);
 
@@ -138,32 +139,43 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
       </div>
 
       {/* ── Today's Workout card ── */}
-      {plan && (
-        <div className="cs-clean-card" style={{ marginBottom: "0.625rem" }}>
-          <div className="cs-label" style={{ marginBottom: 10 }}>Today&apos;s Workout</div>
-          {/* Row 1: icon + text info */}
-          <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", minWidth: 0 }}>
-            <div style={{
-              width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-              background: isRest ? "rgba(255,255,255,0.04)" : "oklch(0.72 0.19 49 / 10%)",
-              border: isRest ? "1px solid rgba(255,255,255,0.06)" : "1px solid oklch(0.72 0.19 49 / 20%)",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.35rem",
-            }}>
-              {plan.emoji}
-            </div>
-            <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
-              <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--foreground)", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{plan.type}</div>
-              <div style={{ fontSize: "0.78rem", color: "var(--muted-foreground)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{plan.detail}</div>
+      {isActiveMember ? (
+        plan && (
+          <div className="cs-clean-card" style={{ marginBottom: "0.625rem" }}>
+            <div className="cs-label" style={{ marginBottom: 10 }}>Today&apos;s Workout</div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", minWidth: 0 }}>
+              <div style={{
+                width: 46, height: 46, borderRadius: 12, flexShrink: 0,
+                background: isRest ? "rgba(255,255,255,0.04)" : "oklch(0.72 0.19 49 / 10%)",
+                border: isRest ? "1px solid rgba(255,255,255,0.06)" : "1px solid oklch(0.72 0.19 49 / 20%)",
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.35rem",
+              }}>
+                {plan.emoji}
+              </div>
+              <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+                <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--foreground)", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{plan.type}</div>
+                <div style={{ fontSize: "0.78rem", color: "var(--muted-foreground)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{plan.detail}</div>
+              </div>
             </div>
           </div>
-          {/* Row 2: CTA button — full width so it never overflows on any screen width */}
-          {!isRest && (
+        )
+      ) : (
+        <div className="cs-clean-card" style={{ marginBottom: "0.625rem" }}>
+          <div className="cs-label" style={{ marginBottom: 10 }}>Today&apos;s Workout</div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "0.5rem 0 0.25rem", gap: 10 }}>
+            <div style={{ fontSize: "2rem" }}>🔒</div>
+            <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--foreground)" }}>Upgrade to Premium</div>
+            <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", lineHeight: 1.6 }}>
+              ✓ Personalized daily workouts<br />
+              ✓ Coach-assigned training plan<br />
+              ✓ Progress tracking
+            </div>
             <button
-              onClick={() => router.push("/weekend-run")}
-              style={{ display: "block", width: "100%", marginTop: "0.75rem", padding: "10px", background: "var(--gradient-accent)", color: "#fff", border: "none", borderRadius: 10, fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)", boxShadow: "var(--shadow-orange)", textAlign: "center" }}>
-              Register for a Session →
+              onClick={() => router.push("/pricing")}
+              style={{ marginTop: 4, padding: "9px 24px", background: "var(--gradient-accent)", color: "#fff", border: "none", borderRadius: 999, fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)", boxShadow: "var(--shadow-orange)" }}>
+              Upgrade →
             </button>
-          )}
+          </div>
         </div>
       )}
 
