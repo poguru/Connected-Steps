@@ -186,9 +186,11 @@ export default function Leaderboard() {
     if (!user) return;
     setFollowBusy(prev => new Set(prev).add(targetEmail));
     try {
+      const token = localStorage.getItem("cs_user_token") ?? "";
       const res  = await fetch("/api/follow", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ follower_email: user.email, following_email: targetEmail }),
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-user-token": token },
+        body: JSON.stringify({ following_email: targetEmail }),
       });
       const data = await res.json();
       if (res.ok) {
