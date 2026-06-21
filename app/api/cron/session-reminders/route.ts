@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
       "session_reminder",
       `${session.title} is tomorrow`,
       `See you at ${venue} at ${timeStr}. Stay hydrated and get good sleep tonight! 🏃`,
-      `/weekend-run`,
+      `/join/${session.id}`,
     );
 
     // ── WhatsApp reminders ────────────────────────────────────────────────────

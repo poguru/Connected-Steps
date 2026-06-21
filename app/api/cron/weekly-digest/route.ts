@@ -368,7 +368,7 @@ export async function GET(req: NextRequest) {
       "weekly_digest",
       "Your week at Connected Steps 🏃",
       sessionSummary,
-      "/dashboard",
+      "/profile",
     );
 
     // ── 6. Send emails via Resend batch API (max 100 per request) ─────────────
