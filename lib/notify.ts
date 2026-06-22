@@ -748,7 +748,7 @@ export function eventRegistrationEmailHTML(opts: {
   });
   const timeStr = startTime ? ` at ${startTime}` : "";
 
-  return emailWrap(`
+  return emailWrapper(`
     <h2 style="margin:0 0 6px;font-size:22px;font-weight:800;color:#0a0a0a;line-height:1.2;">
       You&rsquo;re registered! ✅
     </h2>

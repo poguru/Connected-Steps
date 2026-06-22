@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { redeemCoupon } from "@/lib/coupon-redeem";
+import { signEventQR } from "@/lib/event-qr";
+import { sendEmail, eventRegistrationEmailHTML } from "@/lib/notify";
+import QRCode from "qrcode";
 
 // POST /api/events/verify-payment
 // Body: { razorpay_order_id, razorpay_payment_id, razorpay_signature, registration_code }
@@ -36,9 +39,18 @@ export async function POST(req: NextRequest) {
     // Idempotency guard
     const { data: reg } = await db
       .from("event_registrations")
-      .select("id, coupon_id, user_email, payment_status")
+      .select("id, coupon_id, user_email, user_name, payment_status, event_id, distance_category, events(title, start_date, start_time, location)")
       .eq("registration_code", registration_code)
-      .single();
+      .single<{
+        id: string;
+        coupon_id: string | null;
+        user_email: string;
+        user_name: string;
+        payment_status: string;
+        event_id: string;
+        distance_category: string | null;
+        events: { title: string; start_date: string; start_time: string | null; location: string } | null;
+      }>();
 
     if (!reg) return NextResponse.json({ error: "Registration not found." }, { status: 404 });
     if (reg.payment_status === "paid") return NextResponse.json({ success: true });
@@ -66,6 +78,40 @@ export async function POST(req: NextRequest) {
     if (reg.coupon_id) {
       redeemCoupon(reg.coupon_id, reg.user_email).catch(console.error);
     }
+
+    // Generate QR token + send confirmation email (fire-and-forget)
+    // Payment is confirmed — email failure must never affect the response.
+    ;(async () => {
+      try {
+        const qrToken   = signEventQR(registration_code, reg.event_id);
+        await db.from("event_registrations")
+          .update({ qr_token: qrToken })
+          .eq("registration_code", registration_code);
+
+        const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+        const qrContent = `${appUrl}/event-checkin?t=${encodeURIComponent(qrToken)}`;
+        const qrDataUrl = await QRCode.toDataURL(qrContent, { width: 400, margin: 2 });
+        const ev        = reg.events;
+
+        await sendEmail(
+          reg.user_email,
+          reg.user_name,
+          `Event Registration Confirmed – ${ev?.title ?? "Connected Steps Event"}`,
+          eventRegistrationEmailHTML({
+            name:             reg.user_name,
+            eventTitle:       ev?.title ?? "Connected Steps Event",
+            startDate:        ev?.start_date ?? "",
+            startTime:        ev?.start_time ?? null,
+            location:         ev?.location ?? "",
+            registrationCode: registration_code,
+            distanceCategory: reg.distance_category,
+            qrDataUrl,
+          }),
+        );
+      } catch (e) {
+        console.error("[event-verify-payment] QR/email failed (payment intact):", e);
+      }
+    })();
 
     return NextResponse.json({ success: true });
   } catch (e: unknown) {
