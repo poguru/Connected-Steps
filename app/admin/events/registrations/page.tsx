@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import QRScannerModal from "@/components/ui/QRScannerModal";
 
 interface Reg {
   id: string; registration_code: string; user_email: string; user_name: string;
@@ -51,6 +52,7 @@ export default function AdminRegistrationsPage() {
   const [scanToken,    setScanToken]    = useState("");
   const [scanLoading,  setScanLoading]  = useState(false);
   const [scanResult,   setScanResult]   = useState<CheckInResult | null>(null);
+  const [cameraOpen,   setCameraOpen]   = useState(false);
 
   const headers = { "Content-Type": "application/json" };
 
@@ -84,28 +86,36 @@ export default function AdminRegistrationsPage() {
   }, []); // eslint-disable-line
   useEffect(() => { if (authed) load(); }, [authed]); // eslint-disable-line
 
-  async function handleCheckIn(e: React.FormEvent) {
-    e.preventDefault();
-    if (!scanToken.trim()) return;
+  function handleCameraScan(raw: string) {
+    setCameraOpen(false);
+    // Extract ?t= token from event check-in URL, or use raw string directly
+    let token = raw;
+    try {
+      const u = new URL(raw);
+      token = u.searchParams.get("t") ?? raw;
+    } catch { /* raw token */ }
+    setScanToken(token);
+    runCheckIn(token);
+  }
+
+  async function runCheckIn(token: string) {
+    if (!token.trim()) return;
     setScanLoading(true); setScanResult(null);
     try {
-      const res  = await fetch("/api/events/check-in", {
-        method: "POST", headers,
-        body: JSON.stringify({ token: scanToken.trim() }),
-      });
+      const res  = await fetch("/api/events/check-in", { method: "POST", headers, body: JSON.stringify({ token: token.trim() }) });
       const data = await res.json();
       setScanResult(data);
       if (res.ok && data.valid && !data.already_checked_in) {
-        // Update local list
-        setRegs(prev => prev.map(r =>
-          r.registration_code === data.registration?.code
-            ? { ...r, checked_in_at: data.registration.checked_in_at }
-            : r
-        ));
+        setRegs(prev => prev.map(r => r.registration_code === data.registration?.code ? { ...r, checked_in_at: data.registration.checked_in_at } : r));
         setScanToken("");
       }
     } catch { setScanResult({ valid: false, message: "Network error." }); }
     finally { setScanLoading(false); }
+  }
+
+  async function handleCheckIn(e: React.FormEvent) {
+    e.preventDefault();
+    runCheckIn(scanToken);
   }
 
   async function cancel(id: string) {
@@ -201,14 +211,18 @@ export default function AdminRegistrationsPage() {
 
         {/* ── Check-In Scanner ── */}
         <div style={{ ...S.card, marginBottom: "1.5rem", borderColor: "rgba(74,222,128,0.2)" }}>
-          <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#fff", marginBottom: "0.75rem" }}>
-            🔍 Event Check-In Scanner
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem", flexWrap: "wrap", gap: 8 }}>
+            <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#fff" }}>🔍 Event Check-In Scanner</div>
+            <button onClick={() => { setScanResult(null); setCameraOpen(true); }}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "#e8620a", border: "none", borderRadius: "6px", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: "0.82rem", fontFamily: "inherit" }}>
+              📷 Open Camera
+            </button>
           </div>
           <form onSubmit={handleCheckIn} style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
             <input
               value={scanToken} onChange={e => { setScanToken(e.target.value); setScanResult(null); }}
-              placeholder="Paste or scan QR token…"
-              style={{ ...S.input, flex: "1 1 300px", fontFamily: "monospace", fontSize: "0.78rem" }}
+              placeholder="Or paste QR token manually…"
+              style={{ ...S.input, flex: "1 1 260px", fontFamily: "monospace", fontSize: "0.78rem" }}
             />
             <button type="submit" disabled={scanLoading || !scanToken.trim()}
               style={{ padding: "9px 20px", background: "#4ade80", color: "#000", border: "none", borderRadius: "6px", fontWeight: 700, cursor: scanLoading ? "not-allowed" : "pointer", fontSize: "0.85rem", fontFamily: "inherit", opacity: scanLoading ? 0.6 : 1 }}>
@@ -309,6 +323,14 @@ export default function AdminRegistrationsPage() {
           {filtered.length} of {regs.length} registrations
         </div>
       </div>
+
+      {cameraOpen && (
+        <QRScannerModal
+          title="Scan Participant QR"
+          onScan={handleCameraScan}
+          onClose={() => setCameraOpen(false)}
+        />
+      )}
     </div>
   );
 }

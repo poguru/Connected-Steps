@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import QRScannerModal from "@/components/ui/QRScannerModal";
 
 interface CheckInResult {
   valid:              boolean;
@@ -25,10 +26,11 @@ function CheckInContent() {
   const router       = useRouter();
   const token        = searchParams.get("t") ?? "";
 
-  const [status,   setStatus]   = useState<"loading" | "success" | "duplicate" | "error" | "auth" | "idle">("idle");
-  const [result,   setResult]   = useState<CheckInResult | null>(null);
+  const [status,    setStatus]    = useState<"loading" | "success" | "duplicate" | "error" | "auth" | "idle">("idle");
+  const [result,    setResult]    = useState<CheckInResult | null>(null);
   const [manualTok, setManualTok] = useState("");
-  const [checking, setChecking] = useState(false);
+  const [checking,  setChecking]  = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const didAutoCheck = useRef(false);
 
   async function checkIn(tok: string) {
@@ -168,29 +170,53 @@ function CheckInContent() {
           </div>
         )}
 
-        {/* Idle — manual token entry */}
+        {/* Idle — camera + manual */}
         {status === "idle" && !checking && (
           <div style={card}>
-            <div style={{ textAlign: "center", marginBottom: 24 }}>
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
               <div style={{ fontSize: "2rem", marginBottom: 8 }}>📷</div>
               <div style={{ fontSize: 18, fontWeight: 700, color: "#fff", marginBottom: 6 }}>Event Check-In</div>
               <p style={{ fontSize: 13, color: "#666", margin: 0 }}>
-                Scan a participant&apos;s QR code with your phone camera — this page opens automatically.
+                Scan a participant&apos;s QR code to instantly verify and check them in.
               </p>
             </div>
-            <div style={{ marginBottom: 8, fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: ".06em" }}>Or paste token manually</div>
+
+            <button onClick={() => setCameraOpen(true)}
+              style={{ width: "100%", padding: "13px", background: "#e8620a", border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: "inherit", marginBottom: 16 }}>
+              📷 Open Camera Scanner
+            </button>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+              <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
+              <span style={{ fontSize: 11, color: "#444" }}>OR</span>
+              <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
+            </div>
+
             <form onSubmit={e => { e.preventDefault(); checkIn(manualTok); }} style={{ display: "flex", gap: 8 }}>
               <input
                 value={manualTok} onChange={e => setManualTok(e.target.value)}
-                placeholder="Paste QR token…"
+                placeholder="Paste QR token manually…"
                 style={{ flex: 1, padding: "10px 12px", background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 12, fontFamily: "monospace", outline: "none" }}
               />
               <button type="submit" disabled={!manualTok.trim()}
-                style={{ padding: "10px 16px", background: "#e8620a", border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit", opacity: manualTok.trim() ? 1 : 0.4 }}>
-                Check In
+                style={{ padding: "10px 16px", background: "#333", border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit", opacity: manualTok.trim() ? 1 : 0.4 }}>
+                Go
               </button>
             </form>
           </div>
+        )}
+
+        {cameraOpen && (
+          <QRScannerModal
+            title="Scan Participant QR"
+            onScan={raw => {
+              setCameraOpen(false);
+              let tok = raw;
+              try { const u = new URL(raw); tok = u.searchParams.get("t") ?? raw; } catch { /* raw */ }
+              checkIn(tok);
+            }}
+            onClose={() => setCameraOpen(false)}
+          />
         )}
       </div>
     </div>
