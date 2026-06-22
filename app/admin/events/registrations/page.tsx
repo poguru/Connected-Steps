@@ -9,8 +9,16 @@ interface Reg {
   phone: string | null; blood_group: string | null; coupon_code: string | null;
   coupon_discount: number; original_price: number; final_price: number;
   payment_status: string; razorpay_payment_id: string | null; status: string;
+  checked_in_at: string | null;
   created_at: string;
   events: { id: string; title: string; start_date: string; location: string } | null;
+}
+
+interface CheckInResult {
+  valid: boolean;
+  already_checked_in?: boolean;
+  message: string;
+  registration?: { code: string; name: string; category: string | null; event: string; checked_in_at: string };
 }
 interface Summary { total: number; paid: number; free: number; pending: number; revenue: number }
 
@@ -38,6 +46,11 @@ export default function AdminRegistrationsPage() {
   const [loading, setLoading] = useState(false);
   const [search,  setSearch]  = useState("");
   const [filter,  setFilter]  = useState<"all" | "paid" | "free" | "pending">("all");
+
+  // Check-in scanner state
+  const [scanToken,    setScanToken]    = useState("");
+  const [scanLoading,  setScanLoading]  = useState(false);
+  const [scanResult,   setScanResult]   = useState<CheckInResult | null>(null);
 
   const headers = { "Content-Type": "application/json" };
 
@@ -70,6 +83,30 @@ export default function AdminRegistrationsPage() {
     fetch("/api/admin/auth").then(r => { if (r.ok) setAuthed(true); }).catch(() => {});
   }, []); // eslint-disable-line
   useEffect(() => { if (authed) load(); }, [authed]); // eslint-disable-line
+
+  async function handleCheckIn(e: React.FormEvent) {
+    e.preventDefault();
+    if (!scanToken.trim()) return;
+    setScanLoading(true); setScanResult(null);
+    try {
+      const res  = await fetch("/api/events/check-in", {
+        method: "POST", headers,
+        body: JSON.stringify({ token: scanToken.trim() }),
+      });
+      const data = await res.json();
+      setScanResult(data);
+      if (res.ok && data.valid && !data.already_checked_in) {
+        // Update local list
+        setRegs(prev => prev.map(r =>
+          r.registration_code === data.registration?.code
+            ? { ...r, checked_in_at: data.registration.checked_in_at }
+            : r
+        ));
+        setScanToken("");
+      }
+    } catch { setScanResult({ valid: false, message: "Network error." }); }
+    finally { setScanLoading(false); }
+  }
 
   async function cancel(id: string) {
     if (!confirm("Cancel this registration?")) return;
@@ -162,6 +199,38 @@ export default function AdminRegistrationsPage() {
           </div>
         )}
 
+        {/* ── Check-In Scanner ── */}
+        <div style={{ ...S.card, marginBottom: "1.5rem", borderColor: "rgba(74,222,128,0.2)" }}>
+          <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#fff", marginBottom: "0.75rem" }}>
+            🔍 Event Check-In Scanner
+          </div>
+          <form onSubmit={handleCheckIn} style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            <input
+              value={scanToken} onChange={e => { setScanToken(e.target.value); setScanResult(null); }}
+              placeholder="Paste or scan QR token…"
+              style={{ ...S.input, flex: "1 1 300px", fontFamily: "monospace", fontSize: "0.78rem" }}
+            />
+            <button type="submit" disabled={scanLoading || !scanToken.trim()}
+              style={{ padding: "9px 20px", background: "#4ade80", color: "#000", border: "none", borderRadius: "6px", fontWeight: 700, cursor: scanLoading ? "not-allowed" : "pointer", fontSize: "0.85rem", fontFamily: "inherit", opacity: scanLoading ? 0.6 : 1 }}>
+              {scanLoading ? "Checking…" : "Validate & Check In"}
+            </button>
+          </form>
+          {scanResult && (
+            <div style={{ marginTop: "0.75rem", padding: "12px 16px", borderRadius: "8px", background: scanResult.valid ? (scanResult.already_checked_in ? "rgba(234,179,8,0.1)" : "rgba(74,222,128,0.1)") : "rgba(239,68,68,0.1)", border: `1px solid ${scanResult.valid ? (scanResult.already_checked_in ? "rgba(234,179,8,0.3)" : "rgba(74,222,128,0.3)") : "rgba(239,68,68,0.3)"}` }}>
+              <div style={{ fontWeight: 700, color: scanResult.valid ? (scanResult.already_checked_in ? "#eab308" : "#4ade80") : "#f87171", marginBottom: 4 }}>
+                {scanResult.message}
+              </div>
+              {scanResult.registration && (
+                <div style={{ fontSize: "0.78rem", color: "#aaa" }}>
+                  {scanResult.registration.name} · {scanResult.registration.event}
+                  {scanResult.registration.category ? ` · ${scanResult.registration.category}` : ""}
+                  {" · "}<span style={{ fontFamily: "monospace" }}>{scanResult.registration.code}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Filters */}
         <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.5rem", flexWrap: "wrap", alignItems: "center" }}>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, email, code, event…"
@@ -182,14 +251,14 @@ export default function AdminRegistrationsPage() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
               <thead>
                 <tr style={{ background: "rgba(255,255,255,0.04)" }}>
-                  {["Code", "Participant", "Event", "Date", "Price", "Payment", "Status", "Actions"].map(h => (
+                  {["Code", "Participant", "Event", "Date", "Price", "Payment", "Status", "Check-In", "Actions"].map(h => (
                     <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: "10px", color: "#666", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
-                  <tr><td colSpan={8} style={{ padding: "2rem", textAlign: "center", color: "#555" }}>No registrations found.</td></tr>
+                  <tr><td colSpan={9} style={{ padding: "2rem", textAlign: "center", color: "#555" }}>No registrations found.</td></tr>
                 ) : filtered.map(r => (
                   <tr key={r.id} style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
                     <td style={{ padding: "10px 14px" }}>
@@ -211,6 +280,15 @@ export default function AdminRegistrationsPage() {
                       <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: 999, background: r.status === "confirmed" ? "rgba(74,222,128,0.1)" : "rgba(239,68,68,0.1)", color: r.status === "confirmed" ? "#4ade80" : "#f87171", fontWeight: 700 }}>
                         {r.status.toUpperCase()}
                       </span>
+                    </td>
+                    <td style={{ padding: "10px 14px", whiteSpace: "nowrap" }}>
+                      {r.checked_in_at ? (
+                        <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: 999, background: "rgba(74,222,128,0.12)", border: "1px solid rgba(74,222,128,0.3)", color: "#4ade80", fontWeight: 700 }}>
+                          ✓ {new Date(r.checked_in_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: "10px", color: "#555" }}>—</span>
+                      )}
                     </td>
                     <td style={{ padding: "10px 14px" }}>
                       {r.status !== "cancelled" && (

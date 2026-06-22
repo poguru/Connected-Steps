@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   // Step 1: fetch registrations (no FK join — avoids PostgREST schema-cache issues)
   const { data: regs, error: regErr } = await db
     .from("event_registrations")
-    .select("id, registration_code, payment_status, status, created_at, original_price, coupon_discount, final_price, event_id")
+    .select("id, registration_code, payment_status, status, created_at, original_price, coupon_discount, final_price, event_id, distance_category, qr_token, checked_in_at")
     .eq("user_email", userEmail.toLowerCase())
     .order("created_at", { ascending: false });
 

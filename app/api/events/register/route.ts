@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
+import { signEventQR } from "@/lib/event-qr";
+import { sendEmail, eventRegistrationEmailHTML } from "@/lib/notify";
+import QRCode from "qrcode";
 
 function genCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -193,13 +196,48 @@ export async function POST(req: NextRequest) {
 
       if (regErr) return NextResponse.json({ error: regErr.message }, { status: 500 });
 
+      const finalCode = reg?.registration_code ?? code;
+
       // Redeem coupon atomically (fire-and-forget)
       if (couponId) {
         const { redeemCoupon } = await import("@/lib/coupon-redeem");
         redeemCoupon(couponId, email.toLowerCase()).catch(console.error);
       }
 
-      return NextResponse.json({ success: true, free: true, registration_code: reg?.registration_code ?? code });
+      // Generate QR token + store it + send confirmation email (fire-and-forget)
+      // Registration is already saved — email failure must never roll it back.
+      ;(async () => {
+        try {
+          const qrToken  = signEventQR(finalCode, event_id);
+          await db.from("event_registrations")
+            .update({ qr_token: qrToken })
+            .eq("registration_code", finalCode);
+
+          const appUrl   = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+          const qrContent = `${appUrl}/event-checkin?t=${encodeURIComponent(qrToken)}`;
+          const qrDataUrl = await QRCode.toDataURL(qrContent, { width: 400, margin: 2 });
+
+          await sendEmail(
+            email.toLowerCase().trim(),
+            name.trim(),
+            `Event Registration Confirmed – ${ev.title}`,
+            eventRegistrationEmailHTML({
+              name:             name.trim(),
+              eventTitle:       ev.title,
+              startDate:        ev.start_date,
+              startTime:        ev.start_time ?? null,
+              location:         ev.location,
+              registrationCode: finalCode,
+              distanceCategory: chosenCategory,
+              qrDataUrl,
+            }),
+          );
+        } catch (e) {
+          console.error("[event-register] QR/email failed (registration intact):", e);
+        }
+      })();
+
+      return NextResponse.json({ success: true, free: true, registration_code: finalCode });
     }
 
     // ── Paid event: create pending_payment registration, caller creates Razorpay order ─

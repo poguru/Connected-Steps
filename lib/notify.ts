@@ -728,3 +728,70 @@ export function birthdayEmailHTML(firstName: string): string {
     ${emailFooter()}
   `);
 }
+
+// ── Event Registration Confirmation ──────────────────────────────────────────
+
+export function eventRegistrationEmailHTML(opts: {
+  name:             string;
+  eventTitle:       string;
+  startDate:        string;
+  startTime:        string | null;
+  location:         string;
+  registrationCode: string;
+  distanceCategory: string | null;
+  qrDataUrl:        string;
+}): string {
+  const { name, eventTitle, startDate, startTime, location, registrationCode, distanceCategory, qrDataUrl } = opts;
+  const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const dateStr = new Date(startDate + "T12:00:00Z").toLocaleDateString("en-IN", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric",
+  });
+  const timeStr = startTime ? ` at ${startTime}` : "";
+
+  return emailWrap(`
+    <h2 style="margin:0 0 6px;font-size:22px;font-weight:800;color:#0a0a0a;line-height:1.2;">
+      You&rsquo;re registered! ✅
+    </h2>
+    <p style="margin:0 0 28px;font-size:15px;color:#555;line-height:1.7;">
+      Hi <strong>${name}</strong>, your spot is confirmed for <strong>${eventTitle}</strong>.
+    </p>
+
+    <div style="background:#f9f9f9;border:1px solid #e5e5e5;border-radius:12px;padding:20px 24px;margin-bottom:28px;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="padding:5px 0;font-size:13px;color:#888;width:38%;">Event</td>
+            <td style="padding:5px 0;font-size:14px;color:#0a0a0a;font-weight:600;">${eventTitle}</td></tr>
+        <tr><td style="padding:5px 0;font-size:13px;color:#888;">Date</td>
+            <td style="padding:5px 0;font-size:14px;color:#0a0a0a;">${dateStr}${timeStr}</td></tr>
+        <tr><td style="padding:5px 0;font-size:13px;color:#888;">Location</td>
+            <td style="padding:5px 0;font-size:14px;color:#0a0a0a;">${location}</td></tr>
+        <tr><td style="padding:5px 0;font-size:13px;color:#888;">Registration ID</td>
+            <td style="padding:5px 0;font-size:14px;color:#e8620a;font-weight:700;font-family:monospace;">${registrationCode}</td></tr>
+        ${distanceCategory ? `<tr><td style="padding:5px 0;font-size:13px;color:#888;">Category</td>
+            <td style="padding:5px 0;font-size:14px;color:#0a0a0a;font-weight:600;">${distanceCategory}</td></tr>` : ""}
+      </table>
+    </div>
+
+    <div style="text-align:center;margin-bottom:28px;">
+      <p style="margin:0 0 12px;font-size:12px;color:#888;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;">Your Event QR Code</p>
+      <div style="display:inline-block;background:#fff;border:2px solid #e5e5e5;border-radius:12px;padding:16px;">
+        <img src="${qrDataUrl}" alt="Event QR" width="200" height="200" style="display:block;" />
+      </div>
+      <p style="margin:10px 0 0;font-size:12px;color:#aaa;line-height:1.5;">
+        Show this QR at the event for check-in &amp; bib collection.<br/>
+        If you lose this email, view it anytime in the app.
+      </p>
+    </div>
+
+    <table cellpadding="0" cellspacing="0" style="margin:0 auto 24px;">
+      <tr><td style="background:#e8620a;border-radius:8px;">
+        <a href="${base}/events" style="display:block;padding:12px 32px;font-size:14px;font-weight:700;color:#fff;text-decoration:none;">
+          View My Registrations →
+        </a>
+      </td></tr>
+    </table>
+    <p style="margin:0 0 8px;font-size:12px;color:#aaa;text-align:center;">
+      Questions? <a href="mailto:info@connectedsteps.in" style="color:#e8620a;text-decoration:none;">info@connectedsteps.in</a>
+    </p>
+    ${emailFooter()}
+  `);
+}
