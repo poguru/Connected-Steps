@@ -143,14 +143,24 @@ export async function sendSMS(phone: string, message: string): Promise<NotifyRes
 }
 
 // ── Email ─────────────────────────────────────────────────────────────────────
+// Set NON_OTP_EMAILS_DISABLED=true in Vercel env vars to suppress all
+// non-OTP emails (welcome, membership, session join, etc.) while keeping
+// OTP/verification emails flowing. Re-enable by removing the var or setting
+// it to "false". Business logic always executes — only the Resend call is skipped.
 
 export async function sendEmail(
   to: string,
   toName: string,
   subject: string,
-  html: string
+  html: string,
+  isOtp = false,
 ): Promise<NotifyResult> {
   if (NOTIFICATIONS_PAUSED) return { to, channel: "email", ok: true };
+
+  if (!isOtp && process.env.NON_OTP_EMAILS_DISABLED === "true") {
+    console.log(`[email] SKIPPED (NON_OTP_EMAILS_DISABLED) to=${to} subject="${subject}"`);
+    return { to, channel: "email", ok: true };
+  }
 
   const apiKey    = process.env.RESEND_API_KEY;
   const fromEmail = process.env.RESEND_FROM_EMAIL ?? "noreply@connectedsteps.in";

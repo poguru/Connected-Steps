@@ -144,7 +144,8 @@ export async function POST(req: NextRequest) {
         identifier,
         displayName,
         "Your Connected Steps verification code",
-        otpEmailHTML(displayName, code)
+        otpEmailHTML(displayName, code),
+        true, // isOtp — must always send regardless of NON_OTP_EMAILS_DISABLED
       );
     } else {
       await sendWhatsAppOTP(identifier, displayName, code);
