@@ -35,11 +35,7 @@ async function sendCoachReplyEmail(q: {
   question:   string;
   answer:     string;
 }) {
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) return;
-
-  const appUrl  = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
-  const fromEmail = process.env.RESEND_FROM_EMAIL ?? "Connected Steps <noreply@connectedsteps.in>";
+  const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
   const firstName = q.user_name?.split(" ")[0] || "there";
 
   const html = `
