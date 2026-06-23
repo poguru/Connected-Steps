@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 export async function GET(req: NextRequest) {
   const db = getSupabaseServer();
+
+  // Authenticated callers see full user_email; public/unauthenticated get null.
+  // Prevents email harvesting while keeping the leaderboard publicly viewable.
+  const callerEmail = verifyUserToken(req.headers.get("x-user-token") ?? "");
+
   const friendsOf = new URL(req.url).searchParams.get("friends_of");
 
   // ── Base leaderboard entries ──────────────────────────────────────────────
@@ -50,8 +56,12 @@ export async function GET(req: NextRequest) {
 
   const enriched = entries.map(e => ({
     ...e,
-    week_points:     weekMap[e.user_email] ?? (e.week_points ?? 0),
-    photo:           photoMap[e.user_email] ?? null,
+    week_points: weekMap[e.user_email] ?? (e.week_points ?? 0),
+    photo:       photoMap[e.user_email] ?? null,
+    // user_email only returned to authenticated callers to prevent email harvesting
+    user_email:  callerEmail ? e.user_email : null,
+    // is_me lets the frontend highlight the caller's row without exposing other emails
+    is_me:       callerEmail ? e.user_email.toLowerCase() === callerEmail.toLowerCase() : false,
   }));
 
   return NextResponse.json({ entries: enriched }, {

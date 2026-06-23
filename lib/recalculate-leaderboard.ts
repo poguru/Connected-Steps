@@ -20,6 +20,19 @@ export async function recalculateMonth(month: string): Promise<{ message: string
 
   const db = getSupabaseServer();
 
+  // Debounce: if any leaderboard row for this month was updated in the last 60s,
+  // a concurrent recalculation is already in progress or just completed — skip.
+  // Prevents 100 simultaneous QR scans from spawning 100 full recalculations.
+  const { data: recent } = await db
+    .from("leaderboard")
+    .select("updated_at")
+    .eq("points_month", month)
+    .gte("updated_at", new Date(Date.now() - 60_000).toISOString())
+    .limit(1);
+  if (recent?.length) {
+    return { message: "Skipped — recalculated within last 60s", updated: 0 };
+  }
+
   const today = new Date().toISOString().slice(0, 10);
 
   const { data: sessions, error: sErr } = await db

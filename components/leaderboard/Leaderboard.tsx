@@ -9,8 +9,9 @@ import { getSupabaseSafe } from "@/lib/supabase";
 
 interface User  { firstName: string; lastName: string; email: string; phone: string; photo: string | null; goal: string; location: string; }
 interface Entry {
-  id: string; user_email: string; user_name: string; location: string; goal: string;
+  id: string; user_email: string | null; user_name: string; location: string; goal: string;
   month_points: number; total_points: number; week_points: number; photo: string | null;
+  is_me?: boolean;
 }
 
 type TimeTab = "week" | "month" | "all";
@@ -100,8 +101,13 @@ export default function Leaderboard() {
     };
   }, [preview]);
 
+  const authHeaders = () => {
+    const tok = typeof window !== "undefined" ? (localStorage.getItem("cs_user_token") ?? "") : "";
+    return tok ? { "x-user-token": tok } : {};
+  };
+
   const fetchLeaderboard = useCallback(() => {
-    fetch("/api/leaderboard")
+    fetch("/api/leaderboard", { headers: authHeaders() })
       .then(r => r.json())
       .then(d => {
         if (d.entries) {
@@ -116,7 +122,7 @@ export default function Leaderboard() {
   // Fetch once on mount — do NOT re-fetch on tab change
   useEffect(() => {
     setLoading(true);
-    fetch("/api/leaderboard")
+    fetch("/api/leaderboard", { headers: authHeaders() })
       .then(r => r.json())
       .then(d => {
         if (d.entries) {
@@ -221,7 +227,7 @@ export default function Leaderboard() {
     ranks.push((filtered[i][key] ?? 0) === (filtered[i - 1][key] ?? 0) ? ranks[i - 1] : ranks[i - 1] + 1);
   }
 
-  const myIndex        = filtered.findIndex(e => e.user_email === user.email);
+  const myIndex        = filtered.findIndex(e => e.is_me || (e.user_email && e.user_email === user.email));
   const myRank         = myIndex >= 0 ? ranks[myIndex] : null;
   const myEntry        = myIndex >= 0 ? filtered[myIndex] : null;
   const podium         = filtered.slice(0, 3);
@@ -351,7 +357,7 @@ export default function Leaderboard() {
                   {PODIUM_IDX.map((entryIdx, displayPos) => {
                     const r         = podium[entryIdx];
                     const rank      = entryIdx + 1;
-                    const isMe      = r.user_email === user.email;
+                    const isMe      = r.is_me || (r.user_email != null && r.user_email === user.email);
                     const colors    = PODIUM_COLORS[entryIdx];
                     const platformH = PLATFORM_H[displayPos];
                     const isFirst   = rank === 1;
