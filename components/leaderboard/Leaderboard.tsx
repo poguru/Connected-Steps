@@ -101,7 +101,7 @@ export default function Leaderboard() {
     };
   }, [preview]);
 
-  const authHeaders = () => {
+  const authHeaders = (): Record<string, string> => {
     const tok = typeof window !== "undefined" ? (localStorage.getItem("cs_user_token") ?? "") : "";
     return tok ? { "x-user-token": tok } : {};
   };
