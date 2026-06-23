@@ -1,8 +1,10 @@
 /**
  * Supabase-backed rate limiter — state persists across cold starts and
- * serverless function instances. Falls back to an in-process Map if
- * Supabase is unreachable (fail-open: never block legitimate users due
- * to an infra outage).
+ * serverless function instances.
+ *
+ * Fallback chain on Supabase outage:
+ *   1. Upstash Redis (UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN)
+ *   2. In-process Map (last resort — resets on cold start)
  *
  * Window: 15 minutes | Max failures before block: 5
  */
@@ -12,7 +14,45 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 export const WINDOW_MS    = 15 * 60 * 1000;  // 15 minutes
 export const MAX_FAILURES = 5;
 
-// ── In-process fallback ────────────────────────────────────────────────────
+// ── Upstash Redis fallback ─────────────────────────────────────────────────
+// Uses the REST API directly — no SDK needed, works in Edge/Node alike.
+
+async function redisGet(key: string): Promise<string | null> {
+  const url   = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return null;
+  try {
+    const res  = await fetch(`${url}/get/${encodeURIComponent(key)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json() as { result: string | null };
+    return data.result;
+  } catch { return null; }
+}
+
+async function redisIncr(key: string, ttlSeconds: number): Promise<number | null> {
+  const url   = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return null;
+  try {
+    // INCR then EXPIRE in a pipeline (single HTTP request)
+    const res  = await fetch(`${url}/pipeline`, {
+      method:  "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body:    JSON.stringify([["INCR", key], ["EXPIRE", key, ttlSeconds]]),
+    });
+    const data = await res.json() as [{ result: number }, unknown];
+    return data[0]?.result ?? null;
+  } catch { return null; }
+}
+
+async function redisCheck(key: string, max: number): Promise<boolean | null> {
+  const val = await redisGet(key);
+  if (val === null) return null;            // Redis unavailable
+  return parseInt(val, 10) >= max;
+}
+
+// ── In-process fallback (last resort) ─────────────────────────────────────
 interface Entry { failures: number; windowStart: number; }
 declare global { var __rateLimitStore: Map<string, Entry> | undefined; }
 const fallback: Map<string, Entry> = globalThis.__rateLimitStore
@@ -57,6 +97,7 @@ export async function isRateLimited(
   maxFail = MAX_FAILURES,
   winMs   = WINDOW_MS,
 ): Promise<boolean> {
+  // 1. Try Supabase (primary)
   try {
     const db = getSupabaseServer();
     const { data } = await db
@@ -68,9 +109,14 @@ export async function isRateLimited(
     const expired = Date.now() - new Date(data.window_start as string).getTime() >= winMs;
     if (expired) return false;
     return (data.failures as number) >= maxFail;
-  } catch {
-    return fbCheck(key, maxFail, winMs);
-  }
+  } catch { /* fall through */ }
+
+  // 2. Try Upstash Redis (secondary)
+  const redisResult = await redisCheck(`rl:${key}`, maxFail);
+  if (redisResult !== null) return redisResult;
+
+  // 3. In-process Map (last resort)
+  return fbCheck(key, maxFail, winMs);
 }
 
 /**
@@ -78,17 +124,30 @@ export async function isRateLimited(
  * Resets the window automatically if it has expired.
  */
 export async function recordFailure(key: string, winMs = WINDOW_MS): Promise<number> {
+  const ttlSeconds = Math.ceil(winMs / 1000);
+
+  // 1. Try Supabase (primary)
   try {
     const db = getSupabaseServer();
     const { data } = await db.rpc("record_rate_limit_failure", {
       p_key:       key,
       p_window_ms: winMs,
     });
-    fbRecord(key, winMs); // mirror to in-process cache
+    // Mirror to Redis so fallback stays warm
+    redisIncr(`rl:${key}`, ttlSeconds).catch(() => {});
+    fbRecord(key, winMs);
     return (data as number) ?? 1;
-  } catch {
-    return fbRecord(key, winMs);
+  } catch { /* fall through */ }
+
+  // 2. Try Upstash Redis (secondary)
+  const redisCount = await redisIncr(`rl:${key}`, ttlSeconds);
+  if (redisCount !== null) {
+    fbRecord(key, winMs); // keep in-process warm too
+    return redisCount;
   }
+
+  // 3. In-process Map (last resort)
+  return fbRecord(key, winMs);
 }
 
 /** Custom-window variant — used for phone OTP resend limiting. */
