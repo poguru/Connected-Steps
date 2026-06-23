@@ -168,7 +168,11 @@ export async function POST(req: NextRequest) {
 
     // ── Free event: create confirmed registration immediately ──────────────────
     if (finalPrice === 0) {
-      const code = genCode();
+      const code    = genCode();
+      // Generate QR token before insert so it is saved atomically with the registration.
+      // If this throws (bad env secret), the registration is never created — no orphaned records.
+      const qrToken = signEventQR(code, event_id);
+
       const { data: reg, error: regErr } = await db
         .from("event_registrations")
         .upsert({
@@ -190,13 +194,15 @@ export async function POST(req: NextRequest) {
           payment_status:    "free",
           status:            "confirmed",
           distance_category: chosenCategory,
+          qr_token:          qrToken,
         }, { onConflict: "event_id,user_email", ignoreDuplicates: false })
-        .select("registration_code")
+        .select("registration_code, qr_token")
         .single();
 
       if (regErr) return NextResponse.json({ error: regErr.message }, { status: 500 });
 
-      const finalCode = reg?.registration_code ?? code;
+      const finalCode  = reg?.registration_code ?? code;
+      const finalQr    = reg?.qr_token          ?? qrToken;
 
       // Redeem coupon atomically (fire-and-forget)
       if (couponId) {
@@ -204,17 +210,11 @@ export async function POST(req: NextRequest) {
         redeemCoupon(couponId, email.toLowerCase()).catch(console.error);
       }
 
-      // Generate QR token + store it + send confirmation email (fire-and-forget)
-      // Registration is already saved — email failure must never roll it back.
+      // Send confirmation email with QR (fire-and-forget — email failure never blocks registration)
       ;(async () => {
         try {
-          const qrToken  = signEventQR(finalCode, event_id);
-          await db.from("event_registrations")
-            .update({ qr_token: qrToken })
-            .eq("registration_code", finalCode);
-
-          const appUrl   = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
-          const qrContent = `${appUrl}/event-checkin?t=${encodeURIComponent(qrToken)}`;
+          const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+          const qrContent = `${appUrl}/event-checkin?t=${encodeURIComponent(finalQr)}`;
           const qrDataUrl = await QRCode.toDataURL(qrContent, { width: 400, margin: 2 });
 
           await sendEmail(
@@ -233,7 +233,7 @@ export async function POST(req: NextRequest) {
             }),
           );
         } catch (e) {
-          console.error("[event-register] QR/email failed (registration intact):", e);
+          console.error("[event-register] confirmation email failed (registration intact):", e);
         }
       })();
 
