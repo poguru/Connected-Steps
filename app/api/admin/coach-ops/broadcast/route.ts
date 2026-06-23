@@ -50,28 +50,19 @@ export async function POST(req: NextRequest) {
   const results = { sent: 0, failed: 0, skipped: 0 };
 
   if (channel === "email") {
-    const key  = process.env.RESEND_API_KEY;
-    const from = process.env.RESEND_FROM_EMAIL ?? "Connected Steps <noreply@connectedsteps.in>";
-    if (!key) return NextResponse.json({ error: "Resend not configured" }, { status: 500 });
-
+    const { sendBatchEmails } = await import("@/lib/email-service");
     const BATCH = 100;
     for (let i = 0; i < recipients.length; i += BATCH) {
       const chunk = recipients.slice(i, i + BATCH);
-      const batch = chunk.map(r => ({
-        from,
+      const jobs  = chunk.map(r => ({
+        from:    "",
         to:      [r.email],
         subject: subject?.trim() || "Message from Connected Steps",
         html:    emailHtml(personalise(message, r.name)),
       }));
-      try {
-        const res = await fetch("https://api.resend.com/emails/batch", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-          body: JSON.stringify(batch),
-        });
-        if (res.ok) results.sent += batch.length;
-        else        results.failed += batch.length;
-      } catch { results.failed += batch.length; }
+      const { sent, failed } = await sendBatchEmails(jobs);
+      results.sent   += sent;
+      results.failed += failed;
     }
 
   } else if (channel === "whatsapp") {

@@ -86,14 +86,6 @@ async function sendSessionAnnouncementEmails(
     `/join/${session.id}`,
   ).catch(e => console.error("[admin/sessions] in-app notification error:", e));
 
-  // Email announcements — only if RESEND_API_KEY is configured
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) {
-    console.log("RESEND_API_KEY not set — skipping session announcement emails");
-    return;
-  }
-
-  const fromEmail = process.env.RESEND_FROM_EMAIL ?? "Connected Steps <noreply@connectedsteps.in>";
   const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
   const joinUrl   = `${appUrl}/join/${session.id}`;
 
@@ -111,30 +103,17 @@ async function sendSessionAnnouncementEmails(
     const batch = chunk.map(u => {
       const name = `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() || "there";
       return {
-        from:    fromEmail,
+        from:    "",
         to:      [u.email],
         subject: `New Session: ${session.title} — Connected Steps`,
         html:    buildAnnouncementEmail(name, session.title, dateStr, session.time, displayVenue, joinUrl),
       };
     });
 
-    try {
-      const res = await fetch("https://api.resend.com/emails/batch", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${resendKey}` },
-        body:    JSON.stringify(batch),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        sent += batch.length;
-      } else {
-        console.error(`Resend batch error (chunk ${i}):`, data);
-        failed += batch.length;
-      }
-    } catch (err) {
-      console.error(`Resend batch fetch error (chunk ${i}):`, err);
-      failed += batch.length;
-    }
+    const { sendBatchEmails } = await import("@/lib/email-service");
+    const { sent: s, failed: f } = await sendBatchEmails(batch);
+    sent   += s;
+    failed += f;
   }
 
   console.log(`Session announcement emails: ${sent} sent, ${failed} failed (${users.length} total users)`);

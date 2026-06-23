@@ -75,11 +75,7 @@ async function sendTrainingPlanEmail(p: {
   coach_name: string;
   days:       { type: string; detail: string; emoji: string }[];
 }) {
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) return;
-
   const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
-  const fromEmail = process.env.RESEND_FROM_EMAIL   ?? "Connected Steps <noreply@connectedsteps.in>";
   const firstName = p.firstName || "there";
 
   const dayRows = p.days.map((d, i) => {
@@ -142,17 +138,6 @@ async function sendTrainingPlanEmail(p: {
     </div>
   `;
 
-  await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Content-Type":  "application/json",
-      "Authorization": `Bearer ${resendKey}`,
-    },
-    body: JSON.stringify({
-      from:    fromEmail,
-      to:      [p.email],
-      subject: `Your training plan is ready — ${p.title}`,
-      html,
-    }),
-  });
+  const { sendSingleEmail } = await import("@/lib/email-service");
+  await sendSingleEmail({ to: p.email, subject: `Your training plan is ready — ${p.title}`, html });
 }

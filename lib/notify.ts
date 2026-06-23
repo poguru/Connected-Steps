@@ -162,27 +162,9 @@ export async function sendEmail(
     return { to, channel: "email", ok: true };
   }
 
-  const apiKey    = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.RESEND_FROM_EMAIL ?? "noreply@connectedsteps.in";
-
-  if (!apiKey) {
-    return { to, channel: "email", ok: false, error: "Resend API key not configured." };
-  }
-
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: `Connected Steps <${fromEmail}>`, to: [to], subject, html }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      return { to, channel: "email", ok: false, error: data.message ?? String(res.status) };
-    }
-    return { to, channel: "email", ok: true };
-  } catch (e: unknown) {
-    return { to, channel: "email", ok: false, error: String(e) };
-  }
+  const { sendSingleEmail } = await import("@/lib/email-service");
+  const result = await sendSingleEmail({ to, subject, html });
+  return { to, channel: "email", ok: result.ok, error: result.error };
 }
 
 // ── WhatsApp OTP ──────────────────────────────────────────────────────────────

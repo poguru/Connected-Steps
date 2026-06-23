@@ -27,34 +27,25 @@ export async function POST(req: NextRequest) {
 
     const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/auth/reset-password?token=${token}`;
 
-    // Send email via Resend
-    const resendRes = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-      },
-      body: JSON.stringify({
-        from: process.env.RESEND_FROM_EMAIL ?? "Connected Steps <noreply@connectedsteps.com>",
-        to: [email.toLowerCase().trim()],
-        subject: "Reset your Connected Steps password",
-        html: `
-          <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#111;color:#fff;border-radius:8px;">
-            <h2 style="color:#e8620a;margin-bottom:8px;">Reset your password</h2>
-            <p style="color:#aaa;margin-bottom:24px;">Click the button below to set a new password. This link expires in <strong>1 hour</strong>.</p>
-            <a href="${resetUrl}" style="display:inline-block;padding:12px 28px;background:#e8620a;color:#fff;border-radius:4px;text-decoration:none;font-weight:600;">
-              Reset Password
-            </a>
-            <p style="color:#666;font-size:12px;margin-top:24px;">If you didn't request this, you can safely ignore this email.</p>
-            <p style="color:#444;font-size:11px;margin-top:8px;">Or copy this link: ${resetUrl}</p>
-          </div>
-        `,
-      }),
+    const { sendSingleEmail } = await import("@/lib/email-service");
+    const emailResult = await sendSingleEmail({
+      to:      email.toLowerCase().trim(),
+      subject: "Reset your Connected Steps password",
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#111;color:#fff;border-radius:8px;">
+          <h2 style="color:#e8620a;margin-bottom:8px;">Reset your password</h2>
+          <p style="color:#aaa;margin-bottom:24px;">Click the button below to set a new password. This link expires in <strong>1 hour</strong>.</p>
+          <a href="${resetUrl}" style="display:inline-block;padding:12px 28px;background:#e8620a;color:#fff;border-radius:4px;text-decoration:none;font-weight:600;">
+            Reset Password
+          </a>
+          <p style="color:#666;font-size:12px;margin-top:24px;">If you didn't request this, you can safely ignore this email.</p>
+          <p style="color:#444;font-size:11px;margin-top:8px;">Or copy this link: ${resetUrl}</p>
+        </div>
+      `,
     });
 
-    if (!resendRes.ok) {
-      const err = await resendRes.text();
-      console.error("Resend error:", err);
+    if (!emailResult.ok) {
+      console.error("[forgot-password] email failed:", emailResult.error);
       return NextResponse.json({ error: "Failed to send email. Please try again." }, { status: 500 });
     }
 

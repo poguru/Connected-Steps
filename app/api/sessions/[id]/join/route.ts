@@ -186,14 +186,7 @@ async function sendJoinConfirmationEmail(p: {
   time:      string | null;
   venue:     string | null;
 }) {
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) {
-    console.error("RESEND_API_KEY not set — join confirmation email not sent to", p.email);
-    return;
-  }
-
   const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
-  const fromEmail = process.env.RESEND_FROM_EMAIL   ?? "Connected Steps <noreply@connectedsteps.in>";
   const firstName = p.firstName || "there";
   const dateLabel = formatDate(p.date) + (p.time ? ` at ${p.time}` : "");
 
@@ -274,25 +267,7 @@ async function sendJoinConfirmationEmail(p: {
 </table>
 </body></html>`;
 
-  const res  = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Content-Type":  "application/json",
-      "Authorization": `Bearer ${resendKey}`,
-    },
-    body: JSON.stringify({
-      from:    fromEmail,
-      to:      [p.email],
-      subject: `Your registration is confirmed — ${p.title} | Connected Steps`,
-      html,
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.text().catch(() => res.status.toString());
-    console.error(`Resend error for ${p.email}: ${err}`);
-  } else {
-    const data = await res.json().catch(() => ({}));
-    console.log(`Join confirmation email sent to ${p.email}, id=${data.id}`);
-  }
+  const { sendSingleEmail } = await import("@/lib/email-service");
+  const result = await sendSingleEmail({ to: p.email, subject: `Your registration is confirmed — ${p.title} | Connected Steps`, html });
+  if (!result.ok) console.error(`[SES] join confirmation failed for ${p.email}:`, result.error);
 }

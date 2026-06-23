@@ -373,25 +373,12 @@ export async function GET(req: NextRequest) {
 
     // ── 6. Send emails via Resend batch API (max 100 per request) ─────────────
     let emailSent = 0, emailFailed = 0;
-    const resendKey = process.env.RESEND_API_KEY;
 
-    if (resendKey && freshEmailBatch.length > 0) {
-      const CHUNK = 100;
-      for (let i = 0; i < freshEmailBatch.length; i += CHUNK) {
-        const chunk = freshEmailBatch.slice(i, i + CHUNK);
-        try {
-          const res = await fetch("https://api.resend.com/emails/batch", {
-            method:  "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${resendKey}` },
-            body:    JSON.stringify(chunk),
-          });
-          if (res.ok) { emailSent   += chunk.length; }
-          else        { emailFailed += chunk.length; console.error("[weekly-digest] Resend batch error:", await res.text().catch(() => res.status)); }
-        } catch (err) {
-          emailFailed += chunk.length;
-          console.error("[weekly-digest] Resend fetch error:", err);
-        }
-      }
+    if (freshEmailBatch.length > 0) {
+      const { sendBatchEmails } = await import("@/lib/email-service");
+      const { sent, failed } = await sendBatchEmails(freshEmailBatch);
+      emailSent   = sent;
+      emailFailed = failed;
     }
 
     console.log(

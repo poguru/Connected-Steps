@@ -82,17 +82,6 @@ async function sendCoachReplyEmail(q: {
     </div>
   `;
 
-  await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Content-Type":  "application/json",
-      "Authorization": `Bearer ${resendKey}`,
-    },
-    body: JSON.stringify({
-      from:    fromEmail,
-      to:      [q.user_email],
-      subject: `Coach replied to your question — Connected Steps`,
-      html,
-    }),
-  });
+  const { sendSingleEmail } = await import("@/lib/email-service");
+  await sendSingleEmail({ to: q.user_email, subject: `Coach replied to your question — Connected Steps`, html });
 }

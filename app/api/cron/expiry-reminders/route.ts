@@ -163,25 +163,8 @@ async function sendExpiryEmail(
   expiresAt: string,
   daysLeft: number,
 ): Promise<boolean> {
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) return false;
-
-  const from    = process.env.RESEND_FROM_EMAIL ?? "Connected Steps <noreply@connectedsteps.in>";
+  const { sendSingleEmail } = await import("@/lib/email-service");
   const subject = `Your membership expires in ${daysLeft} day${daysLeft === 1 ? "" : "s"} – Connected Steps`;
-
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${resendKey}` },
-      body: JSON.stringify({
-        from,
-        to:      [email],
-        subject,
-        html:    expiryReminderEmailHTML(name, plan, expiresAt, daysLeft),
-      }),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
+  const result  = await sendSingleEmail({ to: email, subject, html: expiryReminderEmailHTML(name, plan, expiresAt, daysLeft) });
+  return result.ok;
 }
