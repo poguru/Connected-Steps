@@ -236,7 +236,8 @@ export default function Leaderboard() {
   const showLoadMore   = rest.length > visibleCount;
   const showStickyRank = myRank !== null && myRank > 10;
 
-  function followBtn(email: string, compact = false) {
+  function followBtn(email: string | null, compact = false) {
+    if (!email) return null;
     const isFollowing = followingSet.has(email);
     const busy        = followBusy.has(email);
     return (
@@ -296,7 +297,7 @@ export default function Leaderboard() {
           {[
             { val: filtered.length,                                             label: "Runners" },
             { val: myRank ? `#${myRank}` : "—",                                label: "Your rank" },
-            { val: filtered.filter(e => followingSet.has(e.user_email)).length, label: "Following" },
+            { val: filtered.filter(e => e.user_email != null && followingSet.has(e.user_email)).length, label: "Following" },
           ].map(s => (
             <div key={s.label} style={{ flex: 1, background: "var(--surface)", padding: "8px 12px", textAlign: "center" }}>
               <div style={{ fontSize: "1rem", fontWeight: 800, color: "var(--cs-orange)", letterSpacing: "-0.3px" }}>{s.val}</div>
@@ -618,24 +619,24 @@ export default function Leaderboard() {
                     ))}
                   </div>
 
-                  {/* Follow / Following button */}
-                  {!isMe && (
+                  {/* Follow / Following button — only shown when email is known (authenticated) */}
+                  {!isMe && preview.user_email && (
                     <button
-                      onClick={() => toggleFollow(preview.user_email)}
-                      disabled={followBusy.has(preview.user_email)}
+                      onClick={() => toggleFollow(preview.user_email!)}
+                      disabled={followBusy.has(preview.user_email!)}
                       style={{
                         width: "100%", padding: "13px", borderRadius: 12,
                         fontSize: "0.9rem", fontWeight: 700,
-                        cursor: followBusy.has(preview.user_email) ? "not-allowed" : "pointer",
+                        cursor: followBusy.has(preview.user_email!) ? "not-allowed" : "pointer",
                         fontFamily: "var(--font-body)", border: "1px solid", transition: "all 0.15s",
-                        opacity: followBusy.has(preview.user_email) ? 0.6 : 1,
-                        background:  followingSet.has(preview.user_email) ? "transparent" : "var(--gradient-accent)",
-                        color:       followingSet.has(preview.user_email) ? "var(--muted-foreground)" : "#fff",
-                        borderColor: followingSet.has(preview.user_email) ? "var(--border)" : "transparent",
-                        boxShadow:   followingSet.has(preview.user_email) ? "none" : "var(--shadow-orange)",
+                        opacity: followBusy.has(preview.user_email!) ? 0.6 : 1,
+                        background:  followingSet.has(preview.user_email!) ? "transparent" : "var(--gradient-accent)",
+                        color:       followingSet.has(preview.user_email!) ? "var(--muted-foreground)" : "#fff",
+                        borderColor: followingSet.has(preview.user_email!) ? "var(--border)" : "transparent",
+                        boxShadow:   followingSet.has(preview.user_email!) ? "none" : "var(--shadow-orange)",
                       }}
                     >
-                      {followBusy.has(preview.user_email) ? "…" : followingSet.has(preview.user_email) ? "Following" : "Follow"}
+                      {followBusy.has(preview.user_email!) ? "…" : followingSet.has(preview.user_email!) ? "Following" : "Follow"}
                     </button>
                   )}
 
