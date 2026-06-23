@@ -39,7 +39,11 @@ const focusHandlers = {
 };
 
 // email → email-otp → details → done (account created)
+// When NEXT_PUBLIC_ENABLE_SIGNUP_OTP_VERIFICATION=false the email-otp step is skipped.
 type Step = "email" | "email-otp" | "details";
+
+const OTP_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_SIGNUP_OTP_VERIFICATION !== "false";
 
 interface Props { onSwitchToLogin: () => void; }
 
@@ -192,20 +196,36 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
   if (step === "email") return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <ProgressBar />
-      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Step 1 — Verify your email</p>
+      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>
+        Step 1 — {OTP_ENABLED ? "Verify your email" : "Enter your email"}
+      </p>
       <input
         style={inputStyle} type="email" placeholder="Email address"
         value={email} onChange={e => { setEmail(e.target.value); setOtpError(""); }}
         autoComplete="email" {...focusHandlers}
       />
       {otpError && <ErrorBlock msg={otpError} />}
-      <button
-        type="button" onClick={() => sendOtp("email", email, "register")}
-        disabled={sending || !email.includes("@")}
-        style={{ width: "100%", padding: "13px", borderRadius: 999, background: email.includes("@") ? "var(--gradient-accent)" : "oklch(0.72 0.19 49 / 30%)", color: "var(--accent-foreground)", border: "none", cursor: email.includes("@") ? "pointer" : "not-allowed", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem", boxShadow: email.includes("@") ? "var(--shadow-orange)" : "none" }}
-      >
-        {sending ? "Sending…" : "Send OTP to Email →"}
-      </button>
+      {OTP_ENABLED ? (
+        <button
+          type="button" onClick={() => sendOtp("email", email, "register")}
+          disabled={sending || !email.includes("@")}
+          style={{ width: "100%", padding: "13px", borderRadius: 999, background: email.includes("@") ? "var(--gradient-accent)" : "oklch(0.72 0.19 49 / 30%)", color: "var(--accent-foreground)", border: "none", cursor: email.includes("@") ? "pointer" : "not-allowed", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem", boxShadow: email.includes("@") ? "var(--shadow-orange)" : "none" }}
+        >
+          {sending ? "Sending…" : "Send OTP to Email →"}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            console.log("[signup] OTP verification bypassed (NEXT_PUBLIC_ENABLE_SIGNUP_OTP_VERIFICATION=false) for:", email);
+            setStep("details");
+          }}
+          disabled={!email.includes("@")}
+          style={{ width: "100%", padding: "13px", borderRadius: 999, background: email.includes("@") ? "var(--gradient-accent)" : "oklch(0.72 0.19 49 / 30%)", color: "var(--accent-foreground)", border: "none", cursor: email.includes("@") ? "pointer" : "not-allowed", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem", boxShadow: email.includes("@") ? "var(--shadow-orange)" : "none" }}
+        >
+          Continue →
+        </button>
+      )}
     </div>
   );
 
