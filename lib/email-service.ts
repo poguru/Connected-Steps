@@ -69,40 +69,71 @@ function defaultFrom(): string {
   );
 }
 
+// ── Resend fallback ───────────────────────────────────────────────────────────
+// Used when SES is unavailable or in Sandbox (which rejects unverified addresses).
+// Requires RESEND_API_KEY env var. Once SES production access is approved and
+// all users can receive SES emails, this fallback becomes a no-op.
+
+async function sendViaResend(msg: EmailMessage, from: string): Promise<SendResult> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return { ok: false, to: msg.to, error: "Resend not configured" };
+  try {
+    const res  = await fetch("https://api.resend.com/emails", {
+      method:  "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body:    JSON.stringify({ from, to: [msg.to], subject: msg.subject, html: msg.html }),
+    });
+    const data = await res.json().catch(() => ({})) as { message?: string };
+    if (!res.ok) {
+      console.error(`[Resend] fallback failed to=${msg.to}:`, data.message ?? res.status);
+      return { ok: false, to: msg.to, error: data.message ?? String(res.status) };
+    }
+    console.log(`[Resend] fallback sent to=${msg.to} subject="${msg.subject}"`);
+    return { ok: true, to: msg.to };
+  } catch (e: unknown) {
+    return { ok: false, to: msg.to, error: String(e) };
+  }
+}
+
 // ── Core send ─────────────────────────────────────────────────────────────────
+// Tries SES first. If SES fails (e.g. Sandbox rejects unverified address,
+// credentials wrong, or region misconfigured) falls back to Resend automatically.
 
 export async function sendSingleEmail(msg: EmailMessage): Promise<SendResult> {
   const from = msg.from ?? defaultFrom();
 
-  if (!process.env.AWS_SES_ACCESS_KEY_ID) {
-    console.warn("[SES] AWS_SES_ACCESS_KEY_ID not set — email skipped:", msg.subject);
-    return { ok: false, to: msg.to, error: "SES not configured" };
-  }
-
-  const input: SendEmailCommandInput = {
-    FromEmailAddress: from,
-    Destination:      { ToAddresses: [msg.to] },
-    ReplyToAddresses: msg.replyTo ? [msg.replyTo] : undefined,
-    Content: {
-      Simple: {
-        Subject: { Data: msg.subject, Charset: "UTF-8" },
-        Body: {
-          Html: { Data: msg.html,                              Charset: "UTF-8" },
-          Text: { Data: msg.html.replace(/<[^>]*>/g, " "),    Charset: "UTF-8" },
+  // Try SES if credentials are configured
+  if (process.env.AWS_SES_ACCESS_KEY_ID) {
+    const input: SendEmailCommandInput = {
+      FromEmailAddress: from,
+      Destination:      { ToAddresses: [msg.to] },
+      ReplyToAddresses: msg.replyTo ? [msg.replyTo] : undefined,
+      Content: {
+        Simple: {
+          Subject: { Data: msg.subject, Charset: "UTF-8" },
+          Body: {
+            Html: { Data: msg.html,                           Charset: "UTF-8" },
+            Text: { Data: msg.html.replace(/<[^>]*>/g, " "), Charset: "UTF-8" },
+          },
         },
       },
-    },
-  };
+    };
 
-  try {
-    await getClient().send(new SendEmailCommand(input));
-    console.log(`[SES] sent to=${msg.to} subject="${msg.subject}"`);
-    return { ok: true, to: msg.to };
-  } catch (e: unknown) {
-    const err = e instanceof Error ? e.message : String(e);
-    console.error(`[SES] failed to=${msg.to} subject="${msg.subject}":`, err);
-    return { ok: false, to: msg.to, error: err };
+    try {
+      await getClient().send(new SendEmailCommand(input));
+      console.log(`[SES] sent to=${msg.to} subject="${msg.subject}"`);
+      return { ok: true, to: msg.to };
+    } catch (e: unknown) {
+      const err = e instanceof Error ? e.message : String(e);
+      console.error(`[SES] failed to=${msg.to} — falling back to Resend. Error: ${err}`);
+      // Fall through to Resend below
+    }
+  } else {
+    console.warn(`[SES] AWS_SES_ACCESS_KEY_ID not set — trying Resend fallback for: ${msg.subject}`);
   }
+
+  // Resend fallback (covers SES Sandbox, missing credentials, region issues)
+  return sendViaResend(msg, from);
 }
 
 // ── Batch send (parallel, max concurrency 10) ─────────────────────────────────

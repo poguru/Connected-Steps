@@ -140,13 +140,21 @@ export async function POST(req: NextRequest) {
     // ── Dispatch ──────────────────────────────────────────────────────────────
     const displayName = (name as string | undefined)?.trim() || "there";
     if (type === "email") {
-      await sendEmail(
+      const result = await sendEmail(
         identifier,
         displayName,
         "Your Connected Steps verification code",
         otpEmailHTML(displayName, code),
         true, // isOtp — must always send regardless of NON_OTP_EMAILS_DISABLED
       );
+      if (!result.ok) {
+        console.error(`[send-otp] email delivery failed for ${identifier}: ${result.error}`);
+        return NextResponse.json(
+          { error: "Failed to send OTP email. Please try again in a moment." },
+          { status: 500 },
+        );
+      }
+      console.log(`[send-otp] OTP email delivered to ${identifier}`);
     } else {
       await sendWhatsAppOTP(identifier, displayName, code);
     }
