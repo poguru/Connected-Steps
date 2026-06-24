@@ -4,15 +4,17 @@ import { useState, FormEvent } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function ResetPasswordForm() {
   const searchParams = useSearchParams();
   const router       = useRouter();
   const token        = searchParams.get("token") ?? "";
 
-  const [password,  setPassword]  = useState("");
-  const [confirm,   setConfirm]   = useState("");
-  const [showPw,    setShowPw]    = useState(false);
+  const [password,     setPassword]     = useState("");
+  const [confirm,      setConfirm]      = useState("");
+  const [showPw,       setShowPw]       = useState(false);
+  const [showConfirm,  setShowConfirm]  = useState(false);
   const [loading,   setLoading]   = useState(false);
   const [error,     setError]     = useState("");
   const [done,      setDone]      = useState(false);
@@ -93,30 +95,48 @@ export default function ResetPasswordForm() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} noValidate>
-              <div className="mb-3 flex items-center auth-input" style={{ padding: 0 }}>
+              {/* New password — relative container keeps toggle inside field */}
+              <div className="mb-3" style={{ position: "relative" }}>
                 <input
+                  className="auth-input"
                   type={showPw ? "text" : "password"}
                   placeholder="New password (min 8 chars)"
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setError(""); }}
                   autoComplete="new-password"
-                  style={{ flex: 1, background: "transparent", border: "none", outline: "none", padding: "11px 14px", color: "var(--cs-white)", fontFamily: "var(--font-body)", fontSize: "14px" }}
+                  aria-label="New password"
+                  style={{ paddingRight: 44 }}
                 />
-                <button type="button" onClick={() => setShowPw(!showPw)}
-                  style={{ color: "var(--cs-muted)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 500, padding: "0 14px 0 0", whiteSpace: "nowrap", marginLeft: "auto" }}>
-                  {showPw ? "Hide" : "Show"}
+                <button
+                  type="button"
+                  onClick={() => setShowPw(!showPw)}
+                  aria-label={showPw ? "Hide password" : "Show password"}
+                  style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--cs-muted)", display: "flex", alignItems: "center", padding: 0 }}
+                >
+                  {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
 
-              <div className="mb-4">
+              {/* Confirm password — same pattern */}
+              <div className="mb-4" style={{ position: "relative" }}>
                 <input
                   className="auth-input"
-                  type={showPw ? "text" : "password"}
+                  type={showConfirm ? "text" : "password"}
                   placeholder="Confirm new password"
                   value={confirm}
                   onChange={(e) => { setConfirm(e.target.value); setError(""); }}
                   autoComplete="new-password"
+                  aria-label="Confirm new password"
+                  style={{ paddingRight: 44 }}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm(!showConfirm)}
+                  aria-label={showConfirm ? "Hide confirm password" : "Show confirm password"}
+                  style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--cs-muted)", display: "flex", alignItems: "center", padding: 0 }}
+                >
+                  {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
 
               {error && (

@@ -307,7 +307,15 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
           {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
         </button>
       </div>
-      <input style={inputStyle} name="confirm" type={showPw ? "text" : "password"} placeholder="Confirm password" value={form.confirm} onChange={handleFormChange} autoComplete="new-password" {...focusHandlers} />
+      <div style={{ position: "relative" }}>
+        <input style={{ ...inputStyle, paddingRight: 44 }} name="confirm" type={showPw ? "text" : "password"}
+          placeholder="Confirm password" value={form.confirm} onChange={handleFormChange}
+          autoComplete="new-password" aria-label="Confirm password" {...focusHandlers} />
+        <button type="button" onClick={() => setShowPw(!showPw)} aria-label={showPw ? "Hide password" : "Show password"}
+          style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--muted-foreground)", display: "flex", padding: 0 }}>
+          {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+        </button>
+      </div>
 
       {/* Phone — now required */}
       <div>
