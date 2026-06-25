@@ -226,6 +226,7 @@ export async function POST(req: NextRequest) {
               distanceCategory: chosenCategory,
               qrToken:          finalQr,
             }),
+            false, true, // isOtp=false, isTransactional=true — bypass NON_OTP_EMAILS_DISABLED
           );
         } catch (e) {
           console.error("[event-register] confirmation email failed (registration intact):", e);

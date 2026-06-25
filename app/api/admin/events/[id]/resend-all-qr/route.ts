@@ -121,6 +121,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             distanceCategory: reg.distance_category,
             qrToken,
           }),
+          false, // isOtp
+          true,  // isTransactional — bypass NON_OTP_EMAILS_DISABLED
         );
 
         if (result.ok) {

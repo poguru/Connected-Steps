@@ -93,6 +93,7 @@ export async function POST(req: NextRequest) {
           reg.user_email,
           reg.user_name,
           `Event Registration Confirmed – ${ev?.title ?? "Connected Steps Event"}`,
+          // isTransactional=true bypasses NON_OTP_EMAILS_DISABLED
           eventRegistrationEmailHTML({
             name:             reg.user_name,
             eventTitle:       ev?.title ?? "Connected Steps Event",
@@ -103,6 +104,7 @@ export async function POST(req: NextRequest) {
             distanceCategory: reg.distance_category,
             qrToken,
           }),
+          false, true, // isOtp=false, isTransactional=true
         );
       } catch (e) {
         console.error("[event-verify-payment] QR/email failed (payment intact):", e);

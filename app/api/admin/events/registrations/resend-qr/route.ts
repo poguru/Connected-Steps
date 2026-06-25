@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
         distanceCategory: reg.distance_category,
         qrToken,
       }),
+      false, true, // isOtp=false, isTransactional=true
     );
 
     if (!result.ok) return NextResponse.json({ error: `Email failed: ${result.error}` }, { status: 500 });

@@ -157,10 +157,14 @@ export async function sendEmail(
   subject: string,
   html: string,
   isOtp = false,
+  isTransactional = false,  // true = bypass NON_OTP_EMAILS_DISABLED (QR, registration, payment)
 ): Promise<NotifyResult> {
   if (NOTIFICATIONS_PAUSED) return { to, channel: "email", ok: true };
 
-  if (!isOtp && process.env.NON_OTP_EMAILS_DISABLED === "true") {
+  // NON_OTP_EMAILS_DISABLED suppresses optional emails (marketing, digests, notifications).
+  // Transactional emails (QR codes, registration confirmation, payment receipts) are NEVER
+  // suppressed — users must receive these to use the product.
+  if (!isOtp && !isTransactional && process.env.NON_OTP_EMAILS_DISABLED === "true") {
     console.log(`[email] SKIPPED (NON_OTP_EMAILS_DISABLED) to=${to} subject="${subject}"`);
     return { to, channel: "email", ok: true };
   }
