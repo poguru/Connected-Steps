@@ -140,6 +140,21 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
     alert(res.ok ? data.message : `Error: ${data.error}`);
   }
 
+  const [bulkSending, setBulkSending] = useState(false);
+  const [bulkResult,  setBulkResult]  = useState("");
+
+  async function resendAllQR() {
+    const confirmed = regs.filter(r => r.status === "confirmed").length;
+    if (!confirm(`Send QR email to all ${confirmed} confirmed registrants? This may take a moment.`)) return;
+    setBulkSending(true); setBulkResult("");
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/resend-all-qr`, { method: "POST", headers });
+      const data = await res.json();
+      setBulkResult(res.ok ? `✅ Sent: ${data.sent}  Failed: ${data.failed}  Total: ${data.total}` : `❌ ${data.error}`);
+    } catch { setBulkResult("❌ Network error"); }
+    finally { setBulkSending(false); }
+  }
+
   async function sendCommunication(e: React.FormEvent) {
     e.preventDefault();
     if (!commSubject.trim() || !commBody.trim()) return;
@@ -220,9 +235,16 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
         <span style={{ color: "#888", fontSize: "0.85rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>
           {eventTitle || "Registrations"}
         </span>
-        <button onClick={exportCSV} style={{ marginLeft: "auto", padding: "6px 16px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: "0.8rem", fontFamily: "inherit" }}>
-          Export CSV
-        </button>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+          {bulkResult && <span style={{ fontSize: "0.75rem", color: bulkResult.startsWith("✅") ? "#4ade80" : "#f87171" }}>{bulkResult}</span>}
+          <button onClick={resendAllQR} disabled={bulkSending}
+            style={{ padding: "6px 14px", background: bulkSending ? "#1a1a1a" : "rgba(96,165,250,0.15)", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 6, color: bulkSending ? "#444" : "#60a5fa", cursor: bulkSending ? "not-allowed" : "pointer", fontSize: "0.8rem", fontFamily: "inherit", fontWeight: 600 }}>
+            {bulkSending ? "Sending…" : "📧 Resend QR to All"}
+          </button>
+          <button onClick={exportCSV} style={{ padding: "6px 16px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: "0.8rem", fontFamily: "inherit" }}>
+            Export CSV
+          </button>
+        </div>
       </header>
 
       <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "2rem 1.5rem" }}>
