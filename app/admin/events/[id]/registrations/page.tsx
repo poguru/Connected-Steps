@@ -133,6 +133,13 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
     if (res.ok) setRegs(r => r.map(x => x.id === id ? { ...x, status: "cancelled" } : x));
   }
 
+  async function resendQR(id: string, name: string) {
+    if (!confirm(`Resend QR email to ${name}?`)) return;
+    const res  = await fetch("/api/admin/events/registrations/resend-qr", { method: "POST", headers, body: JSON.stringify({ registration_id: id }) });
+    const data = await res.json();
+    alert(res.ok ? data.message : `Error: ${data.error}`);
+  }
+
   async function sendCommunication(e: React.FormEvent) {
     e.preventDefault();
     if (!commSubject.trim() || !commBody.trim()) return;
@@ -335,12 +342,20 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
                           ) : <span style={{ fontSize: "10px", color: "#555" }}>—</span>}
                         </td>
                         <td style={{ padding: "10px 14px" }}>
-                          {r.status !== "cancelled" && (
-                            <button onClick={() => cancel(r.id)}
-                              style={{ padding: "4px 10px", borderRadius: 5, border: "1px solid rgba(239,68,68,0.3)", background: "transparent", color: "#f09595", cursor: "pointer", fontSize: "0.75rem", fontFamily: "inherit" }}>
-                              Cancel
-                            </button>
-                          )}
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {r.status === "confirmed" && (
+                              <button onClick={() => resendQR(r.id, r.user_name)}
+                                style={{ padding: "4px 10px", borderRadius: 5, border: "1px solid rgba(96,165,250,0.3)", background: "transparent", color: "#60a5fa", cursor: "pointer", fontSize: "0.72rem", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                                📧 QR
+                              </button>
+                            )}
+                            {r.status !== "cancelled" && (
+                              <button onClick={() => cancel(r.id)}
+                                style={{ padding: "4px 10px", borderRadius: 5, border: "1px solid rgba(239,68,68,0.3)", background: "transparent", color: "#f09595", cursor: "pointer", fontSize: "0.75rem", fontFamily: "inherit" }}>
+                                Cancel
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}

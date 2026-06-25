@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { isAdminOrCoach } from "@/lib/admin-auth";
+import { isAdminOrCoach, getCoachEmailFromCookie } from "@/lib/admin-auth";
 import { verifyEventQR } from "@/lib/event-qr";
 
 // POST /api/events/check-in
@@ -79,11 +79,12 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // 5. Mark as checked in
-  const now = new Date().toISOString();
+  // 5. Mark as checked in — record who scanned (admin email from cookie)
+  const now          = new Date().toISOString();
+  const adminEmail   = getCoachEmailFromCookie(req) ?? "admin";
   const { error: updateErr } = await db
     .from("event_registrations")
-    .update({ checked_in_at: now })
+    .update({ checked_in_at: now, checked_in_by: adminEmail })
     .eq("id", reg.id);
 
   if (updateErr) {

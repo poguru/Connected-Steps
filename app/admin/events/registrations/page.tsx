@@ -53,7 +53,7 @@ export default function AdminEventRegistrationsIndex() {
       fetch("/api/admin/events/registrations/summary").then(r => r.json()).catch(() => ({ summaries: [] })),
     ])
       .then(([evData, sumData]) => {
-        setEvents(evData.events ?? []);
+        setEvents(evData.data ?? []);
         const map: Record<string, RegStats> = {};
         for (const s of sumData.summaries ?? []) map[s.event_id] = s;
         setStats(map);
