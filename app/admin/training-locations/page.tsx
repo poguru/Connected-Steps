@@ -11,8 +11,11 @@ interface Location {
 const S: Record<string, React.CSSProperties> = {
   card:  { background:"#111", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10, padding:"1.25rem" },
   input: { width:"100%", padding:"9px 12px", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:6, color:"#fff", fontSize:"0.85rem", outline:"none", fontFamily:"inherit", boxSizing:"border-box" as const },
-  btn:   (primary=true): React.CSSProperties => ({ padding:"9px 18px", background:primary?"#e8620a":"rgba(255,255,255,0.06)", border:"none", borderRadius:6, color:primary?"#fff":"#aaa", fontWeight:600, fontSize:"0.82rem", cursor:"pointer", fontFamily:"inherit" }),
 };
+
+function btnStyle(primary = true): React.CSSProperties {
+  return { padding:"9px 18px", background:primary?"#e8620a":"rgba(255,255,255,0.06)", border:"none", borderRadius:6, color:primary?"#fff":"#aaa", fontWeight:600, fontSize:"0.82rem", cursor:"pointer", fontFamily:"inherit" };
+}
 
 const BLANK = { name:"", area:"", city:"Hyderabad", state:"Telangana", meeting_point:"", maps_url:"", display_order:0 };
 
@@ -32,7 +35,7 @@ function MigrateButton() {
   return (
     <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
       {result && <span style={{ fontSize:"0.72rem", color: result.startsWith("✅") ? "#4ade80" : "#f87171" }}>{result}</span>}
-      <button onClick={run} disabled={running} style={{ ...S.btn(false), fontSize:"0.78rem" }}>
+      <button onClick={run} disabled={running} style={{ ...btnStyle(false), fontSize:"0.78rem" }}>
         {running ? "Migrating…" : "⚡ Auto-assign Existing Users"}
       </button>
     </div>
@@ -121,7 +124,7 @@ export default function AdminTrainingLocationsPage() {
         <span style={{ fontWeight:700, fontSize:"0.95rem" }}>Training Locations</span>
         <div style={{ display:"flex", gap:8 }}>
           <MigrateButton />
-          <button onClick={openCreate} style={S.btn()}>+ New Location</button>
+          <button onClick={openCreate} style={btnStyle()}>+ New Location</button>
         </div>
       </header>
 
@@ -146,9 +149,9 @@ export default function AdminTrainingLocationsPage() {
                     <div style={{ fontSize:12, color:"#e8620a", marginTop:4, fontWeight:600 }}>{loc.member_count} members</div>
                   </div>
                   <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
-                    <button onClick={() => openMembers(loc)} style={{ ...S.btn(false), fontSize:"0.75rem" }}>👥 Members</button>
-                    <button onClick={() => openEdit(loc)}   style={{ ...S.btn(false), fontSize:"0.75rem" }}>Edit</button>
-                    <button onClick={() => toggleStatus(loc)} style={{ ...S.btn(false), fontSize:"0.75rem" }}>
+                    <button onClick={() => openMembers(loc)} style={{ ...btnStyle(false), fontSize:"0.75rem" }}>👥 Members</button>
+                    <button onClick={() => openEdit(loc)}   style={{ ...btnStyle(false), fontSize:"0.75rem" }}>Edit</button>
+                    <button onClick={() => toggleStatus(loc)} style={{ ...btnStyle(false), fontSize:"0.75rem" }}>
                       {loc.status==="active" ? "Disable" : "Enable"}
                     </button>
                     {loc.member_count === 0 && (
@@ -186,8 +189,8 @@ export default function AdminTrainingLocationsPage() {
               ))}
               {saveErr && <div style={{ color:"#f87171", fontSize:13 }}>{saveErr}</div>}
               <div style={{ display:"flex", gap:10, marginTop:4 }}>
-                <button type="button" onClick={() => setModal(false)} style={{ ...S.btn(false), flex:1 }}>Cancel</button>
-                <button type="submit" disabled={saving} style={{ ...S.btn(), flex:1 }}>{saving ? "Saving…" : editing ? "Save Changes" : "Create"}</button>
+                <button type="button" onClick={() => setModal(false)} style={{ ...btnStyle(false), flex:1 }}>Cancel</button>
+                <button type="submit" disabled={saving} style={{ ...btnStyle(), flex:1 }}>{saving ? "Saving…" : editing ? "Save Changes" : "Create"}</button>
               </div>
             </form>
           </div>
@@ -204,7 +207,7 @@ export default function AdminTrainingLocationsPage() {
             </div>
             <div style={{ display:"flex", gap:8, marginBottom:"1rem" }}>
               <input style={{ ...S.input, flex:1 }} placeholder="User email to assign…" value={assignEmail} onChange={e => setAssignEmail(e.target.value)} />
-              <button onClick={assignMember} disabled={assigning || !assignEmail.trim()} style={S.btn()}>{assigning ? "…" : "Assign"}</button>
+              <button onClick={assignMember} disabled={assigning || !assignEmail.trim()} style={btnStyle()}>{assigning ? "…" : "Assign"}</button>
             </div>
             <div style={{ flex:1, overflowY:"auto" }}>
               {members.length === 0 ? (

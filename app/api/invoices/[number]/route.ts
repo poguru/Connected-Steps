@@ -16,18 +16,31 @@ export async function GET(
 
   const { data: inv } = await db
     .from("invoices")
-    .select("id, invoice_number, user_email, invoice_html, invoice_status")
+    .select("id, invoice_number, user_email, invoice_html, storage_path, invoice_status")
     .eq("invoice_number", invoiceNumber)
     .single();
 
   if (!inv) return new NextResponse("Invoice not found", { status: 404 });
-  if (!inv.invoice_html) return new NextResponse("Invoice not yet generated", { status: 404 });
+
+  let html: string | null = null;
+
+  // New path: download HTML from Supabase Storage
+  if (inv.storage_path) {
+    const { data: fileData } = await db.storage
+      .from("bills-of-supply")
+      .download(inv.storage_path);
+    if (fileData) html = await fileData.text();
+  }
+
+  // Legacy fallback: serve from DB column (invoices created before storage migration)
+  if (!html && inv.invoice_html) html = inv.invoice_html;
+
+  if (!html) return new NextResponse("Invoice not yet generated", { status: 404 });
 
   // Invoice URLs are semi-private (sequential but not enumerable without knowing
   // the start). No PII beyond name/product/amount in the HTML.
   // Public access is intentional — same model used by Stripe, Razorpay, QuickBooks.
-  // Admins can still be identified server-side for audit purposes.
-  return new NextResponse(inv.invoice_html, {
+  return new NextResponse(html, {
     headers: {
       "Content-Type":  "text/html; charset=utf-8",
       "Cache-Control": "private, no-store",

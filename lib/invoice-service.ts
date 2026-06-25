@@ -452,7 +452,7 @@ export async function createAndSendInvoice(input: InvoiceInput): Promise<Invoice
 
     console.log(`[invoice] Bill of Supply created ${inv.invoice_number} for ${input.userEmail}`);
 
-    // Generate HTML and store it
+    // Generate HTML
     const html = generateInvoiceHTML({
       invoiceNumber:  inv.invoice_number,
       invoiceDate:    today,
@@ -472,7 +472,17 @@ export async function createAndSendInvoice(input: InvoiceInput): Promise<Invoice
       totalAmount:    totalAmt,
     });
 
-    await db.from("invoices").update({ invoice_html: html }).eq("id", inv.id);
+    // Upload HTML to Supabase Storage (private bucket) instead of storing in DB column.
+    // Fallback: if upload fails, store in invoice_html column so download still works.
+    const storagePath = await uploadBillToStorage(db, inv.invoice_number, html);
+    if (storagePath) {
+      await db.from("invoices").update({ storage_path: storagePath }).eq("id", inv.id);
+      console.log(`[invoice] uploaded to storage: ${storagePath}`);
+    } else {
+      // Fallback: store HTML in DB column (legacy path) so existing download flow works
+      await db.from("invoices").update({ invoice_html: html }).eq("id", inv.id);
+      console.warn(`[invoice] storage upload failed — stored HTML in DB column for ${inv.invoice_number}`);
+    }
 
     // Send email with invoice link
     void sendInvoiceEmail(inv.id, inv.invoice_number, input, html);
@@ -480,6 +490,27 @@ export async function createAndSendInvoice(input: InvoiceInput): Promise<Invoice
     return inv as Invoice;
   } catch (e: unknown) {
     console.error("[invoice] createAndSendInvoice failed:", e);
+    return null;
+  }
+}
+
+async function uploadBillToStorage(
+  db: ReturnType<typeof getSupabaseServer>,
+  invoiceNumber: string,
+  html: string,
+): Promise<string | null> {
+  try {
+    const fileName = `${invoiceNumber}.html`;
+    const { error } = await db.storage
+      .from("bills-of-supply")
+      .upload(fileName, Buffer.from(html, "utf-8"), {
+        contentType: "text/html; charset=utf-8",
+        upsert: true,
+      });
+    if (error) { console.error("[invoice] storage upload error:", error.message); return null; }
+    return fileName;
+  } catch (e) {
+    console.error("[invoice] storage upload exception:", e);
     return null;
   }
 }
