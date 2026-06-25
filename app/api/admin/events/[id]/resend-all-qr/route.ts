@@ -26,11 +26,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
   let sent = 0, failed = 0;
 
-  for (const reg of regs as Array<{
+  type RegRow = {
     id: string; registration_code: string; user_email: string; user_name: string;
     distance_category: string | null;
     events: { title: string; start_date: string; start_time: string | null; location: string } | null;
-  }>) {
+  };
+  for (const reg of (regs as unknown as RegRow[])) {
     try {
       const qrToken   = signEventQR(reg.registration_code, eventId);
       await db.from("event_registrations").update({ qr_token: qrToken }).eq("id", reg.id);
