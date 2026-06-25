@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
-import { sendEmail, sendWhatsApp, paymentEmailHTML, membershipWAParams } from "@/lib/notify";
+import { sendWhatsApp, membershipWAParams } from "@/lib/notify";
 import { autoFeedMembershipActivated } from "@/lib/auto-feed";
-import { createAndSendInvoice } from "@/lib/invoice-service";
+import { enqueueJob } from "@/lib/job-queue";
 
 const PLAN_MONTHS: Record<string, number> = {
   monthly:  1,
@@ -93,41 +93,40 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Generate GST invoice for membership (fire-and-forget)
-  void createAndSendInvoice({
-    userEmail:       email.toLowerCase(),
-    userName:        name || "Member",
-    productName:     `Membership — ${PLAN_LABELS[plan] ?? plan}`,
+  const displayName = name || "Member";
+  const planLabel   = PLAN_LABELS[plan] ?? plan;
+  const amountINR   = amount / 100;
+  const expiryISO   = expiresAt.toISOString();
+
+  // Enqueue GST invoice generation — durable, retried on failure
+  await enqueueJob("invoice_generate", {
     productType:     "membership",
-    totalPaidRupees: amount / 100,  // amount is in paise
+    userEmail:       email.toLowerCase(),
+    userName:        displayName,
+    productName:     `Membership — ${planLabel}`,
+    totalPaidRupees: amountINR,
     paymentId:       razorpay_payment_id,
     orderId:         razorpay_order_id,
-  });
+  }, { idempotencyKey: `invoice_generate:${razorpay_payment_id}` });
+
+  // Enqueue membership confirmation email — retried on SES failure
+  await enqueueJob("membership_email", {
+    userEmail:  email.toLowerCase(),
+    userName:   displayName,
+    planLabel,
+    amountINR,
+    expiresAt:  expiryISO,
+    paymentId:  razorpay_payment_id,
+  }, { idempotencyKey: `membership_email:${razorpay_payment_id}`, priority: 10 });
 
   // Coupon was already atomically claimed at create-order time to prevent
   // race conditions. No second redemption needed here.
 
-  // Fetch user phone for WhatsApp
-  const { data: userRow } = await db.from("users").select("phone").eq("email", email.toLowerCase()).single();
-  const phone = userRow?.phone ?? null;
-
-  const displayName  = name || "Member";
-  const planLabel    = PLAN_LABELS[plan] ?? plan;
-  const amountINR    = amount / 100;
-  const expiryISO    = expiresAt.toISOString();
-
+  // Fast fire-and-forget: in-app feed + WhatsApp (non-critical, no retry needed)
   autoFeedMembershipActivated(email.toLowerCase(), displayName, planLabel).catch(() => {});
 
-  // Fire-and-forget: email + WhatsApp
-  sendEmail(
-    email.toLowerCase(),
-    displayName,
-    "Membership Confirmed – Connected Steps",
-    paymentEmailHTML(displayName, planLabel, amountINR, expiryISO),
-    false, // isOtp
-    true,  // isTransactional — bypass NON_OTP_EMAILS_DISABLED
-  ).catch(console.error);
-
+  const { data: userRow } = await db.from("users").select("phone").eq("email", email.toLowerCase()).single();
+  const phone = userRow?.phone ?? null;
   if (phone) {
     sendWhatsApp(
       phone,

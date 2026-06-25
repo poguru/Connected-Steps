@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
-import { createAndSendInvoice } from "@/lib/invoice-service";
+import { enqueueJob } from "@/lib/job-queue";
 
 // POST /api/admin/invoices/backfill
 // Finds ALL paid event registrations and memberships that don't have invoices yet
@@ -9,19 +9,15 @@ import { createAndSendInvoice } from "@/lib/invoice-service";
 export async function POST(req: NextRequest) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await req.json().catch(() => ({})) as { send_email?: boolean };
-  const sendEmail = body.send_email !== false; // default: true
-
   const db = getSupabaseServer();
 
   // ── 1. Paid event registrations without an invoice ────────────────────────
   const { data: paidRegs } = await db
     .from("event_registrations")
-    .select("id, registration_code, user_email, user_name, event_id, final_price, payment_status, razorpay_payment_id, razorpay_order_id, distance_category, events(title, start_date, location)")
-    .in("payment_status", ["paid"])
+    .select("id, registration_code, user_email, user_name, event_id, final_price, razorpay_payment_id, razorpay_order_id, events(title, start_date, location)")
+    .eq("payment_status", "paid")
     .eq("status", "confirmed");
 
-  // Get registration IDs that already have invoices
   const { data: existingRegInvoices } = await db
     .from("invoices")
     .select("registration_id")
@@ -33,7 +29,7 @@ export async function POST(req: NextRequest) {
   // ── 2. Active memberships without an invoice ──────────────────────────────
   const { data: memberships } = await db
     .from("memberships")
-    .select("user_email, plan, amount_paid, razorpay_payment_id, razorpay_order_id, started_at")
+    .select("user_email, plan, amount_paid, razorpay_payment_id, razorpay_order_id")
     .eq("status", "active")
     .not("razorpay_payment_id", "is", null);
 
@@ -60,77 +56,64 @@ export async function POST(req: NextRequest) {
     biannual: "6-Month Membership", annual: "Annual Membership",
   };
 
-  // ── 4. Generate invoices ───────────────────────────────────────────────────
-  let regGenerated = 0, regFailed = 0;
-  let memGenerated = 0, memFailed = 0;
-  const details: { type: string; id: string; status: string; reason?: string }[] = [];
+  // ── 4. Enqueue one bulk_invoice job per missing invoice ───────────────────
+  // Idempotency key prevents double-queuing if admin clicks backfill twice.
+  // The worker processes jobs at ≤20/min — no SES rate-limit hammering.
+  let regQueued = 0, memQueued = 0;
 
-  // Event registration invoices
   type RegRow = {
     id: string; registration_code: string; user_email: string; user_name: string;
     event_id: string; final_price: number | null; razorpay_payment_id: string | null;
-    razorpay_order_id: string | null; distance_category: string | null;
+    razorpay_order_id: string | null;
     events: { title: string; start_date: string; location: string } | null;
   };
-  for (const reg of (regsToInvoice as unknown as RegRow[])) {
-    try {
-      const ev  = reg.events;
-      const inv = await createAndSendInvoice({
-        userEmail:       reg.user_email,
-        userName:        reg.user_name,
-        productName:     ev?.title ?? "Event Registration",
-        productType:     "event",
-        totalPaidRupees: reg.final_price ?? 0,
-        paymentId:       reg.razorpay_payment_id ?? undefined,
-        orderId:         reg.razorpay_order_id   ?? undefined,
-        registrationId:  reg.id,
-        eventId:         reg.event_id,
-        eventDate:       ev?.start_date,
-        eventVenue:      ev?.location,
-      });
-      if (inv) { regGenerated++; details.push({ type: "event", id: reg.registration_code, status: "generated" }); }
-      else      { regFailed++;   details.push({ type: "event", id: reg.registration_code, status: "failed", reason: "createAndSendInvoice returned null" }); }
-    } catch (e: unknown) {
-      regFailed++;
-      details.push({ type: "event", id: reg.registration_code, status: "failed", reason: String(e) });
-    }
 
-    // Small pause to avoid hammering SES rate limit
-    await new Promise(r => setTimeout(r, 1200));
+  for (const reg of (regsToInvoice as unknown as RegRow[])) {
+    const ev = reg.events;
+    await enqueueJob("bulk_invoice", {
+      productType:     "event",
+      userEmail:       reg.user_email,
+      userName:        reg.user_name,
+      productName:     ev?.title ?? "Event Registration",
+      totalPaidRupees: reg.final_price ?? 0,
+      paymentId:       reg.razorpay_payment_id ?? undefined,
+      orderId:         reg.razorpay_order_id   ?? undefined,
+      registrationId:  reg.id,
+      eventId:         reg.event_id,
+      eventDate:       ev?.start_date,
+      eventVenue:      ev?.location,
+    }, {
+      idempotencyKey: `bulk_invoice:event:${reg.id}`,
+      priority:       -5,  // lower priority than transactional jobs
+    });
+    regQueued++;
   }
 
-  // Membership invoices
   for (const mem of membershipsToInvoice) {
-    try {
-      const userName = nameMap.get(mem.user_email) || mem.user_email;
-      const inv = await createAndSendInvoice({
-        userEmail:       mem.user_email,
-        userName,
-        productName:     PLAN_LABELS[mem.plan] ?? `${mem.plan} Membership`,
-        productType:     "membership",
-        totalPaidRupees: (mem.amount_paid ?? 0) / 100, // paise → rupees
-        paymentId:       mem.razorpay_payment_id ?? undefined,
-        orderId:         mem.razorpay_order_id   ?? undefined,
-      });
-      if (inv) { memGenerated++; details.push({ type: "membership", id: mem.razorpay_payment_id ?? mem.user_email, status: "generated" }); }
-      else      { memFailed++;   details.push({ type: "membership", id: mem.razorpay_payment_id ?? mem.user_email, status: "failed" }); }
-    } catch (e: unknown) {
-      memFailed++;
-      details.push({ type: "membership", id: mem.user_email, status: "failed", reason: String(e) });
-    }
-
-    await new Promise(r => setTimeout(r, 1200));
+    const userName = nameMap.get(mem.user_email) || mem.user_email;
+    await enqueueJob("bulk_invoice", {
+      productType:     "membership",
+      userEmail:       mem.user_email,
+      userName,
+      productName:     PLAN_LABELS[mem.plan] ?? `${mem.plan} Membership`,
+      totalPaidRupees: (mem.amount_paid ?? 0) / 100,
+      paymentId:       mem.razorpay_payment_id ?? undefined,
+      orderId:         mem.razorpay_order_id   ?? undefined,
+    }, {
+      idempotencyKey: `bulk_invoice:membership:${mem.razorpay_payment_id}`,
+      priority:       -5,
+    });
+    memQueued++;
   }
 
   return NextResponse.json({
-    summary: {
-      event_registrations: { found: regsToInvoice.length,        generated: regGenerated, failed: regFailed },
-      memberships:         { found: membershipsToInvoice.length,  generated: memGenerated, failed: memFailed },
-      total_generated:     regGenerated + memGenerated,
-      total_failed:        regFailed    + memFailed,
+    queued: {
+      event_registrations: regQueued,
+      memberships:         memQueued,
+      total:               regQueued + memQueued,
       already_had_invoice: alreadyInvoicedRegs.size + alreadyInvoicedPayments.size,
     },
-    details,
+    message: `${regQueued + memQueued} invoice jobs queued — processed by job-worker cron at ≤20/min`,
   });
 }
 
