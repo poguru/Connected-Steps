@@ -4,6 +4,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
 import { sendEmail, sendWhatsApp, paymentEmailHTML, membershipWAParams } from "@/lib/notify";
 import { autoFeedMembershipActivated } from "@/lib/auto-feed";
+import { createAndSendInvoice } from "@/lib/invoice-service";
 
 const PLAN_MONTHS: Record<string, number> = {
   monthly:  1,
@@ -91,6 +92,17 @@ export async function POST(req: NextRequest) {
   );
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Generate GST invoice for membership (fire-and-forget)
+  void createAndSendInvoice({
+    userEmail:       email.toLowerCase(),
+    userName:        name || "Member",
+    productName:     `Membership — ${PLAN_LABELS[plan] ?? plan}`,
+    productType:     "membership",
+    totalPaidRupees: amount / 100,  // amount is in paise
+    paymentId:       razorpay_payment_id,
+    orderId:         razorpay_order_id,
+  });
 
   // Coupon was already atomically claimed at create-order time to prevent
   // race conditions. No second redemption needed here.

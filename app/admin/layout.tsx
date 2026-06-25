@@ -38,10 +38,11 @@ const NAV = [
   {
     section: "Reports",
     links: [
-      { label: "Sessions", href: "/admin/sessions" },
-      { label: "Leaderboard", href: "/admin/leaderboard" },
-      { label: "Memberships", href: "/admin/membership" },
-      { label: "Referrals", href: "/admin/referrals" },
+      { label: "Finance & Invoices", href: "/admin/finance" },
+      { label: "Sessions",           href: "/admin/sessions" },
+      { label: "Leaderboard",        href: "/admin/leaderboard" },
+      { label: "Memberships",        href: "/admin/membership" },
+      { label: "Referrals",          href: "/admin/referrals" },
     ],
   },
   {

@@ -4,6 +4,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { redeemCoupon } from "@/lib/coupon-redeem";
 import { signEventQR } from "@/lib/event-qr";
 import { sendEmail, eventRegistrationEmailHTML } from "@/lib/notify";
+import { createAndSendInvoice } from "@/lib/invoice-service";
 
 // POST /api/events/verify-payment
 // Body: { razorpay_order_id, razorpay_payment_id, razorpay_signature, registration_code }
@@ -77,6 +78,22 @@ export async function POST(req: NextRequest) {
     if (reg.coupon_id) {
       redeemCoupon(reg.coupon_id, reg.user_email).catch(console.error);
     }
+
+    // Generate GST invoice (fire-and-forget — never blocks payment confirmation)
+    const ev = reg.events;
+    void createAndSendInvoice({
+      userEmail:       reg.user_email,
+      userName:        reg.user_name,
+      productName:     ev?.title ?? "Event Registration",
+      productType:     "event",
+      totalPaidRupees: reg.final_price ?? 0,
+      paymentId:       razorpay_payment_id,
+      orderId:         razorpay_order_id,
+      registrationId:  registration_code,
+      eventId:         reg.event_id,
+      eventDate:       ev?.start_date,
+      eventVenue:      ev?.location,
+    });
 
     // Generate QR token + send confirmation email (fire-and-forget)
     // Payment is confirmed — email failure must never affect the response.
