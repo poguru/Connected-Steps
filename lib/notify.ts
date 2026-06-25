@@ -18,10 +18,13 @@ function normalisePhone(phone: string): string {
 // ── Result type ───────────────────────────────────────────────────────────────
 
 export interface NotifyResult {
-  to:      string;
-  channel: "whatsapp" | "sms" | "email";
-  ok:      boolean;
-  error?:  string;
+  to:          string;
+  channel:     "whatsapp" | "sms" | "email";
+  ok:          boolean;
+  error?:      string;
+  messageId?:  string;
+  provider?:   string;
+  httpStatus?: number;
 }
 
 // ── WhatsApp ──────────────────────────────────────────────────────────────────
@@ -164,7 +167,7 @@ export async function sendEmail(
 
   const { sendSingleEmail } = await import("@/lib/email-service");
   const result = await sendSingleEmail({ to, subject, html });
-  return { to, channel: "email", ok: result.ok, error: result.error };
+  return { to, channel: "email", ok: result.ok, error: result.error, messageId: result.messageId, provider: result.provider, httpStatus: result.httpStatus };
 }
 
 // ── WhatsApp OTP ──────────────────────────────────────────────────────────────
