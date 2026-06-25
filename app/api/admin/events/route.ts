@@ -11,27 +11,42 @@ function toSlug(title: string): string {
     .replace(/-+/g, "-");
 }
 
-async function uniqueSlug(db: ReturnType<typeof import("@/lib/supabase-server").getSupabaseServer>, base: string): Promise<string> {
-  let slug = base;
-  let attempt = 0;
-  while (attempt < 10) {
-    const { data } = await db.from("events").select("id").eq("share_slug", slug).single();
-    if (!data) return slug;
-    attempt++;
-    slug = `${base}-${attempt}`;
-  }
-  return `${base}-${Date.now()}`;
+/**
+ * Generate a unique share slug without any DB round-trips.
+ *
+ * Previously: a while-loop queried the DB up to 10 times per event creation
+ * to find an unused slug (worst case ~30 ms + 10 sequential reads).
+ *
+ * Now: append a base-36 timestamp suffix that is effectively unique at human
+ * event-creation rates.  Collisions would require two events created within
+ * the same millisecond with identical titles — handled below by the DB
+ * UNIQUE constraint if idx_events_share_slug is enforced.
+ */
+function uniqueSlug(base: string): string {
+  return `${base}-${Date.now().toString(36)}`;
 }
 
 export async function GET(req: NextRequest) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const db = getSupabaseServer();
-  const { data, error } = await db
-    .from("events")
-    .select("*")
-    .order("created_at", { ascending: false });
+
+  const sp    = req.nextUrl.searchParams;
+  const limit = Math.max(0, parseInt(sp.get("limit") ?? "0", 10));
+  const page  = Math.max(0, parseInt(sp.get("page")  ?? "0", 10));
+
+  let q = db.from("events").select("*").order("created_at", { ascending: false });
+  if (limit > 0) q = q.range(page * limit, page * limit + limit - 1);
+
+  const { data, error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data });
+
+  // Backward-compatible: no pagination params → same { data } shape as before.
+  // With params: adds page/limit/hasMore for client-side pagination UI.
+  return NextResponse.json(
+    limit > 0
+      ? { data, page, limit, hasMore: (data?.length ?? 0) >= limit }
+      : { data }
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -53,7 +68,7 @@ export async function POST(req: NextRequest) {
   }
 
   const db   = getSupabaseServer();
-  const slug = await uniqueSlug(db, toSlug(title));
+  const slug = uniqueSlug(toSlug(title));
 
   const { data, error } = await db
     .from("events")

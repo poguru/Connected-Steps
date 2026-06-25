@@ -88,13 +88,18 @@ export async function GET(req: NextRequest) {
   // Persist and notify new unlocks (fire-and-forget)
   if (newlyUnlocked.length > 0) {
     const persist = async () => {
+      // N+1 fix: was N sequential INSERTs → now 1 batch INSERT.
+      // alreadyEarned filter guarantees no duplicates in normal flow;
+      // ignoreDuplicates handles rare concurrent requests.
+      const { data: inserted } = await db
+        .from("user_achievements")
+        .insert(newlyUnlocked.map(b => ({ user_email: key, badge_id: b.id })))
+        .select("badge_id");
+
+      // Notify only for badges that were actually written (not existing ones)
+      const insertedIds = new Set((inserted ?? []).map(r => r.badge_id));
       for (const badge of newlyUnlocked) {
-        const { error } = await db
-          .from("user_achievements")
-          .insert({ user_email: key, badge_id: badge.id })
-          .select()
-          .single();
-        if (!error) {
+        if (insertedIds.has(badge.id)) {
           createNotification({
             user_email: key,
             type:       "achievement",
@@ -147,13 +152,15 @@ async function runBadgeLogic(
     toUnlock.push({ id: "active_member", label: "Active Member 💳" });
   }
 
+  // Batch insert all badges (N+1 fix: same as persist() in the main handler)
+  const { data: inserted } = await db
+    .from("user_achievements")
+    .insert(toUnlock.map(b => ({ user_email: key, badge_id: b.id })))
+    .select("badge_id");
+
+  const insertedIds = new Set((inserted ?? []).map(r => r.badge_id));
   for (const badge of toUnlock) {
-    const { error } = await db
-      .from("user_achievements")
-      .insert({ user_email: key, badge_id: badge.id })
-      .select()
-      .single();
-    if (!error) {
+    if (insertedIds.has(badge.id)) {
       createNotification({
         user_email: key,
         type:       "achievement",

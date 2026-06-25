@@ -18,12 +18,23 @@ function initWebPush(): boolean {
 export async function GET(req: NextRequest) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const db = getSupabaseServer();
-  const { data, error } = await db
-    .from("sessions")
-    .select("*")
-    .order("date", { ascending: false });
+
+  const sp    = req.nextUrl.searchParams;
+  const limit = Math.max(0, parseInt(sp.get("limit") ?? "0", 10));
+  const page  = Math.max(0, parseInt(sp.get("page")  ?? "0", 10));
+
+  let q = db.from("sessions").select("*").order("date", { ascending: false });
+  if (limit > 0) q = q.range(page * limit, page * limit + limit - 1);
+
+  const { data, error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data });
+
+  // Backward-compatible: no pagination params → same { data } shape as before.
+  return NextResponse.json(
+    limit > 0
+      ? { data, page, limit, hasMore: (data?.length ?? 0) >= limit }
+      : { data }
+  );
 }
 
 export async function POST(req: NextRequest) {

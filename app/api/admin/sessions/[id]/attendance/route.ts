@@ -113,28 +113,31 @@ export async function POST(
   const bonusUsers = toUpsert.filter(u => u.bonus_points > 0);
   if (bonusUsers.length) {
     const db2 = getSupabaseServer();
-    // Fetch session title for the notification
     const { data: sess } = await db2.from("sessions").select("title").eq("id", id).single();
     const sessionTitle = sess?.title ?? "today's session";
 
-    for (const u of bonusUsers) {
-      // Replace existing bonus ledger entry for this user+session (errors ignored)
-      await db2.from("points_ledger")
-        .delete()
-        .eq("user_email", u.user_email)
-        .eq("session_id", id)
-        .eq("category", "bonus");
+    // N+1 fix: was N×(DELETE + INSERT) per user → now 1 batch DELETE + 1 batch INSERT
+    // Delete all existing bonus ledger rows for these users in this session at once.
+    await db2.from("points_ledger")
+      .delete()
+      .eq("session_id", id)
+      .eq("category", "bonus")
+      .in("user_email", bonusUsers.map(u => u.user_email));
 
-      await db2.from("points_ledger").insert({
+    // Insert all bonus rows in a single round-trip.
+    await db2.from("points_ledger").insert(
+      bonusUsers.map(u => ({
         user_email: u.user_email,
         session_id: id,
         points:     u.bonus_points,
         reason:     u.bonus_reason || "Bonus Points",
         category:   "bonus",
         awarded_by: null,
-      });
+      }))
+    );
 
-      // Push notification to the user
+    // Notifications remain per-user (fire-and-forget, not a DB bottleneck)
+    for (const u of bonusUsers) {
       createNotification({
         user_email: u.user_email,
         type:       "achievement",
