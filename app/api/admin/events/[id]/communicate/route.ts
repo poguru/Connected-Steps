@@ -73,7 +73,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { sent, failed } = await sendBatchEmails(jobs, 5);
 
   // Log to history (fire-and-forget — never block the response)
-  db.from("event_comm_history").insert({
+  void db.from("event_comm_history").insert({
     event_id:   id,
     subject,
     recipients: registrants.length,
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     failed,
     status:     failed === registrants.length ? "failed" : "sent",
     filter:     recipient_filter,
-  }).then(() => {}).catch(() => {});
+  });
 
   return NextResponse.json({ sent, failed, total: registrants.length });
 }
