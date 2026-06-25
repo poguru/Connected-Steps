@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
       id, registration_code, user_email, user_name, phone, blood_group,
       emergency_contact, coupon_code, coupon_discount, original_price, final_price,
       payment_status, razorpay_payment_id, status, created_at,
+      distance_category, qr_token, checked_in_at,
       events ( id, title, start_date, location )
     `)
     .order("created_at", { ascending: false });

@@ -13,6 +13,7 @@ interface Reg {
   coupon_discount: number; original_price: number; final_price: number;
   payment_status: string; razorpay_payment_id: string | null; status: string;
   checked_in_at: string | null; created_at: string; distance_category: string | null;
+  qr_token: string | null;
 }
 
 interface Summary { total: number; paid: number; free: number; pending: number; revenue: number; checkedIn: number; }
@@ -140,6 +141,8 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
     alert(res.ok ? data.message : `Error: ${data.error}`);
   }
 
+  const [genLoading,   setGenLoading]   = useState(false);
+  const [genResult,    setGenResult]    = useState("");
   const [bulkSending,  setBulkSending]  = useState(false);
   const [bulkResult,   setBulkResult]   = useState<{ sent: number; failed: number; skipped: number; total: number; details: { email: string; name: string; status: string; reason: string | null }[] } | null>(null);
   const [showDetails,  setShowDetails]  = useState(false);
@@ -156,6 +159,18 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
       else        setBulkResult({ sent: 0, failed: 0, skipped: 0, total: 0, details: [{ email: "", name: "", status: "failed", reason: data.error }] });
     } catch { setBulkResult({ sent: 0, failed: 0, skipped: 0, total: 0, details: [{ email: "", name: "", status: "failed", reason: "Network error" }] }); }
     finally { setBulkSending(false); }
+  }
+
+  async function generateMissingQR() {
+    if (!confirm("Generate QR tokens for all confirmed registrations that are missing one?")) return;
+    setGenLoading(true); setGenResult("");
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/generate-missing-qr`, { method: "POST", headers });
+      const data = await res.json();
+      setGenResult(res.ok ? `✅ Generated: ${data.generated}  Failed: ${data.failed}` : `❌ ${data.error}`);
+      if (res.ok && data.generated > 0) load(); // refresh list
+    } catch { setGenResult("❌ Network error"); }
+    finally { setGenLoading(false); }
   }
 
   function exportFailedCSV() {
@@ -246,6 +261,11 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
           {eventTitle || "Registrations"}
         </span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {genResult && <span style={{ fontSize: "0.72rem", color: genResult.startsWith("✅") ? "#4ade80" : "#f87171" }}>{genResult}</span>}
+          <button onClick={generateMissingQR} disabled={genLoading}
+            style={{ padding: "6px 12px", background: genLoading ? "#1a1a1a" : "rgba(74,222,128,0.12)", border: "1px solid rgba(74,222,128,0.3)", borderRadius: 6, color: genLoading ? "#444" : "#4ade80", cursor: genLoading ? "not-allowed" : "pointer", fontSize: "0.78rem", fontFamily: "inherit", fontWeight: 600, whiteSpace: "nowrap" }}>
+            {genLoading ? "Generating…" : "⚡ Generate Missing QR"}
+          </button>
           {bulkResult && (
             <span style={{ fontSize: "0.75rem", color: "#aaa" }}>
               ✅ {bulkResult.sent} &nbsp;❌ {bulkResult.failed} &nbsp;⏭ {bulkResult.skipped}
@@ -387,7 +407,7 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
                   <thead>
                     <tr style={{ background: "rgba(255,255,255,0.04)" }}>
-                      {["Code","Participant","Category","Price","Payment","Status","Check-In","Actions"].map(h => (
+                      {["Code","Participant","Category","Price","Payment","Status","QR","Check-In","Actions"].map(h => (
                         <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: "10px", color: "#666", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, whiteSpace: "nowrap" }}>{h}</th>
                       ))}
                     </tr>
@@ -396,7 +416,7 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
                     {loading ? (
                       <tr><td colSpan={8} style={{ padding: "2rem", textAlign: "center", color: "#555" }}>Loading…</td></tr>
                     ) : filtered.length === 0 ? (
-                      <tr><td colSpan={8} style={{ padding: "2rem", textAlign: "center", color: "#555" }}>No registrations found.</td></tr>
+                      <tr><td colSpan={9} style={{ padding: "2rem", textAlign: "center", color: "#555" }}>No registrations found.</td></tr>
                     ) : filtered.map(r => (
                       <tr key={r.id} style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
                         <td style={{ padding: "10px 14px" }}><span style={{ fontFamily: "monospace", color: "#e8620a", fontSize: "0.78rem" }}>{r.registration_code}</span></td>
@@ -415,6 +435,16 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
                           <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: 999, background: r.status === "confirmed" ? "rgba(74,222,128,0.1)" : "rgba(239,68,68,0.1)", color: r.status === "confirmed" ? "#4ade80" : "#f87171", fontWeight: 700 }}>
                             {r.status.replace("_", " ").toUpperCase()}
                           </span>
+                        </td>
+                        <td style={{ padding: "10px 14px", whiteSpace: "nowrap" }}>
+                          {r.qr_token ? (
+                            <a href={`/api/events/qr/${encodeURIComponent(r.qr_token)}`} target="_blank" rel="noopener noreferrer"
+                              style={{ fontSize: "10px", fontWeight: 700, color: "#4ade80", textDecoration: "none" }} title="Preview QR">
+                              ✓ QR
+                            </a>
+                          ) : (
+                            <span style={{ fontSize: "10px", color: "#555" }}>—</span>
+                          )}
                         </td>
                         <td style={{ padding: "10px 14px", whiteSpace: "nowrap" }}>
                           {r.checked_in_at ? (

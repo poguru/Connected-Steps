@@ -38,9 +38,12 @@ export interface BatchEmailJob {
 }
 
 export interface SendResult {
-  ok:      boolean;
-  to:      string;
-  error?:  string;
+  ok:           boolean;
+  to:           string;
+  error?:       string;
+  messageId?:   string;   // SES MessageId or Resend email id
+  provider?:    "ses" | "resend";
+  httpStatus?:  number;
 }
 
 // ── Lazy SES client ────────────────────────────────────────────────────────────
@@ -88,8 +91,9 @@ async function sendViaResend(msg: EmailMessage, from: string): Promise<SendResul
       console.error(`[Resend] fallback failed to=${msg.to}:`, data.message ?? res.status);
       return { ok: false, to: msg.to, error: data.message ?? String(res.status) };
     }
-    console.log(`[Resend] fallback sent to=${msg.to} subject="${msg.subject}"`);
-    return { ok: true, to: msg.to };
+    const messageId = (data as { id?: string }).id;
+    console.log(`[Resend] fallback sent to=${msg.to} messageId=${messageId}`);
+    return { ok: true, to: msg.to, messageId, provider: "resend", httpStatus: res.status };
   } catch (e: unknown) {
     return { ok: false, to: msg.to, error: String(e) };
   }
@@ -120,9 +124,11 @@ export async function sendSingleEmail(msg: EmailMessage): Promise<SendResult> {
     };
 
     try {
-      await getClient().send(new SendEmailCommand(input));
-      console.log(`[SES] sent to=${msg.to} subject="${msg.subject}"`);
-      return { ok: true, to: msg.to };
+      const sesResult = await getClient().send(new SendEmailCommand(input));
+      const messageId  = sesResult.MessageId;
+      const httpStatus = sesResult.$metadata?.httpStatusCode;
+      console.log(`[SES] sent to=${msg.to} messageId=${messageId} status=${httpStatus}`);
+      return { ok: true, to: msg.to, messageId, provider: "ses", httpStatus };
     } catch (e: unknown) {
       const err = e instanceof Error ? e.message : String(e);
       console.error(`[SES] failed to=${msg.to} — falling back to Resend. Error: ${err}`);

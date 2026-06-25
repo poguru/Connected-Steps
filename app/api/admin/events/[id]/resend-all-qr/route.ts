@@ -4,12 +4,14 @@ import { isAdminOrCoach } from "@/lib/admin-auth";
 import { signEventQR } from "@/lib/event-qr";
 import { sendEmail, eventRegistrationEmailHTML } from "@/lib/notify";
 
-const BATCH_SIZE  = 10;    // emails per batch
-const BATCH_PAUSE = 1200;  // ms between batches (stays under 10/s Resend limit)
+// SES Sandbox limit: 1 email/second. Production limit starts at 14/s and scales.
+// Using 1 email per 1.1s is safe for Sandbox AND respects Resend's fallback limits.
+const BATCH_SIZE  = 1;    // Send 1 at a time while SES is in Sandbox
+const BATCH_PAUSE = 1100; // 1.1s between emails → stays under 1/s SES limit
 
 type RegRow = {
   id: string; registration_code: string; user_email: string; user_name: string;
-  distance_category: string | null;
+  distance_category: string | null; qr_token: string | null;
   events: { title: string; start_date: string; start_time: string | null; location: string } | null;
 };
 
@@ -21,33 +23,31 @@ type EmailLogRow = {
   subject:         string;
   status:          "sent" | "failed" | "skipped";
   error_message:   string | null;
+  ses_message_id:  string | null;
+  provider:        string | null;
+  http_status:     number | null;
   batch_id:        string;
 };
 
 // POST /api/admin/events/[id]/resend-all-qr
-// Sends QR emails in batches with full per-recipient logging.
-// Returns detailed results including per-email status and error reasons.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id: eventId } = await params;
 
   const body = await req.json().catch(() => ({})) as { retry_failed?: boolean; batch_id?: string };
   const retryMode = body.retry_failed === true;
-
-  const db      = getSupabaseServer();
-  const batchId = body.batch_id ?? `batch_${Date.now()}`;
-  const appUrl  = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const batchId   = body.batch_id ?? `batch_${Date.now()}`;
+  const db        = getSupabaseServer();
 
   // ── 1. Fetch registrations ─────────────────────────────────────────────────
   let query = db
     .from("event_registrations")
-    .select("id, registration_code, user_email, user_name, distance_category, events(title, start_date, start_time, location)")
+    .select("id, registration_code, user_email, user_name, distance_category, qr_token, events(title, start_date, start_time, location)")
     .eq("event_id", eventId)
     .eq("status", "confirmed")
     .neq("payment_status", "pending");
 
   if (retryMode) {
-    // Only fetch registrations that previously failed for this event
     const { data: failedLogs } = await db
       .from("email_logs")
       .select("registration_id")
@@ -64,21 +64,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const rows = regs as unknown as RegRow[];
 
-  // ── 2. Validate & deduplicate emails ──────────────────────────────────────
-  const seen    = new Set<string>();
+  // ── 2. Validate & deduplicate ──────────────────────────────────────────────
+  const seen:   Set<string>   = new Set();
   const logs:   EmailLogRow[] = [];
   const toSend: RegRow[]      = [];
 
   for (const reg of rows) {
     const email = reg.user_email?.trim().toLowerCase();
-    const isValidEmail = email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-
-    if (!email || !isValidEmail) {
-      logs.push({ event_id: eventId, registration_id: reg.id, recipient_email: reg.user_email ?? "", recipient_name: reg.user_name, subject: "", status: "skipped", error_message: "Invalid or missing email address", batch_id: batchId });
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      logs.push({ event_id: eventId, registration_id: reg.id, recipient_email: reg.user_email ?? "", recipient_name: reg.user_name, subject: "", status: "skipped", error_message: "Invalid or missing email", ses_message_id: null, provider: null, http_status: null, batch_id: batchId });
       continue;
     }
     if (seen.has(email)) {
-      logs.push({ event_id: eventId, registration_id: reg.id, recipient_email: email, recipient_name: reg.user_name, subject: "", status: "skipped", error_message: "Duplicate email address", batch_id: batchId });
+      logs.push({ event_id: eventId, registration_id: reg.id, recipient_email: email, recipient_name: reg.user_name, subject: "", status: "skipped", error_message: "Duplicate email", ses_message_id: null, provider: null, http_status: null, batch_id: batchId });
       continue;
     }
     seen.add(email);
@@ -93,13 +91,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     for (const reg of chunk) {
       const ev      = reg.events;
-      const subject = `Your QR Code — ${ev?.title ?? "Connected Steps Event"}`;
-      let status: "sent" | "failed" = "failed";
-      let errorMsg: string | null    = null;
+      const subject = `Your Registration & QR Code — ${ev?.title ?? "Connected Steps Event"}`;
+      let status:     "sent" | "failed" = "failed";
+      let errorMsg:   string | null      = null;
+      let messageId:  string | null      = null;
+      let provider:   string | null      = null;
+      let httpStatus: number | null      = null;
 
       try {
-        const qrToken   = signEventQR(reg.registration_code, eventId);
-        await db.from("event_registrations").update({ qr_token: qrToken }).eq("id", reg.id);
+        // Generate/refresh QR token (ensures every send has a valid token)
+        const qrToken = signEventQR(reg.registration_code, eventId);
+
+        // Store token if missing or refreshing
+        if (!reg.qr_token || reg.qr_token !== qrToken) {
+          await db.from("event_registrations").update({ qr_token: qrToken }).eq("id", reg.id);
+        }
 
         const result = await sendEmail(
           reg.user_email,
@@ -107,10 +113,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           subject,
           eventRegistrationEmailHTML({
             name:             reg.user_name,
-            eventTitle:       ev?.title        ?? "Connected Steps Event",
-            startDate:        ev?.start_date   ?? "",
-            startTime:        ev?.start_time   ?? null,
-            location:         ev?.location     ?? "",
+            eventTitle:       ev?.title       ?? "Connected Steps Event",
+            startDate:        ev?.start_date  ?? "",
+            startTime:        ev?.start_time  ?? null,
+            location:         ev?.location    ?? "",
             registrationCode: reg.registration_code,
             distanceCategory: reg.distance_category,
             qrToken,
@@ -118,23 +124,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         );
 
         if (result.ok) {
-          status = "sent";
+          status     = "sent";
+          messageId  = result.messageId ?? null;
+          provider   = result.provider  ?? null;
+          httpStatus = result.httpStatus ?? null;
           sent++;
+          console.log(`[resend-all-qr] ✅ sent to=${reg.user_email} msgId=${messageId} provider=${provider}`);
         } else {
-          errorMsg = result.error ?? "Unknown provider error";
+          errorMsg   = result.error ?? "Unknown provider error";
+          provider   = result.provider ?? null;
+          httpStatus = result.httpStatus ?? null;
           failed++;
-          console.error(`[resend-all-qr] FAILED to=${reg.user_email} batch=${batchId}:`, errorMsg);
+          console.error(`[resend-all-qr] ❌ FAILED to=${reg.user_email} provider=${provider} error=${errorMsg}`);
         }
       } catch (e: unknown) {
         errorMsg = e instanceof Error ? e.message : String(e);
         failed++;
-        console.error(`[resend-all-qr] EXCEPTION to=${reg.user_email}:`, errorMsg);
+        console.error(`[resend-all-qr] ❌ EXCEPTION to=${reg.user_email}:`, errorMsg);
       }
 
-      logs.push({ event_id: eventId, registration_id: reg.id, recipient_email: reg.user_email, recipient_name: reg.user_name, subject, status, error_message: errorMsg, batch_id: batchId });
+      logs.push({ event_id: eventId, registration_id: reg.id, recipient_email: reg.user_email, recipient_name: reg.user_name, subject, status, error_message: errorMsg, ses_message_id: messageId, provider, http_status: httpStatus, batch_id: batchId });
     }
 
-    // Pause between batches to respect provider rate limits
     if (i + BATCH_SIZE < toSend.length) {
       await new Promise(r => setTimeout(r, BATCH_PAUSE));
     }
@@ -150,21 +161,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   return NextResponse.json({
     batch_id: batchId,
-    sent,
-    failed,
-    skipped,
-    total: rows.length,
+    sent, failed, skipped, total: rows.length,
     details: logs.map(l => ({
-      email:  l.recipient_email,
-      name:   l.recipient_name,
-      status: l.status,
-      reason: l.error_message,
+      email:      l.recipient_email,
+      name:       l.recipient_name,
+      status:     l.status,
+      reason:     l.error_message,
+      message_id: l.ses_message_id,
+      provider:   l.provider,
     })),
   });
 }
 
-// GET /api/admin/events/[id]/resend-all-qr
-// Returns email logs for this event so the UI can show history and retry.
+// GET — email history + summary for this event
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id: eventId } = await params;
@@ -172,7 +181,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const db = getSupabaseServer();
   const { data, error } = await db
     .from("email_logs")
-    .select("id, recipient_email, recipient_name, status, error_message, sent_at, batch_id, retry_count")
+    .select("id, recipient_email, recipient_name, status, error_message, ses_message_id, provider, http_status, sent_at, batch_id")
     .eq("event_id", eventId)
     .order("sent_at", { ascending: false })
     .limit(500);
