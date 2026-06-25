@@ -3,7 +3,6 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 import { signEventQR } from "@/lib/event-qr";
 import { sendEmail, eventRegistrationEmailHTML } from "@/lib/notify";
-import QRCode from "qrcode";
 
 // POST /api/admin/events/registrations/resend-qr
 // Body: { registration_id: string }
@@ -38,15 +37,11 @@ export async function POST(req: NextRequest) {
     // Update stored QR token
     await db.from("event_registrations").update({ qr_token: qrToken }).eq("id", registration_id);
 
-    const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
-    const qrContent = `${appUrl}/event-checkin?t=${encodeURIComponent(qrToken)}`;
-    const qrDataUrl = await QRCode.toDataURL(qrContent, { width: 400, margin: 2 });
-    const ev        = reg.events;
-
+    const ev     = reg.events;
     const result = await sendEmail(
       reg.user_email,
       reg.user_name,
-      `Your QR Code — ${ev?.title ?? "Connected Steps Event"}`,
+      `Your Registration & QR Code — ${ev?.title ?? "Connected Steps Event"}`,
       eventRegistrationEmailHTML({
         name:             reg.user_name,
         eventTitle:       ev?.title ?? "Connected Steps Event",
@@ -55,7 +50,7 @@ export async function POST(req: NextRequest) {
         location:         ev?.location   ?? "",
         registrationCode: reg.registration_code,
         distanceCategory: reg.distance_category,
-        qrDataUrl,
+        qrToken,
       }),
     );
 

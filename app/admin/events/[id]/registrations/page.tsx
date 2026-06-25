@@ -195,8 +195,8 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
         body: `Dear Runner,\n\nThis is a reminder that ${eventTitle} is tomorrow!\n\nPlease carry:\n✓ Your event QR code (check your registration email)\n✓ Valid ID proof\n✓ Water bottle\n✓ Comfortable running gear\n\nWe look forward to seeing you!\n\nTeam Connected Steps`,
       },
       resend_qr: {
-        subject: `Your Registration QR Code — ${eventTitle}`,
-        body: `Dear Runner,\n\nHere is a reminder of your registration details for ${eventTitle}.\n\nYour QR code has been sent separately. Please show it at the venue for entry.\n\nIf you need help, contact us at info@connectedsteps.in\n\nTeam Connected Steps`,
+        subject: `Action Required: Check your QR code for ${eventTitle}`,
+        body: `Dear Runner,\n\nThis is a reminder to check your registration email for your unique QR code for ${eventTitle}.\n\nYour QR code was sent to this email address when you registered. Please search your inbox for an email from Connected Steps with subject "Your Registration & QR Code".\n\nIf you cannot find it, please reply to this email and we will resend it.\n\nEvent Details:\n📅 Date: [Event Date]\n📍 Venue: [Venue Name]\n⏰ Reporting Time: 5:30 AM\n\nTeam Connected Steps\ninfo@connectedsteps.in`,
       },
     };
     if (templates[t]) { setCommSubject(templates[t].subject); setCommBody(templates[t].body); }

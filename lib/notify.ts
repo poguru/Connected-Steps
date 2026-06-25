@@ -721,9 +721,10 @@ export function eventRegistrationEmailHTML(opts: {
   location:         string;
   registrationCode: string;
   distanceCategory: string | null;
-  qrDataUrl:        string;
+  qrDataUrl?:       string;  // legacy base64 (ignored — use qrToken instead)
+  qrToken?:         string;  // HMAC token → public URL served by /api/events/qr/[token]
 }): string {
-  const { name, eventTitle, startDate, startTime, location, registrationCode, distanceCategory, qrDataUrl } = opts;
+  const { name, eventTitle, startDate, startTime, location, registrationCode, distanceCategory, qrToken } = opts;
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
   const dateStr = new Date(startDate + "T12:00:00Z").toLocaleDateString("en-IN", {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
@@ -754,13 +755,31 @@ export function eventRegistrationEmailHTML(opts: {
     </div>
 
     <div style="text-align:center;margin-bottom:28px;">
-      <p style="margin:0 0 12px;font-size:12px;color:#888;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;">Your Event QR Code</p>
-      <div style="display:inline-block;background:#fff;border:2px solid #e5e5e5;border-radius:12px;padding:16px;">
-        <img src="${qrDataUrl}" alt="Event QR" width="200" height="200" style="display:block;" />
+      <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#0a0a0a;">Your Registration QR Code</p>
+      <p style="margin:0 0 16px;font-size:13px;color:#555;line-height:1.6;">
+        Present this QR code at the event check-in counter. No printout needed — your phone is enough.
+      </p>
+      ${qrToken ? `
+      <div style="display:inline-block;background:#fff;border:3px solid #e8620a;border-radius:16px;padding:20px;">
+        <img src="${base}/api/events/qr/${encodeURIComponent(qrToken)}"
+             alt="Your Event QR Code"
+             width="220" height="220"
+             style="display:block;border-radius:4px;" />
       </div>
-      <p style="margin:10px 0 0;font-size:12px;color:#aaa;line-height:1.5;">
-        Show this QR at the event for check-in &amp; bib collection.<br/>
-        If you lose this email, view it anytime in the app.
+      <p style="margin:12px 0 0;font-size:11px;color:#aaa;line-height:1.5;">
+        QR code not displaying? <a href="${base}/events" style="color:#e8620a;text-decoration:none;">View in app →</a>
+      </p>
+      ` : `
+      <div style="background:#fff8f0;border:1px solid #fde0bc;border-radius:12px;padding:20px;text-align:center;">
+        <p style="margin:0;font-size:13px;color:#e8620a;font-weight:600;">QR code unavailable — please contact support.</p>
+      </div>
+      `}
+    </div>
+
+    <div style="background:#fff8f0;border:1px solid #fde0bc;border-radius:10px;padding:14px 18px;margin-bottom:28px;">
+      <p style="margin:0;font-size:13px;color:#c05c00;line-height:1.6;">
+        <strong>📋 What to bring:</strong> This email (digital copy), comfortable running shoes, water bottle.<br/>
+        <strong>⏰ Reporting time:</strong> Please arrive 15 minutes before the flag-off.
       </p>
     </div>
 

@@ -4,7 +4,6 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { redeemCoupon } from "@/lib/coupon-redeem";
 import { signEventQR } from "@/lib/event-qr";
 import { sendEmail, eventRegistrationEmailHTML } from "@/lib/notify";
-import QRCode from "qrcode";
 
 // POST /api/events/verify-payment
 // Body: { razorpay_order_id, razorpay_payment_id, razorpay_signature, registration_code }
@@ -88,10 +87,7 @@ export async function POST(req: NextRequest) {
           .update({ qr_token: qrToken })
           .eq("registration_code", registration_code);
 
-        const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
-        const qrContent = `${appUrl}/event-checkin?t=${encodeURIComponent(qrToken)}`;
-        const qrDataUrl = await QRCode.toDataURL(qrContent, { width: 400, margin: 2 });
-        const ev        = reg.events;
+        const ev = reg.events;
 
         await sendEmail(
           reg.user_email,
@@ -105,7 +101,7 @@ export async function POST(req: NextRequest) {
             location:         ev?.location ?? "",
             registrationCode: registration_code,
             distanceCategory: reg.distance_category,
-            qrDataUrl,
+            qrToken,
           }),
         );
       } catch (e) {

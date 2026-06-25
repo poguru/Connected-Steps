@@ -3,7 +3,6 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 import { signEventQR } from "@/lib/event-qr";
 import { sendEmail, eventRegistrationEmailHTML } from "@/lib/notify";
-import QRCode from "qrcode";
 
 const BATCH_SIZE  = 10;    // emails per batch
 const BATCH_PAUSE = 1200;  // ms between batches (stays under 10/s Resend limit)
@@ -102,9 +101,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         const qrToken   = signEventQR(reg.registration_code, eventId);
         await db.from("event_registrations").update({ qr_token: qrToken }).eq("id", reg.id);
 
-        const qrContent = `${appUrl}/event-checkin?t=${encodeURIComponent(qrToken)}`;
-        const qrDataUrl = await QRCode.toDataURL(qrContent, { width: 400, margin: 2 });
-
         const result = await sendEmail(
           reg.user_email,
           reg.user_name,
@@ -117,7 +113,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             location:         ev?.location     ?? "",
             registrationCode: reg.registration_code,
             distanceCategory: reg.distance_category,
-            qrDataUrl,
+            qrToken,
           }),
         );
 

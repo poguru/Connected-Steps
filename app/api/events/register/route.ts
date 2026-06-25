@@ -3,7 +3,6 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
 import { signEventQR } from "@/lib/event-qr";
 import { sendEmail, eventRegistrationEmailHTML } from "@/lib/notify";
-import QRCode from "qrcode";
 
 function genCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -213,10 +212,6 @@ export async function POST(req: NextRequest) {
       // Send confirmation email with QR (fire-and-forget — email failure never blocks registration)
       ;(async () => {
         try {
-          const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
-          const qrContent = `${appUrl}/event-checkin?t=${encodeURIComponent(finalQr)}`;
-          const qrDataUrl = await QRCode.toDataURL(qrContent, { width: 400, margin: 2 });
-
           await sendEmail(
             email.toLowerCase().trim(),
             name.trim(),
@@ -229,7 +224,7 @@ export async function POST(req: NextRequest) {
               location:         ev.location,
               registrationCode: finalCode,
               distanceCategory: chosenCategory,
-              qrDataUrl,
+              qrToken:          finalQr,
             }),
           );
         } catch (e) {

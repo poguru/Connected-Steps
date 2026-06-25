@@ -1,0 +1,37 @@
+import { NextRequest, NextResponse } from "next/server";
+import { verifyEventQR } from "@/lib/event-qr";
+import QRCode from "qrcode";
+
+// GET /api/events/qr/[token]
+// Returns the QR code as a PNG image. Used in emails so email clients
+// can fetch the image from a public URL (data: URLs are blocked by Gmail/Outlook).
+// The token itself is HMAC-signed and contains no PII — safe to expose publicly.
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ token: string }> }
+) {
+  const { token } = await params;
+
+  // Verify the token is valid before serving the QR
+  const decoded = verifyEventQR(token);
+  if (!decoded) {
+    return new NextResponse("Invalid QR token", { status: 400 });
+  }
+
+  const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const qrContent = `${appUrl}/event-checkin?t=${encodeURIComponent(token)}`;
+
+  const pngBuffer = await QRCode.toBuffer(qrContent, {
+    type:   "png",
+    width:  400,
+    margin: 2,
+    color:  { dark: "#000000", light: "#ffffff" },
+  });
+
+  return new NextResponse(pngBuffer, {
+    headers: {
+      "Content-Type":  "image/png",
+      "Cache-Control": "public, max-age=86400, immutable",
+    },
+  });
+}
