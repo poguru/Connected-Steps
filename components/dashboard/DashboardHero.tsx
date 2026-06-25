@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { calcMissToleranceStreak } from "@/lib/streak-utils";
+import { calcMissToleranceStreak, calcBestStreak } from "@/lib/streak-utils";
 
 interface SessionRecord {
   attended: boolean;
@@ -80,11 +80,22 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
     setPlan(p[(new Date().getDay() + 6) % 7]);
   }, [user.goal]);
 
-  const streak  = calcMissToleranceStreak(
-    sessions
-      .filter(r => r.sessions !== null)
-      .map(r => ({ attended: r.attended, date: r.sessions!.date }))
-  );
+  const sessionRecords = sessions
+    .filter(r => r.sessions !== null)
+    .map(r => ({ attended: r.attended, date: r.sessions!.date }));
+
+  const streak     = calcMissToleranceStreak(sessionRecords);
+  const bestStreak = calcBestStreak(sessionRecords);
+
+  // Next milestone above current streak
+  const MILESTONES = [7, 14, 30, 50, 100];
+  const nextMilestone = MILESTONES.find(m => m > streak) ?? null;
+
+  // Last attended session date
+  const lastAttended = sessionRecords
+    .filter(r => r.attended)
+    .map(r => r.date)
+    .sort((a, b) => b.localeCompare(a))[0] ?? null;
   const monthly  = calcMonthly(sessions);
   // Prefer a session the user is registered for (and not yet attended).
   // Fall back to the first upcoming session (unregistered) so there's always something to join.
@@ -113,12 +124,18 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
             {user.firstName}
           </h1>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {streak > 0 && (
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(232,98,10,0.12)", border: "1px solid rgba(232,98,10,0.25)", borderRadius: 20, padding: "4px 10px" }}>
+            {streak > 0 ? (
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(232,98,10,0.12)", border: "1px solid rgba(232,98,10,0.25)", borderRadius: 20, padding: "4px 10px" }}
+                title={`Best streak: ${bestStreak} sessions${nextMilestone ? ` · Next milestone: ${nextMilestone}` : " · All milestones reached!"}`}>
                 <span style={{ fontSize: "0.8rem" }}>🔥</span>
                 <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--cs-orange)" }}>{streak}-session streak</span>
               </div>
-            )}
+            ) : sessionRecords.filter(r => r.attended).length > 0 ? (
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20, padding: "4px 10px" }}>
+                <span style={{ fontSize: "0.8rem" }}>💪</span>
+                <span style={{ fontSize: "11px", fontWeight: 600, color: "#888" }}>Start a streak!</span>
+              </div>
+            ) : null}
             <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 20, padding: "4px 10px" }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--foreground)", flexShrink: 0 }}>
                 <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
@@ -253,10 +270,34 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
       )}
 
 
+      {/* Streak stats row */}
+      {sessionRecords.filter(r => r.attended).length > 0 && (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "0 0.125rem" }}>
+          {bestStreak > 0 && (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "3px 10px" }}>
+              <span style={{ fontSize: "0.75rem" }}>🏆</span>
+              <span style={{ fontSize: "10px", color: "#aaa" }}>Best: <strong style={{ color: "#ccc" }}>{bestStreak}</strong></span>
+            </div>
+          )}
+          {nextMilestone && streak > 0 && (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "3px 10px" }}>
+              <span style={{ fontSize: "0.75rem" }}>🎯</span>
+              <span style={{ fontSize: "10px", color: "#aaa" }}>{nextMilestone - streak} to {nextMilestone}</span>
+            </div>
+          )}
+          {lastAttended && (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "3px 10px" }}>
+              <span style={{ fontSize: "0.75rem" }}>📅</span>
+              <span style={{ fontSize: "10px", color: "#aaa" }}>Last: <strong style={{ color: "#ccc" }}>{new Date(lastAttended + "T12:00:00Z").toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</strong></span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Streak reset nudge */}
-      {streak === 0 && sessions.some(r => r.sessions !== null) && (
+      {streak === 0 && sessionRecords.filter(r => r.attended).length > 0 && (
         <div style={{ padding: "0.6rem 0.875rem", fontSize: "0.72rem", color: "oklch(0.7 0.15 30)", display: "flex", alignItems: "center", gap: 4 }}>
-          <span>⚠️</span> Two missed sessions reset your streak. Come back strong!
+          <span>⚠️</span> No session in last 14 days — come back to start a new streak!
         </div>
       )}
     </div>
