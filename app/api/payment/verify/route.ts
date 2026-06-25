@@ -123,7 +123,9 @@ export async function POST(req: NextRequest) {
     email.toLowerCase(),
     displayName,
     "Membership Confirmed – Connected Steps",
-    paymentEmailHTML(displayName, planLabel, amountINR, expiryISO)
+    paymentEmailHTML(displayName, planLabel, amountINR, expiryISO),
+    false, // isOtp
+    true,  // isTransactional — bypass NON_OTP_EMAILS_DISABLED
   ).catch(console.error);
 
   if (phone) {

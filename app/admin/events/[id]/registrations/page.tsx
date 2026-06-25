@@ -14,9 +14,15 @@ interface Reg {
   payment_status: string; razorpay_payment_id: string | null; status: string;
   checked_in_at: string | null; created_at: string; distance_category: string | null;
   qr_token: string | null;
+  breakfast_availed?: boolean; breakfast_availed_at?: string | null;
 }
 
-interface Summary { total: number; paid: number; free: number; pending: number; revenue: number; checkedIn: number; }
+interface Summary { total: number; paid: number; free: number; pending: number; revenue: number; checkedIn: number; breakfastIssued?: number; }
+
+interface BreakfastResult {
+  valid: boolean; already_availed?: boolean; message: string;
+  registration?: { code: string; name: string; event: string; breakfast_availed_at?: string; breakfast_verified_by?: string };
+}
 
 interface CheckInResult {
   valid: boolean; already_checked_in?: boolean; message: string; error?: string;
@@ -67,6 +73,12 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
   const [search,   setSearch]   = useState("");
   const [filter,   setFilter]   = useState<"all" | "paid" | "free" | "pending">("all");
   const [cameraOpen, setCameraOpen] = useState(false);
+
+  // Breakfast scanner state
+  const [breakfastCameraOpen, setBreakfastCameraOpen] = useState(false);
+  const [breakfastToken,      setBreakfastToken]      = useState("");
+  const [breakfastLoading,    setBreakfastLoading]    = useState(false);
+  const [breakfastResult,     setBreakfastResult]     = useState<BreakfastResult | null>(null);
   const [scanToken,  setScanToken]  = useState("");
   const [scanLoading, setScanLoading] = useState(false);
   const [scanResult,  setScanResult] = useState<CheckInResult | null>(null);
@@ -93,12 +105,13 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
       // Compute summary client-side from full list
       const all = json.registrations ?? [];
       setSummary({
-        total:     all.length,
-        paid:      all.filter((r: Reg) => r.payment_status === "paid").length,
-        free:      all.filter((r: Reg) => r.payment_status === "free").length,
-        pending:   all.filter((r: Reg) => r.payment_status === "pending").length,
-        revenue:   all.filter((r: Reg) => r.payment_status === "paid").reduce((s: number, r: Reg) => s + (r.final_price ?? 0), 0),
-        checkedIn: all.filter((r: Reg) => r.checked_in_at).length,
+        total:          all.length,
+        paid:           all.filter((r: Reg) => r.payment_status === "paid").length,
+        free:           all.filter((r: Reg) => r.payment_status === "free").length,
+        pending:        all.filter((r: Reg) => r.payment_status === "pending").length,
+        revenue:        all.filter((r: Reg) => r.payment_status === "paid").reduce((s: number, r: Reg) => s + (r.final_price ?? 0), 0),
+        checkedIn:      all.filter((r: Reg) => r.checked_in_at).length,
+        breakfastIssued: all.filter((r: Reg) => r.breakfast_availed).length,
       });
       if (all[0]?.events?.title) setEventTitle(all[0].events.title);
     } catch { setError("Network error."); }
@@ -143,6 +156,28 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
 
   const [genLoading,   setGenLoading]   = useState(false);
   const [genResult,    setGenResult]    = useState("");
+  async function handleBreakfastCheckIn(token: string) {
+    if (!token.trim()) return;
+    setBreakfastLoading(true); setBreakfastResult(null);
+    try {
+      const res  = await fetch("/api/events/mark-breakfast", {
+        method: "POST", headers,
+        body: JSON.stringify({ token: token.trim(), event_id: eventId }),
+      });
+      const data = await res.json();
+      setBreakfastResult(data);
+      if (res.ok && data.valid && !data.already_availed) {
+        setRegs(prev => prev.map(r =>
+          r.registration_code === data.registration?.code
+            ? { ...r, breakfast_availed: true, breakfast_availed_at: data.registration.breakfast_availed_at }
+            : r
+        ));
+        setBreakfastToken("");
+      }
+    } catch { setBreakfastResult({ valid: false, message: "Network error." }); }
+    finally { setBreakfastLoading(false); }
+  }
+
   const [bulkSending,  setBulkSending]  = useState(false);
   const [bulkResult,   setBulkResult]   = useState<{ sent: number; failed: number; skipped: number; total: number; details: { email: string; name: string; status: string; reason: string | null }[] } | null>(null);
   const [showDetails,  setShowDetails]  = useState(false);
@@ -337,7 +372,8 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
               { label: "Paid",       value: summary.paid,      color: "#4ade80"  },
               { label: "Free",       value: summary.free,      color: "#60a5fa"  },
               { label: "Pending",    value: summary.pending,   color: "#eab308"  },
-              { label: "Checked In", value: summary.checkedIn, color: "#a78bfa"  },
+              { label: "Checked In",       value: summary.checkedIn,       color: "#a78bfa"  },
+              { label: "Breakfast Issued", value: summary.breakfastIssued ?? 0, color: "#34d399"  },
               { label: "Revenue",    value: `₹${summary.revenue.toLocaleString("en-IN")}`, color: "#e8620a" },
             ].map(({ label, value, color }) => (
               <div key={label} style={{ ...S.card, textAlign: "center" }}>
@@ -383,6 +419,41 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
                   <div style={{ fontWeight: 700, color: scanResult.valid ? (scanResult.already_checked_in ? "#eab308" : "#4ade80") : "#f87171", marginBottom: 4 }}>{scanResult.message}</div>
                   {scanResult.registration && (
                     <div style={{ fontSize: "0.78rem", color: "#aaa" }}>{scanResult.registration.name}{scanResult.registration.category ? ` · ${scanResult.registration.category}` : ""} · <span style={{ fontFamily: "monospace" }}>{scanResult.registration.code}</span></div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* ── Breakfast Scanner ── */}
+            <div style={{ ...S.card, marginBottom: "1.5rem", borderColor: "rgba(52,211,153,0.2)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem", flexWrap: "wrap", gap: 8 }}>
+                <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#fff" }}>🍽️ Breakfast / Refreshment Scanner</div>
+                <button onClick={() => { setBreakfastResult(null); setBreakfastCameraOpen(true); }}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "#34d399", border: "none", borderRadius: "6px", color: "#000", fontWeight: 700, cursor: "pointer", fontSize: "0.82rem", fontFamily: "inherit" }}>
+                  📷 Open Camera
+                </button>
+              </div>
+              <form onSubmit={e => { e.preventDefault(); handleBreakfastCheckIn(breakfastToken); }} style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+                <input value={breakfastToken} onChange={e => { setBreakfastToken(e.target.value); setBreakfastResult(null); }}
+                  placeholder="Paste QR token manually…"
+                  style={{ ...S.input, flex: "1 1 260px", fontFamily: "monospace", fontSize: "0.78rem" }} />
+                <button type="submit" disabled={breakfastLoading || !breakfastToken.trim()}
+                  style={{ padding: "9px 20px", background: "#34d399", color: "#000", border: "none", borderRadius: "6px", fontWeight: 700, cursor: breakfastLoading ? "not-allowed" : "pointer", fontSize: "0.85rem", fontFamily: "inherit", opacity: breakfastLoading ? 0.6 : 1 }}>
+                  {breakfastLoading ? "Checking…" : "Issue Breakfast"}
+                </button>
+              </form>
+              {breakfastResult && (
+                <div style={{ marginTop: "0.75rem", padding: "12px 16px", borderRadius: 8,
+                  background: breakfastResult.valid ? (breakfastResult.already_availed ? "rgba(234,179,8,0.1)" : "rgba(52,211,153,0.1)") : "rgba(239,68,68,0.1)",
+                  border: `1px solid ${breakfastResult.valid ? (breakfastResult.already_availed ? "rgba(234,179,8,0.3)" : "rgba(52,211,153,0.3)") : "rgba(239,68,68,0.3)"}` }}>
+                  <div style={{ fontWeight: 700, color: breakfastResult.valid ? (breakfastResult.already_availed ? "#eab308" : "#34d399") : "#f87171", marginBottom: 4 }}>
+                    {breakfastResult.message}
+                  </div>
+                  {breakfastResult.registration && (
+                    <div style={{ fontSize: "0.78rem", color: "#aaa" }}>
+                      {breakfastResult.registration.name} · {breakfastResult.registration.event}
+                      {breakfastResult.registration.breakfast_availed_at && ` · ${new Date(breakfastResult.registration.breakfast_availed_at).toLocaleTimeString("en-IN")}`}
+                    </div>
                   )}
                 </div>
               )}
@@ -578,7 +649,7 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
 
       {cameraOpen && (
         <QRScannerModal
-          title="Scan Participant QR"
+          title="Scan Participant QR — Check-In"
           onScan={raw => {
             setCameraOpen(false);
             let tok = raw;
@@ -586,6 +657,19 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
             runCheckIn(tok);
           }}
           onClose={() => setCameraOpen(false)}
+        />
+      )}
+
+      {breakfastCameraOpen && (
+        <QRScannerModal
+          title="Scan QR — Breakfast / Refreshment"
+          onScan={raw => {
+            setBreakfastCameraOpen(false);
+            let tok = raw;
+            try { const u = new URL(raw); tok = u.searchParams.get("t") ?? raw; } catch { /* raw */ }
+            handleBreakfastCheckIn(tok);
+          }}
+          onClose={() => setBreakfastCameraOpen(false)}
         />
       )}
     </div>
