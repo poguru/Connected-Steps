@@ -4,37 +4,45 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 
 interface Metrics {
-  totalMembers:     number;
-  activeMembers:    number;
-  upcomingEvents:   number;
-  revenueThisMonth: number;
-  pendingStories:   number;
-  pendingPosts:     number;
+  // Counts
+  totalMembers:          number;
+  activeMembers:         number;
+  newMembersThisMonth:   number;
+  upcomingEvents:        number;
+  upcomingRegistrations: number;
+  totalParticipants:     number;
+  pendingStories:        number;
+  pendingPosts:          number;
+  // Revenue (rupees)
+  membershipRevenueMonth: number;
+  eventRevenueMonth:      number;
+  totalRevenueMonth:      number;
 }
 
 const QUICK_ACTIONS = [
-  { label: "Mark Session Attendance", href: "/admin/sessions",              desc: "Log today's training session" },
-  { label: "Create Event",            href: "/admin/events",                desc: "Publish a new event or run" },
-  { label: "Review Community Posts",  href: "/admin/community",             desc: "Approve or reject pending posts" },
-  { label: "Write Training Plans",    href: "/admin/training-plans",        desc: "Weekly plans for members" },
-  { label: "Event Registrations",     href: "/admin/events/registrations",  desc: "View registrations & revenue" },
-  { label: "Coach Operations",        href: "/admin/coach-ops",             desc: "Athlete roster & bulk actions" },
-  { label: "Coach Assignments",       href: "/admin/coach-assignments",     desc: "Assign coaches to users" },
+  { label: "Mark Session Attendance", href: "/admin/sessions",             desc: "Log today's training session" },
+  { label: "Create Event",            href: "/admin/events",               desc: "Publish a new event or run" },
+  { label: "Review Community Posts",  href: "/admin/community",            desc: "Approve or reject pending posts" },
+  { label: "Write Training Plans",    href: "/admin/training-plans",       desc: "Weekly plans for members" },
+  { label: "Event Registrations",     href: "/admin/events/registrations", desc: "View registrations & revenue" },
+  { label: "Coach Operations",        href: "/admin/coach-ops",            desc: "Athlete roster & bulk actions" },
+  { label: "Coach Assignments",       href: "/admin/coach-assignments",    desc: "Assign coaches to users" },
 ];
 
-function fmt(n: number) {
-  return n.toLocaleString("en-IN");
-}
+function fmt(n: number) { return n.toLocaleString("en-IN"); }
 
 function fmtRupees(n: number) {
-  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
-  if (n >= 1000)   return `₹${(n / 1000).toFixed(1)}K`;
-  return `₹${n}`;
+  if (n >= 10_00_000) return `₹${(n / 10_00_000).toFixed(2)}Cr`;
+  if (n >= 1_00_000)  return `₹${(n / 1_00_000).toFixed(1)}L`;
+  if (n >= 1_000)     return `₹${(n / 1_000).toFixed(1)}K`;
+  return `₹${fmt(n)}`;
 }
 
 function today() {
   return new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 }
+
+type CardType = { label: string; value: string; sub: string; color?: string; href?: string };
 
 export default function AdminDashboard() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
@@ -48,9 +56,90 @@ export default function AdminDashboard() {
   }, []);
 
   const pending = (metrics?.pendingStories ?? 0) + (metrics?.pendingPosts ?? 0);
+  const v = (n: number | undefined, formatter: (n: number) => string) =>
+    loading ? "—" : formatter(n ?? 0);
+
+  const KPI_ROWS: { section: string; cards: CardType[] }[] = [
+    {
+      section: "Revenue — This Month",
+      cards: [
+        {
+          label: "Total Revenue",
+          value: v(metrics?.totalRevenueMonth, fmtRupees),
+          sub:   "Events + Memberships",
+          color: "#e8620a",
+        },
+        {
+          label: "Event Revenue",
+          value: v(metrics?.eventRevenueMonth, fmtRupees),
+          sub:   "Paid event registrations",
+          color: "#f97316",
+          href:  "/admin/events/registrations",
+        },
+        {
+          label: "Membership Revenue",
+          value: v(metrics?.membershipRevenueMonth, fmtRupees),
+          sub:   "New memberships activated",
+          color: "#fb923c",
+          href:  "/admin/membership",
+        },
+      ],
+    },
+    {
+      section: "Members",
+      cards: [
+        {
+          label: "Active Members",
+          value: v(metrics?.activeMembers, fmt),
+          sub:   "Valid membership now",
+          color: "#4ade80",
+          href:  "/admin/membership",
+        },
+        {
+          label: "New This Month",
+          value: v(metrics?.newMembersThisMonth, fmt),
+          sub:   "Memberships started",
+          color: "#86efac",
+        },
+        {
+          label: "Total Registered",
+          value: v(metrics?.totalMembers, fmt),
+          sub:   "All-time signups",
+          color: "#aaa",
+          href:  "/admin/users",
+        },
+      ],
+    },
+    {
+      section: "Events",
+      cards: [
+        {
+          label: "Upcoming Events",
+          value: v(metrics?.upcomingEvents, fmt),
+          sub:   "Published & future",
+          color: "#60a5fa",
+          href:  "/admin/events",
+        },
+        {
+          label: "Confirmed Registrations",
+          value: v(metrics?.upcomingRegistrations, fmt),
+          sub:   "All confirmed registrants",
+          color: "#93c5fd",
+          href:  "/admin/events/registrations",
+        },
+        {
+          label: "Total Participants",
+          value: v(metrics?.totalParticipants, fmt),
+          sub:   "Unique users in events",
+          color: "#bfdbfe",
+          href:  "/admin/events/registrations",
+        },
+      ],
+    },
+  ];
 
   return (
-    <div style={{ padding: "2rem 2rem 3rem", maxWidth: 960, margin: "0 auto" }}>
+    <div style={{ padding: "2rem 2rem 3rem", maxWidth: 1000, margin: "0 auto" }}>
 
       {/* Header */}
       <div style={{ marginBottom: "2rem" }}>
@@ -58,23 +147,32 @@ export default function AdminDashboard() {
         <p style={{ margin: "4px 0 0", fontSize: 13, color: "#444" }}>{today()}</p>
       </div>
 
-      {/* Metric cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
-        {[
-          { label: "Total Members",      value: loading ? "—" : fmt(metrics?.totalMembers ?? 0),     sub: "All registered" },
-          { label: "Active Members",     value: loading ? "—" : fmt(metrics?.activeMembers ?? 0),    sub: "Valid membership" },
-          { label: "Upcoming Events",    value: loading ? "—" : fmt(metrics?.upcomingEvents ?? 0),   sub: "Scheduled ahead" },
-          { label: "Revenue This Month", value: loading ? "—" : fmtRupees(metrics?.revenueThisMonth ?? 0), sub: "New memberships" },
-        ].map(card => (
-          <div key={card.label} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem 1.5rem" }}>
-            <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "#e8620a", letterSpacing: "-0.02em", lineHeight: 1 }}>
-              {card.value}
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#ccc", marginTop: 6 }}>{card.label}</div>
-            <div style={{ fontSize: 11, color: "#3a3a3a", marginTop: 2 }}>{card.sub}</div>
+      {/* KPI sections */}
+      {KPI_ROWS.map(row => (
+        <div key={row.section} style={{ marginBottom: "1.75rem" }}>
+          <div style={{ fontSize: 10, color: "#333", textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: 700, marginBottom: "0.75rem" }}>
+            {row.section}
           </div>
-        ))}
-      </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.875rem" }}>
+            {row.cards.map(card => {
+              const inner = (
+                <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem 1.5rem", height: "100%", boxSizing: "border-box" as const }}>
+                  <div style={{ fontSize: "1.6rem", fontWeight: 800, color: card.color ?? "#e8620a", letterSpacing: "-0.02em", lineHeight: 1 }}>
+                    {card.value}
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#ccc", marginTop: 6 }}>{card.label}</div>
+                  <div style={{ fontSize: 11, color: "#3a3a3a", marginTop: 2 }}>{card.sub}</div>
+                </div>
+              );
+              return card.href ? (
+                <Link key={card.label} href={card.href} style={{ textDecoration: "none" }}>{inner}</Link>
+              ) : (
+                <div key={card.label}>{inner}</div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
 
       {/* Pending approvals banner */}
       {!loading && pending > 0 && (
@@ -105,7 +203,7 @@ export default function AdminDashboard() {
       )}
 
       {/* Quick actions */}
-      <div style={{ marginBottom: "0.75rem" }}>
+      <div>
         <div style={{ fontSize: 11, color: "#333", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700, marginBottom: "0.75rem" }}>
           Quick Actions
         </div>
