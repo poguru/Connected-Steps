@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import bcrypt from "bcryptjs";
+import { isRateLimited, recordFailure, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit: 5 attempts per IP per 15 minutes
+    const ip  = getClientIp(req);
+    const key = `reset-password:${ip}`;
+    if (await isRateLimited(key)) {
+      return NextResponse.json({ error: "Too many attempts. Please try again in 15 minutes." }, { status: 429, headers: { "Retry-After": "900" } });
+    }
+
     const { token, password } = await req.json();
     if (!token || !password) return NextResponse.json({ error: "Missing fields." }, { status: 400 });
     if (password.length < 8) return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
@@ -27,8 +35,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "This reset link has expired. Please request a new one." }, { status: 400 });
     }
 
-    // Update password
-    const hashed = await bcrypt.hash(password, 10);
+    // Update password — 12 rounds matches registration (was inconsistently 10)
+    const hashed = await bcrypt.hash(password, 12);
     await db.from("users").update({ password: hashed }).eq("email", reset.email);
 
     // Delete used token

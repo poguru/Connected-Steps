@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import crypto from "crypto";
+import { isRateLimited, recordFailure, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit: 5 attempts per IP per 15 minutes — prevents reset email spam
+    const ip  = getClientIp(req);
+    const key = `forgot-password:${ip}`;
+    if (await isRateLimited(key)) {
+      return NextResponse.json({ error: "Too many requests. Please wait 15 minutes before trying again." }, { status: 429, headers: { "Retry-After": "900" } });
+    }
+    await recordFailure(key); // intentional: count every request, not just failures
+
     const { email } = await req.json();
     if (!email) return NextResponse.json({ error: "Email is required." }, { status: 400 });
 
@@ -25,7 +34,11 @@ export async function POST(req: NextRequest) {
     // Store token
     await db.from("password_resets").insert({ email: email.toLowerCase().trim(), token, expires_at });
 
-    const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/auth/reset-password?token=${token}`;
+    const appUrl   = process.env.NEXT_PUBLIC_APP_URL;
+    if (!appUrl) {
+      console.error("[forgot-password] NEXT_PUBLIC_APP_URL not set — reset link will be broken");
+    }
+    const resetUrl = `${appUrl ?? "https://www.connectedsteps.in"}/auth/reset-password?token=${token}`;
 
     const { sendSingleEmail } = await import("@/lib/email-service");
     const emailResult = await sendSingleEmail({

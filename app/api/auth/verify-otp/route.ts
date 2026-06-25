@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
     await db.from("otp_verifications").update({ verified: true }).eq("id", data.id);
     return NextResponse.json({ success: true });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    console.error("[verify-otp] unhandled error:", e);
+    return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 });
   }
 }

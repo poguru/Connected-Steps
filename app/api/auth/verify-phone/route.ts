@@ -99,6 +99,7 @@ export async function POST(req: NextRequest) {
       phone_verified: true,
     });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    console.error("[verify-phone] unhandled error:", e);
+    return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 });
   }
 }

@@ -28,7 +28,8 @@ export async function GET(
     color:  { dark: "#000000", light: "#ffffff" },
   });
 
-  return new NextResponse(pngBuffer, {
+  // Next.js 16 requires Uint8Array/ArrayBuffer, not Node Buffer
+  return new NextResponse(new Uint8Array(pngBuffer), {
     headers: {
       "Content-Type":  "image/png",
       "Cache-Control": "public, max-age=86400, immutable",
