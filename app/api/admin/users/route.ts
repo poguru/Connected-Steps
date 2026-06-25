@@ -5,10 +5,25 @@ import { isAdminOrCoach } from "@/lib/admin-auth";
 export async function GET(req: NextRequest) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const db = getSupabaseServer();
+  const db  = getSupabaseServer();
+  const sp  = req.nextUrl.searchParams;
+  const PAGE_SIZE = 200;
+  const page      = Math.max(0, parseInt(sp.get("page") ?? "0", 10));
+  const search    = sp.get("q")?.trim().toLowerCase() ?? "";
+
+  // Paginated user query — prevents loading entire user table at scale
+  let userQuery = db
+    .from("users")
+    .select("email, first_name, last_name, phone, goal, location, created_at, is_active")
+    .order("created_at", { ascending: false })
+    .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+  if (search) {
+    userQuery = userQuery.or(`email.ilike.%${search}%,first_name.ilike.%${search}%,last_name.ilike.%${search}%,phone.ilike.%${search}%`);
+  }
 
   const [usersRes, membershipsRes, leaderboardRes, sessionsRes] = await Promise.all([
-    db.from("users").select("email, first_name, last_name, phone, goal, location, created_at, is_active").order("created_at", { ascending: false }),
+    userQuery,
     db.from("memberships").select("user_email, plan, status, expires_at"),
     db.from("leaderboard").select("user_email, total_points, month_points, total_runs, total_km"),
     db.from("session_attendance").select("user_email, attended").eq("attended", true),
@@ -53,6 +68,9 @@ export async function GET(req: NextRequest) {
     activeMembers: users.filter((u) => u.isActiveMember).length,
     withStrava:    (leaderboardRes.data ?? []).length,
     totalSessions: Object.values(sessionCountMap).reduce((s, n) => s + n, 0),
+    page,
+    page_size: PAGE_SIZE,
+    has_more:  users.length === PAGE_SIZE,
   };
 
   return NextResponse.json({ users, stats });

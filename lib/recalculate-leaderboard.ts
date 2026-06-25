@@ -148,15 +148,17 @@ export async function recalculateMonth(month: string): Promise<{ message: string
 
   if (upsertRows.length === 0) return { message: "No users to update.", updated: 0 };
 
-  // ── Single atomic upsert for all leaderboard rows ─────────────────────────
-  // One DB round-trip replaces the previous per-user UPDATE/INSERT loop.
-  // Concurrent calls compute the same scores and upsert the same values,
-  // so "last writer wins" is safe — no data corruption possible.
-  const { error: upsertErr } = await db
-    .from("leaderboard")
-    .upsert(upsertRows, { onConflict: "user_email" });
-
-  if (upsertErr) throw new Error(upsertErr.message);
+  // ── Chunked upsert — Supabase PostgREST rejects single batches > 1,000 rows ──
+  // Chunks of 500 are safe, keep each round-trip well below the limit.
+  // "Last writer wins" remains safe — concurrent calls produce identical scores.
+  const CHUNK = 500;
+  for (let i = 0; i < upsertRows.length; i += CHUNK) {
+    const chunk = upsertRows.slice(i, i + CHUNK);
+    const { error: upsertErr } = await db
+      .from("leaderboard")
+      .upsert(chunk, { onConflict: "user_email" });
+    if (upsertErr) throw new Error(`Chunk ${i}–${i + CHUNK}: ${upsertErr.message}`);
+  }
 
   // ── Single batch mark all month attendance as synced ─────────────────────
   // Covers all sessions in the month, not just the one that triggered the sync.

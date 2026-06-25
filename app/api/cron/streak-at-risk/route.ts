@@ -33,7 +33,9 @@ export async function GET(req: NextRequest) {
   // All DB reads happen before the lock is acquired.  If any fetch fails here
   // the route returns 500 with no lock committed, so Vercel's retry fires cleanly.
 
-  // 1. Fetch all attended sessions with their dates (paginated)
+  // 1. Fetch attended sessions within last 90 days only (INACTIVE_DAYS=10 → 90d window is generous)
+  // Bounding to 90 days prevents loading millions of historical rows at scale.
+  const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   let attPages = 0;
   let rows: { user_email: string; sessions: unknown }[];
   try {
@@ -42,6 +44,7 @@ export async function GET(req: NextRequest) {
         .from("session_attendance")
         .select("user_email, sessions!inner(date)")
         .eq("attended", true)
+        .gte("sessions.date", ninetyDaysAgo)  // only recent sessions needed
         .order("user_email")
         .range(from, to),
     );
