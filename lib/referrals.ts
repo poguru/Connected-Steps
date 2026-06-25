@@ -121,16 +121,26 @@ export async function processReferral(
     });
 
     if (insertErr) {
-      if (insertErr.code === "23505") return; // already processed for this user
-      console.error("[referrals] insert error:", insertErr.message);
+      if (insertErr.code === "23505") {
+        console.log(`[referrals] already processed for referred=${normalizedReferred} — skipping`);
+        return;
+      }
+      console.error(`[referrals] INSERT FAILED for code=${referralCode} referrer=${referrerEmail} referred=${normalizedReferred}:`, insertErr.message, insertErr.code);
       return;
     }
+    console.log(`[referrals] row created: code=${referralCode} referrer=${referrerEmail} referred=${normalizedReferred}`);
 
     // Extend / grant memberships for both users
-    await Promise.all([
-      extendOrGrantMembership(referrerEmail, 30),
-      extendOrGrantMembership(normalizedReferred, 30),
-    ]);
+    try {
+      await Promise.all([
+        extendOrGrantMembership(referrerEmail, 30),
+        extendOrGrantMembership(normalizedReferred, 30),
+      ]);
+      console.log(`[referrals] memberships extended for referrer=${referrerEmail} referred=${normalizedReferred}`);
+    } catch (memErr) {
+      console.error(`[referrals] MEMBERSHIP EXTENSION FAILED for code=${referralCode}:`, memErr);
+      // Don't return — still mark reward and send notifications
+    }
 
     // Mark reward as granted
     const rewarded_at = new Date().toISOString();
@@ -166,7 +176,7 @@ export async function processReferral(
       }),
     ]);
   } catch (e) {
-    console.error("[referrals] processReferral error:", e);
+    console.error(`[referrals] processReferral UNHANDLED ERROR code=${referralCode} referred=${referredEmail}:`, e);
   }
 }
 

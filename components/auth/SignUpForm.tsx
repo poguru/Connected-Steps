@@ -60,6 +60,7 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
   const [otpError,   setOtpError]   = useState("");
 
   const [form, setForm]             = useState({ firstName: "", lastName: "", dob: "", password: "", confirm: "" });
+  const [referralInput, setReferralInput] = useState("");
   const [goal,       setGoal]       = useState("5k");
   const [location,   setLocation]   = useState("");
   const [customLoc,  setCustomLoc]  = useState("");
@@ -121,7 +122,9 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
     setSubmitting(true);
     try {
       const finalLocation = location === "Others" ? customLoc : location;
-      const referralCode  = localStorage.getItem("cs_pending_referral") ?? undefined;
+      // Manual input takes priority over localStorage (covers direct code sharing via WhatsApp/SMS)
+      const storedCode   = localStorage.getItem("cs_pending_referral") ?? "";
+      const referralCode = (referralInput.trim() || storedCode) || undefined;
       const res  = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -345,6 +348,34 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
         </select>
         {location === "Others" && (
           <input style={{ ...inputStyle, marginTop: 8 }} type="text" placeholder="Enter your training location" value={customLoc} onChange={e => setCustomLoc(e.target.value)} {...focusHandlers} />
+        )}
+      </div>
+
+      {/* Referral code — optional, pre-filled from localStorage if available */}
+      <div>
+        <label style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5 }}>
+          Referral Code <span style={{ color: "var(--muted-foreground)", fontWeight: 400 }}>(optional)</span>
+        </label>
+        <input
+          style={{ ...inputStyle, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "monospace" }}
+          type="text"
+          placeholder="e.g. ZMGR2639"
+          maxLength={8}
+          value={referralInput}
+          onChange={e => setReferralInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
+          onFocus={() => {
+            // Pre-fill from localStorage when user taps the field (if empty)
+            if (!referralInput) {
+              const stored = localStorage.getItem("cs_pending_referral") ?? "";
+              if (stored) setReferralInput(stored.toUpperCase());
+            }
+          }}
+          {...focusHandlers}
+        />
+        {localStorage.getItem("cs_pending_referral") && !referralInput && (
+          <p style={{ margin: "4px 0 0", fontSize: 10, color: "var(--cs-orange)" }}>
+            ✓ Referral code auto-detected from invite link
+          </p>
         )}
       </div>
 
