@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     // Idempotency guard
     const { data: reg } = await db
       .from("event_registrations")
-      .select("id, coupon_id, user_email, user_name, payment_status, event_id, distance_category, events(title, start_date, start_time, location)")
+      .select("id, coupon_id, user_email, user_name, payment_status, event_id, distance_category, final_price, events(title, start_date, start_time, location)")
       .eq("registration_code", registration_code)
       .single<{
         id: string;
@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
         payment_status: string;
         event_id: string;
         distance_category: string | null;
+        final_price: number | null;
         events: { title: string; start_date: string; start_time: string | null; location: string } | null;
       }>();
 
