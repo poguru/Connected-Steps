@@ -559,8 +559,8 @@ export default function AdminEventsPage() {
                             Delete
                           </button>
                         </div>
-                        <Link href="/admin/events/registrations"
-                          style={{ fontSize: "0.72rem", color: "#888", textDecoration: "none", textAlign: "right" }}>
+                        <Link href={`/admin/events/${ev.id}/registrations`}
+                          style={{ fontSize: "0.72rem", color: "#e8620a", textDecoration: "none", textAlign: "right", fontWeight: 600 }}>
                           View registrations →
                         </Link>
                       </div>

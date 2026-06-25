@@ -20,6 +20,7 @@ interface Event {
   location:                string;
   organizer:               string | null;
   max_participants:        number | null;
+  participant_count:       number | null;
   registration_required:   boolean;
   share_slug:              string | null;
 }
@@ -252,12 +253,18 @@ function EventCard({
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
             {ev.location}
           </div>
-          {ev.max_participants && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.77rem", color: conf.color, fontWeight: 600 }}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
-              {ev.max_participants} slots available
-            </div>
-          )}
+          {ev.max_participants && (() => {
+            const taken = ev.participant_count ?? 0;
+            const left  = ev.max_participants - taken;
+            const full  = left <= 0;
+            const low   = !full && left <= 10;
+            return (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.77rem", color: full ? "#ef4444" : low ? "#eab308" : conf.color, fontWeight: 600 }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+                {full ? "Sold Out" : `${left} of ${ev.max_participants} slots available`}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Actions */}

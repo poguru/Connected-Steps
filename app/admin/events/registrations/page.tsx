@@ -1,177 +1,66 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import QRScannerModal from "@/components/ui/QRScannerModal";
 
-interface Reg {
-  id: string; registration_code: string; user_email: string; user_name: string;
-  phone: string | null; blood_group: string | null; coupon_code: string | null;
-  coupon_discount: number; original_price: number; final_price: number;
-  payment_status: string; razorpay_payment_id: string | null; status: string;
-  checked_in_at: string | null;
-  created_at: string;
-  events: { id: string; title: string; start_date: string; location: string } | null;
+interface EventSummary {
+  id:                string;
+  title:             string;
+  start_date:        string;
+  location:          string;
+  status:            string;
+  max_participants:  number | null;
+  participant_count: number | null;
+  price:             number;
+  registration_closes_at: string | null;
 }
 
-interface CheckInResult {
-  valid: boolean;
-  already_checked_in?: boolean;
-  message: string;
-  registration?: { code: string; name: string; category: string | null; event: string; checked_in_at: string };
-}
-interface Summary { total: number; paid: number; free: number; pending: number; revenue: number }
-
-const S: Record<string, React.CSSProperties> = {
-  card: { background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", padding: "1.25rem" },
-  input: { padding: "9px 13px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "#fff", fontSize: "0.85rem", outline: "none", fontFamily: "inherit" },
-};
-
-function payBadge(s: string) {
-  const c = s === "paid" ? "#4ade80" : s === "free" ? "#60a5fa" : s === "pending" ? "#eab308" : "#888";
-  return <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: 999, background: `${c}18`, border: `1px solid ${c}30`, color: c, fontWeight: 700 }}>{s.toUpperCase()}</span>;
+interface RegStats {
+  event_id: string;
+  total:    number;
+  paid:     number;
+  free:     number;
+  pending:  number;
+  revenue:  number;
 }
 
 function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  return new Date(d + "T12:00:00Z").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 
-export default function AdminRegistrationsPage() {
-  const [password, setPassword] = useState("");
-  const [authed,   setAuthed]   = useState(true);
-  const [authErr,  setAuthErr]  = useState("");
+function statusBadge(ev: EventSummary) {
+  const now     = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+  const nowISO  = now.toISOString();
+  const regClosed = ev.registration_closes_at && nowISO >= ev.registration_closes_at;
+  const full      = ev.max_participants != null && (ev.participant_count ?? 0) >= ev.max_participants;
 
-  const [regs,    setRegs]    = useState<Reg[]>([]);
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [search,  setSearch]  = useState("");
-  const [filter,  setFilter]  = useState<"all" | "paid" | "free" | "pending">("all");
+  if (ev.status !== "published") return { label: "Draft",   color: "#666" };
+  if (full)                       return { label: "Sold Out", color: "#ef4444" };
+  if (regClosed)                  return { label: "Reg. Closed", color: "#eab308" };
+  return                                 { label: "Open",    color: "#4ade80" };
+}
 
-  // Check-in scanner state
-  const [scanToken,    setScanToken]    = useState("");
-  const [scanLoading,  setScanLoading]  = useState(false);
-  const [scanResult,   setScanResult]   = useState<CheckInResult | null>(null);
-  const [cameraOpen,   setCameraOpen]   = useState(false);
-
-  const headers = { "Content-Type": "application/json" };
-
-  async function load() {
-    setLoading(true); setAuthErr("");
-    try {
-      const res = await fetch("/api/admin/events/registrations");
-      const json = await res.json();
-      if (!res.ok) { setAuthErr(json.error ?? "Failed to load"); return; }
-      setRegs(json.registrations ?? []);
-      setSummary(json.summary ?? null);
-    } catch { setAuthErr("Network error."); }
-    finally { setLoading(false); }
-  }
-
-  async function login(e: React.SyntheticEvent) {
-    e.preventDefault(); setLoading(true); setAuthErr("");
-    try {
-      const res = await fetch("/api/admin/auth", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-      });
-      if (!res.ok) { setAuthErr("Incorrect password."); return; }
-      setAuthed(true);
-    } catch { setAuthErr("Network error."); }
-    finally { setLoading(false); }
-  }
+export default function AdminEventRegistrationsIndex() {
+  const [events,  setEvents]  = useState<EventSummary[]>([]);
+  const [stats,   setStats]   = useState<Record<string, RegStats>>({});
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState("");
 
   useEffect(() => {
-    fetch("/api/admin/auth").then(r => { if (r.ok) setAuthed(true); }).catch(() => {});
-  }, []); // eslint-disable-line
-  useEffect(() => { if (authed) load(); }, [authed]); // eslint-disable-line
-
-  function handleCameraScan(raw: string) {
-    setCameraOpen(false);
-    // Extract ?t= token from event check-in URL, or use raw string directly
-    let token = raw;
-    try {
-      const u = new URL(raw);
-      token = u.searchParams.get("t") ?? raw;
-    } catch { /* raw token */ }
-    setScanToken(token);
-    runCheckIn(token);
-  }
-
-  async function runCheckIn(token: string) {
-    if (!token.trim()) return;
-    setScanLoading(true); setScanResult(null);
-    try {
-      const res  = await fetch("/api/events/check-in", { method: "POST", headers, body: JSON.stringify({ token: token.trim() }) });
-      const data = await res.json();
-      setScanResult(data);
-      if (res.ok && data.valid && !data.already_checked_in) {
-        setRegs(prev => prev.map(r => r.registration_code === data.registration?.code ? { ...r, checked_in_at: data.registration.checked_in_at } : r));
-        setScanToken("");
-      }
-    } catch { setScanResult({ valid: false, message: "Network error." }); }
-    finally { setScanLoading(false); }
-  }
-
-  async function handleCheckIn(e: React.FormEvent) {
-    e.preventDefault();
-    runCheckIn(scanToken);
-  }
-
-  async function cancel(id: string) {
-    if (!confirm("Cancel this registration?")) return;
-    const res = await fetch("/api/admin/events/registrations", { method: "PATCH", headers, body: JSON.stringify({ id, status: "cancelled" }) });
-    if (res.ok) setRegs(r => r.map(x => x.id === id ? { ...x, status: "cancelled" } : x));
-  }
-
-  function exportCSV() {
-    const rows = [
-      ["Code", "Name", "Email", "Phone", "Event", "Date", "Location", "Price", "Discount", "Final", "Payment", "Status", "Registered"].join(","),
-      ...regs.map(r => [
-        r.registration_code, r.user_name, r.user_email, r.phone ?? "",
-        r.events?.title ?? "", r.events?.start_date ?? "", r.events?.location ?? "",
-        r.original_price, r.coupon_discount, r.final_price,
-        r.payment_status, r.status,
-        new Date(r.created_at).toLocaleDateString("en-IN"),
-      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")),
-    ].join("\n");
-    const a = document.createElement("a");
-    a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(rows);
-    a.download = `cs-registrations-${Date.now()}.csv`;
-    a.click();
-  }
-
-  const filtered = regs
-    .filter(r => filter === "all" || r.payment_status === filter)
-    .filter(r => {
-      if (!search) return true;
-      const q = search.toLowerCase();
-      return r.user_name.toLowerCase().includes(q)
-        || r.user_email.toLowerCase().includes(q)
-        || r.registration_code.toLowerCase().includes(q)
-        || r.events?.title?.toLowerCase().includes(q);
-    });
-
-  if (!authed) return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center", padding: "1.5rem" }}>
-      <div style={{ width: "100%", maxWidth: "380px" }}>
-        <Link href="/admin" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none", marginBottom: "2.5rem", justifyContent: "center" }}>
-          <Image src="/logo.png" alt="" width={36} height={36} className="rounded-full" />
-          <span style={{ fontSize: "1.1rem", fontWeight: 600, color: "#fff" }}>Admin · Registrations</span>
-        </Link>
-        <div style={S.card}>
-          <form onSubmit={login}>
-            <label style={{ display: "block", fontSize: "11px", color: "#888", marginBottom: "5px" }}>Password</label>
-            <input type="password" value={password} onChange={e => { setPassword(e.target.value); setAuthErr(""); }} autoFocus style={{ ...S.input, width: "100%", marginBottom: "1rem", boxSizing: "border-box" }} />
-            {authErr && <div style={{ color: "#f09595", fontSize: "0.8rem", marginBottom: "0.75rem" }}>{authErr}</div>}
-            <button type="submit" disabled={loading} style={{ width: "100%", padding: "10px", background: "#e8620a", color: "#fff", border: "none", borderRadius: "6px", fontWeight: 700, cursor: "pointer" }}>
-              {loading ? "Checking…" : "Access Dashboard"}
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
-  );
+    Promise.all([
+      fetch("/api/admin/events").then(r => r.json()),
+      fetch("/api/admin/events/registrations/summary").then(r => r.json()).catch(() => ({ summaries: [] })),
+    ])
+      .then(([evData, sumData]) => {
+        setEvents(evData.events ?? []);
+        const map: Record<string, RegStats> = {};
+        for (const s of sumData.summaries ?? []) map[s.event_id] = s;
+        setStats(map);
+      })
+      .catch(() => setError("Failed to load events."))
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff" }}>
@@ -184,153 +73,84 @@ export default function AdminRegistrationsPage() {
         <Link href="/admin/events" style={{ color: "#888", textDecoration: "none", fontSize: "0.85rem" }}>Events</Link>
         <span style={{ color: "#444" }}>/</span>
         <span style={{ color: "#888", fontSize: "0.85rem" }}>Registrations</span>
-        <button onClick={exportCSV} style={{ marginLeft: "auto", padding: "6px 16px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "6px", color: "#fff", cursor: "pointer", fontSize: "0.8rem", fontFamily: "inherit" }}>
-          Export CSV
-        </button>
       </header>
 
-      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "2rem 1.5rem" }}>
+      <div style={{ maxWidth: "900px", margin: "0 auto", padding: "2rem 1.5rem" }}>
+        <h1 style={{ fontSize: "1.2rem", fontWeight: 800, color: "#fff", marginBottom: "1.5rem" }}>
+          Event Registrations
+        </h1>
 
-        {/* Summary cards */}
-        {summary && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px,1fr))", gap: "0.875rem", marginBottom: "2rem" }}>
-            {[
-              { label: "Total", value: summary.total, color: "#fff" },
-              { label: "Paid", value: summary.paid, color: "#4ade80" },
-              { label: "Free", value: summary.free, color: "#60a5fa" },
-              { label: "Pending", value: summary.pending, color: "#eab308" },
-              { label: "Revenue", value: `₹${summary.revenue.toLocaleString("en-IN")}`, color: "#e8620a" },
-            ].map(({ label, value, color }) => (
-              <div key={label} style={{ ...S.card, textAlign: "center" }}>
-                <div style={{ fontSize: "1.5rem", fontWeight: 700, color }}>{value}</div>
-                <div style={{ fontSize: "11px", color: "#666", textTransform: "uppercase", letterSpacing: "0.07em" }}>{label}</div>
-              </div>
-            ))}
-          </div>
+        {loading && <div style={{ textAlign: "center", padding: "4rem", color: "#555" }}>Loading events…</div>}
+        {error   && <div style={{ color: "#f87171", padding: "1rem" }}>{error}</div>}
+
+        {!loading && events.length === 0 && (
+          <div style={{ textAlign: "center", padding: "4rem", color: "#555" }}>No events found.</div>
         )}
 
-        {/* ── Check-In Scanner ── */}
-        <div style={{ ...S.card, marginBottom: "1.5rem", borderColor: "rgba(74,222,128,0.2)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem", flexWrap: "wrap", gap: 8 }}>
-            <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#fff" }}>🔍 Event Check-In Scanner</div>
-            <button onClick={() => { setScanResult(null); setCameraOpen(true); }}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "#e8620a", border: "none", borderRadius: "6px", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: "0.82rem", fontFamily: "inherit" }}>
-              📷 Open Camera
-            </button>
-          </div>
-          <form onSubmit={handleCheckIn} style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <input
-              value={scanToken} onChange={e => { setScanToken(e.target.value); setScanResult(null); }}
-              placeholder="Or paste QR token manually…"
-              style={{ ...S.input, flex: "1 1 260px", fontFamily: "monospace", fontSize: "0.78rem" }}
-            />
-            <button type="submit" disabled={scanLoading || !scanToken.trim()}
-              style={{ padding: "9px 20px", background: "#4ade80", color: "#000", border: "none", borderRadius: "6px", fontWeight: 700, cursor: scanLoading ? "not-allowed" : "pointer", fontSize: "0.85rem", fontFamily: "inherit", opacity: scanLoading ? 0.6 : 1 }}>
-              {scanLoading ? "Checking…" : "Validate & Check In"}
-            </button>
-          </form>
-          {scanResult && (
-            <div style={{ marginTop: "0.75rem", padding: "12px 16px", borderRadius: "8px", background: scanResult.valid ? (scanResult.already_checked_in ? "rgba(234,179,8,0.1)" : "rgba(74,222,128,0.1)") : "rgba(239,68,68,0.1)", border: `1px solid ${scanResult.valid ? (scanResult.already_checked_in ? "rgba(234,179,8,0.3)" : "rgba(74,222,128,0.3)") : "rgba(239,68,68,0.3)"}` }}>
-              <div style={{ fontWeight: 700, color: scanResult.valid ? (scanResult.already_checked_in ? "#eab308" : "#4ade80") : "#f87171", marginBottom: 4 }}>
-                {scanResult.message}
-              </div>
-              {scanResult.registration && (
-                <div style={{ fontSize: "0.78rem", color: "#aaa" }}>
-                  {scanResult.registration.name} · {scanResult.registration.event}
-                  {scanResult.registration.category ? ` · ${scanResult.registration.category}` : ""}
-                  {" · "}<span style={{ fontFamily: "monospace" }}>{scanResult.registration.code}</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          {events.map(ev => {
+            const s      = stats[ev.id];
+            const badge  = statusBadge(ev);
+            const left   = ev.max_participants != null ? ev.max_participants - (ev.participant_count ?? 0) : null;
 
-        {/* Filters */}
-        <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.5rem", flexWrap: "wrap", alignItems: "center" }}>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, email, code, event…"
-            style={{ ...S.input, flex: "1 1 240px" }} />
-          <div style={{ display: "flex", gap: "4px", background: "rgba(255,255,255,0.04)", borderRadius: "7px", padding: "3px" }}>
-            {(["all","paid","free","pending"] as const).map(f => (
-              <button key={f} onClick={() => setFilter(f)}
-                style={{ padding: "5px 14px", borderRadius: 5, border: "none", cursor: "pointer", fontSize: "0.78rem", fontWeight: 600, background: filter === f ? "#e8620a" : "transparent", color: filter === f ? "#fff" : "#888", fontFamily: "inherit" }}>
-                {f.charAt(0).toUpperCase() + f.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Table */}
-        <div style={{ ...S.card, padding: 0, overflow: "hidden" }}>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
-              <thead>
-                <tr style={{ background: "rgba(255,255,255,0.04)" }}>
-                  {["Code", "Participant", "Event", "Date", "Price", "Payment", "Status", "Check-In", "Actions"].map(h => (
-                    <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: "10px", color: "#666", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, whiteSpace: "nowrap" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
-                  <tr><td colSpan={9} style={{ padding: "2rem", textAlign: "center", color: "#555" }}>No registrations found.</td></tr>
-                ) : filtered.map(r => (
-                  <tr key={r.id} style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                    <td style={{ padding: "10px 14px" }}>
-                      <span style={{ fontFamily: "monospace", color: "#e8620a", fontSize: "0.78rem" }}>{r.registration_code}</span>
-                    </td>
-                    <td style={{ padding: "10px 14px" }}>
-                      <div style={{ fontWeight: 600, color: "#fff" }}>{r.user_name}</div>
-                      <div style={{ color: "#666", fontSize: "0.75rem" }}>{r.user_email}</div>
-                      {r.phone && <div style={{ color: "#555", fontSize: "0.72rem" }}>{r.phone}</div>}
-                    </td>
-                    <td style={{ padding: "10px 14px", color: "#ccc" }}>{r.events?.title ?? "—"}</td>
-                    <td style={{ padding: "10px 14px", color: "#888", whiteSpace: "nowrap" }}>{r.events?.start_date ? fmtDate(r.events.start_date) : "—"}</td>
-                    <td style={{ padding: "10px 14px", whiteSpace: "nowrap" }}>
-                      <div style={{ color: "#fff" }}>₹{r.final_price}</div>
-                      {r.coupon_discount > 0 && <div style={{ color: "#4ade80", fontSize: "0.72rem" }}>−₹{r.coupon_discount} ({r.coupon_code})</div>}
-                    </td>
-                    <td style={{ padding: "10px 14px" }}>{payBadge(r.payment_status)}</td>
-                    <td style={{ padding: "10px 14px" }}>
-                      <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: 999, background: r.status === "confirmed" ? "rgba(74,222,128,0.1)" : "rgba(239,68,68,0.1)", color: r.status === "confirmed" ? "#4ade80" : "#f87171", fontWeight: 700 }}>
-                        {r.status.toUpperCase()}
+            return (
+              <div key={ev.id} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem 1.5rem" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{ev.title}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: badge.color, background: `${badge.color}18`, border: `1px solid ${badge.color}30`, padding: "1px 8px", borderRadius: 999 }}>
+                        {badge.label}
                       </span>
-                    </td>
-                    <td style={{ padding: "10px 14px", whiteSpace: "nowrap" }}>
-                      {r.checked_in_at ? (
-                        <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: 999, background: "rgba(74,222,128,0.12)", border: "1px solid rgba(74,222,128,0.3)", color: "#4ade80", fontWeight: 700 }}>
-                          ✓ {new Date(r.checked_in_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      ) : (
-                        <span style={{ fontSize: "10px", color: "#555" }}>—</span>
-                      )}
-                    </td>
-                    <td style={{ padding: "10px 14px" }}>
-                      {r.status !== "cancelled" && (
-                        <button onClick={() => cancel(r.id)}
-                          style={{ padding: "4px 10px", borderRadius: "5px", border: "1px solid rgba(239,68,68,0.3)", background: "transparent", color: "#f09595", cursor: "pointer", fontSize: "0.75rem", fontFamily: "inherit" }}>
-                          Cancel
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>
+                      📅 {fmtDate(ev.start_date)} &nbsp;·&nbsp; 📍 {ev.location}
+                    </div>
+                    {ev.max_participants != null && (
+                      <div style={{ fontSize: 12, color: "#555" }}>
+                        {ev.participant_count ?? 0} registered · {left ?? "∞"} available · {ev.max_participants} capacity
+                      </div>
+                    )}
+                  </div>
 
-        <div style={{ marginTop: "0.75rem", fontSize: "11px", color: "#555" }}>
-          {filtered.length} of {regs.length} registrations
+                  {/* Stats */}
+                  {s ? (
+                    <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{s.total}</div>
+                        <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase" }}>Total</div>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: "#4ade80" }}>{s.paid}</div>
+                        <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase" }}>Paid</div>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: "#60a5fa" }}>{s.free}</div>
+                        <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase" }}>Free</div>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: "#eab308" }}>{s.pending}</div>
+                        <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase" }}>Pending</div>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: "#e8620a" }}>₹{s.revenue.toLocaleString("en-IN")}</div>
+                        <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase" }}>Revenue</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: "#555" }}>No registrations yet</div>
+                  )}
+
+                  <Link href={`/admin/events/${ev.id}/registrations`}
+                    style={{ display: "inline-block", padding: "8px 20px", background: "#e8620a", color: "#fff", borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: "none", flexShrink: 0 }}>
+                    View Registrations →
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
-
-      {cameraOpen && (
-        <QRScannerModal
-          title="Scan Participant QR"
-          onScan={handleCameraScan}
-          onClose={() => setCameraOpen(false)}
-        />
-      )}
     </div>
   );
 }

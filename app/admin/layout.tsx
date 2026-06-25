@@ -22,9 +22,8 @@ const NAV = [
   {
     section: "Events",
     links: [
-      { label: "All Events", href: "/admin/events", exact: true },
-      { label: "Registrations", href: "/admin/events/registrations" },
-      { label: "Run Registrations", href: "/admin/runs" },
+      { label: "All Events",     href: "/admin/events",               exact: true },
+      { label: "Registrations",  href: "/admin/events/registrations"              },
     ],
   },
   {
