@@ -74,6 +74,9 @@ export default function Leaderboard() {
   const [tab,          setTab]          = useState<TimeTab>("month");
   const [loading,      setLoading]      = useState(true);
   const [locFilter,    setLocFilter]    = useState("All");
+  const [locationScope, setLocationScope] = useState<"all" | "my">("all");
+  const [myLocationId,  setMyLocationId]  = useState<string | null>(null);
+  const [myLocationName,setMyLocationName]= useState<string | null>(null);
   const [goalFilter,   setGoalFilter]   = useState("All");
   const [live,         setLive]         = useState(false);
   const [followingSet, setFollowingSet] = useState<Set<string>>(new Set());
@@ -118,6 +121,41 @@ export default function Leaderboard() {
       })
       .catch(() => {});
   }, []);
+
+  // Fetch user's training location on mount (for "My Location" scope)
+  useEffect(() => {
+    const tok = typeof window !== "undefined" ? (localStorage.getItem("cs_user_token") ?? "") : "";
+    if (!tok) return;
+    fetch("/api/user/location", { headers: { "x-user-token": tok } })
+      .then(r => r.json())
+      .then(d => {
+        const primary = (d.locations ?? []).find((l: { is_primary: boolean }) => l.is_primary) ?? d.locations?.[0];
+        if (primary?.training_locations) {
+          setMyLocationId(primary.training_locations.id);
+          setMyLocationName(primary.training_locations.name);
+        }
+      })
+      .catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch leaderboard — re-fetches when scope changes
+  const fetchWithScope = useCallback((scope: "all" | "my") => {
+    setLoading(true);
+    const locParam = scope === "my" && myLocationId ? `?location_id=${myLocationId}` : "";
+    fetch(`/api/leaderboard${locParam}`, { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => {
+        if (d.entries) {
+          rawRef.current = d.entries;
+          const key = ptsKey(tabRef.current);
+          setEntries([...d.entries].sort((a: Entry, b: Entry) => (b[key] ?? 0) - (a[key] ?? 0)));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [myLocationId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { if (locationScope === "my" && myLocationId) fetchWithScope("my"); }, [locationScope, myLocationId]); // eslint-disable-line
 
   // Fetch once on mount — do NOT re-fetch on tab change
   useEffect(() => {
@@ -324,6 +362,18 @@ export default function Leaderboard() {
 
         {/* ── Goal + location filters ── */}
         {(goals.length > 2 || locations.length > 2) && (
+          {/* Training location scope toggle — "My Location" vs "All" */}
+          {myLocationId && (
+            <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.04)", borderRadius: 8, padding: 3, marginBottom: "1rem", width: "fit-content" }}>
+              {(["all","my"] as const).map(s => (
+                <button key={s} type="button" onClick={() => { setLocationScope(s); if (s==="all") fetchWithScope("all"); else if (myLocationId) fetchWithScope("my"); }}
+                  style={{ padding: "6px 16px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: "0.78rem", fontWeight: 600, background: locationScope===s ? "var(--cs-orange)" : "transparent", color: locationScope===s ? "#fff" : "var(--muted-foreground)", fontFamily: "var(--font-body)" }}>
+                  {s === "all" ? "🌍 All" : `📍 ${myLocationName ?? "My Location"}`}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div style={{ display: "flex", gap: 8, marginBottom: "1.5rem", flexWrap: "wrap" }}>
             {goals.length > 2 && (
               <select value={goalFilter} onChange={e => setGoalFilter(e.target.value)}

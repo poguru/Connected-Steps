@@ -9,7 +9,9 @@ export async function GET(req: NextRequest) {
   // Prevents email harvesting while keeping the leaderboard publicly viewable.
   const callerEmail = verifyUserToken(req.headers.get("x-user-token") ?? "");
 
-  const friendsOf = new URL(req.url).searchParams.get("friends_of");
+  const sp         = new URL(req.url).searchParams;
+  const friendsOf  = sp.get("friends_of");
+  const locationId = sp.get("location_id"); // NEW: optional training location filter
 
   // ── Base leaderboard entries ──────────────────────────────────────────────
   let q = db
@@ -24,6 +26,15 @@ export async function GET(req: NextRequest) {
       .eq("follower_email", friendsOf);
     const emails = (follows ?? []).map(f => f.following_email);
     if (!emails.length) return NextResponse.json({ entries: [] });
+    q = q.in("user_email", emails);
+  } else if (locationId) {
+    // Training location tab — filter to users assigned to this location
+    const { data: members } = await db
+      .from("user_location_assignments")
+      .select("user_email")
+      .eq("location_id", locationId);
+    const emails = (members ?? []).map(m => m.user_email);
+    if (!emails.length) return NextResponse.json({ entries: [], location_id: locationId });
     q = q.in("user_email", emails);
   }
 
@@ -64,7 +75,7 @@ export async function GET(req: NextRequest) {
     is_me:       callerEmail ? e.user_email.toLowerCase() === callerEmail.toLowerCase() : false,
   }));
 
-  return NextResponse.json({ entries: enriched }, {
+  return NextResponse.json({ entries: enriched, location_id: locationId ?? null }, {
     headers: {
       // Cache at CDN for 30s; serve stale while revalidating for up to 60s.
       // Keeps the leaderboard fresh without hammering the DB on every page load.

@@ -29,10 +29,11 @@ const NAV = [
   {
     section: "Coaching",
     links: [
-      { label: "Coaches",         href: "/admin/coaches" },
-      { label: "Training Plans",  href: "/admin/training-plans" },
-      { label: "Coach Operations",href: "/admin/coach-ops" },
-      { label: "Coach Ratings",   href: "/admin/coach-ratings" },
+      { label: "Coaches",            href: "/admin/coaches" },
+      { label: "Training Locations", href: "/admin/training-locations" },
+      { label: "Training Plans",     href: "/admin/training-plans" },
+      { label: "Coach Operations",   href: "/admin/coach-ops" },
+      { label: "Coach Ratings",      href: "/admin/coach-ratings" },
     ],
   },
   {
