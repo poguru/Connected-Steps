@@ -55,207 +55,352 @@ export interface Invoice {
   created_at:     string;
 }
 
-// ── HTML Invoice Template ─────────────────────────────────────────────────────
+// ── HTML Invoice Template — Professional GST-Compliant Tax Invoice ────────────
 
 function generateInvoiceHTML(inv: {
-  invoiceNumber: string;
-  invoiceDate:   string;
-  userName:      string;
-  userEmail:     string;
-  userPhone:     string;
-  productName:   string;
-  productType:   string;
-  eventDate?:    string;
-  eventVenue?:   string;
-  paymentId:     string;
-  orderId:       string;
+  invoiceNumber:  string;
+  invoiceDate:    string;
+  userName:       string;
+  userEmail:      string;
+  userPhone:      string;
+  productName:    string;
+  productType:    string;
+  eventDate?:     string;
+  eventVenue?:    string;
+  paymentId:      string;
+  orderId:        string;
   registrationId: string;
-  subtotal:      number;
-  gstPercentage: number;
-  gstAmount:     number;
-  totalAmount:   number;
+  subtotal:       number;
+  gstPercentage:  number;
+  gstAmount:      number;
+  totalAmount:    number;
 }): string {
-  const b = CS_BUSINESS;
-  const fmt = (n: number) => `₹${n.toFixed(2)}`;
-  const addrLines = b.address.split("\n").join("<br/>");
+  const b       = CS_BUSINESS;
+  const appUrl  = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const fmt     = (n: number) => `₹${n.toFixed(2)}`;
+  const inWords = amountInWords(inv.totalAmount);
+  const typeLabel = inv.productType.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+
+  // Bill of Supply verification URL for QR code
+  const verifyUrl = `${appUrl}/invoices/${encodeURIComponent(inv.invoiceNumber)}`;
+  // Public QR code image (works in emails — not a data URL)
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=4&data=${encodeURIComponent(verifyUrl)}`;
+
+  // COMPOSITION SCHEME: total paid = total amount (no tax collected from customer)
+  const totalAmt = inv.totalAmount;
+
+  // Format address lines
+  const addrParts = b.address.split("\n");
+
+  // Service detail rows based on product type
+  const serviceRows = inv.eventDate || inv.eventVenue ? `
+    ${inv.eventDate  ? `<tr><td style="padding:5px 0;color:#666;font-size:11px;width:130px">Event Date</td><td style="padding:5px 0;font-size:11px;color:#222;font-weight:600">${inv.eventDate}</td></tr>` : ""}
+    ${inv.eventVenue ? `<tr><td style="padding:5px 0;color:#666;font-size:11px">Venue</td><td style="padding:5px 0;font-size:11px;color:#222;font-weight:600">${inv.eventVenue}</td></tr>` : ""}
+    ${inv.registrationId ? `<tr><td style="padding:5px 0;color:#666;font-size:11px">Registration ID</td><td style="padding:5px 0;font-size:11px;color:#e8620a;font-family:monospace">${inv.registrationId}</td></tr>` : ""}
+  ` : "";
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Invoice ${inv.invoiceNumber} — Connected Steps</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Bill of Supply ${inv.invoiceNumber} — ${b.name}</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background: #f5f5f5; color: #1a1a1a; font-size: 13px; }
-  .page { max-width: 794px; margin: 0 auto; background: #fff; padding: 48px; position: relative; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 3px solid #e8620a; }
-  .logo-area { display: flex; align-items: center; gap: 14px; }
-  .logo-area img { width: 52px; height: 52px; border-radius: 50%; }
-  .company-name { font-size: 22px; font-weight: 800; color: #1a1a1a; line-height: 1; }
-  .company-sub { font-size: 11px; color: #666; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.08em; }
-  .invoice-title { text-align: right; }
-  .invoice-title h1 { font-size: 28px; font-weight: 900; color: #e8620a; letter-spacing: -0.5px; }
-  .invoice-title .inv-num { font-size: 13px; color: #555; margin-top: 4px; font-family: monospace; }
-  .invoice-title .inv-date { font-size: 12px; color: #888; margin-top: 2px; }
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 28px; }
-  .box { background: #fafafa; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px 18px; }
-  .box-title { font-size: 10px; font-weight: 700; color: #e8620a; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
-  .box p { font-size: 12px; color: #333; line-height: 1.7; }
-  .box .name { font-size: 14px; font-weight: 700; color: #1a1a1a; margin-bottom: 3px; }
-  .box .gstin { font-family: monospace; font-size: 12px; color: #444; margin-top: 4px; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-  thead th { background: #1a1a1a; color: #fff; padding: 10px 14px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; }
-  tbody td { padding: 12px 14px; border-bottom: 1px solid #f0f0f0; font-size: 12px; vertical-align: top; }
-  tbody tr:last-child td { border-bottom: none; }
-  tbody tr:nth-child(even) td { background: #fafafa; }
-  .totals-row td { padding: 8px 14px; font-size: 12px; }
-  .totals-row.subtotal td { border-top: 1px solid #e5e5e5; }
-  .totals-row.gst td { color: #555; }
-  .totals-row.grand td { background: #fff8f4; font-weight: 700; font-size: 14px; border-top: 2px solid #e8620a; color: #e8620a; }
-  .totals-right { text-align: right; }
-  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 28px; }
-  .meta-item { background: #fafafa; border: 1px solid #eee; border-radius: 6px; padding: 8px 12px; }
-  .meta-label { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 0.07em; }
-  .meta-value { font-size: 12px; color: #333; font-weight: 600; margin-top: 2px; word-break: break-all; }
-  .stamp { margin: 24px 0; padding: 16px 20px; border: 1px dashed #c8e6c9; background: #f1f8e9; border-radius: 8px; display: flex; align-items: center; gap: 12px; }
-  .stamp-icon { font-size: 24px; }
-  .stamp-text { font-size: 12px; color: #2e7d32; font-weight: 600; }
-  .stamp-sub { font-size: 11px; color: #555; margin-top: 2px; }
-  .footer { margin-top: 32px; padding-top: 20px; border-top: 1px solid #e5e5e5; display: flex; justify-content: space-between; align-items: flex-end; }
-  .footer-left { font-size: 11px; color: #888; line-height: 1.7; }
-  .footer-right { text-align: right; font-size: 11px; color: #aaa; }
-  .signature-box { text-align: right; margin-bottom: 24px; }
-  .signature-box .sig-line { display: inline-block; width: 140px; border-bottom: 1px solid #333; margin-bottom: 4px; height: 40px; }
-  .signature-box .sig-label { font-size: 11px; color: #555; }
-  .terms { font-size: 10px; color: #999; line-height: 1.6; margin-top: 16px; }
-  @media print {
-    body { background: #fff; }
-    .page { padding: 32px; box-shadow: none; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#eef0f3;color:#1a1a1a;font-size:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .page{max-width:800px;margin:20px auto;background:#fff;box-shadow:0 2px 24px rgba(0,0,0,0.10);position:relative;page-break-inside:avoid}
+  /* Orange top bar */
+  .topbar{background:#e8620a;height:6px}
+  .content{padding:36px 40px 28px}
+
+  /* Header */
+  .inv-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px}
+  .brand{display:flex;align-items:center;gap:14px}
+  .brand img{width:54px;height:54px;border-radius:50%;border:2px solid #e8620a}
+  .brand-name{font-size:22px;font-weight:900;color:#1a1a1a;letter-spacing:-0.5px;line-height:1}
+  .brand-type{font-size:10px;color:#888;margin-top:3px;text-transform:uppercase;letter-spacing:.1em}
+  .brand-gstin{font-size:11px;color:#555;margin-top:6px;font-family:monospace;font-weight:600}
+  .inv-badge{text-align:right}
+  .inv-badge .title{font-size:26px;font-weight:900;color:#e8620a;letter-spacing:1px;line-height:1}
+  .inv-badge .subtitle{font-size:10px;color:#888;letter-spacing:.15em;text-transform:uppercase;margin-top:2px}
+  .inv-badge .num{font-size:13px;font-family:monospace;color:#333;margin-top:8px;font-weight:700}
+  .inv-badge .date{font-size:11px;color:#888;margin-top:3px}
+
+  /* Status banner */
+  .status-bar{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+  .status-paid{font-size:11px;font-weight:800;color:#16a34a;text-transform:uppercase;letter-spacing:.1em;display:flex;align-items:center;gap:6px}
+  .status-details{font-size:11px;color:#555}
+
+  /* Two-column grid */
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px}
+  .info-box{border:1px solid #e5e5e5;border-radius:8px;overflow:hidden}
+  .info-box-head{background:#f8f8f8;border-bottom:1px solid #e5e5e5;padding:8px 14px;font-size:9px;font-weight:800;color:#888;text-transform:uppercase;letter-spacing:.12em}
+  .info-box-head.orange{background:#fff7f0;border-bottom-color:#fde8d2;color:#b8530a}
+  .info-box-body{padding:12px 14px}
+  .info-box-body .name{font-size:14px;font-weight:800;color:#1a1a1a;margin-bottom:4px}
+  .info-box-body p{font-size:11px;color:#555;line-height:1.7}
+  .info-box-body .gstin-tag{display:inline-block;background:#fff7f0;border:1px solid #fde8d2;color:#b8530a;font-family:monospace;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;margin-top:6px}
+
+  /* Meta grid */
+  .meta-section{margin-bottom:22px}
+  .meta-section-title{font-size:9px;font-weight:800;color:#999;text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #f0f0f0}
+  .meta-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .meta-item{background:#fafafa;border:1px solid #eeeeee;border-radius:6px;padding:8px 10px}
+  .meta-label{font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:.08em}
+  .meta-value{font-size:11px;color:#222;font-weight:700;margin-top:3px;word-break:break-all;font-family:monospace}
+  .meta-value.normal{font-family:inherit;font-size:12px}
+
+  /* Service details */
+  .service-box{background:#fff7f0;border:1px solid #fde8d2;border-radius:8px;padding:14px 16px;margin-bottom:22px}
+  .service-title{font-size:9px;font-weight:800;color:#b8530a;text-transform:uppercase;letter-spacing:.12em;margin-bottom:10px}
+  .service-name{font-size:15px;font-weight:800;color:#1a1a1a;margin-bottom:8px}
+  .service-type-badge{display:inline-block;background:#e8620a;color:#fff;font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+
+  /* Line items table */
+  .items-table{width:100%;border-collapse:collapse;margin-bottom:0}
+  .items-table thead th{background:#1a1a1a;color:#fff;padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em}
+  .items-table thead th:last-child{text-align:right}
+  .items-table tbody td{padding:11px 12px;border-bottom:1px solid #f0f0f0;font-size:12px;vertical-align:top;color:#333}
+  .items-table tbody tr:last-child td{border-bottom:none}
+  .items-table .desc-name{font-weight:700;color:#1a1a1a}
+  .items-table .desc-sub{font-size:10px;color:#888;margin-top:2px}
+  .items-table .tr,.items-table .amt{text-align:right}
+  .items-table tfoot td{padding:9px 12px;font-size:12px}
+  .items-table tfoot .lbl{text-align:right;color:#666}
+  .items-table tfoot .amt{text-align:right;font-weight:600}
+  .items-table tfoot .gst-row{background:#fff7f0}
+  .items-table tfoot .gst-row .lbl{color:#b8530a}
+  .items-table tfoot .gst-row .amt{color:#e8620a;font-weight:800}
+  .items-table tfoot .total-row{background:#e8620a}
+  .items-table tfoot .total-row td{font-size:14px;font-weight:900;color:#fff;padding:12px}
+
+  /* Amount in words */
+  .in-words{background:#f8f8f8;border:1px solid #e5e5e5;border-radius:6px;padding:9px 14px;margin-top:14px;font-size:11px;color:#555}
+  .in-words strong{color:#1a1a1a}
+
+  /* Signature + QR */
+  .sig-qr{display:flex;justify-content:space-between;align-items:flex-end;margin-top:28px;padding-top:20px;border-top:1px solid #e5e5e5}
+  .sig-block{text-align:left}
+  .sig-line{display:block;width:160px;border-bottom:1.5px solid #333;height:44px;margin-bottom:4px}
+  .sig-label{font-size:10px;color:#555;font-weight:600}
+  .sig-sub{font-size:9px;color:#aaa;margin-top:2px}
+  .qr-block{text-align:center}
+  .qr-block img{width:90px;height:90px;border:1px solid #e5e5e5;border-radius:6px;display:block}
+  .qr-caption{font-size:9px;color:#aaa;margin-top:4px}
+
+  /* Terms */
+  .terms{margin-top:20px;padding:12px 16px;background:#fafafa;border:1px solid #eee;border-radius:6px}
+  .terms-title{font-size:9px;font-weight:800;color:#888;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
+  .terms p{font-size:10px;color:#999;line-height:1.7}
+  .terms li{font-size:10px;color:#999;line-height:1.7;margin-left:14px}
+
+  /* Footer */
+  .inv-footer{background:#1a1a1a;padding:14px 40px;display:flex;justify-content:space-between;align-items:center}
+  .inv-footer .left{font-size:10px;color:#aaa;line-height:1.8}
+  .inv-footer .left strong{color:#e8620a}
+  .inv-footer .right{font-size:10px;color:#555;text-align:right}
+  .watermark{font-size:10px;color:#bbb;font-style:italic;text-align:center;padding:8px;background:#f8f8f8;border-top:1px solid #e5e5e5}
+
+  @media print{
+    body{background:#fff}
+    .page{margin:0;box-shadow:none;max-width:none}
   }
 </style>
 </head>
 <body>
 <div class="page">
+  <div class="topbar"></div>
+  <div class="content">
 
-  <!-- Header -->
-  <div class="header">
-    <div class="logo-area">
-      <img src="${b.logo}" alt="Connected Steps" onerror="this.style.display='none'" />
-      <div>
-        <div class="company-name">${b.name}</div>
-        <div class="company-sub">${b.type}</div>
-        <div class="gstin" style="margin-top:6px;">GSTIN: ${b.gstin}</div>
+    <!-- HEADER -->
+    <div class="inv-header">
+      <div class="brand">
+        <img src="${b.logo}" alt="${b.name}" onerror="this.style.display='none'" />
+        <div>
+          <div class="brand-name">${b.name}</div>
+          <div class="brand-type">${b.type}</div>
+          <div class="brand-gstin">GSTIN: ${b.gstin}</div>
+          <div style="font-size:10px;color:#888;margin-top:3px">${addrParts[0]}, ${addrParts[1] ?? ""}</div>
+          <div style="font-size:10px;color:#888">${addrParts.slice(2).join(", ")}</div>
+        </div>
+      </div>
+      <div class="inv-badge">
+        <div class="title">BILL OF SUPPLY</div>
+        <div class="subtitle">Composition Taxable Person</div>
+        <div class="num">${inv.invoiceNumber}</div>
+        <div class="date">Date: ${inv.invoiceDate}</div>
+        <div style="margin-top:8px;display:inline-block;background:#fff7f0;border:1px solid #fde8d2;border-radius:4px;padding:3px 10px;font-size:9px;font-weight:700;color:#b8530a;letter-spacing:.08em">Place of Supply: Telangana (36)</div>
       </div>
     </div>
-    <div class="invoice-title">
-      <h1>INVOICE</h1>
-      <div class="inv-num">${inv.invoiceNumber}</div>
-      <div class="inv-date">Date: ${inv.invoiceDate}</div>
+
+    <!-- PAYMENT STATUS BANNER -->
+    <div class="status-bar">
+      <div class="status-paid">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+        PAYMENT RECEIVED — PAID
+      </div>
+      <div class="status-details">
+        ${inv.paymentId ? `Payment ID: <strong>${inv.paymentId.slice(0,20)}…</strong>` : ""}
+        &nbsp;·&nbsp; Currency: <strong>INR (₹)</strong>
+        &nbsp;·&nbsp; Payment Date: <strong>${inv.invoiceDate}</strong>
+      </div>
     </div>
-  </div>
 
-  <!-- Billed To / From -->
-  <div class="two-col">
-    <div class="box">
-      <div class="box-title">Billed To</div>
-      <div class="name">${inv.userName}</div>
-      <p>${inv.userEmail}<br/>${inv.userPhone || ""}</p>
+    <!-- BILLED TO / FROM -->
+    <div class="two-col">
+      <div class="info-box">
+        <div class="info-box-head">Billed To</div>
+        <div class="info-box-body">
+          <div class="name">${inv.userName}</div>
+          <p>${inv.userEmail}</p>
+          ${inv.userPhone ? `<p>${inv.userPhone}</p>` : ""}
+        </div>
+      </div>
+      <div class="info-box">
+        <div class="info-box-head orange">Supplier Details</div>
+        <div class="info-box-body">
+          <div class="name">${b.name}</div>
+          <p>${addrParts.join(", ")}</p>
+          <p style="margin-top:4px">${b.email} · ${b.phone}</p>
+          <p><a href="${b.website}" style="color:#e8620a;text-decoration:none">${b.website}</a></p>
+          <div class="gstin-tag">GSTIN: ${b.gstin}</div>
+        </div>
+      </div>
     </div>
-    <div class="box">
-      <div class="box-title">From</div>
-      <div class="name">${b.name}</div>
-      <p>${addrLines}</p>
-      <p style="margin-top:6px">${b.email}<br/>${b.phone}</p>
+
+    <!-- TRANSACTION REFERENCE -->
+    <div class="meta-section">
+      <div class="meta-section-title">Transaction Reference</div>
+      <div class="meta-grid">
+        <div class="meta-item"><div class="meta-label">Bill of Supply No.</div><div class="meta-value">${inv.invoiceNumber}</div></div>
+        <div class="meta-item"><div class="meta-label">Date</div><div class="meta-value normal">${inv.invoiceDate}</div></div>
+        <div class="meta-item"><div class="meta-label">Service Type</div><div class="meta-value normal">${typeLabel}</div></div>
+        ${inv.orderId        ? `<div class="meta-item"><div class="meta-label">Order ID</div><div class="meta-value">${inv.orderId}</div></div>` : ""}
+        ${inv.paymentId      ? `<div class="meta-item"><div class="meta-label">Payment ID</div><div class="meta-value">${inv.paymentId}</div></div>` : ""}
+        ${inv.registrationId ? `<div class="meta-item"><div class="meta-label">Registration ID</div><div class="meta-value">${inv.registrationId}</div></div>` : ""}
+      </div>
     </div>
-  </div>
 
-  <!-- Transaction Details -->
-  <div class="meta-grid">
-    ${inv.paymentId ? `<div class="meta-item"><div class="meta-label">Payment ID</div><div class="meta-value">${inv.paymentId}</div></div>` : ""}
-    ${inv.orderId   ? `<div class="meta-item"><div class="meta-label">Order ID</div><div class="meta-value">${inv.orderId}</div></div>` : ""}
-    ${inv.registrationId ? `<div class="meta-item"><div class="meta-label">Registration ID</div><div class="meta-value">${inv.registrationId}</div></div>` : ""}
-    ${inv.eventDate ? `<div class="meta-item"><div class="meta-label">Event Date</div><div class="meta-value">${inv.eventDate}</div></div>` : ""}
-    ${inv.eventVenue ? `<div class="meta-item"><div class="meta-label">Venue</div><div class="meta-value">${inv.eventVenue}</div></div>` : ""}
-    <div class="meta-item"><div class="meta-label">Category</div><div class="meta-value">${inv.productType.replace("_"," ").replace(/\b\w/g,c=>c.toUpperCase())}</div></div>
-  </div>
-
-  <!-- Line Items -->
-  <table>
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Description</th>
-        <th style="text-align:right">Qty</th>
-        <th style="text-align:right">Rate (₹)</th>
-        <th style="text-align:right">Amount (₹)</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>1</td>
-        <td>${inv.productName}</td>
-        <td style="text-align:right">1</td>
-        <td style="text-align:right">${inv.subtotal.toFixed(2)}</td>
-        <td style="text-align:right">${inv.subtotal.toFixed(2)}</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <!-- Totals -->
-  <table>
-    <tbody>
-      <tr class="totals-row subtotal">
-        <td colspan="4" class="totals-right" style="color:#555">Subtotal</td>
-        <td style="text-align:right;width:130px">${fmt(inv.subtotal)}</td>
-      </tr>
-      <tr class="totals-row gst">
-        <td colspan="4" class="totals-right">GST @ ${inv.gstPercentage}%</td>
-        <td style="text-align:right">${fmt(inv.gstAmount)}</td>
-      </tr>
-      <tr class="totals-row grand">
-        <td colspan="4" class="totals-right">Total Amount</td>
-        <td style="text-align:right">${fmt(inv.totalAmount)}</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <!-- Payment stamp -->
-  <div class="stamp">
-    <div class="stamp-icon">✅</div>
-    <div>
-      <div class="stamp-text">PAYMENT RECEIVED</div>
-      <div class="stamp-sub">Amount of ${fmt(inv.totalAmount)} received. Thank you!</div>
+    <!-- SERVICE DETAILS -->
+    <div class="service-box">
+      <div class="service-title">Service Details</div>
+      <div class="service-type-badge">${typeLabel}</div>
+      <div class="service-name">${inv.productName}</div>
+      ${serviceRows ? `<table style="width:auto"><tbody>${serviceRows}</tbody></table>` : ""}
     </div>
-  </div>
 
-  <!-- Signature -->
-  <div class="signature-box">
-    <div class="sig-line"></div>
-    <div class="sig-label">Authorised Signatory — Connected Steps</div>
-  </div>
+    <!-- MANDATORY COMPOSITION SCHEME DECLARATION -->
+    <div style="background:#fffbeb;border:1.5px solid #f59e0b;border-radius:7px;padding:10px 14px;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px">
+      <span style="font-size:16px;flex-shrink:0">⚠️</span>
+      <div>
+        <div style="font-size:10px;font-weight:800;color:#92400e;text-transform:uppercase;letter-spacing:.1em;margin-bottom:2px">Statutory Declaration</div>
+        <div style="font-size:11px;color:#78350f;font-weight:600;line-height:1.5">
+          "Composition taxable person, not eligible to collect tax on supplies."
+        </div>
+      </div>
+    </div>
 
-  <!-- Footer -->
-  <div class="footer">
-    <div class="footer-left">
+    <!-- LINE ITEMS — Composition Scheme (no tax columns) -->
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th style="width:32px">#</th>
+          <th>Description of Service</th>
+          <th style="text-align:right;width:50px">Qty</th>
+          <th style="text-align:right;width:120px">Rate (₹)</th>
+          <th style="text-align:right;width:130px">Amount (₹)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td>
+            <div class="desc-name">${inv.productName}</div>
+            <div class="desc-sub">${typeLabel} · ${b.name}</div>
+          </td>
+          <td class="tr">1</td>
+          <td class="amt">${totalAmt.toFixed(2)}</td>
+          <td class="amt">${totalAmt.toFixed(2)}</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr class="total-row">
+          <td colspan="4" style="text-align:right;font-weight:900">Total Amount Payable</td>
+          <td style="text-align:right;font-size:15px;font-weight:900">${fmt(totalAmt)}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <!-- AMOUNT IN WORDS -->
+    <div class="in-words">
+      <strong>Amount in words:</strong> ${inWords} Only
+    </div>
+
+    <!-- SIGNATURE + QR -->
+    <div class="sig-qr">
+      <div class="sig-block">
+        <span class="sig-line"></span>
+        <div class="sig-label">Authorised Signatory</div>
+        <div class="sig-sub">for ${b.name}</div>
+      </div>
+      <div class="qr-block">
+        <img src="${qrUrl}" alt="Invoice QR" />
+        <div class="qr-caption">Scan to verify Bill of Supply</div>
+        <div class="qr-caption" style="margin-top:2px;color:#e8620a;font-weight:600">${inv.invoiceNumber}</div>
+      </div>
+    </div>
+
+    <!-- TERMS -->
+    <div class="terms">
+      <div class="terms-title">Terms &amp; Conditions</div>
+      <ul>
+        <li>Payment has been received in full. This Bill of Supply is your official receipt.</li>
+        <li>Connected Steps is registered under the GST Composition Scheme. No tax is charged to the customer separately.</li>
+        <li>Refunds are subject to the Connected Steps Refund Policy. Contact ${b.email} for queries.</li>
+        <li>For corrections, contact support within 7 days of the date of this document.</li>
+        <li>This Bill of Supply is computer-generated and valid without a physical signature.</li>
+      </ul>
+    </div>
+
+  </div><!-- /content -->
+
+  <!-- FOOTER -->
+  <div class="inv-footer">
+    <div class="left">
       <strong>${b.name}</strong> · GSTIN: ${b.gstin}<br/>
-      ${b.address.replace(/\n/g, " · ")}<br/>
-      ${b.email} · ${b.phone}
+      ${b.email} · ${b.phone} · <a href="${b.website}" style="color:#e8620a;text-decoration:none">${b.website}</a>
     </div>
-    <div class="footer-right">
-      ${inv.invoiceNumber}<br/>
-      ${inv.invoiceDate}
+    <div class="right">
+      Bill of Supply: ${inv.invoiceNumber}<br/>
+      Date: ${inv.invoiceDate}
     </div>
   </div>
+  <div class="watermark">This is a computer-generated Bill of Supply and does not require a physical signature. · Composition taxable person — no tax collected on supplies. · Verify at ${verifyUrl}</div>
 
-  <div class="terms">
-    This is a computer-generated invoice and does not require a physical signature. · GST is payable on reverse charge basis: No.
-    For support, contact ${b.email} or call ${b.phone}. · ${b.website}
-  </div>
-
-</div>
+</div><!-- /page -->
 </body>
 </html>`;
+}
+
+// ── Amount in words helper ────────────────────────────────────────────────────
+
+function amountInWords(amount: number): string {
+  const ones = ["","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"];
+  const tens = ["","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"];
+  function toWords(n: number): string {
+    if (n === 0) return "";
+    if (n < 20)  return ones[n];
+    if (n < 100) return tens[Math.floor(n/10)] + (n%10 ? " " + ones[n%10] : "");
+    if (n < 1000) return ones[Math.floor(n/100)] + " Hundred" + (n%100 ? " " + toWords(n%100) : "");
+    if (n < 100000) return toWords(Math.floor(n/1000)) + " Thousand" + (n%1000 ? " " + toWords(n%1000) : "");
+    if (n < 10000000) return toWords(Math.floor(n/100000)) + " Lakh" + (n%100000 ? " " + toWords(n%100000) : "");
+    return toWords(Math.floor(n/10000000)) + " Crore" + (n%10000000 ? " " + toWords(n%10000000) : "");
+  }
+  const rupees = Math.floor(amount);
+  const paise  = Math.round((amount - rupees) * 100);
+  let result   = `Rupees ${toWords(rupees)}`;
+  if (paise > 0) result += ` and ${toWords(paise)} Paise`;
+  return result;
 }
 
 // ── Core service ──────────────────────────────────────────────────────────────
@@ -279,9 +424,11 @@ export async function createAndSendInvoice(input: InvoiceInput): Promise<Invoice
   }
 
   try {
-    const gstRate   = await getCurrentGSTRate();
-    const breakdown = gstFromInclusive(input.totalPaidRupees, gstRate);
-    const today     = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    // COMPOSITION SCHEME: customer pays total amount, no tax breakdown shown.
+    // subtotal = total_amount, gst_percentage = 0, gst_amount = 0
+    // (Business pays composition tax to govt internally — not collected from customer)
+    const totalAmt = input.totalPaidRupees;
+    const today    = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 
     // Insert invoice row — invoice_number generated by DB default
     const { data: inv, error } = await db.from("invoices").insert({
@@ -295,15 +442,15 @@ export async function createAndSendInvoice(input: InvoiceInput): Promise<Invoice
       registration_id: input.registrationId ?? null,
       membership_id:  input.membershipId  ?? null,
       event_id:       input.eventId       ?? null,
-      subtotal:       breakdown.subtotal,
-      gst_percentage: breakdown.gstPercentage,
-      gst_amount:     breakdown.gstAmount,
-      total_amount:   breakdown.totalAmount,
+      subtotal:       totalAmt,   // same as total — composition scheme
+      gst_percentage: 0,          // no tax collected from customer
+      gst_amount:     0,
+      total_amount:   totalAmt,
     }).select("*").single();
 
     if (error || !inv) { console.error("[invoice] DB insert failed:", error?.message); return null; }
 
-    console.log(`[invoice] created ${inv.invoice_number} for ${input.userEmail}`);
+    console.log(`[invoice] Bill of Supply created ${inv.invoice_number} for ${input.userEmail}`);
 
     // Generate HTML and store it
     const html = generateInvoiceHTML({
@@ -319,10 +466,10 @@ export async function createAndSendInvoice(input: InvoiceInput): Promise<Invoice
       paymentId:      input.paymentId ?? "",
       orderId:        input.orderId   ?? "",
       registrationId: input.registrationId ?? "",
-      subtotal:       breakdown.subtotal,
-      gstPercentage:  breakdown.gstPercentage,
-      gstAmount:      breakdown.gstAmount,
-      totalAmount:    breakdown.totalAmount,
+      subtotal:       totalAmt,
+      gstPercentage:  0,
+      gstAmount:      0,
+      totalAmount:    totalAmt,
     });
 
     await db.from("invoices").update({ invoice_html: html }).eq("id", inv.id);
@@ -347,7 +494,7 @@ async function sendInvoiceEmail(
   const appUrl   = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
   const viewUrl  = `${appUrl}/invoices/${encodeURIComponent(invoiceNumber)}`;
 
-  const subject  = `Invoice ${invoiceNumber} — ${input.productName}`;
+  const subject  = `Bill of Supply ${invoiceNumber} — ${input.productName}`;
   const emailHtml = `
     <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#0a0a0a;color:#f0f0f0;border-radius:8px;">
       <div style="font-size:18px;font-weight:700;color:#e8620a;margin-bottom:4px;">Connected Steps</div>
