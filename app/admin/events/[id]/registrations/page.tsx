@@ -140,19 +140,29 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
     alert(res.ok ? data.message : `Error: ${data.error}`);
   }
 
-  const [bulkSending, setBulkSending] = useState(false);
-  const [bulkResult,  setBulkResult]  = useState("");
+  const [bulkSending,  setBulkSending]  = useState(false);
+  const [bulkResult,   setBulkResult]   = useState<{ sent: number; failed: number; skipped: number; total: number; details: { email: string; name: string; status: string; reason: string | null }[] } | null>(null);
+  const [showDetails,  setShowDetails]  = useState(false);
 
-  async function resendAllQR() {
+  async function resendAllQR(retryFailed = false) {
     const confirmed = regs.filter(r => r.status === "confirmed").length;
-    if (!confirm(`Send QR email to all ${confirmed} confirmed registrants? This may take a moment.`)) return;
-    setBulkSending(true); setBulkResult("");
+    const label     = retryFailed ? "Retry all failed emails?" : `Send QR email to all ${confirmed} confirmed registrants?\n\nThis sends in batches of 10 — may take 1–2 minutes.`;
+    if (!confirm(label)) return;
+    setBulkSending(true); setBulkResult(null); setShowDetails(false);
     try {
-      const res  = await fetch(`/api/admin/events/${eventId}/resend-all-qr`, { method: "POST", headers });
+      const res  = await fetch(`/api/admin/events/${eventId}/resend-all-qr`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ retry_failed: retryFailed }) });
       const data = await res.json();
-      setBulkResult(res.ok ? `✅ Sent: ${data.sent}  Failed: ${data.failed}  Total: ${data.total}` : `❌ ${data.error}`);
-    } catch { setBulkResult("❌ Network error"); }
+      if (res.ok) setBulkResult(data);
+      else        setBulkResult({ sent: 0, failed: 0, skipped: 0, total: 0, details: [{ email: "", name: "", status: "failed", reason: data.error }] });
+    } catch { setBulkResult({ sent: 0, failed: 0, skipped: 0, total: 0, details: [{ email: "", name: "", status: "failed", reason: "Network error" }] }); }
     finally { setBulkSending(false); }
+  }
+
+  function exportFailedCSV() {
+    if (!bulkResult) return;
+    const failed = bulkResult.details.filter(d => d.status === "failed");
+    const rows   = [["Email","Name","Reason"].join(","), ...failed.map(d => [d.email, d.name, d.reason ?? ""].map(v => `"${String(v).replace(/"/g,'""')}"`).join(","))].join("\n");
+    const a      = document.createElement("a"); a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(rows); a.download = `failed-emails-${Date.now()}.csv`; a.click();
   }
 
   async function sendCommunication(e: React.FormEvent) {
@@ -235,11 +245,22 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
         <span style={{ color: "#888", fontSize: "0.85rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>
           {eventTitle || "Registrations"}
         </span>
-        <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
-          {bulkResult && <span style={{ fontSize: "0.75rem", color: bulkResult.startsWith("✅") ? "#4ade80" : "#f87171" }}>{bulkResult}</span>}
-          <button onClick={resendAllQR} disabled={bulkSending}
+        <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {bulkResult && (
+            <span style={{ fontSize: "0.75rem", color: "#aaa" }}>
+              ✅ {bulkResult.sent} &nbsp;❌ {bulkResult.failed} &nbsp;⏭ {bulkResult.skipped}
+              {bulkResult.details.length > 0 && <button onClick={() => setShowDetails(s => !s)} style={{ marginLeft: 8, background: "none", border: "none", color: "#e8620a", cursor: "pointer", fontSize: "0.72rem", fontFamily: "inherit" }}>{showDetails ? "Hide" : "View"} details</button>}
+            </span>
+          )}
+          {bulkResult && bulkResult.failed > 0 && (
+            <button onClick={() => resendAllQR(true)} disabled={bulkSending}
+              style={{ padding: "6px 12px", background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 6, color: "#f87171", cursor: "pointer", fontSize: "0.78rem", fontFamily: "inherit", fontWeight: 600 }}>
+              🔁 Retry {bulkResult.failed} Failed
+            </button>
+          )}
+          <button onClick={() => resendAllQR(false)} disabled={bulkSending}
             style={{ padding: "6px 14px", background: bulkSending ? "#1a1a1a" : "rgba(96,165,250,0.15)", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 6, color: bulkSending ? "#444" : "#60a5fa", cursor: bulkSending ? "not-allowed" : "pointer", fontSize: "0.8rem", fontFamily: "inherit", fontWeight: 600 }}>
-            {bulkSending ? "Sending…" : "📧 Resend QR to All"}
+            {bulkSending ? "Sending (batches of 10)…" : "📧 Resend QR to All"}
           </button>
           <button onClick={exportCSV} style={{ padding: "6px 16px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: "0.8rem", fontFamily: "inherit" }}>
             Export CSV
@@ -248,6 +269,45 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
       </header>
 
       <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "2rem 1.5rem" }}>
+
+        {/* Email send details panel */}
+        {showDetails && bulkResult && bulkResult.details.length > 0 && (
+          <div style={{ ...S.card, marginBottom: "1.5rem", borderColor: "rgba(96,165,250,0.2)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+              <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#fff" }}>Email Send Results</div>
+              {bulkResult.failed > 0 && (
+                <button onClick={exportFailedCSV} style={{ padding: "5px 12px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#aaa", cursor: "pointer", fontSize: "0.75rem", fontFamily: "inherit" }}>
+                  ↓ Export Failed
+                </button>
+              )}
+            </div>
+            <div style={{ maxHeight: 300, overflowY: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78rem" }}>
+                <thead>
+                  <tr style={{ background: "rgba(255,255,255,0.04)" }}>
+                    {["Email","Name","Status","Reason"].map(h => (
+                      <th key={h} style={{ padding: "6px 12px", textAlign: "left", fontSize: "10px", color: "#555", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700 }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {bulkResult.details.map((d, i) => (
+                    <tr key={i} style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+                      <td style={{ padding: "5px 12px", color: "#aaa", fontFamily: "monospace" }}>{d.email}</td>
+                      <td style={{ padding: "5px 12px", color: "#888" }}>{d.name}</td>
+                      <td style={{ padding: "5px 12px" }}>
+                        <span style={{ fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: 999, color: d.status === "sent" ? "#4ade80" : d.status === "skipped" ? "#eab308" : "#f87171", background: d.status === "sent" ? "rgba(74,222,128,0.1)" : d.status === "skipped" ? "rgba(234,179,8,0.1)" : "rgba(239,68,68,0.1)" }}>
+                          {d.status.toUpperCase()}
+                        </span>
+                      </td>
+                      <td style={{ padding: "5px 12px", color: "#666", fontSize: "0.72rem" }}>{d.reason ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Summary cards */}
         {summary && (
