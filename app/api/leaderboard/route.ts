@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
+import { cacheGet, cacheSet, CK, TTL, type LbCacheRow, decorateLb } from "@/lib/cache";
 
 export async function GET(req: NextRequest) {
   const db = getSupabaseServer();
@@ -11,7 +12,22 @@ export async function GET(req: NextRequest) {
 
   const sp         = new URL(req.url).searchParams;
   const friendsOf  = sp.get("friends_of");
-  const locationId = sp.get("location_id"); // NEW: optional training location filter
+  const locationId = sp.get("location_id");
+
+  const cacheKey = CK.leaderboard(locationId, friendsOf);
+
+  // ── Cache read ──────────────────────────────────────────────────────────────
+  const cached = await cacheGet<LbCacheRow[]>(cacheKey);
+  if (cached) {
+    return NextResponse.json(
+      { entries: decorateLb(cached, callerEmail), location_id: locationId ?? null },
+      { headers: {
+          "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
+          "X-Cache": "HIT",
+        },
+      },
+    );
+  }
 
   // ── Base leaderboard entries ──────────────────────────────────────────────
   let q = db
@@ -65,23 +81,32 @@ export async function GET(req: NextRequest) {
   const photoMap: Record<string, string | null> = {};
   for (const u of users ?? []) photoMap[u.email] = u.photo ?? null;
 
-  const enriched = entries.map(e => ({
-    ...e,
-    week_points: weekMap[e.user_email] ?? (e.week_points ?? 0),
-    photo:       photoMap[e.user_email] ?? null,
-    // user_email only returned to authenticated callers to prevent email harvesting
-    user_email:  callerEmail ? e.user_email : null,
-    // is_me lets the frontend highlight the caller's row without exposing other emails
-    is_me:       callerEmail ? e.user_email.toLowerCase() === callerEmail.toLowerCase() : false,
+  // ── Build cache rows (email stored as _raw_email, never sent to clients) ──
+  const toCache: LbCacheRow[] = entries.map(e => ({
+    id:              e.id,
+    _raw_email:      e.user_email,
+    user_name:       e.user_name,
+    location:        e.location ?? null,
+    goal:            e.goal ?? null,
+    month_points:    e.month_points,
+    total_points:    e.total_points,
+    week_points:     weekMap[e.user_email] ?? (e.week_points ?? 0),
+    prev_month_rank: e.prev_month_rank ?? null,
+    updated_at:      e.updated_at ?? null,
+    photo:           photoMap[e.user_email] ?? null,
   }));
 
-  return NextResponse.json({ entries: enriched, location_id: locationId ?? null }, {
-    headers: {
-      // Cache at CDN for 30s; serve stale while revalidating for up to 60s.
-      // Keeps the leaderboard fresh without hammering the DB on every page load.
-      "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
+  // Store in cache (fire-and-forget — never blocks the response)
+  void cacheSet(cacheKey, toCache, TTL.leaderboard);
+
+  return NextResponse.json(
+    { entries: decorateLb(toCache, callerEmail), location_id: locationId ?? null },
+    { headers: {
+        "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
+        "X-Cache": "MISS",
+      },
     },
-  });
+  );
 }
 
 function getISOWeekStart(): string {

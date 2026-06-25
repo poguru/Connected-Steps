@@ -3,6 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireActiveUser } from "@/lib/active-user";
 import { verifyUserToken } from "@/lib/admin-auth";
 import { createNotification } from "@/lib/notify-inapp";
+import { cacheDel, CK } from "@/lib/cache";
 
 export async function GET(
   req: NextRequest,
@@ -98,6 +99,9 @@ export async function POST(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  // Invalidate the user's joined-sessions cache so the next read reflects the new join
+  await cacheDel(CK.userJoinedSessions(user.email));
+
   // Fire-and-forget: confirmation email + in-app notification
   sendJoinConfirmationEmail({
     email:     user.email,
@@ -169,6 +173,10 @@ export async function DELETE(
     .eq("user_email", email.toLowerCase().trim());
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Invalidate the user's joined-sessions cache so the next read is correct
+  await cacheDel(CK.userJoinedSessions(email.toLowerCase().trim()));
+
   return NextResponse.json({ success: true });
 }
 

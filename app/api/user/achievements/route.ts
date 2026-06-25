@@ -3,6 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { createNotification } from "@/lib/notify-inapp";
 import { autoFeedBadgeEarned } from "@/lib/auto-feed";
 import { verifyUserToken } from "@/lib/admin-auth";
+import { cacheGet, cacheSet, CK, TTL } from "@/lib/cache";
 
 const SESSION_BADGES = [
   { id: "first_session",  threshold: 1,  label: "First Session 🎯" },
@@ -18,6 +19,12 @@ const LEADERBOARD_BADGES = [
   { id: "champion", threshold: 1,  label: "Champion 👑" },
 ];
 
+type AchievementsPayload = {
+  sessionCount:    number;
+  leaderboardRank: number | null;
+  hasMembership:   boolean;
+};
+
 export async function GET(req: NextRequest) {
   const token = req.headers.get("x-user-token");
   if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -27,6 +34,22 @@ export async function GET(req: NextRequest) {
   const db  = getSupabaseServer();
   const key = email.toLowerCase();
 
+  const cacheKey = CK.userAchievements(key);
+
+  // ── Cache read ──────────────────────────────────────────────────────────────
+  // We still need to run the badge-unlock logic — but only the heavy stat
+  // queries (session count, leaderboard rank) are served from cache.
+  const cached = await cacheGet<AchievementsPayload>(cacheKey);
+  if (cached) {
+    // Run badge logic in the background using cached values so new badges
+    // can still be unlocked between cache refreshes.
+    runBadgeLogic(db, key, cached.sessionCount, cached.leaderboardRank, cached.hasMembership).catch(
+      () => {},
+    );
+    return NextResponse.json(cached, { headers: { "X-Cache": "HIT" } });
+  }
+
+  // ── Full DB fetch ────────────────────────────────────────────────────────────
   const [sessionRes, leaderboardRes, membershipRes, storedRes] = await Promise.all([
     db.from("session_attendance").select("attended").eq("user_email", key).eq("attended", true),
     db.from("leaderboard").select("month_points").eq("user_email", key).single(),
@@ -50,11 +73,8 @@ export async function GET(req: NextRequest) {
 
   // Compute newly unlocked badges
   const newlyUnlocked: { id: string; label: string }[] = [];
-
   for (const b of SESSION_BADGES) {
-    if (sessionCount >= b.threshold && !alreadyEarned.has(b.id)) {
-      newlyUnlocked.push(b);
-    }
+    if (sessionCount >= b.threshold && !alreadyEarned.has(b.id)) newlyUnlocked.push(b);
   }
   for (const b of LEADERBOARD_BADGES) {
     if (leaderboardRank !== null && leaderboardRank <= b.threshold && !alreadyEarned.has(b.id)) {
@@ -89,5 +109,59 @@ export async function GET(req: NextRequest) {
     persist().catch(console.error);
   }
 
-  return NextResponse.json({ sessionCount, leaderboardRank, hasMembership });
+  const body: AchievementsPayload = { sessionCount, leaderboardRank, hasMembership };
+
+  void cacheSet(cacheKey, body, TTL.userAchievements);
+
+  return NextResponse.json(body, { headers: { "X-Cache": "MISS" } });
+}
+
+/**
+ * Run badge unlock logic using already-computed stats (used on cache hits).
+ * Queries only user_achievements (cheap) — avoids re-running the heavy stat queries.
+ */
+async function runBadgeLogic(
+  db:              ReturnType<typeof getSupabaseServer>,
+  key:             string,
+  sessionCount:    number,
+  leaderboardRank: number | null,
+  hasMembership:   boolean,
+): Promise<void> {
+  const { data: stored } = await db
+    .from("user_achievements")
+    .select("badge_id")
+    .eq("user_email", key);
+
+  const alreadyEarned = new Set((stored ?? []).map(r => r.badge_id));
+  const toUnlock: { id: string; label: string }[] = [];
+
+  for (const b of SESSION_BADGES) {
+    if (sessionCount >= b.threshold && !alreadyEarned.has(b.id)) toUnlock.push(b);
+  }
+  for (const b of LEADERBOARD_BADGES) {
+    if (leaderboardRank !== null && leaderboardRank <= b.threshold && !alreadyEarned.has(b.id)) {
+      toUnlock.push(b);
+    }
+  }
+  if (hasMembership && !alreadyEarned.has("active_member")) {
+    toUnlock.push({ id: "active_member", label: "Active Member 💳" });
+  }
+
+  for (const badge of toUnlock) {
+    const { error } = await db
+      .from("user_achievements")
+      .insert({ user_email: key, badge_id: badge.id })
+      .select()
+      .single();
+    if (!error) {
+      createNotification({
+        user_email: key,
+        type:       "achievement",
+        title:      "Badge Unlocked!",
+        body:       `You earned the ${badge.label} badge.`,
+        action_url: "/achievements",
+      }).catch(() => {});
+      autoFeedBadgeEarned(key, badge.label).catch(() => {});
+    }
+  }
 }

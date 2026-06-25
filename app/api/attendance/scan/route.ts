@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
 import { recalculateMonth } from "@/lib/recalculate-leaderboard";
+import { cacheDel, CK } from "@/lib/cache";
 
 // POST /api/attendance/scan
 // Header: x-user-token
@@ -103,6 +104,13 @@ export async function POST(req: NextRequest) {
     category:   "attendance",
     awarded_by: null,
   });
+
+  // Invalidate per-user caches that reflect attendance data.
+  // Awaited so the next request reads fresh data, not stale cached values.
+  await cacheDel(
+    CK.userAchievements(userEmail.toLowerCase()),
+    CK.userJoinedSessions(userEmail.toLowerCase()),
+  );
 
   // Fire-and-forget leaderboard recalculation — do not block the scan response.
   if (session?.date) {

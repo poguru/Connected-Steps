@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
+import { cacheGet, cacheSet, CK, TTL } from "@/lib/cache";
 
 export async function GET(req: NextRequest) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -9,10 +10,18 @@ export async function GET(req: NextRequest) {
   const now = new Date();
 
   // IST-aware month boundary
-  const istNow       = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
-  const monthStart   = new Date(istNow.getFullYear(), istNow.getMonth(), 1).toISOString();
-  const todayIST     = istNow.toISOString().split("T")[0];
-  const nowISO       = now.toISOString();
+  const istNow     = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+  const monthKey   = `${istNow.getFullYear()}-${String(istNow.getMonth() + 1).padStart(2, "0")}`;
+  const monthStart = new Date(istNow.getFullYear(), istNow.getMonth(), 1).toISOString();
+  const todayIST   = istNow.toISOString().split("T")[0];
+  const nowISO     = now.toISOString();
+
+  // ── Cache read ──────────────────────────────────────────────────────────────
+  const cacheKey = CK.adminDashboard(monthKey);
+  const cached   = await cacheGet<Record<string, number>>(cacheKey);
+  if (cached) {
+    return NextResponse.json(cached, { headers: { "X-Cache": "HIT" } });
+  }
 
   const [
     totalMembersRes,
@@ -91,7 +100,7 @@ export async function GET(req: NextRequest) {
 
   const totalRevenueMonth = membershipRevenueMonth + eventRevenueMonth;
 
-  return NextResponse.json({
+  const body = {
     // Counts
     totalMembers:              totalMembersRes.count            ?? 0,
     activeMembers:             activeMembersRes.count           ?? 0,
@@ -106,5 +115,9 @@ export async function GET(req: NextRequest) {
     membershipRevenueMonth,
     eventRevenueMonth,
     totalRevenueMonth,
-  });
+  };
+
+  void cacheSet(cacheKey, body, TTL.adminDashboard);
+
+  return NextResponse.json(body, { headers: { "X-Cache": "MISS" } });
 }

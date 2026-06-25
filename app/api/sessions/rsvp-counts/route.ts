@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { cacheGet, cacheSet, CK, TTL } from "@/lib/cache";
 
 export async function GET(req: NextRequest) {
   const ids = req.nextUrl.searchParams.get("ids");
@@ -7,6 +8,14 @@ export async function GET(req: NextRequest) {
 
   const sessionIds = ids.split(",").filter(Boolean);
   if (!sessionIds.length) return NextResponse.json({ counts: {} });
+
+  const cacheKey = CK.sessionRsvpCounts(sessionIds);
+
+  // ── Cache read ──────────────────────────────────────────────────────────────
+  const cached = await cacheGet<{ counts: Record<string, number> }>(cacheKey);
+  if (cached) {
+    return NextResponse.json(cached, { headers: { "X-Cache": "HIT" } });
+  }
 
   const db = getSupabaseServer();
   const { data } = await db
@@ -20,5 +29,8 @@ export async function GET(req: NextRequest) {
     counts[row.session_id] = (counts[row.session_id] ?? 0) + 1;
   }
 
-  return NextResponse.json({ counts });
+  const body = { counts };
+  void cacheSet(cacheKey, body, TTL.sessionRsvpCounts);
+
+  return NextResponse.json(body, { headers: { "X-Cache": "MISS" } });
 }
