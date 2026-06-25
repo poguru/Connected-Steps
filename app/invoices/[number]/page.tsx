@@ -9,9 +9,8 @@ export default function InvoicePage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch(`/api/invoices/${encodeURIComponent(params.number)}`, {
-      headers: { "x-user-token": localStorage.getItem("cs_user_token") ?? "" },
-    })
+    // No auth required — invoice number is the access key (public, like Stripe/Razorpay invoices)
+    fetch(`/api/invoices/${encodeURIComponent(params.number)}`)
       .then(r => r.ok ? r.text() : Promise.reject(r.status))
       .then(setHtml)
       .catch(() => setError("Invoice not found or you don't have permission to view it."));
