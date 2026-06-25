@@ -66,12 +66,13 @@ export async function POST(req: NextRequest) {
   const details: { type: string; id: string; status: string; reason?: string }[] = [];
 
   // Event registration invoices
-  for (const reg of regsToInvoice as Array<{
+  type RegRow = {
     id: string; registration_code: string; user_email: string; user_name: string;
     event_id: string; final_price: number | null; razorpay_payment_id: string | null;
     razorpay_order_id: string | null; distance_category: string | null;
     events: { title: string; start_date: string; location: string } | null;
-  }>) {
+  };
+  for (const reg of (regsToInvoice as unknown as RegRow[])) {
     try {
       const ev  = reg.events;
       const inv = await createAndSendInvoice({
