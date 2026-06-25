@@ -209,13 +209,20 @@ export async function POST(req: NextRequest) {
         redeemCoupon(couponId, email.toLowerCase()).catch(console.error);
       }
 
-      // Send confirmation email with QR (fire-and-forget — email failure never blocks registration)
+      // Send confirmation email with QR — fire-and-forget, never blocks registration response.
+      // Tracks delivery status in event_registrations for admin visibility.
       ;(async () => {
+        if (!finalQr) {
+          console.error(`[event-register] no QR token for ${finalCode} — email not sent`);
+          await db.from("event_registrations").update({ email_status: "failed", qr_generated_at: null }).eq("registration_code", finalCode);
+          return;
+        }
+        const subject = `Event Registration Confirmed – ${ev.title}`;
         try {
-          await sendEmail(
+          const result = await sendEmail(
             email.toLowerCase().trim(),
             name.trim(),
-            `Event Registration Confirmed – ${ev.title}`,
+            subject,
             eventRegistrationEmailHTML({
               name:             name.trim(),
               eventTitle:       ev.title,
@@ -226,10 +233,23 @@ export async function POST(req: NextRequest) {
               distanceCategory: chosenCategory,
               qrToken:          finalQr,
             }),
-            false, true, // isOtp=false, isTransactional=true — bypass NON_OTP_EMAILS_DISABLED
+            false, true,
           );
+          if (result.ok) {
+            console.log(`[event-register] ✅ email sent to=${email} msgId=${result.messageId} provider=${result.provider}`);
+            await db.from("event_registrations").update({
+              confirmation_email_sent_at: new Date().toISOString(),
+              email_status:               "sent",
+              email_ses_message_id:       result.messageId ?? null,
+              qr_generated_at:            new Date().toISOString(),
+            }).eq("registration_code", finalCode);
+          } else {
+            console.error(`[event-register] ❌ email FAILED to=${email} error=${result.error} provider=${result.provider}`);
+            await db.from("event_registrations").update({ email_status: "failed", qr_generated_at: new Date().toISOString() }).eq("registration_code", finalCode);
+          }
         } catch (e) {
-          console.error("[event-register] confirmation email failed (registration intact):", e);
+          console.error("[event-register] email exception (registration intact):", e);
+          await db.from("event_registrations").update({ email_status: "failed" }).eq("registration_code", finalCode);
         }
       })();
 
