@@ -363,14 +363,15 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
           maxLength={8}
           value={referralInput}
           onChange={e => setReferralInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
-          onFocus={() => {
+          onFocus={(e) => {
+            focusHandlers.onFocus(e);
             // Pre-fill from localStorage when user taps the field (if empty)
             if (!referralInput) {
               const stored = localStorage.getItem("cs_pending_referral") ?? "";
               if (stored) setReferralInput(stored.toUpperCase());
             }
           }}
-          {...focusHandlers}
+          onBlur={focusHandlers.onBlur}
         />
         {localStorage.getItem("cs_pending_referral") && !referralInput && (
           <p style={{ margin: "4px 0 0", fontSize: 10, color: "var(--cs-orange)" }}>
