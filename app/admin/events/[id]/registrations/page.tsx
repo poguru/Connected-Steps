@@ -37,8 +37,11 @@ const RECIPIENT_LABELS: Record<RecipientFilter, string> = {
 const S: Record<string, React.CSSProperties> = {
   card:  { background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "1.25rem" },
   input: { padding: "9px 13px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#fff", fontSize: "0.85rem", outline: "none", fontFamily: "inherit", width: "100%", boxSizing: "border-box" as const },
-  btn:   (active = true): React.CSSProperties => ({ padding: "9px 20px", background: active ? "#e8620a" : "rgba(255,255,255,0.06)", border: "none", borderRadius: 6, color: active ? "#fff" : "#888", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer", fontFamily: "inherit" }),
 };
+
+function btnStyle(active = true): React.CSSProperties {
+  return { padding: "9px 20px", background: active ? "#e8620a" : "rgba(255,255,255,0.06)", border: "none", borderRadius: 6, color: active ? "#fff" : "#888", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer", fontFamily: "inherit" };
+}
 
 function payBadge(s: string) {
   const c = s === "paid" ? "#4ade80" : s === "free" ? "#60a5fa" : s === "pending" ? "#eab308" : "#888";
@@ -416,7 +419,7 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
                 )}
 
                 <button type="submit" disabled={sending || !commSubject.trim() || !commBody.trim()}
-                  style={{ ...S.btn(!sending && !!commSubject.trim() && !!commBody.trim()), alignSelf: "flex-start" }}>
+                  style={{ ...btnStyle(!sending && !!commSubject.trim() && !!commBody.trim()), alignSelf: "flex-start" }}>
                   {sending ? "Sending…" : `Send to ${RECIPIENT_LABELS[recipient]}`}
                 </button>
               </form>
