@@ -6,17 +6,30 @@ import { App } from "@capacitor/app";
 import BottomNav from "@/components/mobile/BottomNav";
 import { isTokenValid } from "@/lib/client-auth";
 
+// Coach home — shown instead of /dashboard when role=coach
+const COACH_HOME = "/coach";
+
 // Only the home screen triggers the double-back-to-exit flow
 const HOME = "/dashboard";
 
-// Tab-level destinations: back button goes HOME, not browser-back (because
-// the user may have visited multiple tabs in sequence — history.back() would
-// return to the previous tab, not home, which is confusing).
-// Keep this in sync with BottomNav.tsx TABS array.
-const TAB_ROOTS = new Set(["/events", "/community", "/leaderboard", "/profile"]);
+// Tab-level destinations: back button goes HOME, not browser-back
+// For coaches /coach is their home — back from /coach tabs goes to /coach
+const TAB_ROOTS = new Set(["/events", "/community", "/leaderboard", "/profile", "/coach"]);
 
 // Non-authed users are allowed on these routes without being redirected
-const PUBLIC_PREFIX = ["/", "/auth", "/pricing", "/events", "/scan"];
+const PUBLIC_PREFIX = ["/", "/auth", "/pricing", "/events", "/scan", "/coach/login"];
+
+// Returns the correct home for the current user based on role
+function getHomeForRole(): string {
+  try {
+    const stored = localStorage.getItem("cs_user");
+    if (stored) {
+      const u = JSON.parse(stored);
+      if (u.role === "coach") return COACH_HOME;
+    }
+  } catch { /* ignore */ }
+  return HOME;
+}
 
 function getCapNative(): boolean {
   const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
@@ -93,7 +106,8 @@ export default function NativeShell({ children }: { children: React.ReactNode })
       const secure = location.protocol === "https:" ? "; Secure" : "";
       document.cookie = `cs_auth=${token}; path=/; max-age=7776000; SameSite=Lax${secure}`;
       if (path === "/" || path === "/auth" || path === "") {
-        router.replace("/dashboard");
+        // Redirect to role-appropriate home (coaches → /coach, users → /dashboard)
+        router.replace(getHomeForRole());
       }
     } else if (user) {
       // User data present but token expired or missing → real expired session
@@ -122,8 +136,9 @@ export default function NativeShell({ children }: { children: React.ReactNode })
     const listenerPromise = App.addListener("backButton", () => {
       const p = pathnameRef.current;
 
-      if (p === HOME) {
-        // Double-press to exit (only from Home)
+      const roleHome = getHomeForRole();
+      if (p === HOME || p === COACH_HOME) {
+        // Double-press to exit (only from role home)
         const now = Date.now();
         if (now - lastBackPress.current < 2000) {
           App.exitApp();
@@ -132,9 +147,8 @@ export default function NativeShell({ children }: { children: React.ReactNode })
           showToast("Press back again to exit");
         }
       } else if (TAB_ROOTS.has(p)) {
-        // Top-level tab → always go Home (not browser-back, which could
-        // land on another tab if the user has been tab-hopping)
-        routerRef.current.replace(HOME);
+        // Top-level tab → go to role-appropriate home
+        routerRef.current.replace(roleHome);
       } else {
         // Nested page → go up one level in history
         window.history.back();
@@ -149,10 +163,22 @@ export default function NativeShell({ children }: { children: React.ReactNode })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // runs exactly once on mount
 
+  // Determine role for BottomNav
+  const [userRole, setUserRole] = useState<"user" | "coach">("user");
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("cs_user");
+      if (stored) {
+        const u = JSON.parse(stored);
+        if (u.role === "coach") setUserRole("coach");
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   return (
     <>
       {children}
-      {isNative && <BottomNav />}
+      {isNative && <BottomNav role={userRole} />}
     </>
   );
 }

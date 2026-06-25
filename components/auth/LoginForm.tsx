@@ -97,7 +97,10 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
     sessionStorage.removeItem("cs_post_login_redirect");
     const param  = searchParams.get("redirect") ?? "";
     const dest   = stored || param;
-    const safe   = dest.startsWith("/") && !dest.startsWith("//") ? dest : "/dashboard";
+    // Coaches go to /coach portal; regular users go to /dashboard
+    const role   = (user.role as string | undefined) ?? "user";
+    const defaultDest = role === "coach" ? "/coach" : "/dashboard";
+    const safe   = dest.startsWith("/") && !dest.startsWith("//") ? dest : defaultDest;
     router.push(safe);
   }
 

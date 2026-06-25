@@ -148,7 +148,10 @@ export async function POST(
 
 // ── Notification helper ───────────────────────────────────────────────────────
 
-type ConvRow = { user_email: string; coaches: { name: string } | null };
+type ConvRow = {
+  user_email: string;
+  coaches: { id: string; name: string; email: string } | null;
+};
 
 async function notifyRecipient({
   db, conversationId, senderEmail, senderType, body,
@@ -159,23 +162,36 @@ async function notifyRecipient({
   senderType:     string;
   body:           string;
 }) {
-  if (senderType !== "coach") return;
-
   const { data: conv } = await db
     .from("conversations")
-    .select("user_email, coaches(name)")
+    .select("user_email, coaches(id, name, email)")
     .eq("id", conversationId)
     .single<ConvRow>();
 
   if (!conv) return;
 
-  const coachName = conv.coaches?.name ?? "Your coach";
-
-  await createNotification({
-    user_email: conv.user_email,
-    type:       "coach_message",
-    title:      `${coachName} sent you a message`,
-    body:       body.slice(0, 120),
-    action_url: "/messages",
-  });
+  if (senderType === "coach") {
+    // Coach sent → notify the user
+    const coachName = conv.coaches?.name ?? "Your coach";
+    await createNotification({
+      user_email: conv.user_email,
+      type:       "coach_message",
+      title:      `${coachName} sent you a message`,
+      body:       body.slice(0, 120),
+      action_url: "/messages",
+    });
+  } else if (senderType === "user" && conv.coaches?.email) {
+    // User sent → notify the coach (push only, no in-app since coaches use /coach portal)
+    const coachEmail = conv.coaches.email;
+    console.log(`[messages] notifying coach ${coachEmail} of new message from user ${senderEmail}`);
+    // Send in-app notification to coach using coach email
+    // The notifications table stores user_email — coaches share the same notifications system
+    await createNotification({
+      user_email: coachEmail,
+      type:       "coach_message",
+      title:      `New message from ${senderEmail.split("@")[0]}`,
+      body:       body.slice(0, 120),
+      action_url: "/coach/messages",
+    });
+  }
 }
