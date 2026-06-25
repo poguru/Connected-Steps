@@ -39,6 +39,9 @@ export default function AdminFinancePage() {
   const [backfilling, setBackfilling] = useState(false);
   const [backfillResult, setBackfillResult] = useState<{ summary?: { total_generated: number; total_failed: number; already_had_invoice: number } } | null>(null);
   const [preview, setPreview] = useState<{ estimate_to_generate: number } | null>(null);
+  const [activeTab, setActiveTab] = useState<"bills" | "settlement">("bills");
+  const [settlement, setSettlement] = useState<{ summary?: { gross_total: number; razorpay_fees_total: number; gst_on_fees_total: number; net_settled_total: number; total_transactions: number } } | null>(null);
+  const [settlementLoading, setSettlementLoading] = useState(false);
 
   async function load(q = search, type = typeFilter) {
     setLoading(true); setError("");
@@ -57,9 +60,19 @@ export default function AdminFinancePage() {
 
   useEffect(() => {
     load();
-    // Preview how many invoices need to be generated
     fetch("/api/admin/invoices/backfill").then(r => r.json()).then(setPreview).catch(() => {});
   }, []); // eslint-disable-line
+
+  async function loadSettlement() {
+    setSettlementLoading(true);
+    const res = await fetch("/api/admin/finance/settlement").catch(() => null);
+    if (res?.ok) { const d = await res.json(); setSettlement(d); }
+    setSettlementLoading(false);
+  }
+
+  useEffect(() => {
+    if (activeTab === "settlement" && !settlement) loadSettlement();
+  }, [activeTab]); // eslint-disable-line
 
   async function runBackfill() {
     if (!confirm(`Generate invoices for all existing paid transactions?\n\nThis will send emails to users. This may take several minutes.`)) return;
@@ -127,10 +140,55 @@ export default function AdminFinancePage() {
           </div>
         )}
 
-        {/* GST info banner */}
-        <div style={{ background:"rgba(232,98,10,0.06)", border:"1px solid rgba(232,98,10,0.2)", borderRadius:8, padding:"10px 16px", marginBottom:"1.5rem", fontSize:"12px", color:"#aaa" }}>
-          <strong style={{ color:"#e8620a" }}>Connected Steps</strong> · GSTIN: 36AAVFC9839Q1Z4 · GST Rate: 6% · Hyderabad, Telangana
+        {/* Composition Scheme banner */}
+        <div style={{ background:"rgba(245,158,11,0.07)", border:"1px solid rgba(245,158,11,0.25)", borderRadius:8, padding:"10px 16px", marginBottom:"1.5rem", fontSize:"12px", color:"#aaa" }}>
+          <strong style={{ color:"#f59e0b" }}>Connected Steps</strong> · GSTIN: 36AAVFC9839Q1Z4 · <strong style={{ color:"#f59e0b" }}>GST Composition Scheme</strong> · No tax collected from customers · Hyderabad, Telangana
         </div>
+
+        {/* Tab switcher */}
+        <div style={{ display:"flex", gap:4, background:"rgba(255,255,255,0.04)", borderRadius:8, padding:4, marginBottom:"1.5rem", width:"fit-content" }}>
+          {(["bills","settlement"] as const).map(t => (
+            <button key={t} onClick={() => setActiveTab(t)}
+              style={{ padding:"7px 18px", borderRadius:6, border:"none", cursor:"pointer", fontSize:"0.82rem", fontWeight:600, background: activeTab===t ? "#e8620a" : "transparent", color: activeTab===t ? "#fff" : "#666", fontFamily:"inherit" }}>
+              {t === "bills" ? "Bills of Supply" : "🔒 Settlement Report"}
+            </button>
+          ))}
+        </div>
+
+        {/* Settlement Report (admin-only internal) */}
+        {activeTab === "settlement" && (
+          <div>
+            <div style={{ background:"rgba(239,68,68,0.06)", border:"1px solid rgba(239,68,68,0.2)", borderRadius:8, padding:"10px 16px", marginBottom:"1rem", fontSize:"12px", color:"#f87171" }}>
+              🔒 <strong>Internal Only</strong> — This report shows Razorpay platform fees and net settlements. Never share with customers.
+            </div>
+            {settlementLoading ? (
+              <div style={{ padding:"3rem", textAlign:"center", color:"#555" }}>Loading settlement data…</div>
+            ) : settlement?.summary && (
+              <>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))", gap:"0.875rem", marginBottom:"1.5rem" }}>
+                  {[
+                    { label:"Gross Collected",      value:`₹${(settlement.summary.gross_total ?? 0).toFixed(2)}`,          color:"#fff"    },
+                    { label:"Razorpay Fees (2%)",    value:`₹${(settlement.summary.razorpay_fees_total ?? 0).toFixed(2)}`,  color:"#f87171" },
+                    { label:"GST on RP Fees (18%)",  value:`₹${(settlement.summary.gst_on_fees_total ?? 0).toFixed(2)}`,   color:"#f87171" },
+                    { label:"Net Settled",           value:`₹${(settlement.summary.net_settled_total ?? 0).toFixed(2)}`,   color:"#4ade80" },
+                    { label:"Transactions",          value: settlement.summary.total_transactions,                          color:"#aaa"    },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} style={{ ...S.card, textAlign:"center" }}>
+                      <div style={{ fontSize:"1.3rem", fontWeight:800, color }}>{value}</div>
+                      <div style={{ fontSize:"11px", color:"#555", marginTop:3, textTransform:"uppercase", letterSpacing:"0.06em" }}>{label}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ ...S.card, fontSize:"12px", color:"#666" }}>
+                  <strong style={{ color:"#fff" }}>How Razorpay fees are calculated:</strong><br/>
+                  Fee = 2% of gross amount + 18% GST on that fee.<br/>
+                  Example: ₹1,000 → RP fee ₹20 → GST on fee ₹3.60 → Total deduction ₹23.60 → Net settlement ₹976.40<br/>
+                  <span style={{ color:"#555", fontSize:"11px" }}>Actual fees may vary. Verify against your Razorpay dashboard for exact settlements.</span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {backfillResult?.summary && (
           <div style={{ padding:"12px 16px", borderRadius:8, background: backfillResult.summary.total_failed > 0 ? "rgba(234,179,8,0.1)" : "rgba(74,222,128,0.1)", border:`1px solid ${backfillResult.summary.total_failed > 0 ? "rgba(234,179,8,0.3)" : "rgba(74,222,128,0.3)"}`, fontSize:"13px", color: backfillResult.summary.total_failed > 0 ? "#eab308" : "#4ade80", marginBottom:"1rem" }}>
@@ -146,6 +204,8 @@ export default function AdminFinancePage() {
           </div>
         )}
 
+        {/* Bills of Supply tab content */}
+        {activeTab === "bills" && <>
         {/* Filters */}
         <div style={{ display:"flex", gap:"0.75rem", marginBottom:"1.5rem", flexWrap:"wrap", alignItems:"center" }}>
           <input value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === "Enter" && load(search, typeFilter)}
@@ -225,7 +285,8 @@ export default function AdminFinancePage() {
             </div>
           </div>
         )}
-        <div style={{ marginTop:"0.75rem", fontSize:"11px", color:"#555" }}>{invoices.length} invoices</div>
+        <div style={{ marginTop:"0.75rem", fontSize:"11px", color:"#555" }}>{invoices.length} bills of supply</div>
+        </>}
       </div>
     </div>
   );
