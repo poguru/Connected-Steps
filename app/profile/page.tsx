@@ -45,6 +45,76 @@ const inputStyle: React.CSSProperties = {
   boxSizing: "border-box", fontFamily: "inherit",
 };
 
+// ── Training Location section (inline component for profile page) ─────────────
+
+function TrainingLocationSection({ token }: { token: string }) {
+  const [locations,        setLocations]        = React.useState<{ id: string; name: string; meeting_point: string | null }[]>([]);
+  const [current,          setCurrent]          = React.useState<string>("");
+  const [currentName,      setCurrentName]      = React.useState<string>("");
+  const [saving,           setSaving]           = React.useState(false);
+  const [msg,              setMsg]              = React.useState("");
+
+  React.useEffect(() => {
+    if (!token) return;
+    // Fetch available locations and user's current assignment in parallel
+    Promise.all([
+      fetch("/api/training-locations").then(r => r.json()),
+      fetch("/api/user/location", { headers: { "x-user-token": token } }).then(r => r.json()),
+    ]).then(([lData, uData]) => {
+      setLocations(lData.locations ?? []);
+      const primary = (uData.locations ?? []).find((l: { is_primary: boolean }) => l.is_primary) ?? uData.locations?.[0];
+      if (primary?.training_locations) {
+        setCurrent(primary.training_locations.id);
+        setCurrentName(primary.training_locations.name);
+      }
+    }).catch(() => {});
+  }, [token]);
+
+  async function save() {
+    if (!current || !token) return;
+    setSaving(true); setMsg("");
+    const res  = await fetch("/api/user/location", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-user-token": token },
+      body: JSON.stringify({ location_id: current }),
+    });
+    const data = await res.json();
+    if (res.ok) { setCurrentName(locations.find(l => l.id === current)?.name ?? ""); setMsg("✓ Preferred location updated!"); }
+    else setMsg(`Error: ${data.error}`);
+    setSaving(false);
+  }
+
+  if (!locations.length) return null;
+
+  return (
+    <section style={{ background: "var(--surface)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "1.25rem" }}>
+      <div className="cs-label" style={{ marginBottom: "1rem" }}>Preferred Training Location</div>
+      <p style={{ fontSize: 12, color: "var(--muted-foreground)", marginBottom: 12, lineHeight: 1.5 }}>
+        Used for your default leaderboard. You can attend sessions at any location.
+      </p>
+      <select
+        value={current}
+        onChange={e => { setCurrent(e.target.value); setMsg(""); }}
+        style={{ width: "100%", padding: "11px 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, color: "#fff", fontFamily: "inherit", fontSize: "0.875rem", outline: "none", cursor: "pointer", colorScheme: "dark", marginBottom: 10 }}
+      >
+        <option value="" style={{ background: "#1a1a1a" }}>Select a training location</option>
+        {locations.map(loc => (
+          <option key={loc.id} value={loc.id} style={{ background: "#1a1a1a" }}>
+            {loc.name}{loc.meeting_point ? ` — ${loc.meeting_point}` : ""}
+          </option>
+        ))}
+      </select>
+      {msg && <div style={{ fontSize: 12, color: msg.startsWith("✓") ? "#4ade80" : "#f87171", marginBottom: 8 }}>{msg}</div>}
+      <button
+        onClick={save} disabled={saving || !current}
+        style={{ padding: "10px 20px", background: "var(--gradient-accent)", border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: "0.875rem", cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit" }}
+      >
+        {saving ? "Saving…" : "Save Location"}
+      </button>
+    </section>
+  );
+}
+
 export default function ProfilePage() {
   const router  = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -573,6 +643,9 @@ export default function ProfilePage() {
             </div>
           )}
         </section>
+
+        {/* ── Training Location ── */}
+        <TrainingLocationSection token={localStorage.getItem("cs_user_token") ?? ""} />
 
         {/* ── Log out ── */}
         <button

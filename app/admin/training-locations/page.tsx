@@ -16,6 +16,29 @@ const S: Record<string, React.CSSProperties> = {
 
 const BLANK = { name:"", area:"", city:"Hyderabad", state:"Telangana", meeting_point:"", maps_url:"", display_order:0 };
 
+function MigrateButton() {
+  const [running, setRunning] = useState(false);
+  const [result,  setResult]  = useState("");
+
+  async function run() {
+    if (!confirm("Auto-assign existing users to training locations based on their text location field? This is safe to run multiple times.")) return;
+    setRunning(true); setResult("");
+    const res  = await fetch("/api/admin/training-locations/migrate-users", { method:"POST" });
+    const data = await res.json();
+    setResult(res.ok ? `✅ ${data.message}` : `❌ ${data.error}`);
+    setRunning(false);
+  }
+
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+      {result && <span style={{ fontSize:"0.72rem", color: result.startsWith("✅") ? "#4ade80" : "#f87171" }}>{result}</span>}
+      <button onClick={run} disabled={running} style={{ ...S.btn(false), fontSize:"0.78rem" }}>
+        {running ? "Migrating…" : "⚡ Auto-assign Existing Users"}
+      </button>
+    </div>
+  );
+}
+
 export default function AdminTrainingLocationsPage() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading,   setLoading]   = useState(true);
@@ -96,7 +119,10 @@ export default function AdminTrainingLocationsPage() {
     <div style={{ minHeight:"100vh", background:"#0a0a0a", color:"#fff" }}>
       <header style={{ position:"sticky", top:0, zIndex:40, background:"rgba(10,10,10,0.97)", borderBottom:"1px solid rgba(255,255,255,0.07)", padding:"0 2rem", height:60, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
         <span style={{ fontWeight:700, fontSize:"0.95rem" }}>Training Locations</span>
-        <button onClick={openCreate} style={S.btn()}>+ New Location</button>
+        <div style={{ display:"flex", gap:8 }}>
+          <MigrateButton />
+          <button onClick={openCreate} style={S.btn()}>+ New Location</button>
+        </div>
       </header>
 
       <div style={{ maxWidth:960, margin:"0 auto", padding:"2rem 1.5rem" }}>

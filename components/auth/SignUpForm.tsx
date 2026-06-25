@@ -61,8 +61,10 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
 
   const [form, setForm]             = useState({ firstName: "", lastName: "", dob: "", password: "", confirm: "" });
   const [referralInput, setReferralInput] = useState("");
-  const [goal,       setGoal]       = useState("5k");
-  const [location,   setLocation]   = useState("");
+  const [goal,              setGoal]              = useState("5k");
+  const [location,          setLocation]          = useState("");
+  const [trainingLocations, setTrainingLocations] = useState<{ id: string; name: string; meeting_point: string | null }[]>([]);
+  const [preferredLocation, setPreferredLocation] = useState("");
   const [customLoc,  setCustomLoc]  = useState("");
   const [photo,      setPhoto]      = useState<string | null>(null);
   const [showPw,     setShowPw]     = useState(false);
@@ -83,6 +85,14 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
   // ── Progress (2 visible steps: Email, Details) ───────────────────────────
   const stepIndex = step === "email" || step === "email-otp" ? 0 : 1;
   const progress  = Math.round(((stepIndex + 1) / 2) * 100);
+
+  // Fetch training locations once for the preferred location selector
+  useEffect(() => {
+    fetch("/api/training-locations")
+      .then(r => r.json())
+      .then(d => setTrainingLocations(d.locations ?? []))
+      .catch(() => {});
+  }, []);
 
   // ── Send OTP ──────────────────────────────────────────────────────────────
   async function sendOtp(type: "email" | "phone", value: string, purpose: string, isResend = false) {
@@ -140,6 +150,11 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
       if (!res.ok) { setFormError(data.error ?? "Registration failed."); return; }
       localStorage.removeItem("cs_pending_referral");
       localStorage.setItem("cs_pending_photo", photo ?? "");
+      // Save preferred training location (fire-and-forget — never blocks registration)
+      if (preferredLocation) {
+        // Store pending location — actual save happens after login when we have a token
+        localStorage.setItem("cs_pending_location", preferredLocation);
+      }
       router.push("/auth?tab=login&registered=true");
     } catch { setFormError("Network error. Please try again."); }
     finally { setSubmitting(false); }
@@ -350,6 +365,32 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
           <input style={{ ...inputStyle, marginTop: 8 }} type="text" placeholder="Enter your training location" value={customLoc} onChange={e => setCustomLoc(e.target.value)} {...focusHandlers} />
         )}
       </div>
+
+      {/* Preferred Training Location */}
+      {trainingLocations.length > 0 && (
+        <div>
+          <label style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5 }}>
+            Preferred Training Location <span style={{ color: "var(--primary)", fontWeight: 600 }}>*</span>
+          </label>
+          <select
+            style={{ ...inputStyle, cursor: "pointer", colorScheme: "dark" }}
+            value={preferredLocation}
+            onChange={e => setPreferredLocation(e.target.value)}
+            onFocus={focusHandlers.onFocus as never}
+            onBlur={focusHandlers.onBlur as never}
+          >
+            <option value="" style={{ background: "#1a1a1a" }}>Select your training location</option>
+            {trainingLocations.map(loc => (
+              <option key={loc.id} value={loc.id} style={{ background: "#1a1a1a" }}>
+                {loc.name}{loc.meeting_point ? ` — ${loc.meeting_point}` : ""}
+              </option>
+            ))}
+          </select>
+          <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--muted-foreground)" }}>
+            Used for your default leaderboard. You can attend sessions at any location.
+          </p>
+        </div>
+      )}
 
       {/* Referral code — optional, pre-filled from localStorage if available */}
       <div>
