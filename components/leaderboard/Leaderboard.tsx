@@ -360,20 +360,20 @@ export default function Leaderboard() {
           ))}
         </div>
 
+        {/* ── Training location scope: My Location vs All ── */}
+        {myLocationId && (
+          <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.04)", borderRadius: 8, padding: 3, marginBottom: "1rem", width: "fit-content" }}>
+            {(["all","my"] as const).map(s => (
+              <button key={s} type="button" onClick={() => { setLocationScope(s); if (s==="all") fetchWithScope("all"); else if (myLocationId) fetchWithScope("my"); }}
+                style={{ padding: "6px 16px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: "0.78rem", fontWeight: 600, background: locationScope===s ? "var(--cs-orange)" : "transparent", color: locationScope===s ? "#fff" : "var(--muted-foreground)", fontFamily: "var(--font-body)" }}>
+                {s === "all" ? "🌍 All" : `📍 ${myLocationName ?? "My Location"}`}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* ── Goal + location filters ── */}
         {(goals.length > 2 || locations.length > 2) && (
-          {/* Training location scope toggle — "My Location" vs "All" */}
-          {myLocationId && (
-            <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.04)", borderRadius: 8, padding: 3, marginBottom: "1rem", width: "fit-content" }}>
-              {(["all","my"] as const).map(s => (
-                <button key={s} type="button" onClick={() => { setLocationScope(s); if (s==="all") fetchWithScope("all"); else if (myLocationId) fetchWithScope("my"); }}
-                  style={{ padding: "6px 16px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: "0.78rem", fontWeight: 600, background: locationScope===s ? "var(--cs-orange)" : "transparent", color: locationScope===s ? "#fff" : "var(--muted-foreground)", fontFamily: "var(--font-body)" }}>
-                  {s === "all" ? "🌍 All" : `📍 ${myLocationName ?? "My Location"}`}
-                </button>
-              ))}
-            </div>
-          )}
-
           <div style={{ display: "flex", gap: 8, marginBottom: "1.5rem", flexWrap: "wrap" }}>
             {goals.length > 2 && (
               <select value={goalFilter} onChange={e => setGoalFilter(e.target.value)}
