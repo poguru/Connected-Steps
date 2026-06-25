@@ -34,8 +34,11 @@ export default function AdminFinancePage() {
   const [error,    setError]    = useState("");
   const [search,   setSearch]   = useState("");
   const [typeFilter, setTypeFilter] = useState("");
-  const [resending,  setResending]  = useState<string | null>(null);
-  const [resendMsg,  setResendMsg]  = useState("");
+  const [resending,   setResending]   = useState<string | null>(null);
+  const [resendMsg,   setResendMsg]   = useState("");
+  const [backfilling, setBackfilling] = useState(false);
+  const [backfillResult, setBackfillResult] = useState<{ summary?: { total_generated: number; total_failed: number; already_had_invoice: number } } | null>(null);
+  const [preview, setPreview] = useState<{ estimate_to_generate: number } | null>(null);
 
   async function load(q = search, type = typeFilter) {
     setLoading(true); setError("");
@@ -52,7 +55,23 @@ export default function AdminFinancePage() {
     finally { setLoading(false); }
   }
 
-  useEffect(() => { load(); }, []); // eslint-disable-line
+  useEffect(() => {
+    load();
+    // Preview how many invoices need to be generated
+    fetch("/api/admin/invoices/backfill").then(r => r.json()).then(setPreview).catch(() => {});
+  }, []); // eslint-disable-line
+
+  async function runBackfill() {
+    if (!confirm(`Generate invoices for all existing paid transactions?\n\nThis will send emails to users. This may take several minutes.`)) return;
+    setBackfilling(true); setBackfillResult(null);
+    try {
+      const res  = await fetch("/api/admin/invoices/backfill", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ send_email: true }) });
+      const data = await res.json();
+      setBackfillResult(data);
+      load(); // refresh invoice list
+    } catch { setBackfillResult({ summary: { total_generated: 0, total_failed: 0, already_had_invoice: 0 } }); }
+    finally { setBackfilling(false); }
+  }
 
   async function resend(id: string) {
     setResending(id); setResendMsg("");
@@ -76,7 +95,14 @@ export default function AdminFinancePage() {
         <Link href="/admin" style={{ color:"#888", textDecoration:"none", fontSize:"0.85rem" }}>Admin</Link>
         <span style={{ color:"#444" }}>/</span>
         <span style={{ color:"#888", fontSize:"0.85rem" }}>Finance & Invoices</span>
-        <div style={{ marginLeft:"auto", display:"flex", gap:8 }}>
+        <div style={{ marginLeft:"auto", display:"flex", gap:8, alignItems:"center" }}>
+          {preview && preview.estimate_to_generate > 0 && (
+            <span style={{ fontSize:"0.72rem", color:"#eab308" }}>{preview.estimate_to_generate} without invoices</span>
+          )}
+          <button onClick={runBackfill} disabled={backfilling}
+            style={{ padding:"6px 14px", background: backfilling ? "#1a1a1a" : "#e8620a", border:"none", borderRadius:6, color: backfilling ? "#444" : "#fff", cursor: backfilling ? "not-allowed" : "pointer", fontSize:"0.78rem", fontFamily:"inherit", fontWeight:600 }}>
+            {backfilling ? "Generating…" : "⚡ Generate Missing Invoices"}
+          </button>
           <button onClick={exportCSV} style={{ padding:"6px 14px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:6, color:"#fff", cursor:"pointer", fontSize:"0.78rem", fontFamily:"inherit" }}>Export CSV</button>
         </div>
       </header>
@@ -105,6 +131,14 @@ export default function AdminFinancePage() {
         <div style={{ background:"rgba(232,98,10,0.06)", border:"1px solid rgba(232,98,10,0.2)", borderRadius:8, padding:"10px 16px", marginBottom:"1.5rem", fontSize:"12px", color:"#aaa" }}>
           <strong style={{ color:"#e8620a" }}>Connected Steps</strong> · GSTIN: 36AAVFC9839Q1Z4 · GST Rate: 6% · Hyderabad, Telangana
         </div>
+
+        {backfillResult?.summary && (
+          <div style={{ padding:"12px 16px", borderRadius:8, background: backfillResult.summary.total_failed > 0 ? "rgba(234,179,8,0.1)" : "rgba(74,222,128,0.1)", border:`1px solid ${backfillResult.summary.total_failed > 0 ? "rgba(234,179,8,0.3)" : "rgba(74,222,128,0.3)"}`, fontSize:"13px", color: backfillResult.summary.total_failed > 0 ? "#eab308" : "#4ade80", marginBottom:"1rem" }}>
+            ✅ Generated: <strong>{backfillResult.summary.total_generated}</strong> &nbsp;
+            ❌ Failed: <strong>{backfillResult.summary.total_failed}</strong> &nbsp;
+            ⏭ Already had invoice: <strong>{backfillResult.summary.already_had_invoice}</strong>
+          </div>
+        )}
 
         {resendMsg && (
           <div style={{ padding:"10px 16px", borderRadius:8, background: resendMsg.startsWith("✅") ? "rgba(74,222,128,0.1)" : "rgba(239,68,68,0.1)", color: resendMsg.startsWith("✅") ? "#4ade80" : "#f87171", fontSize:"13px", marginBottom:"1rem" }}>
