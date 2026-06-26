@@ -44,14 +44,16 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Summary counts by job type
+  type DeadJob = { id: string; job_type: string; last_error: string | null; created_at: string; attempts: number; max_attempts: number };
+  const jobs = (data as unknown as DeadJob[]) ?? [];
   const byType: Record<string, number> = {};
-  for (const job of data ?? []) {
+  for (const job of jobs) {
     byType[job.job_type] = (byType[job.job_type] ?? 0) + 1;
   }
 
   return NextResponse.json({
-    dead_jobs: data ?? [],
-    count:     (data ?? []).length,
+    dead_jobs: jobs,
+    count:     jobs.length,
     by_type:   byType,
   });
 }
