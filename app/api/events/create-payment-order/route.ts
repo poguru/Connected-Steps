@@ -44,6 +44,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Registration not found or already paid." }, { status: 404 });
     }
 
+    // ── Atomic slot reservation ───────────────────────────────────────────────
+    // reserve_event_slot() acquires a FOR UPDATE lock on the events row so that
+    // concurrent calls for the same event serialize.  Only the first N callers
+    // (where N = max_participants) get 'reserved'; the rest get 'full'.
+    // This prevents users from reaching the Razorpay payment screen for a full
+    // event — they never pay for a slot that doesn't exist.
+    const { data: reservation, error: reserveErr } = await db
+      .rpc("reserve_event_slot", {
+        p_registration_id: reg.id,
+        p_event_id:        reg.event_id,
+        p_ttl_minutes:     15,
+      });
+
+    if (reserveErr) {
+      console.error("[create-payment-order] slot reservation RPC error:", reserveErr.message);
+      return NextResponse.json({ error: "Unable to reserve slot. Please try again." }, { status: 500 });
+    }
+
+    if (reservation === "full") {
+      return NextResponse.json(
+        { error: "This event is fully booked. No slots are currently available." },
+        { status: 409 },
+      );
+    }
+    // 'reserved' or 'already_reserved' — proceed to payment
+
     // Amount in paise
     const amountPaise = reg.final_price * 100;
     if (amountPaise < 100) {

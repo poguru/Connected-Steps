@@ -55,7 +55,20 @@ export async function POST(req: NextRequest) {
     if (!reg) return NextResponse.json({ error: "Registration not found." }, { status: 404 });
     if (reg.payment_status === "paid") return NextResponse.json({ success: true });
 
-    // Update registration to paid
+    // Idempotency: check if this razorpay_payment_id was already processed for
+    // ANY registration (covers webhook retries and concurrent double-submissions).
+    const { data: dupPayment } = await db
+      .from("event_registrations")
+      .select("id")
+      .eq("razorpay_payment_id", razorpay_payment_id)
+      .maybeSingle();
+    if (dupPayment) return NextResponse.json({ success: true });
+
+    // Update registration to paid.
+    // The DB BEFORE trigger (check_event_capacity) enforces the slot limit here
+    // with a FOR UPDATE lock — fully atomic against concurrent confirmations.
+    // The UNIQUE index on razorpay_payment_id catches concurrent duplicate calls
+    // (code 23505 → treated as idempotent success).
     const { error } = await db
       .from("event_registrations")
       .update({
@@ -68,10 +81,20 @@ export async function POST(req: NextRequest) {
       .eq("registration_code", registration_code);
 
     if (error) {
-      const msg = error.message?.includes("fully booked")
-        ? "This event is now fully booked. Please contact support for a refund."
-        : error.message;
-      return NextResponse.json({ error: msg }, { status: error.message?.includes("fully booked") ? 409 : 500 });
+      // Unique violation on razorpay_payment_id = concurrent duplicate submission
+      if (error.code === "23505") return NextResponse.json({ success: true });
+
+      // DB trigger: event reached capacity between slot reservation and confirmation
+      const isFullBooked = error.message?.includes("fully booked")
+        || error.message?.includes("P0001");
+      if (isFullBooked) {
+        return NextResponse.json(
+          { error: "This event is now fully booked. Please contact support for a refund." },
+          { status: 409 },
+        );
+      }
+
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     // Redeem coupon atomically (fire-and-forget — fast, non-critical)
