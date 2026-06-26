@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
   const { data: registrations, error: fetchErr } = await q;
   if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
 
-  const targets = (registrations ?? []) as Array<{
+  const targets = (registrations as unknown as Array<{
     id:                         string;
     registration_code:          string;
     user_email:                 string;
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     confirmation_email_sent_at: string | null;
     qr_token:                   string | null;
     events:                     { title: string; start_date: string; start_time: string | null; location: string } | null;
-  }>;
+  }>) ?? [];
 
   if (dryRun) {
     return NextResponse.json({
