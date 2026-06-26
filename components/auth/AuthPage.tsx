@@ -151,7 +151,12 @@ export default function AuthPage() {
             )}
           </p>
 
-          <Link href="/" style={{ display: "block", textAlign: "center", marginTop: "1rem", fontSize: "0.75rem", color: "var(--muted-foreground)", textDecoration: "none" }}>
+          {/* Coach login — separate portal using HTTP-only cookie auth */}
+          <Link href="/coach/login" style={{ display: "block", textAlign: "center", marginTop: "0.75rem", fontSize: "0.75rem", color: "var(--muted-foreground)", textDecoration: "none" }}>
+            Coach? <span style={{ color: "var(--primary)", fontWeight: 600 }}>Sign in to coach portal →</span>
+          </Link>
+
+          <Link href="/" style={{ display: "block", textAlign: "center", marginTop: "0.5rem", fontSize: "0.75rem", color: "var(--muted-foreground)", textDecoration: "none" }}>
             ← Back to home
           </Link>
         </div>

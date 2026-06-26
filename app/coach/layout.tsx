@@ -45,6 +45,10 @@ export default function CoachLayout({ children }: { children: React.ReactNode })
 
   async function logout() {
     await fetch("/api/coach/auth", { method: "DELETE" });
+    // Clear the localStorage marker so NativeShell doesn't keep the coach
+    // session alive after logout on next app open.
+    localStorage.removeItem("cs_user");
+    localStorage.removeItem("cs_coach_token");
     router.push("/coach/login");
   }
 

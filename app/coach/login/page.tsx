@@ -23,6 +23,13 @@ export default function CoachLoginPage() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Login failed"); return; }
+
+      // Store minimal coach session data in localStorage so NativeShell can
+      // recognise the session on app startup/resume.
+      // Coach auth uses an HTTP-only cookie (cs_coach_session) for API calls,
+      // but NativeShell reads localStorage — both must be set.
+      localStorage.setItem("cs_user", JSON.stringify({ email: data.email, role: "coach" }));
+
       router.push("/coach");
     } catch {
       setError("Network error. Please try again.");

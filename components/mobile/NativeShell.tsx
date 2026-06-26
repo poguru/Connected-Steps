@@ -93,6 +93,14 @@ export default function NativeShell({ children }: { children: React.ReactNode })
     const token = localStorage.getItem("cs_user_token");
     const path  = window.location.pathname;
 
+    // Parse role once — coaches use cookie-based auth (cs_coach_session),
+    // not the localStorage token, so they need a different check path.
+    let parsedRole: string | null = null;
+    try {
+      if (user) parsedRole = (JSON.parse(user) as { role?: string }).role ?? null;
+    } catch { /* ignore */ }
+    const isCoach = parsedRole === "coach";
+
     function clearAuthAndRedirect() {
       localStorage.removeItem("cs_user");
       localStorage.removeItem("cs_user_token");
@@ -101,12 +109,28 @@ export default function NativeShell({ children }: { children: React.ReactNode })
       if (path !== "/auth") router.replace("/auth");
     }
 
-    if (user && isTokenValid(token)) {
-      // Valid session — re-stamp the cookie in case the WebView cleared it
+    if (isCoach) {
+      // ── Coach session ─────────────────────────────────────────────────────
+      // Coach auth relies on the cs_coach_session HTTP-only cookie, not on
+      // cs_user_token.  isTokenValid() would return false (no token stored),
+      // which previously caused clearAuthAndRedirect() to fire and log the
+      // coach out immediately after every app open — the root cause of the
+      // "can't stay logged in" bug.
+      //
+      // We trust the localStorage marker (set by /coach/login on success) and
+      // let the /coach page itself handle an expired cookie by redirecting to
+      // /coach/login if API calls fail with 401.
+      if (path === "/" || path === "/auth" || path === "" || path === "/coach/login") {
+        router.replace(COACH_HOME);
+      }
+      // No cookie re-stamp needed — the server sets cs_coach_session.
+    } else if (user && isTokenValid(token)) {
+      // ── Regular user session ───────────────────────────────────────────────
+      // Valid JWT in localStorage — re-stamp the cookie in case the WebView
+      // cleared it under memory pressure.
       const secure = location.protocol === "https:" ? "; Secure" : "";
       document.cookie = `cs_auth=${token}; path=/; max-age=7776000; SameSite=Lax${secure}`;
       if (path === "/" || path === "/auth" || path === "") {
-        // Redirect to role-appropriate home (coaches → /coach, users → /dashboard)
         router.replace(getHomeForRole());
       }
     } else if (user) {
@@ -120,6 +144,13 @@ export default function NativeShell({ children }: { children: React.ReactNode })
 
     // ── Resume listener: re-check token when app comes back to foreground ──
     const resumePromise = App.addListener("resume", () => {
+      const storedUser = localStorage.getItem("cs_user");
+      let resumeRole: string | null = null;
+      try { resumeRole = storedUser ? (JSON.parse(storedUser) as { role?: string }).role ?? null : null; } catch { /* */ }
+
+      // Coaches use HTTP-only cookie auth — token validation doesn't apply.
+      if (resumeRole === "coach") return;
+
       const t   = localStorage.getItem("cs_user_token");
       const p   = window.location.pathname;
       const pub = PUBLIC_PREFIX.some(pre => p === pre || p.startsWith(pre + "/"));
