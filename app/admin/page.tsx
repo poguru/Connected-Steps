@@ -21,12 +21,12 @@ interface Metrics {
 
 const QUICK_ACTIONS = [
   { label: "Mark Session Attendance", href: "/admin/sessions",             desc: "Log today's training session" },
-  { label: "Create Event",            href: "/admin/events",               desc: "Publish a new event or run" },
+  { label: "Create Event",            href: "/admin/events/new",           desc: "Launch the event creation wizard" },
+  { label: "📈 Analytics & Reports",  href: "/admin/analytics",            desc: "Revenue trends, growth, insights" },
   { label: "Review Community Posts",  href: "/admin/community",            desc: "Approve or reject pending posts" },
   { label: "Write Training Plans",    href: "/admin/training-plans",       desc: "Weekly plans for members" },
   { label: "Event Registrations",     href: "/admin/events/registrations", desc: "View registrations & revenue" },
   { label: "Coach Operations",        href: "/admin/coach-ops",            desc: "Athlete roster & bulk actions" },
-  { label: "Coach Assignments",       href: "/admin/coach-assignments",    desc: "Assign coaches to users" },
 ];
 
 function fmt(n: number) { return n.toLocaleString("en-IN"); }
