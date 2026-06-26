@@ -97,7 +97,10 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
   async function load() {
     setLoading(true); setError("");
     try {
-      const res  = await fetch(`/api/admin/events/registrations?event_id=${eventId}`);
+      // limit=500 — per-event views need all registrations (events rarely exceed 500 participants).
+      // The global registrations list uses server-side pagination (default 50) but per-event
+      // views must show the complete list for accurate summaries and bulk actions.
+      const res  = await fetch(`/api/admin/events/registrations?event_id=${eventId}&limit=500`);
       const json = await res.json();
       if (!res.ok) { setError(json.error ?? "Failed to load"); return; }
       setRegs(json.registrations ?? []);
