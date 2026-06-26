@@ -209,7 +209,7 @@ async function fetchAllPages(
     const { data, error } = await q;
     if (error) throw new Error(`[admin_export] fetch failed: ${error.message}`);
     if (!data?.length) break;
-    all.push(...(data as Record<string, unknown>[]));
+    all.push(...(data as unknown as Record<string, unknown>[]));
     if (data.length < BATCH_SIZE) break;
     from += BATCH_SIZE;
   }
