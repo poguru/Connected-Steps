@@ -1,11 +1,13 @@
 {
   "functions": {
-    "app/api/cron/*.ts":                        { "maxDuration": 300 },
-    "app/api/cron/job-worker/route.ts":         { "maxDuration": 120 },
-    "app/api/admin/leaderboard/recalculate.ts": { "maxDuration": 60  },
-    "app/api/attendance/scan/route.ts":         { "maxDuration": 30  },
-    "app/api/events/register/route.ts":         { "maxDuration": 30  },
-    "app/api/events/verify-payment/route.ts":   { "maxDuration": 30  }
+    "app/api/cron/*.ts":                                                    { "maxDuration": 300 },
+    "app/api/cron/job-worker/route.ts":                                     { "maxDuration": 120 },
+    "app/api/admin/leaderboard/recalculate.ts":                             { "maxDuration": 60  },
+    "app/api/admin/events/registrations/resend-missing/route.ts":           { "maxDuration": 300 },
+    "app/api/admin/events/registrations/reconcile/route.ts":                { "maxDuration": 300 },
+    "app/api/attendance/scan/route.ts":                                     { "maxDuration": 30  },
+    "app/api/events/register/route.ts":                                     { "maxDuration": 30  },
+    "app/api/events/verify-payment/route.ts":                               { "maxDuration": 30  }
   },
   "crons": [
     {

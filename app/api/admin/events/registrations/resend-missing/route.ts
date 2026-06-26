@@ -111,8 +111,8 @@ export async function POST(req: NextRequest) {
       failed++;
     }
 
-    // 500 ms pause between emails to avoid SES rate-limit (14 emails/second max)
-    await new Promise(r => setTimeout(r, 500));
+    // 150 ms pause between emails — SES allows 14/second; 150ms = ~6/second (safe margin)
+    await new Promise(r => setTimeout(r, 150));
   }
 
   console.log(`[resend-missing] complete sent=${sent} skipped=${skipped} failed=${failed} event=${eventId ?? "all"}`);
