@@ -9,6 +9,7 @@ import {
   handleBulkInvoice,
   handleWeeklyDigestEmail,
   handleCertificateGenerate,
+  handleAdminExport,
 } from "@/lib/job-handlers";
 
 // Runs every minute via Vercel Cron.
@@ -40,6 +41,8 @@ async function dispatch(job: JobRow): Promise<void> {
       return handleWeeklyDigestEmail(p as JobPayloads["weekly_digest_email"]);
     case "certificate_generate":
       return handleCertificateGenerate(p as JobPayloads["certificate_generate"]);
+    case "admin_export":
+      return handleAdminExport(p as JobPayloads["admin_export"]);
     default:
       throw new Error(`Unknown job type: ${job.job_type}`);
   }

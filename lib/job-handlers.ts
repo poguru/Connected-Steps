@@ -160,3 +160,135 @@ export async function handleBulkInvoice(p: JobPayloads["bulk_invoice"]): Promise
 export async function handleCertificateGenerate(p: JobPayloads["certificate_generate"]): Promise<void> {
   console.log(`[job-worker] certificate_generate not yet implemented — user=${p.userEmail} event=${p.eventId}`);
 }
+
+// ── admin_export ──────────────────────────────────────────────────────────────
+// Generates CSV (or ZIP of multiple CSVs) from admin datasets, uploads to
+// Supabase Storage `admin-exports`, and marks the admin_exports row as ready.
+//
+// Idempotency: if the export row already has status='ready', skip.
+// Scale: fetches data in 1 000-row pages to avoid loading 100 K rows at once.
+
+const EXPORT_BUCKET = "admin-exports";
+const BATCH_SIZE    = 1_000;
+
+function buildCsv(rows: Record<string, unknown>[], columns: string[]): string {
+  const escape = (v: unknown): string => {
+    const s = String(v ?? "").replace(/"/g, '""');
+    return s.includes(",") || s.includes("\n") || s.includes('"') ? `"${s}"` : s;
+  };
+  const lines = [columns.join(","), ...rows.map(r => columns.map(c => escape(r[c])).join(","))];
+  return lines.join("\n");
+}
+
+async function fetchAllPages(
+  db:      ReturnType<typeof getSupabaseServer>,
+  dataset: string,
+  filters: Record<string, string>,
+): Promise<Record<string, unknown>[]> {
+  const all: Record<string, unknown>[] = [];
+  let   from = 0;
+
+  const COLS: Record<string, string> = {
+    users:         "email, first_name, last_name, phone, goal, location, created_at, is_active",
+    memberships:   "user_email, plan, status, amount_paid, started_at, expires_at, razorpay_payment_id",
+    registrations: "registration_code, user_email, user_name, phone, payment_status, final_price, status, created_at",
+    referrals:     "referral_code, referrer_email, referred_email, status, reward_granted, created_at, rewarded_at",
+  };
+
+  const table = dataset === "registrations" ? "event_registrations" : dataset;
+  const cols  = COLS[dataset] ?? "*";
+
+  for (;;) {
+    let q = db.from(table).select(cols).order("created_at", { ascending: false }).range(from, from + BATCH_SIZE - 1);
+
+    // Apply filters (event_id for registrations, etc.)
+    if (dataset === "registrations" && filters.event_id) {
+      q = q.eq("event_id", filters.event_id) as typeof q;
+    }
+
+    const { data, error } = await q;
+    if (error) throw new Error(`[admin_export] fetch failed: ${error.message}`);
+    if (!data?.length) break;
+    all.push(...(data as Record<string, unknown>[]));
+    if (data.length < BATCH_SIZE) break;
+    from += BATCH_SIZE;
+  }
+
+  return all;
+}
+
+export async function handleAdminExport(p: JobPayloads["admin_export"]): Promise<void> {
+  const db = getSupabaseServer();
+
+  // Idempotency: skip if already completed
+  const { data: exportRow } = await db
+    .from("admin_exports")
+    .select("status")
+    .eq("id", p.exportId)
+    .single();
+
+  if (exportRow?.status === "ready") return;
+
+  // Mark as processing
+  await db.from("admin_exports").update({ status: "processing" }).eq("id", p.exportId);
+
+  try {
+    const datasets = p.format === "zip"
+      ? ["users", "memberships", "registrations", "referrals"]
+      : [p.dataset];
+
+    const COL_HEADERS: Record<string, string[]> = {
+      users:         ["email", "first_name", "last_name", "phone", "goal", "location", "created_at", "is_active"],
+      memberships:   ["user_email", "plan", "status", "amount_paid", "started_at", "expires_at", "razorpay_payment_id"],
+      registrations: ["registration_code", "user_email", "user_name", "phone", "payment_status", "final_price", "status", "created_at"],
+      referrals:     ["referral_code", "referrer_email", "referred_email", "status", "reward_granted", "created_at", "rewarded_at"],
+    };
+
+    let fileBuffer: Buffer;
+    let filePath:   string;
+    let rowCount  = 0;
+
+    if (p.format === "csv") {
+      const rows = await fetchAllPages(db, p.dataset, p.filters);
+      const csv  = buildCsv(rows, COL_HEADERS[p.dataset] ?? []);
+      fileBuffer = Buffer.from(csv, "utf-8");
+      filePath   = `${p.exportId}/${p.dataset}.csv`;
+      rowCount   = rows.length;
+    } else {
+      // ZIP: bundle all datasets using fflate
+      const { zipSync } = await import("fflate");
+      const files: Record<string, Uint8Array> = {};
+      for (const ds of datasets) {
+        const rows = await fetchAllPages(db, ds, p.filters);
+        const csv  = buildCsv(rows, COL_HEADERS[ds] ?? []);
+        files[`${ds}.csv`] = new TextEncoder().encode(csv);
+        rowCount += rows.length;
+      }
+      fileBuffer = Buffer.from(zipSync(files));
+      filePath   = `${p.exportId}/export.zip`;
+    }
+
+    // Upload to Supabase Storage (upsert so retries overwrite)
+    const { error: uploadErr } = await db.storage
+      .from(EXPORT_BUCKET)
+      .upload(filePath, fileBuffer, {
+        contentType: p.format === "csv" ? "text/csv" : "application/zip",
+        upsert:      true,
+      });
+
+    if (uploadErr) throw new Error(`Storage upload failed: ${uploadErr.message}`);
+
+    await db.from("admin_exports").update({
+      status:       "ready",
+      file_path:    filePath,
+      row_count:    rowCount,
+      completed_at: new Date().toISOString(),
+    }).eq("id", p.exportId);
+
+    console.log(`[admin_export] ${p.format} ready — exportId=${p.exportId} rows=${rowCount}`);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await db.from("admin_exports").update({ status: "failed", error: msg.slice(0, 500) }).eq("id", p.exportId);
+    throw e; // re-throw so job-worker records the failure
+  }
+}

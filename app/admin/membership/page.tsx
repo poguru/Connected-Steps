@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -77,14 +77,33 @@ export default function AdminMembershipPage() {
     finally { setLoading(false); }
   }
 
-  async function load() {
+  const PAGE_SIZE = 50;
+  const [page,       setPage]       = useState(0);
+  const [total,      setTotal]      = useState(0);
+  const searchDebounce = useRef<ReturnType<typeof setTimeout>>(null);
+
+  async function load(opts?: { page?: number; filter?: Filter; search?: string }) {
+    const p = opts?.page   ?? page;
+    const f = opts?.filter ?? filter;
+    const q = opts?.search ?? search;
+
     setLoading(true); setError("");
     try {
-      const res = await fetch("/api/admin/memberships");
+      const params = new URLSearchParams({
+        page:  String(p),
+        limit: String(PAGE_SIZE),
+        sort:  "created_at",
+        order: "desc",
+      });
+      if (f && f !== "all") params.set("status", f);
+      if (q.trim()) params.set("q", q.trim());
+
+      const res  = await fetch(`/api/admin/memberships?${params}`);
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Failed to load"); return; }
       setMembers(data.memberships);
       setStats(data.stats);
+      setTotal(data.total ?? 0);
     } catch {
       setError("Something went wrong.");
     } finally {
@@ -117,27 +136,9 @@ export default function AdminMembershipPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (authed) load(); }, [authed]);
 
-  const filtered = useMemo(() => {
-    let list = members;
-    if (filter === "active")   list = list.filter((m) => m.isActive && !m.expiringSoon);
-    if (filter === "expired")  list = list.filter((m) => !m.isActive);
-    if (filter === "expiring") list = list.filter((m) => m.expiringSoon);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter((m) =>
-        `${m.first_name} ${m.last_name}`.toLowerCase().includes(q) ||
-        m.user_email.toLowerCase().includes(q) ||
-        m.phone.includes(q)
-      );
-    }
-    return list;
-  }, [members, filter, search]);
-
-  const PAGE_SIZE  = 50;
-  const [page, setPage] = useState(0);
-  useEffect(() => { setPage(0); }, [filter, search]);
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const visible    = useMemo(() => filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE), [filtered, page]);
+  // Server-side filtering/search — results already paginated from API
+  const visible    = members;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
 
   if (!authed) {
     return (
@@ -219,7 +220,7 @@ export default function AdminMembershipPage() {
             {(["all", "active", "expired", "expiring"] as Filter[]).map((f) => (
               <button
                 key={f}
-                onClick={() => setFilter(f)}
+                onClick={() => { setFilter(f); setPage(0); load({ page: 0, filter: f, search }); }}
                 style={{ padding: "5px 14px", borderRadius: "4px", fontSize: "0.8rem", fontWeight: 500, cursor: "pointer", fontFamily: "inherit", border: "none", background: filter === f ? "#e8620a" : "transparent", color: filter === f ? "#fff" : "#888", transition: "all 0.15s" }}
               >
                 {f === "expiring" ? "Expiring Soon" : f.charAt(0).toUpperCase() + f.slice(1)}
@@ -229,10 +230,16 @@ export default function AdminMembershipPage() {
           <input
             placeholder="Search name, email or phone…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              const q = e.target.value;
+              setSearch(q);
+              setPage(0);
+              if (searchDebounce.current) clearTimeout(searchDebounce.current);
+              searchDebounce.current = setTimeout(() => load({ page: 0, filter, search: q }), 350);
+            }}
             style={{ flex: 1, minWidth: "200px", padding: "7px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "#fff", fontSize: "0.85rem", outline: "none", fontFamily: "inherit" }}
           />
-          <div style={{ fontSize: "0.8rem", color: "#555" }}>{filtered.length} record{filtered.length !== 1 ? "s" : ""}</div>
+          <div style={{ fontSize: "0.8rem", color: "#555" }}>{total} record{total !== 1 ? "s" : ""}</div>
         </div>
 
         {/* Table */}
@@ -287,17 +294,17 @@ export default function AdminMembershipPage() {
         {totalPages > 1 && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1rem 0" }}>
             <button
-              onClick={() => setPage(p => Math.max(0, p - 1))}
+              onClick={() => { const p = Math.max(0, page - 1); setPage(p); load({ page: p }); }}
               disabled={page === 0}
               style={{ padding: "6px 16px", background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 6, color: page === 0 ? "#333" : "#888", cursor: page === 0 ? "not-allowed" : "pointer", fontFamily: "inherit", fontSize: 13 }}
             >
               ← Previous
             </button>
             <span style={{ fontSize: 13, color: "#444" }}>
-              {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length} records
+              {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total} records
             </span>
             <button
-              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              onClick={() => { const p = Math.min(totalPages - 1, page + 1); setPage(p); load({ page: p }); }}
               disabled={page >= totalPages - 1}
               style={{ padding: "6px 16px", background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 6, color: page >= totalPages - 1 ? "#333" : "#888", cursor: page >= totalPages - 1 ? "not-allowed" : "pointer", fontFamily: "inherit", fontSize: 13 }}
             >

@@ -23,7 +23,8 @@ export type JobType =
   | "weekly_digest_email"   // Re-deliver weekly digest to one user
   | "bulk_email"            // Send one email from an admin bulk-send batch
   | "bulk_invoice"          // Generate one invoice from an admin backfill batch
-  | "certificate_generate"; // (stub) Generate participation certificate PDF
+  | "certificate_generate"  // (stub) Generate participation certificate PDF
+  | "admin_export";         // Generate CSV/ZIP export of admin data
 
 // Typed payload per job type — worker casts payload to the correct type via switch
 export type JobPayloads = {
@@ -104,6 +105,14 @@ export type JobPayloads = {
     eventId:     string;
     eventTitle:  string;
     finishTime?: string;
+  };
+
+  admin_export: {
+    exportId:     string;               // admin_exports.id — worker writes status back here
+    dataset:      "users" | "memberships" | "registrations" | "referrals";
+    format:       "csv" | "zip";
+    filters:      Record<string, string>; // arbitrary filter params forwarded to queries
+    requestedBy:  string;
   };
 };
 

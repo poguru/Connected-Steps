@@ -137,3 +137,15 @@ export async function isAdminOrCoach(req: NextRequest): Promise<boolean> {
   const { data } = await db.from("coaches").select("id").eq("email", email).eq("is_active", true).single();
   return !!data;
 }
+
+/** Returns the authenticated admin's identity string for audit logging.
+ *  Returns null if the request is from a coach (no email on header). */
+export function getAdminEmail(req: NextRequest): string | null {
+  const pw = req.headers.get("x-admin-password");
+  if (pw) return "admin";
+  const adminSession = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+  if (adminSession) return "admin";
+  const token = req.headers.get("x-coach-token") ?? req.cookies.get(COOKIE_NAME)?.value;
+  if (token) return verifyCoachToken(token);
+  return null;
+}
