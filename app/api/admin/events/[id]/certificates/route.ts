@@ -52,7 +52,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { data: results, error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const finishers = (results ?? []) as Array<{
+  const finishers = (results as unknown as Array<{
     id:                string;
     user_email:        string;
     user_name:         string;
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     status:            string;
     registration_code: string | null;
     event_registrations: { id: string; certificate_url: string | null; certificate_generated_at: string | null } | null;
-  }>;
+  }>) ?? [];
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
   let generated = 0, skipped = 0, failed = 0;
