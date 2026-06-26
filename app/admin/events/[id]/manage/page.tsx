@@ -247,10 +247,10 @@ export default function EventManagePage() {
             {/* Quick actions */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12 }}>
               {[
-                { label: "View Registrations", href: `/admin/events/${eventId}/registrations`, color: "#e8620a" },
-                { label: "🏁 Race Day Ops", href: `/admin/events/${eventId}/race-day`, color: "#4ade80" },
-                { label: "BIB Collection", href: `/admin/events/${eventId}/bib`, color: "#60a5fa" },
-                { label: "Communicate", href: `/admin/events/${eventId}/registrations`, color: "#a3e635" },
+                { label: "Registrations",  href: `/admin/events/${eventId}/registrations`, color: "#e8620a" },
+                { label: "🏁 Race Day",    href: `/admin/events/${eventId}/race-day`,       color: "#4ade80" },
+                { label: "BIB Collection", href: `/admin/events/${eventId}/bib`,            color: "#60a5fa" },
+                { label: "📊 Results",     href: `/admin/events/${eventId}/results`,         color: "#fbbf24" },
               ].map(a => (
                 <Link key={a.label} href={a.href} style={{ ...card, textDecoration: "none", display: "block", textAlign: "center", padding: "1.25rem", borderColor: `${a.color}22` }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: a.color }}>{a.label}</div>

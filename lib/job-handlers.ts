@@ -170,11 +170,56 @@ export async function handleBulkInvoice(p: JobPayloads["bulk_invoice"]): Promise
 }
 
 // ── certificate_generate ──────────────────────────────────────────────────────
-// Not yet implemented. Handler is a clean no-op so the job completes without
-// filling the dead-letter queue.
+// Emails the participant's certificate as a link.
+// The certificate HTML is already generated and stored in Supabase Storage
+// by /api/admin/events/[id]/certificates before this job is enqueued.
 
 export async function handleCertificateGenerate(p: JobPayloads["certificate_generate"]): Promise<void> {
-  console.log(`[job-worker] certificate_generate not yet implemented — user=${p.userEmail} event=${p.eventId}`);
+  const db = getSupabaseServer();
+
+  // Fetch the stored certificate URL from event_registrations
+  const { data: reg } = await db
+    .from("event_registrations")
+    .select("certificate_url, certificate_generated_at, user_name")
+    .eq("user_email", p.userEmail.toLowerCase())
+    .eq("event_id", p.eventId)
+    .maybeSingle();
+
+  if (!reg?.certificate_url) {
+    console.warn(`[certificate_generate] No certificate URL for ${p.userEmail} event=${p.eventId} — skipping email`);
+    return;
+  }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#0a0a0a;color:#f0f0f0;border-radius:8px;">
+      <div style="font-size:18px;font-weight:700;color:#e8620a;margin-bottom:4px;">Connected Steps</div>
+      <h2 style="color:#fff;font-size:20px;margin:20px 0 8px;">🏅 Your Certificate is Ready!</h2>
+      <p style="color:#aaa;font-size:14px;margin-bottom:20px;">
+        Congratulations, <strong>${p.userName}</strong>! Your certificate for <strong>${p.eventTitle}</strong> is ready.
+        ${p.finishTime ? `You completed the event in <strong>${p.finishTime}</strong>.` : ""}
+      </p>
+      <a href="${reg.certificate_url}" style="display:inline-block;padding:14px 28px;background:#e8620a;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;">
+        View & Download Certificate →
+      </a>
+      <p style="font-size:11px;color:#555;margin-top:20px;">
+        Or open: <a href="${reg.certificate_url}" style="color:#e8620a;">${reg.certificate_url.slice(0, 60)}…</a>
+      </p>
+      <p style="font-size:11px;color:#555;margin-top:4px;">Print the page to save as PDF. Questions? <a href="mailto:info@connectedsteps.in" style="color:#e8620a;">info@connectedsteps.in</a></p>
+    </div>
+  `;
+
+  const result = await sendEmail(
+    p.userEmail, p.userName,
+    `🏅 Your Certificate — ${p.eventTitle}`,
+    html,
+    false, true,  // isTransactional
+  );
+
+  if (!result.ok) throw new Error(`Certificate email failed: ${result.error ?? "unknown"}`);
+
+  console.log(`[certificate_generate] ✅ Certificate email sent to=${p.userEmail} msgId=${result.messageId}`);
 }
 
 // ── admin_export ──────────────────────────────────────────────────────────────
