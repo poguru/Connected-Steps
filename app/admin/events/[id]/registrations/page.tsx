@@ -529,6 +529,11 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
                         </td>
                         <td style={{ padding: "10px 14px" }}>
                           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {/* Phase 2: link to participant detail page */}
+                            <Link href={`/admin/events/${eventId}/registrations/${r.registration_code}`}
+                              style={{ padding: "4px 10px", borderRadius: 5, border: "1px solid rgba(232,98,10,0.3)", background: "transparent", color: "#e8620a", cursor: "pointer", fontSize: "0.72rem", fontFamily: "inherit", textDecoration: "none", whiteSpace: "nowrap" }}>
+                              View
+                            </Link>
                             {r.status === "confirmed" && (
                               <button onClick={() => resendQR(r.id, r.user_name)}
                                 style={{ padding: "4px 10px", borderRadius: 5, border: "1px solid rgba(96,165,250,0.3)", background: "transparent", color: "#60a5fa", cursor: "pointer", fontSize: "0.72rem", fontFamily: "inherit", whiteSpace: "nowrap" }}>
