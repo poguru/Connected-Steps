@@ -266,13 +266,19 @@ export default function AdminEventsPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff" }}>
-      <header style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(10,10,10,0.97)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 2rem", height: "60px", display: "flex", alignItems: "center", gap: "0.75rem" }}>
-        <Link href="/admin" style={{ display: "flex", alignItems: "center", gap: "0.5rem", textDecoration: "none" }}>
-          <Image src="/logo.png" alt="" width={28} height={28} className="rounded-full" />
+      <header style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(10,10,10,0.97)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 2rem", height: "60px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <Link href="/admin" style={{ display: "flex", alignItems: "center", gap: "0.5rem", textDecoration: "none" }}>
+            <Image src="/logo.png" alt="" width={28} height={28} className="rounded-full" />
+          </Link>
+          <span style={{ fontSize: "0.95rem", fontWeight: 600, color: "#fff" }}>Admin</span>
+          <span style={{ color: "#444" }}>/</span>
+          <span style={{ fontSize: "0.85rem", color: "#888" }}>Events &amp; Coupons</span>
+        </div>
+        {/* New event wizard — Phase 1 entry point */}
+        <Link href="/admin/events/new" style={{ padding: "7px 18px", background: "#e8620a", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 700, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}>
+          + Create Event
         </Link>
-        <span style={{ fontSize: "0.95rem", fontWeight: 600, color: "#fff" }}>Admin</span>
-        <span style={{ color: "#444" }}>/</span>
-        <span style={{ fontSize: "0.85rem", color: "#888" }}>Events &amp; Coupons</span>
       </header>
 
       <div style={{ maxWidth: "900px", margin: "0 auto", padding: "2rem 1.5rem" }}>
