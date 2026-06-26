@@ -251,6 +251,7 @@ export default function EventManagePage() {
                 { label: "🏁 Race Day",    href: `/admin/events/${eventId}/race-day`,       color: "#4ade80" },
                 { label: "BIB Collection", href: `/admin/events/${eventId}/bib`,            color: "#60a5fa" },
                 { label: "📊 Results",     href: `/admin/events/${eventId}/results`,         color: "#fbbf24" },
+                { label: "📢 Communicate", href: `/admin/events/${eventId}/communicate`,    color: "#a78bfa" },
               ].map(a => (
                 <Link key={a.label} href={a.href} style={{ ...card, textDecoration: "none", display: "block", textAlign: "center", padding: "1.25rem", borderColor: `${a.color}22` }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: a.color }}>{a.label}</div>
