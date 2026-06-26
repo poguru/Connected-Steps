@@ -59,13 +59,11 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   // Send in-app notifications (writes to DB + fires web/mobile push)
   await createNotifications(
-    emails.map(email => ({
-      user_email: email,
-      type:       "session_reminder" as const,  // closest type for event notifications
-      title,
-      body:       notifBody,
-      action_url: actionUrl,
-    }))
+    emails.map(email => ({ email })),
+    "session_reminder",   // closest NotificationType for event alerts
+    title,
+    notifBody,
+    actionUrl,
   );
 
   // Log to comm history
