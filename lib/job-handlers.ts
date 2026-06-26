@@ -52,7 +52,10 @@ export async function handleEventQrEmail(p: JobPayloads["event_qr_email"]): Prom
     .eq("id", p.registrationId)
     .maybeSingle();
 
-  if (reg?.confirmation_email_sent_at) return;  // already delivered — nothing to do
+  if (reg?.confirmation_email_sent_at) {
+    console.log(`[handleEventQrEmail] already sent for reg=${p.registrationId} — skipping`);
+    return;  // already delivered — idempotency guard
+  }
 
   // Reuse existing QR token or sign a new one
   let qrToken = (reg?.qr_token as string | null) ?? null;
@@ -60,8 +63,9 @@ export async function handleEventQrEmail(p: JobPayloads["event_qr_email"]): Prom
     qrToken = signEventQR(p.registrationCode, p.eventId);
     await db
       .from("event_registrations")
-      .update({ qr_token: qrToken })
+      .update({ qr_token: qrToken, qr_generated_at: new Date().toISOString() })
       .eq("id", p.registrationId);
+    console.log(`[handleEventQrEmail] QR generated reg=${p.registrationId}`);
   }
 
   const html = eventRegistrationEmailHTML({
@@ -82,13 +86,25 @@ export async function handleEventQrEmail(p: JobPayloads["event_qr_email"]): Prom
     false, true,  // isOtp=false, isTransactional=true — never suppressed
   );
 
-  if (!result.ok) throw new Error(`SES delivery failed: ${result.error ?? "unknown"}`);
+  if (!result.ok) {
+    // Record failure in DB so admins can see it and trigger resend
+    await db.from("event_registrations").update({
+      email_status: "failed",
+    }).eq("id", p.registrationId);
 
-  // Mark as sent — prevents re-delivery on retry
-  await db
-    .from("event_registrations")
-    .update({ confirmation_email_sent_at: new Date().toISOString(), email_status: "sent" })
-    .eq("id", p.registrationId);
+    console.error(`[handleEventQrEmail] SES failed reg=${p.registrationId} error="${result.error}" provider=${result.provider}`);
+    throw new Error(`SES delivery failed: ${result.error ?? "unknown"}`);
+  }
+
+  // Mark as sent — save SES message ID and QR timestamp for full traceability
+  await db.from("event_registrations").update({
+    confirmation_email_sent_at: new Date().toISOString(),
+    email_status:               "sent",
+    email_ses_message_id:       result.messageId ?? null,
+    qr_generated_at:            new Date().toISOString(),
+  }).eq("id", p.registrationId);
+
+  console.log(`[handleEventQrEmail] ✅ email sent reg=${p.registrationId} to=${p.userEmail} msgId=${result.messageId} provider=${result.provider}`);
 }
 
 // ── membership_email ──────────────────────────────────────────────────────────

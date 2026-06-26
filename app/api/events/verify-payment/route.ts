@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import crypto from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { redeemCoupon } from "@/lib/coupon-redeem";
@@ -130,13 +131,44 @@ export async function POST(req: NextRequest) {
       eventVenue:      ev?.location,
     };
 
-    // Enqueue for durability/retry
+    // Enqueue for durability/retry — survives function restarts.
+    // Jobs are the fallback: if after() succeeds they no-op (idempotency guard).
+    // If after() fails, the daily cron picks them up.
     await enqueueJob("event_qr_email",   qrPayload,      { idempotencyKey: `event_qr_email:${reg.id}`, priority: 10 });
     await enqueueJob("invoice_generate", invoicePayload, { idempotencyKey: `invoice_generate:${razorpay_payment_id}` });
 
-    // Fire immediately (Hobby plan: daily cron is too slow for payments)
-    void handleEventQrEmail(qrPayload).catch(console.error);
-    void handleInvoiceGenerate(invoicePayload).catch(console.error);
+    // ── ROOT CAUSE FIX ────────────────────────────────────────────────────────
+    // Previously: `void handleEventQrEmail(...).catch()` fired then returned the
+    // response. Vercel freezes the function immediately after the response is
+    // sent, killing the email BEFORE SES is called. This is why users were not
+    // receiving their confirmation emails.
+    //
+    // Fix: next/server `after()` keeps the function alive until the callback
+    // completes, even after the response has been sent to the client. This is
+    // the designed Next.js solution for post-response async work.
+    after(async () => {
+      try {
+        await handleEventQrEmail(qrPayload);
+        console.log(`[verify-payment] ✅ QR email sent reg=${reg.id}`);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error(`[verify-payment] ❌ QR email failed reg=${reg.id}:`, msg);
+        // Record failure so admin can see and resend
+        try {
+          await getSupabaseServer()
+            .from("event_registrations")
+            .update({ email_status: "failed" })
+            .eq("id", reg.id);
+        } catch { /* non-critical — failure already logged */ }
+      }
+
+      try {
+        await handleInvoiceGenerate(invoicePayload);
+        console.log(`[verify-payment] ✅ Invoice generated reg=${reg.id}`);
+      } catch (e: unknown) {
+        console.error(`[verify-payment] ❌ Invoice failed reg=${reg.id}:`, e instanceof Error ? e.message : String(e));
+      }
+    });
 
     return NextResponse.json({ success: true });
   } catch (e: unknown) {

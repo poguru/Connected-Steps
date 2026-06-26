@@ -17,7 +17,9 @@ const config: Config = {
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
   },
-  testMatch: ["**/__tests__/**/*.test.ts"],
+  testMatch:   ["**/__tests__/**/*.test.ts"],
+  setupFilesAfterFramework: [],
+  setupFiles:  ["<rootDir>/__tests__/setup.ts"],
 };
 
 export default config;

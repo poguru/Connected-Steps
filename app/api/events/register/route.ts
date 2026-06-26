@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
 import { signEventQR } from "@/lib/event-qr";
@@ -209,12 +210,19 @@ export async function POST(req: NextRequest) {
         redeemCoupon(couponId, email.toLowerCase()).catch(console.error);
       }
 
-      // Send confirmation email with QR — fire-and-forget, never blocks registration response.
-      // Tracks delivery status in event_registrations for admin visibility.
-      ;(async () => {
+      // ── ROOT CAUSE FIX ────────────────────────────────────────────────────────
+      // Previously: an unawaited IIFE sent the email after the response returned.
+      // Vercel freezes the function immediately after NextResponse.json(), so SES
+      // was never reached — users received no confirmation email.
+      //
+      // Fix: after() keeps the function alive until the callback completes, even
+      // after the response has been sent. This is the Next.js-designed solution.
+      after(async () => {
         if (!finalQr) {
           console.error(`[event-register] no QR token for ${finalCode} — email not sent`);
-          await db.from("event_registrations").update({ email_status: "failed", qr_generated_at: null }).eq("registration_code", finalCode);
+          await db.from("event_registrations")
+            .update({ email_status: "failed", qr_generated_at: null })
+            .eq("registration_code", finalCode);
           return;
         }
         const subject = `Event Registration Confirmed – ${ev.title}`;
@@ -233,7 +241,7 @@ export async function POST(req: NextRequest) {
               distanceCategory: chosenCategory,
               qrToken:          finalQr,
             }),
-            false, true,
+            false, true,  // isOtp=false, isTransactional=true — never suppressed
           );
           if (result.ok) {
             console.log(`[event-register] ✅ email sent to=${email} msgId=${result.messageId} provider=${result.provider}`);
@@ -245,13 +253,17 @@ export async function POST(req: NextRequest) {
             }).eq("registration_code", finalCode);
           } else {
             console.error(`[event-register] ❌ email FAILED to=${email} error=${result.error} provider=${result.provider}`);
-            await db.from("event_registrations").update({ email_status: "failed", qr_generated_at: new Date().toISOString() }).eq("registration_code", finalCode);
+            await db.from("event_registrations")
+              .update({ email_status: "failed", qr_generated_at: new Date().toISOString() })
+              .eq("registration_code", finalCode);
           }
         } catch (e) {
           console.error("[event-register] email exception (registration intact):", e);
-          await db.from("event_registrations").update({ email_status: "failed" }).eq("registration_code", finalCode);
+          await db.from("event_registrations")
+            .update({ email_status: "failed" })
+            .eq("registration_code", finalCode);
         }
-      })();
+      });
 
       return NextResponse.json({ success: true, free: true, registration_code: finalCode });
     }
