@@ -5,6 +5,7 @@ import { verifyUserToken } from "@/lib/admin-auth";
 import { sendWhatsApp, membershipWAParams } from "@/lib/notify";
 import { autoFeedMembershipActivated } from "@/lib/auto-feed";
 import { enqueueJob } from "@/lib/job-queue";
+import { handleInvoiceGenerate, handleMembershipEmail } from "@/lib/job-handlers";
 
 const PLAN_MONTHS: Record<string, number> = {
   monthly:  1,
@@ -98,26 +99,30 @@ export async function POST(req: NextRequest) {
   const amountINR   = amount / 100;
   const expiryISO   = expiresAt.toISOString();
 
-  // Enqueue GST invoice generation — durable, retried on failure
-  await enqueueJob("invoice_generate", {
-    productType:     "membership",
+  // Enqueue for durability/retry — also fire immediately so users don't wait
+  const invoicePayload = {
+    productType:     "membership" as const,
     userEmail:       email.toLowerCase(),
     userName:        displayName,
     productName:     `Membership — ${planLabel}`,
     totalPaidRupees: amountINR,
     paymentId:       razorpay_payment_id,
     orderId:         razorpay_order_id,
-  }, { idempotencyKey: `invoice_generate:${razorpay_payment_id}` });
-
-  // Enqueue membership confirmation email — retried on SES failure
-  await enqueueJob("membership_email", {
+  };
+  const membershipEmailPayload = {
     userEmail:  email.toLowerCase(),
     userName:   displayName,
     planLabel,
     amountINR,
     expiresAt:  expiryISO,
     paymentId:  razorpay_payment_id,
-  }, { idempotencyKey: `membership_email:${razorpay_payment_id}`, priority: 10 });
+  };
+  await enqueueJob("invoice_generate",  invoicePayload,        { idempotencyKey: `invoice_generate:${razorpay_payment_id}` });
+  await enqueueJob("membership_email",  membershipEmailPayload, { idempotencyKey: `membership_email:${razorpay_payment_id}`, priority: 10 });
+
+  // Fire immediately (Hobby plan: daily cron is too slow for payments)
+  void handleInvoiceGenerate(invoicePayload).catch(console.error);
+  void handleMembershipEmail(membershipEmailPayload).catch(console.error);
 
   // Coupon was already atomically claimed at create-order time to prevent
   // race conditions. No second redemption needed here.

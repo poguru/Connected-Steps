@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { redeemCoupon } from "@/lib/coupon-redeem";
 import { enqueueJob } from "@/lib/job-queue";
+import { handleEventQrEmail, handleInvoiceGenerate } from "@/lib/job-handlers";
 
 // POST /api/events/verify-payment
 // Body: { razorpay_order_id, razorpay_payment_id, razorpay_signature, registration_code }
@@ -80,8 +81,7 @@ export async function POST(req: NextRequest) {
 
     const ev = reg.events;
 
-    // Enqueue QR + confirmation email — high priority, retried on SES failure
-    await enqueueJob("event_qr_email", {
+    const qrPayload = {
       registrationId:   reg.id,
       registrationCode: registration_code,
       eventId:          reg.event_id,
@@ -92,11 +92,9 @@ export async function POST(req: NextRequest) {
       startTime:        ev?.start_time ?? null,
       location:         ev?.location ?? "",
       distanceCategory: reg.distance_category,
-    }, { idempotencyKey: `event_qr_email:${reg.id}`, priority: 10 });
-
-    // Enqueue GST invoice generation — retried on storage/SES failure
-    await enqueueJob("invoice_generate", {
-      productType:     "event",
+    };
+    const invoicePayload = {
+      productType:     "event" as const,
       userEmail:       reg.user_email,
       userName:        reg.user_name,
       productName:     ev?.title ?? "Event Registration",
@@ -107,7 +105,15 @@ export async function POST(req: NextRequest) {
       eventId:         reg.event_id,
       eventDate:       ev?.start_date,
       eventVenue:      ev?.location,
-    }, { idempotencyKey: `invoice_generate:${razorpay_payment_id}` });
+    };
+
+    // Enqueue for durability/retry
+    await enqueueJob("event_qr_email",   qrPayload,      { idempotencyKey: `event_qr_email:${reg.id}`, priority: 10 });
+    await enqueueJob("invoice_generate", invoicePayload, { idempotencyKey: `invoice_generate:${razorpay_payment_id}` });
+
+    // Fire immediately (Hobby plan: daily cron is too slow for payments)
+    void handleEventQrEmail(qrPayload).catch(console.error);
+    void handleInvoiceGenerate(invoicePayload).catch(console.error);
 
     return NextResponse.json({ success: true });
   } catch (e: unknown) {

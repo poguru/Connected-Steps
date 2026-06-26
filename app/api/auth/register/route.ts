@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { autoFeedMemberJoined } from "@/lib/auto-feed";
-import { getOrCreateCode } from "@/lib/referrals";
+import { getOrCreateCode, processReferral } from "@/lib/referrals";
 import { enqueueJob } from "@/lib/job-queue";
 import { sendEmail, welcomeEmailHTML, adminNewUserEmailHTML } from "@/lib/notify";
 
@@ -95,12 +95,14 @@ export async function POST(req: NextRequest) {
     getOrCreateCode(email.toLowerCase()).catch(() => {});
 
     if (referralCode && typeof referralCode === "string") {
-      // Enqueue referral processing — durable, retried if membership extension fails
-      await enqueueJob("referral_reward", {
+      const referralPayload = {
         referralCode:      referralCode.trim(),
         referredEmail:     email.toLowerCase(),
         referredFirstName: firstName,
-      }, { idempotencyKey: `referral_reward:${email.toLowerCase()}` });
+      };
+      // Enqueue for durability/retry and fire immediately
+      await enqueueJob("referral_reward", referralPayload, { idempotencyKey: `referral_reward:${email.toLowerCase()}` });
+      void processReferral(referralPayload.referralCode, referralPayload.referredEmail, referralPayload.referredFirstName).catch(console.error);
     }
 
     // Welcome email to new user (non-blocking)
