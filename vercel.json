@@ -1,6 +1,8 @@
 {
   "functions": {
     "app/api/cron/*.ts":                                                    { "maxDuration": 300 },
+    "app/api/admin/events/[id]/communicate/send-next/route.ts":             { "maxDuration": 15  },
+    "app/api/admin/events/[id]/communicate/status/route.ts":                { "maxDuration": 10  },
     "app/api/cron/job-worker/route.ts":                                     { "maxDuration": 120 },
     "app/api/admin/leaderboard/recalculate.ts":                             { "maxDuration": 60  },
     "app/api/admin/events/registrations/resend-missing/route.ts":           { "maxDuration": 300 },

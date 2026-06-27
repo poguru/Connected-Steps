@@ -255,6 +255,8 @@ function EventCard({
             const left  = ev.max_participants - taken;
             const full  = left <= 0;
             const low   = !full && left <= 10;
+            // Show slot count only when registration is open; always show "Sold Out"
+            if (!full && !lifecycle.canRegister) return null;
             return (
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.77rem", color: full ? "#ef4444" : low ? "#eab308" : conf.color, fontWeight: 600 }}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
@@ -284,12 +286,15 @@ function EventCard({
               Register Now
             </button>
           )}
-          <button onClick={() => onShare(ev)}
-            style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", color: "var(--cs-muted)", fontSize: "0.78rem", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 5 }}
-            title="Share event">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-            Share
-          </button>
+          {/* Share only while registration is open — sharing a closed/live/completed event is misleading */}
+          {lifecycle.canRegister && (
+            <button onClick={() => onShare(ev)}
+              style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", color: "var(--cs-muted)", fontSize: "0.78rem", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 5 }}
+              title="Share event">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+              Share
+            </button>
+          )}
         </div>
       </div>
     </div>

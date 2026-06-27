@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import RegisterButton from "@/components/events/RegisterButton";
 import { getEventLifecycleStatus, LIFECYCLE_LABEL, LIFECYCLE_COLOR } from "@/lib/event-status";
+import { getLifecycle } from "@/lib/event-lifecycle";
 import { getDistanceOption } from "@/lib/event-distances";
 import EventDetailCountdown from "@/components/events/EventDetailCountdown";
 
@@ -111,10 +112,11 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
   const slotsLeft = ev.max_participants ? ev.max_participants - slotsUsed : null;
   const isFull    = slotsLeft !== null && slotsLeft <= 0;
 
-  const conf    = TYPE[ev.event_type] ?? TYPE.running;
-  const time    = fmtTime(ev.start_time);
-  const endTime = fmtTime(ev.end_time);
-  const ls      = getEventLifecycleStatus(ev);
+  const conf      = TYPE[ev.event_type] ?? TYPE.running;
+  const time      = fmtTime(ev.start_time);
+  const endTime   = fmtTime(ev.end_time);
+  const ls        = getEventLifecycleStatus(ev);
+  const lifecycle = getLifecycle(ev);
   const lsCol   = LIFECYCLE_COLOR[ls];
   const closeAt = ev.registration_closes_at
     ? new Date(ev.registration_closes_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
@@ -188,21 +190,25 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
             ) : ev.location}
           </Row>
           {ev.organizer && <Row icon="👟" label="Organizer">{ev.organizer}</Row>}
-          {slotsLeft !== null && (
+          {/* Show slot count only when registration is open; always show "Sold Out" */}
+          {slotsLeft !== null && (isFull || lifecycle.canRegister) && (
             <Row icon="👥" label="Availability">
               <span style={{ color: isFull ? "#ef4444" : slotsLeft <= 5 ? "#eab308" : "#4ade80" }}>
-                {isFull ? "Fully booked" : `${slotsLeft} of ${ev.max_participants} slots left`}
+                {isFull ? "Sold Out" : `${slotsLeft} of ${ev.max_participants} slots left`}
               </span>
             </Row>
           )}
-          <Row icon="💰" label="Registration Fee">
-            <span style={{ fontWeight: 700, color: ev.price === 0 ? "#4ade80" : "#e8620a", fontSize: "1rem" }}>
-              {ev.price === 0 ? "Free Entry" : `₹${ev.price}`}
-            </span>
-          </Row>
-          {closeAt && (
+          {/* Registration fee and closing date are only relevant while registration is open */}
+          {lifecycle.canRegister && (
+            <Row icon="💰" label="Registration Fee">
+              <span style={{ fontWeight: 700, color: ev.price === 0 ? "#4ade80" : "#e8620a", fontSize: "1rem" }}>
+                {ev.price === 0 ? "Free Entry" : `₹${ev.price}`}
+              </span>
+            </Row>
+          )}
+          {lifecycle.canRegister && closeAt && (
             <Row icon="🔒" label="Registration Closes">
-              <span style={{ color: ls === "REGISTRATION_CLOSED" ? "#f87171" : "rgba(255,255,255,0.85)" }}>
+              <span style={{ color: "rgba(255,255,255,0.85)" }}>
                 {closeAt} IST
               </span>
             </Row>

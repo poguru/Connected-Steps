@@ -1,42 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
-import { sendBatchEmails } from "@/lib/email-service";
 
 type RecipientFilter = "all" | "paid" | "free" | "pending" | "checked_in" | "not_checked_in";
 
-// GET  — email history for this event
+// GET — communication history for this event
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const db = getSupabaseServer();
   const { data } = await db
     .from("event_comm_history")
-    .select("id, sent_at, subject, recipients, status")
+    .select("id, sent_at, subject, recipients, sent, failed, status, channel, recipient_filter")
     .eq("event_id", id)
     .order("sent_at", { ascending: false })
     .limit(20);
   return NextResponse.json({ history: data ?? [] });
 }
 
-// POST — send email to filtered registrants
+// POST — enqueue all recipient emails for async delivery.
+// Returns { batch_id, queued } immediately.
+// The admin UI then calls /send-next once per second to process the queue.
+// This design ensures SES sandbox rate (1 email/second) is never exceeded.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
 
-  const { recipient_filter, subject, body } = await req.json() as {
-    recipient_filter: RecipientFilter;
-    subject:          string;
-    body:             string;
-  };
+  const body = await req.json() as { recipient_filter: RecipientFilter; subject: string; body: string };
+  const { recipient_filter, subject } = body;
+  const emailBody = body.body;
 
-  if (!subject?.trim() || !body?.trim()) {
+  if (!subject?.trim() || !emailBody?.trim())
     return NextResponse.json({ error: "subject and body are required" }, { status: 400 });
-  }
 
   const db = getSupabaseServer();
 
-  // Fetch registrants matching the filter
+  // Fetch matching registrants
   let query = db
     .from("event_registrations")
     .select("user_email, user_name, payment_status, status, checked_in_at")
@@ -49,39 +48,58 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (recipient_filter === "checked_in")     query = query.not("checked_in_at", "is", null);
   if (recipient_filter === "not_checked_in") query = query.is("checked_in_at", null).eq("status", "confirmed");
 
-  const { data: registrants, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  if (!registrants?.length) return NextResponse.json({ sent: 0, failed: 0, message: "No recipients matched the filter." });
+  const { data: registrants, error: fetchErr } = await query;
+  if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
+  if (!registrants?.length)
+    return NextResponse.json({ queued: 0, batch_id: null, message: "No recipients matched the filter." });
 
-  const fromEmail = process.env.AWS_SES_FROM_EMAIL ?? process.env.RESEND_FROM_EMAIL ?? "Connected Steps <info@connectedsteps.in>";
-  const html      = body.replace(/\n/g, "<br>");
+  // Deduplicate by email
+  const seen = new Set<string>();
+  const recipients = registrants.filter(r => {
+    if (!r.user_email || seen.has(r.user_email)) return false;
+    seen.add(r.user_email);
+    return true;
+  });
 
-  const jobs = registrants.map(r => ({
-    from:    fromEmail,
-    to:      [r.user_email],
+  const htmlBody  = emailBody.replace(/\n/g, "<br>");
+  const batchId   = crypto.randomUUID();
+
+  // Build one queue row per recipient (HTML personalised per recipient)
+  const rows = recipients.map(r => ({
+    batch_id:        batchId,
+    event_id:        id,
+    recipient_email: r.user_email,
+    recipient_name:  r.user_name ?? null,
     subject,
-    html:    `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#0a0a0a;color:#f0f0f0;border-radius:8px;">
-      <div style="margin-bottom:20px;"><img src="https://www.connectedsteps.in/logo.png" width="40" style="border-radius:50%;"/> <span style="font-size:16px;font-weight:700;color:#fff;margin-left:10px;">Connected Steps</span></div>
+    html_body: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#0a0a0a;color:#f0f0f0;border-radius:8px;">
+      <div style="margin-bottom:20px;">
+        <img src="https://www.connectedsteps.in/logo.png" width="40" style="border-radius:50%;vertical-align:middle;"/>
+        <span style="font-size:16px;font-weight:700;color:#fff;margin-left:10px;">Connected Steps</span>
+      </div>
       <p style="margin:0 0 12px;color:#ccc;">Hi <strong style="color:#fff;">${r.user_name || "there"}</strong>,</p>
-      <div style="line-height:1.8;color:#ccc;">${html}</div>
+      <div style="line-height:1.8;color:#ccc;">${htmlBody}</div>
       <div style="margin-top:28px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.1);font-size:11px;color:#555;">
         Connected Steps · Hyderabad · <a href="https://www.connectedsteps.in" style="color:#e8620a;text-decoration:none;">connectedsteps.in</a>
       </div>
     </div>`,
   }));
 
-  const { sent, failed } = await sendBatchEmails(jobs, 5);
+  const { error: insertErr } = await db.from("email_queue").insert(rows);
+  if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
 
-  // Log to history (fire-and-forget — never block the response)
+  // Create history entry in 'queued' state; updated to 'sent'/'failed' when processing completes
   void db.from("event_comm_history").insert({
-    event_id:   id,
+    event_id:         id,
     subject,
-    recipients: registrants.length,
-    sent,
-    failed,
-    status:     failed === registrants.length ? "failed" : "sent",
-    filter:     recipient_filter,
+    recipients:       recipients.length,
+    sent:             0,
+    failed:           0,
+    status:           "queued",
+    filter:           recipient_filter,
+    recipient_filter,
+    channel:          "email",
+    batch_id:         batchId,
   });
 
-  return NextResponse.json({ sent, failed, total: registrants.length });
+  return NextResponse.json({ batch_id: batchId, queued: recipients.length });
 }

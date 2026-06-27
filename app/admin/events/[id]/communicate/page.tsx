@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
@@ -21,12 +21,37 @@ interface CommHistory {
   channel?:         string;
 }
 
+interface EmailDetail {
+  email:        string;
+  status:       "delivered" | "queued" | "failed";
+  error?:       string | null;
+  code?:        string | null;
+  is_permanent?: boolean | null;
+  attempts:     number;
+}
+
+interface SendState {
+  phase:     "idle" | "queuing" | "sending" | "done";
+  batchId:   string | null;
+  total:     number;
+  queued:    number;
+  delivered: number;
+  failed:    number;
+  details:   EmailDetail[];
+  // transient failed count (can be retried)
+  retryable: number;
+}
+
+const INITIAL_SEND: SendState = {
+  phase: "idle", batchId: null, total: 0, queued: 0,
+  delivered: 0, failed: 0, details: [], retryable: 0,
+};
+
 // ── Template library ──────────────────────────────────────────────────────────
 
 const EMAIL_TEMPLATES = [
   {
-    id: "schedule",
-    label: "📅 Event Schedule",
+    id: "schedule", label: "📅 Event Schedule",
     subject: "Event Schedule — Connected Steps",
     body: `Hi {name},
 
@@ -45,8 +70,7 @@ For any queries: info@connectedsteps.in
 See you at the start line! 🏃`,
   },
   {
-    id: "reminder",
-    label: "⏰ Race Day Reminder",
+    id: "reminder", label: "⏰ Race Day Reminder",
     subject: "Race Day Tomorrow — You're Ready!",
     body: `Hi {name},
 
@@ -63,8 +87,7 @@ We're excited to see you tomorrow!
 — Connected Steps Team`,
   },
   {
-    id: "bib_reminder",
-    label: "📦 BIB Collection Reminder",
+    id: "bib_reminder", label: "📦 BIB Collection Reminder",
     subject: "Don't Forget to Collect Your BIB Packet!",
     body: `Hi {name},
 
@@ -87,8 +110,7 @@ See you at the collection center!
 — Connected Steps Team`,
   },
   {
-    id: "update",
-    label: "📢 Important Update",
+    id: "update", label: "📢 Important Update",
     subject: "Important Update — Connected Steps Event",
     body: `Hi {name},
 
@@ -104,8 +126,7 @@ Thank you for your understanding.
 — Connected Steps Team`,
   },
   {
-    id: "results",
-    label: "🏅 Results Available",
+    id: "results", label: "🏅 Results Available",
     subject: "Your Results Are Live! 🏁",
     body: `Hi {name},
 
@@ -121,8 +142,7 @@ Thank you for being part of Connected Steps.
 — Connected Steps Team`,
   },
   {
-    id: "certificate",
-    label: "📜 Certificate Ready",
+    id: "certificate", label: "📜 Certificate Ready",
     subject: "Your Finisher Certificate is Ready! 🏅",
     body: `Hi {name},
 
@@ -135,19 +155,14 @@ Print it, frame it, or share it — you've earned it!
 Thank you for running with Connected Steps.
 — Connected Steps Team`,
   },
-  {
-    id: "custom",
-    label: "✏️ Custom Message",
-    subject: "",
-    body: "",
-  },
+  { id: "custom", label: "✏️ Custom Message", subject: "", body: "" },
 ];
 
 const PUSH_TEMPLATES = [
   { id: "reminder",  label: "⏰ Race Day Reminder", title: "Race Day Tomorrow! 🏃", body: "Don't forget — your event is tomorrow. Check your registration email for your QR code." },
-  { id: "bib",       label: "📦 BIB Reminder",       title: "Collect Your BIB 📦", body: "Your BIB packet is ready for collection. Please pick it up before race day." },
+  { id: "bib",       label: "📦 BIB Reminder",       title: "Collect Your BIB 📦",  body: "Your BIB packet is ready for collection. Please pick it up before race day." },
   { id: "checkin",   label: "✅ Check-In Open",       title: "Check-In is Open! ✅", body: "Race day check-in is now open. Show your QR code at the entrance." },
-  { id: "update",    label: "📢 Quick Update",        title: "Event Update 📢", body: "" },
+  { id: "update",    label: "📢 Quick Update",        title: "Event Update 📢",       body: "" },
   { id: "results",   label: "🏅 Results Live",         title: "Your Results Are Live! 🏁", body: "Check your finish time and position on the results page." },
   { id: "custom",    label: "✏️ Custom",              title: "", body: "" },
 ];
@@ -163,40 +178,42 @@ const FILTERS: { value: RecipientFilter; label: string }[] = [
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const S = {
-  page:   { minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "inherit" } as React.CSSProperties,
-  header: { position: "sticky" as const, top: 0, zIndex: 40, background: "rgba(10,10,10,0.97)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 2rem", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" } as React.CSSProperties,
-  card:   { background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem" } as React.CSSProperties,
-  input:  { width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const } as React.CSSProperties,
-  select: { width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const, cursor: "pointer" } as React.CSSProperties,
-  textarea: { width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const, resize: "vertical" as const } as React.CSSProperties,
-  btn:    (p = true): React.CSSProperties => ({ padding: "9px 20px", background: p ? "#e8620a" : "rgba(255,255,255,0.06)", border: p ? "none" : "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: p ? "#fff" : "#aaa", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }),
-  label:  { display: "block", fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 6 } as React.CSSProperties,
+  page:    { minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "inherit" } as React.CSSProperties,
+  header:  { position: "sticky" as const, top: 0, zIndex: 40, background: "rgba(10,10,10,0.97)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 2rem", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" } as React.CSSProperties,
+  card:    { background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem" } as React.CSSProperties,
+  input:   { width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const } as React.CSSProperties,
+  select:  { width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const, cursor: "pointer" } as React.CSSProperties,
+  textarea:{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const, resize: "vertical" as const } as React.CSSProperties,
+  btn:     (p = true): React.CSSProperties => ({ padding: "9px 20px", background: p ? "#e8620a" : "rgba(255,255,255,0.06)", border: p ? "none" : "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: p ? "#fff" : "#aaa", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }),
+  label:   { display: "block", fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 6 } as React.CSSProperties,
 };
 
-// ── Component ──────────────────────────────────────────────────────────────────
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function CommunicatePage() {
   const params  = useParams();
   const eventId = params.id as string;
 
-  const [tab,     setTab]     = useState<"email"|"push"|"history">("email");
+  const [tab,     setTab]     = useState<"email" | "push" | "history">("email");
   const [history, setHistory] = useState<CommHistory[]>([]);
 
-  // Email state
+  // Email composer state
   const [emailFilter,   setEmailFilter]   = useState<RecipientFilter>("all");
   const [emailSubject,  setEmailSubject]  = useState("");
   const [emailBody,     setEmailBody]     = useState("");
   const [emailTemplate, setEmailTemplate] = useState("custom");
-  const [emailSending,  setEmailSending]  = useState(false);
-  const [emailResult,   setEmailResult]   = useState<{ sent: number; failed: number } | null>(null);
+
+  // Async send state machine
+  const [send, setSend] = useState<SendState>(INITIAL_SEND);
+  const loopActive      = useRef(false);
 
   // Push state
-  const [pushFilter,    setPushFilter]    = useState<RecipientFilter>("all");
-  const [pushTitle,     setPushTitle]     = useState("");
-  const [pushBody,      setPushBody]      = useState("");
-  const [pushTemplate,  setPushTemplate]  = useState("custom");
-  const [pushSending,   setPushSending]   = useState(false);
-  const [pushResult,    setPushResult]    = useState<{ sent: number } | null>(null);
+  const [pushFilter,   setPushFilter]   = useState<RecipientFilter>("all");
+  const [pushTitle,    setPushTitle]    = useState("");
+  const [pushBody,     setPushBody]     = useState("");
+  const [pushTemplate, setPushTemplate] = useState("custom");
+  const [pushSending,  setPushSending]  = useState(false);
+  const [pushResult,   setPushResult]   = useState<{ sent: number } | null>(null);
 
   const [toast, setToast] = useState("");
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(""), 3500); };
@@ -209,7 +226,82 @@ export default function CommunicatePage() {
     setHistory(data.history ?? []);
   }
 
-  // ── Email send ──────────────────────────────────────────────────────────────
+  // ── Sending loop ─────────────────────────────────────────────────────────────
+  // Runs when phase transitions to 'sending'. Calls /send-next once per 1100ms
+  // to stay under the SES sandbox rate limit of 1 email/second.
+
+  useEffect(() => {
+    if (send.phase !== "sending" || !send.batchId) return;
+
+    loopActive.current = true;
+    const batchId = send.batchId;
+
+    void (async () => {
+      while (loopActive.current) {
+        try {
+          const res  = await fetch(`/api/admin/events/${eventId}/communicate/send-next`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ batch_id: batchId }),
+          });
+          const data = await res.json() as {
+            done?:          boolean;
+            delivered?:     number;
+            failed?:        number;
+            total?:         number;
+            email?:         string;
+            status?:        string;
+            error?:         string | null;
+            error_code?:    string | null;
+            is_permanent?:  boolean | null;
+            attempts?:      number;
+            retrying?:      boolean;
+          };
+
+          if (!loopActive.current) break;
+
+          if (data.done) {
+            setSend(s => ({ ...s, phase: "done", queued: 0 }));
+            void loadHistory();
+            break;
+          }
+
+          setSend(s => {
+            const detail: EmailDetail = {
+              email:        data.email ?? "",
+              status:       (data.status ?? "failed") as EmailDetail["status"],
+              error:        data.error,
+              code:         data.error_code,
+              is_permanent: data.is_permanent,
+              attempts:     data.attempts ?? 1,
+            };
+            return {
+              ...s,
+              queued:    data.retrying ? s.queued : Math.max(0, s.queued - 1),
+              delivered: data.status === "delivered" ? s.delivered + 1 : s.delivered,
+              failed:    data.status === "failed"    ? s.failed    + 1 : s.failed,
+              retryable: data.status === "failed" && !data.is_permanent ? s.retryable + 1 : s.retryable,
+              details:   [...s.details, detail],
+            };
+          });
+        } catch {
+          // Network error — wait 3s before retry
+          await new Promise<void>(r => setTimeout(r, 3000));
+          if (!loopActive.current) break;
+          continue;
+        }
+
+        // 1100ms between sends to stay safely under SES 1/sec sandbox limit
+        if (loopActive.current) {
+          await new Promise<void>(r => setTimeout(r, 1100));
+        }
+      }
+    })();
+
+    return () => { loopActive.current = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [send.phase, send.batchId]);
+
+  // ── Email enqueue ─────────────────────────────────────────────────────────────
 
   function applyEmailTemplate(id: string) {
     setEmailTemplate(id);
@@ -217,22 +309,56 @@ export default function CommunicatePage() {
     if (t && id !== "custom") { setEmailSubject(t.subject); setEmailBody(t.body); }
   }
 
-  async function sendEmail() {
+  async function enqueueEmail() {
     if (!emailSubject.trim() || !emailBody.trim()) { showToast("Subject and body are required"); return; }
-    if (!confirm(`Send email to ${FILTERS.find(f => f.value === emailFilter)?.label}?`)) return;
-    setEmailSending(true); setEmailResult(null);
+    const filterLabel = FILTERS.find(f => f.value === emailFilter)?.label ?? emailFilter;
+    if (!confirm(`Queue email to ${filterLabel}?\n\nEmails will be sent one per second. Keep this tab open until sending completes.`)) return;
+
+    setSend({ ...INITIAL_SEND, phase: "queuing" });
+
     try {
       const res  = await fetch(`/api/admin/events/${eventId}/communicate`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ subject: emailSubject, body: emailBody, recipient_filter: emailFilter }),
       });
-      const data = await res.json();
-      if (res.ok) { setEmailResult(data); showToast(`✅ Sent ${data.sent} emails`); await loadHistory(); }
-      else showToast(`❌ ${data.error ?? "Send failed"}`);
-    } finally { setEmailSending(false); }
+      const data = await res.json() as { batch_id?: string; queued?: number; message?: string; error?: string };
+
+      if (!res.ok) { setSend(INITIAL_SEND); showToast(`❌ ${data.error ?? "Failed to queue emails"}`); return; }
+      if (!data.batch_id || !data.queued) { setSend(INITIAL_SEND); showToast(data.message ?? "No recipients matched"); return; }
+
+      setSend({ ...INITIAL_SEND, phase: "sending", batchId: data.batch_id, total: data.queued, queued: data.queued });
+    } catch {
+      setSend(INITIAL_SEND);
+      showToast("❌ Network error — please try again");
+    }
   }
 
-  // ── Push send ───────────────────────────────────────────────────────────────
+  async function retryFailed() {
+    if (!send.batchId) return;
+    const res  = await fetch(`/api/admin/events/${eventId}/communicate/status`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ batch_id: send.batchId }),
+    });
+    const data = await res.json() as { requeued?: number };
+    if ((data.requeued ?? 0) > 0) {
+      setSend(s => ({ ...s, phase: "sending", queued: data.requeued!, details: [], retryable: 0 }));
+    } else {
+      showToast("No transient failures to retry");
+    }
+  }
+
+  function downloadCSV() {
+    const rows = ["Email,Status,Error,Code,Permanent,Attempts",
+      ...send.details.map(d =>
+        `${d.email},${d.status},"${(d.error ?? "").replace(/"/g, "'")}",${d.code ?? ""},${d.is_permanent ?? ""},${d.attempts}`
+      )];
+    const a = document.createElement("a");
+    a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(rows.join("\n"));
+    a.download = `email-report-${send.batchId?.slice(0, 8) ?? "batch"}.csv`;
+    a.click();
+  }
+
+  // ── Push send ─────────────────────────────────────────────────────────────────
 
   function applyPushTemplate(id: string) {
     setPushTemplate(id);
@@ -255,13 +381,15 @@ export default function CommunicatePage() {
     } finally { setPushSending(false); }
   }
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────────
 
   const TABS = [
     { key: "email",   label: "📧 Email" },
     { key: "push",    label: "🔔 Push Notification" },
     { key: "history", label: `📋 History (${history.length})` },
   ];
+
+  const pct = send.total > 0 ? Math.round(((send.delivered + send.failed) / send.total) * 100) : 0;
 
   return (
     <div style={S.page}>
@@ -289,7 +417,7 @@ export default function CommunicatePage() {
 
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "1.75rem 2rem" }}>
 
-        {/* ── Email Tab ──────────────────────────────────────────────────────── */}
+        {/* ── Email Tab ────────────────────────────────────────────────────── */}
         {tab === "email" && (
           <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 20 }}>
             {/* Template sidebar */}
@@ -302,46 +430,154 @@ export default function CommunicatePage() {
                   </button>
                 ))}
               </div>
+
+              {/* SES limit info */}
+              <div style={{ marginTop: 20, padding: "10px 12px", background: "rgba(96,165,250,0.05)", border: "1px solid rgba(96,165,250,0.15)", borderRadius: 8, fontSize: 11, color: "#60a5fa", lineHeight: 1.6 }}>
+                <strong>SES Sandbox</strong><br />
+                Rate: 1 email / second<br />
+                Quota: 200 emails / day<br /><br />
+                Emails queue instantly and send 1/sec in the background. Keep this tab open.
+              </div>
             </div>
 
             {/* Composer */}
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
                 <label style={S.label}>Recipients</label>
-                <select style={S.select} value={emailFilter} onChange={e => setEmailFilter(e.target.value as RecipientFilter)}>
+                <select style={S.select} value={emailFilter} onChange={e => setEmailFilter(e.target.value as RecipientFilter)} disabled={send.phase === "sending"}>
                   {FILTERS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
                 </select>
               </div>
 
               <div>
                 <label style={S.label}>Subject *</label>
-                <input style={S.input} value={emailSubject} onChange={e => setEmailSubject(e.target.value)} placeholder="Email subject line" />
+                <input style={S.input} value={emailSubject} onChange={e => setEmailSubject(e.target.value)} placeholder="Email subject line" disabled={send.phase === "sending"} />
               </div>
 
               <div>
                 <label style={S.label}>Message *</label>
                 <p style={{ fontSize: 11, color: "#555", marginBottom: 6 }}>Use <code style={{ color: "#e8620a" }}>{"{name}"}</code> for participant name. Plain text — line breaks become paragraphs.</p>
-                <textarea style={{ ...S.textarea, minHeight: 280 }} value={emailBody} onChange={e => setEmailBody(e.target.value)} placeholder="Write your message here…" />
+                <textarea style={{ ...S.textarea, minHeight: 260 }} value={emailBody} onChange={e => setEmailBody(e.target.value)} placeholder="Write your message here…" disabled={send.phase === "sending"} />
               </div>
 
-              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <button onClick={sendEmail} disabled={emailSending} style={S.btn()}>
-                  {emailSending ? "Sending…" : "Send Email"}
-                </button>
-                {emailResult && (
-                  <span style={{ fontSize: 13, color: "#4ade80" }}>
-                    ✅ Sent to {emailResult.sent} participants{emailResult.failed > 0 ? ` · ❌ ${emailResult.failed} failed` : ""}
-                  </span>
-                )}
-              </div>
+              {/* ── Send button / progress display ─────────────────────────── */}
+              {send.phase === "idle" && (
+                <button onClick={enqueueEmail} style={S.btn()}>Queue &amp; Send Email</button>
+              )}
+
+              {send.phase === "queuing" && (
+                <div style={{ fontSize: 13, color: "#60a5fa" }}>⏳ Preparing queue…</div>
+              )}
+
+              {(send.phase === "sending" || send.phase === "done") && (
+                <div style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "16px 18px" }}>
+
+                  {/* Status header */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                    {send.phase === "sending" ? (
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#60a5fa" }}>📤 Sending… (keep this tab open)</span>
+                    ) : (
+                      <span style={{ fontSize: 13, fontWeight: 700, color: send.failed === 0 ? "#4ade80" : "#fbbf24" }}>
+                        {send.failed === 0 ? "✅ All emails delivered" : `⚠️ Completed with ${send.failed} failure${send.failed !== 1 ? "s" : ""}`}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Progress bar */}
+                  <div style={{ height: 6, background: "rgba(255,255,255,0.06)", borderRadius: 3, marginBottom: 12, overflow: "hidden" }}>
+                    <div style={{ display: "flex", height: "100%", borderRadius: 3, overflow: "hidden", transition: "width 0.3s" }}>
+                      <div style={{ width: `${send.total > 0 ? (send.delivered / send.total) * 100 : 0}%`, background: "#4ade80", transition: "width 0.5s" }} />
+                      <div style={{ width: `${send.total > 0 ? (send.failed / send.total) * 100 : 0}%`, background: "#f87171", transition: "width 0.5s" }} />
+                    </div>
+                  </div>
+
+                  {/* Counters */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 12 }}>
+                    {[
+                      { label: "Total",     value: send.total,     color: "#888"    },
+                      { label: "Queued",    value: send.queued,    color: "#60a5fa" },
+                      { label: "Delivered", value: send.delivered, color: "#4ade80" },
+                      { label: "Failed",    value: send.failed,    color: send.failed > 0 ? "#f87171" : "#555" },
+                    ].map(c => (
+                      <div key={c.label} style={{ textAlign: "center" as const, padding: "8px 6px", background: "rgba(255,255,255,0.03)", borderRadius: 6 }}>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: c.color }}>{c.value}</div>
+                        <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".06em" }}>{c.label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Progress text */}
+                  <div style={{ fontSize: 11, color: "#555", marginBottom: 12 }}>
+                    {send.phase === "sending"
+                      ? `Processing ${send.delivered + send.failed} of ${send.total} — ${pct}% complete`
+                      : `${pct}% complete · ${send.total} recipients`}
+                  </div>
+
+                  {/* Actions when done */}
+                  {send.phase === "done" && (
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
+                      {send.retryable > 0 && (
+                        <button onClick={retryFailed} style={{ ...S.btn(), fontSize: 12, padding: "7px 14px" }}>
+                          🔄 Retry {send.retryable} Transient Failure{send.retryable !== 1 ? "s" : ""}
+                        </button>
+                      )}
+                      {send.details.length > 0 && (
+                        <button onClick={downloadCSV} style={{ ...S.btn(false), fontSize: 12, padding: "7px 14px" }}>
+                          ↓ Download Report CSV
+                        </button>
+                      )}
+                      <button onClick={() => setSend(INITIAL_SEND)} style={{ ...S.btn(false), fontSize: 12, padding: "7px 14px" }}>
+                        Send Another
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Per-email detail log (scrollable, newest-last) */}
+                  {send.details.length > 0 && (
+                    <div style={{ marginTop: 12, maxHeight: 180, overflowY: "auto" as const, background: "#0a0a0a", borderRadius: 6, border: "1px solid rgba(255,255,255,0.05)", padding: "8px 10px" }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 6 }}>
+                        Delivery Log ({send.details.length})
+                      </div>
+                      {[...send.details].reverse().map((d, i) => (
+                        <div key={i} style={{ display: "flex", gap: 8, fontSize: 11, marginBottom: 3, alignItems: "flex-start" }}>
+                          <span style={{ flexShrink: 0, color: d.status === "delivered" ? "#4ade80" : d.status === "queued" ? "#60a5fa" : "#f87171" }}>
+                            {d.status === "delivered" ? "✓" : d.status === "queued" ? "↻" : "✗"}
+                          </span>
+                          <span style={{ color: "#888", flexShrink: 0, minWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{d.email}</span>
+                          {d.status !== "delivered" && d.error && (
+                            <span style={{ color: "#555", fontSize: 10 }}>{d.error.slice(0, 70)}</span>
+                          )}
+                          {d.status === "queued" && (
+                            <span style={{ color: "#60a5fa", fontSize: 10 }}>retrying (attempt {d.attempts})</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Failure details when done */}
+                  {send.phase === "done" && send.failed > 0 && (
+                    <div style={{ marginTop: 10, background: "rgba(248,113,113,0.05)", border: "1px solid rgba(248,113,113,0.15)", borderRadius: 6, padding: "10px 12px" }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#f87171", marginBottom: 6 }}>Failed Recipients</div>
+                      {send.details.filter(d => d.status === "failed").map((d, i) => (
+                        <div key={i} style={{ fontSize: 11, color: "#888", marginBottom: 3 }}>
+                          <span style={{ color: "#f87171" }}>{d.email}</span>
+                          {d.code && <span style={{ color: "#555", marginLeft: 8, fontFamily: "monospace", fontSize: 10 }}>{d.code.replace(/_/g, " ")}</span>}
+                          {d.is_permanent && <span style={{ color: "#ef4444", marginLeft: 6, fontSize: 10 }}>permanent</span>}
+                          {!d.is_permanent && <span style={{ color: "#60a5fa", marginLeft: 6, fontSize: 10 }}>transient</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* ── Push Notification Tab ──────────────────────────────────────────── */}
+        {/* ── Push Notification Tab ─────────────────────────────────────────── */}
         {tab === "push" && (
           <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 20 }}>
-            {/* Template sidebar */}
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 10 }}>Quick Templates</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -351,7 +587,6 @@ export default function CommunicatePage() {
                   </button>
                 ))}
               </div>
-
               <div style={{ marginTop: 20, padding: "12px", background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, fontSize: 11, color: "#555", lineHeight: 1.6 }}>
                 <strong style={{ color: "#888" }}>Channels:</strong><br />
                 • In-app notification (database)<br />
@@ -361,7 +596,6 @@ export default function CommunicatePage() {
               </div>
             </div>
 
-            {/* Composer */}
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
                 <label style={S.label}>Recipients</label>
@@ -369,20 +603,16 @@ export default function CommunicatePage() {
                   {FILTERS.filter(f => f.value !== "pending").map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
                 </select>
               </div>
-
               <div>
                 <label style={S.label}>Notification Title *</label>
                 <input style={S.input} value={pushTitle} onChange={e => setPushTitle(e.target.value)} placeholder="Race Day Tomorrow! 🏃" maxLength={65} />
                 <div style={{ fontSize: 11, color: "#555", marginTop: 4 }}>{pushTitle.length}/65 characters</div>
               </div>
-
               <div>
                 <label style={S.label}>Message Body *</label>
                 <textarea style={{ ...S.textarea, minHeight: 100 }} value={pushBody} onChange={e => setPushBody(e.target.value)} placeholder="Don't forget — your event is tomorrow…" maxLength={178} />
                 <div style={{ fontSize: 11, color: "#555", marginTop: 4 }}>{pushBody.length}/178 characters</div>
               </div>
-
-              {/* Preview */}
               {(pushTitle || pushBody) && (
                 <div style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "14px 16px" }}>
                   <div style={{ fontSize: 11, color: "#555", marginBottom: 8, fontWeight: 700, textTransform: "uppercase" as const }}>Preview</div>
@@ -395,7 +625,6 @@ export default function CommunicatePage() {
                   </div>
                 </div>
               )}
-
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <button onClick={sendPush} disabled={pushSending} style={{ ...S.btn(), background: "#7c3aed" }}>
                   {pushSending ? "Sending…" : "Send Push Notification"}
@@ -408,7 +637,7 @@ export default function CommunicatePage() {
           </div>
         )}
 
-        {/* ── History Tab ────────────────────────────────────────────────────── */}
+        {/* ── History Tab ───────────────────────────────────────────────────── */}
         {tab === "history" && (
           <div>
             {history.length === 0 ? (
@@ -421,7 +650,7 @@ export default function CommunicatePage() {
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-                      {["Sent At", "Subject", "Channel", "Filter", "Sent", "Failed", "Status"].map(h => (
+                      {["Sent At", "Subject", "Channel", "Filter", "Delivered", "Failed", "Status"].map(h => (
                         <th key={h} style={{ padding: "10px 14px", textAlign: "left" as const, fontSize: 10, color: "#555", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: ".07em" }}>{h}</th>
                       ))}
                     </tr>
@@ -439,10 +668,14 @@ export default function CommunicatePage() {
                           </span>
                         </td>
                         <td style={{ padding: "10px 14px", color: "#666", fontSize: 12 }}>{h.recipient_filter ?? "all"}</td>
-                        <td style={{ padding: "10px 14px", color: "#4ade80", fontWeight: 700 }}>{h.sent ?? h.recipients}</td>
+                        <td style={{ padding: "10px 14px", color: "#4ade80", fontWeight: 700 }}>{h.sent ?? 0}</td>
                         <td style={{ padding: "10px 14px", color: h.failed > 0 ? "#f87171" : "#555" }}>{h.failed ?? 0}</td>
                         <td style={{ padding: "10px 14px" }}>
-                          <span style={{ padding: "2px 8px", borderRadius: 999, background: "rgba(74,222,128,0.1)", color: "#4ade80", fontSize: 11, fontWeight: 700 }}>
+                          <span style={{
+                            padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 700,
+                            background: h.status === "queued" ? "rgba(96,165,250,0.12)" : h.status === "failed" ? "rgba(248,113,113,0.12)" : "rgba(74,222,128,0.1)",
+                            color:      h.status === "queued" ? "#60a5fa"              : h.status === "failed" ? "#f87171"              : "#4ade80",
+                          }}>
                             {h.status ?? "sent"}
                           </span>
                         </td>
