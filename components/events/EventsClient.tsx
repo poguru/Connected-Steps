@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import MyEventRegistrations from "@/components/dashboard/MyEventRegistrations";
 import { getEventLifecycleStatus, LIFECYCLE_LABEL, LIFECYCLE_COLOR } from "@/lib/event-status";
+import EventCountdown from "@/components/events/EventCountdown";
 import { getDistanceOption } from "@/lib/event-distances";
 
 interface Event {
@@ -72,12 +73,17 @@ function EventCard({ ev }: { ev: Event }) {
                 FREE
               </span>
             )}
-            {/* Lifecycle badge — only show non-UPCOMING states */}
-            {ls !== "UPCOMING" && (
-              <span style={{ fontSize: "10px", fontWeight: 700, color: lsCol.text, background: lsCol.bg, border: `1px solid ${lsCol.border}`, padding: "1px 7px", borderRadius: 999 }}>
-                {LIFECYCLE_LABEL[ls].toUpperCase()}
-              </span>
-            )}
+            {/* Live lifecycle countdown badge — replaces static "UPCOMING" label */}
+            <EventCountdown
+              event={{
+                start_date:             ev.start_date,
+                start_time:             ev.start_time,
+                end_date:               ev.end_date,
+                end_time:               ev.end_time,
+                registration_closes_at: ev.registration_closes_at,
+              }}
+              compact
+            />
             {/* Distance badges */}
             {(ev.distance_categories ?? []).map(cat => {
               const d = getDistanceOption(cat);

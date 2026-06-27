@@ -5,6 +5,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import RegisterButton from "@/components/events/RegisterButton";
 import { getEventLifecycleStatus, LIFECYCLE_LABEL, LIFECYCLE_COLOR } from "@/lib/event-status";
 import { getDistanceOption } from "@/lib/event-distances";
+import EventDetailCountdown from "@/components/events/EventDetailCountdown";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -162,9 +163,18 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
           })}
         </div>
 
-        <h1 style={{ fontSize: "clamp(1.75rem, 5vw, 2.5rem)", fontWeight: 700, lineHeight: 1.15, marginBottom: "1.5rem", color: "#fff" }}>
+        <h1 style={{ fontSize: "clamp(1.75rem, 5vw, 2.5rem)", fontWeight: 700, lineHeight: 1.15, marginBottom: "1.25rem", color: "#fff" }}>
           {ev.title}
         </h1>
+
+        {/* Live countdown — client component, server timestamps passed as props */}
+        <EventDetailCountdown event={{
+          start_date:             ev.start_date,
+          start_time:             ev.start_time,
+          end_date:               ev.end_date,
+          end_time:               ev.end_time,
+          registration_closes_at: ev.registration_closes_at,
+        }} />
 
         {/* Details card */}
         <div style={{ display: "flex", flexDirection: "column", gap: "0.875rem", marginBottom: "1.75rem", padding: "1.25rem 1.5rem", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "14px" }}>

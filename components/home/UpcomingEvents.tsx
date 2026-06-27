@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import EventCountdown from "@/components/events/EventCountdown";
+import { getLifecycle } from "@/lib/event-lifecycle";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -16,35 +18,13 @@ interface Event {
   start_time:              string | null;
   end_date:                string | null;
   end_time:                string | null;
-  registration_close_time: string | null;
+  registration_closes_at: string | null;
   location:                string;
   organizer:               string | null;
   max_participants:        number | null;
   participant_count:       number | null;
   registration_required:   boolean;
   share_slug:              string | null;
-}
-
-// ── Lifecycle status ──────────────────────────────────────────────────────────
-
-function getISTNow() {
-  const ist = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
-  return {
-    date: ist.toISOString().split("T")[0],
-    time: ist.toTimeString().split(" ")[0].substring(0, 5),
-  };
-}
-
-function eventStatus(ev: Event): "open" | "registration_closed" | "completed" {
-  const { date: today, time: nowTime } = getISTNow();
-  const done =
-    !!(ev.end_date && ev.end_date < today) ||
-    !!(ev.end_date === today && ev.end_time != null && ev.end_time.substring(0, 5) <= nowTime);
-  if (done) return "completed";
-  const regClosed =
-    ev.registration_close_time != null &&
-    (today > ev.start_date || (today === ev.start_date && nowTime >= ev.registration_close_time.substring(0, 5)));
-  return regClosed ? "registration_closed" : "open";
 }
 
 // ── Event type config ─────────────────────────────────────────────────────────
@@ -176,12 +156,20 @@ function EventCard({
 }: {
   ev: Event; featured?: boolean; onShare: (ev: Event) => void;
 }) {
-  const router    = useRouter();
-  const conf      = typeConf(ev.event_type);
-  const countdown = daysUntil(ev.start_date);
-  const urgent    = countdown === "Today" || countdown === "Tomorrow";
-  const time      = fmtTime(ev.start_time);
-  const status    = eventStatus(ev);
+  const router     = useRouter();
+  const conf       = typeConf(ev.event_type);
+  const time       = fmtTime(ev.start_time);
+  const lifecycle  = getLifecycle({
+    start_date:             ev.start_date,
+    start_time:             ev.start_time,
+    end_date:               ev.end_date,
+    end_time:               ev.end_time,
+    registration_closes_at: ev.registration_closes_at,
+  });
+  // Highlight card border when event is today or registration is closing soon
+  const urgent = lifecycle.nextTransitionMs !== null
+    ? (lifecycle.nextTransitionMs - Date.now()) < 24 * 60 * 60 * 1000
+    : false;
 
   function handleRegister() {
     const dest = `/events/${ev.share_slug ?? ev.id}`;
@@ -226,9 +214,18 @@ function EventCard({
           <span style={{ fontSize: "10px", fontWeight: 700, color: conf.color, textTransform: "uppercase", letterSpacing: "0.08em" }}>{conf.label}</span>
         </div>
 
-        {/* Countdown badge */}
-        <div style={{ position: "absolute", top: 10, right: 10, padding: "3px 9px", borderRadius: 999, background: urgent ? "var(--cs-orange)" : "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)", fontSize: "10px", fontWeight: 700, color: urgent ? "#fff" : "rgba(255,255,255,0.75)" }}>
-          {countdown}
+        {/* Live lifecycle countdown badge */}
+        <div style={{ position: "absolute", top: 10, right: 10, backdropFilter: "blur(6px)" }}>
+          <EventCountdown
+            event={{
+              start_date:             ev.start_date,
+              start_time:             ev.start_time,
+              end_date:               ev.end_date,
+              end_time:               ev.end_time,
+              registration_closes_at: ev.registration_closes_at,
+            }}
+            compact
+          />
         </div>
       </div>
 
@@ -269,18 +266,22 @@ function EventCard({
 
         {/* Actions */}
         <div style={{ display: "flex", gap: "0.5rem", marginTop: "auto", paddingTop: "0.75rem" }}>
-          {status === "completed" ? (
+          {lifecycle.isCompleted ? (
             <div style={{ flex: 1, padding: "8px 14px", borderRadius: 8, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.3)", fontSize: "0.78rem", fontWeight: 700, textAlign: "center" }}>
-              Completed
+              Event Completed
             </div>
-          ) : status === "registration_closed" ? (
+          ) : lifecycle.isLive ? (
+            <div style={{ flex: 1, padding: "8px 14px", borderRadius: 8, background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.25)", color: "#a78bfa", fontSize: "0.78rem", fontWeight: 700, textAlign: "center" }}>
+              ● Event Live Now
+            </div>
+          ) : !lifecycle.canRegister ? (
             <div style={{ flex: 1, padding: "8px 14px", borderRadius: 8, background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.2)", color: "#f87171", fontSize: "0.78rem", fontWeight: 700, textAlign: "center" }}>
               Registration Closed
             </div>
           ) : (
             <button onClick={handleRegister}
               style={{ flex: 1, padding: "8px 14px", borderRadius: 8, background: "var(--gradient-accent)", border: "none", color: "#fff", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", boxShadow: "var(--shadow-orange)" }}>
-              Register
+              Register Now
             </button>
           )}
           <button onClick={() => onShare(ev)}
