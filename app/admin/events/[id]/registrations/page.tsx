@@ -93,17 +93,24 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
   const [sendQueued,  setSendQueued]  = useState(0);
   const [history,     setHistory]     = useState<CommHistory[]>([]);
 
+  // Admin registration modal
+  const [regModal,   setRegModal]   = useState(false);
+  const [regForm,    setRegForm]    = useState({ name: "", email: "", phone: "", distance_category: "", payment_status: "free" as "paid"|"free"|"pending", send_email: true, bypass_capacity: false });
+  const [regLoading, setRegLoading] = useState(false);
+  const [regResult,  setRegResult]  = useState<{ success?: boolean; registration_code?: string; error?: string } | null>(null);
+  const [eventCats,  setEventCats]  = useState<string[]>([]);
+
   const headers = { "Content-Type": "application/json" };
 
   async function load() {
     setLoading(true); setError("");
     try {
-      // limit=500 — per-event views need all registrations (events rarely exceed 500 participants).
-      // The global registrations list uses server-side pagination (default 50) but per-event
-      // views must show the complete list for accurate summaries and bulk actions.
-      const res  = await fetch(`/api/admin/events/registrations?event_id=${eventId}&limit=500`);
-      const json = await res.json();
-      if (!res.ok) { setError(json.error ?? "Failed to load"); return; }
+      const [regRes, evRes] = await Promise.all([
+        fetch(`/api/admin/events/registrations?event_id=${eventId}&limit=500`),
+        fetch(`/api/admin/events/${eventId}/overview`),
+      ]);
+      const json   = await regRes.json();
+      if (!regRes.ok) { setError(json.error ?? "Failed to load"); return; }
       setRegs(json.registrations ?? []);
 
       // Compute summary client-side from full list
@@ -118,6 +125,13 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
         breakfastIssued: all.filter((r: Reg) => r.breakfast_availed).length,
       });
       if (all[0]?.events?.title) setEventTitle(all[0].events.title);
+
+      // Fetch event categories for admin registration modal
+      if (evRes.ok) {
+        const evData = await evRes.json();
+        setEventCats(evData.event?.distance_categories ?? []);
+        if (!eventTitle && evData.event?.title) setEventTitle(evData.event.title);
+      }
     } catch { setError("Network error."); }
     finally { setLoading(false); }
   }
@@ -275,6 +289,33 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
     a.click();
   }
 
+  async function handleAdminRegister(e: React.FormEvent) {
+    e.preventDefault();
+    setRegLoading(true); setRegResult(null);
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/register`, {
+        method: "POST", headers,
+        body: JSON.stringify({
+          name:              regForm.name.trim(),
+          email:             regForm.email.trim().toLowerCase(),
+          phone:             regForm.phone.trim() || undefined,
+          distance_category: regForm.distance_category || undefined,
+          payment_status:    regForm.payment_status,
+          send_email:        regForm.send_email,
+          bypass_capacity:   regForm.bypass_capacity,
+          special_notes:     "Admin / Walk-in Registration",
+        }),
+      });
+      const data = await res.json();
+      setRegResult(data);
+      if (res.ok && data.success) {
+        await load();
+        setRegForm({ name: "", email: "", phone: "", distance_category: "", payment_status: "free", send_email: true, bypass_capacity: false });
+      }
+    } catch { setRegResult({ error: "Network error" }); }
+    finally { setRegLoading(false); }
+  }
+
   const filtered = regs
     .filter(r => filter === "all" || r.payment_status === filter)
     .filter(r => {
@@ -322,6 +363,10 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
           <button onClick={() => resendAllQR(false)} disabled={bulkSending}
             style={{ padding: "6px 14px", background: bulkSending ? "#1a1a1a" : "rgba(96,165,250,0.15)", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 6, color: bulkSending ? "#444" : "#60a5fa", cursor: bulkSending ? "not-allowed" : "pointer", fontSize: "0.8rem", fontFamily: "inherit", fontWeight: 600 }}>
             {bulkSending ? "Sending (batches of 10)…" : "📧 Resend QR to All"}
+          </button>
+          <button onClick={() => { setRegModal(true); setRegResult(null); }}
+            style={{ padding: "6px 14px", background: "#e8620a", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: "0.8rem", fontFamily: "inherit", fontWeight: 700, whiteSpace: "nowrap" }}>
+            + Register Participant
           </button>
           <button onClick={exportCSV} style={{ padding: "6px 16px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: "0.8rem", fontFamily: "inherit" }}>
             Export CSV
@@ -689,6 +734,82 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
           }}
           onClose={() => setBreakfastCameraOpen(false)}
         />
+      )}
+
+      {/* ── Admin Register Participant Modal ──────────────────────────────── */}
+      {regModal && (
+        <div onClick={() => setRegModal(false)} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: "1.5rem", maxHeight: "90vh", overflowY: "auto" as const }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.25rem" }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: "1rem", color: "#fff" }}>Register Participant</div>
+                <div style={{ fontSize: 11, color: "#555", marginTop: 3 }}>Admin bypass — ignores registration deadline &amp; event status</div>
+              </div>
+              <button onClick={() => setRegModal(false)} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: "1.4rem", lineHeight: 1 }}>×</button>
+            </div>
+
+            <form onSubmit={handleAdminRegister} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <label style={{ display: "block", fontSize: 11, color: "#555", marginBottom: 5, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: ".06em" }}>Full Name *</label>
+                <input required value={regForm.name} onChange={e => setRegForm(f => ({ ...f, name: e.target.value }))} placeholder="Participant name" style={{ ...S.input }} />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 11, color: "#555", marginBottom: 5, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: ".06em" }}>Email *</label>
+                <input required type="email" value={regForm.email} onChange={e => setRegForm(f => ({ ...f, email: e.target.value }))} placeholder="participant@example.com" style={{ ...S.input }} />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 11, color: "#555", marginBottom: 5, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: ".06em" }}>Phone</label>
+                <input value={regForm.phone} onChange={e => setRegForm(f => ({ ...f, phone: e.target.value }))} placeholder="10-digit phone" style={{ ...S.input }} />
+              </div>
+              {eventCats.length > 1 && (
+                <div>
+                  <label style={{ display: "block", fontSize: 11, color: "#555", marginBottom: 5, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: ".06em" }}>Distance Category *</label>
+                  <select required value={regForm.distance_category} onChange={e => setRegForm(f => ({ ...f, distance_category: e.target.value }))} style={{ ...S.input, cursor: "pointer" } as React.CSSProperties}>
+                    <option value="">Select category…</option>
+                    {eventCats.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label style={{ display: "block", fontSize: 11, color: "#555", marginBottom: 5, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: ".06em" }}>Payment Status</label>
+                <select value={regForm.payment_status} onChange={e => setRegForm(f => ({ ...f, payment_status: e.target.value as "paid"|"free"|"pending" }))} style={{ ...S.input, cursor: "pointer" } as React.CSSProperties}>
+                  <option value="free">Free / Complimentary</option>
+                  <option value="paid">Paid (cash / offline)</option>
+                  <option value="pending">Pending</option>
+                </select>
+              </div>
+              <div style={{ display: "flex", gap: 16, flexWrap: "wrap" as const }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
+                  <input type="checkbox" checked={regForm.send_email} onChange={e => setRegForm(f => ({ ...f, send_email: e.target.checked }))} />
+                  Send confirmation email with QR
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
+                  <input type="checkbox" checked={regForm.bypass_capacity} onChange={e => setRegForm(f => ({ ...f, bypass_capacity: e.target.checked }))} />
+                  Bypass capacity limit
+                </label>
+              </div>
+
+              {regResult && (
+                <div style={{ padding: "10px 12px", borderRadius: 8, background: regResult.success ? "rgba(74,222,128,0.08)" : "rgba(239,68,68,0.08)", border: `1px solid ${regResult.success ? "rgba(74,222,128,0.2)" : "rgba(239,68,68,0.2)"}`, fontSize: 13 }}>
+                  {regResult.success ? (
+                    <div style={{ color: "#4ade80" }}>✅ Registered — Code: <strong>{regResult.registration_code}</strong></div>
+                  ) : (
+                    <div style={{ color: "#f87171" }}>❌ {regResult.error}</div>
+                  )}
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+                <button type="submit" disabled={regLoading} style={{ flex: 1, padding: "10px", background: "#e8620a", border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 13, cursor: regLoading ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                  {regLoading ? "Registering…" : "Register Participant"}
+                </button>
+                <button type="button" onClick={() => setRegModal(false)} style={{ padding: "10px 18px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#aaa", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

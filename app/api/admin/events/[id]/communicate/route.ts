@@ -48,10 +48,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (recipient_filter === "checked_in")     query = query.not("checked_in_at", "is", null);
   if (recipient_filter === "not_checked_in") query = query.is("checked_in_at", null).eq("status", "confirmed");
 
-  const { data: registrants, error: fetchErr } = await query;
+  const [{ data: registrants, error: fetchErr }, { data: ev }] = await Promise.all([
+    query,
+    db.from("events").select("title").eq("id", id).single(),
+  ]);
   if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
   if (!registrants?.length)
     return NextResponse.json({ queued: 0, batch_id: null, message: "No recipients matched the filter." });
+
+  const eventTitle = ev?.title ?? "";
 
   // Deduplicate by email
   const seen = new Set<string>();
@@ -61,28 +66,35 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return true;
   });
 
-  const htmlBody  = emailBody.replace(/\n/g, "<br>");
-  const batchId   = crypto.randomUUID();
+  const batchId = crypto.randomUUID();
 
-  // Build one queue row per recipient (HTML personalised per recipient)
-  const rows = recipients.map(r => ({
-    batch_id:        batchId,
-    event_id:        id,
-    recipient_email: r.user_email,
-    recipient_name:  r.user_name ?? null,
-    subject,
-    html_body: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#0a0a0a;color:#f0f0f0;border-radius:8px;">
+  // Build one queue row per recipient — personalise body variables per recipient
+  const rows = recipients.map(r => {
+    const personalizedBody = emailBody
+      .replace(/\{name\}/gi,  r.user_name  || "Participant")
+      .replace(/\{email\}/gi, r.user_email || "")
+      .replace(/\{event\}/gi, eventTitle)
+      .replace(/\n/g, "<br>");
+
+    return {
+      batch_id:        batchId,
+      event_id:        id,
+      recipient_email: r.user_email,
+      recipient_name:  r.user_name ?? null,
+      subject,
+      html_body: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#0a0a0a;color:#f0f0f0;border-radius:8px;">
       <div style="margin-bottom:20px;">
         <img src="https://www.connectedsteps.in/logo.png" width="40" style="border-radius:50%;vertical-align:middle;"/>
         <span style="font-size:16px;font-weight:700;color:#fff;margin-left:10px;">Connected Steps</span>
       </div>
       <p style="margin:0 0 12px;color:#ccc;">Hi <strong style="color:#fff;">${r.user_name || "there"}</strong>,</p>
-      <div style="line-height:1.8;color:#ccc;">${htmlBody}</div>
+      <div style="line-height:1.8;color:#ccc;">${personalizedBody}</div>
       <div style="margin-top:28px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.1);font-size:11px;color:#555;">
         Connected Steps · Hyderabad · <a href="https://www.connectedsteps.in" style="color:#e8620a;text-decoration:none;">connectedsteps.in</a>
       </div>
     </div>`,
-  }));
+    };
+  });
 
   const { error: insertErr } = await db.from("email_queue").insert(rows);
   if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
