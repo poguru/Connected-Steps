@@ -151,28 +151,80 @@ export default function EventManagePage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError("");
     try {
-      // Use the shared stats endpoint — single source of truth for all metrics
-      const res  = await fetch(`/api/admin/events/${eventId}/stats`);
-      const json = await res.json() as HubData;
-      if (!res.ok) throw new Error((json as { error?: string }).error ?? "Failed to load");
+      // Primary: /overview — proven stable, always works even without latest migrations.
+      // Secondary: /stats — enriches with shared RPC stats if available.
+      const res  = await fetch(`/api/admin/events/${eventId}/overview`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error ?? "Failed to load event");
 
-      // Normalise into the shape the JSX expects (backward-compat shim)
-      const s = json.stats;
-      setData({
-        ...json,
-        registrations: s,
-        capacity:      { max: s.capacity_max, filled: s.capacity_filled, remaining: s.capacity_remaining },
-        revenue:       { collected: s.revenue_collected, pending: s.revenue_pending },
-        emails: {
-          campaigns:             s.campaigns,
-          confirmation_sent:     s.email_sent,
-          confirmation_failed:   s.email_failed,
-          campaign_delivered:    s.campaign_delivered,
-          campaign_failed:       s.campaign_failed,
-          campaign_queued:       s.campaign_queued,
+      // Safely extract every field with fallback defaults so no property access can crash.
+      const ev    = json.event    ?? null;
+      const regs  = json.registrations ?? {};
+      const cap   = json.capacity ?? { max: null, filled: 0, remaining: null };
+      const rev   = json.revenue  ?? { collected: 0, pending: 0 };
+      const emls  = json.emails   ?? {};
+
+      if (!ev) throw new Error("Event not found");
+
+      const normalized: OverviewData = {
+        event: ev,
+        stats: {
+          total:             regs.total             ?? 0,
+          confirmed:         regs.confirmed         ?? 0,
+          cancelled:         regs.cancelled         ?? 0,
+          pending:           regs.pending           ?? 0,
+          paid:              regs.paid              ?? 0,
+          free:              regs.free              ?? 0,
+          checked_in:        regs.checked_in        ?? 0,
+          bib_collected:     0,
+          breakfast:         0,
+          certificates:      0,
+          revenue_collected: rev.collected          ?? 0,
+          revenue_pending:   rev.pending            ?? 0,
+          avg_per_paid:      0,
+          email_sent:        emls.confirmation_sent    ?? 0,
+          email_failed:      emls.confirmation_failed  ?? 0,
+          email_none:        0,
+          campaign_delivered:emls.campaign_delivered   ?? 0,
+          campaign_failed:   emls.campaign_failed      ?? 0,
+          campaign_queued:   emls.campaign_queued      ?? 0,
+          campaigns:         emls.campaigns            ?? 0,
+          capacity_max:      cap.max,
+          capacity_filled:   cap.filled               ?? 0,
+          capacity_remaining:cap.remaining,
+          capacity_pct:      cap.max && cap.max > 0 ? Math.round(((cap.filled ?? 0) / cap.max) * 100) : null,
+          finishers: 0, dnf: 0, dns: 0,
+          by_category: {}, timeline: [], computed_at: "",
         },
-      } as OverviewData);
+        registrations: {
+          total: regs.total ?? 0, confirmed: regs.confirmed ?? 0,
+          cancelled: regs.cancelled ?? 0, pending: regs.pending ?? 0,
+          paid: regs.paid ?? 0, free: regs.free ?? 0, checked_in: regs.checked_in ?? 0,
+          bib_collected: 0, breakfast: 0, certificates: 0,
+          revenue_collected: rev.collected ?? 0, revenue_pending: rev.pending ?? 0, avg_per_paid: 0,
+          email_sent: emls.confirmation_sent ?? 0, email_failed: emls.confirmation_failed ?? 0, email_none: 0,
+          campaign_delivered: emls.campaign_delivered ?? 0, campaign_failed: emls.campaign_failed ?? 0,
+          campaign_queued: emls.campaign_queued ?? 0, campaigns: emls.campaigns ?? 0,
+          capacity_max: cap.max, capacity_filled: cap.filled ?? 0, capacity_remaining: cap.remaining,
+          capacity_pct: null, finishers: 0, dnf: 0, dns: 0, by_category: {}, timeline: [], computed_at: "",
+        },
+        capacity: cap,
+        revenue:  rev,
+        emails: {
+          campaigns:            emls.campaigns            ?? 0,
+          confirmation_sent:    emls.confirmation_sent    ?? 0,
+          confirmation_failed:  emls.confirmation_failed  ?? 0,
+          campaign_delivered:   emls.campaign_delivered   ?? 0,
+          campaign_failed:      emls.campaign_failed      ?? 0,
+          campaign_queued:      emls.campaign_queued      ?? 0,
+        },
+        races:        json.races        ?? [],
+        recent_comms: json.recent_comms ?? [],
+      };
+
+      setData(normalized);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -249,10 +301,17 @@ export default function EventManagePage() {
     </div>
   );
 
-  const { event, registrations: reg, capacity: cap, revenue: rev, emails, races } = data;
-  const badge     = getEventStatusBadge(data);
-  const isPublished = event.status === "published";
-  const capPct    = cap.max ? pct(cap.filled, cap.max) : 0;
+  // All property accesses use optional chaining / fallbacks so no single
+  // undefined value can crash the entire page render.
+  const event      = data.event;
+  const reg        = data.registrations;
+  const cap        = data.capacity  ?? { max: null,  filled: 0, remaining: null };
+  const rev        = data.revenue   ?? { collected: 0, pending: 0 };
+  const emails     = data.emails    ?? {} as typeof data.emails;
+  const races      = data.races     ?? [];
+  const badge      = getEventStatusBadge(data);   // always returns FALLBACK_BADGE if anything fails
+  const isPublished = event?.status === "published";
+  const capPct     = (cap.max && cap.max > 0) ? pct(cap.filled ?? 0, cap.max) : 0;
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "inherit", display: "flex", flexDirection: "column" }}>
