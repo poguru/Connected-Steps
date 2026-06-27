@@ -28,6 +28,7 @@ CREATE INDEX IF NOT EXISTS idx_email_queue_batch ON public.email_queue (batch_id
 CREATE INDEX IF NOT EXISTS idx_email_queue_event ON public.email_queue (event_id);
 
 ALTER TABLE public.email_queue ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "service_role_all" ON public.email_queue;
 CREATE POLICY "service_role_all" ON public.email_queue
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 
