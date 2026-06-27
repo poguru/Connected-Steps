@@ -19,6 +19,29 @@ interface CommHistory {
   status:           string;
   recipient_filter: string;
   channel?:         string;
+  batch_id?:        string | null;
+}
+
+interface DeliveryEmail {
+  email:          string;
+  name?:          string | null;
+  status:         string;
+  error?:         string | null;
+  code?:          string | null;
+  is_permanent?:  boolean | null;
+  attempts:       number;
+  aws_message_id?: string | null;
+  sent_at?:       string | null;
+}
+
+interface BatchDetail {
+  total:     number;
+  queued:    number;
+  sending:   number;
+  delivered: number;
+  failed:    number;
+  retryable: number;
+  emails:    DeliveryEmail[];
 }
 
 interface EmailDetail {
@@ -215,6 +238,13 @@ export default function CommunicatePage() {
   const [pushSending,  setPushSending]  = useState(false);
   const [pushResult,   setPushResult]   = useState<{ sent: number } | null>(null);
 
+  // Delivery tracking state (history tab drill-down)
+  const [expandedBatch,  setExpandedBatch]  = useState<string | null>(null);
+  const [batchDetail,    setBatchDetail]    = useState<BatchDetail | null>(null);
+  const [detailLoading,  setDetailLoading]  = useState(false);
+  const [detailFilter,   setDetailFilter]   = useState<string>("all");
+  const [detailSearch,   setDetailSearch]   = useState("");
+
   const [toast, setToast] = useState("");
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(""), 3500); };
 
@@ -355,6 +385,53 @@ export default function CommunicatePage() {
     const a = document.createElement("a");
     a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(rows.join("\n"));
     a.download = `email-report-${send.batchId?.slice(0, 8) ?? "batch"}.csv`;
+    a.click();
+  }
+
+  // ── Delivery tracking ─────────────────────────────────────────────────────────
+
+  async function toggleBatchDetail(batchId: string | null | undefined) {
+    if (!batchId) return;
+    if (expandedBatch === batchId) {
+      setExpandedBatch(null); setBatchDetail(null); setDetailFilter("all"); setDetailSearch("");
+      return;
+    }
+    setExpandedBatch(batchId); setBatchDetail(null); setDetailLoading(true);
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/communicate/status?batch_id=${batchId}&include_all=true`);
+      const data = await res.json() as BatchDetail;
+      setBatchDetail(data);
+    } catch { showToast("Failed to load delivery detail"); }
+    finally { setDetailLoading(false); }
+  }
+
+  async function retryBatchFailed(batchId: string) {
+    const res  = await fetch(`/api/admin/events/${eventId}/communicate/status`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ batch_id: batchId }),
+    });
+    const data = await res.json() as { requeued?: number };
+    if ((data.requeued ?? 0) > 0) {
+      showToast(`🔄 ${data.requeued} emails re-queued for retry`);
+      void toggleBatchDetail(batchId); // refresh
+    } else {
+      showToast("No transient failures to retry");
+    }
+  }
+
+  function downloadBatchCSV(batchId: string) {
+    if (!batchDetail) return;
+    const rows = [
+      "Email,Name,Status,Error,Code,Permanent,Attempts,AWS Message ID,Sent At",
+      ...batchDetail.emails.map(d =>
+        [d.email, d.name ?? "", d.status, d.error ?? "", d.code ?? "", d.is_permanent ?? "", d.attempts, d.aws_message_id ?? "", d.sent_at ?? ""]
+          .map(v => `"${String(v).replace(/"/g, "'")}"`)
+          .join(",")
+      ),
+    ].join("\n");
+    const a = document.createElement("a");
+    a.href  = "data:text/csv;charset=utf-8," + encodeURIComponent(rows);
+    a.download = `delivery-report-${batchId.slice(0, 8)}.csv`;
     a.click();
   }
 
@@ -639,52 +716,170 @@ export default function CommunicatePage() {
 
         {/* ── History Tab ───────────────────────────────────────────────────── */}
         {tab === "history" && (
-          <div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {history.length === 0 ? (
               <div style={{ ...S.card, textAlign: "center", padding: "4rem" }}>
                 <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
                 <div style={{ fontWeight: 700, fontSize: 16, color: "#555" }}>No messages sent yet</div>
               </div>
-            ) : (
-              <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, overflow: "hidden" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                  <thead>
-                    <tr style={{ background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-                      {["Sent At", "Subject", "Channel", "Filter", "Delivered", "Failed", "Status"].map(h => (
-                        <th key={h} style={{ padding: "10px 14px", textAlign: "left" as const, fontSize: 10, color: "#555", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: ".07em" }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {history.map(h => (
-                      <tr key={h.id} style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
-                        <td style={{ padding: "10px 14px", color: "#666", whiteSpace: "nowrap" as const, fontSize: 12 }}>
-                          {new Date(h.sent_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                        </td>
-                        <td style={{ padding: "10px 14px", fontWeight: 600, maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis" as const, whiteSpace: "nowrap" as const }}>{h.subject}</td>
-                        <td style={{ padding: "10px 14px" }}>
-                          <span style={{ padding: "2px 10px", borderRadius: 999, background: (h.channel ?? "email") === "push" ? "rgba(124,58,237,0.15)" : "rgba(232,98,10,0.12)", color: (h.channel ?? "email") === "push" ? "#a78bfa" : "#e8620a", fontSize: 11, fontWeight: 700 }}>
-                            {(h.channel ?? "email").toUpperCase()}
-                          </span>
-                        </td>
-                        <td style={{ padding: "10px 14px", color: "#666", fontSize: 12 }}>{h.recipient_filter ?? "all"}</td>
-                        <td style={{ padding: "10px 14px", color: "#4ade80", fontWeight: 700 }}>{h.sent ?? 0}</td>
-                        <td style={{ padding: "10px 14px", color: h.failed > 0 ? "#f87171" : "#555" }}>{h.failed ?? 0}</td>
-                        <td style={{ padding: "10px 14px" }}>
-                          <span style={{
-                            padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 700,
-                            background: h.status === "queued" ? "rgba(96,165,250,0.12)" : h.status === "failed" ? "rgba(248,113,113,0.12)" : "rgba(74,222,128,0.1)",
-                            color:      h.status === "queued" ? "#60a5fa"              : h.status === "failed" ? "#f87171"              : "#4ade80",
-                          }}>
-                            {h.status ?? "sent"}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            ) : history.map(h => {
+              const isExpanded = expandedBatch === h.batch_id;
+              const canExpand  = !!h.batch_id && (h.channel ?? "email") === "email";
+              const pct        = h.recipients > 0 ? Math.round(((h.sent ?? 0) / h.recipients) * 100) : 0;
+
+              // Filtered + searched emails for the detail panel
+              const detailEmails = (batchDetail?.emails ?? []).filter(d => {
+                const matchStatus = detailFilter === "all" || d.status === detailFilter;
+                const matchSearch = !detailSearch || d.email.toLowerCase().includes(detailSearch.toLowerCase()) || (d.name ?? "").toLowerCase().includes(detailSearch.toLowerCase());
+                return matchStatus && matchSearch;
+              });
+
+              return (
+                <div key={h.id} style={{ background: "#111", border: `1px solid ${isExpanded ? "rgba(232,98,10,0.3)" : "rgba(255,255,255,0.07)"}`, borderRadius: 12, overflow: "hidden", transition: "border-color 0.2s" }}>
+                  {/* Campaign row */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", flexWrap: "wrap" as const }}>
+                    <div style={{ flex: 1, minWidth: 180 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: "#fff", marginBottom: 2 }}>{h.subject}</div>
+                      <div style={{ fontSize: 11, color: "#555" }}>
+                        {new Date(h.sent_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        {" · "}{h.recipient_filter ?? "all"}
+                        {" · "}<span style={{ color: (h.channel ?? "email") === "push" ? "#a78bfa" : "#e8620a" }}>{(h.channel ?? "email").toUpperCase()}</span>
+                      </div>
+                    </div>
+
+                    {/* Delivery stats mini-bar */}
+                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
+                      <div style={{ textAlign: "center" as const }}>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: "#4ade80" }}>{h.sent ?? 0}</div>
+                        <div style={{ fontSize: 9, color: "#555", textTransform: "uppercase" as const }}>Delivered</div>
+                      </div>
+                      <div style={{ textAlign: "center" as const }}>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: (h.failed ?? 0) > 0 ? "#f87171" : "#555" }}>{h.failed ?? 0}</div>
+                        <div style={{ fontSize: 9, color: "#555", textTransform: "uppercase" as const }}>Failed</div>
+                      </div>
+                      <div style={{ textAlign: "center" as const }}>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: "#888" }}>{h.recipients ?? 0}</div>
+                        <div style={{ fontSize: 9, color: "#555", textTransform: "uppercase" as const }}>Total</div>
+                      </div>
+                      {h.recipients > 0 && (
+                        <div style={{ width: 50, height: 50, position: "relative" as const }}>
+                          <svg viewBox="0 0 36 36" style={{ transform: "rotate(-90deg)" }}>
+                            <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
+                            <circle cx="18" cy="18" r="15.9" fill="none" stroke={pct === 100 ? "#4ade80" : pct > 80 ? "#fbbf24" : "#f87171"} strokeWidth="3"
+                              strokeDasharray={`${pct} ${100 - pct}`} strokeLinecap="round" />
+                          </svg>
+                          <div style={{ position: "absolute" as const, inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "#aaa" }}>{pct}%</div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: "center" }}>
+                      <span style={{
+                        padding: "3px 10px", borderRadius: 999, fontSize: 10, fontWeight: 700,
+                        background: h.status === "queued" ? "rgba(96,165,250,0.12)" : h.status === "failed" ? "rgba(248,113,113,0.12)" : "rgba(74,222,128,0.1)",
+                        color:      h.status === "queued" ? "#60a5fa"              : h.status === "failed" ? "#f87171"              : "#4ade80",
+                      }}>
+                        {h.status ?? "sent"}
+                      </span>
+                      {canExpand && (
+                        <button onClick={() => toggleBatchDetail(h.batch_id)} style={{ padding: "5px 12px", background: isExpanded ? "rgba(232,98,10,0.15)" : "rgba(255,255,255,0.05)", border: `1px solid ${isExpanded ? "rgba(232,98,10,0.3)" : "rgba(255,255,255,0.1)"}`, borderRadius: 6, color: isExpanded ? "#e8620a" : "#888", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                          {isExpanded ? "▲ Hide" : "▼ Details"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Delivery detail panel */}
+                  {isExpanded && (
+                    <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "14px 16px" }}>
+                      {detailLoading ? (
+                        <div style={{ fontSize: 12, color: "#555", padding: "20px 0", textAlign: "center" as const }}>Loading delivery data…</div>
+                      ) : batchDetail ? (
+                        <>
+                          {/* Stats row */}
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, marginBottom: 14 }}>
+                            {[
+                              { label: "Total",     v: batchDetail.total,     c: "#888"    },
+                              { label: "Delivered", v: batchDetail.delivered, c: "#4ade80" },
+                              { label: "Failed",    v: batchDetail.failed,    c: batchDetail.failed > 0 ? "#f87171" : "#555" },
+                              { label: "Queued",    v: batchDetail.queued,    c: "#60a5fa" },
+                              { label: "Retryable", v: batchDetail.retryable, c: batchDetail.retryable > 0 ? "#fbbf24" : "#555" },
+                            ].map(s => (
+                              <div key={s.label} style={{ textAlign: "center" as const, padding: "8px 4px", background: "rgba(255,255,255,0.02)", borderRadius: 6 }}>
+                                <div style={{ fontSize: 20, fontWeight: 700, color: s.c }}>{s.v}</div>
+                                <div style={{ fontSize: 9, color: "#555", textTransform: "uppercase" as const }}>{s.label}</div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Actions */}
+                          <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" as const }}>
+                            {batchDetail.retryable > 0 && (
+                              <button onClick={() => retryBatchFailed(h.batch_id!)} style={{ padding: "6px 14px", background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.25)", borderRadius: 6, color: "#fbbf24", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                                🔄 Retry {batchDetail.retryable} Transient Failure{batchDetail.retryable !== 1 ? "s" : ""}
+                              </button>
+                            )}
+                            <button onClick={() => downloadBatchCSV(h.batch_id!)} style={{ padding: "6px 14px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#aaa", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                              ↓ Download CSV ({batchDetail.total} rows)
+                            </button>
+                          </div>
+
+                          {/* Filter + search */}
+                          <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center", flexWrap: "wrap" as const }}>
+                            <div style={{ display: "flex", gap: 2, background: "rgba(255,255,255,0.04)", borderRadius: 6, padding: 2 }}>
+                              {["all","delivered","failed","queued"].map(f => (
+                                <button key={f} onClick={() => setDetailFilter(f)} style={{ padding: "4px 10px", borderRadius: 5, border: "none", background: detailFilter === f ? "#e8620a" : "transparent", color: detailFilter === f ? "#fff" : "#666", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                                  {f === "all" ? `All (${batchDetail.total})` : f === "delivered" ? `✓ ${batchDetail.delivered}` : f === "failed" ? `✗ ${batchDetail.failed}` : `⏳ ${batchDetail.queued}`}
+                                </button>
+                              ))}
+                            </div>
+                            <input value={detailSearch} onChange={e => setDetailSearch(e.target.value)} placeholder="Search email or name…" style={{ padding: "5px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#fff", fontSize: 11, outline: "none", fontFamily: "inherit", flex: 1, minWidth: 180 }} />
+                          </div>
+
+                          {/* Per-email table */}
+                          <div style={{ maxHeight: 320, overflowY: "auto" as const, background: "#0a0a0a", borderRadius: 6, border: "1px solid rgba(255,255,255,0.05)" }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                              <thead style={{ position: "sticky" as const, top: 0, background: "#0a0a0a", zIndex: 1 }}>
+                                <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+                                  {["Status","Recipient","AWS Message ID","Error","Attempts","Sent At"].map(col => (
+                                    <th key={col} style={{ padding: "8px 10px", textAlign: "left" as const, fontSize: 9, color: "#555", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: ".06em", whiteSpace: "nowrap" as const }}>{col}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {detailEmails.length === 0 ? (
+                                  <tr><td colSpan={6} style={{ padding: "20px", textAlign: "center" as const, color: "#555" }}>No results</td></tr>
+                                ) : detailEmails.slice(0, 200).map((d, i) => (
+                                  <tr key={i} style={{ borderTop: "1px solid rgba(255,255,255,0.03)" }}>
+                                    <td style={{ padding: "6px 10px", whiteSpace: "nowrap" as const }}>
+                                      <span style={{ fontSize: 10, fontWeight: 700, color: d.status === "delivered" ? "#4ade80" : d.status === "queued" ? "#60a5fa" : "#f87171" }}>
+                                        {d.status === "delivered" ? "✓ delivered" : d.status === "queued" ? "⏳ queued" : "✗ failed"}
+                                        {d.is_permanent === true && <span style={{ color: "#ef4444", marginLeft: 4 }}>perm</span>}
+                                      </span>
+                                    </td>
+                                    <td style={{ padding: "6px 10px" }}>
+                                      <div style={{ color: "#fff" }}>{d.name || "—"}</div>
+                                      <div style={{ color: "#555", fontSize: 10 }}>{d.email}</div>
+                                    </td>
+                                    <td style={{ padding: "6px 10px", color: "#555", fontFamily: "monospace", fontSize: 10 }}>{d.aws_message_id ? d.aws_message_id.slice(0, 20) + "…" : "—"}</td>
+                                    <td style={{ padding: "6px 10px", color: "#666", maxWidth: 180, overflow: "hidden" as const, textOverflow: "ellipsis" as const, whiteSpace: "nowrap" as const }}>{d.error ?? "—"}</td>
+                                    <td style={{ padding: "6px 10px", color: "#666", textAlign: "center" as const }}>{d.attempts}</td>
+                                    <td style={{ padding: "6px 10px", color: "#555", whiteSpace: "nowrap" as const, fontSize: 10 }}>{d.sent_at ? new Date(d.sent_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                            {detailEmails.length > 200 && (
+                              <div style={{ padding: "8px 10px", fontSize: 10, color: "#555", textAlign: "center" as const }}>Showing first 200 of {detailEmails.length} — download CSV for full list</div>
+                            )}
+                          </div>
+                        </>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

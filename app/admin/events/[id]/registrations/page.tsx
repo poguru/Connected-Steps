@@ -229,7 +229,11 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
       });
       const data = await res.json();
       if (!res.ok) { setSendResult(`Error: ${data.error}`); return; }
-      setSendResult(`✅ Sent to ${data.sent} recipients${data.failed ? ` (${data.failed} failed)` : ""}`);
+      // API now returns {batch_id, queued} — emails send 1/sec in background
+      const n = data.queued ?? data.sent ?? 0;
+      setSendResult(n > 0
+        ? `✅ ${n} emails queued — sending 1/sec via AWS SES. Open Communication Hub to track delivery.`
+        : data.message ?? "No recipients matched the selected filter.");
       setCommSubject(""); setCommBody(""); setTemplate("");
       loadHistory();
     } catch { setSendResult("Network error. Please try again."); }

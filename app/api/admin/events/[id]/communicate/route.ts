@@ -11,7 +11,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const db = getSupabaseServer();
   const { data } = await db
     .from("event_comm_history")
-    .select("id, sent_at, subject, recipients, sent, failed, status, channel, recipient_filter")
+    .select("id, sent_at, subject, recipients, sent, failed, status, channel, recipient_filter, batch_id")
     .eq("event_id", id)
     .order("sent_at", { ascending: false })
     .limit(20);
