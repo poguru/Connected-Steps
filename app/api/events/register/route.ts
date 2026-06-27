@@ -32,6 +32,11 @@ export async function POST(req: NextRequest) {
       distance_category,
     } = await req.json();
 
+    // ── Release expired slots (compensates for Hobby-plan daily-only cron) ───────
+    // Fire-and-forget: frees pending_payment slots whose TTL has elapsed so the
+    // capacity check below sees an accurate available count.
+    void getSupabaseServer().rpc("release_expired_slots").then(() => {}).catch(() => {});
+
     // ── Rate limiting ──────────────────────────────────────────────────────────
     // Prevents spam registrations and capacity exhaustion attacks.
     // Per-email: max 3 registration attempts per 15 minutes (handles retries without abuse).

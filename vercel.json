@@ -51,7 +51,7 @@
     },
     {
       "path": "/api/cron/slot-expiry",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 2 * * *"
     }
   ]
 }
