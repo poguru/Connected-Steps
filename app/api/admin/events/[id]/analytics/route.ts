@@ -15,19 +15,45 @@ export async function GET(req: NextRequest, { params }: Params) {
   const { id: eventId } = await params;
   const db = getSupabaseServer();
 
-  const [evRes, regsRes, resultsRes] = await Promise.all([
+  // Step 1: Always-safe core query — uses only columns that exist in the base schema.
+  // Deliberately avoids columns added by optional migrations (phase3 BIB, phase5 certs).
+  // This ensures funnel + revenue + email stats always work.
+  const [evRes, coreRegsRes, resultsRes] = await Promise.all([
     db.from("events").select("title, start_date, max_participants, participant_count").eq("id", eventId).single(),
     db.from("event_registrations")
-      .select("payment_status, final_price, status, created_at, checked_in_at, bib_collected_at, breakfast_availed, distance_category, email_status, certificate_generated_at")
+      .select("payment_status, final_price, status, created_at, distance_category, email_status, checked_in_at")
       .eq("event_id", eventId),
     db.from("event_results")
       .select("status, finish_time, overall_position, distance_category")
       .eq("event_id", eventId),
   ]);
 
-  const ev   = evRes.data;
-  const regs = regsRes.data ?? [];
+  if (coreRegsRes.error) console.error("[analytics] core regs failed:", coreRegsRes.error.message);
+  if (resultsRes.error)  console.error("[analytics] results failed:",   resultsRes.error.message);
+
+  const ev      = evRes.data;
+  const regs    = coreRegsRes.data ?? [];
   const results = resultsRes.data ?? [];
+
+  // Step 2: Optional race-day / certificate columns — added by phase3 & phase5 migrations.
+  // If the migration hasn't run these queries return an error; we fall back to 0.
+  const [raceRegsRes, certRegsRes] = await Promise.all([
+    db.from("event_registrations")
+      .select("bib_collected_at, breakfast_availed")
+      .eq("event_id", eventId),
+    db.from("event_registrations")
+      .select("certificate_generated_at")
+      .eq("event_id", eventId)
+      .not("certificate_generated_at", "is", null),
+  ]);
+
+  const raceRegs = raceRegsRes.data  ?? [];
+  const certRegs = certRegsRes.error ? [] : (certRegsRes.data ?? []);
+
+  // Build combined view for race-day analytics
+  const bibCollected        = raceRegs.filter(r => r.bib_collected_at).length;
+  const breakfastIssued     = raceRegs.filter(r => r.breakfast_availed).length;
+  const certificatesGenerated = certRegs.length;
 
   // ── Registration funnel ───────────────────────────────────────────────────
   const total       = regs.length;
@@ -43,11 +69,9 @@ export async function GET(req: NextRequest, { params }: Params) {
     .reduce((s, r) => s + (r.final_price ?? 0), 0);
 
   // ── Race day progression ──────────────────────────────────────────────────
-  const checkedIn       = regs.filter(r => r.checked_in_at).length;
-  const bibCollected    = regs.filter(r => r.bib_collected_at).length;
-  const breakfastIssued = regs.filter(r => r.breakfast_availed).length;
-  const finishers       = results.filter(r => r.status === "finisher").length;
-  const certificatesGenerated = regs.filter(r => r.certificate_generated_at).length;
+  const checkedIn = regs.filter(r => r.checked_in_at).length;
+  const finishers = results.filter(r => r.status === "finisher").length;
+  // bibCollected, breakfastIssued, certificatesGenerated — from step 2 queries above
 
   const checkInRate     = confirmed > 0 ? Math.round((checkedIn / confirmed)       * 100) : 0;
   const bibRate         = confirmed > 0 ? Math.round((bibCollected / confirmed)    * 100) : 0;

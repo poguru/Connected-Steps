@@ -96,20 +96,28 @@ function ProgressBar({ value, max, color = "#e8620a" }: { value: number; max: nu
 
 // ── Event status from lifecycle ────────────────────────────────────────────────
 
+const LIFECYCLE_BADGE: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  draft:                { label: "Draft",         color: "#6b7280", bg: "rgba(107,114,128,0.12)", border: "rgba(107,114,128,0.25)" },
+  registration_not_open:{ label: "Reg. Not Open", color: "#60a5fa", bg: "rgba(96,165,250,0.12)",  border: "rgba(96,165,250,0.3)"  },
+  registration_open:    { label: "Reg. Open",     color: "#4ade80", bg: "rgba(74,222,128,0.12)",  border: "rgba(74,222,128,0.3)"  },
+  registration_closed:  { label: "Reg. Closed",   color: "#fbbf24", bg: "rgba(251,191,36,0.12)",  border: "rgba(251,191,36,0.3)"  },
+  event_live:           { label: "Live Now",       color: "#a78bfa", bg: "rgba(167,139,250,0.12)", border: "rgba(167,139,250,0.3)" },
+  completed:            { label: "Completed",      color: "#6b7280", bg: "rgba(107,114,128,0.12)", border: "rgba(107,114,128,0.25)" },
+};
+const FALLBACK_BADGE = { label: "Published", color: "#4ade80", bg: "rgba(74,222,128,0.12)", border: "rgba(74,222,128,0.3)" };
+
 function getEventStatusBadge(data: OverviewData) {
   const { event } = data;
-  if (event.status === "draft") return { label: "Draft", color: "#6b7280", bg: "rgba(107,114,128,0.12)", border: "rgba(107,114,128,0.25)" };
-  const lc = getLifecycle({
-    start_date: event.start_date, start_time: event.start_time,
-    end_date: event.end_date, end_time: event.end_time,
-    registration_closes_at: event.registration_closes_at,
-  });
-  switch (lc.state) {
-    case "registration_not_open": return { label: "Reg. Not Open",  color: "#60a5fa", bg: "rgba(96,165,250,0.12)",  border: "rgba(96,165,250,0.3)"  };
-    case "registration_open":     return { label: "Reg. Open",      color: "#4ade80", bg: "rgba(74,222,128,0.12)",  border: "rgba(74,222,128,0.3)"  };
-    case "registration_closed":   return { label: "Reg. Closed",    color: "#fbbf24", bg: "rgba(251,191,36,0.12)",  border: "rgba(251,191,36,0.3)"  };
-    case "event_live":            return { label: "Live Now",        color: "#a78bfa", bg: "rgba(167,139,250,0.12)", border: "rgba(167,139,250,0.3)" };
-    case "completed":             return { label: "Completed",       color: "#6b7280", bg: "rgba(107,114,128,0.12)", border: "rgba(107,114,128,0.25)" };
+  if (event.status !== "published") return LIFECYCLE_BADGE.draft ?? FALLBACK_BADGE;
+  try {
+    const lc = getLifecycle({
+      start_date: event.start_date, start_time: event.start_time,
+      end_date: event.end_date,     end_time: event.end_time,
+      registration_closes_at: event.registration_closes_at,
+    });
+    return LIFECYCLE_BADGE[lc.state] ?? FALLBACK_BADGE;
+  } catch {
+    return FALLBACK_BADGE;
   }
 }
 
@@ -416,17 +424,17 @@ export default function EventManagePage() {
               <div style={{ marginBottom: 20 }}>
                 <SectionHeader title="Quick Actions" />
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
-                  {[
-                    { label: "Registrations",       icon: "👥", href: `registrations`,           color: "#e8620a" },
-                    { label: "Communicate",         icon: "📢", href: `communicate`,             color: "#a78bfa" },
-                    { label: "Race Day",            icon: "🏃", href: `race-day`,                color: "#4ade80" },
-                    { label: "BIB Collection",      icon: "📦", href: `bib`,                     color: "#60a5fa" },
-                    { label: "Results",             icon: "🏅", href: `results`,                 color: "#fbbf24" },
-                    { label: "Analytics",           icon: "📈", href: `analytics`,               color: "#34d399" },
-                    { label: "Register Participant",icon: "➕", href: `registrations?action=register`, color: "#e8620a" },
-                    { label: "Edit Event",          icon: "✏️", href: `../new?edit=${eventId}`,  color: "#888"    },
-                  ].map(a => (
-                    <Link key={a.label} href={a.href.startsWith("/") || a.href.startsWith("..") ? a.href : `/admin/events/${eventId}/${a.href}`}
+                  {([
+                    { label: "Registrations",       icon: "👥", href: `/admin/events/${eventId}/registrations`,                color: "#e8620a" },
+                    { label: "Communicate",         icon: "📢", href: `/admin/events/${eventId}/communicate`,                  color: "#a78bfa" },
+                    { label: "Race Day",            icon: "🏃", href: `/admin/events/${eventId}/race-day`,                    color: "#4ade80" },
+                    { label: "BIB Collection",      icon: "📦", href: `/admin/events/${eventId}/bib`,                         color: "#60a5fa" },
+                    { label: "Results",             icon: "🏅", href: `/admin/events/${eventId}/results`,                     color: "#fbbf24" },
+                    { label: "Analytics",           icon: "📈", href: `/admin/events/${eventId}/analytics`,                   color: "#34d399" },
+                    { label: "Register Participant",icon: "➕", href: `/admin/events/${eventId}/registrations?action=register`,color: "#e8620a" },
+                    { label: "Edit Event",          icon: "✏️", href: `/admin/events/new?edit=${eventId}`,                    color: "#888"    },
+                  ] as const).map(a => (
+                    <Link key={a.label} href={a.href}
                       style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: "1.1rem 0.75rem", background: "#111", border: `1px solid ${a.color}18`, borderRadius: 10, textDecoration: "none", transition: "border-color 0.15s" }}>
                       <span style={{ fontSize: 22 }}>{a.icon}</span>
                       <span style={{ fontSize: 11, fontWeight: 700, color: a.color, textAlign: "center" as const }}>{a.label}</span>

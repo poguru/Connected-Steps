@@ -32,7 +32,7 @@ const S = {
   h2:     { fontSize: 11, fontWeight: 700, color: "#e8620a", textTransform: "uppercase" as const, letterSpacing: ".08em", marginBottom: 12 } as React.CSSProperties,
 };
 
-function fmt(n: number): string {
+function fmtInr(n: number): string {
   if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
   if (n >= 1000)   return `₹${(n / 1000).toFixed(1)}K`;
   return `₹${n}`;
@@ -81,13 +81,16 @@ export default function EventAnalyticsPage() {
   const [data,    setData]    = useState<EventAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetch(`/api/admin/events/${eventId}/analytics`)
-      .then(r => r.json())
-      .then(setData)
-      .finally(() => setLoading(false));
-  // eslint-disable-next-line
-  }, []);
+  async function loadData() {
+    setLoading(true);
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/analytics`);
+      const json = await res.json();
+      setData(json);
+    } finally { setLoading(false); }
+  }
+
+  useEffect(() => { void loadData(); /* eslint-disable-next-line */ }, []);
 
   if (loading) return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center", color: "#555" }}>
@@ -111,26 +114,29 @@ export default function EventAnalyticsPage() {
           <span style={{ color: "#333" }}>/</span>
           <span style={{ fontWeight: 700, fontSize: 15 }}>Analytics — {event?.title}</span>
         </div>
-        <a href={`/api/admin/events/${eventId}/registrations/export`} download style={{ padding: "6px 14px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#aaa", fontSize: 12, fontWeight: 600, textDecoration: "none" }}>
-          Export CSV
-        </a>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={loadData} title="Refresh" style={{ padding: "6px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#555", fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>↻</button>
+          <a href={`/api/admin/events/${eventId}/registrations/export`} download style={{ padding: "6px 14px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#aaa", fontSize: 12, fontWeight: 600, textDecoration: "none" }}>
+            Export CSV
+          </a>
+        </div>
       </header>
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "1.75rem 2rem", display: "flex", flexDirection: "column", gap: 16 }}>
 
-        {/* Top row: KPIs */}
+        {/* Top row: KPIs — each links to corresponding management page */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12 }}>
           {[
-            { label: "Total Registered",  value: funnel.total,          color: "#fff" },
-            { label: "Confirmed",          value: funnel.confirmed,      color: "#4ade80" },
-            { label: "Revenue",            value: fmt(revenue.total),    color: "#e8620a" },
-            { label: "Avg per Paid",       value: fmt(revenue.avg_per_participant), color: "#fbbf24" },
-            { label: "Capacity",           value: capacity.pct !== null ? `${capacity.pct}%` : "Unlimited", color: capacity.pct && capacity.pct > 90 ? "#f87171" : "#60a5fa" },
+            { label: "Total Registered", value: funnel.total,                                                   color: "#fff",     href: `/admin/events/${eventId}/registrations` },
+            { label: "Confirmed",         value: funnel.confirmed,                                              color: "#4ade80",  href: `/admin/events/${eventId}/registrations?payment_status=paid` },
+            { label: "Revenue",           value: fmtInr(revenue.total),                                         color: "#e8620a",  href: `/admin/events/${eventId}/registrations` },
+            { label: "Avg per Paid",      value: fmtInr(revenue.avg_per_participant),                           color: "#fbbf24",  href: `/admin/events/${eventId}/registrations` },
+            { label: "Capacity",          value: capacity.pct !== null ? `${capacity.pct}%` : "Unlimited",      color: capacity.pct && capacity.pct > 90 ? "#f87171" : "#60a5fa", href: `/admin/events/${eventId}/registrations` },
           ].map(k => (
-            <div key={k.label} style={S.card}>
+            <Link key={k.label} href={k.href} style={{ ...S.card, textDecoration: "none", display: "block" }}>
               <div style={{ fontSize: 24, fontWeight: 900, color: k.color, lineHeight: 1, marginBottom: 4 }}>{k.value}</div>
               <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", fontWeight: 600 }}>{k.label}</div>
-            </div>
+            </Link>
           ))}
         </div>
 
@@ -188,7 +194,14 @@ export default function EventAnalyticsPage() {
           <div style={S.card}>
             <div style={S.h2}>By Race / Distance</div>
             {Object.entries(by_race).length === 0 ? (
-              <div style={{ color: "#555", fontSize: 12, textAlign: "center", padding: "1rem" }}>No race data</div>
+              <div style={{ padding: "1.5rem", textAlign: "center" as const }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>🏁</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#555", marginBottom: 4 }}>No category data yet</div>
+                <div style={{ fontSize: 11, color: "#444", lineHeight: 1.5 }}>
+                  This table shows registrations broken down by race/distance category.<br/>
+                  Data will appear once participants register and select a distance.
+                </div>
+              </div>
             ) : (
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                 <thead>
@@ -204,7 +217,7 @@ export default function EventAnalyticsPage() {
                       <td style={{ padding: "8px", fontWeight: 700 }}>{cat}</td>
                       <td style={{ padding: "8px", color: "#aaa" }}>{v.total}</td>
                       <td style={{ padding: "8px", color: "#4ade80" }}>{v.paid}</td>
-                      <td style={{ padding: "8px", color: "#e8620a", fontWeight: 700 }}>{fmt(v.revenue)}</td>
+                      <td style={{ padding: "8px", color: "#e8620a", fontWeight: 700 }}>{fmtInr(v.revenue)}</td>
                       <td style={{ padding: "8px", color: "#60a5fa" }}>{v.checked_in}</td>
                     </tr>
                   ))}
@@ -225,7 +238,17 @@ export default function EventAnalyticsPage() {
               </div>
             </>
           ) : (
-            <div style={{ color: "#555", textAlign: "center", padding: "1rem" }}>No registration timeline data</div>
+            <div style={{ padding: "1.5rem", textAlign: "center" as const }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>📅</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#555", marginBottom: 4 }}>No registrations yet</div>
+              <div style={{ fontSize: 11, color: "#444", lineHeight: 1.5 }}>
+                Daily registration activity will be charted here as participants sign up.<br/>
+                Each bar represents registrations received on a given day.
+              </div>
+              <Link href={`/admin/events/${eventId}/registrations?action=register`} style={{ display: "inline-block", marginTop: 12, fontSize: 12, color: "#e8620a", textDecoration: "none", fontWeight: 600 }}>
+                Register the first participant →
+              </Link>
+            </div>
           )}
         </div>
 
