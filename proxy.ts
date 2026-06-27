@@ -68,6 +68,26 @@ export async function proxy(request: NextRequest) {
     response.headers.set("Access-Control-Allow-Origin", origin);
     Object.entries(corsOptions).forEach(([k, v]) => response.headers.set(k, v));
   }
+
+  // ── Security headers (applied to every response) ──────────────────────────
+  response.headers.set("X-Frame-Options",           "SAMEORIGIN");
+  response.headers.set("X-Content-Type-Options",    "nosniff");
+  response.headers.set("Referrer-Policy",           "strict-origin-when-cross-origin");
+  response.headers.set("X-XSS-Protection",          "1; mode=block");
+  response.headers.set("Permissions-Policy",        "camera=(self), microphone=(), geolocation=(), payment=(self)");
+  response.headers.set("Content-Security-Policy", [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://checkout.razorpay.com",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data:",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://checkout.razorpay.com https://resend.com",
+    "frame-src https://checkout.razorpay.com",
+    "frame-ancestors 'self'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join("; "));
+
   return response;
 }
 
