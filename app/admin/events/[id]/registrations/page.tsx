@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import QRScannerModal from "@/components/ui/QRScannerModal";
@@ -63,6 +64,7 @@ function fmtDate(d: string) {
 
 export default function EventRegistrationsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: eventId } = use(params);
+  const searchParams    = useSearchParams();
 
   const [tab,      setTab]      = useState<Tab>("registrations");
   const [regs,     setRegs]     = useState<Reg[]>([]);
@@ -143,6 +145,7 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
 
   useEffect(() => { load(); }, [eventId]); // eslint-disable-line
   useEffect(() => { if (tab === "communicate") loadHistory(); }, [tab]); // eslint-disable-line
+  useEffect(() => { if (searchParams.get("action") === "register") { setRegModal(true); } }, [searchParams]); // eslint-disable-line
 
   async function runCheckIn(token: string) {
     if (!token.trim()) return;
@@ -332,15 +335,10 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
     <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff" }}>
       {/* Header */}
       <header style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(10,10,10,0.97)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 2rem", height: "60px", display: "flex", alignItems: "center", gap: "0.75rem" }}>
-        <Link href="/admin" style={{ textDecoration: "none" }}>
-          <Image src="/logo.png" alt="" width={28} height={28} className="rounded-full" />
-        </Link>
-        <span style={{ fontWeight: 600 }}>Admin</span>
-        <span style={{ color: "#444" }}>/</span>
-        <Link href="/admin/events/registrations" style={{ color: "#888", textDecoration: "none", fontSize: "0.85rem" }}>Events</Link>
-        <span style={{ color: "#444" }}>/</span>
+        <Link href={`/admin/events/${eventId}/manage`} style={{ color: "#555", fontSize: 13, textDecoration: "none", whiteSpace: "nowrap" }}>← Event Hub</Link>
+        <span style={{ color: "#333" }}>/</span>
         <span style={{ color: "#888", fontSize: "0.85rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>
-          {eventTitle || "Registrations"}
+          Registrations{eventTitle ? ` — ${eventTitle}` : ""}
         </span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           {genResult && <span style={{ fontSize: "0.72rem", color: genResult.startsWith("✅") ? "#4ade80" : "#f87171" }}>{genResult}</span>}

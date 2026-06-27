@@ -239,6 +239,62 @@ export default function ParticipantDetailPage() {
           </div>
         </div>
 
+        {/* ── Activity Timeline ──────────────────────────────────────────── */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 12 }}>Activity Timeline</div>
+          <div style={{ position: "relative", paddingLeft: 28 }}>
+            {/* Vertical line */}
+            <div style={{ position: "absolute", left: 9, top: 0, bottom: 0, width: 2, background: "rgba(255,255,255,0.06)", borderRadius: 1 }} />
+
+            {((): Array<{ at: string | null | undefined; label: string; detail?: string | null; color: string; icon: string }> => [
+              { at: reg.created_at,                   icon: "📝", color: "#e8620a", label: "Registered",             detail: reg.distance_category ? `Distance: ${reg.distance_category}` : undefined },
+              { at: reg.payment_status === "paid" ? reg.created_at : null, icon: "💳", color: "#4ade80", label: "Payment Confirmed", detail: reg.final_price > 0 ? `₹${reg.final_price}${reg.razorpay_payment_id ? ` · ${reg.razorpay_payment_id}` : ""}` : undefined },
+              { at: reg.payment_status === "free" ? reg.created_at : null, icon: "🎁", color: "#60a5fa", label: "Free Registration",  detail: reg.coupon_code ? `Coupon: ${reg.coupon_code}` : "Complimentary" },
+              { at: reg.qr_generated_at,              icon: "🎫", color: "#a78bfa", label: "QR Code Generated",       detail: reg.qr_token?.slice(0, 20) + "…" },
+              { at: reg.confirmation_email_sent_at,   icon: reg.email_status === "sent" ? "✅" : "❌", color: reg.email_status === "sent" ? "#4ade80" : "#f87171", label: "Confirmation Email", detail: reg.email_status === "sent" ? (reg.email_ses_message_id ? `SES: ${reg.email_ses_message_id.slice(0, 24)}…` : "Delivered") : "Failed" },
+              { at: reg.checked_in_at,                icon: "✅", color: "#4ade80", label: "Checked In",              detail: "Race day check-in" },
+              { at: reg.breakfast_availed_at,         icon: "🍽️", color: "#34d399", label: "Breakfast Issued",       detail: reg.breakfast_verified_by ? `By: ${reg.breakfast_verified_by}` : undefined },
+            ])()
+              .filter(e => e.at)
+              .sort((a, b) => new Date(a.at!).getTime() - new Date(b.at!).getTime())
+              .map((e, i) => (
+                <div key={i} style={{ position: "relative", marginBottom: 14, paddingBottom: 4 }}>
+                  {/* Dot */}
+                  <div style={{ position: "absolute", left: -22, top: 4, width: 14, height: 14, borderRadius: "50%", background: "#0a0a0a", border: `2px solid ${e.color}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8 }} />
+                  <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                    <span style={{ fontSize: 14, flexShrink: 0 }}>{e.icon}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{e.label}</span>
+                        <span style={{ fontSize: 11, color: "#555" }}>
+                          {new Date(e.at!).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </div>
+                      {e.detail && <div style={{ fontSize: 11, color: "#666", marginTop: 2, fontFamily: "monospace" }}>{e.detail}</div>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+            {/* Pending items */}
+            {((): Array<{ label: string; hint: string }> => [
+              ...(!reg.checked_in_at ? [{ label: "Check-In", hint: "Pending on race day" }] : []),
+              ...(!reg.breakfast_availed && reg.checked_in_at ? [{ label: "Breakfast", hint: "Not availed" }] : []),
+            ])().map((e, i) => (
+              <div key={`p${i}`} style={{ position: "relative", marginBottom: 14, opacity: 0.35 }}>
+                <div style={{ position: "absolute", left: -22, top: 4, width: 14, height: 14, borderRadius: "50%", background: "#0a0a0a", border: "2px solid rgba(255,255,255,0.15)" }} />
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 14 }}>⏳</span>
+                  <div>
+                    <span style={{ fontSize: 13, color: "#666" }}>{e.label}</span>
+                    <span style={{ fontSize: 11, color: "#444", marginLeft: 8 }}>{e.hint}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
 
           {/* Left column */}

@@ -155,7 +155,7 @@ export default function BibManagePage() {
     <div style={C.page}>
       <header style={C.header}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Link href={`/admin/events/${eventId}/registrations`} style={{ color: "#555", fontSize: 13, textDecoration: "none" }}>← Registrations</Link>
+          <Link href={`/admin/events/${eventId}/manage`} style={{ color: "#555", fontSize: 13, textDecoration: "none" }}>← Event Hub</Link>
           <span style={{ color: "#333" }}>/</span>
           <span style={{ fontWeight: 700, fontSize: 15 }}>BIB Collection</span>
         </div>

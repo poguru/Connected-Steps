@@ -41,6 +41,7 @@ const NAV_ITEMS = [
   { key: "bib",         icon: "📦", label: "BIB Collection", href: "bib",           inline: false },
   { key: "results",     icon: "🏅", label: "Results",        href: "results",       inline: false },
   { key: "analytics",   icon: "📈", label: "Analytics",      href: "analytics",     inline: false },
+  { key: "sponsors",    icon: "🤝", label: "Sponsors",       href: "sponsors",      inline: false },
   { key: "finance",     icon: "💰", label: "Finance",        href: null,    inline: true  },
   { key: "settings",    icon: "⚙️", label: "Settings",       href: null,    inline: true  },
 ] as const;
@@ -324,9 +325,12 @@ export default function EventManagePage() {
               {/* ── Participants ───────────────────────────────────────────── */}
               <div style={{ marginBottom: 20 }}>
                 <SectionHeader title="Participants" action={
-                  <Link href={`/admin/events/${eventId}/registrations`} style={{ fontSize: 11, color: "#e8620a", textDecoration: "none", fontWeight: 600 }}>
-                    View all →
-                  </Link>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <button onClick={load} title="Refresh stats" style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 14, padding: "2px 6px", borderRadius: 4 }}>↻</button>
+                    <Link href={`/admin/events/${eventId}/registrations`} style={{ fontSize: 11, color: "#e8620a", textDecoration: "none", fontWeight: 600 }}>
+                      View all →
+                    </Link>
+                  </div>
                 } />
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10 }}>
                   <StatCard label="Total"      value={fmt(reg.total)}      />
@@ -413,14 +417,16 @@ export default function EventManagePage() {
                 <SectionHeader title="Quick Actions" />
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
                   {[
-                    { label: "Registrations",  icon: "👥", href: `registrations`, color: "#e8620a"  },
-                    { label: "Communicate",    icon: "📢", href: `communicate`,    color: "#a78bfa"  },
-                    { label: "Race Day",       icon: "🏃", href: `race-day`,       color: "#4ade80"  },
-                    { label: "BIB Collection", icon: "📦", href: `bib`,            color: "#60a5fa"  },
-                    { label: "Results",        icon: "🏅", href: `results`,         color: "#fbbf24"  },
-                    { label: "Analytics",      icon: "📈", href: `analytics`,       color: "#34d399"  },
+                    { label: "Registrations",       icon: "👥", href: `registrations`,           color: "#e8620a" },
+                    { label: "Communicate",         icon: "📢", href: `communicate`,             color: "#a78bfa" },
+                    { label: "Race Day",            icon: "🏃", href: `race-day`,                color: "#4ade80" },
+                    { label: "BIB Collection",      icon: "📦", href: `bib`,                     color: "#60a5fa" },
+                    { label: "Results",             icon: "🏅", href: `results`,                 color: "#fbbf24" },
+                    { label: "Analytics",           icon: "📈", href: `analytics`,               color: "#34d399" },
+                    { label: "Register Participant",icon: "➕", href: `registrations?action=register`, color: "#e8620a" },
+                    { label: "Edit Event",          icon: "✏️", href: `../new?edit=${eventId}`,  color: "#888"    },
                   ].map(a => (
-                    <Link key={a.label} href={`/admin/events/${eventId}/${a.href}`}
+                    <Link key={a.label} href={a.href.startsWith("/") || a.href.startsWith("..") ? a.href : `/admin/events/${eventId}/${a.href}`}
                       style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: "1.1rem 0.75rem", background: "#111", border: `1px solid ${a.color}18`, borderRadius: 10, textDecoration: "none", transition: "border-color 0.15s" }}>
                       <span style={{ fontSize: 22 }}>{a.icon}</span>
                       <span style={{ fontSize: 11, fontWeight: 700, color: a.color, textAlign: "center" as const }}>{a.label}</span>

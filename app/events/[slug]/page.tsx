@@ -55,6 +55,22 @@ async function getEvent(slug: string): Promise<Event | null> {
   }
 }
 
+interface Sponsor { id: string; name: string; tier: string; logo_url: string | null; website_url: string | null; description: string | null; display_order: number; }
+
+async function getSponsors(eventId: string): Promise<Sponsor[]> {
+  try {
+    const db = getSupabaseServer();
+    const { data } = await db
+      .from("event_sponsors")
+      .select("id, name, tier, logo_url, website_url, description, display_order")
+      .eq("event_id", eventId)
+      .eq("visible", true)
+      .order("display_order")
+      .order("created_at");
+    return data ?? [];
+  } catch { return []; }
+}
+
 async function getSlotCount(eventId: string): Promise<number> {
   try {
     const db = getSupabaseServer();
@@ -108,7 +124,10 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
   const [ev, slotsTaken] = await Promise.all([getEvent(slug), (async () => 0)()]);
   if (!ev) notFound();
 
-  const slotsUsed = ev.max_participants ? await getSlotCount(ev.id) : 0;
+  const [slotsUsed, sponsors] = await Promise.all([
+    ev.max_participants ? getSlotCount(ev.id) : Promise.resolve(0),
+    getSponsors(ev.id),
+  ]);
   const slotsLeft = ev.max_participants ? ev.max_participants - slotsUsed : null;
   const isFull    = slotsLeft !== null && slotsLeft <= 0;
 
@@ -224,8 +243,14 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
 
         {/* CTA */}
         {isFull ? (
-          <div style={{ padding: "14px", borderRadius: "10px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", color: "#f87171", fontWeight: 600, textAlign: "center", fontSize: "0.95rem", marginBottom: "1rem" }}>
-            This event is fully booked
+          <div style={{ marginBottom: "1rem" }}>
+            <div style={{ padding: "14px", borderRadius: "10px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", color: "#f87171", fontWeight: 600, textAlign: "center", fontSize: "0.95rem", marginBottom: "0.75rem" }}>
+              This event is fully booked
+            </div>
+            <a href={`/events/${ev.share_slug ?? ev.id}/waitlist`}
+              style={{ display: "block", width: "100%", textAlign: "center", padding: "12px 28px", borderRadius: "10px", background: "rgba(96,165,250,0.08)", color: "#60a5fa", fontWeight: 700, fontSize: "0.95rem", border: "1px solid rgba(96,165,250,0.25)", textDecoration: "none", boxSizing: "border-box" }}>
+              📋 Join Waitlist — Get notified when a spot opens
+            </a>
           </div>
         ) : (
           <RegisterButton
@@ -244,6 +269,36 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
             ← View all events
           </Link>
         </div>
+
+        {/* Sponsors */}
+        {sponsors.length > 0 && (
+          <div style={{ marginBottom: "2rem" }}>
+            <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "rgba(255,255,255,0.25)", textTransform: "uppercase", letterSpacing: ".1em", marginBottom: "1rem", textAlign: "center" }}>
+              Event Partners
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", justifyContent: "center", alignItems: "center" }}>
+              {sponsors.map(s => (
+                <div key={s.id} style={{ textAlign: "center" }}>
+                  {s.website_url ? (
+                    <a href={s.website_url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                      {s.logo_url ? (
+                        <img src={s.logo_url} alt={s.name} style={{ height: 40, maxWidth: 120, objectFit: "contain", filter: "brightness(0) invert(0.6)", transition: "filter 0.2s" }} />
+                      ) : (
+                        <span style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>{s.name}</span>
+                      )}
+                    </a>
+                  ) : (
+                    s.logo_url ? (
+                      <img src={s.logo_url} alt={s.name} style={{ height: 40, maxWidth: 120, objectFit: "contain", filter: "brightness(0) invert(0.6)" }} />
+                    ) : (
+                      <span style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>{s.name}</span>
+                    )
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Terms */}
         {ev.terms_conditions && (

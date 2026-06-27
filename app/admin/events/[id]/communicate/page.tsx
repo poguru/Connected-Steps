@@ -238,6 +238,11 @@ export default function CommunicatePage() {
   const [pushSending,  setPushSending]  = useState(false);
   const [pushResult,   setPushResult]   = useState<{ sent: number } | null>(null);
 
+  // Test email state
+  const [testEmailAddr,  setTestEmailAddr]  = useState("");
+  const [testSending,    setTestSending]    = useState(false);
+  const [testResult,     setTestResult]     = useState<string>("");
+
   // Delivery tracking state (history tab drill-down)
   const [expandedBatch,  setExpandedBatch]  = useState<string | null>(null);
   const [batchDetail,    setBatchDetail]    = useState<BatchDetail | null>(null);
@@ -435,6 +440,24 @@ export default function CommunicatePage() {
     a.click();
   }
 
+  // ── Test email ────────────────────────────────────────────────────────────────
+
+  async function sendTestEmail() {
+    if (!emailSubject.trim() || !emailBody.trim()) { showToast("Write a subject and message first"); return; }
+    const to = testEmailAddr.trim() || prompt("Send test to which email address?");
+    if (!to) return;
+    setTestSending(true); setTestResult("");
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/communicate/test`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to, subject: emailSubject, body: emailBody }),
+      });
+      const data = await res.json() as { ok?: boolean; error?: string };
+      setTestResult(data.ok ? `✅ Test sent to ${to}` : `❌ ${data.error ?? "Failed"}`);
+    } catch { setTestResult("❌ Network error"); }
+    finally { setTestSending(false); }
+  }
+
   // ── Push send ─────────────────────────────────────────────────────────────────
 
   function applyPushTemplate(id: string) {
@@ -539,7 +562,13 @@ export default function CommunicatePage() {
 
               {/* ── Send button / progress display ─────────────────────────── */}
               {send.phase === "idle" && (
-                <button onClick={enqueueEmail} style={S.btn()}>Queue &amp; Send Email</button>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const, alignItems: "center" }}>
+                  <button onClick={enqueueEmail} style={S.btn()}>Queue &amp; Send Email</button>
+                  <button onClick={sendTestEmail} disabled={testSending} style={{ ...S.btn(false), fontSize: 12, padding: "7px 14px" }}>
+                    {testSending ? "Sending test…" : "📨 Send Test"}
+                  </button>
+                  {testResult && <span style={{ fontSize: 12, color: testResult.startsWith("✅") ? "#4ade80" : "#f87171" }}>{testResult}</span>}
+                </div>
               )}
 
               {send.phase === "queuing" && (

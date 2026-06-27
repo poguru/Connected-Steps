@@ -119,7 +119,10 @@ export default function ResultsPage() {
           <span style={{ color: "#333" }}>/</span>
           <span style={{ fontWeight: 700, fontSize: 15 }}>Results & Certificates</span>
         </div>
-        <button onClick={loadAll} style={{ ...S.btn(false), fontSize: 12, padding: "6px 14px" }}>Refresh</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          {eventId && <Link href={`/events/[slug]/results`} style={{ padding: "5px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#888", fontSize: 12, fontWeight: 600, textDecoration: "none" }}>Public View ↗</Link>}
+          <button onClick={loadAll} style={{ ...S.btn(false), fontSize: 12, padding: "6px 14px" }}>Refresh</button>
+        </div>
       </header>
 
       {/* Tabs */}
