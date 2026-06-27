@@ -555,18 +555,31 @@ export default function AdminEventsPage() {
                         </div>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: "6px", flexShrink: 0, alignItems: "flex-end" }}>
-                        <div style={{ display: "flex", gap: "8px" }}>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" as const, justifyContent: "flex-end" }}>
+                          <Link href={`/admin/events/${ev.id}/manage`}
+                            style={{ padding: "7px 14px", borderRadius: "6px", border: "1px solid rgba(232,98,10,0.3)", background: "rgba(232,98,10,0.08)", color: "#e8620a", fontSize: "0.78rem", fontWeight: 700, textDecoration: "none" }}>
+                            Event Hub
+                          </Link>
                           <button onClick={() => togglePublish(ev)}
-                            style={{ padding: "7px 14px", borderRadius: "6px", border: "none", cursor: "pointer", fontSize: "0.78rem", fontWeight: 700, background: ev.status === "published" ? "rgba(74,222,128,0.12)" : "rgba(232,98,10,0.12)", color: ev.status === "published" ? "#4ade80" : "#e8620a" }}>
+                            style={{ padding: "7px 14px", borderRadius: "6px", border: "none", cursor: "pointer", fontSize: "0.78rem", fontWeight: 700, background: ev.status === "published" ? "rgba(74,222,128,0.12)" : "rgba(255,255,255,0.06)", color: ev.status === "published" ? "#4ade80" : "#888", fontFamily: "inherit" }}>
                             {ev.status === "published" ? "Unpublish" : "Publish"}
                           </button>
+                          <button onClick={async () => {
+                            const t = prompt("New title:", `${ev.title} (Copy)`);
+                            if (!t) return;
+                            const res = await fetch(`/api/admin/events/${ev.id}/duplicate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ new_title: t }) });
+                            const d = await res.json() as { event_id?: string };
+                            if (d.event_id) { window.location.href = `/admin/events/${d.event_id}/manage`; }
+                          }} style={{ padding: "7px 12px", borderRadius: "6px", border: "1px solid rgba(96,165,250,0.25)", cursor: "pointer", fontSize: "0.78rem", background: "rgba(96,165,250,0.06)", color: "#60a5fa", fontFamily: "inherit" }}>
+                            Duplicate
+                          </button>
                           <button onClick={() => deleteEvent(ev.id)}
-                            style={{ padding: "7px 12px", borderRadius: "6px", border: "1px solid rgba(226,75,74,0.3)", cursor: "pointer", fontSize: "0.78rem", background: "transparent", color: "#f09595" }}>
+                            style={{ padding: "7px 12px", borderRadius: "6px", border: "1px solid rgba(226,75,74,0.3)", cursor: "pointer", fontSize: "0.78rem", background: "transparent", color: "#f09595", fontFamily: "inherit" }}>
                             Delete
                           </button>
                         </div>
                         <Link href={`/admin/events/${ev.id}/registrations`}
-                          style={{ fontSize: "0.72rem", color: "#e8620a", textDecoration: "none", textAlign: "right", fontWeight: 600 }}>
+                          style={{ fontSize: "0.72rem", color: "#555", textDecoration: "none", textAlign: "right", fontWeight: 600 }}>
                           View registrations →
                         </Link>
                       </div>

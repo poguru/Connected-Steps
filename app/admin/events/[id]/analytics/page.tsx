@@ -84,9 +84,26 @@ export default function EventAnalyticsPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const res  = await fetch(`/api/admin/events/${eventId}/analytics`);
-      const json = await res.json();
-      setData(json);
+      // Use shared stats endpoint — same source of truth as Event Hub
+      const [analyticsRes, statsRes] = await Promise.all([
+        fetch(`/api/admin/events/${eventId}/analytics`),
+        fetch(`/api/admin/events/${eventId}/stats`),
+      ]);
+      const analytics = await analyticsRes.json();
+      const shared    = await statsRes.json();
+
+      // Merge: prefer shared stats for funnel/revenue, keep analytics for
+      // race_day progression and email delivery details
+      if (shared?.stats) {
+        const s = shared.stats;
+        analytics.funnel   = { total: s.total, confirmed: s.confirmed, paid: s.paid, free: s.free, pending: s.pending, cancelled: s.cancelled };
+        analytics.revenue  = { total: s.revenue_collected, avg_per_participant: s.avg_per_paid };
+        analytics.capacity = { max: s.capacity_max, used: s.capacity_filled, pct: s.capacity_pct };
+        analytics.email    = { sent: s.email_sent, failed: s.email_failed, none: s.email_none, rate: s.confirmed > 0 ? Math.round(s.email_sent / s.confirmed * 100) : 0 };
+        analytics.by_race  = s.by_category ?? {};
+        analytics.registration_timeline = s.timeline ?? [];
+      }
+      setData(analytics);
     } finally { setLoading(false); }
   }
 

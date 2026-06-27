@@ -7,8 +7,23 @@ import Image from "next/image";
 import { getLifecycle } from "@/lib/event-lifecycle";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
+// HubData is the shape returned by /api/admin/events/[id]/stats (single source of truth)
 
-interface OverviewData {
+interface EventStats {
+  total: number; confirmed: number; cancelled: number; pending: number;
+  paid: number; free: number; checked_in: number;
+  bib_collected: number; breakfast: number; certificates: number;
+  revenue_collected: number; revenue_pending: number; avg_per_paid: number;
+  email_sent: number; email_failed: number; email_none: number;
+  campaign_delivered: number; campaign_failed: number; campaign_queued: number; campaigns: number;
+  capacity_max: number | null; capacity_filled: number; capacity_remaining: number | null; capacity_pct: number | null;
+  finishers: number; dnf: number; dns: number;
+  by_category: Record<string, { total: number; paid: number; revenue: number; checked_in: number }>;
+  timeline: Array<{ date: string; count: number }>;
+  computed_at: string;
+}
+
+interface HubData {
   event: {
     id: string; title: string; status: string;
     start_date: string; start_time: string | null;
@@ -19,16 +34,18 @@ interface OverviewData {
     distance_categories: string[] | null;
     featured: boolean; share_slug: string | null;
   };
-  registrations: {
-    total: number; confirmed: number; pending: number; cancelled: number;
-    paid: number; free: number; checked_in: number; active: number;
-  };
-  capacity: { max: number | null; filled: number; remaining: number | null };
-  revenue:  { collected: number; pending: number };
-  emails:   { campaigns: number; confirmation_sent: number; confirmation_failed: number; campaign_delivered: number; campaign_failed: number; campaign_queued: number };
-  races:    Array<{ id: string; name: string; distance: string; price: number; max_slots: number | null; status: string; gun_time: string | null; flag_off_time: string | null; report_time: string | null }>;
+  stats:        EventStats;
+  races:        Array<{ id: string; name: string; distance: string; price: number; max_slots: number | null; status: string; gun_time: string | null; flag_off_time: string | null; report_time: string | null }>;
   recent_comms: Array<{ sent: number; failed: number; status: string; sent_at: string; subject: string; channel: string | null; recipients: number }>;
 }
+
+// Backward-compat shim so existing JSX that references data.registrations still works
+type OverviewData = HubData & {
+  registrations: EventStats; // alias for stats
+  capacity:      { max: number | null; filled: number; remaining: number | null };
+  revenue:       { collected: number; pending: number };
+  emails:        { campaigns: number; confirmation_sent: number; confirmation_failed: number; campaign_delivered: number; campaign_failed: number; campaign_queued: number };
+};
 
 // ── Sidebar navigation definition ─────────────────────────────────────────────
 
@@ -135,10 +152,27 @@ export default function EventManagePage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res  = await fetch(`/api/admin/events/${eventId}/overview`);
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Failed to load");
-      setData(json as OverviewData);
+      // Use the shared stats endpoint — single source of truth for all metrics
+      const res  = await fetch(`/api/admin/events/${eventId}/stats`);
+      const json = await res.json() as HubData;
+      if (!res.ok) throw new Error((json as { error?: string }).error ?? "Failed to load");
+
+      // Normalise into the shape the JSX expects (backward-compat shim)
+      const s = json.stats;
+      setData({
+        ...json,
+        registrations: s,
+        capacity:      { max: s.capacity_max, filled: s.capacity_filled, remaining: s.capacity_remaining },
+        revenue:       { collected: s.revenue_collected, pending: s.revenue_pending },
+        emails: {
+          campaigns:             s.campaigns,
+          confirmation_sent:     s.email_sent,
+          confirmation_failed:   s.email_failed,
+          campaign_delivered:    s.campaign_delivered,
+          campaign_failed:       s.campaign_failed,
+          campaign_queued:       s.campaign_queued,
+        },
+      } as OverviewData);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -156,6 +190,38 @@ export default function EventManagePage() {
       body: JSON.stringify({ id: eventId, status: newStatus }),
     });
     setData(d => d ? { ...d, event: { ...d.event, status: newStatus } } : d);
+  }
+
+  async function duplicateEvent() {
+    const newTitle = prompt("New event title:", `${data?.event.title} (Copy)`);
+    if (newTitle === null) return; // cancelled
+    const incSponsors = confirm("Copy sponsors too?");
+    const res  = await fetch(`/api/admin/events/${eventId}/duplicate`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ new_title: newTitle || undefined, include_sponsors: incSponsors }),
+    });
+    const result = await res.json() as { event_id?: string; title?: string; error?: string };
+    if (res.ok && result.event_id) {
+      if (confirm(`✅ "${result.title}" created as draft. Go to new event hub?`)) {
+        window.location.href = `/admin/events/${result.event_id}/manage`;
+      }
+    } else {
+      alert(`❌ ${result.error ?? "Duplicate failed"}`);
+    }
+  }
+
+  async function archiveEvent() {
+    if (!data?.event) return;
+    const isArchived = data.event.status === "archived";
+    const action     = isArchived ? "restore" : "archive";
+    if (!confirm(`${isArchived ? "Restore" : "Archive"} this event?`)) return;
+    const res = await fetch(`/api/admin/events/${eventId}/archive`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    const result = await res.json() as { status?: string; error?: string };
+    if (res.ok) setData(d => d ? { ...d, event: { ...d.event, status: result.status ?? d.event.status } } : d);
+    else alert(`❌ ${result.error}`);
   }
 
   function navClick(item: typeof NAV_ITEMS[number]) {
@@ -577,7 +643,13 @@ export default function EventManagePage() {
                   return <button key={i} onClick={item.action ?? undefined} style={style}>{inner}</button>;
                 })}
 
-                <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 10, marginTop: 4 }}>
+                <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 10, marginTop: 4, display: "flex", flexDirection: "column", gap: 8 }}>
+                  <button onClick={duplicateEvent} style={{ width: "100%", padding: "12px 16px", background: "rgba(96,165,250,0.06)", border: "1px solid rgba(96,165,250,0.18)", borderRadius: 10, color: "#60a5fa", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", textAlign: "left" as const }}>
+                    📋 Duplicate Event — create a copy as new draft
+                  </button>
+                  <button onClick={archiveEvent} style={{ width: "100%", padding: "12px 16px", background: "rgba(107,114,128,0.06)", border: "1px solid rgba(107,114,128,0.18)", borderRadius: 10, color: "#9ca3af", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", textAlign: "left" as const }}>
+                    {event.status === "archived" ? "♻️ Restore Event — move back to draft" : "📦 Archive Event — hide from active list"}
+                  </button>
                   <button onClick={togglePublish} style={{ width: "100%", padding: "12px 16px", background: isPublished ? "rgba(239,68,68,0.08)" : "rgba(74,222,128,0.08)", border: `1px solid ${isPublished ? "rgba(239,68,68,0.2)" : "rgba(74,222,128,0.2)"}`, borderRadius: 10, color: isPublished ? "#f87171" : "#4ade80", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", textAlign: "left" as const }}>
                     {isPublished ? "⛔ Unpublish Event" : "🚀 Publish Event"}
                   </button>
