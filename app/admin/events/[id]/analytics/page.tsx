@@ -78,8 +78,10 @@ export default function EventAnalyticsPage() {
   const params  = useParams();
   const eventId = params.id as string;
 
-  const [data,    setData]    = useState<EventAnalytics | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data,         setData]         = useState<EventAnalytics | null>(null);
+  const [loading,      setLoading]      = useState(true);
+  const [resending,    setResending]    = useState(false);
+  const [resendResult, setResendResult] = useState<string>("");
 
   async function loadData() {
     setLoading(true);
@@ -108,6 +110,22 @@ export default function EventAnalyticsPage() {
   }
 
   useEffect(() => { void loadData(); /* eslint-disable-next-line */ }, []);
+
+  async function resendPending() {
+    if (!confirm("Send confirmation emails to all participants who haven't received one yet?")) return;
+    setResending(true); setResendResult("");
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/resend-all-qr`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ retry_failed: false }) });
+      const data = await res.json() as { sent?: number; failed?: number; skipped?: number };
+      if (res.ok) {
+        setResendResult(`✅ Sent: ${data.sent ?? 0}  ·  Skipped (already sent): ${data.skipped ?? 0}  ·  Failed: ${data.failed ?? 0}`);
+        void loadData();
+      } else {
+        setResendResult("❌ Send failed — check the registrations page for details");
+      }
+    } catch { setResendResult("❌ Network error"); }
+    finally   { setResending(false); }
+  }
 
   if (loading) return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center", color: "#555" }}>
@@ -185,7 +203,20 @@ export default function EventAnalyticsPage() {
 
           {/* Email delivery */}
           <div style={S.card}>
-            <div style={S.h2}>Email Delivery</div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={S.h2}>Email Delivery</div>
+              {email.none > 0 && (
+                <button onClick={resendPending} disabled={resending}
+                  style={{ padding: "5px 12px", background: "#e8620a", border: "none", borderRadius: 6, color: "#fff", fontSize: 11, fontWeight: 700, cursor: resending ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: resending ? 0.6 : 1, flexShrink: 0 }}>
+                  {resending ? "Sending…" : `📧 Send to ${email.none} pending`}
+                </button>
+              )}
+            </div>
+            {resendResult && (
+              <div style={{ marginBottom: 10, padding: "8px 10px", borderRadius: 7, background: resendResult.startsWith("✅") ? "rgba(74,222,128,0.08)" : "rgba(248,113,113,0.08)", fontSize: 12, color: resendResult.startsWith("✅") ? "#4ade80" : "#f87171" }}>
+                {resendResult}
+              </div>
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
               {[
                 { label: "Sent",    value: email.sent,   color: "#4ade80" },
