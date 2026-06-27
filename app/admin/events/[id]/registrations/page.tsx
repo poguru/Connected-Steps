@@ -90,6 +90,7 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
   const [template,    setTemplate]    = useState("");
   const [sending,     setSending]     = useState(false);
   const [sendResult,  setSendResult]  = useState("");
+  const [sendQueued,  setSendQueued]  = useState(0);
   const [history,     setHistory]     = useState<CommHistory[]>([]);
 
   const headers = { "Content-Type": "application/json" };
@@ -228,12 +229,10 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
         body: JSON.stringify({ recipient_filter: recipient, subject: commSubject, body: commBody }),
       });
       const data = await res.json();
-      if (!res.ok) { setSendResult(`Error: ${data.error}`); return; }
-      // API now returns {batch_id, queued} — emails send 1/sec in background
+      if (!res.ok) { setSendResult(`Error: ${data.error}`); setSendQueued(0); return; }
       const n = data.queued ?? data.sent ?? 0;
-      setSendResult(n > 0
-        ? `✅ ${n} emails queued — sending 1/sec via AWS SES. Open Communication Hub to track delivery.`
-        : data.message ?? "No recipients matched the selected filter.");
+      setSendQueued(n);
+      setSendResult(n > 0 ? "queued" : data.message ?? "No recipients matched the selected filter.");
       setCommSubject(""); setCommBody(""); setTemplate("");
       loadHistory();
     } catch { setSendResult("Network error. Please try again."); }
@@ -623,8 +622,15 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
                 </div>
 
                 {sendResult && (
-                  <div style={{ padding: "10px 14px", borderRadius: 8, background: sendResult.startsWith("✅") ? "rgba(74,222,128,0.1)" : "rgba(239,68,68,0.1)", color: sendResult.startsWith("✅") ? "#4ade80" : "#f87171", fontSize: "0.82rem" }}>
-                    {sendResult}
+                  <div style={{ padding: "10px 14px", borderRadius: 8, background: sendResult === "queued" ? "rgba(74,222,128,0.08)" : sendResult.startsWith("Error") ? "rgba(239,68,68,0.1)" : "rgba(255,255,255,0.04)", color: sendResult === "queued" ? "#4ade80" : sendResult.startsWith("Error") ? "#f87171" : "#888", fontSize: "0.82rem", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" as const }}>
+                    {sendResult === "queued" ? (
+                      <>
+                        <span>✅ <strong>{sendQueued}</strong> emails queued — sending 1 per second via AWS SES.</span>
+                        <Link href={`/admin/events/${eventId}/communicate`} style={{ padding: "4px 12px", background: "#e8620a", borderRadius: 6, color: "#fff", fontSize: "0.78rem", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" as const }}>
+                          Open Communication Hub →
+                        </Link>
+                      </>
+                    ) : sendResult}
                   </div>
                 )}
 
