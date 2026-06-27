@@ -25,7 +25,7 @@ interface OverviewData {
   };
   capacity: { max: number | null; filled: number; remaining: number | null };
   revenue:  { collected: number; pending: number };
-  emails:   { campaigns: number; sent: number; failed: number; queued: number; delivered: number };
+  emails:   { campaigns: number; confirmation_sent: number; confirmation_failed: number; campaign_delivered: number; campaign_failed: number; campaign_queued: number };
   races:    Array<{ id: string; name: string; distance: string; price: number; max_slots: number | null; status: string; gun_time: string | null; flag_off_time: string | null; report_time: string | null }>;
   recent_comms: Array<{ sent: number; failed: number; status: string; sent_at: string; subject: string; channel: string | null; recipients: number }>;
 }
@@ -392,10 +392,12 @@ export default function EventManagePage() {
                   </Link>
                 } />
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10, marginBottom: 12 }}>
-                  <StatCard label="Campaigns"  value={fmt(emails.campaigns)}  />
-                  <StatCard label="Delivered"  value={fmt(emails.delivered || emails.sent)} color="#4ade80" accent={emails.delivered > 0} />
-                  <StatCard label="Failed"     value={fmt(emails.failed)}     color={emails.failed > 0 ? "#f87171" : "#555"} accent={emails.failed > 0} />
-                  {emails.queued > 0 && <StatCard label="In Queue"  value={fmt(emails.queued)} color="#60a5fa" accent />}
+                  <StatCard label="Confirmation ✓" value={fmt(emails.confirmation_sent ?? 0)}   color="#4ade80" accent={(emails.confirmation_sent ?? 0) > 0} />
+                  <StatCard label="Confirmation ✗" value={fmt(emails.confirmation_failed ?? 0)} color={(emails.confirmation_failed ?? 0) > 0 ? "#f87171" : "#555"} />
+                  <StatCard label="Bulk Campaigns"  value={fmt(emails.campaigns ?? 0)} />
+                  <StatCard label="Campaign Delivered" value={fmt(emails.campaign_delivered ?? 0)} color="#4ade80" accent={(emails.campaign_delivered ?? 0) > 0} />
+                  {(emails.campaign_failed ?? 0) > 0 && <StatCard label="Campaign Failed" value={fmt(emails.campaign_failed ?? 0)} color="#f87171" accent />}
+                  {(emails.campaign_queued ?? 0) > 0 && <StatCard label="In Queue" value={fmt(emails.campaign_queued ?? 0)} color="#60a5fa" accent />}
                 </div>
 
                 {/* Recent campaigns */}

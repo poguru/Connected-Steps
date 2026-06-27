@@ -32,7 +32,19 @@ interface CheckInResult {
 
 interface CommHistory { id: string; sent_at: string; subject: string; recipients: number; status: string; }
 
-type Tab = "registrations" | "communicate";
+interface WaitlistEntry {
+  id:                string;
+  user_email:        string;
+  user_name:         string;
+  phone:             string | null;
+  distance_category: string | null;
+  status:            string;
+  position:          number | null;
+  created_at:        string;
+  approved_at:       string | null;
+}
+
+type Tab = "registrations" | "waitlist" | "communicate";
 type RecipientFilter = "all" | "paid" | "free" | "pending" | "checked_in" | "not_checked_in";
 
 const RECIPIENT_LABELS: Record<RecipientFilter, string> = {
@@ -95,6 +107,11 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
   const [sendQueued,  setSendQueued]  = useState(0);
   const [history,     setHistory]     = useState<CommHistory[]>([]);
 
+  // Waitlist state
+  const [waitlist,     setWaitlist]     = useState<WaitlistEntry[]>([]);
+  const [waitlistLoading, setWaitlistLoading] = useState(false);
+  const [waitlistAction,  setWaitlistAction]  = useState<string>("");
+
   // Admin registration modal
   const [regModal,   setRegModal]   = useState(false);
   const [regForm,    setRegForm]    = useState({ name: "", email: "", phone: "", distance_category: "", payment_status: "free" as "paid"|"free"|"pending", send_email: true, bypass_capacity: false });
@@ -143,8 +160,29 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
     if (res?.ok) { const d = await res.json(); setHistory(d.history ?? []); }
   }
 
+  async function loadWaitlist() {
+    setWaitlistLoading(true);
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/waitlist`);
+      const data = await res.json();
+      setWaitlist(data.waitlist ?? []);
+    } catch { /* silent */ }
+    finally { setWaitlistLoading(false); }
+  }
+
+  async function handleWaitlistAction(waitlistId: string, action: "approve" | "reject") {
+    setWaitlistAction(waitlistId + action);
+    try {
+      const res = await fetch(`/api/admin/events/${eventId}/waitlist`, {
+        method: "PATCH", headers, body: JSON.stringify({ waitlist_id: waitlistId, action }),
+      });
+      if (res.ok) await loadWaitlist();
+    } finally { setWaitlistAction(""); }
+  }
+
   useEffect(() => { load(); }, [eventId]); // eslint-disable-line
   useEffect(() => { if (tab === "communicate") loadHistory(); }, [tab]); // eslint-disable-line
+  useEffect(() => { if (tab === "waitlist") void loadWaitlist(); }, [tab]); // eslint-disable-line
   useEffect(() => { if (searchParams.get("action") === "register") { setRegModal(true); } }, [searchParams]); // eslint-disable-line
 
   async function runCheckIn(token: string) {
@@ -435,10 +473,14 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
 
         {/* Tabs */}
         <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.04)", borderRadius: 8, padding: 4, marginBottom: "1.5rem", width: "fit-content" }}>
-          {(["registrations", "communicate"] as Tab[]).map(t => (
-            <button key={t} onClick={() => setTab(t)}
-              style={{ padding: "7px 18px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: "0.82rem", fontWeight: 600, background: tab === t ? "#e8620a" : "transparent", color: tab === t ? "#fff" : "#666", fontFamily: "inherit" }}>
-              {t === "registrations" ? "Registrations" : "📧 Communicate"}
+          {([
+            { key: "registrations", label: "Registrations" },
+            { key: "waitlist",      label: `📋 Waitlist${waitlist.filter(w => w.status === "waiting").length > 0 ? ` (${waitlist.filter(w => w.status === "waiting").length})` : ""}` },
+            { key: "communicate",   label: "📧 Communicate" },
+          ] as { key: Tab; label: string }[]).map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              style={{ padding: "7px 18px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: "0.82rem", fontWeight: 600, background: tab === t.key ? "#e8620a" : "transparent", color: tab === t.key ? "#fff" : "#666", fontFamily: "inherit" }}>
+              {t.label}
             </button>
           ))}
         </div>
@@ -602,6 +644,100 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
             </div>
             <div style={{ marginTop: "0.75rem", fontSize: "11px", color: "#555" }}>{filtered.length} of {regs.length} registrations</div>
           </>
+        )}
+
+        {/* ══ WAITLIST TAB ════════════════════════════════════════════════════ */}
+        {tab === "waitlist" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>
+                Waitlist
+                <span style={{ marginLeft: 8, fontSize: 11, color: "#555" }}>
+                  {waitlist.filter(w => w.status === "waiting").length} waiting · {waitlist.filter(w => w.status === "approved").length} approved
+                </span>
+              </div>
+              <button onClick={loadWaitlist} style={{ ...btnStyle(false), padding: "5px 12px", fontSize: "0.78rem" }}>
+                Refresh
+              </button>
+            </div>
+
+            {waitlistLoading ? (
+              <div style={{ ...S.card, textAlign: "center", padding: "3rem", color: "#555" }}>Loading waitlist…</div>
+            ) : waitlist.length === 0 ? (
+              <div style={{ ...S.card, textAlign: "center", padding: "3rem" }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
+                <div style={{ fontWeight: 700, color: "#555", marginBottom: 6 }}>No waitlist entries</div>
+                <div style={{ fontSize: 12, color: "#444", lineHeight: 1.6 }}>
+                  When this event is fully booked, participants can join the waitlist.<br/>
+                  Waitlisted participants appear here for approval.
+                </div>
+              </div>
+            ) : (
+              <div style={{ ...S.card, padding: 0, overflow: "hidden" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
+                  <thead>
+                    <tr style={{ background: "rgba(255,255,255,0.04)" }}>
+                      {["Pos", "Name", "Email", "Category", "Joined", "Status", "Actions"].map(h => (
+                        <th key={h} style={{ padding: "10px 14px", textAlign: "left" as const, fontSize: "10px", color: "#666", textTransform: "uppercase" as const, letterSpacing: "0.07em", fontWeight: 700 }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {waitlist.map(w => (
+                      <tr key={w.id} style={{ borderTop: "1px solid rgba(255,255,255,0.06)", opacity: w.status === "rejected" ? 0.45 : 1 }}>
+                        <td style={{ padding: "10px 14px", color: "#e8620a", fontWeight: 700 }}>#{w.position ?? "—"}</td>
+                        <td style={{ padding: "10px 14px" }}>
+                          <div style={{ fontWeight: 600, color: "#fff" }}>{w.user_name}</div>
+                          {w.phone && <div style={{ fontSize: 11, color: "#555" }}>{w.phone}</div>}
+                        </td>
+                        <td style={{ padding: "10px 14px", color: "#888", fontSize: 12 }}>{w.user_email}</td>
+                        <td style={{ padding: "10px 14px", color: "#aaa" }}>{w.distance_category || "—"}</td>
+                        <td style={{ padding: "10px 14px", color: "#555", fontSize: 11, whiteSpace: "nowrap" as const }}>
+                          {new Date(w.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                        </td>
+                        <td style={{ padding: "10px 14px" }}>
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999,
+                            background: w.status === "waiting" ? "rgba(96,165,250,0.12)" : w.status === "approved" ? "rgba(74,222,128,0.12)" : "rgba(239,68,68,0.08)",
+                            color:      w.status === "waiting" ? "#60a5fa"              : w.status === "approved" ? "#4ade80"              : "#f87171",
+                          }}>
+                            {w.status.toUpperCase()}
+                          </span>
+                        </td>
+                        <td style={{ padding: "10px 14px" }}>
+                          {w.status === "waiting" && (
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button
+                                onClick={() => handleWaitlistAction(w.id, "approve")}
+                                disabled={!!waitlistAction}
+                                style={{ padding: "4px 10px", borderRadius: 5, border: "1px solid rgba(74,222,128,0.3)", background: "rgba(74,222,128,0.08)", color: "#4ade80", fontSize: "0.72rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                                {waitlistAction === w.id + "approve" ? "…" : "Approve"}
+                              </button>
+                              <button
+                                onClick={() => handleWaitlistAction(w.id, "reject")}
+                                disabled={!!waitlistAction}
+                                style={{ padding: "4px 10px", borderRadius: 5, border: "1px solid rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.06)", color: "#f87171", fontSize: "0.72rem", cursor: "pointer", fontFamily: "inherit" }}>
+                                {waitlistAction === w.id + "reject" ? "…" : "Reject"}
+                              </button>
+                            </div>
+                          )}
+                          {w.status === "approved" && w.approved_at && (
+                            <span style={{ fontSize: 11, color: "#4ade80" }}>
+                              ✓ {new Date(w.approved_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div style={{ padding: "10px 14px", background: "rgba(96,165,250,0.05)", border: "1px solid rgba(96,165,250,0.15)", borderRadius: 8, fontSize: 12, color: "#60a5fa", lineHeight: 1.6 }}>
+              💡 Approving a waitlisted participant sends them an email notification with a link to register. A spot must be made available (e.g., cancellation) before approving.
+            </div>
+          </div>
         )}
 
         {/* ══ COMMUNICATE TAB ════════════════════════════════════════════════ */}

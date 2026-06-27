@@ -64,31 +64,39 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const pendingRevenue = all.filter(r => r.payment_status === "pending").reduce((s, r) => s + (r.final_price ?? 0), 0);
 
   // ── Email stats ────────────────────────────────────────────────────────────
-  const hist           = history ?? [];
-  const emailSent      = hist.reduce((s, h) => s + (h.sent    ?? 0), 0);
-  const emailFailed    = hist.reduce((s, h) => s + (h.failed  ?? 0), 0);
+  const hist = history ?? [];
 
-  // From the queue table (per-email accuracy)
-  const queueRows      = emailQ ?? [];
-  const qDelivered     = queueRows.filter(r => r.status === "delivered").length;
-  const qFailed        = queueRows.filter(r => r.status === "failed").length;
-  const qQueued        = queueRows.filter(r => r.status === "queued").length;
+  // Per-registration email_status is the most granular source of truth for
+  // confirmation email delivery (one row per participant, set by register/route.ts)
+  const confirmationSent   = (regs ?? []).filter(r => (r as {email_status?: string}).email_status === "sent").length;
+  const confirmationFailed = (regs ?? []).filter(r => (r as {email_status?: string}).email_status === "failed").length;
+
+  // email_queue tracks BULK campaign emails (separate from confirmation emails)
+  const queueRows = emailQ ?? [];
+  const qDelivered = queueRows.filter(r => r.status === "delivered").length;
+  const qFailed    = queueRows.filter(r => r.status === "failed").length;
+  const qQueued    = queueRows.filter(r => r.status === "queued").length;
 
   // ── Capacity ────────────────────────────────────────────────────────────────
-  const maxCap   = ev?.max_participants ?? null;
-  const remaining = maxCap !== null ? Math.max(0, maxCap - active) : null;
+  // Use `confirmed` (not `active`) to match the DB trigger that increments
+  // participant_count only on confirmed status — this is the authoritative count.
+  const maxCap    = ev?.max_participants ?? null;
+  const remaining = maxCap !== null ? Math.max(0, maxCap - confirmed) : null;
 
   return NextResponse.json({
     event: ev,
     registrations: { total, confirmed, pending, cancelled, paid, free, checked_in: checkedIn, active },
-    capacity:      { max: maxCap, filled: active, remaining },
+    capacity:      { max: maxCap, filled: confirmed, remaining },
     revenue:       { collected: revenue, pending: pendingRevenue },
     emails: {
-      campaigns:  hist.length,
-      sent:       Math.max(emailSent, qDelivered),
-      failed:     Math.max(emailFailed, qFailed),
-      queued:     qQueued,
-      delivered:  qDelivered,
+      // confirmation = transactional registration emails (per participant)
+      confirmation_sent:   confirmationSent,
+      confirmation_failed: confirmationFailed,
+      // campaigns = bulk admin-initiated emails (via communication hub)
+      campaigns:           hist.length,
+      campaign_delivered:  qDelivered,
+      campaign_failed:     qFailed,
+      campaign_queued:     qQueued,
     },
     races:        races ?? [],
     recent_comms: hist.slice(0, 5),

@@ -82,12 +82,33 @@ export async function GET(req: NextRequest) {
 }
 
 // PATCH /api/admin/events/registrations — cancel or update status
+// Idempotency: if status already matches the requested value, return the current
+// row without touching the DB. Prevents double-submit from network retries.
 export async function PATCH(req: NextRequest) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id, status } = await req.json();
   if (!id || !status) return NextResponse.json({ error: "id and status required" }, { status: 400 });
 
+  const VALID_STATUSES = ["confirmed", "cancelled", "pending_payment"];
+  if (!VALID_STATUSES.includes(status))
+    return NextResponse.json({ error: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` }, { status: 400 });
+
   const db = getSupabaseServer();
+
+  // Read current state first — idempotency guard
+  const { data: current } = await db
+    .from("event_registrations")
+    .select("id, status, event_id, user_email, user_name")
+    .eq("id", id)
+    .single();
+
+  if (!current) return NextResponse.json({ error: "Registration not found" }, { status: 404 });
+
+  // Idempotent: already in the requested state — return without writing
+  if (current.status === status) {
+    return NextResponse.json({ data: current, idempotent: true });
+  }
+
   const { data, error } = await db
     .from("event_registrations")
     .update({ status })
@@ -96,5 +117,26 @@ export async function PATCH(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Audit log — write fire-and-forget so it never blocks the response
+  // Audit log — fire-and-forget; failure must never break the main operation
+  // Audit log — fire-and-forget; failure must never break the main operation
+  void (async () => {
+    try {
+      await db.from("audit_logs").insert({
+        action:     `registration_${status}`,
+        table_name: "event_registrations",
+        record_id:  id,
+        event_id:   current.event_id,
+        metadata: {
+          previous_status: current.status,
+          new_status:      status,
+          user_email:      current.user_email,
+          user_name:       current.user_name,
+        },
+      });
+    } catch { /* never block the response */ }
+  })();
+
   return NextResponse.json({ data });
 }

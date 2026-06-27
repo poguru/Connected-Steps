@@ -32,6 +32,27 @@ export async function POST(req: NextRequest) {
       distance_category,
     } = await req.json();
 
+    // ── Rate limiting ──────────────────────────────────────────────────────────
+    // Prevents spam registrations and capacity exhaustion attacks.
+    // Per-email: max 3 registration attempts per 15 minutes (handles retries without abuse).
+    // Per-IP: max 20 registration attempts per minute (allows family/group registrations).
+    if (email) {
+      const db = getSupabaseServer();
+      const ip  = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+
+      const [emailCount, ipCount] = await Promise.all([
+        db.rpc("record_rate_limit_failure", { p_key: `reg:email:${email.toLowerCase().trim()}`, p_window_ms: 900000 }),
+        db.rpc("record_rate_limit_failure", { p_key: `reg:ip:${ip}`, p_window_ms: 60000 }),
+      ]);
+
+      if ((emailCount.data ?? 0) > 3) {
+        return NextResponse.json({ error: "Too many registration attempts for this email. Please wait 15 minutes." }, { status: 429 });
+      }
+      if ((ipCount.data ?? 0) > 20) {
+        return NextResponse.json({ error: "Too many registration attempts. Please try again in a minute." }, { status: 429 });
+      }
+    }
+
     if (!event_id || !email || !name) {
       return NextResponse.json({ error: "event_id, email, and name are required." }, { status: 400 });
     }

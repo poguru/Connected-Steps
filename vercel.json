@@ -1,6 +1,7 @@
 {
   "functions": {
     "app/api/cron/*.ts":                                                    { "maxDuration": 300 },
+    "app/api/cron/slot-expiry/route.ts":                                    { "maxDuration": 30  },
     "app/api/admin/events/[id]/communicate/send-next/route.ts":             { "maxDuration": 15  },
     "app/api/admin/events/[id]/communicate/status/route.ts":                { "maxDuration": 10  },
     "app/api/cron/job-worker/route.ts":                                     { "maxDuration": 120 },
@@ -47,6 +48,10 @@
     {
       "path": "/api/cron/hourly-session-alerts",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/slot-expiry",
+      "schedule": "*/30 * * * *"
     }
   ]
 }
