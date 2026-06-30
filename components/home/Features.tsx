@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
+import { Card, Label } from "@/components/ui/ds";
 
 // ── Check icon ────────────────────────────────────────────────────────────────
 function Check() {
@@ -121,10 +122,8 @@ export default function Features() {
             <div style={{ display: "grid", gap: "1rem" }} className="cs-programs-cols">
 
               {/* Training Programs */}
-              <div style={{ padding: "1.5rem", borderRadius: 14, background: "var(--cs-charcoal)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--cs-orange)", marginBottom: "1rem" }}>
-                  Training Programs
-                </div>
+              <Card style={{ background: "var(--cs-charcoal)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <Label style={{ marginBottom: "1rem" }}>Training Programs</Label>
                 <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "0.65rem" }}>
                   {programs.map(p => (
                     <li key={p} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "0.875rem", color: "var(--cs-cream)" }}>
@@ -132,13 +131,11 @@ export default function Features() {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </Card>
 
               {/* Weekly Activities */}
-              <div style={{ padding: "1.5rem", borderRadius: 14, background: "var(--cs-charcoal)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--cs-orange)", marginBottom: "1rem" }}>
-                  Every Week
-                </div>
+              <Card style={{ background: "var(--cs-charcoal)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <Label style={{ marginBottom: "1rem" }}>Every Week</Label>
                 <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "0.65rem" }}>
                   {activities.map(a => (
                     <li key={a} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "0.875rem", color: "var(--cs-cream)" }}>
@@ -146,15 +143,13 @@ export default function Features() {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </Card>
             </div>
 
             {/* Recent Sessions — only shows when real data exists */}
             {sessions.length > 0 && (
-              <div style={{ padding: "1.25rem 1.5rem", borderRadius: 14, background: "var(--cs-charcoal)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--cs-orange)", marginBottom: "1rem" }}>
-                  Recent Community Sessions
-                </div>
+              <Card style={{ background: "var(--cs-charcoal)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <Label style={{ marginBottom: "1rem" }}>Recent Community Sessions</Label>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
                   {sessions.map((s, i) => (
                     <div key={s.id}
@@ -185,7 +180,7 @@ export default function Features() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </Card>
             )}
           </div>
         </div>
