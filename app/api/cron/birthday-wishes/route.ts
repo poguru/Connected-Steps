@@ -91,6 +91,9 @@ export async function GET(req: NextRequest) {
               email, firstName,
               `🎉 Happy Birthday, ${firstName}! From Connected Steps`,
               birthdayEmailHTML(firstName),
+              false,  // isOtp
+              false,  // isTransactional — birthday emails are non-transactional
+              `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in"}/api/unsubscribe?email=${encodeURIComponent(email)}`,
             );
             await db.from("users")
               .update({ birthday_email_sent: todayStr })

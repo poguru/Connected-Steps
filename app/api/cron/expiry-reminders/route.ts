@@ -165,6 +165,12 @@ async function sendExpiryEmail(
 ): Promise<boolean> {
   const { sendSingleEmail } = await import("@/lib/email-service");
   const subject = `Your membership expires in ${daysLeft} day${daysLeft === 1 ? "" : "s"} – Connected Steps`;
-  const result  = await sendSingleEmail({ to: email, subject, html: expiryReminderEmailHTML(name, plan, expiresAt, daysLeft) });
+  const result  = await sendSingleEmail({
+    to:      email,
+    subject,
+    html:    expiryReminderEmailHTML(name, plan, expiresAt, daysLeft),
+    // Expiry reminders are non-transactional — include unsubscribe header per RFC 2369
+    listUnsubscribeUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in"}/api/unsubscribe?email=${encodeURIComponent(email)}`,
+  });
   return result.ok;
 }

@@ -157,7 +157,8 @@ export async function sendEmail(
   subject: string,
   html: string,
   isOtp = false,
-  isTransactional = false,  // true = bypass NON_OTP_EMAILS_DISABLED (QR, registration, payment)
+  isTransactional = false,   // true = bypass NON_OTP_EMAILS_DISABLED (QR, registration, payment)
+  listUnsubscribeUrl?: string, // set for non-transactional bulk/digest emails
 ): Promise<NotifyResult> {
   if (NOTIFICATIONS_PAUSED) return { to, channel: "email", ok: true };
 
@@ -170,7 +171,7 @@ export async function sendEmail(
   }
 
   const { sendSingleEmail } = await import("@/lib/email-service");
-  const result = await sendSingleEmail({ to, subject, html });
+  const result = await sendSingleEmail({ to, subject, html, listUnsubscribeUrl });
   return { to, channel: "email", ok: result.ok, error: result.error, messageId: result.messageId, provider: result.provider, httpStatus: result.httpStatus };
 }
 

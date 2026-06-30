@@ -280,7 +280,7 @@ export async function GET(req: NextRequest) {
   // ── 4. Send notifications + emails ─────────────────────────────────────────
 
   const notifUsers: { email: string }[] = [];
-  type EmailJob = { from: string; to: string[]; subject: string; html: string };
+  type EmailJob = { from: string; to: string[]; subject: string; html: string; listUnsubscribeUrl?: string };
   const emailBatch: EmailJob[] = [];
 
   const fromEmail = process.env.RESEND_FROM_EMAIL ?? "Connected Steps <noreply@connectedsteps.in>";
@@ -306,6 +306,8 @@ export async function GET(req: NextRequest) {
       from:    fromEmail,
       to:      [email],
       subject: `Your Connected Steps week — ${shortDate(todayStr)}`,
+      // Weekly digest is non-transactional — include List-Unsubscribe header
+      listUnsubscribeUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in"}/api/unsubscribe?email=${encodeURIComponent(email)}`,
       html:    buildDigestEmail({
         name:      firstName,
         sessions,

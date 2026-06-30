@@ -38,13 +38,20 @@ export interface EmailMessage {
   html:     string;
   from?:    string;
   replyTo?: string;
+  /**
+   * When set, adds RFC 2369 List-Unsubscribe and List-Unsubscribe-Post headers.
+   * Required by Amazon SES for bulk / non-transactional emails (digests, reminders, etc.).
+   * Transactional emails (OTP, QR codes, payment receipts) must NOT include this.
+   */
+  listUnsubscribeUrl?: string;
 }
 
 export interface BatchEmailJob {
-  from:    string;
-  to:      string[];
-  subject: string;
-  html:    string;
+  from:                string;
+  to:                  string[];
+  subject:             string;
+  html:                string;
+  listUnsubscribeUrl?: string;   // per-recipient unsubscribe URL (for bulk non-transactional sends)
 }
 
 /** Error category for failure classification and retry decisions */
@@ -133,7 +140,19 @@ async function sendViaResend(msg: EmailMessage, from: string): Promise<SendResul
     const res  = await fetch("https://api.resend.com/emails", {
       method:  "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body:    JSON.stringify({ from, to: [msg.to], subject: msg.subject, html: msg.html }),
+      body:    JSON.stringify({
+        from,
+        to:       [msg.to],
+        subject:  msg.subject,
+        html:     msg.html,
+        reply_to: msg.replyTo ?? "info@connectedsteps.in",
+        ...(msg.listUnsubscribeUrl ? {
+          headers: {
+            "List-Unsubscribe":      `<${msg.listUnsubscribeUrl}>, <mailto:unsubscribe@connectedsteps.in?subject=Unsubscribe>`,
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+          },
+        } : {}),
+      }),
     });
     const data = await res.json().catch(() => ({})) as { message?: string; id?: string };
 
@@ -166,10 +185,20 @@ export async function sendSingleEmail(msg: EmailMessage): Promise<SendResult> {
   const from = msg.from ?? defaultFrom();
 
   if (process.env.AWS_SES_ACCESS_KEY_ID) {
+    // Build optional List-Unsubscribe headers for non-transactional bulk emails.
+    // SES requires these for digests, reminders, and marketing-adjacent emails.
+    // Never add to OTP, QR, or payment confirmation emails (isTransactional=true callers).
+    const unsubscribeHeaders = msg.listUnsubscribeUrl
+      ? [
+          { Name: "List-Unsubscribe",      Value: `<${msg.listUnsubscribeUrl}>, <mailto:unsubscribe@connectedsteps.in?subject=Unsubscribe>` },
+          { Name: "List-Unsubscribe-Post", Value: "List-Unsubscribe=One-Click" },
+        ]
+      : undefined;
+
     const input: SendEmailCommandInput = {
       FromEmailAddress: from,
       Destination:      { ToAddresses: [msg.to] },
-      ReplyToAddresses: msg.replyTo ? [msg.replyTo] : undefined,
+      ReplyToAddresses: msg.replyTo ? [msg.replyTo] : ["info@connectedsteps.in"],
       Content: {
         Simple: {
           Subject: { Data: msg.subject, Charset: "UTF-8" },
@@ -177,6 +206,7 @@ export async function sendSingleEmail(msg: EmailMessage): Promise<SendResult> {
             Html: { Data: msg.html,                           Charset: "UTF-8" },
             Text: { Data: msg.html.replace(/<[^>]*>/g, " "), Charset: "UTF-8" },
           },
+          ...(unsubscribeHeaders ? { Headers: unsubscribeHeaders } : {}),
         },
       },
     };
@@ -227,7 +257,13 @@ export async function sendBatchEmails(
   interBatchDelayMs   = 400,   // pause between chunks to respect SES rate limits
 ): Promise<BatchSendResult> {
   const messages: EmailMessage[] = jobs.flatMap(j =>
-    j.to.map(to => ({ to, subject: j.subject, html: j.html, from: j.from }))
+    j.to.map(to => ({
+      to,
+      subject:             j.subject,
+      html:                j.html,
+      from:                j.from,
+      listUnsubscribeUrl:  j.listUnsubscribeUrl,
+    }))
   );
 
   let sent = 0, failed = 0;
