@@ -4,9 +4,9 @@ import { useState, useEffect, useRef, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Eye, EyeOff, Camera, CheckCircle2 } from "lucide-react";
+import { Camera, CheckCircle2 } from "lucide-react";
 import OtpInput from "./OtpInput";
-import { Alert } from "@/components/ui/ds";
+import { Alert, Input, PasswordInput, Select } from "@/components/ui/ds";
 
 const GOALS = [
   { id: "5k",       label: "First 5K"            },
@@ -20,24 +20,7 @@ const GOALS = [
   { id: "strength", label: "Strength & Endurance" },
 ];
 
-const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "11px 14px",
-  background: "var(--surface)", border: "1px solid var(--border)",
-  borderRadius: 10, color: "var(--foreground)",
-  fontFamily: "var(--font-body)", fontSize: 14, outline: "none",
-  transition: "border-color 0.15s, box-shadow 0.15s", boxSizing: "border-box",
-};
-
-const focusHandlers = {
-  onFocus: (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
-    e.currentTarget.style.borderColor = "var(--primary)";
-    e.currentTarget.style.boxShadow   = "0 0 0 3px oklch(0.72 0.19 49 / 15%)";
-  },
-  onBlur: (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
-    e.currentTarget.style.borderColor = "var(--border)";
-    e.currentTarget.style.boxShadow   = "none";
-  },
-};
+// inputStyle and focusHandlers removed — DS Input/Select/PasswordInput handle focus internally
 
 // email → email-otp → details → done (account created)
 // When NEXT_PUBLIC_ENABLE_SIGNUP_OTP_VERIFICATION=false the email-otp step is skipped.
@@ -216,11 +199,9 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
       <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>
         Step 1 — {OTP_ENABLED ? "Verify your email" : "Enter your email"}
       </p>
-      <input
-        style={inputStyle} type="email" placeholder="Email address"
+      <Input type="email" placeholder="Email address"
         value={email} onChange={e => { setEmail(e.target.value); setOtpError(""); }}
-        autoComplete="email" {...focusHandlers}
-      />
+        autoComplete="email" />
       {otpError && <ErrorBlock msg={otpError} />}
       {OTP_ENABLED ? (
         <button
@@ -298,8 +279,8 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
 
       {/* Name */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        <input style={inputStyle} name="firstName" type="text" placeholder="First name" value={form.firstName} onChange={handleFormChange} autoComplete="given-name" {...focusHandlers} />
-        <input style={inputStyle} name="lastName"  type="text" placeholder="Last name"  value={form.lastName}  onChange={handleFormChange} autoComplete="family-name" {...focusHandlers} />
+        <Input name="firstName" placeholder="First name" value={form.firstName} onChange={handleFormChange} autoComplete="given-name" />
+        <Input name="lastName"  placeholder="Last name"  value={form.lastName}  onChange={handleFormChange} autoComplete="family-name" />
       </div>
 
       {/* DOB */}
@@ -307,39 +288,24 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
         <label style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5 }}>
           Date of Birth <span style={{ color: "var(--primary)", fontWeight: 600 }}>*</span>
         </label>
-        <input
-          style={{ ...inputStyle, colorScheme: "dark" }}
-          name="dob" type="date"
+        <Input name="dob" type="date"
           max={new Date().toISOString().split("T")[0]}
-          value={form.dob} onChange={handleFormChange} {...focusHandlers}
-        />
+          value={form.dob} onChange={handleFormChange} />
       </div>
 
       {/* Password */}
-      <div style={{ position: "relative" }}>
-        <input style={{ ...inputStyle, paddingRight: 44 }} name="password" type={showPw ? "text" : "password"}
-          placeholder="Password (min 8 chars)" value={form.password} onChange={handleFormChange} autoComplete="new-password" {...focusHandlers} />
-        <button type="button" onClick={() => setShowPw(!showPw)}
-          style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--muted-foreground)", display: "flex", padding: 0 }}>
-          {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
-        </button>
-      </div>
-      <div style={{ position: "relative" }}>
-        <input style={{ ...inputStyle, paddingRight: 44 }} name="confirm" type={showPw ? "text" : "password"}
-          placeholder="Confirm password" value={form.confirm} onChange={handleFormChange}
-          autoComplete="new-password" aria-label="Confirm password" {...focusHandlers} />
-        <button type="button" onClick={() => setShowPw(!showPw)} aria-label={showPw ? "Hide password" : "Show password"}
-          style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--muted-foreground)", display: "flex", padding: 0 }}>
-          {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
-        </button>
-      </div>
+      <PasswordInput name="password" placeholder="Password (min 8 chars)"
+        value={form.password} onChange={handleFormChange} autoComplete="new-password" />
+      <PasswordInput name="confirm" placeholder="Confirm password"
+        value={form.confirm} onChange={handleFormChange}
+        autoComplete="new-password" aria-label="Confirm password" />
 
       {/* Phone — now required */}
       <div>
         <label style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5 }}>
           WhatsApp / Mobile number <span style={{ color: "var(--primary)", fontWeight: 600 }}>*</span>
         </label>
-        <input style={inputStyle} type="tel" placeholder="e.g. 9876543210" maxLength={10} value={phone} onChange={e => { setPhone(e.target.value.replace(/\D/g, "").slice(0, 10)); setFormError(""); }} autoComplete="tel" {...focusHandlers} />
+        <Input type="tel" placeholder="e.g. 9876543210" maxLength={10} value={phone} onChange={e => { setPhone(e.target.value.replace(/\D/g, "").slice(0, 10)); setFormError(""); }} autoComplete="tel" />
         <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--muted-foreground)" }}>
           10-digit Indian mobile number. Used for session updates.
         </p>
@@ -348,20 +314,20 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
       {/* Goal */}
       <div>
         <label style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5 }}>Running goal</label>
-        <select value={goal} onChange={e => setGoal(e.target.value)} style={{ ...inputStyle, cursor: "pointer", colorScheme: "dark" }} onFocus={focusHandlers.onFocus as never} onBlur={focusHandlers.onBlur as never}>
-          {GOALS.map(g => <option key={g.id} value={g.id} style={{ background: "#1a1a1a" }}>{g.label}</option>)}
-        </select>
+        <Select value={goal} onChange={e => setGoal(e.target.value)}>
+          {GOALS.map(g => <option key={g.id} value={g.id}>{g.label}</option>)}
+        </Select>
       </div>
 
       {/* Location */}
       <div>
         <label style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5 }}>Training location</label>
-        <select value={location} onChange={e => setLocation(e.target.value)} style={{ ...inputStyle, cursor: "pointer", colorScheme: "dark" }} onFocus={focusHandlers.onFocus as never} onBlur={focusHandlers.onBlur as never}>
+        <Select value={location} onChange={e => setLocation(e.target.value)}>
           <option value="">Select a location</option>
-          {["Kondapur", "Kukatpally", "Kokapet", "Miyapur", "Others"].map(loc => <option key={loc} value={loc} style={{ background: "#1a1a1a" }}>{loc}</option>)}
-        </select>
+          {["Kondapur", "Kukatpally", "Kokapet", "Miyapur", "Others"].map(loc => <option key={loc} value={loc}>{loc}</option>)}
+        </Select>
         {location === "Others" && (
-          <input style={{ ...inputStyle, marginTop: 8 }} type="text" placeholder="Enter your training location" value={customLoc} onChange={e => setCustomLoc(e.target.value)} {...focusHandlers} />
+          <Input type="text" placeholder="Enter your training location" value={customLoc} onChange={e => setCustomLoc(e.target.value)} style={{ marginTop: 8 }} />
         )}
       </div>
 
@@ -371,20 +337,14 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
           <label style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5 }}>
             Preferred Training Location <span style={{ color: "var(--primary)", fontWeight: 600 }}>*</span>
           </label>
-          <select
-            style={{ ...inputStyle, cursor: "pointer", colorScheme: "dark" }}
-            value={preferredLocation}
-            onChange={e => setPreferredLocation(e.target.value)}
-            onFocus={focusHandlers.onFocus as never}
-            onBlur={focusHandlers.onBlur as never}
-          >
-            <option value="" style={{ background: "#1a1a1a" }}>Select your training location</option>
+          <Select value={preferredLocation} onChange={e => setPreferredLocation(e.target.value)}>
+            <option value="">Select your training location</option>
             {trainingLocations.map(loc => (
-              <option key={loc.id} value={loc.id} style={{ background: "#1a1a1a" }}>
+              <option key={loc.id} value={loc.id}>
                 {loc.name}{loc.meeting_point ? ` — ${loc.meeting_point}` : ""}
               </option>
             ))}
-          </select>
+          </Select>
           <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--muted-foreground)" }}>
             Used for your default leaderboard. You can attend sessions at any location.
           </p>
@@ -396,22 +356,20 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
         <label style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5 }}>
           Referral Code <span style={{ color: "var(--muted-foreground)", fontWeight: 400 }}>(optional)</span>
         </label>
-        <input
-          style={{ ...inputStyle, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "monospace" }}
+        <Input
           type="text"
           placeholder="e.g. ZMGR2639"
           maxLength={8}
           value={referralInput}
           onChange={e => setReferralInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
-          onFocus={(e) => {
-            focusHandlers.onFocus(e);
+          onFocus={() => {
             // Pre-fill from localStorage when user taps the field (if empty)
             if (!referralInput) {
               const stored = localStorage.getItem("cs_pending_referral") ?? "";
               if (stored) setReferralInput(stored.toUpperCase());
             }
           }}
-          onBlur={focusHandlers.onBlur}
+          style={{ textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "monospace" }}
         />
         {localStorage.getItem("cs_pending_referral") && !referralInput && (
           <p style={{ margin: "4px 0 0", fontSize: 10, color: "var(--cs-orange)" }}>
