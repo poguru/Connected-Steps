@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import { Avatar, Card, Chip, Button, Label, color } from "@/components/ui/ds";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -744,16 +745,11 @@ export default function Dashboard() {
 
         {/* ── Left sidebar ── */}
         <aside className="cs-db-left">
-          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 20, padding: "1.75rem", textAlign: "center", boxShadow: "var(--shadow-md)" }}>
-            {user.photo ? (
-              <img src={user.photo} alt={fullName} style={{ width: "76px", height: "76px", borderRadius: "50%", objectFit: "cover", border: "3px solid var(--cs-orange)", margin: "0 auto 1rem", display: "block" }} />
-            ) : (
-              <div style={{ width: "76px", height: "76px", borderRadius: "50%", background: "oklch(0.72 0.19 49 / 12%)", border: "3px solid var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.6rem", fontWeight: 800, color: "var(--cs-orange)", margin: "0 auto 1rem" }}>
-                {userInitials}
-              </div>
-            )}
+          <Card style={{ borderRadius: 20, padding: "1.75rem", textAlign: "center", boxShadow: "var(--shadow-md)" }}>
+            <Avatar name={fullName} src={user.photo} size={76}
+              style={{ border: `3px solid ${color.orange}`, margin: "0 auto 1rem" }} />
             <div className="font-display" style={{ fontSize: "1.15rem", fontWeight: 700, color: "var(--cs-white)", marginBottom: "0.2rem" }}>{fullName}</div>
-            <div style={{ fontSize: "0.72rem", color: "var(--cs-orange)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.5rem", fontWeight: 600 }}>{goalLabel[user.goal] ?? user.goal}</div>
+            <Chip label={goalLabel[user.goal] ?? user.goal} size="xs" style={{ marginBottom: "1.5rem" }} />
 
             <div style={{ display: "flex", justifyContent: "center", gap: "1rem", marginBottom: "1.25rem" }}>
               <div style={{ textAlign: "center" }}>
@@ -769,24 +765,24 @@ export default function Dashboard() {
 
             {followCounts !== null && (
               <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "1rem", display: "flex", justifyContent: "center", gap: "2rem", marginBottom: user.location ? "1rem" : 0 }}>
-                {(["followers", "following"] as const).map((type, i) => (
-                  <button key={type} onClick={() => openFollowModal(type)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "center" }}
+                {(["followers", "following"] as const).map((type) => (
+                  <button key={type} onClick={() => openFollowModal(type)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "center", opacity: 1, transition: "opacity 0.15s" }}
                     onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity = "0.7"}
                     onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity = "1"}>
                     <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--cs-white)" }}>{type === "followers" ? followCounts.followers : followCounts.following}</div>
-                    <div style={{ fontSize: "9px", color: "var(--cs-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{type}</div>
+                    <Label style={{ color: "var(--cs-muted)" }}>{type}</Label>
                   </button>
-                )).reduce<React.ReactNode[]>((acc, el, i) => i === 0 ? [el] : [...acc, <div key="div" style={{ width: "1px", background: "rgba(255,255,255,0.06)" }} />, el], [])}
+                ))}
               </div>
             )}
 
             {user.location && (
               <div style={{ borderTop: followCounts !== null ? "none" : "1px solid rgba(255,255,255,0.06)", paddingTop: followCounts !== null ? 0 : "1rem", textAlign: "left" }}>
-                <div style={{ fontSize: "9px", color: "var(--cs-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Location</div>
+                <Label style={{ color: "var(--cs-muted)", marginBottom: "4px" }}>Location</Label>
                 <div style={{ fontSize: "0.82rem", color: "var(--cs-white)" }}>📍 {user.location}</div>
               </div>
             )}
-          </div>
+          </Card>
         </aside>
 
         {/* ── Main feed ── */}
@@ -844,59 +840,48 @@ export default function Dashboard() {
 
           {/* Leaderboard + Community links (desktop sidebar only) */}
           <div className="cs-desktop-only">
-            <div
-              onClick={() => router.push("/leaderboard")}
-              style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "0.9rem 1.1rem", marginBottom: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", boxShadow: "var(--shadow-md)", transition: "opacity 0.15s" }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = "0.82"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
-            >
+            <Card hoverable onClick={() => router.push("/leaderboard")}
+              style={{ marginBottom: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
               <div>
-                <div style={{ fontSize: "10px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "2px" }}>Leaderboard</div>
+                <Label style={{ color: "var(--cs-muted)", marginBottom: "2px" }}>Leaderboard</Label>
                 <div style={{ fontSize: "0.85rem", color: "var(--cs-white)", fontWeight: 600 }}>View rankings</div>
               </div>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--cs-orange)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 9H4.5a2.5 2.5 0 0 0 0 5H6M18 9h1.5a2.5 2.5 0 0 1 0 5H18M8 9h8M8 15h8M12 3v2M12 19v2M9 21h6"/>
-              </svg>
-            </div>
+              <span style={{ color: color.orange, fontSize: 20 }}>🏆</span>
+            </Card>
 
-          {/* Community — one card replaces Ask/Story/QA forms */}
-          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, marginBottom: "0.75rem", overflow: "hidden", boxShadow: "var(--shadow-md)" }}>
-            <div style={{ padding: "0.9rem 1.1rem 0.5rem", fontSize: "10px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600 }}>Community</div>
+          {/* Community */}
+          <Card style={{ marginBottom: "0.75rem", padding: 0, overflow: "hidden" }}>
+            <Label style={{ color: "var(--cs-muted)", padding: "0.9rem 1.1rem 0.5rem" }}>Community</Label>
             {([
-              { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>, label: "Share Your Story",    href: "/community"    },
-              { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>, label: "Ask a Question",      href: "/community"    },
-              { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>, label: "My Coach Q&A",        href: "/my-questions" },
-            ] as { icon: React.ReactNode; label: string; href: string }[]).map((item, i) => (
-              <div
-                key={item.label}
-                onClick={() => router.push(item.href)}
+              { label: "Share Your Story", href: "/community",    icon: "📝" },
+              { label: "Ask a Question",   href: "/community",    icon: "❓" },
+              { label: "My Coach Q&A",     href: "/my-questions", icon: "💬" },
+            ]).map((item, i) => (
+              <div key={item.label} onClick={() => router.push(item.href)}
                 style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.75rem 1.1rem", borderTop: i > 0 ? "1px solid rgba(255,255,255,0.05)" : "none", cursor: "pointer", transition: "background 0.12s" }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-              >
-                <span style={{ color: "var(--muted-foreground)", display: "flex", alignItems: "center" }}>{item.icon}</span>
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}>
+                <span>{item.icon}</span>
                 <span style={{ fontSize: "0.82rem", color: "var(--cs-white)", fontWeight: 500, flex: 1 }}>{item.label}</span>
-                <span style={{ fontSize: "0.75rem", color: "var(--cs-orange)", fontWeight: 600 }}>→</span>
+                <span style={{ fontSize: "0.75rem", color: color.orange, fontWeight: 600 }}>→</span>
               </div>
             ))}
-          </div>
+          </Card>
 
           </div>{/* end cs-desktop-only: leaderboard + community */}
 
           {/* Push Notifications (compact) */}
           {pushSupported && (
-            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "0.9rem 1.1rem", marginBottom: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", boxShadow: "var(--shadow-md)" }}>
+            <Card style={{ marginBottom: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem" }}>
               <div>
-                <div style={{ fontSize: "10px", color: "var(--cs-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "2px" }}>Notifications</div>
+                <Label style={{ color: "var(--cs-muted)", marginBottom: "2px" }}>Notifications</Label>
                 <div style={{ fontSize: "0.8rem", color: "var(--cs-white)" }}>{pushEnabled ? "Alerts on" : "Session alerts"}</div>
               </div>
-              <button
-                onClick={handlePushToggle}
-                style={{ flexShrink: 0, padding: "5px 12px", borderRadius: 8, fontSize: "0.75rem", fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)", border: pushEnabled ? "1px solid rgba(74,222,128,0.3)" : "1px solid rgba(232,98,10,0.3)", background: pushEnabled ? "rgba(74,222,128,0.1)" : "rgba(232,98,10,0.1)", color: pushEnabled ? "#4ade80" : "var(--cs-orange)", whiteSpace: "nowrap" }}
-              >
+              <Button size="xs" variant={pushEnabled ? "secondary" : "primary"}
+                onClick={handlePushToggle} style={{ flexShrink: 0, color: pushEnabled ? color.success : undefined, borderColor: pushEnabled ? color.successBorder : undefined, background: pushEnabled ? color.successBg : undefined }}>
                 {pushEnabled ? "On ✓" : "Enable"}
-              </button>
-            </div>
+              </Button>
+            </Card>
           )}
 
           {/* Rate Your Coach — desktop only to reduce mobile scroll */}
