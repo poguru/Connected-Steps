@@ -79,6 +79,19 @@ export function Divider({ style }: { style?: React.CSSProperties }) {
   return <hr style={{ border: "none", borderTop: `1px solid ${color.border}`, margin: "20px 0", ...style }} />;
 }
 
+// ── Section Divider with label (used between content groups) ──────────────────
+
+export function SectionDivider({ label, style }: { label?: string; style?: React.CSSProperties }) {
+  if (!label) return <Divider style={style} />;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "12px", margin: "24px 0", ...style }}>
+      <div style={{ flex: 1, height: 1, background: color.border }} />
+      <span style={{ fontSize: "10px", fontWeight: 700, color: color.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: font.body, whiteSpace: "nowrap" }}>{label}</span>
+      <div style={{ flex: 1, height: 1, background: color.border }} />
+    </div>
+  );
+}
+
 // ── Section header row ────────────────────────────────────────────────────────
 
 export function SectionRow({ title, action, style }: { title: string; action?: React.ReactNode; style?: React.CSSProperties }) {

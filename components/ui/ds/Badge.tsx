@@ -1,17 +1,22 @@
 import React from "react";
 import { color, radius, font } from "./tokens";
 
-export type BadgeColor = "orange" | "green" | "red" | "yellow" | "blue" | "purple" | "gray";
+export type BadgeColor = "orange" | "green" | "red" | "yellow" | "blue" | "purple" | "gray"
+                       | "gold"  | "silver" | "bronze";
 export type BadgeSize  = "xs" | "sm" | "md";
 
 const colorMap: Record<BadgeColor, { bg: string; text: string; border: string }> = {
-  orange: { bg: color.orangeMuted,  text: color.orange,   border: color.orangeBorder  },
-  green:  { bg: color.successBg,    text: color.success,   border: color.successBorder },
-  red:    { bg: color.errorBg,      text: color.error,     border: color.errorBorder   },
-  yellow: { bg: color.warningBg,    text: color.warning,   border: color.warningBorder },
-  blue:   { bg: color.infoBg,       text: color.info,      border: color.infoBorder    },
-  purple: { bg: "rgba(167,139,250,0.12)", text: "#a78bfa", border: "rgba(167,139,250,0.3)" },
-  gray:   { bg: color.surface,       text: color.textMuted, border: color.border        },
+  orange: { bg: color.orangeMuted,       text: color.orange,    border: color.orangeBorder      },
+  green:  { bg: color.successBg,         text: color.success,   border: color.successBorder     },
+  red:    { bg: color.errorBg,           text: color.error,     border: color.errorBorder       },
+  yellow: { bg: color.warningBg,         text: color.warning,   border: color.warningBorder     },
+  blue:   { bg: color.infoBg,            text: color.info,      border: color.infoBorder        },
+  purple: { bg: "rgba(167,139,250,0.12)",text: "#a78bfa",       border: "rgba(167,139,250,0.3)" },
+  gray:   { bg: color.surface,           text: color.textMuted, border: color.border            },
+  // Medal colours for leaderboard
+  gold:   { bg: "rgba(251,191,36,0.18)", text: "#f59e0b",       border: "rgba(251,191,36,0.4)"  },
+  silver: { bg: "rgba(156,163,175,0.18)",text: "#9ca3af",       border: "rgba(156,163,175,0.4)" },
+  bronze: { bg: "rgba(180,83,9,0.18)",   text: "#b45309",       border: "rgba(180,83,9,0.4)"    },
 };
 
 const sizeMap: Record<BadgeSize, React.CSSProperties> = {

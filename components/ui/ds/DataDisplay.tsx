@@ -36,11 +36,13 @@ export function ProgressBar({ value, max = 100, color: c, height = 6, label, sho
 
 // ── Avatar ────────────────────────────────────────────────────────────────────
 
-interface AvatarProps {
+export interface AvatarProps {
   name?:   string;
   src?:    string | null;
   size?:   number;
   color?:  string;
+  /** Leaderboard rank overlay — shows number badge in bottom-right corner */
+  rank?:   number;
   style?:  React.CSSProperties;
 }
 
@@ -51,14 +53,24 @@ function initials(name: string) {
 const avatarColors = ["#e8620a", "#4ade80", "#60a5fa", "#a78bfa", "#fbbf24", "#f87171", "#34d399"];
 function pickColor(name: string) { return avatarColors[name.charCodeAt(0) % avatarColors.length]; }
 
-export function Avatar({ name = "?", src, size = 36, color: c, style }: AvatarProps) {
+const MEDAL: Record<number, string> = { 1: "#f59e0b", 2: "#9ca3af", 3: "#b45309" };
+
+export function Avatar({ name = "?", src, size = 36, color: c, rank, style }: AvatarProps) {
   const bg = c ?? (name ? pickColor(name) : color.orange);
+  const rankColor = rank ? (MEDAL[rank] ?? color.orange) : null;
   return (
-    <div style={{ width: size, height: size, borderRadius: radius.full, flexShrink: 0, overflow: "hidden", background: src ? "transparent" : `${bg}22`, border: `2px solid ${bg}44`, display: "flex", alignItems: "center", justifyContent: "center", ...style }}>
-      {src ? (
-        <img src={src} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-      ) : (
-        <span style={{ fontSize: size * 0.36, fontWeight: 700, color: bg, fontFamily: font.body, userSelect: "none" }}>{initials(name)}</span>
+    <div style={{ position: "relative", width: size, height: size, flexShrink: 0, display: "inline-flex", ...style }}>
+      <div style={{ width: size, height: size, borderRadius: radius.full, overflow: "hidden", background: src ? "transparent" : `${bg}22`, border: `2px solid ${bg}44`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {src ? (
+          <img src={src} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : (
+          <span style={{ fontSize: size * 0.36, fontWeight: 700, color: bg, fontFamily: font.body, userSelect: "none" }}>{initials(name)}</span>
+        )}
+      </div>
+      {rank && (
+        <div style={{ position: "absolute", bottom: -2, right: -2, width: size * 0.42, height: size * 0.42, borderRadius: "50%", background: rankColor!, border: `2px solid ${color.dark}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: size * 0.22, fontWeight: 800, color: "#fff", fontFamily: font.body }}>
+          {rank}
+        </div>
       )}
     </div>
   );

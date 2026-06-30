@@ -41,7 +41,7 @@ export * from "./Navigation";     // Breadcrumbs, Tabs, SegmentedControl,
 
 // ── Layout primitives ─────────────────────────────────────────────────────────
 export * from "./Layout";         // Page, PageHeader, Container, TwoCol,
-                                  // Divider, SectionRow, StatStrip
+                                  // Divider, SectionDivider, SectionRow, StatStrip
 export * from "./Layouts";        // StickyHeader, AuthLayout, PublicLayout,
                                   // DashboardLayout, AdminContent,
                                   // SettingsLayout, EventLayout
