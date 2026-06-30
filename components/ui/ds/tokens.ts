@@ -85,3 +85,46 @@ export const spacing = {
   12: "48px",
   16: "64px",
 } as const;
+
+/** Z-index scale — use these instead of raw numbers */
+export const zIndex = {
+  base:     0,
+  raised:   10,
+  dropdown: 100,
+  sticky:   200,
+  overlay:  300,
+  modal:    400,
+  popover:  500,
+  toast:    600,
+  tooltip:  700,
+} as const;
+
+/** Responsive breakpoints (use in window.innerWidth checks or CSS media queries) */
+export const breakpoint = {
+  xs:  360,
+  sm:  480,
+  md:  768,
+  lg:  1024,
+  xl:  1280,
+  xxl: 1440,
+} as const;
+
+/** Standardised icon sizes — apply as fontSize or width/height */
+export const iconSize = {
+  xs:  12,
+  sm:  14,
+  md:  18,
+  lg:  22,
+  xl:  28,
+  xxl: 36,
+} as const;
+
+/** Content container max-widths */
+export const maxWidth = {
+  xs:   480,
+  sm:   640,
+  md:   768,
+  lg:   960,
+  xl:   1100,
+  full: 1280,
+} as const;
