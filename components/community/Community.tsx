@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Search, X } from "lucide-react";
 import { MenuUser } from "@/components/ui/UserMenu";
 import AppNav from "@/components/layout/AppNav";
 import ActivityFeed from "@/components/feed/ActivityFeed";
 import PostCard from "@/components/community/PostCard";
 import CreatePost from "@/components/community/CreatePost";
 import type { UserPost } from "@/app/api/posts/route";
+import { Avatar, Card, Chip, Button, Label, Tabs, SearchInput, EmptyState, Skeleton, color } from "@/components/ui/ds";
 
 interface User   { firstName: string; lastName: string; email: string; phone: string; goal: string; location: string; photo: string | null; }
 interface Runner { user_email: string; user_name: string; location: string; goal: string; total_points: number; month_points: number; }
@@ -31,24 +31,23 @@ function RunnerCard({
   onFollow: (email: string) => void;
 }) {
   return (
-    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "0.875rem 1rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
-      <div style={{ width: 42, height: 42, borderRadius: "50%", background: "var(--gradient-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.85rem", fontWeight: 700, color: "#fff", flexShrink: 0 }}>
-        {initials(runner.user_name)}
-      </div>
+    <Card style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+      <Avatar name={runner.user_name} size={42} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: "0.875rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{runner.user_name}</div>
-        <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 20, background: "var(--surface-elevated)", color: "var(--muted-foreground)" }}>📍 {runner.location}</span>
-          <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 20, background: "oklch(0.72 0.19 49 / 8%)", color: "var(--cs-orange)", fontWeight: 600 }}>{runner.total_points ?? 0} pts</span>
-          {runner.goal && <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 20, background: "var(--surface-elevated)", color: "var(--muted-foreground)" }}>🎯 {goalLabel[runner.goal] ?? runner.goal}</span>}
+        <div style={{ fontSize: "0.875rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{runner.user_name}</div>
+        <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" as const }}>
+          <Chip label={`📍 ${runner.location}`} size="xs" color={color.textMuted} />
+          <Chip label={`${runner.total_points ?? 0} pts`} size="xs" color={color.orange} />
+          {runner.goal && <Chip label={`🎯 ${goalLabel[runner.goal] ?? runner.goal}`} size="xs" color={color.textMuted} />}
         </div>
       </div>
       {!isSelf && (
-        <button onClick={() => onFollow(runner.user_email)} disabled={busy} style={{ flexShrink: 0, padding: "6px 14px", borderRadius: 8, fontSize: "0.78rem", fontWeight: 600, cursor: busy ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", border: "1px solid", transition: "all 0.15s", opacity: busy ? 0.6 : 1, background: isFollowing ? "transparent" : "var(--gradient-accent)", color: isFollowing ? "var(--muted-foreground)" : "#fff", borderColor: isFollowing ? "var(--border)" : "transparent" }}>
+        <Button size="sm" variant={isFollowing ? "ghost" : "primary"} loading={busy}
+          onClick={() => onFollow(runner.user_email)} style={{ flexShrink: 0 }}>
           {busy ? "…" : isFollowing ? "Following" : "Follow"}
-        </button>
+        </Button>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -63,7 +62,6 @@ export default function Community() {
   const [searching,    setSearching]    = useState(false);
   const [followingSet, setFollowingSet] = useState<Set<string>>(new Set());
   const [followBusy,   setFollowBusy]   = useState<Set<string>>(new Set());
-  const inputRef = useRef<HTMLInputElement>(null);
 
   // Posts tab
   const [posts,        setPosts]        = useState<UserPost[]>([]);
@@ -150,30 +148,20 @@ export default function Community() {
         </div>
 
         {/* Tabs */}
-        <div style={{ display: "flex", gap: 4, padding: 4, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, marginBottom: "1.25rem" }}>
-          {([["discover","🔍 Discover"],["posts","✍️ Posts"],["activity","⚡ Activity"]] as [Tab,string][]).map(([t, label]) => (
-            <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: "8px 8px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: "0.75rem", fontWeight: 600, background: tab === t ? "var(--gradient-accent)" : "transparent", color: tab === t ? "#fff" : "var(--muted-foreground)", boxShadow: tab === t ? "var(--shadow-orange)" : "none", transition: "all 0.15s", whiteSpace: "nowrap" }}>
-              {label}
-            </button>
-          ))}
-        </div>
+        <Tabs
+          tabs={[{ key: "discover", label: "🔍 Discover" }, { key: "posts", label: "✍️ Posts" }, { key: "activity", label: "⚡ Activity" }]}
+          active={tab} onChange={v => setTab(v as Tab)} variant="pill"
+          style={{ marginBottom: "1.25rem" }} />
 
         {/* ── DISCOVER TAB ── */}
         {tab === "discover" && (
           <>
-            <div style={{ position: "relative", marginBottom: "1rem" }}>
-              <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted-foreground)" }} />
-              <input ref={inputRef} type="text" placeholder="Search by name or location…" value={query} onChange={e => setQuery(e.target.value)}
-                style={{ width: "100%", padding: "11px 36px 11px 38px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, color: "var(--foreground)", fontSize: "0.875rem", fontFamily: "var(--font-body)", outline: "none", boxSizing: "border-box" }}
-                onFocus={e => { e.currentTarget.style.borderColor = "oklch(0.72 0.19 49 / 60%)"; }}
-                onBlur={e  => { e.currentTarget.style.borderColor = "var(--border)"; }} />
-              {query && (
-                <button onClick={() => { setQuery(""); inputRef.current?.focus(); }}
-                  style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "var(--muted-foreground)", cursor: "pointer", display: "flex", padding: 0 }}>
-                  <X size={15} />
-                </button>
-              )}
-            </div>
+            <SearchInput
+              value={query} placeholder="Search by name or location…"
+              onChange={e => setQuery(e.target.value)}
+              onClear={() => setQuery("")}
+              loading={searching}
+              style={{ marginBottom: "1rem" }} />
 
             <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginBottom: "0.75rem" }}>
               {searching ? "Searching…" : `${others.length} runner${others.length !== 1 ? "s" : ""} found`}
@@ -181,7 +169,7 @@ export default function Community() {
 
             {!searching && following.length > 0 && !query && (
               <div style={{ marginBottom: "1.25rem" }}>
-                <div style={{ fontSize: 10, color: "var(--cs-orange)", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700, marginBottom: "0.5rem" }}>Following · {following.length}</div>
+                <Label style={{ marginBottom: "0.5rem" }}>Following · {following.length}</Label>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                   {following.map(r => <RunnerCard key={r.user_email} runner={r} isFollowing={true} busy={followBusy.has(r.user_email)} isSelf={false} onFollow={toggleFollow} />)}
                 </div>
@@ -190,19 +178,18 @@ export default function Community() {
 
             <div>
               {!searching && (notFollowing.length > 0 || query) && (
-                <div style={{ fontSize: 10, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600, marginBottom: "0.5rem" }}>
+                <Label style={{ color: color.textMuted, marginBottom: "0.5rem" }}>
                   {query ? `Results for "${query}"` : "Discover runners"}
-                </div>
+                </Label>
               )}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 {searching ? (
-                  [1,2,3].map(i => <div key={i} style={{ height: 68, borderRadius: 12, background: "var(--surface)", border: "1px solid var(--border)", opacity: 0.6 }} />)
+                  [1,2,3].map(i => <Skeleton key={i} height="68px" radius="12px" />)
                 ) : (query ? others : notFollowing).length === 0 ? (
-                  <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "2rem", textAlign: "center" }}>
-                    <div style={{ fontSize: "1.75rem", marginBottom: 8 }}>🔍</div>
-                    <div style={{ fontSize: "0.875rem", fontWeight: 600, marginBottom: 4 }}>{query ? "No runners found" : "No new runners to discover"}</div>
-                    <div style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>{query ? "Try a different name or location." : "Check back as more members join."}</div>
-                  </div>
+                  <EmptyState icon="🔍"
+                    title={query ? "No runners found" : "No new runners to discover"}
+                    body={query ? "Try a different name or location." : "Check back as more members join."}
+                    style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12 }} />
                 ) : (
                   (query ? others : notFollowing).map(r => <RunnerCard key={r.user_email} runner={r} isFollowing={followingSet.has(r.user_email)} busy={followBusy.has(r.user_email)} isSelf={r.user_email === user.email} onFollow={toggleFollow} />)
                 )}
@@ -215,30 +202,21 @@ export default function Community() {
         {tab === "posts" && user && (
           <>
             {/* Compose button */}
-            <button onClick={() => setShowCreate(true)}
-              style={{ display: "flex", alignItems: "center", gap: "0.6rem", width: "100%", padding: "0.875rem 1rem", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, cursor: "pointer", fontFamily: "var(--font-body)", fontSize: "0.85rem", color: "var(--muted-foreground)", marginBottom: "1rem", textAlign: "left", transition: "border-color 0.15s" }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = "oklch(0.72 0.19 49 / 40%)")}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = "var(--border)")}>
-              <div style={{ width: 34, height: 34, borderRadius: "50%", background: "oklch(0.72 0.19 49 / 12%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem", fontWeight: 700, color: "var(--cs-orange)", flexShrink: 0 }}>
-                {user.firstName.charAt(0)}
-              </div>
-              <span>Share a run, achievement, or question…</span>
-              <span style={{ marginLeft: "auto", fontSize: "0.75rem", color: "var(--cs-orange)", fontWeight: 700, flexShrink: 0 }}>Post</span>
-            </button>
+            <Card hoverable onClick={() => setShowCreate(true)} style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1rem", cursor: "pointer" }}>
+              <Avatar name={user.firstName} size={34} />
+              <span style={{ fontSize: "0.85rem", color: "var(--muted-foreground)", flex: 1 }}>Share a run, achievement, or question…</span>
+              <span style={{ fontSize: "0.75rem", color: color.orange, fontWeight: 700, flexShrink: 0 }}>Post</span>
+            </Card>
 
             {postsLoading ? (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
-                {[1,2,3].map(i => <div key={i} style={{ height: 120, borderRadius: 14, background: "var(--surface)", border: "1px solid var(--border)", opacity: 0.6 }} />)}
+                {[1,2,3].map(i => <Skeleton key={i} height="120px" radius="14px" />)}
               </div>
             ) : posts.length === 0 ? (
-              <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "2.5rem 1.5rem", textAlign: "center" }}>
-                <div style={{ fontSize: "2rem", marginBottom: 8 }}>✍️</div>
-                <div style={{ fontSize: "0.9rem", fontWeight: 600, marginBottom: 4 }}>No posts yet</div>
-                <div style={{ fontSize: "0.8rem", color: "var(--muted-foreground)", marginBottom: "1rem" }}>Be the first to share a run update, achievement, or question.</div>
-                <button onClick={() => setShowCreate(true)} style={{ padding: "9px 20px", background: "var(--gradient-accent)", color: "#fff", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: "0.82rem", fontWeight: 700, boxShadow: "var(--shadow-orange)" }}>
-                  Create first post →
-                </button>
-              </div>
+              <EmptyState icon="✍️" title="No posts yet"
+                body="Be the first to share a run update, achievement, or question."
+                action={<Button size="sm" onClick={() => setShowCreate(true)}>Create first post →</Button>}
+                style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14 }} />
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 {posts.map(p => (
