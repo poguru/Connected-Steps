@@ -3,6 +3,7 @@
 import { useState, FormEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { Alert } from "@/components/ui/ds";
 
 export default function ForgotPasswordForm() {
   const [email,   setEmail]   = useState("");
@@ -83,12 +84,7 @@ export default function ForgotPasswordForm() {
                 />
               </div>
 
-              {error && (
-                <div className="text-xs px-3 py-2 rounded mb-4 text-center"
-                  style={{ background: "rgba(226,75,74,0.1)", border: "1px solid rgba(226,75,74,0.3)", color: "#f09595" }}>
-                  {error}
-                </div>
-              )}
+              {error && <Alert variant="error" style={{ marginBottom: "1rem" }}>{error}</Alert>}
 
               <button
                 type="submit"

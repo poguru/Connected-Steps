@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Eye, EyeOff, Camera, CheckCircle2 } from "lucide-react";
 import OtpInput from "./OtpInput";
+import { Alert } from "@/components/ui/ds";
 
 const GOALS = [
   { id: "5k",       label: "First 5K"            },
@@ -182,11 +183,9 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
     return true;
   }
 
-  // ── Error block ───────────────────────────────────────────────────────────
+  // ── Error block — uses DS Alert for visual consistency ────────────────────
   const ErrorBlock = ({ msg }: { msg: string }) => (
-    <div style={{ background: "oklch(0.62 0.22 22 / 10%)", border: "1px solid oklch(0.62 0.22 22 / 30%)", borderRadius: 8, padding: "10px 14px", fontSize: "0.8rem", color: "#f09595", textAlign: "center" }}>
-      {msg}
-    </div>
+    <Alert variant="error">{msg}</Alert>
   );
 
   // ── Progress bar ──────────────────────────────────────────────────────────

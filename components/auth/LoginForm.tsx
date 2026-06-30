@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import OtpInput from "./OtpInput";
+import { Alert } from "@/components/ui/ds";
 
 const inputStyle: React.CSSProperties = {
   width: "100%", padding: "11px 14px",
@@ -192,7 +193,7 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
         </Link>
       </div>
 
-      {pwError && <div style={{ background: "oklch(0.62 0.22 22 / 10%)", border: "1px solid oklch(0.62 0.22 22 / 30%)", borderRadius: 8, padding: "10px 14px", fontSize: "0.8rem", color: "#f09595", textAlign: "center" }}>{pwError}</div>}
+      {pwError && <Alert variant="error">{pwError}</Alert>}
 
       <button type="button" onClick={submitLogin} onTouchEnd={submitLogin} disabled={pwLoading} style={{ width: "100%", padding: "13px", borderRadius: 999, background: pwLoading ? "oklch(0.72 0.19 49 / 60%)" : "var(--gradient-accent)", color: "var(--accent-foreground)", border: "none", cursor: pwLoading ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem", boxShadow: pwLoading ? "none" : "var(--shadow-orange)", transition: "opacity 0.2s" }}>
         {pwLoading ? "Signing in…" : "Sign in"}
@@ -212,7 +213,7 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
         value={identifier} onChange={e => { setIdentifier(e.target.value); setOtpError(""); }}
         autoComplete="username" onFocus={focusOn} onBlur={focusOff}
       />
-      {otpError && <div style={{ background: "oklch(0.62 0.22 22 / 10%)", border: "1px solid oklch(0.62 0.22 22 / 30%)", borderRadius: 8, padding: "10px 14px", fontSize: "0.8rem", color: "#f09595", textAlign: "center" }}>{otpError}</div>}
+      {otpError && <Alert variant="error">{otpError}</Alert>}
       <button
         type="button" onClick={sendOtp} disabled={sending || !identifier.trim()}
         style={{ width: "100%", padding: "13px", borderRadius: 999, background: identifier.trim() ? "var(--gradient-accent)" : "oklch(0.72 0.19 49 / 30%)", color: "var(--accent-foreground)", border: "none", cursor: identifier.trim() ? "pointer" : "not-allowed", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem", boxShadow: identifier.trim() ? "var(--shadow-orange)" : "none" }}
@@ -231,7 +232,7 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
         {"Check your inbox."}
       </p>
       <OtpInput value={otpCode} onChange={v => { setOtpCode(v); setOtpError(""); }} />
-      {otpError && <div style={{ background: "oklch(0.62 0.22 22 / 10%)", border: "1px solid oklch(0.62 0.22 22 / 30%)", borderRadius: 8, padding: "10px 14px", fontSize: "0.8rem", color: "#f09595", textAlign: "center" }}>{otpError}</div>}
+      {otpError && <Alert variant="error">{otpError}</Alert>}
       <button
         type="button" onClick={verifyOtp} disabled={verifying || otpCode.length !== 6}
         style={{ width: "100%", padding: "13px", borderRadius: 999, background: otpCode.length === 6 ? "var(--gradient-accent)" : "oklch(0.72 0.19 49 / 30%)", color: "var(--accent-foreground)", border: "none", cursor: otpCode.length === 6 ? "pointer" : "not-allowed", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem", boxShadow: otpCode.length === 6 ? "var(--shadow-orange)" : "none" }}

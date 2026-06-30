@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { Eye, EyeOff } from "lucide-react";
+import { Alert } from "@/components/ui/ds";
 
 export default function ResetPasswordForm() {
   const searchParams = useSearchParams();
@@ -24,7 +25,7 @@ export default function ResetPasswordForm() {
       <div className="auth-layout">
         <div className="auth-right">
           <div style={{ width: "100%", maxWidth: "380px", textAlign: "center" }}>
-            <div style={{ fontSize: "0.9rem", color: "#f09595", marginBottom: "1rem" }}>Invalid or missing reset link.</div>
+            <Alert variant="error" style={{ marginBottom: "1rem" }}>Invalid or missing reset link.</Alert>
             <Link href="/auth/forgot-password" style={{ fontSize: "0.8rem", color: "var(--cs-orange)" }}>Request a new one</Link>
           </div>
         </div>
@@ -139,12 +140,7 @@ export default function ResetPasswordForm() {
                 </button>
               </div>
 
-              {error && (
-                <div className="text-xs px-3 py-2 rounded mb-4 text-center"
-                  style={{ background: "rgba(226,75,74,0.1)", border: "1px solid rgba(226,75,74,0.3)", color: "#f09595" }}>
-                  {error}
-                </div>
-              )}
+              {error && <Alert variant="error" style={{ marginBottom: "1rem" }}>{error}</Alert>}
 
               <button
                 type="submit"
