@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { PageHeader, Label, Card, Alert, color } from "@/components/ui/ds";
 
 interface Metrics {
   // Counts
@@ -139,30 +140,25 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div style={{ padding: "2rem 2rem 3rem", maxWidth: 1000, margin: "0 auto" }}>
+    <div style={{ padding: "1.75rem 2rem 3rem", maxWidth: 1000, margin: "0 auto" }}>
 
-      {/* Header */}
-      <div style={{ marginBottom: "2rem" }}>
-        <h1 style={{ margin: 0, fontSize: "1.4rem", fontWeight: 700, color: "#fff" }}>Dashboard</h1>
-        <p style={{ margin: "4px 0 0", fontSize: 13, color: "#444" }}>{today()}</p>
-      </div>
+      <PageHeader title="Dashboard" style={{ marginBottom: "1.75rem" }}
+        breadcrumb={<span style={{ fontSize: 12, color: color.textMuted }}>{today()}</span>} />
 
       {/* KPI sections */}
       {KPI_ROWS.map(row => (
         <div key={row.section} style={{ marginBottom: "1.75rem" }}>
-          <div style={{ fontSize: 10, color: "#333", textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: 700, marginBottom: "0.75rem" }}>
-            {row.section}
-          </div>
+          <Label style={{ marginBottom: "0.75rem", color: color.textMuted }}>{row.section}</Label>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.875rem" }}>
             {row.cards.map(card => {
               const inner = (
-                <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem 1.5rem", height: "100%", boxSizing: "border-box" as const }}>
-                  <div style={{ fontSize: "1.6rem", fontWeight: 800, color: card.color ?? "#e8620a", letterSpacing: "-0.02em", lineHeight: 1 }}>
+                <Card hoverable={!!card.href} style={{ height: "100%", boxSizing: "border-box" }}>
+                  <div style={{ fontSize: "1.6rem", fontWeight: 800, color: card.color ?? color.orange, letterSpacing: "-0.02em", lineHeight: 1 }}>
                     {card.value}
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#ccc", marginTop: 6 }}>{card.label}</div>
-                  <div style={{ fontSize: 11, color: "#3a3a3a", marginTop: 2 }}>{card.sub}</div>
-                </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: color.textSecondary, marginTop: 6 }}>{card.label}</div>
+                  <div style={{ fontSize: 11, color: color.textMuted, marginTop: 2 }}>{card.sub}</div>
+                </Card>
               );
               return card.href ? (
                 <Link key={card.label} href={card.href} style={{ textDecoration: "none" }}>{inner}</Link>
@@ -176,48 +172,42 @@ export default function AdminDashboard() {
 
       {/* Pending approvals banner */}
       {!loading && pending > 0 && (
-        <div style={{ background: "rgba(232,98,10,0.07)", border: "1px solid rgba(232,98,10,0.2)", borderRadius: 10, padding: "1rem 1.25rem", marginBottom: "1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+        <Alert variant="warning" style={{ marginBottom: "1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" as const, gap: "1rem" }}>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#e8620a" }}>
+            <div style={{ fontWeight: 600 }}>
               {pending} item{pending !== 1 ? "s" : ""} awaiting review
             </div>
-            <div style={{ fontSize: 12, color: "#666", marginTop: 3 }}>
+            <div style={{ fontSize: 12, marginTop: 2, opacity: 0.8 }}>
               {metrics!.pendingStories > 0 && `${metrics!.pendingStories} runner ${metrics!.pendingStories === 1 ? "story" : "stories"}`}
               {metrics!.pendingStories > 0 && metrics!.pendingPosts > 0 && " · "}
               {metrics!.pendingPosts > 0 && `${metrics!.pendingPosts} community ${metrics!.pendingPosts === 1 ? "post" : "posts"}`}
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
             {metrics!.pendingStories > 0 && (
-              <Link href="/admin/stories" style={{ fontSize: 12, fontWeight: 600, color: "#e8620a", textDecoration: "none", background: "rgba(232,98,10,0.15)", borderRadius: 6, padding: "5px 12px" }}>
+              <Link href="/admin/stories" style={{ fontSize: 12, fontWeight: 600, color: color.warning, textDecoration: "none", background: "rgba(251,191,36,0.15)", borderRadius: 6, padding: "5px 12px" }}>
                 Review Stories
               </Link>
             )}
             {metrics!.pendingPosts > 0 && (
-              <Link href="/admin/community" style={{ fontSize: 12, fontWeight: 600, color: "#e8620a", textDecoration: "none", background: "rgba(232,98,10,0.15)", borderRadius: 6, padding: "5px 12px" }}>
+              <Link href="/admin/community" style={{ fontSize: 12, fontWeight: 600, color: color.warning, textDecoration: "none", background: "rgba(251,191,36,0.15)", borderRadius: 6, padding: "5px 12px" }}>
                 Review Posts
               </Link>
             )}
           </div>
-        </div>
+        </Alert>
       )}
 
       {/* Quick actions */}
       <div>
-        <div style={{ fontSize: 11, color: "#333", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700, marginBottom: "0.75rem" }}>
-          Quick Actions
-        </div>
+        <Label style={{ marginBottom: "0.75rem", color: color.textMuted }}>Quick Actions</Label>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "0.75rem" }}>
           {QUICK_ACTIONS.map(action => (
             <Link key={action.href} href={action.href} style={{ textDecoration: "none" }}>
-              <div
-                style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "1rem 1.25rem", cursor: "pointer", transition: "border-color 0.15s" }}
-                onMouseEnter={e => (e.currentTarget.style.borderColor = "rgba(232,98,10,0.3)")}
-                onMouseLeave={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)")}
-              >
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#e0e0e0", marginBottom: 3 }}>{action.label}</div>
-                <div style={{ fontSize: 12, color: "#444" }}>{action.desc}</div>
-              </div>
+              <Card hoverable style={{ cursor: "pointer" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: color.textPrimary, marginBottom: 3 }}>{action.label}</div>
+                <div style={{ fontSize: 12, color: color.textMuted }}>{action.desc}</div>
+              </Card>
             </Link>
           ))}
         </div>
