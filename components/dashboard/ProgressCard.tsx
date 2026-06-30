@@ -1,5 +1,7 @@
 "use client";
 
+import { Card, ProgressBar, Skeleton } from "@/components/ui/ds";
+
 interface Achievement { icon: string; label: string; earned: boolean; }
 
 interface Props {
@@ -36,15 +38,15 @@ export default function ProgressCard({ totalPoints, monthSessions, totalSessions
   const monthPct = Math.min(monthSessions / MONTHLY_TARGET, 1);
 
   if (loading) return (
-    <div style={{ background: "var(--surface)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "1.25rem", marginBottom: "1rem" }}>
-      {[60, 40, 80].map((w, i) => (
-        <div key={i} style={{ height: 14, width: `${w}%`, background: "rgba(255,255,255,0.06)", borderRadius: 7, marginBottom: 10 }} />
-      ))}
-    </div>
+    <Card style={{ marginBottom: "1rem" }}>
+      <Skeleton width="60%" height="14px" style={{ marginBottom: 10 }} />
+      <Skeleton width="40%" height="14px" style={{ marginBottom: 10 }} />
+      <Skeleton width="80%" height="14px" />
+    </Card>
   );
 
   return (
-    <div style={{ background: "var(--surface)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "1.25rem", marginBottom: "1rem" }}>
+    <Card style={{ background: "var(--surface)", border: "1px solid rgba(255,255,255,0.06)", marginBottom: "1rem" }}>
 
       {/* Header */}
       <div className="cs-label" style={{ marginBottom: "1rem" }}>My Progress</div>
@@ -70,11 +72,7 @@ export default function ProgressCard({ totalPoints, monthSessions, totalSessions
       </div>
 
       {/* Tier progress bar */}
-      <div style={{ marginBottom: "0.25rem" }}>
-        <div style={{ height: 5, background: "rgba(255,255,255,0.07)", borderRadius: 999, overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${progress * 100}%`, background: tier.color, borderRadius: 999, transition: "width 0.6s ease" }} />
-        </div>
-      </div>
+      <ProgressBar value={progress * 100} max={100} color={tier.color} height={5} style={{ marginBottom: "0.25rem" }} />
       <div style={{ fontSize: "10px", color: "var(--muted-foreground)", marginBottom: "1rem" }}>
         {tier.max === Infinity
           ? "Maximum tier reached"
@@ -105,9 +103,8 @@ export default function ProgressCard({ totalPoints, monthSessions, totalSessions
             {monthSessions}/{MONTHLY_TARGET} sessions
           </div>
         </div>
-        <div style={{ height: 5, background: "rgba(255,255,255,0.07)", borderRadius: 999, overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${monthPct * 100}%`, background: monthSessions >= MONTHLY_TARGET ? "#4ade80" : "var(--gradient-accent)", borderRadius: 999, transition: "width 0.6s ease" }} />
-        </div>
+        <ProgressBar value={monthSessions} max={MONTHLY_TARGET} height={5}
+          color={monthSessions >= MONTHLY_TARGET ? "#4ade80" : "var(--cs-orange)"} />
       </div>
 
       {/* Achievements strip */}
@@ -129,6 +126,6 @@ export default function ProgressCard({ totalPoints, monthSessions, totalSessions
           </div>
         ))}
       </div>
-    </div>
+    </Card>
   );
 }
