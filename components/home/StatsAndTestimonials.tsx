@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { Users, Activity, Dumbbell, MessageSquare, Quote, Star } from "lucide-react";
+import { Card, Label, SkeletonCard } from "@/components/ui/ds";
 
 const FALLBACK_STORIES = [
   { id: -1, user_name: "Priya Sharma",  achievement: "Ran first 10K in 2025",         quote: "I went from 'I can't run a kilometre' to finishing my first 10K in four months. The coaches and community made all the difference.", rating: 5 },
@@ -52,28 +53,7 @@ function CountUp({ to, suffix = "" }: { to: number; suffix?: string }) {
   return <span ref={ref}>{count.toLocaleString()}{suffix}</span>;
 }
 
-// ── Skeleton shimmer ──────────────────────────────────────────────────────────
-function StatSkeleton() {
-  return (
-    <div style={{ position: "relative", overflow: "hidden", borderRadius: 12, border: "1px solid var(--border)", background: "var(--surface)", padding: "1.25rem", boxShadow: "var(--shadow-md)" }}>
-      <div style={{ width: 48, height: 48, borderRadius: 12, background: "var(--border)", marginBottom: "1.25rem",
-        animation: "cs-shimmer 1.4s infinite",
-        backgroundImage: "linear-gradient(90deg, var(--border) 25%, var(--surface-elevated) 50%, var(--border) 75%)",
-        backgroundSize: "200% 100%",
-      }} />
-      <div style={{ height: 36, width: "60%", borderRadius: 6, marginBottom: 8,
-        animation: "cs-shimmer 1.4s infinite",
-        backgroundImage: "linear-gradient(90deg, var(--border) 25%, var(--surface-elevated) 50%, var(--border) 75%)",
-        backgroundSize: "200% 100%",
-      }} />
-      <div style={{ height: 14, width: "80%", borderRadius: 4,
-        animation: "cs-shimmer 1.4s infinite",
-        backgroundImage: "linear-gradient(90deg, var(--border) 25%, var(--surface-elevated) 50%, var(--border) 75%)",
-        backgroundSize: "200% 100%",
-      }} />
-    </div>
-  );
-}
+// StatSkeleton replaced by DS SkeletonCard (same visual, single source of truth)
 
 function initials(name: string) {
   return name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
@@ -136,23 +116,14 @@ export default function StatsAndTestimonials() {
 
   return (
     <>
-      <style>{`
-        @keyframes cs-shimmer {
-          0%   { background-position: 200% 0; }
-          100% { background-position: -200% 0; }
-        }
-      `}</style>
-
       {/* ── Stats grid ── */}
       <section style={{ maxWidth: 1280, margin: "0 auto", padding: "5rem 1.5rem" }}>
         <div style={{ display: "grid", gap: "1rem" }} className="sm:grid-cols-2 lg:grid-cols-4">
           {loading
-            ? Array.from({ length: 4 }).map((_, i) => <StatSkeleton key={i} />)
+            ? Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} lines={2} />)
             : statCards.map((s) => (
-              <div key={s.label}
-                style={{ position: "relative", overflow: "hidden", borderRadius: 12, border: "1px solid var(--border)", background: "var(--surface)", padding: "1.25rem", boxShadow: "var(--shadow-md)", transition: "transform 0.2s, box-shadow 0.2s" }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; (e.currentTarget as HTMLElement).style.boxShadow = "var(--shadow-lg)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.boxShadow = "var(--shadow-md)"; }}
+              <Card key={s.label} hoverable
+                style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-md)" }}
               >
                 {/* Icon */}
                 <div style={{ width: 48, height: 48, borderRadius: 12, display: "grid", placeItems: "center", color: "#fff", boxShadow: "var(--shadow-md)", marginBottom: "1.25rem" }} className={s.grad}>
@@ -169,7 +140,7 @@ export default function StatsAndTestimonials() {
 
                 {/* Label */}
                 <div style={{ marginTop: 4, fontSize: "0.875rem", color: "var(--muted-foreground)" }}>{s.label}</div>
-              </div>
+              </Card>
             ))
           }
         </div>
@@ -189,9 +160,7 @@ export default function StatsAndTestimonials() {
       <section style={{ background: "var(--gradient-soft)", padding: "5rem 0" }}>
         <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 1.5rem" }}>
           <div style={{ textAlign: "center", marginBottom: "3.5rem" }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--primary)", marginBottom: "0.75rem" }}>
-              Runner Stories
-            </div>
+            <Label style={{ color: "var(--primary)", marginBottom: "0.75rem" }}>Runner Stories</Label>
             <h2 className="font-display" style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 700, letterSpacing: "-0.015em", color: "var(--foreground)" }}>
               Real runners. <span className="text-gradient-primary">Real results.</span>
             </h2>
@@ -208,8 +177,8 @@ export default function StatsAndTestimonials() {
 
           <div style={{ display: "grid", gap: "1.25rem" }} className="sm:grid-cols-2 lg:grid-cols-3">
             {display.slice(0, 3).map((s) => (
-              <div key={s.id}
-                style={{ borderRadius: 12, border: "1px solid var(--border)", background: "var(--surface)", padding: "1.25rem", display: "flex", flexDirection: "column", gap: "0.875rem", boxShadow: "var(--shadow-md)", borderTop: "2px solid var(--cs-orange)" }}>
+              <Card key={s.id}
+                style={{ background: "var(--surface)", border: "1px solid var(--border)", borderTop: "2px solid var(--cs-orange)", display: "flex", flexDirection: "column", gap: "0.875rem", boxShadow: "var(--shadow-md)" }}>
                 <Quote size={20} style={{ color: "var(--primary)", opacity: 0.5 }} />
                 <div style={{ display: "flex", gap: 2 }}>
                   {[1,2,3,4,5].map(i => (
@@ -228,7 +197,7 @@ export default function StatsAndTestimonials() {
                     <div style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 1 }}>{s.achievement}</div>
                   </div>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         </div>
