@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import EventCountdown from "@/components/events/EventCountdown";
 import { getLifecycle } from "@/lib/event-lifecycle";
+import { Chip, Button, SkeletonCard, EmptyState, color } from "@/components/ui/ds";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -209,9 +210,8 @@ function EventCard({
         {ev.cover_image && <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(13,13,16,0.75) 0%, transparent 50%)" }} />}
 
         {/* Type badge */}
-        <div style={{ position: "absolute", top: 10, left: 10, display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 999, background: conf.bg, border: `1px solid ${conf.color}30`, backdropFilter: "blur(6px)" }}>
-          <span style={{ fontSize: "10px" }}>{conf.icon}</span>
-          <span style={{ fontSize: "10px", fontWeight: 700, color: conf.color, textTransform: "uppercase", letterSpacing: "0.08em" }}>{conf.label}</span>
+        <div style={{ position: "absolute", top: 10, left: 10, backdropFilter: "blur(6px)" }}>
+          <Chip label={`${conf.icon} ${conf.label}`} size="xs" color={conf.color} />
         </div>
 
         {/* Live lifecycle countdown badge */}
@@ -269,31 +269,19 @@ function EventCard({
         {/* Actions */}
         <div style={{ display: "flex", gap: "0.5rem", marginTop: "auto", paddingTop: "0.75rem" }}>
           {lifecycle.isCompleted ? (
-            <div style={{ flex: 1, padding: "8px 14px", borderRadius: 8, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.3)", fontSize: "0.78rem", fontWeight: 700, textAlign: "center" }}>
-              Event Completed
-            </div>
+            <Chip label="Event Completed" size="sm" color={color.textMuted} style={{ flex: 1, justifyContent: "center" }} />
           ) : lifecycle.isLive ? (
-            <div style={{ flex: 1, padding: "8px 14px", borderRadius: 8, background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.25)", color: "#a78bfa", fontSize: "0.78rem", fontWeight: 700, textAlign: "center" }}>
-              ● Event Live Now
-            </div>
+            <Chip label="● Event Live Now" size="sm" color="#a78bfa" style={{ flex: 1, justifyContent: "center" }} />
           ) : !lifecycle.canRegister ? (
-            <div style={{ flex: 1, padding: "8px 14px", borderRadius: 8, background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.2)", color: "#f87171", fontSize: "0.78rem", fontWeight: 700, textAlign: "center" }}>
-              Registration Closed
-            </div>
+            <Chip label="Registration Closed" size="sm" color={color.error} style={{ flex: 1, justifyContent: "center" }} />
           ) : (
-            <button onClick={handleRegister}
-              style={{ flex: 1, padding: "8px 14px", borderRadius: 8, background: "var(--gradient-accent)", border: "none", color: "#fff", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", boxShadow: "var(--shadow-orange)" }}>
-              Register Now
-            </button>
+            <Button onClick={handleRegister} size="sm" fullWidth>Register Now</Button>
           )}
-          {/* Share only while registration is open — sharing a closed/live/completed event is misleading */}
           {lifecycle.canRegister && (
-            <button onClick={() => onShare(ev)}
-              style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", color: "var(--cs-muted)", fontSize: "0.78rem", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 5 }}
-              title="Share event">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            <Button variant="secondary" size="sm" onClick={() => onShare(ev)} title="Share event"
+              icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>}>
               Share
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -349,18 +337,12 @@ export default function UpcomingEvents() {
         </div>
 
         {loading ? (
-          // Skeleton
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "1rem" }}>
-            {[0,1,2].map(i => (
-              <div key={i} style={{ height: 320, borderRadius: 14, backgroundImage: "linear-gradient(90deg, var(--cs-charcoal) 25%, rgba(255,255,255,0.04) 50%, var(--cs-charcoal) 75%)", backgroundSize: "200% 100%", animation: "cs-shimmer 1.4s infinite" }} />
-            ))}
+            {[0,1,2].map(i => <SkeletonCard key={i} lines={3} />)}
           </div>
         ) : events.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "3rem 1rem" }}>
-            <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem", opacity: 0.35 }}>📅</div>
-            <div style={{ fontWeight: 600, color: "var(--cs-cream)", marginBottom: "0.4rem" }}>No upcoming events</div>
-            <div style={{ fontSize: "0.82rem", color: "var(--cs-muted)" }}>Check back soon — new events will be announced here.</div>
-          </div>
+          <EmptyState icon="📅" title="No upcoming events"
+            body="Check back soon — new events will be announced here." />
         ) : (
           <>
             {/* Desktop grid */}
