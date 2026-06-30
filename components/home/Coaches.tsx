@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { COACHES, CoachProfile } from "@/lib/coach-data";
+import { Chip, Button, Label, Card, color } from "@/components/ui/ds";
 
 interface Rating { coach_name: string; avg: number; count: number; }
 
@@ -20,15 +21,9 @@ function Stars({ val }: { val: number }) {
   );
 }
 
+// SectionLabel → DS Label (same orange, uppercase, letter-spacing)
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-      <div style={{ width: 20, height: 1, background: "rgba(232,98,10,0.7)", flexShrink: 0 }} />
-      <span style={{ fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--cs-orange)", fontWeight: 700 }}>
-        {children}
-      </span>
-    </div>
-  );
+  return <Label style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 10 }}>{children}</Label>;
 }
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
@@ -205,15 +200,10 @@ function CoachModal({
               gap: 10,
             }}>
               {coach.medals.map((m, i) => (
-                <div key={i} style={{
-                  display: "flex", gap: 10, alignItems: "flex-start",
-                  padding: "12px 14px",
-                  background: "rgba(232,98,10,0.06)", border: "1px solid rgba(232,98,10,0.18)",
-                  borderRadius: 10,
-                }}>
+                <Card key={i} variant="orange" style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                   <span style={{ fontSize: "1.15rem", flexShrink: 0 }}>{m.icon}</span>
                   <span style={{ fontSize: "0.81rem", color: "rgba(255,255,255,0.82)", lineHeight: 1.5 }}>{m.text}</span>
-                </div>
+                </Card>
               ))}
             </div>
           </section>
@@ -386,34 +376,13 @@ function CoachCard({
         </p>
 
         {/* Badges */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-          {badges.map(b => (
-            <span key={b} style={{
-              fontSize: 10, padding: "3px 8px", borderRadius: 4,
-              background: "rgba(232,98,10,0.09)", border: "1px solid rgba(232,98,10,0.28)",
-              color: "rgba(255,255,255,0.78)", whiteSpace: "nowrap", fontWeight: 500,
-            }}>
-              {b}
-            </span>
-          ))}
+        <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 5 }}>
+          {badges.map(b => <Chip key={b} label={b} size="xs" color={color.orange} />)}
         </div>
 
         {/* Know More */}
         <div style={{ marginTop: "auto", paddingTop: 4 }}>
-          <button
-            className="cs-know-more-btn"
-            onClick={onOpen}
-            style={{
-              fontSize: "0.76rem", fontWeight: 700,
-              color: "var(--cs-orange)",
-              background: "rgba(232,98,10,0.07)",
-              border: "1px solid rgba(232,98,10,0.32)",
-              borderRadius: 6, padding: "7px 14px",
-              cursor: "pointer", fontFamily: "var(--font-body)",
-            }}
-          >
-            Know More →
-          </button>
+          <Button variant="outline" size="sm" onClick={onOpen}>Know More →</Button>
         </div>
       </div>
     </div>
