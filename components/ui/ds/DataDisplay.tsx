@@ -107,14 +107,16 @@ interface ChipProps {
   onRemove?:   () => void;
   color?:      string;
   icon?:       string;
-  size?:       "sm" | "md";
+  size?:       "xs" | "sm" | "md";
   style?:      React.CSSProperties;
+  title?:      string;   // native HTML tooltip
 }
 
-export function Chip({ label, onRemove, color: c = color.orange, icon, size = "sm", style }: ChipProps) {
-  const sm = size === "sm";
+export function Chip({ label, onRemove, color: c = color.orange, icon, size = "sm", style, title }: ChipProps) {
+  const sm = size === "sm" || size === "xs";
+  const xs = size === "xs";
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: sm ? "2px 8px" : "4px 12px", background: `${c}14`, border: `1px solid ${c}30`, borderRadius: radius.full, fontSize: sm ? "11px" : "12px", fontWeight: 600, color: c, fontFamily: font.body, whiteSpace: "nowrap", ...style }}>
+    <span title={title} style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: xs ? "1px 6px" : sm ? "2px 8px" : "4px 12px", background: `${c}14`, border: `1px solid ${c}30`, borderRadius: radius.full, fontSize: xs ? "10px" : sm ? "11px" : "12px", fontWeight: 600, color: c, fontFamily: font.body, whiteSpace: "nowrap", ...style }}>
       {icon && <span style={{ fontSize: sm ? "11px" : "13px" }}>{icon}</span>}
       {label}
       {onRemove && (

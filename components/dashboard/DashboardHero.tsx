@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { calcMissToleranceStreak, calcBestStreak } from "@/lib/streak-utils";
+import { Avatar, Card, Chip, Button, color } from "@/components/ui/ds";
 
 interface SessionRecord {
   attended: boolean;
@@ -123,42 +124,27 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
           }}>
             {user.firstName}
           </h1>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const }}>
             {streak > 0 ? (
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(232,98,10,0.12)", border: "1px solid rgba(232,98,10,0.25)", borderRadius: 20, padding: "4px 10px" }}
-                title={`Best streak: ${bestStreak} sessions${nextMilestone ? ` · Next milestone: ${nextMilestone}` : " · All milestones reached!"}`}>
-                <span style={{ fontSize: "0.8rem" }}>🔥</span>
-                <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--cs-orange)" }}>{streak}-session streak</span>
-              </div>
+              <Chip label={`🔥 ${streak}-session streak`} color={color.orange} size="sm"
+                style={{ cursor: "help" }}
+                title={`Best streak: ${bestStreak} sessions${nextMilestone ? ` · Next milestone: ${nextMilestone}` : " · All milestones reached!"}`} />
             ) : sessionRecords.filter(r => r.attended).length > 0 ? (
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20, padding: "4px 10px" }}>
-                <span style={{ fontSize: "0.8rem" }}>💪</span>
-                <span style={{ fontSize: "11px", fontWeight: 600, color: "#888" }}>Start a streak!</span>
-              </div>
+              <Chip label="💪 Start a streak!" size="sm" />
             ) : null}
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 20, padding: "4px 10px" }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--foreground)", flexShrink: 0 }}>
-                <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-              </svg>
-              <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--foreground)" }}>{monthly} this month</span>
-            </div>
+            <Chip label={`📅 ${monthly} this month`} size="sm" />
           </div>
         </div>
 
         {/* Avatar */}
-        {user.photo ? (
-          <img src={user.photo} alt={user.firstName} style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover", border: "2.5px solid var(--cs-orange)", flexShrink: 0 }} />
-        ) : (
-          <div style={{ width: 52, height: 52, borderRadius: "50%", background: "oklch(0.72 0.19 49 / 15%)", border: "2.5px solid var(--cs-orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem", fontWeight: 800, color: "var(--cs-orange)", flexShrink: 0 }}>
-            {user.initials ?? user.firstName[0]?.toUpperCase()}
-          </div>
-        )}
+        <Avatar name={user.firstName} src={user.photo} size={52}
+          style={{ border: `2.5px solid ${color.orange}`, flexShrink: 0 }} />
       </div>
 
       {/* ── Today's Workout card ── */}
       {isActiveMember === null ? null : isActiveMember ? (
         plan && (
-          <div className="cs-clean-card" style={{ marginBottom: "0.625rem" }}>
+          <Card style={{ marginBottom: "0.625rem" }}>
             <div className="cs-label" style={{ marginBottom: 10 }}>Today&apos;s Workout</div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", minWidth: 0 }}>
               <div style={{
@@ -174,10 +160,10 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
                 <div style={{ fontSize: "0.78rem", color: "var(--muted-foreground)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{plan.detail}</div>
               </div>
             </div>
-          </div>
+          </Card>
         )
       ) : (
-        <div className="cs-clean-card" style={{ marginBottom: "0.625rem" }}>
+        <Card style={{ marginBottom: "0.625rem" }}>
           <div className="cs-label" style={{ marginBottom: 10 }}>Today&apos;s Workout</div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "0.5rem 0 0.25rem", gap: 10 }}>
             <div style={{ fontSize: "2rem" }}>🔒</div>
@@ -187,29 +173,19 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
               ✓ Coach-assigned training plan<br />
               ✓ Progress tracking
             </div>
-            <button
-              onClick={() => router.push("/pricing")}
-              style={{ marginTop: 4, padding: "9px 24px", background: "var(--gradient-accent)", color: "#fff", border: "none", borderRadius: 999, fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)", boxShadow: "var(--shadow-orange)" }}>
+            <Button size="sm" onClick={() => router.push("/pricing")} style={{ marginTop: 4 }}>
               Upgrade →
-            </button>
+            </Button>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* ── Next session card ── */}
       {nextSess && (
-        <div style={{
+        <Card style={{
           background: "var(--surface)",
-          borderRadius: 16,
-          padding: "1.25rem",
-          border: joined
-            ? "1px solid oklch(0.74 0.22 150 / 20%)"
-            : "1px solid rgba(255,255,255,0.06)",
-          marginBottom: "0.625rem",
-          minWidth: 0,
-          overflow: "hidden",
-          boxSizing: "border-box",
-          width: "100%",
+          border: joined ? `1px solid ${color.successBorder}` : "1px solid rgba(255,255,255,0.06)",
+          marginBottom: "0.625rem", width: "100%",
         }}>
           <div className="cs-label" style={{ marginBottom: 10, color: joined ? "#4ade80" : "var(--cs-orange)" }}>
             {joined ? "Your Upcoming Session" : "Up Next"}
@@ -251,45 +227,29 @@ export default function DashboardHero({ user, sessions, upcomingSessions, joined
           </div>
           {/* Row 2: CTA button — full width so it is always fully visible */}
           {joined ? (
-            <button
+            <Button variant="secondary" fullWidth size="sm"
               onClick={() => router.push("/scan")}
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginTop: "0.75rem", padding: "10px", background: "rgba(96,165,250,0.12)", color: "rgba(147,197,253,1)", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 10, fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)", boxSizing: "border-box" }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-              </svg>
-              Scan QR to Mark Attendance
-            </button>
+              style={{ marginTop: "0.75rem", color: color.info, borderColor: color.infoBorder, background: color.infoBg }}>
+              📱 Scan QR to Mark Attendance
+            </Button>
           ) : (
-            <button
+            <Button fullWidth size="sm"
               onClick={() => router.push(`/join/${nextSess.id}`)}
-              style={{ display: "block", width: "100%", marginTop: "0.75rem", padding: "10px", background: "var(--gradient-accent)", color: "#fff", border: "none", borderRadius: 10, fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)", boxShadow: "var(--shadow-orange)", textAlign: "center", boxSizing: "border-box" }}>
+              style={{ marginTop: "0.75rem" }}>
               Join Session →
-            </button>
+            </Button>
           )}
-        </div>
+        </Card>
       )}
 
 
       {/* Streak stats row */}
       {sessionRecords.filter(r => r.attended).length > 0 && (
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "0 0.125rem" }}>
-          {bestStreak > 0 && (
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "3px 10px" }}>
-              <span style={{ fontSize: "0.75rem" }}>🏆</span>
-              <span style={{ fontSize: "10px", color: "#aaa" }}>Best: <strong style={{ color: "#ccc" }}>{bestStreak}</strong></span>
-            </div>
-          )}
-          {nextMilestone && streak > 0 && (
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "3px 10px" }}>
-              <span style={{ fontSize: "0.75rem" }}>🎯</span>
-              <span style={{ fontSize: "10px", color: "#aaa" }}>{nextMilestone - streak} to {nextMilestone}</span>
-            </div>
-          )}
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const, padding: "0 0.125rem" }}>
+          {bestStreak > 0 && <Chip label={`🏆 Best: ${bestStreak}`} size="xs" />}
+          {nextMilestone && streak > 0 && <Chip label={`🎯 ${nextMilestone - streak} to ${nextMilestone}`} size="xs" />}
           {lastAttended && (
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "3px 10px" }}>
-              <span style={{ fontSize: "0.75rem" }}>📅</span>
-              <span style={{ fontSize: "10px", color: "#aaa" }}>Last: <strong style={{ color: "#ccc" }}>{new Date(lastAttended + "T12:00:00Z").toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</strong></span>
-            </div>
+            <Chip label={`📅 Last: ${new Date(lastAttended + "T12:00:00Z").toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`} size="xs" />
           )}
         </div>
       )}
