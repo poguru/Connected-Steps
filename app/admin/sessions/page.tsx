@@ -291,6 +291,11 @@ export default function AdminSessionsPage() {
     setPhotoUploading(false);
   };
 
+  // View More / Show Less state — no API calls, pure client-side slice
+  const INITIAL_VISIBLE = 5;
+  const PAGE_SIZE       = 5;
+  const [visibleCount,  setVisibleCount]  = useState(INITIAL_VISIBLE);
+
   const [copiedId,    setCopiedId]    = useState<string | null>(null);
   const [shareSession, setShareSession] = useState<Session | null>(null);
 
@@ -413,14 +418,28 @@ export default function AdminSessionsPage() {
             </form>
           </div>
 
-          {/* Sessions list */}
+          {/* Sessions list — sorted: upcoming (nearest first) then completed (most recent first) */}
+          {(() => {
+            const today = new Date().toISOString().slice(0, 10);
+            const upcoming  = sessions.filter(s => s.date >= today).sort((a, b) => a.date.localeCompare(b.date));
+            const completed = sessions.filter(s => s.date <  today).sort((a, b) => b.date.localeCompare(a.date));
+            const sortedSessions = [...upcoming, ...completed];
+            const visibleSessions = sortedSessions.slice(0, visibleCount);
+            const hasMore  = visibleCount < sortedSessions.length;
+            const isExpanded = visibleCount > INITIAL_VISIBLE;
+
+            return (
           <div>
-            <div style={{ fontSize: "10px", color: "#888", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Sessions ({sessions.length})</div>
+            <div style={{ fontSize: "10px", color: "#888", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.75rem" }}>
+              Sessions ({sessions.length})
+              {upcoming.length > 0 && <span style={{ color: "#4ade80", marginLeft: 6 }}>· {upcoming.length} upcoming</span>}
+            </div>
             {sessions.length === 0 ? (
               <div style={{ fontSize: "0.8rem", color: "#555" }}>No sessions yet.</div>
             ) : (
+              <>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                {sessions.map((s) => (
+                {visibleSessions.map((s) => (
                   <div key={s.id} style={{ borderRadius: "6px", border: "1px solid", borderColor: selected?.id === s.id ? "rgba(232,98,10,0.4)" : "rgba(255,255,255,0.07)", overflow: "hidden" }}>
 
                     {/* Session row */}
@@ -498,8 +517,56 @@ export default function AdminSessionsPage() {
                   </div>
                 ))}
               </div>
+
+              {/* View More / Show Less button */}
+              {(hasMore || isExpanded) && (
+                <div style={{ marginTop: "0.75rem", textAlign: "center" }}>
+                  {hasMore ? (
+                    <button
+                      onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+                      style={{
+                        background: "none",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        borderRadius: "6px",
+                        color: "#888",
+                        cursor: "pointer",
+                        fontSize: "0.78rem",
+                        fontFamily: "inherit",
+                        padding: "7px 20px",
+                        transition: "border-color 0.15s, color 0.15s",
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(232,98,10,0.4)"; (e.currentTarget as HTMLButtonElement).style.color = "#e8620a"; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.12)"; (e.currentTarget as HTMLButtonElement).style.color = "#888"; }}
+                    >
+                      View More Sessions ({sortedSessions.length - visibleCount} remaining)
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setVisibleCount(INITIAL_VISIBLE)}
+                      style={{
+                        background: "none",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        borderRadius: "6px",
+                        color: "#555",
+                        cursor: "pointer",
+                        fontSize: "0.78rem",
+                        fontFamily: "inherit",
+                        padding: "7px 20px",
+                        transition: "border-color 0.15s, color 0.15s",
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.25)"; (e.currentTarget as HTMLButtonElement).style.color = "#aaa"; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.12)"; (e.currentTarget as HTMLButtonElement).style.color = "#555"; }}
+                    >
+                      Show Less
+                    </button>
+                  )}
+                </div>
+              )}
+              </>
             )}
           </div>
+            );
+          })()}
         </div>
 
         {/* Right — session detail */}
