@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Card, Badge, Button, EmptyState, Skeleton } from "@/components/ui/ds";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -148,35 +149,30 @@ export default function TrainingPlan({ goal, email, isActiveMember }: Props) {
   const todayIdx = (new Date().getDay() + 6) % 7;
 
   if (loading || isActiveMember === null) return (
-    <div style={{ background: "var(--surface)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "1.25rem", marginBottom: "0.75rem", minHeight: 100, opacity: 0.5 }} />
+    <Card style={{ marginBottom: "0.75rem", minHeight: 100, opacity: 0.5 }}>
+      <Skeleton height="12px" width="40%" style={{ marginBottom: 10 }} />
+      <Skeleton height="12px" width="70%" style={{ marginBottom: 8 }} />
+      <Skeleton height="12px" width="55%" />
+    </Card>
   );
 
   // Free users — show upgrade CTA, never show plan content
   if (!isActiveMember) return (
-    <div style={{ background: "var(--surface)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "1.5rem", marginBottom: "0.75rem", textAlign: "center" }}>
+    <Card style={{ marginBottom: "0.75rem" }}>
       <div className="cs-label" style={{ marginBottom: 12 }}>Weekly Plan</div>
-      <div style={{ fontSize: "1.75rem", marginBottom: 8 }}>🔒</div>
-      <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--foreground)", marginBottom: 8 }}>Unlock Your Training Plan</div>
-      <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", lineHeight: 1.7, marginBottom: 16 }}>
-        ✓ Personalized weekly plan<br />
-        ✓ Coach guidance<br />
-        ✓ Progress tracking
-      </div>
-      <a href="/pricing" style={{ display: "inline-block", padding: "9px 24px", background: "var(--gradient-accent)", color: "#fff", borderRadius: 999, fontSize: "13px", fontWeight: 700, textDecoration: "none" }}>
-        Upgrade →
-      </a>
-    </div>
+      <EmptyState icon="🔒" title="Unlock Your Training Plan"
+        body={"✓ Personalized weekly plan\n✓ Coach guidance\n✓ Progress tracking"}
+        action={<Button size="sm" as="button" onClick={() => { window.location.href = "/pricing"; }}>Upgrade →</Button>} />
+    </Card>
   );
 
   // Premium user — no plan assigned yet
   if (noPlan && !plan) return (
-    <div style={{ background: "var(--surface)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "1.5rem", marginBottom: "0.75rem" }}>
+    <Card style={{ marginBottom: "0.75rem" }}>
       <div className="cs-label" style={{ marginBottom: 12 }}>Weekly Plan</div>
-      <div style={{ fontSize: "0.85rem", color: "var(--muted-foreground)", lineHeight: 1.6, textAlign: "center", padding: "0.5rem 0" }}>
-        No training plan assigned yet.<br />
-        <span style={{ color: "var(--foreground)", fontWeight: 500 }}>Your coach will assign one shortly.</span>
-      </div>
-    </div>
+      <EmptyState icon="📋" title="No plan assigned yet"
+        body="Your coach will assign a personalised plan shortly." />
+    </Card>
   );
 
   const activePlan = plan!;
@@ -194,9 +190,7 @@ export default function TrainingPlan({ goal, email, isActiveMember }: Props) {
             </div>
           )}
         </div>
-        <span style={{ fontSize: "10px", color: "var(--cs-orange)", fontWeight: 700, letterSpacing: "0.06em", background: "rgba(232,98,10,0.08)", border: "1px solid rgba(232,98,10,0.2)", padding: "2px 8px", borderRadius: 999 }}>
-          Custom
-        </span>
+        <Badge color="orange" size="xs">Custom</Badge>
       </div>
 
       {/* Premium users with assigned plan — show coach/title info */}
@@ -251,10 +245,10 @@ export default function TrainingPlan({ goal, email, isActiveMember }: Props) {
                 )}
               </div>
 
-              {/* Intensity pill */}
-              <div style={{ flexShrink: 0, fontSize: "9px", fontWeight: 700, color: intens.color, background: intens.bg, border: `1px solid ${intens.color}25`, padding: "2px 8px", borderRadius: 999, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+              {/* Intensity badge */}
+              <Badge size="xs" style={{ flexShrink: 0, background: intens.bg, color: intens.color, border: `1px solid ${intens.color}25` }}>
                 {intens.label}
-              </div>
+              </Badge>
             </div>
           );
         })}
