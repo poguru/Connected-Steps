@@ -1151,6 +1151,30 @@ select.auth-input option {
   margin-top: 3px;
 }
 
+/* ── CTA button utilities — replaces onMouseEnter/Leave style-swapping ─────── */
+.cs-cta-btn-primary {
+  display: inline-flex; align-items: center; gap: 8px;
+  border-radius: 999px; background: var(--gradient-accent);
+  font-weight: 600; color: var(--accent-foreground);
+  text-decoration: none; box-shadow: var(--shadow-orange);
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  padding: 11px 22px; font-size: 0.875rem;
+}
+.cs-cta-btn-primary:hover { transform: scale(1.02); }
+
+.cs-cta-btn-secondary {
+  display: inline-flex; align-items: center; gap: 8px;
+  border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface); font-weight: 600;
+  color: var(--foreground); text-decoration: none;
+  box-shadow: var(--shadow-md);
+  transition: background 0.2s ease;
+  padding: 11px 22px; font-size: 0.875rem;
+}
+.cs-cta-btn-secondary:hover { background: var(--surface-elevated); }
+
+.cs-cta-btn-lg { padding: 14px 32px; font-size: 1rem; }
+
 /* ── Design System animations ──────────────────────────────────────────────── */
 
 @keyframes cs-shimmer {

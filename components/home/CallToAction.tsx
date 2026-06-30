@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, Building2 } from "lucide-react";
+import { Label } from "@/components/ui/ds";
 
 const benefits = [
   "Employee engagement",
@@ -41,10 +42,7 @@ export default function CallToAction() {
                   </div>
                 ))}
               </div>
-              <a href="mailto:corporate@connectedsteps.in"
-                style={{ display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 999, background: "var(--gradient-accent)", padding: "14px 24px", fontSize: "0.95rem", fontWeight: 600, color: "var(--accent-foreground)", textDecoration: "none", boxShadow: "var(--shadow-orange)", transition: "transform 0.2s" }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = "scale(1.02)"}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = ""}>
+              <a href="mailto:corporate@connectedsteps.in" className="cs-cta-btn-primary">
                 Book a Consultation <ArrowRight size={16} />
               </a>
               <div style={{ marginTop: "1.5rem", display: "flex", flexWrap: "wrap", gap: "0.6rem" }}>
@@ -80,9 +78,7 @@ export default function CallToAction() {
       <section style={{ background: "var(--gradient-soft)", padding: "5rem 0" }}>
         <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 1.5rem", textAlign: "center" }}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--primary)", marginBottom: "1rem" }}>
-              Join Connected Steps
-            </div>
+            <Label style={{ color: "var(--primary)", marginBottom: "1rem" }}>Join Connected Steps</Label>
             <h2 className="font-display" style={{ fontSize: "clamp(2.5rem, 5vw, 4rem)", fontWeight: 700, letterSpacing: "-0.015em", color: "var(--foreground)", marginBottom: "1.25rem" }}>
               Your goal is waiting.{" "}
               <span className="text-gradient-accent">We have the plan.</span>
@@ -91,16 +87,10 @@ export default function CallToAction() {
               Create your free account in 60 seconds. Browse sessions, see your plan preview, and join the community — before you spend a rupee.
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "0.75rem" }}>
-              <Link href={loggedIn ? "/dashboard" : "/auth?tab=register"}
-                style={{ display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 999, background: "var(--gradient-accent)", padding: "14px 32px", fontSize: "1rem", fontWeight: 700, color: "var(--accent-foreground)", textDecoration: "none", boxShadow: "var(--shadow-orange)", transition: "transform 0.2s" }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = "scale(1.02)"}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = ""}>
+              <Link href={loggedIn ? "/dashboard" : "/auth?tab=register"} className="cs-cta-btn-primary cs-cta-btn-lg">
                 {loggedIn ? "Go to Dashboard" : "Join free — start running"} <ArrowRight size={18} />
               </Link>
-              <Link href="/pricing"
-                style={{ display: "inline-flex", alignItems: "center", borderRadius: 999, border: "1px solid var(--border)", background: "var(--surface)", padding: "14px 32px", fontSize: "1rem", fontWeight: 600, color: "var(--foreground)", textDecoration: "none", boxShadow: "var(--shadow-md)", transition: "background 0.2s" }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--surface-elevated)"}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "var(--surface)"}>
+              <Link href="/pricing" className="cs-cta-btn-secondary cs-cta-btn-lg">
                 View pricing
               </Link>
             </div>
