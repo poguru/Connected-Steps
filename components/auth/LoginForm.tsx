@@ -3,20 +3,8 @@
 import { useState, useRef, FormEvent, ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff } from "lucide-react";
 import OtpInput from "./OtpInput";
-import { Alert } from "@/components/ui/ds";
-
-const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "11px 14px",
-  background: "var(--surface)", border: "1px solid var(--border)",
-  borderRadius: 10, color: "var(--foreground)",
-  fontFamily: "var(--font-body)", fontSize: 15, outline: "none",
-  transition: "border-color 0.15s, box-shadow 0.15s", boxSizing: "border-box",
-};
-
-const focusOn  = (e: React.FocusEvent<HTMLInputElement>) => { e.currentTarget.style.borderColor = "var(--primary)"; e.currentTarget.style.boxShadow = "0 0 0 3px oklch(0.72 0.19 49 / 15%)"; };
-const focusOff = (e: React.FocusEvent<HTMLInputElement>) => { e.currentTarget.style.borderColor = "var(--border)";  e.currentTarget.style.boxShadow = "none"; };
+import { Alert, Input, PasswordInput } from "@/components/ui/ds";
 
 type Mode    = "password" | "otp";
 type OtpStep = "identifier" | "code";
@@ -173,19 +161,11 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
     <form onSubmit={handlePasswordSubmit} noValidate style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <ModeToggle />
 
-      <input style={inputStyle} name="identifier" type="text" placeholder="Email address"
-        value={form.identifier} onChange={handleChange} autoComplete="username"
-        onFocus={focusOn} onBlur={focusOff} />
+      <Input name="identifier" type="text" placeholder="Email address"
+        value={form.identifier} onChange={handleChange} autoComplete="username" />
 
-      <div style={{ position: "relative" }}>
-        <input style={{ ...inputStyle, paddingRight: 44 }} name="password" type={showPw ? "text" : "password"}
-          placeholder="Password" value={form.password} onChange={handleChange} autoComplete="current-password"
-          onFocus={focusOn} onBlur={focusOff} />
-        <button type="button" onClick={() => setShowPw(!showPw)}
-          style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--muted-foreground)", display: "flex", padding: 0 }}>
-          {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
-        </button>
-      </div>
+      <PasswordInput placeholder="Password" name="password"
+        value={form.password} onChange={handleChange} autoComplete="current-password" />
 
       <div style={{ textAlign: "right" }}>
         <Link href="/auth/forgot-password" style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", textDecoration: "none" }}>
@@ -208,11 +188,9 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
       <p style={{ margin: 0, fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.6 }}>
         Enter your registered email and we&apos;ll send you a one-time code.
       </p>
-      <input
-        style={inputStyle} type="email" placeholder="Email address"
+      <Input type="email" placeholder="Email address"
         value={identifier} onChange={e => { setIdentifier(e.target.value); setOtpError(""); }}
-        autoComplete="username" onFocus={focusOn} onBlur={focusOff}
-      />
+        autoComplete="username" />
       {otpError && <Alert variant="error">{otpError}</Alert>}
       <button
         type="button" onClick={sendOtp} disabled={sending || !identifier.trim()}
