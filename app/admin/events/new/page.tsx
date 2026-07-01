@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import { Button, Alert, Badge, Spinner } from "@/components/ui/ds";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -376,24 +377,22 @@ export default function NewEventWizard() {
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {savedAt && <span style={{ fontSize: 11, color: "#333" }}>Saved {savedAt}</span>}
-          <button onClick={handleSaveDraft} disabled={saving} style={{ padding: "7px 16px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#888", fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
-            {saving ? "Saving…" : "Save Draft"}
-          </button>
-          <Link href="/admin/events" style={{ padding: "7px 14px", background: "transparent", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, color: "#555", fontWeight: 600, fontSize: 13, textDecoration: "none" }}>
-            Cancel
+          <Button size="sm" variant="secondary" loading={saving} onClick={handleSaveDraft}>Save Draft</Button>
+          <Link href="/admin/events" style={{ textDecoration: "none" }}>
+            <Button size="sm" variant="ghost">Cancel</Button>
           </Link>
         </div>
       </header>
 
       {/* Draft restore banner */}
       {hasDraft && (
-        <div style={{ background: "rgba(232,98,10,0.1)", borderBottom: "1px solid rgba(232,98,10,0.2)", padding: "10px 2rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 13, color: "#e8620a", fontWeight: 600 }}>You have an unsaved draft. Continue where you left off?</span>
+        <Alert variant="warning" style={{ margin: "0", borderRadius: 0, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span>You have an unsaved draft. Continue where you left off?</span>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={restoreDraft} style={{ padding: "5px 14px", background: "#e8620a", border: "none", borderRadius: 7, color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Restore Draft</button>
-            <button onClick={discardDraft} style={{ padding: "5px 14px", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#555", fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Start Fresh</button>
+            <Button size="xs" onClick={restoreDraft}>Restore Draft</Button>
+            <Button size="xs" variant="ghost" onClick={discardDraft}>Start Fresh</Button>
           </div>
-        </div>
+        </Alert>
       )}
 
       {/* Step progress */}
@@ -437,25 +436,16 @@ export default function NewEventWizard() {
 
         {/* Navigation bar */}
         <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "rgba(8,8,8,0.96)", backdropFilter: "blur(12px)", borderTop: "1px solid rgba(255,255,255,0.06)", padding: "14px 2rem", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 40 }}>
-          <button onClick={handleBack} disabled={step === 0 || saving} style={{ padding: "10px 22px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 9, color: step === 0 ? "#333" : "#888", fontWeight: 600, fontSize: 14, cursor: step === 0 ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
-            ← Back
-          </button>
+          <Button variant="secondary" disabled={step === 0 || saving} onClick={handleBack}>← Back</Button>
 
           <div style={{ fontSize: 12, color: "#2a2a2a" }}>
             Step {step + 1} of {STEPS.length}
           </div>
 
           {step < STEPS.length - 1 ? (
-            <button onClick={handleNext} disabled={saving} style={{ padding: "10px 28px", background: saving ? "#6b2a04" : "#e8620a", border: "none", borderRadius: 9, color: "#fff", fontWeight: 700, fontSize: 14, cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 8, minWidth: 130 }}>
-              {saving ? <>
-                <span style={{ display: "inline-block", width: 14, height: 14, border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
-                Saving…
-              </> : "Continue →"}
-            </button>
+            <Button loading={saving} onClick={handleNext}>Continue →</Button>
           ) : (
-            <button onClick={handlePublish} disabled={saving} style={{ padding: "10px 28px", background: saving ? "#166534" : "#16a34a", border: "none", borderRadius: 9, color: "#fff", fontWeight: 700, fontSize: 14, cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 8 }}>
-              {saving ? "Publishing…" : "🚀 Publish Event"}
-            </button>
+            <Button loading={saving} onClick={handlePublish}>🚀 Publish Event</Button>
           )}
         </div>
       </div>
@@ -632,8 +622,8 @@ function StepRaces({
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
-                  <button onClick={() => onEdit(i)} style={{ padding: "5px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#888", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Edit</button>
-                  <button onClick={() => onDelete(i)} style={{ padding: "5px 12px", background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 7, color: "#f87171", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Remove</button>
+                  <Button size="xs" variant="ghost" onClick={() => onEdit(i)}>Edit</Button>
+                  <Button size="xs" variant="danger" onClick={() => onDelete(i)}>Remove</Button>
                 </div>
               </div>
             ))}
@@ -641,7 +631,7 @@ function StepRaces({
         </div>
       )}
 
-      {errors.races && <div style={{ color: "#f87171", fontSize: 13, marginBottom: 14, padding: "10px 14px", background: "rgba(248,113,113,0.07)", borderRadius: 8, border: "1px solid rgba(248,113,113,0.2)" }}>{errors.races}</div>}
+      {errors.races && <Alert variant="error" style={{ marginBottom: 14 }}>{errors.races}</Alert>}
 
       {/* Add/Edit form */}
       {!skipRaces && (
@@ -713,14 +703,8 @@ function StepRaces({
           </div>
 
           <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={onAdd} style={{ padding: "10px 22px", background: "#e8620a", border: "none", borderRadius: 9, color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
-              {editIdx !== null ? "Update Race" : "+ Add Race"}
-            </button>
-            {editIdx !== null && (
-              <button onClick={onCancel} style={{ padding: "10px 18px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 9, color: "#666", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
-                Cancel
-              </button>
-            )}
+            <Button onClick={onAdd}>{editIdx !== null ? "Update Race" : "+ Add Race"}</Button>
+            {editIdx !== null && <Button variant="secondary" onClick={onCancel}>Cancel</Button>}
           </div>
         </SectionCard>
       )}
@@ -733,9 +717,7 @@ function StepRaces({
           </div>
           <div style={{ fontSize: 11, color: "#444", marginTop: 2 }}>Participants register directly without choosing a distance</div>
         </div>
-        <button onClick={onSkipToggle} style={{ padding: "6px 14px", background: skipRaces ? "rgba(74,222,128,0.15)" : "rgba(255,255,255,0.05)", border: `1px solid ${skipRaces ? "rgba(74,222,128,0.3)" : "rgba(255,255,255,0.1)"}`, borderRadius: 8, color: skipRaces ? "#4ade80" : "#555", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
-          {skipRaces ? "Add Races" : "Skip — No Races"}
-        </button>
+        <Button size="sm" variant={skipRaces ? "ghost" : "secondary"} onClick={onSkipToggle}>{skipRaces ? "Add Races" : "Skip — No Races"}</Button>
       </div>
     </div>
   );
@@ -866,13 +848,7 @@ function StepReview({ form, races, skipRaces, onPublish, saving }: { form: Wizar
             {isReady ? "The event goes live immediately and appears on the website." : "Go back and fill in the required fields."}
           </div>
         </div>
-        <button
-          onClick={onPublish}
-          disabled={saving || !isReady}
-          style={{ padding: "12px 28px", background: isReady ? (saving ? "#166534" : "#16a34a") : "#1a1a1a", border: "none", borderRadius: 10, color: isReady ? "#fff" : "#333", fontWeight: 700, fontSize: 15, cursor: isReady && !saving ? "pointer" : "not-allowed", fontFamily: "inherit", whiteSpace: "nowrap" as const }}
-        >
-          {saving ? "Publishing…" : "🚀 Publish Now"}
-        </button>
+        <Button loading={saving} disabled={!isReady} onClick={onPublish}>🚀 Publish Now</Button>
       </div>
     </div>
   );
