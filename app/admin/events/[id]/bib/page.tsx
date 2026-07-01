@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import QRScannerModal from "@/components/ui/QRScannerModal";
+import { Card, Button, Input, Alert, Badge, StatCard, Tabs, EmptyState, Spinner } from "@/components/ui/ds";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -34,19 +35,8 @@ interface ScanResult {
 const C = {
   page:   { minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "inherit" } as React.CSSProperties,
   header: { position: "sticky" as const, top: 0, zIndex: 40, background: "rgba(10,10,10,0.97)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 2rem", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" } as React.CSSProperties,
-  card:   { background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem" } as React.CSSProperties,
   input:  { width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 14, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const } as React.CSSProperties,
-  btn:    (p = true): React.CSSProperties => ({ padding: "9px 20px", background: p ? "#e8620a" : "rgba(255,255,255,0.06)", border: p ? "none" : "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: p ? "#fff" : "#aaa", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }),
 };
-
-function StatCard({ label, value, color = "#fff" }: { label: string; value: number; color?: string }) {
-  return (
-    <div style={C.card}>
-      <div style={{ fontSize: 28, fontWeight: 900, color, lineHeight: 1 }}>{value}</div>
-      <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", marginTop: 6, fontWeight: 600 }}>{label}</div>
-    </div>
-  );
-}
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -159,17 +149,13 @@ export default function BibManagePage() {
           <span style={{ color: "#333" }}>/</span>
           <span style={{ fontWeight: 700, fontSize: 15 }}>BIB Collection</span>
         </div>
-        <button onClick={loadAll} style={{ ...C.btn(false), padding: "6px 14px", fontSize: 12 }}>Refresh</button>
+        <Button size="sm" variant="ghost" onClick={loadAll}>↻ Refresh</Button>
       </header>
 
       {/* Tabs */}
       <div style={{ borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 2rem", background: "#0d0d0d" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex" }}>
-          {TABS.map(t => (
-            <button key={t.key} onClick={() => setTab(t.key as typeof tab)} style={{ padding: "12px 18px", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: tab === t.key ? 700 : 400, color: tab === t.key ? "#fff" : "#555", borderBottom: tab === t.key ? "2px solid #e8620a" : "2px solid transparent", marginBottom: -1 }}>
-              {t.label}
-            </button>
-          ))}
+        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+          <Tabs tabs={TABS.map(t => ({ key: t.key, label: t.label }))} active={tab} onChange={k => setTab(k as typeof tab)} />
         </div>
       </div>
 
@@ -189,7 +175,7 @@ export default function BibManagePage() {
             )}
 
             {/* BIB Assignment */}
-            <div style={{ ...C.card, marginBottom: 16 }}>
+            <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem", marginBottom: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#e8620a", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 14 }}>BIB Number Assignment</div>
               <p style={{ fontSize: 13, color: "#666", margin: "0 0 16px" }}>
                 Automatically assigns sequential BIB numbers to all confirmed, paid registrations grouped by race category.
@@ -210,18 +196,14 @@ export default function BibManagePage() {
               )}
 
               <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={previewBibAssignment} style={C.btn(false)}>Preview</button>
-                <button onClick={() => assignBibs(false)} disabled={assigning} style={C.btn()}>
-                  {assigning ? "Assigning…" : "Assign BIBs"}
-                </button>
-                <button onClick={() => assignBibs(true)} disabled={assigning} style={{ ...C.btn(false), color: "#f87171", borderColor: "rgba(239,68,68,0.3)" }}>
-                  Force Reassign All
-                </button>
+                <Button variant="secondary" onClick={previewBibAssignment}>Preview</Button>
+                <Button loading={assigning} onClick={() => assignBibs(false)}>Assign BIBs</Button>
+                <Button variant="danger" loading={assigning} onClick={() => assignBibs(true)}>Force Reassign All</Button>
               </div>
             </div>
 
             {/* Quick go to scanner */}
-            <div style={{ ...C.card, textAlign: "center", padding: "2rem", cursor: "pointer" }} onClick={() => setTab("scanner")}>
+            <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "2rem", textAlign: "center", cursor: "pointer" }} onClick={() => setTab("scanner")}>
               <div style={{ fontSize: 40, marginBottom: 8 }}>📦</div>
               <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Open BIB Scanner</div>
               <div style={{ fontSize: 13, color: "#555" }}>Scan participant QR codes to hand over BIB packets</div>
@@ -232,7 +214,7 @@ export default function BibManagePage() {
         {/* BIB Scanner Tab */}
         {tab === "scanner" && (
           <div style={{ maxWidth: 560, margin: "0 auto" }}>
-            <div style={{ ...C.card, marginBottom: 16 }}>
+            <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem", marginBottom: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#e8620a", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 14 }}>📦 BIB Collection Scanner</div>
               <p style={{ fontSize: 13, color: "#666", margin: "0 0 16px" }}>Scan or paste the participant&apos;s QR token. Duplicates are automatically prevented.</p>
 
@@ -246,19 +228,14 @@ export default function BibManagePage() {
                   onKeyDown={e => e.key === "Enter" && handleScan(scanToken)}
                   autoFocus
                 />
-                <button onClick={() => handleScan(scanToken)} disabled={scanning || !scanToken.trim()} style={C.btn()}>
-                  {scanning ? "…" : "Collect BIB"}
-                </button>
+                <Button loading={scanning} disabled={!scanToken.trim()} onClick={() => handleScan(scanToken)}>Collect BIB</Button>
               </div>
-
-              <button onClick={() => setCameraOpen(true)} style={{ ...C.btn(false), width: "100%" }}>
-                📷 Open Camera
-              </button>
+              <Button variant="secondary" fullWidth onClick={() => setCameraOpen(true)}>📷 Open Camera</Button>
             </div>
 
             {/* Scan Result */}
             {scanResult && (
-              <div style={{ ...C.card, border: `1px solid ${scanResult.already_collected ? "rgba(251,191,36,0.3)" : scanResult.valid ? "rgba(74,222,128,0.3)" : "rgba(248,113,113,0.3)"}`, background: scanResult.already_collected ? "rgba(251,191,36,0.05)" : scanResult.valid ? "rgba(74,222,128,0.05)" : "rgba(248,113,113,0.05)" }}>
+              <div style={{ borderRadius: 12, padding: "1.25rem", border: `1px solid ${scanResult.already_collected ? "rgba(251,191,36,0.3)" : scanResult.valid ? "rgba(74,222,128,0.3)" : "rgba(248,113,113,0.3)"}`, background: scanResult.already_collected ? "rgba(251,191,36,0.05)" : scanResult.valid ? "rgba(74,222,128,0.05)" : "rgba(248,113,113,0.05)" }}>
                 <div style={{ fontSize: 20, fontWeight: 800, color: scanResult.already_collected ? "#fbbf24" : scanResult.valid ? "#4ade80" : "#f87171", marginBottom: 8 }}>
                   {scanResult.message}
                 </div>
@@ -294,13 +271,13 @@ export default function BibManagePage() {
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <div style={{ fontSize: 13, color: "#555" }}>{regs.filter(r => r.bib_collected_at).length} of {regs.filter(r => r.bib_number).length} BIBs collected</div>
-              <a href={`/api/admin/events/${eventId}/registrations/export`} download style={{ ...C.btn(false), fontSize: 12, textDecoration: "none" }}>
-                Export CSV
+              <a href={`/api/admin/events/${eventId}/registrations/export`} download style={{ textDecoration: "none" }}>
+                <Button size="sm" variant="secondary">Export CSV</Button>
               </a>
             </div>
 
             {loading ? (
-              <div style={{ textAlign: "center", padding: "3rem", color: "#555" }}>Loading…</div>
+              <div style={{ textAlign: "center", padding: "3rem" }}><Spinner /></div>
             ) : (
               <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, overflow: "hidden" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -325,11 +302,9 @@ export default function BibManagePage() {
                         </td>
                         <td style={{ padding: "10px 14px", color: "#aaa" }}>{r.distance_category ?? "OPEN"}</td>
                         <td style={{ padding: "10px 14px" }}>
-                          {r.bib_collected_at ? (
-                            <span style={{ padding: "2px 10px", borderRadius: 999, background: "rgba(74,222,128,0.1)", color: "#4ade80", fontSize: 11, fontWeight: 700 }}>COLLECTED</span>
-                          ) : (
-                            <span style={{ padding: "2px 10px", borderRadius: 999, background: "rgba(251,191,36,0.1)", color: "#fbbf24", fontSize: 11, fontWeight: 700 }}>PENDING</span>
-                          )}
+                          {r.bib_collected_at
+                            ? <Badge color="green" size="sm">COLLECTED</Badge>
+                            : <Badge color="yellow" size="sm">PENDING</Badge>}
                         </td>
                         <td style={{ padding: "10px 14px", color: "#666", fontSize: 12 }}>
                           {r.bib_collected_at ? new Date(r.bib_collected_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}
@@ -350,15 +325,15 @@ export default function BibManagePage() {
             {centers.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
                 {centers.map(c => (
-                  <div key={c.id} style={{ ...C.card, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div key={c.id} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: 15 }}>{c.name}</div>
                       {c.address && <div style={{ color: "#666", fontSize: 13 }}>📍 {c.address}</div>}
                       {c.contact_name && <div style={{ color: "#666", fontSize: 12 }}>👤 {c.contact_name} {c.contact_phone && `· ${c.contact_phone}`}</div>}
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
-                      {c.maps_url && <a href={c.maps_url} target="_blank" rel="noopener" style={{ ...C.btn(false), fontSize: 12, textDecoration: "none", padding: "5px 12px" }}>Maps ↗</a>}
-                      <button onClick={() => deleteCenter(c.id)} style={{ ...C.btn(false), fontSize: 12, color: "#f87171", borderColor: "rgba(239,68,68,0.3)", padding: "5px 12px" }}>Delete</button>
+                      {c.maps_url && <a href={c.maps_url} target="_blank" rel="noopener" style={{ textDecoration: "none" }}><Button size="xs" variant="ghost">Maps ↗</Button></a>}
+                      <Button size="xs" variant="danger" onClick={() => deleteCenter(c.id)}>Delete</Button>
                     </div>
                   </div>
                 ))}
@@ -366,7 +341,7 @@ export default function BibManagePage() {
             )}
 
             {/* Add center form */}
-            <div style={C.card}>
+            <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem" }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#e8620a", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 14 }}>+ Add Collection Center</div>
               <form onSubmit={addCenter}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
@@ -391,9 +366,7 @@ export default function BibManagePage() {
                   <label style={{ display: "block", fontSize: 11, color: "#555", fontWeight: 600, textTransform: "uppercase" as const, marginBottom: 6 }}>Google Maps URL</label>
                   <input style={C.input} value={centerForm.maps_url} onChange={e => setCenterForm(f => ({ ...f, maps_url: e.target.value }))} placeholder="https://maps.google.com/…" />
                 </div>
-                <button type="submit" disabled={savingCenter} style={C.btn()}>
-                  {savingCenter ? "Adding…" : "Add Center"}
-                </button>
+                <Button type="submit" loading={savingCenter}>Add Center</Button>
               </form>
             </div>
           </div>
