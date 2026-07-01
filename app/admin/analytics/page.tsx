@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { Card, Button, Badge, Label, Spinner } from "@/components/ui/ds";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -70,13 +71,7 @@ function BarChart({ values, labels, color = "#e8620a", height = 80 }: { values: 
 // ── Growth badge ──────────────────────────────────────────────────────────────
 
 function Growth({ pct }: { pct: number }) {
-  const up    = pct >= 0;
-  const label = `${up ? "+" : ""}${pct}% vs last month`;
-  return (
-    <span style={{ fontSize: 11, fontWeight: 700, color: up ? "#4ade80" : "#f87171", background: up ? "rgba(74,222,128,0.1)" : "rgba(248,113,113,0.1)", padding: "2px 8px", borderRadius: 999 }}>
-      {up ? "↑" : "↓"} {label}
-    </span>
-  );
+  return <Badge color={pct >= 0 ? "green" : "red"} size="sm">{pct >= 0 ? "↑" : "↓"} {pct >= 0 ? "+" : ""}{pct}% vs last month</Badge>;
 }
 
 // ── KPI Card ──────────────────────────────────────────────────────────────────
@@ -91,23 +86,21 @@ function KPI({ label, value, sub, color = "#fff", trend, sparkline, sparkColor }
   sparkColor?: string;
 }) {
   return (
-    <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.1rem 1.25rem" }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 8 }}>{label}</div>
+    <Card>
+      <Label style={{ marginBottom: "8px" }}>{label}</Label>
       <div style={{ fontSize: 26, fontWeight: 900, color, lineHeight: 1, marginBottom: 4 }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: "#555", marginBottom: 8 }}>{sub}</div>}
       {trend !== undefined && <div style={{ marginBottom: 8 }}><Growth pct={trend} /></div>}
       {sparkline && <Sparkline values={sparkline} color={sparkColor ?? "#e8620a"} height={36} />}
-    </div>
+    </Card>
   );
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const S = {
-  page:    { minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "inherit" } as React.CSSProperties,
-  header:  { position: "sticky" as const, top: 0, zIndex: 40, background: "rgba(10,10,10,0.97)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 2rem", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" } as React.CSSProperties,
-  section: { background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.5rem" } as React.CSSProperties,
-  h2:      { fontSize: 11, fontWeight: 700, color: "#e8620a", textTransform: "uppercase" as const, letterSpacing: ".08em", marginBottom: 16 } as React.CSSProperties,
+  page:   { minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "inherit" } as React.CSSProperties,
+  header: { position: "sticky" as const, top: 0, zIndex: 40, background: "rgba(10,10,10,0.97)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 2rem", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" } as React.CSSProperties,
 };
 
 function fmt(n: number): string {
@@ -148,9 +141,7 @@ export default function AnalyticsPage() {
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <span style={{ fontSize: 12, color: "#555" }}>Period:</span>
           {[3, 6, 12].map(m => (
-            <button key={m} onClick={() => setMonths(m)} style={{ padding: "5px 12px", background: months === m ? "#e8620a" : "rgba(255,255,255,0.06)", border: "none", borderRadius: 8, color: months === m ? "#fff" : "#888", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-              {m}M
-            </button>
+            <Button key={m} size="xs" variant={months === m ? "primary" : "ghost"} onClick={() => setMonths(m)}>{m}M</Button>
           ))}
         </div>
       </header>
@@ -158,51 +149,51 @@ export default function AnalyticsPage() {
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "1.75rem 2rem", display: "flex", flexDirection: "column", gap: 20 }}>
 
         {loading && !data ? (
-          <div style={{ textAlign: "center", padding: "5rem", color: "#555" }}>Loading analytics…</div>
+          <div style={{ textAlign: "center", padding: "5rem" }}><Spinner /></div>
         ) : data ? (<>
 
           {/* Revenue section */}
           <div>
-            <div style={S.h2}>Revenue</div>
+            <Label style={{ marginBottom: "12px" }}>Revenue</Label>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 12 }}>
               <KPI label="Total Revenue"        value={fmt(data.summary.total_revenue)}        color="#e8620a" trend={data.growth.revenue}       sparkline={data.trends.revenue}       sparkColor="#e8620a" />
               <KPI label="Event Revenue"        value={fmt(data.summary.event_revenue)}        color="#fbbf24" sparkline={data.trends.revenue.map((_, i) => data.trends.revenue[i])} sparkColor="#fbbf24" />
               <KPI label="Membership Revenue"   value={fmt(data.summary.membership_revenue)}   color="#60a5fa" sparkline={data.trends.memberships} sparkColor="#60a5fa" />
             </div>
-            <div style={S.section}>
-              <div style={S.h2}>Revenue by Month (₹)</div>
+            <Card>
+              <Label style={{ marginBottom: "16px" }}>Revenue by Month (₹)</Label>
               <BarChart values={data.trends.revenue} labels={labels} color="#e8620a" height={100} />
-            </div>
+            </Card>
           </div>
 
           {/* Members section */}
           <div>
-            <div style={S.h2}>Members & Growth</div>
+            <Label style={{ marginBottom: "12px" }}>Members &amp; Growth</Label>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 12 }}>
               <KPI label="Active Members"    value={String(data.summary.active_memberships)} color="#4ade80" />
               <KPI label="New Users"         value={String(data.summary.total_new_users)}    color="#60a5fa" trend={data.growth.users} sparkline={data.trends.new_users} sparkColor="#60a5fa" />
               <KPI label="New Memberships"   value={String(data.trends.memberships.reduce((a, b) => a + b, 0))} color="#a78bfa" sparkline={data.trends.memberships} sparkColor="#a78bfa" />
               <KPI label="Upcoming Events"   value={String(data.summary.events_upcoming)} sub={`${data.summary.events_published} published`} />
             </div>
-            <div style={S.section}>
-              <div style={S.h2}>New Users by Month</div>
+            <Card>
+              <Label style={{ marginBottom: "16px" }}>New Users by Month</Label>
               <BarChart values={data.trends.new_users} labels={labels} color="#60a5fa" height={80} />
-            </div>
+            </Card>
           </div>
 
           {/* Events section */}
           <div>
-            <div style={S.h2}>Event Registrations</div>
+            <Label style={{ marginBottom: "12px" }}>Event Registrations</Label>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 12 }}>
               <KPI label="Total Registrations" value={String(data.summary.total_registrations)}  trend={data.growth.registrations} sparkline={data.trends.registrations} />
               <KPI label="Paid"                value={String(data.summary.paid_registrations)}   color="#4ade80" />
               <KPI label="Free / Comps"        value={String(data.summary.free_registrations)}   color="#a3e635" />
               <KPI label="Check-In Rate"       value={`${data.summary.check_in_rate}%`}          color={data.summary.check_in_rate > 70 ? "#4ade80" : "#fbbf24"} />
             </div>
-            <div style={S.section}>
-              <div style={S.h2}>Registrations by Month</div>
+            <Card>
+              <Label style={{ marginBottom: "16px" }}>Registrations by Month</Label>
               <BarChart values={data.trends.registrations} labels={labels} color="#4ade80" height={80} />
-            </div>
+            </Card>
           </div>
 
           {/* Quick links */}
@@ -212,9 +203,11 @@ export default function AnalyticsPage() {
               { label: "📊 Finance & Settlement",    href: "/admin/finance",    note: "Revenue & Razorpay fees" },
               { label: "🏆 Leaderboard Archive",     href: "/admin/leaderboard", note: "Monthly rank snapshots" },
             ].map(l => (
-              <Link key={l.label} href={l.href} style={{ ...S.section, textDecoration: "none", display: "block", padding: "1rem 1.25rem" }}>
-                <div style={{ fontWeight: 700, fontSize: 14, color: "#e8620a", marginBottom: 4 }}>{l.label}</div>
-                <div style={{ fontSize: 12, color: "#555" }}>{l.note}</div>
+              <Link key={l.label} href={l.href} style={{ textDecoration: "none" }}>
+                <Card hoverable style={{ padding: "1rem 1.25rem" }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: "#e8620a", marginBottom: 4 }}>{l.label}</div>
+                  <div style={{ fontSize: 12, color: "#555" }}>{l.note}</div>
+                </Card>
               </Link>
             ))}
           </div>
