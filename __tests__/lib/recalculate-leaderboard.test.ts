@@ -3,9 +3,17 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key";
 process.env.NEXT_PUBLIC_SUPABASE_URL  = "https://test.supabase.co";
 
 jest.mock("@/lib/supabase-server", () => ({ getSupabaseServer: jest.fn() }));
+// Mock cache so tests don't need Redis — also lets us assert cache is invalidated
+jest.mock("@/lib/cache", () => ({
+  cacheDel: jest.fn().mockResolvedValue(undefined),
+  CK:       { leaderboard: (loc: unknown, friends: unknown) => `lb:v1:${loc ?? "_"}:${friends ?? "_"}` },
+}));
 
 import { recalculateMonth } from "@/lib/recalculate-leaderboard";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { cacheDel } from "@/lib/cache";
+
+const mockCacheDel = cacheDel as jest.Mock;
 
 const mockGetSupabaseServer = getSupabaseServer as jest.Mock;
 
@@ -319,6 +327,122 @@ describe("recalculateMonth", () => {
       expect(lteArg).toBe("2026-06-07");
 
       jest.useRealTimers();
+    });
+  });
+
+  // ── Cache invalidation ─────────────────────────────────────────────────────
+
+  describe("cache invalidation after upsert", () => {
+
+    test("calls cacheDel with the base leaderboard key after a successful update", async () => {
+      const db = makeDb({
+        sessions:   SESSIONS,
+        attendance: [{ id: 1, session_id: "s1", user_email: "a@x.com", attended: true, bonus_points: 0 }],
+        users:      [USERS[0]],
+      });
+      mockGetSupabaseServer.mockReturnValue(db);
+      mockCacheDel.mockClear();
+
+      await recalculateMonth("2026-06");
+
+      expect(mockCacheDel).toHaveBeenCalledTimes(1);
+      expect(mockCacheDel).toHaveBeenCalledWith("lb:v1:_:_");
+    });
+
+    test("does NOT call cacheDel when there are no sessions (early return)", async () => {
+      const db = makeDb({ sessions: [], attendance: [], users: [] });
+      mockGetSupabaseServer.mockReturnValue(db);
+      mockCacheDel.mockClear();
+
+      await recalculateMonth("2026-06");
+
+      expect(mockCacheDel).not.toHaveBeenCalled();
+    });
+
+    test("does NOT call cacheDel when no attendance records found (early return)", async () => {
+      const db = makeDb({
+        sessions:   SESSIONS,
+        attendance: [],
+        users:      [],
+      });
+      mockGetSupabaseServer.mockReturnValue(db);
+      mockCacheDel.mockClear();
+
+      await recalculateMonth("2026-06");
+
+      expect(mockCacheDel).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── User not in users table must still be processed ────────────────────────
+
+  describe("graceful handling when user email is absent from the users table", () => {
+
+    test("user with no users-table row is included using existing leaderboard name", async () => {
+      // "ghost@x.com" exists in session_attendance and leaderboard but NOT in users table.
+      // After the fix this user must still be upserted with correct month_points.
+      const db = makeDb({
+        sessions:   SESSIONS,
+        attendance: [{ id: 1, session_id: "s1", user_email: "ghost@x.com", attended: true, bonus_points: 0 }],
+        users:      [],   // ← ghost not here
+        existingLeaderboard: [{
+          user_email:   "ghost@x.com",
+          user_name:    "Ghost User",  // ← name preserved from LB row
+          month_points: 0,
+          total_points: 10,
+          points_month: "2026-05",
+        }],
+      });
+      mockGetSupabaseServer.mockReturnValue(db);
+
+      const result = await recalculateMonth("2026-06");
+
+      expect(result.updated).toBe(1);
+      const rows = db._upsertMock.mock.calls[0][0] as { user_email: string; month_points: number; user_name: string }[];
+      const ghost = rows.find(r => r.user_email === "ghost@x.com");
+      expect(ghost).toBeDefined();
+      expect(ghost?.month_points).toBe(5);    // earned 5 pts
+      expect(ghost?.user_name).toBe("Ghost User");  // name from existing LB row
+    });
+
+    test("user with no users-table row AND no existing LB row gets email prefix as name", async () => {
+      const db = makeDb({
+        sessions:   SESSIONS,
+        attendance: [{ id: 1, session_id: "s1", user_email: "new@example.com", attended: true, bonus_points: 0 }],
+        users:      [],
+        existingLeaderboard: [],
+      });
+      mockGetSupabaseServer.mockReturnValue(db);
+
+      const result = await recalculateMonth("2026-06");
+
+      expect(result.updated).toBe(1);
+      const rows = db._upsertMock.mock.calls[0][0] as { user_email: string; user_name: string }[];
+      const entry = rows.find(r => r.user_email === "new@example.com");
+      expect(entry?.user_name).toBe("new");  // email prefix fallback
+    });
+
+    test("case-insensitive email matching resolves users table lookup correctly", async () => {
+      // session_attendance stores "Alice@X.COM" (mixed case)
+      // users table stores "alice@x.com" (lowercase) — same email, different case
+      // Before the fix: userMap.get("Alice@X.COM") → undefined → user skipped
+      // After the fix:  userMap is keyed by lowercase, lookup is also lowercase → found
+      const db = makeDb({
+        sessions:   SESSIONS,
+        attendance: [{ id: 1, session_id: "s1", user_email: "Alice@x.com", attended: true, bonus_points: 0 }],
+        users:      [{ ...USERS[0], email: "alice@x.com" }],
+        existingLeaderboard: [],
+      });
+      mockGetSupabaseServer.mockReturnValue(db);
+
+      await recalculateMonth("2026-06");
+
+      const rows = db._upsertMock.mock.calls[0][0] as { user_email: string; user_name: string; month_points: number }[];
+      // The attendance email is preserved as the upsert key
+      const alice = rows.find(r => r.user_email === "Alice@x.com");
+      expect(alice?.month_points).toBe(5);
+      // Name comes from the users table (matched case-insensitively)
+      expect(alice?.user_name).toBe("Alice A");
     });
   });
 });

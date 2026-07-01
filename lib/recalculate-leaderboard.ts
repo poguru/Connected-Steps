@@ -1,4 +1,5 @@
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { cacheDel, CK } from "@/lib/cache";
 
 function lastDay(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
@@ -76,14 +77,17 @@ export async function recalculateMonth(month: string): Promise<{ message: string
     .in("email", emails);
   if (uErr) throw new Error(uErr.message);
 
-  const userMap = new Map((users ?? []).map((u) => [u.email, u]));
+  // Case-insensitive dedup: index by lowercase email so we can look up either case.
+  const userMap = new Map((users ?? []).map((u) => [u.email.toLowerCase(), u]));
 
-  // Fetch all existing leaderboard fields so we can preserve run/km data on upsert
+  // Fetch all existing leaderboard fields so we can preserve run/km data on upsert.
+  // Also fetch location, goal, and user_name so users absent from the `users` table
+  // retain their display data from the previous leaderboard row.
   const { data: existing } = await db
     .from("leaderboard")
-    .select("user_email, month_points, total_points, points_month, month_runs, month_km, month_time_secs, total_runs, total_km, total_time_secs")
+    .select("user_email, user_name, location, goal, month_points, total_points, points_month, month_runs, month_km, month_time_secs, total_runs, total_km, total_time_secs")
     .in("user_email", emails);
-  const lbMap = new Map((existing ?? []).map((e) => [e.user_email, e]));
+  const lbMap = new Map((existing ?? []).map((e) => [e.user_email.toLowerCase(), e]));
 
   const sessionDateMap = new Map(sessions.map((s) => [s.id, s.date]));
 
@@ -111,8 +115,21 @@ export async function recalculateMonth(month: string): Promise<{ message: string
   const upsertRows: Record<string, unknown>[] = [];
 
   for (const email of emails) {
-    const user = userMap.get(email);
-    if (!user) continue;
+    // Look up the user profile case-insensitively.
+    const user = userMap.get(email.toLowerCase());
+    // Look up existing leaderboard row (case-insensitive) to preserve run/km data
+    // and carry the display name when the user has no users-table row.
+    const lb   = lbMap.get(email.toLowerCase());
+
+    // Build display name: prefer users table → existing LB row → email prefix.
+    // We do NOT skip users who are absent from the users table; they still earned
+    // attendance points and must appear on the leaderboard.
+    const displayName = user
+      ? `${user.first_name} ${user.last_name}`.trim()
+      : (lb?.user_name ?? email.split("@")[0]);
+
+    const location = user?.location ?? lb?.location ?? "";
+    const goal     = user?.goal     ?? lb?.goal     ?? "";
 
     const userAtt = userAttMap.get(email) ?? [];
 
@@ -135,16 +152,15 @@ export async function recalculateMonth(month: string): Promise<{ message: string
     }
 
     const newMonthPts = basePoints + weeklyBonus;
-    const lb          = lbMap.get(email);
     const oldMonthPts = lb && lb.points_month === month ? (lb.month_points ?? 0) : 0;
     const oldTotal    = lb?.total_points ?? 0;
     const newTotal    = Math.max(0, oldTotal - oldMonthPts + newMonthPts);
 
     upsertRows.push({
       user_email:      email,
-      user_name:       `${user.first_name} ${user.last_name}`,
-      location:        user.location ?? "",
-      goal:            user.goal ?? "",
+      user_name:       displayName,
+      location,
+      goal,
       month_points:    newMonthPts,
       total_points:    newTotal,
       points_month:    month,
@@ -181,6 +197,16 @@ export async function recalculateMonth(month: string): Promise<{ message: string
       .update({ points_synced: true })
       .in("id", allAttIds);
   }
+
+  // ── Invalidate public leaderboard cache ───────────────────────────────────
+  // The public /api/leaderboard route stores its response in Redis (30s TTL)
+  // and behind HTTP CDN (stale-while-revalidate 60s).  Without explicit
+  // invalidation users would see a stale snapshot for up to ~90 s after sync.
+  // We delete the base cache key (no-location, no-friends) which is the most
+  // frequently served variant.  Location-specific and friends-scoped keys carry
+  // their own 30s TTL and will self-expire; explicit deletion is not needed for
+  // correctness (just convenience for admin-facing tools).
+  await cacheDel(CK.leaderboard(null, null));
 
   return { message: `Recalculated points for ${upsertRows.length} user(s) — ${month}.`, updated: upsertRows.length };
 }
