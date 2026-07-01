@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Card } from "@/components/ui/ds";
 
 const SETTINGS = [
   {
@@ -19,17 +20,13 @@ export default function SettingsPage() {
       <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
         {SETTINGS.map(s => (
           <Link key={s.href} href={s.href} style={{ textDecoration: "none" }}>
-            <div
-              style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "1.25rem 1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", cursor: "pointer", transition: "border-color 0.15s" }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = "rgba(232,98,10,0.3)")}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)")}
-            >
+            <Card hoverable style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>{s.title}</div>
                 <div style={{ fontSize: 12, color: "#555", marginTop: 3 }}>{s.desc}</div>
               </div>
               <span style={{ color: "#333", fontSize: 18, flexShrink: 0 }}>→</span>
-            </div>
+            </Card>
           </Link>
         ))}
       </div>

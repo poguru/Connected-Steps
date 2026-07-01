@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { Card, Button, Input, Alert, Badge, StatCard } from "@/components/ui/ds";
 
 interface Referral {
   id:             string;
@@ -120,25 +121,23 @@ export default function AdminReferralsPage() {
 
   if (!authed) return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "2rem", width: 320 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.5rem" }}>
-          <Image src="/logo.png" alt="Connected Steps" width={32} height={32} className="rounded-full" />
-          <div>
-            <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "#fff" }}>Connected Steps</div>
-            <div style={{ fontSize: "10px", color: "#e8620a", letterSpacing: "0.1em", textTransform: "uppercase" }}>Admin · Referrals</div>
+      <div style={{ width: 320 }}>
+        <Card>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.5rem" }}>
+            <Image src="/logo.png" alt="Connected Steps" width={32} height={32} className="rounded-full" />
+            <div>
+              <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "#fff" }}>Connected Steps</div>
+              <Badge color="orange" size="sm" style={{ marginTop: 3 }}>Admin · Referrals</Badge>
+            </div>
           </div>
-        </div>
-        <input type="password" placeholder="Admin password" value={pw}
-          onChange={e => { setPw(e.target.value); setAuthError(""); }}
-          onKeyDown={e => e.key === "Enter" && login(pw)}
-          style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#fff", fontSize: "0.875rem", outline: "none", boxSizing: "border-box", marginBottom: "0.75rem", fontFamily: "inherit" }}
-        />
-        {authError && <div style={{ fontSize: "0.8rem", color: "#f09595", marginBottom: "0.75rem" }}>{authError}</div>}
-        <button onClick={() => login(pw)} disabled={loading}
-          style={{ width: "100%", padding: 10, background: "#e8620a", color: "#fff", border: "none", borderRadius: 6, fontSize: "0.875rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-          {loading ? "Loading…" : "Access Admin"}
-        </button>
-        <Link href="/admin" style={{ display: "block", textAlign: "center", marginTop: "1rem", fontSize: "0.75rem", color: "#555", textDecoration: "none" }}>← Back to Admin Hub</Link>
+          <Input type="password" placeholder="Admin password" value={pw}
+            onChange={e => { setPw(e.target.value); setAuthError(""); }}
+            onKeyDown={e => e.key === "Enter" && login(pw)}
+            style={{ marginBottom: "0.75rem" }} />
+          {authError && <Alert variant="error" style={{ marginBottom: "0.75rem" }}>{authError}</Alert>}
+          <Button fullWidth loading={loading} onClick={() => login(pw)}>Access Admin</Button>
+          <Link href="/admin" style={{ display: "block", textAlign: "center", marginTop: "1rem", fontSize: "0.75rem", color: "#555", textDecoration: "none" }}>← Back to Admin Hub</Link>
+        </Card>
       </div>
     </div>
   );
@@ -161,17 +160,9 @@ export default function AdminReferralsPage() {
         {/* Summary cards */}
         {summary && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "1rem", marginBottom: "2.5rem" }}>
-            {[
-              { label: "Total Referrals",   value: summary.total,         icon: "🔗" },
-              { label: "Successful",        value: summary.successful,    icon: "✅" },
-              { label: "Rewards Issued",    value: summary.rewardsIssued, icon: "🎁" },
-            ].map(c => (
-              <div key={c.label} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "1.25rem" }}>
-                <div style={{ fontSize: "1.75rem", marginBottom: "0.5rem" }}>{c.icon}</div>
-                <div style={{ fontSize: "2rem", fontWeight: 700, color: "#e8620a", lineHeight: 1 }}>{c.value}</div>
-                <div style={{ fontSize: "0.75rem", color: "#666", marginTop: 4, textTransform: "uppercase", letterSpacing: "0.08em" }}>{c.label}</div>
-              </div>
-            ))}
+            <StatCard label="Total Referrals" value={summary.total}         icon="🔗" />
+            <StatCard label="Successful"      value={summary.successful}    icon="✅" />
+            <StatCard label="Rewards Issued"  value={summary.rewardsIssued} icon="🎁" />
           </div>
         )}
 
@@ -192,41 +183,15 @@ export default function AdminReferralsPage() {
         )}
 
         {/* Backfill missed referral */}
-        <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "1.25rem", marginBottom: "2rem" }}>
+        <Card style={{ marginBottom: "2rem" }}>
           <div style={{ fontSize: "0.75rem", color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.75rem" }}>Retroactive Referral Fix</div>
-          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "flex-end" }}>
-            <div style={{ flex: 1, minWidth: 140 }}>
-              <div style={{ fontSize: "10px", color: "#555", marginBottom: 4 }}>Referral Code</div>
-              <input
-                value={bfCode}
-                onChange={e => setBfCode(e.target.value.toUpperCase())}
-                placeholder="e.g. ZMGR2639"
-                style={{ width: "100%", padding: "8px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#fff", fontSize: "0.85rem", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
-              />
-            </div>
-            <div style={{ flex: 2, minWidth: 200 }}>
-              <div style={{ fontSize: "10px", color: "#555", marginBottom: 4 }}>Referred User Email</div>
-              <input
-                value={bfEmail}
-                onChange={e => setBfEmail(e.target.value)}
-                placeholder="friend@example.com"
-                style={{ width: "100%", padding: "8px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#fff", fontSize: "0.85rem", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
-              />
-            </div>
-            <button
-              onClick={backfill}
-              disabled={bfLoading || !bfCode.trim() || !bfEmail.trim()}
-              style={{ padding: "8px 20px", background: bfLoading ? "#333" : "#e8620a", color: "#fff", border: "none", borderRadius: 6, fontSize: "0.85rem", fontWeight: 600, cursor: bfLoading ? "not-allowed" : "pointer", fontFamily: "inherit", flexShrink: 0 }}
-            >
-              {bfLoading ? "Processing…" : "Grant Reward"}
-            </button>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" as const, alignItems: "flex-end" }}>
+            <Input value={bfCode} onChange={e => setBfCode(e.target.value.toUpperCase())} placeholder="e.g. ZMGR2639" style={{ flex: 1, minWidth: 140 }} />
+            <Input value={bfEmail} onChange={e => setBfEmail(e.target.value)} placeholder="friend@example.com" style={{ flex: 2, minWidth: 200 }} />
+            <Button loading={bfLoading} disabled={!bfCode.trim() || !bfEmail.trim()} onClick={backfill}>Grant Reward</Button>
           </div>
-          {bfResult && (
-            <div style={{ marginTop: "0.75rem", fontSize: "0.82rem", color: bfResult.ok ? "#4ade80" : "#f09595" }}>
-              {bfResult.ok ? "✓ " : "✗ "}{bfResult.msg}
-            </div>
-          )}
-        </div>
+          {bfResult && <Alert variant={bfResult.ok ? "success" : "error"} style={{ marginTop: "0.75rem" }}>{bfResult.msg}</Alert>}
+        </Card>
 
         {/* Search */}
         <div style={{ marginBottom: "1rem" }}>
@@ -274,14 +239,12 @@ export default function AdminReferralsPage() {
                     </td>
                     <td style={{ padding: "10px 12px", color: "#888" }}>{fmt(r.created_at)}</td>
                     <td style={{ padding: "10px 12px" }}>
-                      <span style={{ padding: "3px 8px", borderRadius: 999, background: s.bg, color: s.color, fontSize: "10px", fontWeight: 600 }}>
-                        {s.label}
-                      </span>
+                      <Badge size="sm" style={{ background: s.bg, color: s.color }}>{s.label}</Badge>
                     </td>
                     <td style={{ padding: "10px 12px" }}>
                       {r.reward_granted
-                        ? <span style={{ color: "#4ade80", fontSize: "10px", fontWeight: 600 }}>✓ Granted{r.rewarded_at ? ` · ${fmt(r.rewarded_at)}` : ""}</span>
-                        : <span style={{ color: "#555", fontSize: "10px" }}>Pending</span>}
+                        ? <Badge size="sm" color="green">✓ Granted{r.rewarded_at ? ` · ${fmt(r.rewarded_at)}` : ""}</Badge>
+                        : <Badge size="sm" color="gray">Pending</Badge>}
                     </td>
                   </tr>
                 );

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { Card, Button, Input, Alert, Badge, EmptyState } from "@/components/ui/ds";
 
 interface Post {
   id: number;
@@ -143,17 +144,16 @@ export default function AdminCommunityPage() {
   if (!authed) {
     return (
       <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "2rem", width: "320px" }}>
-          <div style={{ fontSize: "1rem", fontWeight: 600, color: "#fff", marginBottom: "1.25rem" }}>Admin — Community Q&A</div>
-          <input type="password" placeholder="Admin password" value={pw}
-            onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && login(pw)}
-            style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "#fff", fontSize: "0.875rem", outline: "none", boxSizing: "border-box", marginBottom: "0.75rem", fontFamily: "inherit" }} />
-          {error && <div style={{ fontSize: "0.8rem", color: "#f09595", marginBottom: "0.75rem" }}>{error}</div>}
-          <button onClick={() => login(pw)} disabled={loading}
-            style={{ width: "100%", padding: "10px", background: "#e8620a", color: "#fff", border: "none", borderRadius: "6px", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            {loading ? "Loading…" : "Access"}
-          </button>
-          <Link href="/admin" style={{ display: "block", textAlign: "center", marginTop: "1rem", fontSize: "0.75rem", color: "#555", textDecoration: "none" }}>← Back to admin</Link>
+        <div style={{ width: "320px" }}>
+          <Card>
+            <div style={{ fontSize: "1rem", fontWeight: 600, color: "#fff", marginBottom: "1.25rem" }}>Admin — Community Q&A</div>
+            <Input type="password" placeholder="Admin password" value={pw}
+              onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && login(pw)}
+              style={{ marginBottom: "0.75rem" }} />
+            {error && <Alert variant="error" style={{ marginBottom: "0.75rem" }}>{error}</Alert>}
+            <Button fullWidth loading={loading} onClick={() => login(pw)}>Access</Button>
+            <Link href="/admin" style={{ display: "block", textAlign: "center", marginTop: "1rem", fontSize: "0.75rem", color: "#555", textDecoration: "none" }}>← Back to admin</Link>
+          </Card>
         </div>
       </div>
     );
@@ -175,16 +175,11 @@ export default function AdminCommunityPage() {
           <span style={{ fontSize: "0.78rem", color: "#555" }}>
             {pendingPosts.length} posts · {pendingReplies.length} replies pending
           </span>
-          <button onClick={() => { setError(""); login(pw); }} style={{ fontSize: "0.75rem", color: "#888", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", padding: "4px 12px", cursor: "pointer", fontFamily: "inherit" }}>Refresh</button>
+          <Button size="xs" variant="ghost" onClick={() => { setError(""); load(); }}>Refresh</Button>
         </div>
       </header>
 
-      {error && (
-        <div style={{ background: "rgba(240,149,149,0.08)", borderBottom: "1px solid rgba(240,149,149,0.25)", padding: "10px 2rem", fontSize: "0.82rem", color: "#f09595", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span>⚠ {error}</span>
-          <button onClick={() => setError("")} style={{ background: "none", border: "none", color: "#f09595", cursor: "pointer", fontSize: "1rem", lineHeight: 1, padding: 0 }}>×</button>
-        </div>
-      )}
+      {error && <Alert variant="error" style={{ margin: "0 2rem" }}>⚠ {error} <Button size="xs" variant="ghost" onClick={() => setError("")}>×</Button></Alert>}
       <div style={{ maxWidth: "860px", margin: "0 auto", padding: "2rem 1.5rem", display: "flex", flexDirection: "column", gap: "2.5rem" }}>
 
         {/* Pending Posts */}
@@ -192,22 +187,19 @@ export default function AdminCommunityPage() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
             <div style={{ fontSize: "11px", color: "#555", letterSpacing: "0.08em", textTransform: "uppercase" }}>Pending Posts ({pendingPosts.length})</div>
             {pendingPosts.length > 0 && (
-              <button onClick={approveAll} disabled={approvingAll}
-                style={{ padding: "5px 14px", background: "#4ade80", color: "#000", border: "none", borderRadius: "6px", fontSize: "0.78rem", fontWeight: 700, cursor: approvingAll ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: approvingAll ? 0.6 : 1 }}>
-                {approvingAll ? "Approving…" : `Approve all (${pendingPosts.length})`}
-              </button>
+              <Button size="sm" loading={approvingAll} onClick={approveAll}>Approve all ({pendingPosts.length})</Button>
             )}
           </div>
           {pendingPosts.length === 0 ? (
-            <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", padding: "1.5rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>No posts pending.</div>
+            <EmptyState title="No posts pending." />
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
               {pendingPosts.map((p) => (
-                <div key={p.id} style={{ background: "#111", border: "1px solid rgba(232,98,10,0.2)", borderRadius: "8px", padding: "1.25rem" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
+                <Card key={p.id} style={{ borderColor: "rgba(232,98,10,0.2)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" as const }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.5rem" }}>
-                        <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "20px", background: "rgba(255,255,255,0.07)", color: CATEGORY_COLORS[p.category] ?? "#888" }}>{p.category}</span>
+                        <Badge size="sm" style={{ color: CATEGORY_COLORS[p.category] ?? "#888", background: `${CATEGORY_COLORS[p.category] ?? "#888"}18`, borderColor: `${CATEGORY_COLORS[p.category] ?? "#888"}30` }}>{p.category}</Badge>
                         <span style={{ fontSize: "11px", color: "#555" }}>{p.user_name} · {fmtDate(p.created_at)}</span>
                       </div>
                       <div style={{ fontWeight: 600, color: "#fff", marginBottom: "0.5rem" }}>{p.title}</div>
@@ -215,17 +207,11 @@ export default function AdminCommunityPage() {
                       <div style={{ fontSize: "11px", color: "#555", marginTop: "0.5rem" }}>{p.user_email}</div>
                     </div>
                     <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
-                      <button onClick={() => actPost(p.id, "approve")} disabled={actingPost === p.id}
-                        style={{ padding: "7px 16px", background: "#4ade80", color: "#000", border: "none", borderRadius: "6px", fontSize: "0.8rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                        {actingPost === p.id ? "…" : "Approve"}
-                      </button>
-                      <button onClick={() => actPost(p.id, "reject")} disabled={actingPost === p.id}
-                        style={{ padding: "7px 16px", background: "transparent", color: "#f09595", border: "1px solid rgba(240,149,149,0.3)", borderRadius: "6px", fontSize: "0.8rem", cursor: "pointer", fontFamily: "inherit" }}>
-                        {actingPost === p.id ? "…" : "Reject"}
-                      </button>
+                      <Button size="sm" loading={actingPost === p.id} onClick={() => actPost(p.id, "approve")}>Approve</Button>
+                      <Button size="sm" variant="danger" loading={actingPost === p.id} onClick={() => actPost(p.id, "reject")}>Reject</Button>
                     </div>
                   </div>
-                </div>
+                </Card>
               ))}
             </div>
           )}
@@ -235,12 +221,12 @@ export default function AdminCommunityPage() {
         <section>
           <div style={{ fontSize: "11px", color: "#555", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1rem" }}>Pending Replies ({pendingReplies.length})</div>
           {pendingReplies.length === 0 ? (
-            <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", padding: "1.5rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>No replies pending.</div>
+            <EmptyState title="No replies pending." />
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
               {pendingReplies.map((r) => (
-                <div key={r.id} style={{ background: "#111", border: "1px solid rgba(96,165,250,0.2)", borderRadius: "8px", padding: "1.25rem" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
+                <Card key={r.id} style={{ borderColor: "rgba(96,165,250,0.2)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" as const }}>
                     <div style={{ flex: 1 }}>
                       {r.community_posts && (
                         <div style={{ fontSize: "11px", color: "#555", marginBottom: "0.4rem" }}>
@@ -251,17 +237,11 @@ export default function AdminCommunityPage() {
                       <div style={{ fontSize: "11px", color: "#555", marginTop: "0.4rem" }}>{r.user_name} · {r.user_email} · {fmtDate(r.created_at)}</div>
                     </div>
                     <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
-                      <button onClick={() => actReply(r.id, "approve")} disabled={actingReply === r.id}
-                        style={{ padding: "7px 16px", background: "#4ade80", color: "#000", border: "none", borderRadius: "6px", fontSize: "0.8rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                        {actingReply === r.id ? "…" : "Approve"}
-                      </button>
-                      <button onClick={() => actReply(r.id, "reject")} disabled={actingReply === r.id}
-                        style={{ padding: "7px 16px", background: "transparent", color: "#f09595", border: "1px solid rgba(240,149,149,0.3)", borderRadius: "6px", fontSize: "0.8rem", cursor: "pointer", fontFamily: "inherit" }}>
-                        {actingReply === r.id ? "…" : "Reject"}
-                      </button>
+                      <Button size="sm" loading={actingReply === r.id} onClick={() => actReply(r.id, "approve")}>Approve</Button>
+                      <Button size="sm" variant="danger" loading={actingReply === r.id} onClick={() => actReply(r.id, "reject")}>Reject</Button>
                     </div>
                   </div>
-                </div>
+                </Card>
               ))}
             </div>
           )}
@@ -271,20 +251,20 @@ export default function AdminCommunityPage() {
         <section>
           <div style={{ fontSize: "11px", color: "#555", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1rem" }}>Live Posts ({approvedPosts.length})</div>
           {approvedPosts.length === 0 ? (
-            <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", padding: "1.5rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>No approved posts yet.</div>
+            <EmptyState title="No approved posts yet." />
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
               {approvedPosts.map((p) => {
                 const postReplies = approvedReplies.filter((r) => r.post_id === p.id);
                 return (
-                  <div key={p.id} style={{ background: "#111", border: "1px solid rgba(74,222,128,0.15)", borderRadius: "8px", padding: "1.25rem" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
+                  <Card key={p.id} style={{ borderColor: "rgba(74,222,128,0.15)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" as const }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.5rem" }}>
-                          <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "20px", background: "rgba(74,222,128,0.1)", color: CATEGORY_COLORS[p.category] ?? "#888" }}>{p.category}</span>
+                          <Badge size="sm" style={{ color: CATEGORY_COLORS[p.category] ?? "#888", background: `${CATEGORY_COLORS[p.category] ?? "#888"}18`, borderColor: `${CATEGORY_COLORS[p.category] ?? "#888"}30` }}>{p.category}</Badge>
                           <span style={{ fontSize: "11px", color: "#555" }}>{p.user_name} · {fmtDate(p.created_at)}</span>
                           {postReplies.length > 0 && (
-                            <span style={{ fontSize: "11px", color: "#60a5fa" }}>{postReplies.length} answer{postReplies.length !== 1 ? "s" : ""}</span>
+                            <Badge size="sm" color="blue">{postReplies.length} answer{postReplies.length !== 1 ? "s" : ""}</Badge>
                           )}
                         </div>
                         <div style={{ fontWeight: 600, color: "#fff", marginBottom: "0.4rem" }}>{p.title}</div>
@@ -299,12 +279,9 @@ export default function AdminCommunityPage() {
                           </div>
                         )}
                       </div>
-                      <button onClick={() => actPost(p.id, "reject")} disabled={actingPost === p.id}
-                        style={{ padding: "6px 14px", background: "transparent", color: "#555", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", fontSize: "0.78rem", cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
-                        Remove
-                      </button>
+                      <Button size="sm" variant="ghost" onClick={() => actPost(p.id, "reject")}>Remove</Button>
                     </div>
-                  </div>
+                  </Card>
                 );
               })}
             </div>
