@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { Button, Alert, Badge, Label, Tabs, Spinner } from "@/components/ui/ds";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -203,12 +204,9 @@ const FILTERS: { value: RecipientFilter; label: string }[] = [
 const S = {
   page:    { minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "inherit" } as React.CSSProperties,
   header:  { position: "sticky" as const, top: 0, zIndex: 40, background: "rgba(10,10,10,0.97)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 2rem", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" } as React.CSSProperties,
-  card:    { background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem" } as React.CSSProperties,
   input:   { width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const } as React.CSSProperties,
   select:  { width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const, cursor: "pointer" } as React.CSSProperties,
   textarea:{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const, resize: "vertical" as const } as React.CSSProperties,
-  btn:     (p = true): React.CSSProperties => ({ padding: "9px 20px", background: p ? "#e8620a" : "rgba(255,255,255,0.06)", border: p ? "none" : "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: p ? "#fff" : "#aaa", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }),
-  label:   { display: "block", fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 6 } as React.CSSProperties,
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -499,19 +497,15 @@ export default function CommunicatePage() {
           <span style={{ color: "#333" }}>/</span>
           <span style={{ fontWeight: 700, fontSize: 15 }}>Communication Hub</span>
         </div>
-        <Link href={`/admin/events/${eventId}/registrations`} style={{ ...S.btn(false), fontSize: 12, textDecoration: "none", padding: "6px 14px" }}>
-          View Registrations
+        <Link href={`/admin/events/${eventId}/registrations`} style={{ textDecoration: "none" }}>
+          <Button size="sm" variant="secondary">View Registrations</Button>
         </Link>
       </header>
 
       {/* Tabs */}
       <div style={{ borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 2rem", background: "#0d0d0d" }}>
-        <div style={{ maxWidth: 900, margin: "0 auto", display: "flex" }}>
-          {TABS.map(t => (
-            <button key={t.key} onClick={() => setTab(t.key as typeof tab)} style={{ padding: "12px 18px", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: tab === t.key ? 700 : 400, color: tab === t.key ? "#fff" : "#555", borderBottom: tab === t.key ? "2px solid #e8620a" : "2px solid transparent", marginBottom: -1 }}>
-              {t.label}
-            </button>
-          ))}
+        <div style={{ maxWidth: 900, margin: "0 auto" }}>
+          <Tabs tabs={TABS.map(t => ({ key: t.key, label: t.label }))} active={tab} onChange={k => setTab(k as typeof tab)} />
         </div>
       </div>
 
@@ -543,19 +537,19 @@ export default function CommunicatePage() {
             {/* Composer */}
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
-                <label style={S.label}>Recipients</label>
+                <Label>Recipients</Label>
                 <select style={S.select} value={emailFilter} onChange={e => setEmailFilter(e.target.value as RecipientFilter)} disabled={send.phase === "sending"}>
                   {FILTERS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
                 </select>
               </div>
 
               <div>
-                <label style={S.label}>Subject *</label>
+                <Label>Subject *</Label>
                 <input style={S.input} value={emailSubject} onChange={e => setEmailSubject(e.target.value)} placeholder="Email subject line" disabled={send.phase === "sending"} />
               </div>
 
               <div>
-                <label style={S.label}>Message *</label>
+                <Label>Message *</Label>
                 <p style={{ fontSize: 11, color: "#555", marginBottom: 6 }}>Use <code style={{ color: "#e8620a" }}>{"{name}"}</code> for participant name. Plain text — line breaks become paragraphs.</p>
                 <textarea style={{ ...S.textarea, minHeight: 260 }} value={emailBody} onChange={e => setEmailBody(e.target.value)} placeholder="Write your message here…" disabled={send.phase === "sending"} />
               </div>
@@ -563,11 +557,9 @@ export default function CommunicatePage() {
               {/* ── Send button / progress display ─────────────────────────── */}
               {send.phase === "idle" && (
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const, alignItems: "center" }}>
-                  <button onClick={enqueueEmail} style={S.btn()}>Queue &amp; Send Email</button>
-                  <button onClick={sendTestEmail} disabled={testSending} style={{ ...S.btn(false), fontSize: 12, padding: "7px 14px" }}>
-                    {testSending ? "Sending test…" : "📨 Send Test"}
-                  </button>
-                  {testResult && <span style={{ fontSize: 12, color: testResult.startsWith("✅") ? "#4ade80" : "#f87171" }}>{testResult}</span>}
+                  <Button onClick={enqueueEmail}>Queue &amp; Send Email</Button>
+                  <Button size="sm" variant="secondary" loading={testSending} onClick={sendTestEmail}>📨 Send Test</Button>
+                  {testResult && <Badge color={testResult.startsWith("✅") ? "green" : "red"} size="sm">{testResult}</Badge>}
                 </div>
               )}
 
@@ -623,18 +615,12 @@ export default function CommunicatePage() {
                   {send.phase === "done" && (
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
                       {send.retryable > 0 && (
-                        <button onClick={retryFailed} style={{ ...S.btn(), fontSize: 12, padding: "7px 14px" }}>
-                          🔄 Retry {send.retryable} Transient Failure{send.retryable !== 1 ? "s" : ""}
-                        </button>
+                        <Button size="sm" onClick={retryFailed}>🔄 Retry {send.retryable} Transient Failure{send.retryable !== 1 ? "s" : ""}</Button>
                       )}
                       {send.details.length > 0 && (
-                        <button onClick={downloadCSV} style={{ ...S.btn(false), fontSize: 12, padding: "7px 14px" }}>
-                          ↓ Download Report CSV
-                        </button>
+                        <Button size="sm" variant="secondary" onClick={downloadCSV}>↓ Download Report CSV</Button>
                       )}
-                      <button onClick={() => setSend(INITIAL_SEND)} style={{ ...S.btn(false), fontSize: 12, padding: "7px 14px" }}>
-                        Send Another
-                      </button>
+                      <Button size="sm" variant="secondary" onClick={() => setSend(INITIAL_SEND)}>Send Another</Button>
                     </div>
                   )}
 
@@ -704,18 +690,18 @@ export default function CommunicatePage() {
 
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
-                <label style={S.label}>Recipients</label>
+                <Label>Recipients</Label>
                 <select style={S.select} value={pushFilter} onChange={e => setPushFilter(e.target.value as RecipientFilter)}>
                   {FILTERS.filter(f => f.value !== "pending").map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
                 </select>
               </div>
               <div>
-                <label style={S.label}>Notification Title *</label>
+                <Label>Notification Title *</Label>
                 <input style={S.input} value={pushTitle} onChange={e => setPushTitle(e.target.value)} placeholder="Race Day Tomorrow! 🏃" maxLength={65} />
                 <div style={{ fontSize: 11, color: "#555", marginTop: 4 }}>{pushTitle.length}/65 characters</div>
               </div>
               <div>
-                <label style={S.label}>Message Body *</label>
+                <Label>Message Body *</Label>
                 <textarea style={{ ...S.textarea, minHeight: 100 }} value={pushBody} onChange={e => setPushBody(e.target.value)} placeholder="Don't forget — your event is tomorrow…" maxLength={178} />
                 <div style={{ fontSize: 11, color: "#555", marginTop: 4 }}>{pushBody.length}/178 characters</div>
               </div>
@@ -732,12 +718,8 @@ export default function CommunicatePage() {
                 </div>
               )}
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <button onClick={sendPush} disabled={pushSending} style={{ ...S.btn(), background: "#7c3aed" }}>
-                  {pushSending ? "Sending…" : "Send Push Notification"}
-                </button>
-                {pushResult && (
-                  <span style={{ fontSize: 13, color: "#4ade80" }}>✅ Sent to {pushResult.sent} users</span>
-                )}
+                <Button loading={pushSending} onClick={sendPush}>Send Push Notification</Button>
+                {pushResult && <Badge color="green">✅ Sent to {pushResult.sent} users</Badge>}
               </div>
             </div>
           </div>
@@ -747,7 +729,7 @@ export default function CommunicatePage() {
         {tab === "history" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {history.length === 0 ? (
-              <div style={{ ...S.card, textAlign: "center", padding: "4rem" }}>
+              <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "4rem", textAlign: "center" }}>
                 <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
                 <div style={{ fontWeight: 700, fontSize: 16, color: "#555" }}>No messages sent yet</div>
               </div>
