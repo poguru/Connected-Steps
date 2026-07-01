@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { Card, Button, Alert, Badge } from "@/components/ui/ds";
 
 interface Setting { key: string; value: string; updated_at: string; }
 
@@ -63,18 +64,14 @@ export default function NotificationsSettingsPage() {
       <h1 style={{ margin: "0 0 4px", fontSize: "1.3rem", fontWeight: 700, color: "#fff" }}>Notification Settings</h1>
       <p style={{ margin: "0 0 2rem", fontSize: 13, color: "#555" }}>Control automated messages sent to members.</p>
 
-      {loadErr && (
-        <div style={{ background: "rgba(240,149,149,0.08)", border: "1px solid rgba(240,149,149,0.2)", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#f09595", marginBottom: "1rem" }}>
-          {loadErr}
-        </div>
-      )}
+      {loadErr && <Alert variant="error" style={{ marginBottom: "1rem" }}>{loadErr}</Alert>}
 
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
 
         {toggleKeys.map(key => {
           const isOn = get(key) !== "false";
           return (
-            <div key={key} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "1.25rem 1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+            <Card key={key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "#fff", marginBottom: 3 }}>{labelMap[key]}</div>
                 <div style={{ fontSize: 12, color: "#555" }}>{descMap[key]}</div>
@@ -92,15 +89,15 @@ export default function NotificationsSettingsPage() {
               >
                 <span style={{ position: "absolute", top: 3, left: isOn ? 24 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left 0.2s" }} />
               </button>
-              {saved[key] && <span style={{ fontSize: 11, color: "#4ade80", flexShrink: 0 }}>Saved</span>}
-            </div>
+              {saved[key] && <Badge color="green" size="sm">Saved</Badge>}
+            </Card>
           );
         })}
 
         {textKeys.map(key => {
           const val = get(key);
           return (
-            <div key={key} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "1.25rem 1.5rem" }}>
+            <Card key={key}>
               <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "#fff", marginBottom: 3 }}>{labelMap[key]}</div>
               <div style={{ fontSize: 12, color: "#555", marginBottom: "0.75rem" }}>{descMap[key]}</div>
               <div style={{ display: "flex", gap: 8 }}>
@@ -110,31 +107,27 @@ export default function NotificationsSettingsPage() {
                   defaultValue={val}
                   style={{ flex: 1, padding: "9px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 7, color: "#fff", fontSize: 13, outline: "none", fontFamily: "monospace" }}
                 />
-                <button
-                  onClick={() => {
+                <Button loading={saving[key]} onClick={() => {
                     const el = document.getElementById(`input-${key}`) as HTMLInputElement | null;
                     if (el) save(key, el.value.trim());
-                  }}
-                  disabled={saving[key]}
-                  style={{ padding: "9px 18px", background: "#e8620a", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: saving[key] ? 0.5 : 1 }}
-                >
-                  {saving[key] ? "Saving…" : saved[key] ? "Saved ✓" : "Save"}
-                </button>
+                  }}>
+                  {saved[key] ? "Saved ✓" : "Save"}
+                </Button>
               </div>
-            </div>
+            </Card>
           );
         })}
 
       </div>
 
-      <div style={{ marginTop: "2rem", background: "#111", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "1rem 1.5rem" }}>
+      <Card style={{ marginTop: "2rem" }}>
         <div style={{ fontSize: 11, color: "#444", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.08em" }}>Birthday cron schedule</div>
         <div style={{ fontSize: 13, color: "#666", lineHeight: 1.7 }}>
           Runs daily at <strong style={{ color: "#ccc" }}>7:00 AM IST</strong>.
           Sends to all members whose birthday matches today.
           Duplicates are prevented via <code style={{ fontSize: 11, background: "rgba(255,255,255,0.06)", padding: "1px 5px", borderRadius: 3 }}>birthday_email_sent</code> / <code style={{ fontSize: 11, background: "rgba(255,255,255,0.06)", padding: "1px 5px", borderRadius: 3 }}>birthday_wa_sent</code> columns.
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { Card, Button, Input, Alert, StatCard, EmptyState } from "@/components/ui/ds";
 
 interface Rating {
   id: number;
@@ -71,17 +72,16 @@ export default function CoachRatingsPage() {
   if (!authed) {
     return (
       <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "2rem", width: "320px" }}>
-          <div style={{ fontSize: "1rem", fontWeight: 600, color: "#fff", marginBottom: "1.25rem" }}>Admin — Coach Ratings</div>
-          <input type="password" placeholder="Admin password" value={pw}
-            onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && login(pw)}
-            style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "#fff", fontSize: "0.875rem", outline: "none", boxSizing: "border-box", marginBottom: "0.75rem", fontFamily: "inherit" }} />
-          {error && <div style={{ fontSize: "0.8rem", color: "#f09595", marginBottom: "0.75rem" }}>{error}</div>}
-          <button onClick={() => login(pw)} disabled={loading}
-            style={{ width: "100%", padding: "10px", background: "#e8620a", color: "#fff", border: "none", borderRadius: "6px", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            {loading ? "Loading…" : "Access"}
-          </button>
-          <Link href="/admin" style={{ display: "block", textAlign: "center", marginTop: "1rem", fontSize: "0.75rem", color: "#555", textDecoration: "none" }}>← Back to admin</Link>
+        <div style={{ width: "320px" }}>
+          <Card>
+            <div style={{ fontSize: "1rem", fontWeight: 600, color: "#fff", marginBottom: "1.25rem" }}>Admin — Coach Ratings</div>
+            <Input type="password" placeholder="Admin password" value={pw}
+              onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && login(pw)}
+              style={{ marginBottom: "0.75rem" }} />
+            {error && <Alert variant="error" style={{ marginBottom: "0.75rem" }}>{error}</Alert>}
+            <Button fullWidth loading={loading} onClick={() => login(pw)}>Access</Button>
+            <Link href="/admin" style={{ display: "block", textAlign: "center", marginTop: "1rem", fontSize: "0.75rem", color: "#555", textDecoration: "none" }}>← Back to admin</Link>
+          </Card>
         </div>
       </div>
     );
@@ -102,7 +102,7 @@ export default function CoachRatingsPage() {
           <Link href="/admin"><Image src="/logo.png" alt="" width={28} height={28} className="rounded-full" /></Link>
           <span style={{ fontSize: "0.95rem", fontWeight: 600 }}>Coach Ratings</span>
         </div>
-        <button onClick={() => load()} style={{ fontSize: "0.75rem", color: "#888", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", padding: "4px 12px", cursor: "pointer", fontFamily: "inherit" }}>Refresh</button>
+        <Button size="xs" variant="ghost" onClick={() => load()}>Refresh</Button>
       </header>
 
       <div style={{ maxWidth: "860px", margin: "0 auto", padding: "2rem 1.5rem", display: "flex", flexDirection: "column", gap: "2rem" }}>
@@ -110,17 +110,8 @@ export default function CoachRatingsPage() {
         {/* Summary cards */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
           {summaries.map((s) => (
-            <div key={s.name} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "1.25rem" }}>
-              <div style={{ fontSize: "11px", color: "#555", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "0.4rem" }}>{s.name}</div>
-              {s.avg ? (
-                <>
-                  <div style={{ fontSize: "2rem", fontWeight: 700, color: "#fbbf24" }}>{s.avg}★</div>
-                  <div style={{ fontSize: "11px", color: "#555", marginTop: "2px" }}>{s.count} {s.count === 1 ? "review" : "reviews"}</div>
-                </>
-              ) : (
-                <div style={{ fontSize: "0.82rem", color: "#555" }}>No ratings yet</div>
-              )}
-            </div>
+            <StatCard key={s.name} label={s.name} value={s.avg ? `${s.avg}★` : "—"}
+              color={s.avg ? "#fbbf24" : "#555"} sub={s.count > 0 ? `${s.count} ${s.count === 1 ? "review" : "reviews"}` : "No ratings yet"} />
           ))}
         </div>
 
@@ -137,9 +128,9 @@ export default function CoachRatingsPage() {
         {/* Ratings list */}
         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
           {filtered.length === 0 ? (
-            <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", padding: "2rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>No ratings yet.</div>
+            <EmptyState title="No ratings yet." />
           ) : filtered.map((r) => (
-            <div key={r.id} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", padding: "1.25rem" }}>
+            <Card key={r.id}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.4rem" }}>
@@ -150,7 +141,7 @@ export default function CoachRatingsPage() {
                   <div style={{ fontSize: "11px", color: "#555", marginTop: "0.4rem" }}>{r.user_email} · {fmtDate(r.created_at)}</div>
                 </div>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
 

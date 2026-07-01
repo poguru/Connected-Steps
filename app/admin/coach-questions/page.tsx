@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Card, Button, Textarea, Badge, Tabs, EmptyState, Spinner } from "@/components/ui/ds";
 
 interface Question {
   id: string;
@@ -72,24 +73,21 @@ export default function CoachQuestionsAdmin() {
         </div>
 
         {/* Tabs */}
-        <div style={{ display: "flex", gap: "4px", background: "rgba(255,255,255,0.05)", borderRadius: "6px", padding: "4px", width: "fit-content", marginBottom: "1.5rem" }}>
-          {(["pending", "answered"] as const).map((t) => (
-            <button key={t} onClick={() => setTab(t)}
-              style={{ padding: "7px 20px", borderRadius: "4px", fontSize: "0.82rem", fontWeight: 600, border: "none", cursor: "pointer", fontFamily: "inherit", background: tab === t ? "#e8620a" : "transparent", color: tab === t ? "#fff" : "#888", transition: "all 0.15s" }}>
-              {t === "pending" ? `Pending (${pending.length})` : `Answered (${answered.length})`}
-            </button>
-          ))}
-        </div>
+        <Tabs variant="pill" style={{ marginBottom: "1.5rem" }}
+          tabs={[
+            { key: "pending",  label: `Pending (${pending.length})`  },
+            { key: "answered", label: `Answered (${answered.length})` },
+          ]}
+          active={tab}
+          onChange={k => setTab(k as "pending" | "answered")} />
 
         {/* List */}
         {loading ? (
-          <div style={{ color: "#888", textAlign: "center", padding: "3rem" }}>Loading…</div>
+          <div style={{ textAlign: "center", padding: "3rem" }}><Spinner /></div>
         ) : list.length === 0 ? (
-          <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", padding: "3rem", textAlign: "center", color: "#888" }}>
-            {tab === "pending" ? "No pending questions — all caught up!" : "No answered questions yet."}
-          </div>
+          <EmptyState title={tab === "pending" ? "No pending questions — all caught up!" : "No answered questions yet."} />
         ) : list.map((q) => (
-          <div key={q.id} style={{ background: "#111", border: `1px solid ${q.status === "pending" ? "rgba(232,98,10,0.3)" : "rgba(255,255,255,0.08)"}`, borderRadius: "10px", padding: "1.5rem", marginBottom: "1rem" }}>
+          <Card key={q.id} style={{ marginBottom: "1rem", borderColor: q.status === "pending" ? "rgba(232,98,10,0.3)" : undefined }}>
 
             {/* Meta */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
@@ -97,7 +95,7 @@ export default function CoachQuestionsAdmin() {
                 <div style={{ fontWeight: 600, color: "#fff", fontSize: "0.9rem" }}>{q.user_name}</div>
                 <div style={{ fontSize: "11px", color: "#666" }}>{q.user_email} · {fmtDate(q.created_at)}</div>
               </div>
-              <span style={{ fontSize: "10px", fontWeight: 700, padding: "3px 10px", borderRadius: "20px", background: "rgba(232,98,10,0.12)", color: "#e8620a" }}>{q.category}</span>
+              <Badge color="orange" size="sm">{q.category}</Badge>
             </div>
 
             {/* Question */}
@@ -116,24 +114,14 @@ export default function CoachQuestionsAdmin() {
             {/* Answer input */}
             {tab === "pending" && (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                <textarea
-                  value={answers[q.id] ?? ""}
-                  onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
-                  placeholder="Type your coaching advice or answer here…"
-                  rows={3}
-                  style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", color: "#fff", fontSize: "0.85rem", outline: "none", resize: "vertical", boxSizing: "border-box", fontFamily: "inherit", lineHeight: 1.6 }}
-                />
+                <Textarea value={answers[q.id] ?? ""} onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
+                  placeholder="Type your coaching advice or answer here…" style={{ minHeight: "76px" }} />
                 <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                  <button
-                    onClick={() => submitAnswer(q.id)}
-                    disabled={!answers[q.id]?.trim() || saving === q.id}
-                    style={{ padding: "8px 22px", background: "#e8620a", color: "#fff", border: "none", borderRadius: "6px", fontSize: "0.82rem", fontWeight: 700, cursor: !answers[q.id]?.trim() || saving === q.id ? "not-allowed" : "pointer", opacity: !answers[q.id]?.trim() ? 0.5 : 1, fontFamily: "inherit" }}>
-                    {saving === q.id ? "Saving…" : "Send Reply"}
-                  </button>
+                  <Button size="sm" loading={saving === q.id} disabled={!answers[q.id]?.trim()} onClick={() => submitAnswer(q.id)}>Send Reply</Button>
                 </div>
               </div>
             )}
-          </div>
+          </Card>
         ))}
       </div>
     </div>
