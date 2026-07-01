@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import QRScannerModal from "@/components/ui/QRScannerModal";
+import { Button, Alert, Badge, StatCard, Tabs, Spinner } from "@/components/ui/ds";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -43,18 +44,16 @@ interface ByCategory {
 const D = {
   page:   { minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "inherit" } as React.CSSProperties,
   header: { position: "sticky" as const, top: 0, zIndex: 40, background: "rgba(10,10,10,0.97)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 2rem", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" } as React.CSSProperties,
-  card:   { background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem" } as React.CSSProperties,
   input:  { width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 14, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const } as React.CSSProperties,
-  btn:    (p = true): React.CSSProperties => ({ padding: "9px 18px", background: p ? "#e8620a" : "rgba(255,255,255,0.06)", border: p ? "none" : "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: p ? "#fff" : "#aaa", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }),
 };
 
 function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
-function StatCard({ label, value, sub, color = "#fff", big }: { label: string; value: string | number; sub?: string; color?: string; big?: boolean }) {
+function RaceDayStatCard({ label, value, sub, color = "#fff", big }: { label: string; value: string | number; sub?: string; color?: string; big?: boolean }) {
   return (
-    <div style={D.card}>
+    <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem" }}>
       <div style={{ fontSize: big ? 40 : 28, fontWeight: 900, color, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>{sub}</div>}
       <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", marginTop: 6, fontWeight: 600 }}>{label}</div>
@@ -205,11 +204,9 @@ export default function RaceDayPage() {
             <input type="checkbox" checked={autoRefresh} onChange={e => setAutoRefresh(e.target.checked)} />
             Auto-refresh
           </label>
-          <button onClick={() => { setNewCount(0); load(); }} style={{ ...D.btn(false), padding: "6px 14px", fontSize: 12 }}>
-            Refresh Now
-          </button>
-          <Link href={`/event-checkin`} target="_blank" style={{ ...D.btn(), padding: "6px 14px", fontSize: 12, textDecoration: "none" }}>
-            Full Screen Check-In ↗
+          <Button size="sm" variant="ghost" onClick={() => { setNewCount(0); load(); }}>Refresh Now</Button>
+          <Link href="/event-checkin" target="_blank" style={{ textDecoration: "none" }}>
+            <Button size="sm">Full Screen Check-In ↗</Button>
           </Link>
         </div>
       </header>
@@ -234,7 +231,7 @@ export default function RaceDayPage() {
             {summary && (
               <>
                 <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
-                  <div style={{ ...D.card, background: "linear-gradient(135deg, #1a0900 0%, #111 100%)", border: "1px solid rgba(232,98,10,0.2)", display: "flex", alignItems: "center", gap: 20 }}>
+                  <div style={{ background: "linear-gradient(135deg, #1a0900 0%, #111 100%)", border: "1px solid rgba(232,98,10,0.2)", borderRadius: 12, padding: "1.25rem", display: "flex", alignItems: "center", gap: 20 }}>
                     <div>
                       <div style={{ fontSize: 52, fontWeight: 900, color: "#e8620a", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
                         {summary.checked_in}
@@ -252,17 +249,17 @@ export default function RaceDayPage() {
                     </div>
                   </div>
 
-                  <StatCard label="Not Arrived"     value={summary.not_checked_in}   color={summary.not_checked_in > 0 ? "#fbbf24" : "#555"} />
-                  <StatCard label="Breakfast"       value={summary.breakfast_issued}  color="#a3e635" />
-                  <StatCard label="BIB Collected"   value={summary.bib_collected}     color="#60a5fa" />
-                  <StatCard label="Total Confirmed" value={summary.total}             />
+                  <RaceDayStatCard label="Not Arrived"     value={summary.not_checked_in}   color={summary.not_checked_in > 0 ? "#fbbf24" : "#555"} />
+                  <RaceDayStatCard label="Breakfast"       value={summary.breakfast_issued}  color="#a3e635" />
+                  <RaceDayStatCard label="BIB Collected"   value={summary.bib_collected}     color="#60a5fa" />
+                  <RaceDayStatCard label="Total Confirmed" value={summary.total}             />
                 </div>
 
                 {/* Category breakdown */}
                 {Object.keys(byCategory).length > 1 && (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 16 }}>
                     {Object.entries(byCategory).map(([cat, v]) => (
-                      <div key={cat} style={{ ...D.card, padding: "0.875rem 1rem" }}>
+                      <div key={cat} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "0.875rem 1rem" }}>
                         <div style={{ fontSize: 11, fontWeight: 700, color: "#e8620a", textTransform: "uppercase" as const, letterSpacing: ".06em", marginBottom: 8 }}>{cat}</div>
                         <div style={{ display: "flex", gap: 12, fontSize: 13 }}>
                           <div><span style={{ fontWeight: 700, color: "#4ade80" }}>{v.checked_in}</span><span style={{ color: "#555" }}>/{v.total} in</span></div>
@@ -280,7 +277,7 @@ export default function RaceDayPage() {
 
             {/* Recent check-ins */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <div style={D.card}>
+              <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem" }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: "#e8620a", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 12 }}>
                   Recent Check-Ins
                 </div>
@@ -304,17 +301,17 @@ export default function RaceDayPage() {
 
               {/* Quick actions */}
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <div style={{ ...D.card, cursor: "pointer" }} onClick={() => setTab("checkin")}>
+                <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem", cursor: "pointer" }} onClick={() => setTab("checkin")}>
                   <div style={{ fontSize: 32, marginBottom: 6 }}>📷</div>
                   <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Check-In Scanner</div>
                   <div style={{ fontSize: 12, color: "#555" }}>Scan QR to mark arrival</div>
                 </div>
-                <div style={{ ...D.card, cursor: "pointer" }} onClick={() => setTab("breakfast")}>
+                <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem", cursor: "pointer" }} onClick={() => setTab("breakfast")}>
                   <div style={{ fontSize: 32, marginBottom: 6 }}>🥐</div>
                   <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Breakfast Scanner</div>
                   <div style={{ fontSize: 12, color: "#555" }}>Issue breakfast / refreshments</div>
                 </div>
-                <Link href={`/admin/events/${eventId}/bib`} style={{ ...D.card, textDecoration: "none", cursor: "pointer" }}>
+                <Link href={`/admin/events/${eventId}/bib`} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem", textDecoration: "none", cursor: "pointer" }}>
                   <div style={{ fontSize: 32, marginBottom: 6 }}>📦</div>
                   <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>BIB Collection</div>
                   <div style={{ fontSize: 12, color: "#555" }}>Scan QR to hand over BIB</div>
@@ -327,7 +324,7 @@ export default function RaceDayPage() {
         {/* ── Check-In Scanner Tab ────────────────────────────────────────── */}
         {tab === "checkin" && (
           <div style={{ maxWidth: 540, margin: "0 auto" }}>
-            <div style={{ ...D.card, marginBottom: 14 }}>
+            <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem", marginBottom: 14 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#e8620a", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 14 }}>📷 Event Check-In</div>
               <p style={{ fontSize: 13, color: "#666", margin: "0 0 16px" }}>Scan participant QR code to mark them as arrived. Duplicate scans are safely ignored.</p>
               <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
@@ -340,15 +337,13 @@ export default function RaceDayPage() {
                   onKeyDown={e => e.key === "Enter" && handleCheckIn(scanToken)}
                   autoFocus
                 />
-                <button onClick={() => handleCheckIn(scanToken)} disabled={scanning || !scanToken.trim()} style={D.btn()}>
-                  {scanning ? "…" : "Check In"}
-                </button>
+                <Button loading={scanning} disabled={!scanToken.trim()} onClick={() => handleCheckIn(scanToken)}>Check In</Button>
               </div>
-              <button onClick={() => setCameraOpen(true)} style={{ ...D.btn(false), width: "100%" }}>📷 Open Camera</button>
+              <Button variant="secondary" fullWidth onClick={() => setCameraOpen(true)}>📷 Open Camera</Button>
             </div>
 
             {scanResult && (
-              <div style={{ ...D.card, border: `1px solid ${scanResult.already_checked_in ? "rgba(251,191,36,0.3)" : scanResult.valid ? "rgba(74,222,128,0.3)" : "rgba(248,113,113,0.3)"}`, background: scanResult.already_checked_in ? "rgba(251,191,36,0.05)" : scanResult.valid ? "rgba(74,222,128,0.05)" : "rgba(248,113,113,0.05)" }}>
+              <div style={{ borderRadius: 12, padding: "1.25rem", border: `1px solid ${scanResult.already_checked_in ? "rgba(251,191,36,0.3)" : scanResult.valid ? "rgba(74,222,128,0.3)" : "rgba(248,113,113,0.3)"}`, background: scanResult.already_checked_in ? "rgba(251,191,36,0.05)" : scanResult.valid ? "rgba(74,222,128,0.05)" : "rgba(248,113,113,0.05)" }}>
                 <div style={{ fontSize: 18, fontWeight: 800, color: scanResult.already_checked_in ? "#fbbf24" : scanResult.valid ? "#4ade80" : "#f87171", marginBottom: 8 }}>
                   {scanResult.message}
                 </div>
@@ -366,11 +361,11 @@ export default function RaceDayPage() {
             {/* Live mini-stats */}
             {summary && (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 16 }}>
-                <div style={{ ...D.card, textAlign: "center" }}>
+                <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem", textAlign: "center" }}>
                   <div style={{ fontSize: 32, fontWeight: 900, color: "#4ade80" }}>{summary.checked_in}</div>
                   <div style={{ fontSize: 11, color: "#555", fontWeight: 700, textTransform: "uppercase" as const }}>Checked In</div>
                 </div>
-                <div style={{ ...D.card, textAlign: "center" }}>
+                <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem", textAlign: "center" }}>
                   <div style={{ fontSize: 32, fontWeight: 900, color: "#fbbf24" }}>{summary.not_checked_in}</div>
                   <div style={{ fontSize: 11, color: "#555", fontWeight: 700, textTransform: "uppercase" as const }}>Pending</div>
                 </div>
@@ -382,7 +377,7 @@ export default function RaceDayPage() {
         {/* ── Breakfast Scanner Tab ───────────────────────────────────────── */}
         {tab === "breakfast" && (
           <div style={{ maxWidth: 540, margin: "0 auto" }}>
-            <div style={{ ...D.card, marginBottom: 14 }}>
+            <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem", marginBottom: 14 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#a3e635", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 14 }}>🥐 Breakfast / Refreshments</div>
               <p style={{ fontSize: 13, color: "#666", margin: "0 0 16px" }}>Scan participant QR code to issue breakfast. Each participant can only receive one breakfast.</p>
               <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
@@ -395,15 +390,13 @@ export default function RaceDayPage() {
                   onKeyDown={e => e.key === "Enter" && handleBreakfast(bfToken)}
                   autoFocus={tab === "breakfast"}
                 />
-                <button onClick={() => handleBreakfast(bfToken)} disabled={bfScanning || !bfToken.trim()} style={{ ...D.btn(), background: "#16a34a" }}>
-                  {bfScanning ? "…" : "Issue"}
-                </button>
+                <Button loading={bfScanning} disabled={!bfToken.trim()} onClick={() => handleBreakfast(bfToken)}>Issue</Button>
               </div>
-              <button onClick={() => setBfCameraOpen(true)} style={{ ...D.btn(false), width: "100%" }}>📷 Open Camera</button>
+              <Button variant="secondary" fullWidth onClick={() => setBfCameraOpen(true)}>📷 Open Camera</Button>
             </div>
 
             {bfResult && (
-              <div style={{ ...D.card, border: `1px solid ${bfResult.already_availed ? "rgba(251,191,36,0.3)" : bfResult.valid ? "rgba(74,222,128,0.3)" : "rgba(248,113,113,0.3)"}`, background: bfResult.already_availed ? "rgba(251,191,36,0.05)" : bfResult.valid ? "rgba(74,222,128,0.05)" : "rgba(248,113,113,0.05)" }}>
+              <div style={{ borderRadius: 12, padding: "1.25rem", border: `1px solid ${bfResult.already_availed ? "rgba(251,191,36,0.3)" : bfResult.valid ? "rgba(74,222,128,0.3)" : "rgba(248,113,113,0.3)"}`, background: bfResult.already_availed ? "rgba(251,191,36,0.05)" : bfResult.valid ? "rgba(74,222,128,0.05)" : "rgba(248,113,113,0.05)" }}>
                 <div style={{ fontSize: 18, fontWeight: 800, color: bfResult.already_availed ? "#fbbf24" : bfResult.valid ? "#4ade80" : "#f87171" }}>
                   {bfResult.message}
                 </div>
@@ -419,11 +412,11 @@ export default function RaceDayPage() {
 
             {summary && (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 16 }}>
-                <div style={{ ...D.card, textAlign: "center" }}>
+                <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem", textAlign: "center" }}>
                   <div style={{ fontSize: 32, fontWeight: 900, color: "#a3e635" }}>{summary.breakfast_issued}</div>
                   <div style={{ fontSize: 11, color: "#555", fontWeight: 700, textTransform: "uppercase" as const }}>Issued</div>
                 </div>
-                <div style={{ ...D.card, textAlign: "center" }}>
+                <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem", textAlign: "center" }}>
                   <div style={{ fontSize: 32, fontWeight: 900, color: "#555" }}>{(summary.checked_in ?? 0) - (summary.breakfast_issued ?? 0)}</div>
                   <div style={{ fontSize: 11, color: "#555", fontWeight: 700, textTransform: "uppercase" as const }}>Checked In / No Breakfast</div>
                 </div>
@@ -439,11 +432,11 @@ export default function RaceDayPage() {
               <div style={{ fontSize: 13, color: "#555" }}>
                 {pending.length} registered participants not yet checked in
               </div>
-              <button onClick={() => load()} style={{ ...D.btn(false), fontSize: 12, padding: "6px 14px" }}>Refresh</button>
+              <Button size="sm" variant="ghost" onClick={() => load()}>Refresh</Button>
             </div>
 
             {pending.length === 0 ? (
-              <div style={{ ...D.card, textAlign: "center", padding: "4rem" }}>
+              <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "4rem", textAlign: "center" }}>
                 <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
                 <div style={{ fontWeight: 700, fontSize: 18, color: "#4ade80" }}>Everyone is checked in!</div>
               </div>
