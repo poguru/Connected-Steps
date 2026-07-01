@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { Card, Button, Input, Label, Alert, Badge, StatCard } from "@/components/ui/ds";
 
 interface Registration {
   id: string;
@@ -155,29 +156,16 @@ export default function AdminRunsPage() {
             <Image src="/logo.png" alt="Connected Steps" width={36} height={36} className="rounded-full" />
             <span style={{ fontSize: "1.1rem", fontWeight: 600, color: "#fff" }}>Connected Steps</span>
           </Link>
-          <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", padding: "2rem" }}>
-            <div style={{ fontSize: "10px", color: "#e8620a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.5rem", fontWeight: 600 }}>Admin Access</div>
+          <Card>
+            <Badge color="orange" style={{ marginBottom: "0.5rem" }}>Admin Access</Badge>
             <h1 style={{ fontSize: "1.4rem", fontWeight: 300, color: "#fff", marginBottom: "1.75rem" }}>Run Registrations</h1>
-            <form onSubmit={login}>
-              <label style={{ display: "block", fontSize: "11px", color: "#888", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "6px" }}>Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); setAuthError(""); }}
-                placeholder="Enter admin password"
-                autoFocus
-                style={{ width: "100%", padding: "11px 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "#fff", fontSize: "0.875rem", outline: "none", boxSizing: "border-box", marginBottom: "1rem" }}
-              />
-              {authError && (
-                <div style={{ background: "rgba(226,75,74,0.1)", border: "1px solid rgba(226,75,74,0.3)", borderRadius: "6px", padding: "9px 12px", marginBottom: "1rem", fontSize: "0.8rem", color: "#f09595" }}>
-                  {authError}
-                </div>
-              )}
-              <button type="submit" disabled={loading} style={{ width: "100%", padding: "12px", background: "#e8620a", color: "#fff", border: "none", borderRadius: "6px", fontSize: "0.9rem", fontWeight: 700, cursor: loading ? "not-allowed" : "pointer" }}>
-                {loading ? "Verifying…" : "Access Dashboard"}
-              </button>
+            <form onSubmit={login} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <Label>Password</Label>
+              <Input type="password" value={password} onChange={(e) => { setPassword(e.target.value); setAuthError(""); }} placeholder="Enter admin password" autoFocus />
+              {authError && <Alert variant="error">{authError}</Alert>}
+              <Button type="submit" loading={loading} fullWidth>Access Dashboard</Button>
             </form>
-          </div>
+          </Card>
         </div>
       </div>
     );
@@ -197,15 +185,7 @@ export default function AdminRunsPage() {
           <span style={{ color: "#444", fontSize: "0.8rem" }}>/</span>
           <span style={{ fontSize: "0.85rem", color: "#888" }}>Run Registrations</span>
         </div>
-        <button
-          onClick={downloadCSV}
-          style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 18px", background: "#e8620a", color: "#fff", border: "none", borderRadius: "6px", fontSize: "0.8rem", fontWeight: 700, cursor: "pointer" }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-          Download Excel
-        </button>
+        <Button size="sm" onClick={downloadCSV}>↓ Download Excel</Button>
       </header>
 
       <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "2rem 1.5rem" }}>
@@ -237,10 +217,7 @@ export default function AdminRunsPage() {
             { label: "Guests",           value: stats.guests },
             ...Object.entries(stats.distMap).map(([d, c]) => ({ label: d, value: c })),
           ].map((s) => (
-            <div key={s.label} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", padding: "1rem 1.25rem" }}>
-              <div style={{ fontSize: "1.6rem", fontWeight: 700, color: "#e8620a" }}>{s.value}</div>
-              <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.06em", marginTop: "2px" }}>{s.label}</div>
-            </div>
+            <StatCard key={s.label} label={s.label} value={s.value} />
           ))}
         </div>
 
@@ -277,17 +254,17 @@ export default function AdminRunsPage() {
                       <td style={td}>{r.email}</td>
                       <td style={td}>{r.phone}</td>
                       <td style={{ ...td, textAlign: "center" }}>
-                        <span style={{ padding: "2px 10px", borderRadius: "12px", background: "rgba(232,98,10,0.12)", color: "#e8620a", fontSize: "0.75rem", fontWeight: 600 }}>{r.blood_group}</span>
+                        <Badge color="orange" size="sm">{r.blood_group}</Badge>
                       </td>
                       <td style={{ ...td, textAlign: "center" }}>
-                        <span style={{ padding: "2px 10px", borderRadius: "12px", background: "rgba(255,255,255,0.07)", color: "#ccc", fontSize: "0.75rem", fontWeight: 600 }}>{r.distance}</span>
+                        <Badge color="gray" size="sm">{r.distance}</Badge>
                       </td>
                       <td style={td}>{r.emergency_contact_name}</td>
                       <td style={td}>{r.emergency_contact_phone}</td>
                       <td style={{ ...td, textAlign: "center" }}>
                         {r.is_member
-                          ? <span style={{ color: "#4ade80", fontSize: "0.75rem", fontWeight: 600 }}>✓ Member</span>
-                          : <span style={{ color: "#666", fontSize: "0.75rem" }}>Guest</span>}
+                          ? <Badge color="green" size="sm">✓ Member</Badge>
+                          : <Badge color="gray" size="sm">Guest</Badge>}
                       </td>
                       <td style={{ ...td, color: "#666", fontSize: "0.75rem" }}>
                         {r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
