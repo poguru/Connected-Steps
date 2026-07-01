@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { getEventLifecycleStatus, LIFECYCLE_LABEL, LIFECYCLE_COLOR, type EventLifecycleStatus } from "@/lib/event-status";
 import { DISTANCE_OPTIONS, getDistanceOption } from "@/lib/event-distances";
+import { Card, Button, Input, Label, Alert, Badge, Tabs, EmptyState } from "@/components/ui/ds";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -52,9 +53,6 @@ interface Coupon {
 
 const S: Record<string, React.CSSProperties> = {
   input: { width: "100%", padding: "10px 13px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "#fff", fontSize: "0.875rem", outline: "none", boxSizing: "border-box" },
-  label: { display: "block", fontSize: "11px", color: "#888", letterSpacing: "0.07em", textTransform: "uppercase" as const, marginBottom: "5px" },
-  btn:   { padding: "10px 22px", background: "#e8620a", color: "#fff", border: "none", borderRadius: "6px", fontSize: "0.85rem", fontWeight: 700, cursor: "pointer" },
-  card:  { background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", padding: "1.5rem" },
 };
 
 const EVENT_TYPES = ["running", "cycling", "training", "race", "community", "workshop"];
@@ -233,16 +231,16 @@ export default function AdminEventsPage() {
           <Image src="/logo.png" alt="Connected Steps" width={36} height={36} className="rounded-full" />
           <span style={{ fontSize: "1.1rem", fontWeight: 600, color: "#fff" }}>Admin · Events</span>
         </Link>
-        <div style={S.card}>
-          <div style={{ fontSize: "10px", color: "#e8620a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.5rem", fontWeight: 600 }}>Admin Access</div>
+        <Card>
+          <Badge color="orange" style={{ marginBottom: "0.5rem" }}>Admin Access</Badge>
           <h1 style={{ fontSize: "1.4rem", fontWeight: 300, color: "#fff", marginBottom: "1.75rem" }}>Events &amp; Coupons</h1>
-          <form onSubmit={login}>
-            <label style={S.label}>Password</label>
-            <input type="password" value={password} onChange={e => { setPassword(e.target.value); setAuthErr(""); }} placeholder="Admin password" autoFocus style={{ ...S.input, marginBottom: "1rem" }} />
-            {authErr && <div style={{ background: "rgba(226,75,74,0.1)", border: "1px solid rgba(226,75,74,0.3)", borderRadius: "6px", padding: "9px 12px", marginBottom: "1rem", fontSize: "0.8rem", color: "#f09595" }}>{authErr}</div>}
-            <button type="submit" disabled={loading} style={{ ...S.btn, width: "100%" }}>{loading ? "Checking…" : "Access Dashboard"}</button>
+          <form onSubmit={login} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <Label>Password</Label>
+            <Input type="password" value={password} onChange={e => { setPassword(e.target.value); setAuthErr(""); }} placeholder="Admin password" autoFocus />
+            {authErr && <Alert variant="error">{authErr}</Alert>}
+            <Button type="submit" loading={loading} fullWidth>Access Dashboard</Button>
           </form>
-        </div>
+        </Card>
       </div>
     </div>
   );
@@ -275,94 +273,88 @@ export default function AdminEventsPage() {
           <span style={{ color: "#444" }}>/</span>
           <span style={{ fontSize: "0.85rem", color: "#888" }}>Events &amp; Coupons</span>
         </div>
-        {/* New event wizard — Phase 1 entry point */}
-        <Link href="/admin/events/new" style={{ padding: "7px 18px", background: "#e8620a", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 700, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}>
-          + Create Event
-        </Link>
+        <Link href="/admin/events/new"><Button size="sm">+ Create Event</Button></Link>
       </header>
 
       <div style={{ maxWidth: "900px", margin: "0 auto", padding: "2rem 1.5rem" }}>
 
         {/* Tabs */}
-        <div style={{ display: "flex", gap: "4px", marginBottom: "2rem", background: "rgba(255,255,255,0.04)", borderRadius: "8px", padding: "4px", width: "fit-content" }}>
-          {(["events", "coupons"] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)}
-              style={{ padding: "8px 22px", borderRadius: "6px", border: "none", cursor: "pointer", fontSize: "0.85rem", fontWeight: 600, background: tab === t ? "#e8620a" : "transparent", color: tab === t ? "#fff" : "#888", transition: "all 0.2s" }}>
-              {t === "events" ? "🗓 Events" : "🎟 Coupons"}
-            </button>
-          ))}
-        </div>
+        <Tabs variant="pill" style={{ marginBottom: "2rem" }}
+          tabs={[
+            { key: "events",  label: "🗓 Events"  },
+            { key: "coupons", label: "🎟 Coupons" },
+          ]}
+          active={tab}
+          onChange={(k) => setTab(k as "events" | "coupons")} />
 
-        {msg && <div style={{ padding: "10px 14px", borderRadius: "6px", marginBottom: "1.5rem", fontSize: "0.85rem", background: msg.startsWith("✅") ? "rgba(74,222,128,0.08)" : "rgba(226,75,74,0.08)", border: `1px solid ${msg.startsWith("✅") ? "rgba(74,222,128,0.25)" : "rgba(226,75,74,0.3)"}`, color: msg.startsWith("✅") ? "#4ade80" : "#f09595" }}>{msg}</div>}
+        {msg && <Alert variant={msg.startsWith("✅") ? "success" : "error"} style={{ marginBottom: "1.5rem" }}>{msg}</Alert>}
 
         {/* ── EVENTS TAB ── */}
         {tab === "events" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
 
             {/* Create form */}
-            <div style={S.card}>
-              <div style={{ fontSize: "11px", color: "#e8620a", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "1.25rem" }}>Create New Event</div>
+            <Card>
+              <Badge color="orange" style={{ marginBottom: "1.25rem" }}>Create New Event</Badge>
               <form onSubmit={createEvent}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
 
                   <div style={{ gridColumn: "1/-1" }}>
-                    <label style={S.label}>Event Title *</label>
+                    <Label>Event Title *</Label>
                     <input style={S.input} value={ef.title} onChange={e => setEf(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Weekend Group Run – Jubilee Hills" required />
                   </div>
 
                   <div style={{ gridColumn: "1/-1" }}>
-                    <label style={S.label}>Description</label>
+                    <Label>Description</Label>
                     <textarea style={{ ...S.input, minHeight: "80px", resize: "vertical" } as React.CSSProperties} value={ef.description} onChange={e => setEf(f => ({ ...f, description: e.target.value }))} placeholder="Tell participants what to expect…" />
                   </div>
 
                   <div>
-                    <label style={S.label}>Event Type *</label>
+                    <Label>Event Type *</Label>
                     <select style={{ ...S.input, cursor: "pointer", colorScheme: "dark" }} value={ef.event_type} onChange={e => setEf(f => ({ ...f, event_type: e.target.value }))}>
                       {EVENT_TYPES.map(t => <option key={t} value={t} style={{ background: "#1a1a1a" }}>{TYPE_ICON[t]} {t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
                     </select>
                   </div>
 
                   <div>
-                    <label style={S.label}>Location *</label>
+                    <Label>Location *</Label>
                     <input style={S.input} value={ef.location} onChange={e => setEf(f => ({ ...f, location: e.target.value }))} placeholder="e.g. Kondapur, Hyderabad" required />
                   </div>
 
                   {/* ── Event Start ── */}
                   <div>
-                    <label style={S.label}>Event Start Date *</label>
+                    <Label>Event Start Date *</Label>
                     <input style={{ ...S.input, colorScheme: "dark" }} type="date" value={ef.start_date} onChange={e => setEf(f => ({ ...f, start_date: e.target.value }))} required />
                   </div>
 
                   <div>
-                    <label style={S.label}>Event Start Time (IST)</label>
+                    <Label>Event Start Time (IST)</Label>
                     <input style={{ ...S.input, colorScheme: "dark" }} type="time" value={ef.start_time} onChange={e => setEf(f => ({ ...f, start_time: e.target.value }))} />
                   </div>
 
                   {/* ── Event End ── */}
                   <div>
-                    <label style={S.label}>Event End Date</label>
+                    <Label>Event End Date</Label>
                     <input style={{ ...S.input, colorScheme: "dark" }} type="date" value={ef.end_date} onChange={e => setEf(f => ({ ...f, end_date: e.target.value }))} />
                   </div>
 
                   <div>
-                    <label style={S.label}>Event End Time (IST)</label>
+                    <Label>Event End Time (IST)</Label>
                     <input style={{ ...S.input, colorScheme: "dark" }} type="time" value={ef.end_time} onChange={e => setEf(f => ({ ...f, end_time: e.target.value }))} />
                   </div>
 
                   {/* ── Registration Close — two fields ── */}
                   <div style={{ gridColumn: "1/-1" }}>
-                    <div style={{ fontSize: "11px", color: "#e8620a", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.75rem", paddingTop: "0.25rem", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-                      Registration Deadline
-                    </div>
+                    <Badge color="orange" style={{ marginBottom: "0.75rem" }}>Registration Deadline</Badge>
                   </div>
 
                   <div>
-                    <label style={S.label}>Registration Closes — Date</label>
+                    <Label>Registration Closes — Date</Label>
                     <input style={{ ...S.input, colorScheme: "dark" }} type="date" value={ef.registration_close_date} onChange={e => setEf(f => ({ ...f, registration_close_date: e.target.value }))} />
                   </div>
 
                   <div>
-                    <label style={S.label}>Registration Closes — Time (IST)</label>
+                    <Label>Registration Closes — Time (IST)</Label>
                     <input style={{ ...S.input, colorScheme: "dark" }} type="time" value={ef.registration_close_time} onChange={e => setEf(f => ({ ...f, registration_close_time: e.target.value }))} />
                     <div style={{ fontSize: "11px", color: "#555", marginTop: "4px" }}>
                       {ef.registration_close_date && ef.registration_close_time
@@ -373,9 +365,7 @@ export default function AdminEventsPage() {
 
                   {/* ── Distance Categories ── */}
                   <div style={{ gridColumn: "1/-1" }}>
-                    <div style={{ fontSize: "11px", color: "#e8620a", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.75rem", paddingTop: "0.25rem", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-                      Distance Categories
-                    </div>
+                    <Badge color="orange" style={{ marginBottom: "0.75rem" }}>Distance Categories</Badge>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                       {DISTANCE_OPTIONS.map(opt => {
                         const selected = ef.distance_categories.includes(opt.code);
@@ -410,17 +400,17 @@ export default function AdminEventsPage() {
 
                   {/* ── Rest of fields ── */}
                   <div>
-                    <label style={S.label}>Organizer</label>
+                    <Label>Organizer</Label>
                     <input style={S.input} value={ef.organizer} onChange={e => setEf(f => ({ ...f, organizer: e.target.value }))} placeholder="e.g. Kalyan" />
                   </div>
 
                   <div>
-                    <label style={S.label}>Max Participants</label>
+                    <Label>Max Participants</Label>
                     <input style={S.input} type="number" min="1" value={ef.max_participants} onChange={e => setEf(f => ({ ...f, max_participants: e.target.value }))} placeholder="Leave blank for unlimited" />
                   </div>
 
                   <div style={{ gridColumn: "1/-1" }}>
-                    <label style={S.label}>Cover Image URL</label>
+                    <Label>Cover Image URL</Label>
                     <input style={S.input} value={ef.cover_image} onChange={e => setEf(f => ({ ...f, cover_image: e.target.value }))} placeholder="https://… (optional)" />
                     {ef.cover_image && (
                       <div style={{ marginTop: "8px", borderRadius: "6px", overflow: "hidden", height: "100px" }}>
@@ -430,23 +420,23 @@ export default function AdminEventsPage() {
                   </div>
 
                   <div>
-                    <label style={S.label}>Registration Price (₹)</label>
+                    <Label>Registration Price (₹)</Label>
                     <input style={S.input} type="number" min="0" value={ef.price} onChange={e => setEf(f => ({ ...f, price: e.target.value }))} placeholder="0 for free events" />
                     {Number(ef.price) === 0 && <div style={{ fontSize: "11px", color: "#555", marginTop: "4px" }}>Free event — no payment required</div>}
                   </div>
 
                   <div>
-                    <label style={S.label}>Google Maps URL</label>
+                    <Label>Google Maps URL</Label>
                     <input style={S.input} value={ef.maps_url} onChange={e => setEf(f => ({ ...f, maps_url: e.target.value }))} placeholder="https://maps.google.com/…" />
                   </div>
 
                   <div style={{ gridColumn: "1/-1" }}>
-                    <label style={S.label}>Terms &amp; Conditions</label>
+                    <Label>Terms &amp; Conditions</Label>
                     <textarea style={{ ...S.input, minHeight: "80px", resize: "vertical" } as React.CSSProperties} value={ef.terms_conditions} onChange={e => setEf(f => ({ ...f, terms_conditions: e.target.value }))} placeholder="e.g. Participants must carry their own water. No refunds after 48 hours..." />
                   </div>
 
                   <div>
-                    <label style={{ ...S.label, marginBottom: 0 }}>Featured Event</label>
+                    <Label>Featured Event</Label>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
                       <button type="button" onClick={() => setEf(f => ({ ...f, featured: !f.featured }))}
                         style={{ width: "40px", height: "22px", borderRadius: "11px", border: "none", cursor: "pointer", background: ef.featured ? "#e8620a" : "rgba(255,255,255,0.15)", transition: "background 0.2s", position: "relative" }}>
@@ -457,7 +447,7 @@ export default function AdminEventsPage() {
                   </div>
 
                   <div>
-                    <label style={{ ...S.label, marginBottom: 0 }}>Registration Required</label>
+                    <Label>Registration Required</Label>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
                       <button type="button" onClick={() => setEf(f => ({ ...f, registration_required: !f.registration_required }))}
                         style={{ width: "40px", height: "22px", borderRadius: "11px", border: "none", cursor: "pointer", background: ef.registration_required ? "#e8620a" : "rgba(255,255,255,0.15)", transition: "background 0.2s", position: "relative" }}>
@@ -468,9 +458,9 @@ export default function AdminEventsPage() {
                   </div>
 
                 </div>
-                <button type="submit" disabled={loading} style={S.btn}>{loading ? "Creating…" : "Create Event (Draft)"}</button>
+                <Button type="submit" loading={loading}>Create Event (Draft)</Button>
               </form>
-            </div>
+            </Card>
 
             {/* Status filter */}
             <div>
@@ -500,38 +490,28 @@ export default function AdminEventsPage() {
                 {filteredEvents.length} event{filteredEvents.length !== 1 ? "s" : ""}
               </div>
               {filteredEvents.length === 0 ? (
-                <div style={{ ...S.card, textAlign: "center", color: "#555" }}>No events in this category.</div>
+                <EmptyState title="No events in this category." />
               ) : filteredEvents.map(ev => {
                 const ls    = getEventLifecycleStatus(ev);
                 const lsCol = LIFECYCLE_COLOR[ls];
                 const closeAt = fmtDatetime(ev.registration_closes_at);
                 return (
-                  <div key={ev.id} style={{ ...S.card, marginBottom: "1rem" }}>
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
+                  <Card key={ev.id} style={{ marginBottom: "1rem" }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" as const }}>
                       {ev.cover_image && (
                         <img src={ev.cover_image} alt="" style={{ width: "72px", height: "56px", objectFit: "cover", borderRadius: "6px", flexShrink: 0 }} />
                       )}
                       <div style={{ flex: 1, minWidth: "200px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px", flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px", flexWrap: "wrap" as const }}>
                           <span style={{ fontSize: "0.95rem", fontWeight: 700, color: "#fff" }}>{ev.title}</span>
-                          {/* Publish status */}
-                          <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "12px", background: ev.status === "published" ? "rgba(74,222,128,0.12)" : "rgba(255,255,255,0.06)", color: ev.status === "published" ? "#4ade80" : "#888", fontWeight: 700 }}>
+                          <Badge color={ev.status === "published" ? "green" : "gray"} size="sm">
                             {ev.status === "published" ? "LIVE" : "DRAFT"}
-                          </span>
-                          {/* Lifecycle status */}
-                          <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "12px", background: lsCol.bg, border: `1px solid ${lsCol.border}`, color: lsCol.text, fontWeight: 700 }}>
-                            {LIFECYCLE_LABEL[ls]}
-                          </span>
-                          <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "12px", background: "rgba(255,255,255,0.05)", color: "#aaa" }}>
-                            {TYPE_ICON[ev.event_type] ?? ""} {ev.event_type}
-                          </span>
+                          </Badge>
+                          <Badge size="sm" style={{ background: lsCol.bg, border: `1px solid ${lsCol.border}`, color: lsCol.text }}>{LIFECYCLE_LABEL[ls]}</Badge>
+                          <Badge color="gray" size="sm">{TYPE_ICON[ev.event_type] ?? ""} {ev.event_type}</Badge>
                           {(ev.distance_categories ?? []).map(cat => {
                             const d = getDistanceOption(cat);
-                            return (
-                              <span key={cat} style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "12px", background: d.bg, border: `1px solid ${d.border}`, color: d.color, fontWeight: 700 }}>
-                                {cat}
-                              </span>
-                            );
+                            return <Badge key={cat} size="sm" style={{ background: d.bg, border: `1px solid ${d.border}`, color: d.color }}>{cat}</Badge>;
                           })}
                         </div>
                         <div style={{ fontSize: "0.78rem", color: "#888", marginBottom: "2px" }}>
@@ -539,11 +519,7 @@ export default function AdminEventsPage() {
                           {ev.end_date ? ` → ${fmtDate(ev.end_date)}${ev.end_time ? ` ${fmtTime(ev.end_time)}` : ""}` : ""}
                         </div>
                         <div style={{ fontSize: "0.78rem", color: "#888", marginBottom: "2px" }}>📍 {ev.location}</div>
-                        {closeAt && (
-                          <div style={{ fontSize: "0.72rem", color: "#e8620a", marginBottom: "2px" }}>
-                            🔒 Reg. closes: {closeAt} IST
-                          </div>
-                        )}
+                        {closeAt && <div style={{ fontSize: "0.72rem", color: "#e8620a", marginBottom: "2px" }}>🔒 Reg. closes: {closeAt} IST</div>}
                         {ev.organizer && <div style={{ fontSize: "0.75rem", color: "#666" }}>Organizer: {ev.organizer}</div>}
                         {ev.max_participants && <div style={{ fontSize: "0.75rem", color: "#666" }}>Max: {ev.max_participants} participants</div>}
                         <div style={{ fontSize: "0.75rem", color: ev.price ? "#e8620a" : "#555" }}>
@@ -556,27 +532,21 @@ export default function AdminEventsPage() {
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: "6px", flexShrink: 0, alignItems: "flex-end" }}>
                         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" as const, justifyContent: "flex-end" }}>
-                          <Link href={`/admin/events/${ev.id}/manage`}
-                            style={{ padding: "7px 14px", borderRadius: "6px", border: "1px solid rgba(232,98,10,0.3)", background: "rgba(232,98,10,0.08)", color: "#e8620a", fontSize: "0.78rem", fontWeight: 700, textDecoration: "none" }}>
-                            Event Hub
+                          <Link href={`/admin/events/${ev.id}/manage`}>
+                            <Button size="sm" variant="outline">Event Hub</Button>
                           </Link>
-                          <button onClick={() => togglePublish(ev)}
-                            style={{ padding: "7px 14px", borderRadius: "6px", border: "none", cursor: "pointer", fontSize: "0.78rem", fontWeight: 700, background: ev.status === "published" ? "rgba(74,222,128,0.12)" : "rgba(255,255,255,0.06)", color: ev.status === "published" ? "#4ade80" : "#888", fontFamily: "inherit" }}>
+                          <Button size="sm" variant={ev.status === "published" ? "secondary" : "ghost"}
+                            onClick={() => togglePublish(ev)}>
                             {ev.status === "published" ? "Unpublish" : "Publish"}
-                          </button>
-                          <button onClick={async () => {
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={async () => {
                             const t = prompt("New title:", `${ev.title} (Copy)`);
                             if (!t) return;
                             const res = await fetch(`/api/admin/events/${ev.id}/duplicate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ new_title: t }) });
                             const d = await res.json() as { event_id?: string };
                             if (d.event_id) { window.location.href = `/admin/events/${d.event_id}/manage`; }
-                          }} style={{ padding: "7px 12px", borderRadius: "6px", border: "1px solid rgba(96,165,250,0.25)", cursor: "pointer", fontSize: "0.78rem", background: "rgba(96,165,250,0.06)", color: "#60a5fa", fontFamily: "inherit" }}>
-                            Duplicate
-                          </button>
-                          <button onClick={() => deleteEvent(ev.id)}
-                            style={{ padding: "7px 12px", borderRadius: "6px", border: "1px solid rgba(226,75,74,0.3)", cursor: "pointer", fontSize: "0.78rem", background: "transparent", color: "#f09595", fontFamily: "inherit" }}>
-                            Delete
-                          </button>
+                          }}>Duplicate</Button>
+                          <Button size="sm" variant="danger" onClick={() => deleteEvent(ev.id)}>Delete</Button>
                         </div>
                         <Link href={`/admin/events/${ev.id}/registrations`}
                           style={{ fontSize: "0.72rem", color: "#555", textDecoration: "none", textAlign: "right", fontWeight: 600 }}>
@@ -584,7 +554,7 @@ export default function AdminEventsPage() {
                         </Link>
                       </div>
                     </div>
-                  </div>
+                  </Card>
                 );
               })}
             </div>
@@ -595,8 +565,8 @@ export default function AdminEventsPage() {
         {tab === "coupons" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
 
-            <div style={S.card}>
-              <div style={{ fontSize: "11px", color: "#e8620a", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "1.25rem" }}>Create Coupon</div>
+            <Card>
+              <Badge color="orange" style={{ marginBottom: "1.25rem" }}>Create Coupon</Badge>
               <form onSubmit={createCoupon}>
                 <div style={{ display: "flex", gap: "4px", marginBottom: "1.25rem", background: "rgba(255,255,255,0.04)", borderRadius: "6px", padding: "3px", width: "fit-content" }}>
                   {[{ v: "shared", l: "Shared Code" }, { v: "unique", l: "Unique Per Member" }].map(({ v, l }) => (
@@ -610,72 +580,72 @@ export default function AdminEventsPage() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
                   {cf.type === "shared" ? (
                     <div>
-                      <label style={S.label}>Coupon Code *</label>
+                      <Label>Coupon Code *</Label>
                       <input style={S.input} value={cf.code} onChange={e => setCf(f => ({ ...f, code: e.target.value.toUpperCase() }))} placeholder="e.g. SUMMER20" required />
                     </div>
                   ) : (
                     <>
                       <div>
-                        <label style={S.label}>Code Prefix</label>
+                        <Label>Code Prefix</Label>
                         <input style={S.input} value={cf.prefix} onChange={e => setCf(f => ({ ...f, prefix: e.target.value.toUpperCase() }))} placeholder="CS" maxLength={6} />
                       </div>
                       <div style={{ gridColumn: "1/-1" }}>
-                        <label style={S.label}>Member Emails (one per line or comma-separated) *</label>
+                        <Label>Member Emails (one per line or comma-separated) *</Label>
                         <textarea style={{ ...S.input, minHeight: "100px", resize: "vertical" } as React.CSSProperties} value={cf.emails} onChange={e => setCf(f => ({ ...f, emails: e.target.value }))} placeholder={"member1@email.com\nmember2@email.com"} required={cf.type === "unique"} />
                         <div style={{ fontSize: "11px", color: "#555", marginTop: "4px" }}>One unique code will be generated per email.</div>
                       </div>
                     </>
                   )}
                   <div>
-                    <label style={S.label}>Description</label>
+                    <Label>Description</Label>
                     <input style={S.input} value={cf.description} onChange={e => setCf(f => ({ ...f, description: e.target.value }))} placeholder="e.g. Member exclusive 20% off" />
                   </div>
                   <div>
-                    <label style={S.label}>Discount Type</label>
+                    <Label>Discount Type</Label>
                     <select style={{ ...S.input, cursor: "pointer", colorScheme: "dark" }} value={cf.discount_type} onChange={e => setCf(f => ({ ...f, discount_type: e.target.value }))}>
                       <option value="percentage" style={{ background: "#1a1a1a" }}>Percentage (%)</option>
                       <option value="fixed" style={{ background: "#1a1a1a" }}>Fixed Amount (₹)</option>
                     </select>
                   </div>
                   <div>
-                    <label style={S.label}>Discount Value *</label>
+                    <Label>Discount Value *</Label>
                     <input style={S.input} type="number" value={cf.discount_value} onChange={e => setCf(f => ({ ...f, discount_value: e.target.value }))} placeholder={cf.discount_type === "percentage" ? "20 = 20% off" : "50 = ₹50 off"} required min="1" />
                   </div>
                   {cf.type === "shared" && (
                     <div>
-                      <label style={S.label}>Max Uses</label>
+                      <Label>Max Uses</Label>
                       <input style={S.input} type="number" value={cf.max_uses} onChange={e => setCf(f => ({ ...f, max_uses: e.target.value }))} placeholder="999" min="1" />
                     </div>
                   )}
                   <div>
-                    <label style={S.label}>Restrict to Event (optional)</label>
+                    <Label>Restrict to Event (optional)</Label>
                     <select style={{ ...S.input, cursor: "pointer", colorScheme: "dark" }} value={cf.event_id} onChange={e => setCf(f => ({ ...f, event_id: e.target.value }))}>
                       <option value="" style={{ background: "#1a1a1a" }}>All events</option>
                       {events.map(ev => <option key={ev.id} value={ev.id} style={{ background: "#1a1a1a" }}>{ev.title}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label style={S.label}>Expiry Date (optional)</label>
+                    <Label>Expiry Date (optional)</Label>
                     <input style={{ ...S.input, colorScheme: "dark" }} type="date" value={cf.expires_at} onChange={e => setCf(f => ({ ...f, expires_at: e.target.value }))} />
                   </div>
                 </div>
-                <button type="submit" disabled={loading} style={S.btn}>{loading ? "Creating…" : "Create Coupon"}</button>
+                <Button type="submit" loading={loading}>Create Coupon</Button>
               </form>
-            </div>
+            </Card>
 
             <div>
               <div style={{ fontSize: "11px", color: "#888", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "1rem" }}>All Coupons ({coupons.length})</div>
               {coupons.length === 0 ? (
-                <div style={{ ...S.card, textAlign: "center", color: "#555" }}>No coupons yet.</div>
+                <EmptyState title="No coupons yet." />
               ) : coupons.map(c => (
-                <div key={c.id} style={{ ...S.card, marginBottom: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+                <Card key={c.id} style={{ marginBottom: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" as const }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "3px" }}>
                       <span style={{ fontFamily: "monospace", fontSize: "1rem", fontWeight: 700, color: "#e8620a", letterSpacing: "0.08em" }}>{c.code}</span>
-                      <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "12px", background: "rgba(255,255,255,0.06)", color: "#888" }}>
+                      <Badge color="gray" size="sm">
                         {c.discount_type === "percentage" ? `${c.discount_value}% off` : `₹${c.discount_value} off`}
-                      </span>
-                      {c.assigned_to_email && <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "12px", background: "rgba(56,189,248,0.1)", color: "#38bdf8" }}>Member</span>}
+                      </Badge>
+                      {c.assigned_to_email && <Badge color="blue" size="sm">Member</Badge>}
                     </div>
                     {c.description && <div style={{ fontSize: "0.78rem", color: "#888", marginBottom: "2px" }}>{c.description}</div>}
                     {c.assigned_to_email && <div style={{ fontSize: "0.75rem", color: "#555" }}>→ {c.assigned_to_email}</div>}
@@ -684,11 +654,8 @@ export default function AdminEventsPage() {
                       {c.expires_at ? ` · Expires ${fmtDate(c.expires_at.split("T")[0])}` : ""}
                     </div>
                   </div>
-                  <button onClick={() => deleteCoupon(c.id)}
-                    style={{ padding: "6px 14px", borderRadius: "6px", border: "1px solid rgba(226,75,74,0.3)", cursor: "pointer", fontSize: "0.8rem", background: "transparent", color: "#f09595", flexShrink: 0 }}>
-                    Delete
-                  </button>
-                </div>
+                  <Button size="sm" variant="danger" onClick={() => deleteCoupon(c.id)}>Delete</Button>
+                </Card>
               ))}
             </div>
           </div>
