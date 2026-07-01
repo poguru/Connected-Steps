@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { Card, Button, Input, Alert, Badge } from "@/components/ui/ds";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -179,20 +180,17 @@ export default function TrainingPlansAdmin() {
   if (!authed) {
     return (
       <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", padding: "2.5rem", width: "320px" }}>
+        <Card style={{ width: "320px" }}>
           <div style={{ textAlign: "center", marginBottom: "1.5rem" }}>
             <div style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>📋</div>
             <div style={{ color: "#fff", fontWeight: 600 }}>Training Plans</div>
             <div style={{ fontSize: "0.8rem", color: "#555", marginTop: "4px" }}>Admin access required</div>
           </div>
-          <input type="password" placeholder="Admin password" value={password} onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && login()}
-            style={{ ...inp, marginBottom: "0.75rem" }} />
-          {authErr && <div style={{ fontSize: "0.8rem", color: "#f09595", marginBottom: "0.5rem" }}>{authErr}</div>}
-          <button onClick={login} style={{ width: "100%", background: "#e8620a", border: "none", borderRadius: "6px", padding: "10px", color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: "0.9rem" }}>
-            Sign In
-          </button>
-        </div>
+          <Input type="password" placeholder="Admin password" value={password} onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && login()} style={{ marginBottom: "0.75rem" }} />
+          {authErr && <Alert variant="error" style={{ marginBottom: "0.5rem" }}>{authErr}</Alert>}
+          <Button fullWidth onClick={login}>Sign In</Button>
+        </Card>
       </div>
     );
   }
@@ -229,7 +227,7 @@ export default function TrainingPlansAdmin() {
                     style={{ textAlign: "left", padding: "10px 12px", borderRadius: "6px", border: "1px solid", cursor: "pointer", background: isSelected ? "rgba(232,98,10,0.1)" : "transparent", borderColor: isSelected ? "rgba(232,98,10,0.4)" : "rgba(255,255,255,0.07)", transition: "all 0.15s", width: "100%" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#fff" }}>{u.first_name} {u.last_name}</div>
-                      {hasPlan && <span style={{ fontSize: "9px", background: "rgba(74,222,128,0.15)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.3)", borderRadius: "20px", padding: "1px 6px" }}>Plan ✓</span>}
+                      {hasPlan && <Badge color="green" size="sm">Plan ✓</Badge>}
                     </div>
                     <div style={{ fontSize: "0.72rem", color: "#555", marginTop: "2px" }}>{u.email}</div>
                     <div style={{ fontSize: "0.72rem", color: "#444", marginTop: "1px" }}>{u.goal?.toUpperCase()} · {u.location}</div>
@@ -252,7 +250,7 @@ export default function TrainingPlansAdmin() {
 
               {/* User header */}
               <div style={{ marginBottom: "1.5rem" }}>
-                <div style={{ fontSize: "10px", color: "#e8620a", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "4px" }}>Writing plan for</div>
+                <Badge color="orange" style={{ marginBottom: "4px" }}>Writing plan for</Badge>
                 <div style={{ fontSize: "1.2rem", fontWeight: 600, color: "#fff" }}>{selectedUser.first_name} {selectedUser.last_name}</div>
                 <div style={{ fontSize: "0.8rem", color: "#555" }}>{selectedUser.email} · {selectedUser.goal?.toUpperCase()}</div>
               </div>
@@ -266,10 +264,9 @@ export default function TrainingPlansAdmin() {
                     { label: "Next week",  offset: 1 },
                     { label: "Week after", offset: 2 },
                   ].map((w) => (
-                    <button key={w.offset} onClick={() => setWeekOffset(w.offset)}
-                      style={{ padding: "6px 14px", borderRadius: "6px", border: "1px solid", cursor: "pointer", fontSize: "0.8rem", fontFamily: "inherit", background: weekOffset === w.offset ? "rgba(232,98,10,0.15)" : "transparent", borderColor: weekOffset === w.offset ? "rgba(232,98,10,0.5)" : "rgba(255,255,255,0.1)", color: weekOffset === w.offset ? "#e8620a" : "#888", transition: "all 0.15s" }}>
+                    <Button key={w.offset} size="sm" variant={weekOffset === w.offset ? "primary" : "ghost"} onClick={() => setWeekOffset(w.offset)}>
                       {w.label}
-                    </button>
+                    </Button>
                   ))}
                 </div>
                 <div style={{ fontSize: "0.78rem", color: "#555", marginTop: "0.5rem" }}>📅 {weekRange}</div>
@@ -319,14 +316,9 @@ export default function TrainingPlansAdmin() {
               </div>
 
               {/* Save */}
-              <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
-                <button onClick={savePlan} disabled={saving}
-                  style={{ padding: "10px 28px", background: "#e8620a", border: "none", borderRadius: "6px", color: "#fff", fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", fontSize: "0.9rem", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
-                  {saving ? "Saving…" : "Save Plan"}
-                </button>
-                {saveMsg && (
-                  <span style={{ fontSize: "0.82rem", color: saveMsg.startsWith("✓") ? "#4ade80" : "#f09595" }}>{saveMsg}</span>
-                )}
+              <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" as const }}>
+                <Button loading={saving} onClick={savePlan}>Save Plan</Button>
+                {saveMsg && <Alert variant={saveMsg.startsWith("✓") ? "success" : "error"}>{saveMsg}</Alert>}
               </div>
             </div>
           )}

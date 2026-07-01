@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Card, Button, Input, Label, Alert, Badge, Spinner } from "@/components/ui/ds";
 
 interface DiagnosisReport {
   searched_with:          Record<string, string>;
@@ -65,10 +66,7 @@ interface DiagnosisReport {
 }
 
 const S = {
-  card:   { background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem" } as React.CSSProperties,
-  input:  { width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const } as React.CSSProperties,
-  label:  { display: "block", fontSize: 10, fontWeight: 700, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 5 } as React.CSSProperties,
-  btn:    (primary = true): React.CSSProperties => ({ padding: "9px 20px", background: primary ? "#e8620a" : "rgba(255,255,255,0.06)", border: primary ? "none" : "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: primary ? "#fff" : "#aaa", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }),
+  input: { width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const } as React.CSSProperties,
 };
 
 const STATUS_COLOR: Record<string, string> = {
@@ -143,47 +141,25 @@ export default function PaymentReconcilePage() {
       </div>
 
       {/* Search form */}
-      <div style={{ ...S.card, marginBottom: 20, border: "1px solid rgba(232,98,10,0.2)" }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#e8620a", textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 14 }}>
-          Search by any identifier
-        </div>
+      <Card style={{ marginBottom: 20, borderColor: "rgba(232,98,10,0.2)" }}>
+        <Badge color="orange" style={{ marginBottom: 14 }}>Search by any identifier</Badge>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <div>
-            <label style={S.label}>Razorpay Payment ID (pay_xxx)</label>
-            <input style={S.input} value={form.payment_id} onChange={e => setForm(f => ({ ...f, payment_id: e.target.value }))} placeholder="pay_XXXXXXXXXX" />
-          </div>
-          <div>
-            <label style={S.label}>Razorpay Order ID (order_xxx)</label>
-            <input style={S.input} value={form.order_id} onChange={e => setForm(f => ({ ...f, order_id: e.target.value }))} placeholder="order_XXXXXXXXXX" />
-          </div>
-          <div>
-            <label style={S.label}>Registration Code</label>
-            <input style={S.input} value={form.registration_code} onChange={e => setForm(f => ({ ...f, registration_code: e.target.value }))} placeholder="CS-EVT-XXXXXX" />
-          </div>
-          <div>
-            <label style={S.label}>User Email</label>
-            <input style={S.input} value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="user@example.com" type="email" />
-          </div>
-          <div>
-            <label style={S.label}>Phone Number</label>
-            <input style={S.input} value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="9876543210" />
-          </div>
-          <div>
-            <label style={S.label}>UPI Transaction ID / UTR / RRN</label>
-            <input style={S.input} value={form.utr} onChange={e => setForm(f => ({ ...f, utr: e.target.value }))} placeholder="T26062212035140030813 or 591942146801" />
-          </div>
+          <div><Label>Razorpay Payment ID (pay_xxx)</Label><input style={S.input} value={form.payment_id} onChange={e => setForm(f => ({ ...f, payment_id: e.target.value }))} placeholder="pay_XXXXXXXXXX" /></div>
+          <div><Label>Razorpay Order ID (order_xxx)</Label><input style={S.input} value={form.order_id} onChange={e => setForm(f => ({ ...f, order_id: e.target.value }))} placeholder="order_XXXXXXXXXX" /></div>
+          <div><Label>Registration Code</Label><input style={S.input} value={form.registration_code} onChange={e => setForm(f => ({ ...f, registration_code: e.target.value }))} placeholder="CS-EVT-XXXXXX" /></div>
+          <div><Label>User Email</Label><input style={S.input} value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="user@example.com" type="email" /></div>
+          <div><Label>Phone Number</Label><input style={S.input} value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="9876543210" /></div>
+          <div><Label>UPI Transaction ID / UTR / RRN</Label><input style={S.input} value={form.utr} onChange={e => setForm(f => ({ ...f, utr: e.target.value }))} placeholder="T26062212035140030813 or 591942146801" /></div>
         </div>
-        {error && <div style={{ marginTop: 10, padding: "8px 12px", background: "rgba(248,113,113,0.08)", borderRadius: 7, fontSize: 12, color: "#f87171" }}>{error}</div>}
+        {error && <Alert variant="error" style={{ marginTop: 10 }}>{error}</Alert>}
         <div style={{ marginTop: 14 }}>
-          <button onClick={investigate} disabled={loading} style={S.btn()}>
-            {loading ? "Investigating…" : "🔍 Investigate Payment"}
-          </button>
+          <Button loading={loading} onClick={investigate}>🔍 Investigate Payment</Button>
         </div>
-      </div>
+      </Card>
 
       {/* Diagnosis */}
       {diag && (
-        <div style={{ ...S.card, marginBottom: 16, border: `1px solid ${diagCol}25`, background: `${diagCol}08` }}>
+        <div style={{ background: `${diagCol}08`, border: `1px solid ${diagCol}25`, borderRadius: 12, padding: "1.25rem", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
             <span style={{ fontSize: 18 }}>{diag.status === "COMPLETE" ? "✅" : diag.can_auto_recover ? "⚠️" : "❌"}</span>
             <span style={{ fontSize: 14, fontWeight: 700, color: diagCol }}>{diag.status.replace(/_/g, " ")}</span>
@@ -204,10 +180,9 @@ export default function PaymentReconcilePage() {
               {reconcileResult && (
                 <div style={{ marginBottom: 8, fontSize: 12, color: reconcileResult.startsWith("✅") ? "#4ade80" : "#f87171" }}>{reconcileResult}</div>
               )}
-              <button onClick={() => forceReconcile(dbReg.registration_code, rzpPay.id, rzpPay.order_id)} disabled={reconciling}
-                style={{ ...S.btn(), background: "#16a34a", fontSize: 12, padding: "7px 16px" }}>
-                {reconciling ? "Reconciling…" : `✅ Confirm & Send QR to ${dbReg.user_email}`}
-              </button>
+              <Button size="sm" loading={reconciling} onClick={() => forceReconcile(dbReg.registration_code, rzpPay.id, rzpPay.order_id)}>
+                ✅ Confirm & Send QR to {dbReg.user_email}
+              </Button>
             </div>
           )}
         </div>
@@ -217,7 +192,7 @@ export default function PaymentReconcilePage() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
 
           {/* Database */}
-          <div style={S.card}>
+          <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: report.database.found ? "#4ade80" : "#f87171", textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 12 }}>
               {report.database.found ? "✅" : "❌"} Our Database ({report.database.count} found)
             </div>
@@ -255,7 +230,7 @@ export default function PaymentReconcilePage() {
           </div>
 
           {/* Razorpay */}
-          <div style={S.card}>
+          <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: report.razorpay.payment_found ? "#4ade80" : "#f87171", textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 12 }}>
               {report.razorpay.payment_found ? "✅" : "❌"} Razorpay
             </div>
@@ -302,7 +277,7 @@ export default function PaymentReconcilePage() {
       )}
 
       {/* Instructions */}
-      <div style={{ ...S.card, marginTop: 20, border: "1px solid rgba(96,165,250,0.15)", background: "rgba(96,165,250,0.04)" }}>
+      <div style={{ background: "rgba(96,165,250,0.04)", border: "1px solid rgba(96,165,250,0.15)", borderRadius: 12, padding: "1.25rem", marginTop: 20 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: "#60a5fa", textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 10 }}>
           How to use this tool
         </div>
