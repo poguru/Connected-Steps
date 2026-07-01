@@ -59,7 +59,10 @@ export function Avatar({ name = "?", src, size = 36, color: c, rank, style }: Av
   const bg = c ?? (name ? pickColor(name) : color.orange);
   const rankColor = rank ? (MEDAL[rank] ?? color.orange) : null;
   return (
-    <div style={{ position: "relative", width: size, height: size, flexShrink: 0, display: "inline-flex", ...style }}>
+    // borderRadius on the outer container ensures any `border` passed via the
+    // `style` prop (e.g. from Leaderboard podium cards) also appears circular
+    // rather than as a square frame around the inner circle.
+    <div style={{ position: "relative", width: size, height: size, flexShrink: 0, display: "inline-flex", borderRadius: radius.full, ...style }}>
       <div style={{ width: size, height: size, borderRadius: radius.full, overflow: "hidden", background: src ? "transparent" : `${bg}22`, border: `2px solid ${bg}44`, display: "flex", alignItems: "center", justifyContent: "center" }}>
         {src ? (
           <img src={src} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />

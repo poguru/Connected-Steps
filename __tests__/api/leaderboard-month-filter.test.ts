@@ -300,10 +300,14 @@ describe("week_points are dynamically computed and unaffected by the month fix",
     );
     const entries = await getEntries(db);
 
-    // Week attendance: 5 pts (no bonus) + 10 pts (5 bonus) = 15 total
-    // Wait, let me recalculate: first entry bonus_points=0 → 5 pts; second bonus_points=5 → 5 pts
-    // Total: 5 + 5 = 10 pts
-    expect(entries[0].week_points).toBe(10);
+    // Corrected formula (fixed): `5 + bonus_points` matches recalculateMonth.
+    // session 1: bonus_points=0 → 5 + 0 = 5 pts
+    // session 2: bonus_points=5 → 5 + 5 = 10 pts
+    // Total: 5 + 10 = 15 pts
+    //
+    // Old (buggy) formula was `bonus_points > 0 ? bonus_points : 5`, which gave
+    // session 1 → 5 pts and session 2 → 5 pts (incorrect, lost the bonus).
+    expect(entries[0].week_points).toBe(15);
     // Month points are still zeroed correctly
     expect(entries[0].month_points).toBe(0);
     jest.useRealTimers();
@@ -461,5 +465,111 @@ describe("partial July data: some users have July points, others do not", () => 
     expect(find("bob@test.com")  ?.month_points).toBe(0);  // stale June data
     expect(find("carol@test.com")?.month_points).toBe(0);  // null → stale
     jest.useRealTimers();
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 10. WEEK_POINTS formula: `5 + bonus_points` (not `bonus_points || 5`)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("week_points formula consistency with recalculateMonth", () => {
+
+  // Helper: build a mock DB where session_attendance returns specific rows
+  function makeDbWithWeekAtt(
+    weekRows: { user_email: string; bonus_points: number | null }[]
+  ) {
+    const lbEntries = [
+      { ...BASE_ENTRY, id: "u1", user_email: "a@test.com", points_month: "2025-07", month_points: 5 },
+    ];
+
+    const usersChain = {
+      select: jest.fn().mockReturnThis(),
+      in:     jest.fn().mockResolvedValue({ data: [], error: null }),
+    };
+
+    const lbChain = {
+      select:  jest.fn().mockReturnThis(),
+      order:   jest.fn().mockReturnThis(),
+      limit:   jest.fn().mockResolvedValue({ data: lbEntries, error: null }),
+      in:      jest.fn().mockReturnThis(),
+    };
+
+    const weekChain = {
+      select: jest.fn().mockReturnThis(),
+      eq:     jest.fn().mockReturnThis(),
+      gte:    jest.fn().mockResolvedValue({ data: weekRows, error: null }),
+    };
+
+    return {
+      from: jest.fn().mockImplementation((table: string) => {
+        if (table === "leaderboard")        return lbChain;
+        if (table === "session_attendance") return weekChain;
+        if (table === "users")              return usersChain;
+        return { select: jest.fn().mockReturnThis(), in: jest.fn().mockResolvedValue({ data: [], error: null }) };
+      }),
+    };
+  }
+
+  async function getWeekPoints(
+    weekRows: { user_email: string; bonus_points: number | null }[]
+  ): Promise<number> {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2025-07-15T10:00:00Z")); // mid-July
+
+    const db = makeDbWithWeekAtt(weekRows);
+    mockDb.mockReturnValue(db);
+    const res  = await GET(makeRequest());
+    const body = await res.json() as { entries: Record<string, unknown>[] };
+    jest.useRealTimers();
+    const entry = body.entries.find(e => e.user_email === "a@test.com");
+    return (entry?.week_points as number) ?? 0;
+  }
+
+  test("bonus_points=0: week_points = 5 (base attendance only)", async () => {
+    const pts = await getWeekPoints([
+      { user_email: "a@test.com", bonus_points: 0 },
+    ]);
+    expect(pts).toBe(5);
+  });
+
+  test("bonus_points=null: week_points = 5 (null treated as 0 bonus)", async () => {
+    const pts = await getWeekPoints([
+      { user_email: "a@test.com", bonus_points: null },
+    ]);
+    expect(pts).toBe(5);
+  });
+
+  test("bonus_points=5: week_points = 10 (5 base + 5 bonus, matching recalculateMonth)", async () => {
+    // recalculateMonth formula: 5 + bonus_points = 5 + 5 = 10
+    // weekMap formula (fixed):  5 + bonus_points = 5 + 5 = 10
+    // OLD buggy formula:        bonus_points > 0 ? bonus_points : 5 = 5 (WRONG)
+    const pts = await getWeekPoints([
+      { user_email: "a@test.com", bonus_points: 5 },
+    ]);
+    expect(pts).toBe(10);
+  });
+
+  test("bonus_points=3: week_points = 8 (5 base + 3 bonus)", async () => {
+    const pts = await getWeekPoints([
+      { user_email: "a@test.com", bonus_points: 3 },
+    ]);
+    expect(pts).toBe(8);
+  });
+
+  test("two sessions in the week: week_points sums both correctly", async () => {
+    // Two sessions, no bonus → 5 + 5 = 10
+    const pts = await getWeekPoints([
+      { user_email: "a@test.com", bonus_points: 0 },
+      { user_email: "a@test.com", bonus_points: 0 },
+    ]);
+    expect(pts).toBe(10);
+  });
+
+  test("two sessions, one with bonus: week_points = 5 + (5+3) = 13", async () => {
+    const pts = await getWeekPoints([
+      { user_email: "a@test.com", bonus_points: 0 },  // 5
+      { user_email: "a@test.com", bonus_points: 3 },  // 8
+    ]);
+    expect(pts).toBe(13);
   });
 });

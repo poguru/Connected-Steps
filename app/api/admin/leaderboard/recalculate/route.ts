@@ -11,8 +11,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Provide month as YYYY-MM" }, { status: 400 });
   }
 
+  // Admin-triggered recalculations always bypass the 60-second debounce so that
+  // "Save Attendance → Recalculate" chains never silently skip the second step.
   try {
-    const result = await recalculateMonth(month);
+    const result = await recalculateMonth(month, { force: true });
     return NextResponse.json(result);
   } catch (e: unknown) {
     return NextResponse.json({ error: String(e) }, { status: 500 });

@@ -446,3 +446,109 @@ describe("recalculateMonth", () => {
     });
   });
 });
+
+// ── force flag: bypass 60-second debounce ─────────────────────────────────────
+
+describe("force flag bypasses debounce", () => {
+
+  function makeDbWithRecentRow(sessionDate: string, attendance: AttRow[], users: UserRow[]) {
+    const upsertMock       = jest.fn().mockResolvedValue({ error: null });
+    const attUpdateInMock  = jest.fn().mockResolvedValue({ error: null });
+
+    return {
+      from: jest.fn().mockImplementation((table: string) => {
+        if (table === "sessions") {
+          const c: Record<string, jest.Mock> = {} as Record<string, jest.Mock>;
+          c.select = jest.fn().mockReturnValue(c);
+          c.gte    = jest.fn().mockReturnValue(c);
+          c.lte    = jest.fn().mockReturnValue(c);
+          c.order  = jest.fn().mockResolvedValue({ data: [{ id: "s1", date: sessionDate, location: "Hyd" }], error: null });
+          return c;
+        }
+        if (table === "session_attendance") {
+          const c: Record<string, jest.Mock> = {} as Record<string, jest.Mock>;
+          c.select = jest.fn().mockReturnValue(c);
+          c.in     = jest.fn().mockResolvedValue({ data: attendance, error: null });
+          c.update = jest.fn().mockReturnValue({ in: attUpdateInMock });
+          return c;
+        }
+        if (table === "users") {
+          const c: Record<string, jest.Mock> = {} as Record<string, jest.Mock>;
+          c.select = jest.fn().mockReturnValue(c);
+          c.in     = jest.fn().mockResolvedValue({ data: users, error: null });
+          return c;
+        }
+        if (table === "leaderboard") {
+          const lbChain: Record<string, jest.Mock> = {} as Record<string, jest.Mock>;
+          lbChain.select = jest.fn().mockReturnValue(lbChain);
+          lbChain.eq     = jest.fn().mockReturnValue(lbChain);
+          lbChain.gte    = jest.fn().mockReturnValue(lbChain);
+          // Debounce check returns a RECENT row → would normally skip
+          lbChain.limit  = jest.fn().mockResolvedValue({ data: [{ updated_at: new Date().toISOString() }], error: null });
+          lbChain.in     = jest.fn().mockResolvedValue({ data: [], error: null });
+          return { ...lbChain, upsert: upsertMock };
+        }
+        return {};
+      }),
+      _upsertMock:      upsertMock,
+      _attUpdateInMock: attUpdateInMock,
+    };
+  }
+
+  test("without force: skips when debounce row is recent", async () => {
+    const db = makeDbWithRecentRow("2026-06-07", [], []);
+    mockGetSupabaseServer.mockReturnValue(db);
+
+    const result = await recalculateMonth("2026-06");
+
+    expect(result.updated).toBe(0);
+    expect(result.message).toMatch(/skipped/i);
+    expect(db._upsertMock).not.toHaveBeenCalled();
+  });
+
+  test("with force: runs even when debounce row is recent", async () => {
+    const db = makeDbWithRecentRow("2026-06-07", [
+      { id: 1, session_id: "s1", user_email: "a@x.com", attended: true, bonus_points: 0 },
+    ], [USERS[0]]);
+    mockGetSupabaseServer.mockReturnValue(db);
+
+    const result = await recalculateMonth("2026-06", { force: true });
+
+    expect(result.updated).toBe(1);
+    expect(db._upsertMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── Scoring consistency: week_points formula must match recalculateMonth ───────
+// The public API computes week_points as `5 + (bonus_points ?? 0)`.
+// recalculateMonth computes basePoints as `5 + (bonus_points ?? 0)`.
+// Both MUST produce the same number for the same session row.
+
+describe("scoring formula consistency (week vs month)", () => {
+
+  const SCORING_CASES: { bonusPoints: number; expectedPts: number }[] = [
+    { bonusPoints: 0,  expectedPts: 5  },   // plain attendance, no bonus
+    { bonusPoints: 5,  expectedPts: 10 },   // 5 extra bonus pts on top of base 5
+    { bonusPoints: 10, expectedPts: 15 },   // 10 extra bonus pts
+    { bonusPoints: 3,  expectedPts: 8  },   // 3 extra bonus pts
+  ];
+
+  test.each(SCORING_CASES)(
+    "bonus_points=$bonusPoints → month_points=$expectedPts (same as week formula 5+bonus)",
+    async ({ bonusPoints, expectedPts }) => {
+      const db = makeDb({
+        sessions:   SESSIONS,
+        attendance: [{ id: 1, session_id: "s1", user_email: "a@x.com", attended: true, bonus_points: bonusPoints }],
+        users:      [USERS[0]],
+      });
+      mockGetSupabaseServer.mockReturnValue(db);
+
+      await recalculateMonth("2026-06");
+
+      const rows = db._upsertMock.mock.calls[0][0] as { month_points: number }[];
+      expect(rows[0].month_points).toBe(expectedPts);
+      // This value should equal what the week_points formula `5 + bonus` produces:
+      expect(5 + bonusPoints).toBe(expectedPts);
+    }
+  );
+});

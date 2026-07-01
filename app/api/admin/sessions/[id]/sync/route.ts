@@ -48,7 +48,9 @@ export async function POST(
 
   // Recalculate the full month — single source of truth.
   // Also marks all session_attendance rows for this month as points_synced = true.
-  const result = await recalculateMonth(sessionMonth);
+  // force: true — the admin explicitly triggered this sync, so bypass the
+  // 60-second debounce that protects against concurrent QR-scan storms.
+  const result = await recalculateMonth(sessionMonth, { force: true });
 
   return NextResponse.json({
     synced:  result.updated,

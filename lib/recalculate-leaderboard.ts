@@ -27,7 +27,18 @@ function mondayKey(dateStr: string): string {
   return monday.toISOString().slice(0, 10);
 }
 
-export async function recalculateMonth(month: string): Promise<{ message: string; updated: number }> {
+/**
+ * @param month  "YYYY-MM" string identifying the calendar month to recalculate.
+ * @param force  When true, bypass the 60-second debounce guard.  Pass true from
+ *               admin-triggered manual recalculations so they are never silently
+ *               skipped.  The debounce exists only to prevent 100 simultaneous
+ *               QR-scan webhooks from spawning 100 full recalculations; it must
+ *               never suppress an explicit admin action.
+ */
+export async function recalculateMonth(
+  month: string,
+  { force = false }: { force?: boolean } = {},
+): Promise<{ message: string; updated: number }> {
   const [year, mo] = month.split("-").map(Number);
   const rangeStart = `${month}-01`;
   const rangeEnd   = `${month}-${String(lastDay(year, mo)).padStart(2, "0")}T23:59:59Z`;
@@ -37,14 +48,17 @@ export async function recalculateMonth(month: string): Promise<{ message: string
   // Debounce: if any leaderboard row for this month was updated in the last 60s,
   // a concurrent recalculation is already in progress or just completed — skip.
   // Prevents 100 simultaneous QR scans from spawning 100 full recalculations.
-  const { data: recent } = await db
-    .from("leaderboard")
-    .select("updated_at")
-    .eq("points_month", month)
-    .gte("updated_at", new Date(Date.now() - 60_000).toISOString())
-    .limit(1);
-  if (recent?.length) {
-    return { message: "Skipped — recalculated within last 60s", updated: 0 };
+  // Bypassed when `force = true` so admin manual actions are never dropped.
+  if (!force) {
+    const { data: recent } = await db
+      .from("leaderboard")
+      .select("updated_at")
+      .eq("points_month", month)
+      .gte("updated_at", new Date(Date.now() - 60_000).toISOString())
+      .limit(1);
+    if (recent?.length) {
+      return { message: "Skipped — recalculated within last 60s", updated: 0 };
+    }
   }
 
   const today = todayIST();

@@ -85,7 +85,8 @@ describe("POST /api/admin/sessions/[id]/sync", () => {
 
     expect(res.status).toBe(200);
     expect(mockRecalculateMonth).toHaveBeenCalledTimes(1);
-    expect(mockRecalculateMonth).toHaveBeenCalledWith(SESSION_MONTH);
+    // Admin sync passes force:true so the 60-second debounce is bypassed
+    expect(mockRecalculateMonth).toHaveBeenCalledWith(SESSION_MONTH, { force: true });
     expect(body.synced).toBe(3);
   });
 
@@ -126,6 +127,6 @@ describe("POST /api/admin/sessions/[id]/sync", () => {
 
     await POST(makeRequest(), makeParams());
 
-    expect(mockRecalculateMonth).toHaveBeenCalledWith("2026-06");
+    expect(mockRecalculateMonth).toHaveBeenCalledWith("2026-06", { force: true });
   });
 });

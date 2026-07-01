@@ -109,7 +109,13 @@ export async function GET(req: NextRequest) {
 
   const weekMap: Record<string, number> = {};
   for (const row of weekAttendance ?? []) {
-    const pts = (row.bonus_points && row.bonus_points > 0) ? row.bonus_points : 5;
+    // Scoring rule must match recalculate-leaderboard.ts exactly:
+    //   5 base points + bonus_points (extra points on top of base).
+    // Previous formula `bonus_points > 0 ? bonus_points : 5` was wrong:
+    // it treated bonus_points as a *replacement* for the 5-pt base rather
+    // than an *addition*, causing week_points to be inconsistent with
+    // month_points when bonus points were set.
+    const pts = 5 + (row.bonus_points ?? 0);
     weekMap[row.user_email] = (weekMap[row.user_email] ?? 0) + pts;
   }
 
