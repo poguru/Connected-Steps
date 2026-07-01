@@ -3,6 +3,36 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
 import { cacheGet, cacheSet, CK, TTL, type LbCacheRow, decorateLb } from "@/lib/cache";
 
+// ── IST timezone helpers ──────────────────────────────────────────────────────
+// The application serves a running club in Hyderabad (IST, UTC+05:30).
+// All calendar-boundary decisions (month start, week start) must use the IST
+// wall-clock date, NOT the server's UTC clock, to avoid serving last month's
+// data in the first 5h30m of a new IST calendar month/day.
+
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // 330 min in ms
+
+/** Returns a Date whose UTC fields represent the current IST wall-clock time. */
+function nowIST(): Date {
+  return new Date(Date.now() + IST_OFFSET_MS);
+}
+
+/** Current calendar month in IST as "YYYY-MM". */
+export function currentMonthIST(): string {
+  return nowIST().toISOString().slice(0, 7);
+}
+
+/**
+ * ISO week Monday in IST as "YYYY-MM-DD".
+ * Week starts on Monday per ISO 8601.
+ */
+export function isoWeekStartIST(): string {
+  const ist  = nowIST();
+  const day  = ist.getUTCDay();          // 0 = Sunday
+  const diff = day === 0 ? -6 : 1 - day; // days back to Monday
+  const mon  = new Date(ist.getTime() + diff * 24 * 60 * 60 * 1000);
+  return mon.toISOString().slice(0, 10);
+}
+
 export async function GET(req: NextRequest) {
   const db = getSupabaseServer();
 
@@ -30,9 +60,11 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Base leaderboard entries ──────────────────────────────────────────────
+  // IMPORTANT: also select `points_month` so we can validate whether the
+  // cached `month_points` value belongs to the current calendar month (IST).
   let q = db
     .from("leaderboard")
-    .select("id, user_email, user_name, location, goal, month_points, total_points, week_points, prev_month_rank, updated_at");
+    .select("id, user_email, user_name, location, goal, month_points, points_month, total_points, week_points, prev_month_rank, updated_at");
 
   if (friendsOf) {
     // Friends tab — get followed emails first
@@ -58,8 +90,17 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!entries?.length) return NextResponse.json({ entries: [] });
 
-  // ── Compute week_points from session attendance (current ISO week) ─────────
-  const weekStart = getISOWeekStart();
+  // ── Determine current IST calendar month ──────────────────────────────────
+  // `month_points` in the leaderboard table is a cached value from the last
+  // recalculation. `points_month` records which YYYY-MM that calculation was
+  // for. If `points_month` does not match today's IST month the cached value
+  // is stale (e.g. June data shown on 1 July) and must be treated as 0.
+  const curMonth = currentMonthIST();
+
+  // ── Compute week_points from session attendance (current IST ISO week) ─────
+  // Always recomputed live (not read from the cached leaderboard column) to
+  // guarantee correctness across week boundaries without waiting for a sync.
+  const weekStart = isoWeekStartIST();
   const { data: weekAttendance } = await db
     .from("session_attendance")
     .select("user_email, bonus_points, sessions!inner(date)")
@@ -88,7 +129,11 @@ export async function GET(req: NextRequest) {
     user_name:       e.user_name,
     location:        e.location ?? null,
     goal:            e.goal ?? null,
-    month_points:    e.month_points,
+    // Gate month_points on points_month matching the current IST calendar month.
+    // If the last recalculation was for a previous month (e.g. June) and no
+    // July sessions have been synced yet, month_points must be 0 — not the
+    // stale June value stored in the table.
+    month_points:    e.points_month === curMonth ? (e.month_points ?? 0) : 0,
     total_points:    e.total_points,
     week_points:     weekMap[e.user_email] ?? (e.week_points ?? 0),
     prev_month_rank: e.prev_month_rank ?? null,
@@ -107,14 +152,4 @@ export async function GET(req: NextRequest) {
       },
     },
   );
-}
-
-function getISOWeekStart(): string {
-  const now  = new Date();
-  const day  = now.getDay(); // 0=Sun
-  const diff = (day === 0 ? -6 : 1 - day);
-  const mon  = new Date(now);
-  mon.setDate(now.getDate() + diff);
-  mon.setHours(0, 0, 0, 0);
-  return mon.toISOString().slice(0, 10);
 }

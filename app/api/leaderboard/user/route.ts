@@ -19,7 +19,10 @@ export async function GET(req: NextRequest) {
 
   if (!data) return NextResponse.json({ month_points: 0, total_points: 0, month_xp: 0, total_xp: 0, rank: null });
 
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  // Use IST (UTC+05:30) so the month boundary matches the IST calendar day,
+  // not the UTC clock — avoids showing June data on 1 July IST until 5h30m UTC.
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+  const currentMonth  = new Date(Date.now() + IST_OFFSET_MS).toISOString().slice(0, 7);
   const month_points = data.points_month === currentMonth ? (data.month_points ?? 0) : 0;
   const total_points = data.total_points ?? 0;
 

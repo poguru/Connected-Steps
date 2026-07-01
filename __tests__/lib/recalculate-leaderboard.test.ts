@@ -74,12 +74,16 @@ function makeDb(opts: {
       }
 
       if (table === "leaderboard") {
-        return {
-          select: jest.fn().mockReturnValue({
-            in: jest.fn().mockResolvedValue({ data: opts.existingLeaderboard ?? [], error: null }),
-          }),
-          upsert: upsertMock,
-        };
+        // The leaderboard table is queried twice:
+        //   1. Debounce check: .select().eq().gte().limit()  → always returns [] (no skip)
+        //   2. Existing data:  .select().in()               → returns existingLeaderboard
+        const lbChain: Record<string, jest.Mock> = {} as Record<string, jest.Mock>;
+        lbChain.select = jest.fn().mockReturnValue(lbChain);
+        lbChain.eq     = jest.fn().mockReturnValue(lbChain);
+        lbChain.gte    = jest.fn().mockReturnValue(lbChain);
+        lbChain.limit  = jest.fn().mockResolvedValue({ data: [], error: null }); // debounce: no recent
+        lbChain.in     = jest.fn().mockResolvedValue({ data: opts.existingLeaderboard ?? [], error: null });
+        return { ...lbChain, upsert: upsertMock };
       }
 
       return {};
@@ -236,5 +240,85 @@ describe("recalculateMonth", () => {
 
     expect(result.updated).toBe(0);
     expect(db._upsertMock).not.toHaveBeenCalled();
+  });
+
+  // ── IST timezone: todayIST() upper bound ───────────────────────────────────
+
+  describe("IST timezone boundary for session upper bound", () => {
+
+    test("includes IST-same-day sessions even when UTC is still the previous day", async () => {
+      // IST: 2026-06-08 01:30 (early morning) = UTC: 2026-06-07 20:00
+      // Without the IST fix, `today` (UTC) would be "2026-06-07", excluding
+      // the 2026-06-08 session that already ran in IST time.
+      // With the fix, `today` (IST) = "2026-06-08", so it IS included.
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date("2026-06-07T20:00:00Z")); // IST: 2026-06-08 01:30
+
+      const db = makeDb({
+        sessions:   [{ id: "s1", date: "2026-06-08", location: "Hyd" }],
+        attendance: [{ id: 1, session_id: "s1", user_email: "a@x.com", attended: true, bonus_points: 0 }],
+        users:      [USERS[0]],
+      });
+      mockGetSupabaseServer.mockReturnValue(db);
+
+      const result = await recalculateMonth("2026-06");
+
+      // The session on "2026-06-08" must be included (IST today is 2026-06-08)
+      // so Alice should have earned 5 points.
+      expect(result.updated).toBe(1);
+      const rows = db._upsertMock.mock.calls[0][0] as { month_points: number }[];
+      expect(rows[0].month_points).toBe(5);
+
+      jest.useRealTimers();
+    });
+
+    test("excludes sessions strictly in the future (IST)", async () => {
+      // IST: 2026-06-07 10:00 (morning) = UTC: 2026-06-07 04:30
+      // Session dated 2026-06-08 is tomorrow in IST, should be excluded by the
+      // `lte("date", today)` filter. We check that `today` is NOT in the future.
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date("2026-06-07T04:30:00Z")); // IST: 2026-06-07 10:00
+
+      // The DB mock uses the date range filter in the real `sessions` query.
+      // We verify the sessions query was called with a `lte` date of "2026-06-07"
+      // (IST today), not "2026-06-08".
+      const db = makeDb({
+        sessions:   [],   // simulate: DB returned no sessions (filtered out future)
+        attendance: [],
+        users:      [],
+      });
+      mockGetSupabaseServer.mockReturnValue(db);
+
+      // Extract the `lte` value passed to the sessions query
+      const lteCapture = jest.fn().mockReturnValue({
+        order: jest.fn().mockResolvedValue({ data: [], error: null }),
+      });
+      db.from = jest.fn().mockImplementation((table: string) => {
+        if (table === "sessions") {
+          return {
+            select: jest.fn().mockReturnThis(),
+            gte:    jest.fn().mockReturnThis(),
+            lte:    lteCapture,
+            order:  jest.fn().mockResolvedValue({ data: [], error: null }),
+          };
+        }
+        // leaderboard debounce
+        const lbChain: Record<string, jest.Mock> = {} as Record<string, jest.Mock>;
+        lbChain.select = jest.fn().mockReturnValue(lbChain);
+        lbChain.eq     = jest.fn().mockReturnValue(lbChain);
+        lbChain.gte    = jest.fn().mockReturnValue(lbChain);
+        lbChain.limit  = jest.fn().mockResolvedValue({ data: [], error: null });
+        lbChain.in     = jest.fn().mockResolvedValue({ data: [], error: null });
+        return { ...lbChain, upsert: jest.fn() };
+      });
+
+      await recalculateMonth("2026-06");
+
+      // The lte value passed should be "2026-06-07" (IST today), not a future date
+      const lteArg = lteCapture.mock.calls[0]?.[1] as string;
+      expect(lteArg).toBe("2026-06-07");
+
+      jest.useRealTimers();
+    });
   });
 });

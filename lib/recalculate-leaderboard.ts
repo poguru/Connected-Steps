@@ -4,6 +4,19 @@ function lastDay(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }
 
+/**
+ * Current calendar date in IST (UTC+05:30) as "YYYY-MM-DD".
+ *
+ * Sessions are stored with IST-local dates (e.g. "2025-07-01").
+ * Using UTC for `today` would cause a ~5h30m window at the start of each
+ * IST day where `today` (UTC) is still the previous date, causing the
+ * upper-bound session filter to exclude same-day IST sessions.
+ */
+function todayIST(): string {
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+  return new Date(Date.now() + IST_OFFSET_MS).toISOString().slice(0, 10);
+}
+
 function mondayKey(dateStr: string): string {
   const d = new Date(dateStr.slice(0, 10) + "T12:00:00Z");
   const dow = d.getUTCDay();
@@ -33,7 +46,7 @@ export async function recalculateMonth(month: string): Promise<{ message: string
     return { message: "Skipped — recalculated within last 60s", updated: 0 };
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIST();
 
   const { data: sessions, error: sErr } = await db
     .from("sessions")
