@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { Button, Alert, Badge as DSBadge, Spinner } from "@/components/ui/ds";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -65,44 +66,17 @@ function fmtDate(iso: string | null | undefined, short = false): string {
   });
 }
 
-function Badge({ label, color }: { label: string; color: string }) {
-  const bg: Record<string, string> = {
-    green:  "rgba(74,222,128,0.1)",
-    orange: "rgba(232,98,10,0.1)",
-    yellow: "rgba(251,191,36,0.1)",
-    red:    "rgba(248,113,113,0.1)",
-    gray:   "rgba(255,255,255,0.06)",
-    blue:   "rgba(96,165,250,0.1)",
-  };
-  const fg: Record<string, string> = {
-    green: "#4ade80", orange: "#e8620a", yellow: "#fbbf24",
-    red: "#f87171", gray: "#888", blue: "#60a5fa",
-  };
-  return (
-    <span style={{ padding: "3px 12px", borderRadius: 999, fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: ".06em", background: bg[color], color: fg[color] }}>
-      {label}
-    </span>
-  );
-}
-
 function statusBadge(s: string) {
-  if (s === "confirmed") return <Badge label="Confirmed" color="green" />;
-  if (s === "cancelled") return <Badge label="Cancelled" color="red" />;
-  if (s === "pending_payment") return <Badge label="Pending Payment" color="yellow" />;
-  return <Badge label={s} color="gray" />;
+  const c = s === "confirmed" ? "green" : s === "cancelled" ? "red" : s === "pending_payment" ? "yellow" : "gray";
+  return <DSBadge color={c as "green"|"red"|"yellow"|"gray"}>{s === "pending_payment" ? "Pending Payment" : s.charAt(0).toUpperCase()+s.slice(1)}</DSBadge>;
 }
-
 function paymentBadge(s: string) {
-  if (s === "paid")    return <Badge label="Paid" color="green" />;
-  if (s === "free")    return <Badge label="Free" color="blue" />;
-  if (s === "pending") return <Badge label="Pending" color="yellow" />;
-  return <Badge label={s} color="gray" />;
+  const c = s === "paid" ? "green" : s === "free" ? "blue" : s === "pending" ? "yellow" : "gray";
+  return <DSBadge color={c as "green"|"blue"|"yellow"|"gray"}>{s.charAt(0).toUpperCase()+s.slice(1)}</DSBadge>;
 }
-
 function emailBadge(s: string | null) {
-  if (s === "sent")   return <Badge label="Sent" color="green" />;
-  if (s === "failed") return <Badge label="Failed" color="red" />;
-  return <Badge label="Not sent" color="gray" />;
+  const c = s === "sent" ? "green" : s === "failed" ? "red" : "gray";
+  return <DSBadge color={c as "green"|"red"|"gray"}>{s === "sent" ? "Sent" : s === "failed" ? "Failed" : "Not sent"}</DSBadge>;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -166,16 +140,16 @@ export default function ParticipantDetailPage() {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
 
   if (loading) return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center", color: "#555" }}>
-      Loading participant…
+    <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <Spinner />
     </div>
   );
 
   if (error || !reg) return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
       <div style={{ textAlign: "center" }}>
-        <div style={{ color: "#f87171", marginBottom: 12 }}>{error || "Registration not found"}</div>
-        <button onClick={() => router.back()} style={{ color: "#e8620a", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>← Go back</button>
+        <Alert variant="error" style={{ marginBottom: 12 }}>{error || "Registration not found"}</Alert>
+        <Button variant="ghost" size="sm" onClick={() => router.back()}>← Go back</Button>
       </div>
     </div>
   );
@@ -203,21 +177,9 @@ export default function ParticipantDetailPage() {
               Download QR ↗
             </a>
           )}
-          <button
-            onClick={resendEmail}
-            disabled={action !== "" || isCancelled}
-            style={{ padding: "6px 14px", background: "rgba(99,165,250,0.1)", border: "1px solid rgba(99,165,250,0.2)", borderRadius: 8, color: "#60a5fa", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: (action !== "" || isCancelled) ? 0.5 : 1 }}
-          >
-            {action === "resending" ? "Sending…" : "Resend Email"}
-          </button>
+          <Button size="sm" variant="secondary" loading={action === "resending"} disabled={action !== "" || isCancelled} onClick={resendEmail}>Resend Email</Button>
           {!isCancelled && (
-            <button
-              onClick={cancelRegistration}
-              disabled={action !== ""}
-              style={{ padding: "6px 14px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, color: "#f87171", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
-            >
-              {action === "cancelling" ? "Cancelling…" : "Cancel Registration"}
-            </button>
+            <Button size="sm" variant="danger" loading={action === "cancelling"} disabled={action !== ""} onClick={cancelRegistration}>Cancel Registration</Button>
           )}
         </div>
       </header>
@@ -234,8 +196,8 @@ export default function ParticipantDetailPage() {
             {statusBadge(reg.status)}
             {paymentBadge(reg.payment_status)}
             {emailBadge(reg.email_status)}
-            {reg.checked_in_at && <Badge label="Checked In" color="blue" />}
-            {reg.breakfast_availed && <Badge label="Breakfast ✓" color="green" />}
+            {reg.checked_in_at && <DSBadge color="blue">Checked In</DSBadge>}
+            {reg.breakfast_availed && <DSBadge color="green">Breakfast ✓</DSBadge>}
           </div>
         </div>
 
