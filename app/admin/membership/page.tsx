@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { Card, Button, Input, Label, Alert, Badge, Modal, StatCard, EmptyState } from "@/components/ui/ds";
 
 const PLAN_LABELS: Record<string, string> = {
   monthly:   "Monthly",
@@ -143,25 +144,16 @@ export default function AdminMembershipPage() {
   if (!authed) {
     return (
       <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "2rem", width: "320px" }}>
-          <div style={{ fontSize: "1rem", fontWeight: 600, color: "#fff", marginBottom: "1.25rem" }}>Admin — Memberships</div>
-          <input
-            type="password"
-            placeholder="Admin password"
-            value={pw}
-            onChange={(e) => setPw(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && login(pw)}
-            style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "#fff", fontSize: "0.875rem", outline: "none", boxSizing: "border-box", marginBottom: "0.75rem", fontFamily: "inherit" }}
-          />
-          {error && <div style={{ fontSize: "0.8rem", color: "#f09595", marginBottom: "0.75rem" }}>{error}</div>}
-          <button
-            onClick={() => login(pw)}
-            disabled={loading}
-            style={{ width: "100%", padding: "10px", background: "#e8620a", color: "#fff", border: "none", borderRadius: "6px", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
-          >
-            {loading ? "Loading…" : "Access"}
-          </button>
-          <Link href="/admin" style={{ display: "block", textAlign: "center", marginTop: "1rem", fontSize: "0.75rem", color: "#555", textDecoration: "none" }}>← Back to admin</Link>
+        <div style={{ width: "320px" }}>
+          <Card>
+            <div style={{ fontSize: "1rem", fontWeight: 600, color: "#fff", marginBottom: "1.25rem" }}>Admin — Memberships</div>
+            <Input type="password" placeholder="Admin password" value={pw}
+              onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && login(pw)}
+              style={{ marginBottom: "0.75rem" }} />
+            {error && <Alert variant="error" style={{ marginBottom: "0.75rem" }}>{error}</Alert>}
+            <Button fullWidth loading={loading} onClick={() => login(pw)}>Access</Button>
+            <Link href="/admin" style={{ display: "block", textAlign: "center", marginTop: "1rem", fontSize: "0.75rem", color: "#555", textDecoration: "none" }}>← Back to admin</Link>
+          </Card>
         </div>
       </div>
     );
@@ -179,18 +171,8 @@ export default function AdminMembershipPage() {
           <span style={{ fontSize: "0.95rem", fontWeight: 600, color: "#fff" }}>Memberships</span>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={() => { setGrantEmail(""); setGrantPlan("monthly"); setGrantErr(""); setGrantOk(""); setGrantModal(true); }}
-            style={{ fontSize: "0.75rem", color: "#fff", background: "#e8620a", border: "none", borderRadius: "4px", padding: "5px 14px", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}
-          >
-            + Grant Membership
-          </button>
-          <button
-            onClick={() => load()}
-            style={{ fontSize: "0.75rem", color: "#888", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", padding: "4px 12px", cursor: "pointer", fontFamily: "inherit" }}
-          >
-            Refresh
-          </button>
+          <Button size="sm" onClick={() => { setGrantEmail(""); setGrantPlan("monthly"); setGrantErr(""); setGrantOk(""); setGrantModal(true); }}>+ Grant Membership</Button>
+          <Button size="sm" variant="ghost" onClick={() => load()}>Refresh</Button>
         </div>
       </header>
 
@@ -206,10 +188,7 @@ export default function AdminMembershipPage() {
               { label: "Expiring in 7d",  value: stats.expiringSoon,                                   color: "#fbbf24" },
               { label: "Total Revenue",   value: `₹${(stats.revenue / 100).toLocaleString("en-IN")}`,  color: "#e8620a" },
             ].map((s) => (
-              <div key={s.label} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", padding: "1.25rem" }}>
-                <div style={{ fontSize: "1.6rem", fontWeight: 700, color: s.color }}>{s.value}</div>
-                <div style={{ fontSize: "11px", color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: "4px" }}>{s.label}</div>
-              </div>
+              <StatCard key={s.label} label={s.label} value={s.value} color={s.color} />
             ))}
           </div>
         )}
@@ -257,7 +236,7 @@ export default function AdminMembershipPage() {
           </div>
 
           {visible.length === 0 ? (
-            <div style={{ padding: "3rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>No members found.</div>
+            <EmptyState title="No members found." />
           ) : (
             visible.map((m) => {
               const days = daysLeft(m.expires_at);
@@ -281,9 +260,7 @@ export default function AdminMembershipPage() {
                     {days < 0 ? `${Math.abs(days)}d ago` : `${days}d`}
                   </div>
                   <div>
-                    <span style={{ fontSize: "10px", fontWeight: 700, padding: "3px 10px", borderRadius: "20px", background: `${statusColor}18`, color: statusColor }}>
-                      {statusLabel}
-                    </span>
+                    <Badge color={m.expiringSoon ? "yellow" : m.isActive ? "green" : "red"} size="sm">{statusLabel}</Badge>
                   </div>
                 </div>
               );
@@ -293,100 +270,44 @@ export default function AdminMembershipPage() {
 
         {totalPages > 1 && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1rem 0" }}>
-            <button
-              onClick={() => { const p = Math.max(0, page - 1); setPage(p); load({ page: p }); }}
-              disabled={page === 0}
-              style={{ padding: "6px 16px", background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 6, color: page === 0 ? "#333" : "#888", cursor: page === 0 ? "not-allowed" : "pointer", fontFamily: "inherit", fontSize: 13 }}
-            >
-              ← Previous
-            </button>
-            <span style={{ fontSize: 13, color: "#444" }}>
-              {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total} records
-            </span>
-            <button
-              onClick={() => { const p = Math.min(totalPages - 1, page + 1); setPage(p); load({ page: p }); }}
-              disabled={page >= totalPages - 1}
-              style={{ padding: "6px 16px", background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 6, color: page >= totalPages - 1 ? "#333" : "#888", cursor: page >= totalPages - 1 ? "not-allowed" : "pointer", fontFamily: "inherit", fontSize: 13 }}
-            >
-              Next →
-            </button>
+            <Button size="sm" variant="ghost" disabled={page === 0} onClick={() => { const p = Math.max(0, page - 1); setPage(p); load({ page: p }); }}>← Previous</Button>
+            <span style={{ fontSize: 13, color: "#444" }}>{page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total} records</span>
+            <Button size="sm" variant="ghost" disabled={page >= totalPages - 1} onClick={() => { const p = Math.min(totalPages - 1, page + 1); setPage(p); load({ page: p }); }}>Next →</Button>
           </div>
         )}
 
       </div>
 
       {/* Grant Membership Modal */}
-      {grantModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
-          <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: "2rem", width: "100%", maxWidth: 420 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>Grant Membership</div>
-              <button onClick={() => setGrantModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#555", fontSize: 20, lineHeight: 1, padding: 0 }}>×</button>
-            </div>
-
-            <form onSubmit={handleGrant} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <div>
-                <label style={{ display: "block", fontSize: 11, color: "#666", marginBottom: 6, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em" }}>
-                  User Email *
-                </label>
-                <input
-                  required type="email"
-                  placeholder="user@example.com"
-                  value={grantEmail}
-                  onChange={e => setGrantEmail(e.target.value)}
-                  style={{ width: "100%", background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "10px 12px", color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" as const }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: 11, color: "#666", marginBottom: 6, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em" }}>
-                  Plan *
-                </label>
-                <select
-                  value={grantPlan}
-                  onChange={e => setGrantPlan(e.target.value)}
-                  style={{ width: "100%", background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "10px 12px", color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none", cursor: "pointer", colorScheme: "dark" as const }}
-                >
-                  <option value="monthly">Monthly (1 month)</option>
-                  <option value="quarterly">Quarterly (3 months)</option>
-                  <option value="biannual">6 Months</option>
-                  <option value="annual">Annual (12 months)</option>
-                </select>
-              </div>
-
-              {grantErr && (
-                <div style={{ background: "rgba(220,50,50,0.1)", border: "1px solid rgba(220,50,50,0.3)", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#f87171" }}>
-                  {grantErr}
-                </div>
-              )}
-              {grantOk && (
-                <div style={{ background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.3)", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#4ade80" }}>
-                  {grantOk}
-                </div>
-              )}
-
-              <p style={{ fontSize: 11, color: "#444", margin: 0 }}>
-                Amount will be recorded as ₹0 (manual grant). Any existing active membership will be expired first.
-              </p>
-
-              <div style={{ display: "flex", gap: 10 }}>
-                <button
-                  type="button" onClick={() => setGrantModal(false)}
-                  style={{ flex: 1, padding: "10px", background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 8, color: "#aaa", fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit" disabled={granting}
-                  style={{ flex: 1, padding: "10px", background: granting ? "#1a1a1a" : "#e8620a", border: "none", borderRadius: 8, color: granting ? "#444" : "#fff", fontWeight: 600, fontSize: 13, cursor: granting ? "not-allowed" : "pointer", fontFamily: "inherit" }}
-                >
-                  {granting ? "Granting…" : "Grant Membership"}
-                </button>
-              </div>
-            </form>
+      <Modal open={grantModal} onClose={() => setGrantModal(false)} title="Grant Membership" maxWidth={420}
+        footer={
+          <div style={{ display: "flex", gap: 10 }}>
+            <Button variant="secondary" fullWidth onClick={() => setGrantModal(false)}>Cancel</Button>
+            <Button fullWidth loading={granting} onClick={(e) => handleGrant(e as unknown as React.FormEvent)}>Grant Membership</Button>
           </div>
-        </div>
-      )}
+        }>
+        <form onSubmit={handleGrant} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div>
+            <Label>User Email *</Label>
+            <Input required type="email" placeholder="user@example.com" value={grantEmail} onChange={e => setGrantEmail(e.target.value)} />
+          </div>
+          <div>
+            <Label>Plan *</Label>
+            <select value={grantPlan} onChange={e => setGrantPlan(e.target.value)}
+              style={{ width: "100%", background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "10px 12px", color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none", cursor: "pointer", colorScheme: "dark" as const }}>
+              <option value="monthly">Monthly (1 month)</option>
+              <option value="quarterly">Quarterly (3 months)</option>
+              <option value="biannual">6 Months</option>
+              <option value="annual">Annual (12 months)</option>
+            </select>
+          </div>
+          {grantErr && <Alert variant="error">{grantErr}</Alert>}
+          {grantOk  && <Alert variant="success">{grantOk}</Alert>}
+          <p style={{ fontSize: 11, color: "#444", margin: 0 }}>
+            Amount will be recorded as ₹0 (manual grant). Any existing active membership will be expired first.
+          </p>
+        </form>
+      </Modal>
     </div>
   );
 }

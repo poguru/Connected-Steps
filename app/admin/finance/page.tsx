@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { Button, Alert, Badge, StatCard, Tabs, Spinner } from "@/components/ui/ds";
 
 interface Invoice {
   id: string; invoice_number: string; user_name: string; user_email: string;
@@ -23,7 +24,6 @@ function fmtRupees(n: number) {
 function fmtDate(d: string) { return new Date(d).toLocaleDateString("en-IN", { day:"numeric", month:"short", year:"numeric" }); }
 
 const S: Record<string, React.CSSProperties> = {
-  card:  { background:"#111", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10, padding:"1.25rem" },
   input: { padding:"8px 12px", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:6, color:"#fff", fontSize:"0.82rem", outline:"none", fontFamily:"inherit" },
 };
 
@@ -112,11 +112,8 @@ export default function AdminFinancePage() {
           {preview && preview.estimate_to_generate > 0 && (
             <span style={{ fontSize:"0.72rem", color:"#eab308" }}>{preview.estimate_to_generate} without invoices</span>
           )}
-          <button onClick={runBackfill} disabled={backfilling}
-            style={{ padding:"6px 14px", background: backfilling ? "#1a1a1a" : "#e8620a", border:"none", borderRadius:6, color: backfilling ? "#444" : "#fff", cursor: backfilling ? "not-allowed" : "pointer", fontSize:"0.78rem", fontFamily:"inherit", fontWeight:600 }}>
-            {backfilling ? "Generating…" : "⚡ Generate Missing Invoices"}
-          </button>
-          <button onClick={exportCSV} style={{ padding:"6px 14px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:6, color:"#fff", cursor:"pointer", fontSize:"0.78rem", fontFamily:"inherit" }}>Export CSV</button>
+          <Button size="sm" loading={backfilling} onClick={runBackfill}>⚡ Generate Missing Invoices</Button>
+          <Button size="sm" variant="secondary" onClick={exportCSV}>Export CSV</Button>
         </div>
       </header>
 
@@ -132,28 +129,21 @@ export default function AdminFinancePage() {
               { label:"Emails Sent",     value: summary.emailSent,                         color:"#4ade80" },
               { label:"Failed Emails",   value: summary.emailFailed,                       color: summary.emailFailed > 0 ? "#f87171" : "#555" },
             ].map(({ label, value, color }) => (
-              <div key={label} style={{ ...S.card, textAlign:"center" }}>
-                <div style={{ fontSize:"1.5rem", fontWeight:800, color }}>{value}</div>
-                <div style={{ fontSize:"11px", color:"#555", marginTop:3, textTransform:"uppercase", letterSpacing:"0.06em" }}>{label}</div>
-              </div>
+              <StatCard key={label} label={label} value={value} color={color} />
             ))}
           </div>
         )}
 
         {/* Composition Scheme banner */}
-        <div style={{ background:"rgba(245,158,11,0.07)", border:"1px solid rgba(245,158,11,0.25)", borderRadius:8, padding:"10px 16px", marginBottom:"1.5rem", fontSize:"12px", color:"#aaa" }}>
-          <strong style={{ color:"#f59e0b" }}>Connected Steps</strong> · GSTIN: 36AAVFC9839Q1Z4 · <strong style={{ color:"#f59e0b" }}>GST Composition Scheme</strong> · No tax collected from customers · Hyderabad, Telangana
-        </div>
+        <Alert variant="warning" style={{ marginBottom:"1.5rem", fontSize:"12px" }}>
+          <strong>Connected Steps</strong> · GSTIN: 36AAVFC9839Q1Z4 · <strong>GST Composition Scheme</strong> · No tax collected from customers · Hyderabad, Telangana
+        </Alert>
 
         {/* Tab switcher */}
-        <div style={{ display:"flex", gap:4, background:"rgba(255,255,255,0.04)", borderRadius:8, padding:4, marginBottom:"1.5rem", width:"fit-content" }}>
-          {(["bills","settlement"] as const).map(t => (
-            <button key={t} onClick={() => setActiveTab(t)}
-              style={{ padding:"7px 18px", borderRadius:6, border:"none", cursor:"pointer", fontSize:"0.82rem", fontWeight:600, background: activeTab===t ? "#e8620a" : "transparent", color: activeTab===t ? "#fff" : "#666", fontFamily:"inherit" }}>
-              {t === "bills" ? "Bills of Supply" : "🔒 Settlement Report"}
-            </button>
-          ))}
-        </div>
+        <Tabs variant="pill" style={{ marginBottom:"1.5rem" }}
+          tabs={[{ key:"bills", label:"Bills of Supply" }, { key:"settlement", label:"🔒 Settlement Report" }]}
+          active={activeTab}
+          onChange={k => setActiveTab(k as "bills" | "settlement")} />
 
         {/* Settlement Report (admin-only internal) */}
         {activeTab === "settlement" && (
@@ -162,7 +152,7 @@ export default function AdminFinancePage() {
               🔒 <strong>Internal Only</strong> — This report shows Razorpay platform fees and net settlements. Never share with customers.
             </div>
             {settlementLoading ? (
-              <div style={{ padding:"3rem", textAlign:"center", color:"#555" }}>Loading settlement data…</div>
+              <div style={{ padding:"3rem", textAlign:"center" }}><Spinner /></div>
             ) : settlement?.summary && (
               <>
                 <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))", gap:"0.875rem", marginBottom:"1.5rem" }}>
@@ -173,13 +163,10 @@ export default function AdminFinancePage() {
                     { label:"Net Settled",           value:`₹${(settlement.summary.net_settled_total ?? 0).toFixed(2)}`,   color:"#4ade80" },
                     { label:"Transactions",          value: settlement.summary.total_transactions,                          color:"#aaa"    },
                   ].map(({ label, value, color }) => (
-                    <div key={label} style={{ ...S.card, textAlign:"center" }}>
-                      <div style={{ fontSize:"1.3rem", fontWeight:800, color }}>{value}</div>
-                      <div style={{ fontSize:"11px", color:"#555", marginTop:3, textTransform:"uppercase", letterSpacing:"0.06em" }}>{label}</div>
-                    </div>
+                    <StatCard key={label} label={label} value={value} color={color} />
                   ))}
                 </div>
-                <div style={{ ...S.card, fontSize:"12px", color:"#666" }}>
+                <div style={{ background:"#111", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10, padding:"1.25rem", fontSize:"12px", color:"#666" }}>
                   <strong style={{ color:"#fff" }}>How Razorpay fees are calculated:</strong><br/>
                   Fee = 2% of gross amount + 18% GST on that fee.<br/>
                   Example: ₹1,000 → RP fee ₹20 → GST on fee ₹3.60 → Total deduction ₹23.60 → Net settlement ₹976.40<br/>
@@ -191,17 +178,15 @@ export default function AdminFinancePage() {
         )}
 
         {backfillResult?.summary && (
-          <div style={{ padding:"12px 16px", borderRadius:8, background: backfillResult.summary.total_failed > 0 ? "rgba(234,179,8,0.1)" : "rgba(74,222,128,0.1)", border:`1px solid ${backfillResult.summary.total_failed > 0 ? "rgba(234,179,8,0.3)" : "rgba(74,222,128,0.3)"}`, fontSize:"13px", color: backfillResult.summary.total_failed > 0 ? "#eab308" : "#4ade80", marginBottom:"1rem" }}>
+          <Alert variant={backfillResult.summary.total_failed > 0 ? "warning" : "success"} style={{ marginBottom:"1rem" }}>
             ✅ Generated: <strong>{backfillResult.summary.total_generated}</strong> &nbsp;
             ❌ Failed: <strong>{backfillResult.summary.total_failed}</strong> &nbsp;
             ⏭ Already had invoice: <strong>{backfillResult.summary.already_had_invoice}</strong>
-          </div>
+          </Alert>
         )}
 
         {resendMsg && (
-          <div style={{ padding:"10px 16px", borderRadius:8, background: resendMsg.startsWith("✅") ? "rgba(74,222,128,0.1)" : "rgba(239,68,68,0.1)", color: resendMsg.startsWith("✅") ? "#4ade80" : "#f87171", fontSize:"13px", marginBottom:"1rem" }}>
-            {resendMsg}
-          </div>
+          <Alert variant={resendMsg.startsWith("✅") ? "success" : "error"} style={{ marginBottom:"1rem" }}>{resendMsg}</Alert>
         )}
 
         {/* Bills of Supply tab content */}
@@ -215,16 +200,16 @@ export default function AdminFinancePage() {
             <option value="">All Types</option>
             {Object.entries(TYPE_LABELS).map(([v,l]) => <option key={v} value={v}>{l}</option>)}
           </select>
-          <button onClick={() => load(search, typeFilter)} style={{ padding:"8px 18px", background:"#e8620a", border:"none", borderRadius:6, color:"#fff", fontWeight:700, cursor:"pointer", fontSize:"0.82rem", fontFamily:"inherit" }}>Search</button>
+          <Button size="sm" onClick={() => load(search, typeFilter)}>Search</Button>
         </div>
 
         {/* Table */}
         {loading ? (
-          <div style={{ textAlign:"center", padding:"4rem", color:"#555" }}>Loading…</div>
+          <div style={{ textAlign:"center", padding:"4rem" }}><Spinner /></div>
         ) : error ? (
-          <div style={{ color:"#f87171", padding:"1rem" }}>{error}</div>
+          <Alert variant="error">{error}</Alert>
         ) : (
-          <div style={{ ...S.card, padding:0, overflow:"hidden" }}>
+          <div style={{ background:"#111", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10, padding:0, overflow:"hidden" }}>
             <div style={{ overflowX:"auto" }}>
               <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"0.8rem" }}>
                 <thead>
@@ -254,15 +239,13 @@ export default function AdminFinancePage() {
                       <td style={{ padding:"9px 12px", color:"#aaa" }}>₹{inv.gst_amount.toFixed(2)}</td>
                       <td style={{ padding:"9px 12px", color:"#e8620a", fontWeight:700 }}>₹{inv.total_amount.toFixed(2)}</td>
                       <td style={{ padding:"9px 12px" }}>
-                        <span style={{ fontSize:"9px", fontWeight:700, padding:"2px 7px", borderRadius:999, color: inv.invoice_status==="sent" ? "#4ade80" : "#eab308", background: inv.invoice_status==="sent" ? "rgba(74,222,128,0.1)" : "rgba(234,179,8,0.1)" }}>
-                          {inv.invoice_status.toUpperCase()}
-                        </span>
+                        <Badge color={inv.invoice_status==="sent" ? "green" : "yellow"} size="sm">{inv.invoice_status.toUpperCase()}</Badge>
                       </td>
                       <td style={{ padding:"9px 12px" }}>
                         {inv.email_sent ? (
-                          <span style={{ fontSize:"9px", color:"#4ade80" }}>✓ Sent</span>
+                          <Badge color="green" size="sm">✓ Sent</Badge>
                         ) : inv.email_error ? (
-                          <span style={{ fontSize:"9px", color:"#f87171" }} title={inv.email_error}>✗ Failed</span>
+                          <Badge color="red" size="sm">✗ Failed</Badge>
                         ) : (
                           <span style={{ fontSize:"9px", color:"#555" }}>—</span>
                         )}
@@ -272,10 +255,7 @@ export default function AdminFinancePage() {
                         <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
                           <a href={`/api/invoices/${encodeURIComponent(inv.invoice_number)}`} target="_blank" rel="noopener noreferrer"
                             style={{ fontSize:"0.7rem", color:"#60a5fa", textDecoration:"none", fontWeight:600 }}>View</a>
-                          <button onClick={() => resend(inv.id)} disabled={resending === inv.id}
-                            style={{ background:"none", border:"none", cursor:"pointer", fontSize:"0.7rem", color:"#e8620a", fontFamily:"inherit", fontWeight:600, padding:0 }}>
-                            {resending === inv.id ? "…" : "Resend"}
-                          </button>
+                          <Button size="xs" variant="ghost" loading={resending === inv.id} onClick={() => resend(inv.id)}>Resend</Button>
                         </div>
                       </td>
                     </tr>

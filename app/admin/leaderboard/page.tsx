@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { Card, Button, Input, Alert, Badge, Tabs, EmptyState } from "@/components/ui/ds";
 
 interface LiveEntry {
   user_email:   string;
@@ -44,11 +45,6 @@ function medal(rank: number) {
   return `#${rank}`;
 }
 
-const inp: React.CSSProperties = {
-  width: "100%", padding: "9px 12px",
-  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-  borderRadius: "6px", color: "#fff", fontSize: "0.825rem", outline: "none", boxSizing: "border-box",
-};
 
 const colGrid      = "48px 1fr 130px 90px 90px";
 const colGridNoLoc = "48px 1fr 90px 90px";
@@ -158,13 +154,13 @@ export default function AdminLeaderboardPage() {
               <div style={{ fontSize: "10px", color: "#e8620a", letterSpacing: "0.1em", textTransform: "uppercase" }}>Leaderboard Archive</div>
             </div>
           </Link>
-          <form onSubmit={login} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            <input type="password" placeholder="Admin password" value={password} onChange={(e) => setPassword(e.target.value)} style={inp} />
-            {authErr && <div style={{ fontSize: "12px", color: "#f09595" }}>{authErr}</div>}
-            <button type="submit" disabled={authLoad} style={{ padding: "10px", background: "#e8620a", color: "#fff", border: "none", borderRadius: "6px", fontWeight: 700, cursor: authLoad ? "not-allowed" : "pointer", fontSize: "0.875rem" }}>
-              {authLoad ? "Checking…" : "Access Dashboard"}
-            </button>
-          </form>
+          <Card>
+            <form onSubmit={login} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              <Input type="password" placeholder="Admin password" value={password} onChange={(e) => setPassword(e.target.value)} />
+              {authErr && <Alert variant="error">{authErr}</Alert>}
+              <Button type="submit" loading={authLoad} fullWidth>Access Dashboard</Button>
+            </form>
+          </Card>
         </div>
       </div>
     );
@@ -233,9 +229,7 @@ export default function AdminLeaderboardPage() {
             <div style={{ fontSize: "10px", color: "#e8620a", textTransform: "uppercase", letterSpacing: "0.08em" }}>Leaderboard Archive</div>
           </div>
         </Link>
-        <button onClick={reload} style={{ fontSize: "11px", color: "#888", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", padding: "6px 14px", cursor: "pointer" }}>
-          Refresh
-        </button>
+        <Button size="sm" variant="ghost" onClick={reload}>Refresh</Button>
       </header>
 
       <div style={{ maxWidth: "960px", margin: "0 auto", padding: "2rem" }}>
@@ -250,50 +244,18 @@ export default function AdminLeaderboardPage() {
               <div style={{ fontSize: "1.2rem", fontWeight: 600, color: "#fff" }}>{monthLabel(currentMonth)}</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-              {recalcMsg && (
-                <div style={{ fontSize: "0.8rem", color: recalcMsg.startsWith("Error") ? "#f09595" : "#4ade80" }}>
-                  {recalcMsg}
-                </div>
-              )}
-              {archiveMsg && (
-                <div style={{ fontSize: "0.8rem", color: archiveMsg.startsWith("Error") ? "#f09595" : "#4ade80" }}>
-                  {archiveMsg}
-                </div>
-              )}
-              <button
-                onClick={recalculate}
-                disabled={recalculating}
-                style={{ padding: "9px 20px", background: recalculating ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.08)", color: recalculating ? "#555" : "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "6px", fontWeight: 700, cursor: recalculating ? "not-allowed" : "pointer", fontSize: "0.825rem", whiteSpace: "nowrap" }}
-              >
-                {recalculating ? "Recalculating…" : "Recalculate Points"}
-              </button>
-              <button
-                onClick={archiveNow}
-                disabled={archiving}
-                style={{ padding: "9px 20px", background: archiving ? "rgba(232,98,10,0.5)" : "#e8620a", color: "#fff", border: "none", borderRadius: "6px", fontWeight: 700, cursor: archiving ? "not-allowed" : "pointer", fontSize: "0.825rem", whiteSpace: "nowrap" }}
-              >
-                {archiving ? "Saving…" : alreadyArchived ? "Re-save Snapshot" : "Save Snapshot"}
-              </button>
+              {recalcMsg && <Alert variant={recalcMsg.startsWith("Error") ? "error" : "success"}>{recalcMsg}</Alert>}
+              {archiveMsg && <Alert variant={archiveMsg.startsWith("Error") ? "error" : "success"}>{archiveMsg}</Alert>}
+              <Button size="sm" variant="secondary" loading={recalculating} onClick={recalculate}>Recalculate Points</Button>
+              <Button size="sm" loading={archiving} onClick={archiveNow}>{alreadyArchived ? "Re-save Snapshot" : "Save Snapshot"}</Button>
             </div>
           </div>
 
           {/* View toggle */}
-          <div style={{ display: "flex", gap: "4px", padding: "4px", marginBottom: "1rem", borderRadius: "6px", background: "rgba(255,255,255,0.04)", width: "fit-content" }}>
-            {(["overall", "location"] as const).map((v) => (
-              <button
-                key={v}
-                onClick={() => setView(v)}
-                style={{
-                  padding: "7px 18px", borderRadius: "4px", fontSize: "0.825rem", fontWeight: 600,
-                  background: view === v ? "#e8620a" : "transparent",
-                  color: view === v ? "#fff" : "#888",
-                  border: "none", cursor: "pointer", fontFamily: "inherit",
-                }}
-              >
-                {v === "overall" ? "Overall" : "By Location"}
-              </button>
-            ))}
-          </div>
+          <Tabs variant="pill" style={{ marginBottom: "1rem" }}
+            tabs={[{ key:"overall", label:"Overall" }, { key:"location", label:"By Location" }]}
+            active={view}
+            onChange={k => setView(k as "overall" | "location")} />
 
           {/* ── Overall view ── */}
           {view === "overall" && (
@@ -304,9 +266,7 @@ export default function AdminLeaderboardPage() {
                 ))}
               </div>
               {liveWithPoints.length === 0 ? (
-                <div style={{ padding: "3rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>
-                  No participants with points yet this month.
-                </div>
+                <EmptyState title="No participants with points yet this month." />
               ) : (
                 liveWithPoints.map((entry, i) => (
                   <AthleteRow key={entry.user_email} entry={entry} rank={i + 1} />
@@ -319,9 +279,7 @@ export default function AdminLeaderboardPage() {
           {view === "location" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               {locationGroups.length === 0 ? (
-                <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", padding: "3rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>
-                  No participants with points yet this month.
-                </div>
+                <EmptyState title="No participants with points yet this month." />
               ) : (
                 locationGroups.map(({ loc, entries, total }) => (
                   <div key={loc} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", overflow: "hidden" }}>
@@ -371,9 +329,7 @@ export default function AdminLeaderboardPage() {
         </div>
 
         {months.length === 0 ? (
-          <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "10px", padding: "3rem", textAlign: "center", color: "#555" }}>
-            No archived months yet. Click "Save Snapshot" above to lock in this month's standings.
-          </div>
+          <EmptyState title="No archived months yet." body={'Click "Save Snapshot" above to lock in this month\'s standings.'} />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             {months.map((month) => {
@@ -390,9 +346,7 @@ export default function AdminLeaderboardPage() {
                       <div style={{ fontSize: "10px", color: "#888" }}>{rows.length} participant{rows.length !== 1 ? "s" : ""}</div>
                       <div style={{ display: "flex", gap: "0.4rem" }}>
                         {rows.slice(0, 3).map((r) => (
-                          <span key={r.rank} style={{ fontSize: "11px", background: "rgba(232,98,10,0.15)", border: "1px solid rgba(232,98,10,0.3)", borderRadius: "4px", padding: "2px 8px", color: "#e8620a" }}>
-                            {medal(r.rank)} {r.user_name.split(" ")[0]}
-                          </span>
+                          <Badge key={r.rank} color="orange" size="sm">{medal(r.rank)} {r.user_name.split(" ")[0]}</Badge>
                         ))}
                       </div>
                     </div>
