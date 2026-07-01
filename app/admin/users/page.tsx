@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { Card, Button, Input, Alert, Badge, EmptyState, StatCard } from "@/components/ui/ds";
 
 const GOAL_LABELS: Record<string, string> = {
   "5k":  "5K", "10k": "10K", "half": "Half Marathon", "full": "Full Marathon",
@@ -130,17 +131,16 @@ export default function AdminUsersPage() {
   if (!authed) {
     return (
       <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "2rem", width: "320px" }}>
-          <div style={{ fontSize: "1rem", fontWeight: 600, color: "#fff", marginBottom: "1.25rem" }}>Admin — Users</div>
-          <input type="password" placeholder="Admin password" value={pw}
-            onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && login(pw)}
-            style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "#fff", fontSize: "0.875rem", outline: "none", boxSizing: "border-box", marginBottom: "0.75rem", fontFamily: "inherit" }} />
-          {error && <div style={{ fontSize: "0.8rem", color: "#f09595", marginBottom: "0.75rem" }}>{error}</div>}
-          <button onClick={() => login(pw)} disabled={loading}
-            style={{ width: "100%", padding: "10px", background: "#e8620a", color: "#fff", border: "none", borderRadius: "6px", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            {loading ? "Loading…" : "Access"}
-          </button>
-          <Link href="/admin" style={{ display: "block", textAlign: "center", marginTop: "1rem", fontSize: "0.75rem", color: "#555", textDecoration: "none" }}>← Back to admin</Link>
+        <div style={{ width: "320px" }}>
+          <Card>
+            <div style={{ fontSize: "1rem", fontWeight: 600, color: "#fff", marginBottom: "1.25rem" }}>Admin — Users</div>
+            <Input type="password" placeholder="Admin password" value={pw}
+              onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && login(pw)}
+              style={{ marginBottom: "0.75rem" }} />
+            {error && <Alert variant="error" style={{ marginBottom: "0.75rem" }}>{error}</Alert>}
+            <Button fullWidth loading={loading} onClick={() => login(pw)}>Access</Button>
+            <Link href="/admin" style={{ display: "block", textAlign: "center", marginTop: "1rem", fontSize: "0.75rem", color: "#555", textDecoration: "none" }}>← Back to admin</Link>
+          </Card>
         </div>
       </div>
     );
@@ -153,7 +153,7 @@ export default function AdminUsersPage() {
           <Link href="/admin"><Image src="/logo.png" alt="" width={28} height={28} className="rounded-full" /></Link>
           <span style={{ fontSize: "0.95rem", fontWeight: 600 }}>Users</span>
         </div>
-        <button onClick={() => load()} style={{ fontSize: "0.75rem", color: "#888", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", padding: "4px 12px", cursor: "pointer", fontFamily: "inherit" }}>Refresh</button>
+        <Button size="xs" variant="ghost" onClick={() => load()}>Refresh</Button>
       </header>
 
       <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "2rem 1.5rem" }}>
@@ -161,18 +161,11 @@ export default function AdminUsersPage() {
         {/* Stats */}
         {stats && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "1rem", marginBottom: "2rem" }}>
-            {[
-              { label: "Total Users",      value: stats.total,          color: "#fff" },
-              { label: "Active Members",   value: stats.activeMembers,  color: "#4ade80" },
-              { label: "Strava Connected", value: stats.withStrava,     color: "#fc4c02" },
-              { label: "Sessions Attended",value: stats.totalSessions,  color: "#e8620a" },
-              { label: "Deactivated",      value: deactivatedCount,     color: "#f09595" },
-            ].map((s) => (
-              <div key={s.label} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", padding: "1.25rem" }}>
-                <div style={{ fontSize: "1.6rem", fontWeight: 700, color: s.color }}>{s.value}</div>
-                <div style={{ fontSize: "11px", color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: "4px" }}>{s.label}</div>
-              </div>
-            ))}
+            <StatCard label="Total Users"       value={stats.total} />
+            <StatCard label="Active Members"    value={stats.activeMembers} color="#4ade80" />
+            <StatCard label="Strava Connected"  value={stats.withStrava} color="#fc4c02" />
+            <StatCard label="Sessions Attended" value={stats.totalSessions} color="#e8620a" />
+            <StatCard label="Deactivated"       value={deactivatedCount} color="#f09595" />
           </div>
         )}
 
@@ -211,7 +204,7 @@ export default function AdminUsersPage() {
           </div>
 
           {visible.length === 0 ? (
-            <div style={{ padding: "3rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>No users found.</div>
+            <EmptyState title="No users found." />
           ) : visible.map((u) => {
             const isDeactivated = u.is_active === false;
             const isPending     = toggling[u.email];
@@ -220,7 +213,7 @@ export default function AdminUsersPage() {
                 <div>
                   <div style={{ fontWeight: 600, color: "#fff", display: "flex", alignItems: "center", gap: 6 }}>
                     {u.first_name} {u.last_name}
-                    {isDeactivated && <span style={{ fontSize: "9px", fontWeight: 700, padding: "1px 6px", borderRadius: "10px", background: "rgba(240,149,149,0.12)", color: "#f09595", letterSpacing: "0.05em" }}>DISABLED</span>}
+                    {isDeactivated && <Badge color="red" size="sm">DISABLED</Badge>}
                   </div>
                   <div style={{ fontSize: "11px", color: "#555", marginTop: "2px" }}>📞 {u.phone || "—"} · Joined {fmtDate(u.created_at)}</div>
                 </div>
@@ -234,9 +227,7 @@ export default function AdminUsersPage() {
                 <div>
                   {u.isActiveMember ? (
                     <div>
-                      <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "20px", background: "rgba(74,222,128,0.12)", color: "#4ade80" }}>
-                        {PLAN_LABELS[u.membership ?? ""] ?? u.membership}
-                      </span>
+                      <Badge color="green" size="sm">{PLAN_LABELS[u.membership ?? ""] ?? u.membership}</Badge>
                       <div style={{ fontSize: "10px", color: "#555", marginTop: "3px" }}>until {fmtDate(u.expires_at ?? "")}</div>
                     </div>
                   ) : (
@@ -244,17 +235,10 @@ export default function AdminUsersPage() {
                   )}
                 </div>
                 <div>
-                  <button
-                    disabled={isPending}
-                    onClick={() => toggleActive(u.email, !isDeactivated)}
-                    style={{
-                      fontSize: "10px", fontWeight: 600, padding: "4px 10px", borderRadius: "5px", cursor: isPending ? "default" : "pointer",
-                      border: "none", fontFamily: "inherit", opacity: isPending ? 0.5 : 1, transition: "opacity 0.15s",
-                      background: isDeactivated ? "rgba(74,222,128,0.12)" : "rgba(240,149,149,0.12)",
-                      color:      isDeactivated ? "#4ade80"               : "#f09595",
-                    }}>
-                    {isPending ? "…" : isDeactivated ? "Enable" : "Disable"}
-                  </button>
+                  <Button size="xs" variant={isDeactivated ? "ghost" : "danger"} loading={isPending}
+                    onClick={() => toggleActive(u.email, !isDeactivated)}>
+                    {isDeactivated ? "Enable" : "Disable"}
+                  </Button>
                 </div>
               </div>
             );
@@ -263,23 +247,11 @@ export default function AdminUsersPage() {
 
         {totalPages > 1 && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1rem 0" }}>
-            <button
-              onClick={() => setPage(p => Math.max(0, p - 1))}
-              disabled={page === 0}
-              style={{ padding: "6px 16px", background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 6, color: page === 0 ? "#333" : "#888", cursor: page === 0 ? "not-allowed" : "pointer", fontFamily: "inherit", fontSize: 13 }}
-            >
-              ← Previous
-            </button>
+            <Button size="sm" variant="ghost" disabled={page === 0} onClick={() => setPage(p => Math.max(0, p - 1))}>← Previous</Button>
             <span style={{ fontSize: 13, color: "#444" }}>
               {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length} users
             </span>
-            <button
-              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-              disabled={page >= totalPages - 1}
-              style={{ padding: "6px 16px", background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 6, color: page >= totalPages - 1 ? "#333" : "#888", cursor: page >= totalPages - 1 ? "not-allowed" : "pointer", fontFamily: "inherit", fontSize: 13 }}
-            >
-              Next →
-            </button>
+            <Button size="sm" variant="ghost" disabled={page >= totalPages - 1} onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}>Next →</Button>
           </div>
         )}
 
