@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { Card, Button, Label, Alert, StatCard, Avatar, Spinner } from "@/components/ui/ds";
 
 interface Coach {
   id:             string;
@@ -134,11 +135,8 @@ export default function CoachAssignmentsPage() {
 
   // ── Styles ────────────────────────────────────────────────────────────────
 
-  const card:   React.CSSProperties = { background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "1.25rem" };
-  const label:  React.CSSProperties = { fontSize: "11px", color: "#888", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600, marginBottom: 6, display: "block" };
   const input:  React.CSSProperties = { width: "100%", background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "9px 12px", fontSize: "0.9rem", color: "#fff", fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
   const select: React.CSSProperties = { ...input, cursor: "pointer" };
-  const btn:    React.CSSProperties = { padding: "9px 20px", borderRadius: 8, background: "#e8620a", color: "#fff", border: "none", cursor: "pointer", fontWeight: 700, fontSize: "0.85rem", fontFamily: "inherit" };
 
   // ── Main UI ───────────────────────────────────────────────────────────────
 
@@ -156,53 +154,34 @@ export default function CoachAssignmentsPage() {
 
         {/* Stats strip */}
         <div style={{ display: "flex", gap: 12, marginBottom: "1.75rem", flexWrap: "wrap" }}>
-          {[
-            { label: "Total Users",    val: users.length },
-            { label: "Assigned",       val: byUser.size },
-            { label: "Unassigned",     val: unassignedUsers.length },
-            { label: "Active Coaches", val: assignableCoaches.length },
-          ].map(s => (
-            <div key={s.label} style={{ background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "12px 18px", minWidth: 110 }}>
-              <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "#e8620a", letterSpacing: "-0.5px" }}>{s.val}</div>
-              <div style={{ fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 2 }}>{s.label}</div>
-            </div>
-          ))}
+          <StatCard label="Total Users"    value={users.length} />
+          <StatCard label="Assigned"       value={byUser.size} color="#4ade80" />
+          <StatCard label="Unassigned"     value={unassignedUsers.length} color={unassignedUsers.length > 0 ? "#fbbf24" : "#555"} />
+          <StatCard label="Active Coaches" value={assignableCoaches.length} />
         </div>
 
         {/* Assign form */}
-        <div style={{ ...card, marginBottom: "1.5rem" }}>
+        <Card style={{ marginBottom: "1.5rem" }}>
           <div style={{ fontSize: "0.9rem", fontWeight: 700, marginBottom: "1rem" }}>New Assignment</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 12, alignItems: "flex-end" }}>
             <div>
-              <label style={label}>User</label>
+              <Label>User</Label>
               <select value={selUser} onChange={e => setSelUser(e.target.value)} style={select}>
                 <option value="">Select user…</option>
-                {users.map(u => (
-                  <option key={u.email} value={u.email}>
-                    {u.first_name} {u.last_name} ({u.email})
-                  </option>
-                ))}
+                {users.map(u => (<option key={u.email} value={u.email}>{u.first_name} {u.last_name} ({u.email})</option>))}
               </select>
             </div>
             <div>
-              <label style={label}>Coach</label>
+              <Label>Coach</Label>
               <select value={selCoach} onChange={e => setSelCoach(e.target.value)} style={select}>
                 <option value="">Select coach…</option>
-                {assignableCoaches.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
+                {assignableCoaches.map(c => (<option key={c.id} value={c.id}>{c.name}</option>))}
               </select>
             </div>
-            <button onClick={assign} disabled={assigning || !selUser || !selCoach} style={{ ...btn, opacity: assigning || !selUser || !selCoach ? 0.5 : 1 }}>
-              {assigning ? "Assigning…" : "Assign →"}
-            </button>
+            <Button loading={assigning} disabled={!selUser || !selCoach} onClick={assign}>Assign →</Button>
           </div>
-          {msg && (
-            <div style={{ marginTop: "0.75rem", fontSize: "0.82rem", color: msg.startsWith("Error") ? "#f09595" : "#4ade80" }}>
-              {msg}
-            </div>
-          )}
-        </div>
+          {msg && <Alert variant={msg.startsWith("Error") ? "error" : "success"} style={{ marginTop: "0.75rem" }}>{msg}</Alert>}
+        </Card>
 
         {/* Search */}
         <div style={{ marginBottom: "1rem" }}>
@@ -217,9 +196,9 @@ export default function CoachAssignmentsPage() {
 
         {/* User table */}
         {loading ? (
-          <div style={{ color: "#888", fontSize: "0.85rem", padding: "2rem 0" }}>Loading…</div>
+          <div style={{ textAlign: "center", padding: "2rem 0" }}><Spinner /></div>
         ) : (
-          <div style={{ ...card, padding: 0, overflow: "hidden" }}>
+          <Card style={{ padding: 0, overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
@@ -242,9 +221,7 @@ export default function CoachAssignmentsPage() {
                       <tr key={user.email} style={{ borderTop: i > 0 ? "1px solid rgba(255,255,255,0.04)" : "none", opacity: 0.55 }}>
                         <td style={{ padding: "0.875rem 1rem" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.72rem", fontWeight: 700, color: "#888", flexShrink: 0 }}>
-                              {initials(fullName)}
-                            </div>
+                            <Avatar name={fullName} size={32} />
                             <div>
                               <div style={{ fontSize: "0.88rem", fontWeight: 600 }}>{fullName}</div>
                               <div style={{ fontSize: "0.72rem", color: "#888" }}>{user.email}</div>
@@ -265,9 +242,7 @@ export default function CoachAssignmentsPage() {
                       {ai === 0 ? (
                         <td style={{ padding: "0.875rem 1rem" }} rowSpan={userAssignments.length}>
                           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(232,98,10,0.12)", border: "1px solid rgba(232,98,10,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.72rem", fontWeight: 700, color: "#e8620a", flexShrink: 0 }}>
-                              {initials(fullName)}
-                            </div>
+                            <Avatar name={fullName} size={32} />
                             <div>
                               <div style={{ fontSize: "0.88rem", fontWeight: 600 }}>{fullName}</div>
                               <div style={{ fontSize: "0.72rem", color: "#888" }}>{user.email}</div>
@@ -277,9 +252,7 @@ export default function CoachAssignmentsPage() {
                       ) : null}
                       <td style={{ padding: "0.875rem 1rem" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#e8620a22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", fontWeight: 700, color: "#e8620a", flexShrink: 0 }}>
-                            {initials(a.coaches?.name ?? "?")}
-                          </div>
+                          <Avatar name={a.coaches?.name ?? "?"} size={28} />
                           <div>
                             <div style={{ fontSize: "0.85rem", fontWeight: 600 }}>{a.coaches?.name ?? "Unknown"}</div>
                             {a.coaches?.specialization && (
@@ -292,19 +265,14 @@ export default function CoachAssignmentsPage() {
                         {fmtDate(a.assigned_at)}
                       </td>
                       <td style={{ padding: "0.875rem 1rem", textAlign: "right" }}>
-                        <button
-                          onClick={() => remove(a.user_email, a.coach_id, a.coaches?.name ?? "coach")}
-                          style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", color: "#f09595", borderRadius: 6, padding: "4px 10px", fontSize: "0.72rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
-                        >
-                          Remove
-                        </button>
+                        <Button size="xs" variant="danger" onClick={() => remove(a.user_email, a.coach_id, a.coaches?.name ?? "coach")}>Remove</Button>
                       </td>
                     </tr>
                   ));
                 })}
               </tbody>
             </table>
-          </div>
+          </Card>
         )}
 
         <div style={{ marginTop: "1.25rem", fontSize: "0.75rem", color: "#555", lineHeight: 1.6 }}>
