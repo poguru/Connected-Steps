@@ -105,6 +105,7 @@ export function AvatarGroup({ avatars, max = 4, size = 32, style }: {
 interface ChipProps {
   label:       string;
   onRemove?:   () => void;
+  onClick?:    () => void;
   color?:      string;
   icon?:       string;
   size?:       "xs" | "sm" | "md";
@@ -112,11 +113,11 @@ interface ChipProps {
   title?:      string;   // native HTML tooltip
 }
 
-export function Chip({ label, onRemove, color: c = color.orange, icon, size = "sm", style, title }: ChipProps) {
+export function Chip({ label, onRemove, onClick, color: c = color.orange, icon, size = "sm", style, title }: ChipProps) {
   const sm = size === "sm" || size === "xs";
   const xs = size === "xs";
   return (
-    <span title={title} style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: xs ? "1px 6px" : sm ? "2px 8px" : "4px 12px", background: `${c}14`, border: `1px solid ${c}30`, borderRadius: radius.full, fontSize: xs ? "10px" : sm ? "11px" : "12px", fontWeight: 600, color: c, fontFamily: font.body, whiteSpace: "nowrap", ...style }}>
+    <span title={title} onClick={onClick} style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: xs ? "1px 6px" : sm ? "2px 8px" : "4px 12px", background: `${c}14`, border: `1px solid ${c}30`, borderRadius: radius.full, fontSize: xs ? "10px" : sm ? "11px" : "12px", fontWeight: 600, color: c, fontFamily: font.body, whiteSpace: "nowrap", ...style }}>
       {icon && <span style={{ fontSize: sm ? "11px" : "13px" }}>{icon}</span>}
       {label}
       {onRemove && (

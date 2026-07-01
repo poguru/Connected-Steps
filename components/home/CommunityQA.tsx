@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Card, Chip, Button, Avatar, Input, Textarea, Alert, Modal, Label, Skeleton, EmptyState, color } from "@/components/ui/ds";
 
 const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
   "Recovery":           { bg: "rgba(74,222,128,0.1)",   color: "#4ade80" },
@@ -71,31 +72,14 @@ function ReplyForm({ postId, onDone }: { postId: number; onDone: () => void }) {
 
   return (
     <div style={{ marginTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-      <textarea
-        value={body}
-        onChange={(e) => setBody(e.target.value.slice(0, 600))}
+      <Textarea value={body} onChange={(e) => setBody(e.target.value.slice(0, 600))}
         placeholder="Write your answer or suggestion… (max 600 characters)"
-        rows={3}
-        style={{
-          width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)",
-          border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px",
-          color: "#fff", fontSize: "0.82rem", fontFamily: "inherit",
-          outline: "none", resize: "vertical", boxSizing: "border-box", lineHeight: 1.6,
-        }}
-      />
+        style={{ minHeight: "76px" }} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: "10px", color: "#555" }}>{body.length}/600</span>
-        <button onClick={submit} disabled={saving || !body.trim()}
-          style={{
-            padding: "7px 18px", background: "#e8620a", color: "#fff", border: "none",
-            borderRadius: "6px", fontSize: "0.8rem", fontWeight: 700,
-            cursor: saving || !body.trim() ? "not-allowed" : "pointer",
-            opacity: saving || !body.trim() ? 0.6 : 1, fontFamily: "inherit",
-          }}>
-          {saving ? "Posting…" : "Post Answer"}
-        </button>
+        <span style={{ fontSize: "10px", color: color.textMuted }}>{body.length}/600</span>
+        <Button size="sm" loading={saving} disabled={!body.trim()} onClick={submit}>Post Answer</Button>
       </div>
-      {msg && <div style={{ fontSize: "0.78rem", color: msg.startsWith("✓") ? "#4ade80" : "#f09595" }}>{msg}</div>}
+      {msg && <Alert variant={msg.startsWith("✓") ? "success" : "error"}>{msg}</Alert>}
     </div>
   );
 }
@@ -131,17 +115,10 @@ function PostCard({ post, isLoggedIn, onLoginRedirect, likeCount, liked, onLike 
   }
 
   return (
-    <div style={{
-      background: "var(--cs-charcoal)", border: "1px solid rgba(255,255,255,0.07)",
-      borderRadius: "10px", padding: "1.25rem",
-      display: "flex", flexDirection: "column", gap: "0.75rem",
-      transition: "border-color 0.15s",
-    }}>
+    <Card style={{ background: "var(--cs-charcoal)", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
       {/* Header row */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem", flexWrap: "wrap" }}>
-        <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", padding: "3px 10px", borderRadius: "20px", background: c.bg, color: c.color }}>
-          {post.category}
-        </span>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem", flexWrap: "wrap" as const }}>
+        <Chip label={post.category} size="xs" color={c.color} />
         <span style={{ fontSize: "11px", color: "var(--cs-muted)" }}>{fmtDate(post.created_at)}</span>
       </div>
 
@@ -159,35 +136,14 @@ function PostCard({ post, isLoggedIn, onLoginRedirect, likeCount, liked, onLike 
       <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "0.6rem", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
         <span style={{ fontSize: "11px", color: "var(--cs-muted)" }}>— {post.user_name}</span>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-          {/* Like button */}
-          <button
-            onClick={() => { if (!isLoggedIn) { onLoginRedirect(); return; } onLike(); }}
-            style={{
-              fontSize: "11px", display: "flex", alignItems: "center", gap: "4px",
-              color: liked ? "var(--cs-orange)" : "var(--cs-muted)",
-              background: liked ? "rgba(232,98,10,0.1)" : "none",
-              border: `1px solid ${liked ? "rgba(232,98,10,0.3)" : "rgba(255,255,255,0.08)"}`,
-              borderRadius: "20px", padding: "3px 12px", cursor: "pointer", fontFamily: "inherit",
-              transition: "all 0.15s",
-            }}>
+          <Button size="xs" variant={liked ? "primary" : "ghost"}
+            onClick={() => { if (!isLoggedIn) { onLoginRedirect(); return; } onLike(); }}>
             ♥{likeCount > 0 ? ` ${likeCount}` : ""}
-          </button>
-          <button onClick={toggle}
-            style={{
-              fontSize: "11px", color: expanded ? "var(--cs-orange)" : "var(--cs-muted)",
-              background: "none", border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: "20px", padding: "3px 12px", cursor: "pointer", fontFamily: "inherit",
-            }}>
-            {expanded ? "Hide answers" : `View answers`}
-          </button>
-          <button onClick={handleReply}
-            style={{
-              fontSize: "11px", color: "#fff", background: "var(--cs-orange)",
-              border: "none", borderRadius: "20px", padding: "3px 12px",
-              cursor: "pointer", fontFamily: "inherit", fontWeight: 600,
-            }}>
-            Answer
-          </button>
+          </Button>
+          <Button size="xs" variant="secondary" onClick={toggle}>
+            {expanded ? "Hide answers" : "View answers"}
+          </Button>
+          <Button size="xs" onClick={handleReply}>Answer</Button>
         </div>
       </div>
 
@@ -213,9 +169,7 @@ function PostCard({ post, isLoggedIn, onLoginRedirect, likeCount, liked, onLike 
                     : r.user_name;
                   return (
                   <div key={r.id} style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start" }}>
-                    <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "rgba(232,98,10,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", color: "var(--cs-orange)", fontWeight: 700, flexShrink: 0, letterSpacing: "0.02em" }}>
-                      {initials}
-                    </div>
+                    <Avatar name={displayName} size={32} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: "11px", color: "var(--cs-muted)", marginBottom: "3px" }}>
                         <span style={{ color: "var(--cs-white)", fontWeight: 600 }}>{displayName}</span> · {fmtDate(r.created_at)}
@@ -234,18 +188,11 @@ function PostCard({ post, isLoggedIn, onLoginRedirect, likeCount, liked, onLike 
           )}
 
           {!showReplyForm && (
-            <button onClick={handleReply}
-              style={{
-                fontSize: "0.8rem", color: "var(--cs-orange)", background: "rgba(232,98,10,0.08)",
-                border: "1px solid rgba(232,98,10,0.2)", borderRadius: "6px", padding: "8px",
-                cursor: "pointer", fontFamily: "inherit", fontWeight: 600,
-              }}>
-              + Write an answer
-            </button>
+            <Button variant="ghost" size="sm" fullWidth onClick={handleReply}>+ Write an answer</Button>
           )}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -287,60 +234,41 @@ function AskModal({ onClose, onPosted }: { onClose: () => void; onPosted: () => 
   }
 
   return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 1000,
-      background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)",
-      display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem",
-    }} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div style={{
-        background: "#111", border: "1px solid rgba(255,255,255,0.1)",
-        borderRadius: "14px", padding: "2rem", width: "100%", maxWidth: "500px",
-        display: "flex", flexDirection: "column", gap: "1.25rem",
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ fontSize: "1rem", fontWeight: 700, color: "#fff" }}>Ask the Community</div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "#888", fontSize: "1.25rem", cursor: "pointer", lineHeight: 1 }}>×</button>
-        </div>
-
+    <Modal open onClose={onClose} title="Ask the Community" maxWidth={500}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
         <div>
-          <div style={{ fontSize: "11px", color: "#888", marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.07em" }}>Category</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-            {POST_CATS.map((cat) => {
-              const active = form.category === cat;
-              return (
-                <button key={cat} onClick={() => setForm((f) => ({ ...f, category: cat }))}
-                  style={{ padding: "5px 14px", borderRadius: "20px", fontSize: "0.78rem", fontWeight: 500, cursor: "pointer", fontFamily: "inherit", border: "none", background: active ? "rgba(232,98,10,0.15)" : "rgba(255,255,255,0.05)", color: active ? "var(--cs-orange)" : "#888", outline: active ? "1px solid rgba(232,98,10,0.4)" : "none", transition: "all 0.15s" }}>
-                  {cat}
-                </button>
-              );
-            })}
+          <Label>Category</Label>
+          <div style={{ display: "flex", flexWrap: "wrap" as const, gap: "6px", marginTop: "0.5rem" }}>
+            {POST_CATS.map((cat) => (
+              <Chip key={cat} label={cat} size="sm"
+                color={form.category === cat ? "var(--cs-orange)" : color.textMuted}
+                style={{ cursor: "pointer", opacity: form.category === cat ? 1 : 0.7 }}
+                onClick={() => setForm((f) => ({ ...f, category: cat }))} />
+            ))}
           </div>
         </div>
 
         <div>
-          <div style={{ fontSize: "11px", color: "#888", marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.07em" }}>Title / Question</div>
-          <input value={form.title} onChange={(e) => { setForm((f) => ({ ...f, title: e.target.value.slice(0, 120) })); setErrors((er) => ({ ...er, title: false })); }}
-            placeholder="e.g. Best recovery drink after a long run?" maxLength={120}
-            style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: `1px solid ${errors.title ? "#f09595" : "rgba(255,255,255,0.1)"}`, borderRadius: "8px", color: "#fff", fontSize: "0.875rem", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
-          <div style={{ fontSize: "10px", color: "#555", textAlign: "right", marginTop: "3px" }}>{form.title.length}/120</div>
+          <Label>Title / Question</Label>
+          <Input value={form.title} onChange={(e) => { setForm((f) => ({ ...f, title: e.target.value.slice(0, 120) })); setErrors((er) => ({ ...er, title: false })); }}
+            placeholder="e.g. Best recovery drink after a long run?"
+            error={errors.title ? "Required" : undefined} style={{ marginTop: "0.5rem" }} />
+          <span style={{ fontSize: "10px", color: color.textMuted, float: "right", marginTop: "3px" }}>{form.title.length}/120</span>
         </div>
 
         <div>
-          <div style={{ fontSize: "11px", color: "#888", marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.07em" }}>Details</div>
-          <textarea value={form.body} onChange={(e) => { setForm((f) => ({ ...f, body: e.target.value.slice(0, 600) })); setErrors((er) => ({ ...er, body: false })); }}
-            placeholder="Share your question, tip, or experience in detail…" maxLength={600} rows={5}
-            style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: `1px solid ${errors.body ? "#f09595" : "rgba(255,255,255,0.1)"}`, borderRadius: "8px", color: "#fff", fontSize: "0.875rem", outline: "none", resize: "vertical", boxSizing: "border-box", fontFamily: "inherit", lineHeight: 1.6 }} />
-          <div style={{ fontSize: "10px", color: "#555", textAlign: "right", marginTop: "3px" }}>{form.body.length}/600</div>
+          <Label>Details</Label>
+          <Textarea value={form.body} onChange={(e) => { setForm((f) => ({ ...f, body: e.target.value.slice(0, 600) })); setErrors((er) => ({ ...er, body: false })); }}
+            placeholder="Share your question, tip, or experience in detail…"
+            style={{ marginTop: "0.5rem", minHeight: "120px", borderColor: errors.body ? "#f09595" : undefined }} />
+          <span style={{ fontSize: "10px", color: color.textMuted, float: "right", marginTop: "3px" }}>{form.body.length}/600</span>
         </div>
 
-        {msg && <div style={{ fontSize: "0.82rem", color: msg.startsWith("✓") ? "#4ade80" : "#f09595", textAlign: "center" }}>{msg}</div>}
+        {msg && <Alert variant={msg.startsWith("✓") ? "success" : "error"}>{msg}</Alert>}
 
-        <button onClick={submit} disabled={saving}
-          style={{ padding: "12px", background: "#e8620a", color: "#fff", border: "none", borderRadius: "8px", fontSize: "0.9rem", fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1, fontFamily: "inherit" }}>
-          {saving ? "Posting…" : "Post to Community"}
-        </button>
+        <Button fullWidth loading={saving} onClick={submit}>Post to Community</Button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -458,26 +386,19 @@ export default function CommunityQA() {
         {loading ? (
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             {[1, 2, 3].map((i) => (
-              <div key={i} style={{ background: "var(--cs-charcoal)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "10px", padding: "1.25rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+              <Card key={i} style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
                 <div style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
-                  <div style={{ width: "52px", height: "20px", background: "rgba(255,255,255,0.06)", borderRadius: "20px" }} />
-                  <div style={{ width: "70px", height: "13px", background: "rgba(255,255,255,0.04)", borderRadius: "4px" }} />
+                  <Skeleton width={52} height={20} style={{ borderRadius: "20px" }} />
+                  <Skeleton width={70} height={13} />
                 </div>
-                <div style={{ width: "75%", height: "15px", background: "rgba(255,255,255,0.06)", borderRadius: "4px" }} />
-                <div style={{ width: "50%", height: "11px", background: "rgba(255,255,255,0.04)", borderRadius: "4px" }} />
-              </div>
+                <Skeleton width="75%" height={15} />
+                <Skeleton width="50%" height={11} />
+              </Card>
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div style={{ background: "var(--cs-charcoal)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "10px", padding: "3rem", textAlign: "center" }}>
-            <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>💬</div>
-            <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--cs-white)", marginBottom: "0.5rem" }}>No posts yet</div>
-            <div style={{ fontSize: "0.82rem", color: "var(--cs-muted)", marginBottom: "1.25rem" }}>Be the first to ask a question or share a tip.</div>
-            <button onClick={handleAskClick}
-              style={{ padding: "9px 20px", background: "var(--cs-orange)", color: "#fff", border: "none", borderRadius: "6px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-              Ask the community →
-            </button>
-          </div>
+          <EmptyState icon="💬" title="No posts yet" body="Be the first to ask a question or share a tip."
+            action={<Button onClick={handleAskClick}>Ask the community →</Button>} />
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "1rem" }}>
             {filtered.map((post) => (
