@@ -360,11 +360,13 @@ export default function CommunityQA() {
         {/* Header */}
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem", marginBottom: "2rem" }}>
           <div>
-            <span className="gold-line" />
-            <div className="section-label" style={{ marginTop: "0.5rem" }}>Community</div>
-            <h2 className="font-display mt-2" style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.5rem)", fontWeight: 300, color: "var(--cs-white)" }}>
+            <div className="cs-section-badge" style={{ marginBottom: "1rem" }}>Community</div>
+            <h2 className="font-display" style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.5rem)", fontWeight: 300, color: "var(--cs-white)", lineHeight: 1.1 }}>
               Questions &{" "}
-              <em className="not-italic" style={{ color: "var(--cs-orange)" }}>Discussions</em>
+              <em className="not-italic" style={{
+                background: "linear-gradient(135deg, oklch(0.78 0.18 55), oklch(0.68 0.22 30))",
+                WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
+              }}>Discussions</em>
             </h2>
             <p style={{ fontSize: "0.875rem", color: "var(--cs-muted)", marginTop: "0.5rem" }}>
               Recovery tips, shoe advice, race info — answered by our community.

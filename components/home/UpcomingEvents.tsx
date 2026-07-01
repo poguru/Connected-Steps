@@ -319,11 +319,13 @@ export default function UpcomingEvents() {
         {/* Header */}
         <div style={{ marginBottom: "2rem", display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem" }}>
           <div>
-            <span className="gold-line" />
-            <div className="section-label">What&apos;s On</div>
-            <h2 className="font-display mt-2" style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 300, color: "var(--cs-cream)" }}>
+            <div className="cs-section-badge" style={{ marginBottom: "1rem" }}>What&apos;s On</div>
+            <h2 className="font-display" style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 300, color: "var(--cs-cream)", lineHeight: 1.1 }}>
               Upcoming{" "}
-              <em className="not-italic" style={{ color: "var(--cs-orange)" }}>events</em>
+              <em className="not-italic" style={{
+                background: "linear-gradient(135deg, oklch(0.78 0.18 55), oklch(0.68 0.22 30))",
+                WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
+              }}>events</em>
             </h2>
           </div>
           {events.length > 0 && (

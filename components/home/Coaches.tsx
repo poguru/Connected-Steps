@@ -433,15 +433,17 @@ export default function Coaches() {
 
         {/* Header */}
         <div className="text-center mb-16">
-          <span className="gold-line mx-auto" />
-          <div className="section-label">Meet the coaches</div>
+          <div className="cs-section-badge" style={{ width: "fit-content", margin: "0 auto 1.25rem" }}>Meet the Coaches</div>
           <h2
-            className="font-display mt-2"
-            style={{ fontSize: "clamp(2.2rem, 4vw, 3.5rem)", fontWeight: 300, color: "var(--cs-white)" }}
+            className="font-display"
+            style={{ fontSize: "clamp(2.2rem, 4vw, 3.5rem)", fontWeight: 300, color: "var(--cs-white)", lineHeight: 1.1 }}
           >
             Trained by champions.
             <br />
-            <em className="not-italic" style={{ color: "var(--cs-orange)" }}>Coached by the best.</em>
+            <em className="not-italic" style={{
+              background: "linear-gradient(135deg, oklch(0.78 0.18 55), oklch(0.68 0.22 30))",
+              WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
+            }}>Coached by the best.</em>
           </h2>
           <p style={{ marginTop: "1rem", fontSize: "0.95rem", color: "var(--cs-muted)", maxWidth: "520px", margin: "1rem auto 0" }}>
             Our coaches are national-level athletes and certified professionals who&apos;ve competed and won at the highest levels.

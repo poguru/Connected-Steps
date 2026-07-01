@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Star } from "lucide-react";
+import { ArrowRight, Star, Users, Zap } from "lucide-react";
 import CommunityHighlights from "./CommunityHighlights";
 
-// ── Animated count-up (starts when scrolled into view) ───────────────────────
-function CountUp({ to, suffix = "", duration = 1800 }: { to: number; suffix?: string; duration?: number }) {
-  const [count,   setCount]   = useState(0);
-  const ref     = useRef<HTMLSpanElement>(null);
+// ── Animated count-up (Intersection Observer) ─────────────────────────────────
+function CountUp({ to, suffix = "", duration = 2200 }: { to: number; suffix?: string; duration?: number }) {
+  const [count, setCount] = useState(0);
+  const ref = useRef<HTMLSpanElement>(null);
   const started = useRef(false);
 
   useEffect(() => {
@@ -17,14 +17,20 @@ function CountUp({ to, suffix = "", duration = 1800 }: { to: number; suffix?: st
   }, [to]);
 
   useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setCount(to);
+      return;
+    }
     const observer = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting && !started.current) {
         started.current = true;
         const t0 = Date.now();
         const tick = () => {
           const p = Math.min((Date.now() - t0) / duration, 1);
-          setCount(Math.floor((1 - Math.pow(1 - p, 3)) * to));
+          const eased = 1 - Math.pow(1 - p, 3);
+          setCount(Math.floor(eased * to));
           if (p < 1) requestAnimationFrame(tick);
+          else setCount(to);
         };
         requestAnimationFrame(tick);
       }
@@ -36,162 +42,224 @@ function CountUp({ to, suffix = "", duration = 1800 }: { to: number; suffix?: st
   return <span ref={ref}>{count.toLocaleString()}{suffix}</span>;
 }
 
-// ── Skeleton shimmer block ────────────────────────────────────────────────────
-function Skeleton({ width = 48, height = 20 }: { width?: number; height?: number }) {
-  return (
-    <span style={{
-      display: "inline-block", width, height,
-      borderRadius: 4,
-      background: "linear-gradient(90deg, var(--border) 25%, var(--surface-elevated) 50%, var(--border) 75%)",
-      backgroundSize: "200% 100%",
-      animation: "cs-shimmer 1.4s infinite",
-      verticalAlign: "middle",
-    }} />
-  );
-}
-
 interface Stats {
-  totalRunners:       number;
-  activeThisMonth:    number;
+  totalRunners: number;
+  activeThisMonth: number;
   trainingsConducted: number;
-  communityPosts:     number;
-  avgRating:          number | null;
+  communityPosts: number;
+  avgRating: number | null;
 }
 
 export default function Hero() {
-  const [stats,   setStats]   = useState<Stats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const heroRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
+    setLoggedIn(!!localStorage.getItem("cs_user"));
     fetch("/api/stats")
       .then(r => r.json())
-      .then(d => { setStats(d); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then(d => setStats(d))
+      .catch(() => {});
   }, []);
 
   return (
-    <section className="relative overflow-hidden bg-gradient-soft animate-fade-in">
-      <style>{`
-        @keyframes cs-shimmer {
-          0%   { background-position: 200% 0; }
-          100% { background-position: -200% 0; }
-        }
-      `}</style>
+    <section
+      ref={heroRef}
+      style={{
+        position: "relative",
+        minHeight: "100svh",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        overflow: "hidden",
+        background: "var(--background)",
+      }}
+    >
+      {/* ── Background ambiance ── */}
+      <div className="cs-hero-glow-a" aria-hidden />
+      <div className="cs-hero-glow-b" aria-hidden />
 
-      <div className="dot-bg absolute inset-0 opacity-50" />
-      <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full blur-3xl pointer-events-none"
-        style={{ background: "oklch(0.74 0.2 50 / 18%)" }} />
+      {/* Subtle noise layer */}
+      <div style={{
+        position: "absolute", inset: 0, opacity: 0.025, pointerEvents: "none",
+        backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+      }} aria-hidden />
 
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "2.5rem 1.5rem 3rem" }}
-        className="lg:grid lg:grid-cols-2 lg:gap-16 lg:items-center">
+      {/* ── Main grid ── */}
+      <div style={{
+        maxWidth: 1280, margin: "0 auto",
+        padding: "clamp(5rem, 12vh, 8rem) 1.5rem clamp(3rem, 8vh, 5rem)",
+        position: "relative", zIndex: 1,
+        display: "grid",
+        gridTemplateColumns: "1fr",
+        gap: "3rem",
+        width: "100%",
+      }}
+        className="lg:grid-cols-[55fr_45fr] lg:items-center lg:gap-16"
+      >
 
-        {/* ── Left ─────────────────────────────────────────────────────── */}
-        <div className="animate-fade-up">
+        {/* ══ LEFT — headline + CTAs ══════════════════════════════════════ */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
 
           {/* Badge */}
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 999,
-            border: "1px solid var(--border)", background: "var(--surface)",
-            padding: "5px 12px", fontSize: 11, fontWeight: 500,
-            color: "var(--muted-foreground)", marginBottom: "1.25rem",
-            boxShadow: "var(--shadow-md)" }}>
-            <span style={{ position: "relative", display: "inline-flex", width: 7, height: 7 }}>
-              <span className="animate-pulse-ring" style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "var(--accent)" }} />
-              <span style={{ position: "relative", display: "inline-flex", width: 7, height: 7, borderRadius: "50%", background: "var(--accent)" }} />
+          <div className="animate-fade-up" style={{
+            display: "inline-flex", alignItems: "center", gap: 10,
+            borderRadius: 999,
+            border: "1px solid oklch(0.72 0.19 49 / 28%)",
+            background: "oklch(0.72 0.19 49 / 7%)",
+            padding: "6px 16px", marginBottom: "2rem",
+            width: "fit-content",
+            fontSize: 11, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase" as const,
+            color: "var(--cs-orange)",
+          }}>
+            <span style={{
+              position: "relative", display: "inline-flex", width: 8, height: 8,
+            }}>
+              <span className="animate-pulse-ring" style={{
+                position: "absolute", inset: 0, borderRadius: "50%", background: "var(--cs-orange)",
+              }} />
+              <span style={{
+                position: "relative", width: 8, height: 8, borderRadius: "50%", background: "var(--cs-orange)", display: "block",
+              }} />
             </span>
-            NIS-certified coaching, Hyderabad
+            NIS Certified Coaching · Hyderabad
           </div>
 
           {/* Headline */}
-          <h1 className="font-display animate-fade-up-1"
-            style={{ fontSize: "clamp(2.2rem, 6vw, 3.75rem)", fontWeight: 700, lineHeight: 1.05, letterSpacing: "-0.015em", color: "var(--foreground)", marginBottom: "1rem" }}>
-            First 5K. First marathon.{" "}
-            <span className="text-gradient-accent">One community.</span>
+          <h1
+            className="animate-fade-up-1 cs-hero-headline"
+            style={{ marginBottom: "1.5rem" }}
+          >
+            First 5K.<br />
+            First Marathon.<br />
+            <em>One Community.</em>
           </h1>
 
-          {/* Sub */}
-          <p className="animate-fade-up-2" style={{ maxWidth: 500, fontSize: "1rem", color: "var(--muted-foreground)", lineHeight: 1.7, marginBottom: "1.75rem" }}>
-            Structured marathon prep, weekly group runs, and coaching that doesn&apos;t stop when the session ends.
+          {/* Supporting text */}
+          <p className="animate-fade-up-2" style={{
+            maxWidth: 520,
+            fontSize: "clamp(1rem, 1.8vw, 1.15rem)",
+            color: "var(--muted-foreground)",
+            lineHeight: 1.75,
+            marginBottom: "2.5rem",
+          }}>
+            Join Hyderabad&apos;s growing running community with structured coaching,
+            weekly sessions and marathon training — from your first kilometre to your finish-line moment.
           </p>
 
           {/* CTAs */}
-          <div className="hero-cta animate-fade-up-3">
-            <Link href="/auth?tab=register"
-              style={{ display: "inline-flex", alignItems: "center", gap: 8,
-                borderRadius: 8, background: "var(--gradient-accent)",
-                padding: "12px 24px", fontSize: "0.9rem", fontWeight: 600,
-                color: "var(--accent-foreground)", textDecoration: "none",
-                boxShadow: "var(--shadow-orange)" }}>
-              Get my free account <ArrowRight size={15} />
+          <div className="animate-fade-up-3" style={{
+            display: "flex", flexWrap: "wrap" as const, gap: "0.875rem",
+            marginBottom: "2.75rem",
+          }}>
+            <Link href={loggedIn ? "/dashboard" : "/auth?tab=register"} className="cs-hero-cta-primary">
+              {loggedIn ? "Go to Dashboard" : "Join Now"}
+              <ArrowRight size={16} />
             </Link>
-            <Link href="/pricing"
-              style={{ display: "inline-flex", alignItems: "center", gap: 8,
-                borderRadius: 8, border: "1px solid var(--border)",
-                background: "var(--surface)", padding: "12px 24px",
-                fontSize: "0.9rem", fontWeight: 500,
-                color: "var(--foreground)", textDecoration: "none" }}>
-              See plans from ₹40/day
+
+            <Link href="/running-club-hyderabad" className="cs-hero-cta-secondary">
+              Explore Programs
             </Link>
           </div>
 
-          {/* ── Trust row ── */}
-          <div className="animate-fade-up-4" style={{ marginTop: "1.75rem", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "1.25rem", fontSize: "0.85rem", color: "var(--muted-foreground)" }}>
+          {/* ── Trust stats strip ── */}
+          <div className="animate-fade-up-4" style={{
+            display: "flex", flexWrap: "wrap" as const, gap: "0.75rem",
+            paddingTop: "1.75rem",
+            borderTop: "1px solid rgba(255,255,255,0.06)",
+          }}>
+            {/* Runners */}
+            <div className="cs-stat-pill">
+              <Users size={14} style={{ color: "var(--cs-orange)", flexShrink: 0 }} />
+              <span>
+                <strong style={{ color: "var(--foreground)" }}>
+                  {stats?.totalRunners
+                    ? <CountUp to={stats.totalRunners} />
+                    : "500+"}
+                </strong>
+                {" "}runners
+              </span>
+            </div>
 
-            {/* Runner count — only render when loaded and > 0 */}
-            {loading ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ display: "flex" }}>
-                  {["A","B","C","D"].map((l, i) => (
-                    <div key={l} style={{ width: 26, height: 26, borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 9, fontWeight: 700, color: "#fff", marginLeft: i === 0 ? 0 : -7, border: "2px solid var(--background)", background: ["var(--gradient-primary)","var(--gradient-accent)","linear-gradient(135deg,oklch(0.72 0.14 210),oklch(0.6 0.18 210))","linear-gradient(135deg,oklch(0.55 0.18 300),oklch(0.45 0.22 300))"][i] }}>
-                      {l}
-                    </div>
+            {/* Rating */}
+            {stats?.avgRating != null && (
+              <div className="cs-stat-pill">
+                <span style={{ display: "flex", gap: 2 }}>
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <Star key={i} size={11} style={{ fill: "#fbbf24", color: "#fbbf24", flexShrink: 0 }} />
                   ))}
-                </div>
-                <Skeleton width={90} height={16} />
+                </span>
+                <span><strong style={{ color: "var(--foreground)" }}>{stats.avgRating}</strong> avg rating</span>
               </div>
-            ) : stats && stats.totalRunners > 0 ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ display: "flex" }}>
-                  {["A","B","C","D"].map((l, i) => (
-                    <div key={l} style={{ width: 26, height: 26, borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 9, fontWeight: 700, color: "#fff", marginLeft: i === 0 ? 0 : -7, border: "2px solid var(--background)", background: ["var(--gradient-primary)","var(--gradient-accent)","linear-gradient(135deg,oklch(0.72 0.14 210),oklch(0.6 0.18 210))","linear-gradient(135deg,oklch(0.55 0.18 300),oklch(0.45 0.22 300))"][i] }}>
-                      {l}
-                    </div>
-                  ))}
-                </div>
+            )}
+
+            {/* Sessions */}
+            {stats?.trainingsConducted != null && stats.trainingsConducted > 0 && (
+              <div className="cs-stat-pill">
+                <Zap size={13} style={{ color: "var(--cs-orange)", flexShrink: 0 }} />
                 <span>
-                  <span style={{ fontWeight: 600, color: "var(--foreground)" }}>
-                    <CountUp to={stats.totalRunners} />
-                  </span>{" "}
-                  runners joined
+                  <strong style={{ color: "var(--foreground)" }}>
+                    <CountUp to={stats.trainingsConducted} />
+                  </strong>
+                  {" "}sessions run
                 </span>
               </div>
-            ) : null}
-
-            {/* Avg rating — only show when real ratings exist */}
-            {loading ? (
-              <Skeleton width={100} height={16} />
-            ) : stats?.avgRating != null ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                {[1,2,3,4,5].map(i => (
-                  <Star key={i} size={13} style={{ fill: "var(--accent)", color: "var(--accent)" }} />
-                ))}
-                <span>
-                  <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{stats.avgRating}</span> avg rating
-                </span>
-              </div>
-            ) : null}
-
+            )}
           </div>
         </div>
 
-        {/* ── Right — community highlights (desktop only) ──────────────── */}
-        <div className="relative hidden lg:block animate-fade-up-2">
-          <div style={{ position: "absolute", inset: -20, borderRadius: 28, background: "var(--gradient-accent)", opacity: 0.12, filter: "blur(28px)" }} />
-          <div style={{ position: "relative" }}>
+        {/* ══ RIGHT — community card ════════════════════════════════════════ */}
+        <div className="relative hidden lg:block animate-fade-up-2" style={{ position: "relative" }}>
+          {/* Glow behind card */}
+          <div style={{
+            position: "absolute",
+            inset: "-24px",
+            borderRadius: 32,
+            background: "radial-gradient(ellipse at 60% 50%, oklch(0.72 0.19 49 / 18%) 0%, transparent 70%)",
+            filter: "blur(20px)",
+            pointerEvents: "none",
+          }} aria-hidden />
+          <div style={{ position: "relative", borderRadius: 20, overflow: "hidden" }}>
             <CommunityHighlights />
           </div>
         </div>
 
       </div>
+
+      {/* ── Scroll indicator ── */}
+      <div
+        className="animate-fade-up-4"
+        style={{
+          position: "absolute", bottom: "2rem", left: "50%", transform: "translateX(-50%)",
+          display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+          opacity: 0.4,
+        }}
+        aria-hidden
+      >
+        <div style={{
+          width: 24, height: 38, borderRadius: 12,
+          border: "1.5px solid rgba(255,255,255,0.3)",
+          display: "flex", alignItems: "flex-start", justifyContent: "center",
+          padding: "5px 0",
+        }}>
+          <div style={{
+            width: 3, height: 8, borderRadius: 2,
+            background: "rgba(255,255,255,0.5)",
+            animation: "cs-scroll-dot 1.6s ease-in-out infinite",
+          }} />
+        </div>
+        <span style={{ fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "rgba(255,255,255,0.5)" }}>
+          Scroll
+        </span>
+      </div>
+
+      <style>{`
+        @keyframes cs-scroll-dot {
+          0%, 100% { transform: translateY(0); opacity: 0.5; }
+          50%       { transform: translateY(10px); opacity: 1; }
+        }
+      `}</style>
     </section>
   );
 }

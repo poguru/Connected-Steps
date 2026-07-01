@@ -117,13 +117,13 @@ export default function StatsAndTestimonials() {
   return (
     <>
       {/* ── Stats grid ── */}
-      <section style={{ maxWidth: 1280, margin: "0 auto", padding: "5rem 1.5rem" }}>
+      <section style={{ maxWidth: 1280, margin: "0 auto", padding: "5rem 1.5rem 4rem" }}>
         <div style={{ display: "grid", gap: "1rem" }} className="sm:grid-cols-2 lg:grid-cols-4">
           {loading
             ? Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} lines={2} />)
             : statCards.map((s) => (
-              <Card key={s.label} hoverable
-                style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow-md)" }}
+              <Card key={s.label} hoverable className="cs-lift"
+                style={{ background: "var(--surface)", border: "1px solid rgba(255,255,255,0.06)", boxShadow: "var(--shadow-md)" }}
               >
                 {/* Icon */}
                 <div style={{ width: 48, height: 48, borderRadius: 12, display: "grid", placeItems: "center", color: "#fff", boxShadow: "var(--shadow-md)", marginBottom: "1.25rem" }} className={s.grad}>
@@ -160,9 +160,16 @@ export default function StatsAndTestimonials() {
       <section style={{ background: "var(--gradient-soft)", padding: "5rem 0" }}>
         <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 1.5rem" }}>
           <div style={{ textAlign: "center", marginBottom: "3.5rem" }}>
-            <Label style={{ color: "var(--primary)", marginBottom: "0.75rem" }}>Runner Stories</Label>
-            <h2 className="font-display" style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 700, letterSpacing: "-0.015em", color: "var(--foreground)" }}>
-              Real runners. <span className="text-gradient-primary">Real results.</span>
+            <div className="cs-section-badge" style={{ width: "fit-content", margin: "0 auto 1.25rem" }}>Runner Stories</div>
+            <h2 className="font-display" style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 300, color: "var(--foreground)", lineHeight: 1.1 }}>
+              Real runners.{" "}
+              <em style={{
+                fontStyle: "normal",
+                background: "linear-gradient(135deg, oklch(0.78 0.18 55), oklch(0.68 0.22 30))",
+                WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
+              }}>
+                Real results.
+              </em>
             </h2>
 
             {/* Avg rating — only if real ratings exist */}

@@ -86,13 +86,17 @@ export default function Features() {
 
           {/* ── Left ─────────────────────────────────────────────────────── */}
           <div className="cs-features-left">
-            <span className="gold-line" />
-            <div className="section-label">Why Connected Steps</div>
+            <div className="cs-section-badge" style={{ marginBottom: "1.25rem" }}>Why Connected Steps</div>
 
-            <h2 className="font-display mt-3 mb-5"
-              style={{ fontSize: "clamp(1.9rem, 3.5vw, 2.9rem)", fontWeight: 300, lineHeight: 1.12, color: "var(--cs-cream)" }}>
+            <h2 className="font-display mb-5"
+              style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)", fontWeight: 300, lineHeight: 1.1, color: "var(--cs-cream)" }}>
               Why Runners Choose{" "}
-              <em className="not-italic" style={{ color: "var(--cs-orange)" }}>Connected Steps</em>
+              <em className="not-italic" style={{
+                background: "linear-gradient(135deg, oklch(0.78 0.18 55), oklch(0.68 0.22 30))",
+                WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
+              }}>
+                Connected Steps
+              </em>
             </h2>
 
             <p style={{ fontSize: "0.95rem", lineHeight: 1.8, color: "var(--cs-muted)", maxWidth: 380, marginBottom: "0.9rem" }}>

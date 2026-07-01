@@ -1207,3 +1207,270 @@ select.auth-input option {
   outline: 2px solid rgba(232,98,10,0.6);
   outline-offset: 2px;
 }
+
+/* ═══════════════════════════════════════════════════════
+   PREMIUM HOME PAGE — scroll reveal & new section styles
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Scroll Reveal (Intersection Observer activated) ── */
+.cs-reveal,
+.cs-reveal-l,
+.cs-reveal-r,
+.cs-reveal-s {
+  will-change: opacity, transform;
+}
+.cs-reveal   { opacity: 0; transform: translateY(44px);  transition: opacity 0.85s cubic-bezier(0.16,1,0.3,1), transform 0.85s cubic-bezier(0.16,1,0.3,1); }
+.cs-reveal-l { opacity: 0; transform: translateX(-44px); transition: opacity 0.85s cubic-bezier(0.16,1,0.3,1), transform 0.85s cubic-bezier(0.16,1,0.3,1); }
+.cs-reveal-r { opacity: 0; transform: translateX(44px);  transition: opacity 0.85s cubic-bezier(0.16,1,0.3,1), transform 0.85s cubic-bezier(0.16,1,0.3,1); }
+.cs-reveal-s { opacity: 0; transform: scale(0.93);        transition: opacity 0.75s cubic-bezier(0.16,1,0.3,1), transform 0.75s cubic-bezier(0.16,1,0.3,1); }
+
+.cs-reveal.cs-vis, .cs-reveal-l.cs-vis, .cs-reveal-r.cs-vis, .cs-reveal-s.cs-vis {
+  opacity: 1; transform: none;
+}
+
+.cs-d1 { transition-delay: 0.07s !important; }
+.cs-d2 { transition-delay: 0.14s !important; }
+.cs-d3 { transition-delay: 0.21s !important; }
+.cs-d4 { transition-delay: 0.28s !important; }
+.cs-d5 { transition-delay: 0.35s !important; }
+.cs-d6 { transition-delay: 0.42s !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cs-reveal, .cs-reveal-l, .cs-reveal-r, .cs-reveal-s {
+    opacity: 1 !important; transform: none !important; transition: none !important;
+  }
+}
+
+/* ── Premium Hero ───────────────────────────────────── */
+.cs-hero-glow-a {
+  position: absolute;
+  width: 55vw; height: 55vw; max-width: 700px; max-height: 700px;
+  border-radius: 50%;
+  background: radial-gradient(circle, oklch(0.72 0.19 49 / 22%) 0%, transparent 70%);
+  top: -20%; right: -10%;
+  pointer-events: none;
+  animation: cs-glow-drift 8s ease-in-out infinite alternate;
+}
+.cs-hero-glow-b {
+  position: absolute;
+  width: 35vw; height: 35vw; max-width: 450px; max-height: 450px;
+  border-radius: 50%;
+  background: radial-gradient(circle, oklch(0.66 0.22 30 / 12%) 0%, transparent 70%);
+  bottom: 10%; left: -5%;
+  pointer-events: none;
+  animation: cs-glow-drift 10s ease-in-out infinite alternate-reverse;
+}
+@keyframes cs-glow-drift {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(2%, 3%) scale(1.06); }
+}
+
+.cs-hero-headline {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(3.2rem, 7.5vw, 6.5rem);
+  font-weight: 300;
+  line-height: 1.0;
+  letter-spacing: -0.025em;
+  color: var(--foreground);
+}
+.cs-hero-headline em {
+  font-style: normal;
+  background: linear-gradient(135deg, oklch(0.82 0.19 55) 0%, oklch(0.68 0.22 30) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+/* ── Journey Section ────────────────────────────────── */
+.cs-journey-step {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0 0.5rem;
+  cursor: default;
+}
+.cs-journey-node {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem;
+  border: 2px solid rgba(255,255,255,0.08);
+  background: var(--surface);
+  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  margin-bottom: 0.875rem;
+  position: relative;
+  z-index: 2;
+}
+.cs-journey-step:hover .cs-journey-node {
+  transform: scale(1.15);
+  border-color: var(--cs-orange);
+  box-shadow: 0 0 24px oklch(0.72 0.19 49 / 35%);
+}
+.cs-journey-connector {
+  position: absolute;
+  top: 27px; left: calc(50% + 28px);
+  width: calc(100% - 56px);
+  height: 2px;
+  background: linear-gradient(to right, var(--cs-orange), rgba(255,255,255,0.08));
+}
+
+/* ── Membership Plans ───────────────────────────────── */
+.cs-plan-card {
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: var(--surface);
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+.cs-plan-card:hover {
+  transform: translateY(-6px);
+  border-color: rgba(255,255,255,0.15);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.4);
+}
+.cs-plan-card.cs-plan-featured {
+  border-color: oklch(0.72 0.19 49 / 60%);
+  background: linear-gradient(160deg, oklch(0.20 0.012 40) 0%, var(--surface) 60%);
+  box-shadow: 0 0 0 1px oklch(0.72 0.19 49 / 30%), 0 20px 50px oklch(0.72 0.19 49 / 15%);
+}
+.cs-plan-card.cs-plan-featured:hover {
+  box-shadow: 0 0 0 1px oklch(0.72 0.19 49 / 50%), 0 30px 70px oklch(0.72 0.19 49 / 25%);
+}
+
+/* ── FAQ Accordion ──────────────────────────────────── */
+.cs-faq-item {
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  padding: 1.25rem 0;
+}
+.cs-faq-trigger {
+  width: 100%;
+  background: none; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  color: var(--foreground);
+  font-family: var(--font-body), sans-serif;
+  font-size: 1rem; font-weight: 600;
+  text-align: left; padding: 0;
+  transition: color 0.2s;
+}
+.cs-faq-trigger:hover { color: var(--cs-orange); }
+.cs-faq-icon {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.12);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  font-size: 1rem;
+  transition: transform 0.35s cubic-bezier(0.16,1,0.3,1), border-color 0.2s, background 0.2s;
+}
+.cs-faq-trigger:hover .cs-faq-icon {
+  border-color: var(--cs-orange);
+  background: oklch(0.72 0.19 49 / 10%);
+}
+.cs-faq-icon.open { transform: rotate(45deg); border-color: var(--cs-orange); background: oklch(0.72 0.19 49 / 12%); }
+
+.cs-faq-body {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.4s cubic-bezier(0.16,1,0.3,1), opacity 0.3s ease;
+  opacity: 0;
+}
+.cs-faq-body.open { max-height: 400px; opacity: 1; }
+
+/* ── Premium section header ─────────────────────────── */
+.cs-section-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  border-radius: 999px;
+  border: 1px solid oklch(0.72 0.19 49 / 30%);
+  background: oklch(0.72 0.19 49 / 8%);
+  padding: 5px 14px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--cs-orange);
+  margin-bottom: 1.25rem;
+}
+
+/* ── Premium hover lift cards ───────────────────────── */
+.cs-lift {
+  transition: transform 0.3s cubic-bezier(0.16,1,0.3,1), box-shadow 0.3s ease;
+}
+.cs-lift:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+}
+
+/* ── Stat strip ─────────────────────────────────────── */
+.cs-stat-pill {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid rgba(255,255,255,0.07);
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+  transition: border-color 0.2s;
+}
+.cs-stat-pill:hover { border-color: oklch(0.72 0.19 49 / 35%); }
+
+/* ── Hero CTA CSS hover (avoids JS onMouseEnter/Leave) ── */
+.cs-hero-cta-primary {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 14px 28px; border-radius: 10px;
+  background: var(--gradient-accent);
+  color: var(--accent-foreground);
+  font-size: 0.95rem; font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 8px 32px oklch(0.72 0.19 49 / 40%);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.cs-hero-cta-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px oklch(0.72 0.19 49 / 52%);
+}
+.cs-hero-cta-secondary {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 14px 28px; border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.03);
+  color: var(--muted-foreground);
+  font-size: 0.95rem; font-weight: 500;
+  text-decoration: none;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+.cs-hero-cta-secondary:hover {
+  border-color: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.06);
+  color: var(--foreground);
+}
+/* Final CTA button hover */
+.cs-final-cta-primary {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 15px 32px; border-radius: 12px;
+  background: var(--gradient-accent);
+  color: var(--accent-foreground);
+  font-size: 1rem; font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 8px 32px oklch(0.72 0.19 49 / 45%);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.cs-final-cta-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 44px oklch(0.72 0.19 49 / 55%);
+}
+.cs-final-cta-secondary {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 15px 28px; border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04);
+  color: var(--muted-foreground);
+  font-size: 1rem; font-weight: 500;
+  text-decoration: none;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+.cs-final-cta-secondary:hover {
+  border-color: rgba(255,255,255,0.22);
+  background: rgba(255,255,255,0.07);
+  color: var(--foreground);
+}
