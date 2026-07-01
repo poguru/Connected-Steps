@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { Card, Button, Input, Alert, Badge, Tabs, StatCard, Avatar, EmptyState, Spinner } from "@/components/ui/ds";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -32,7 +33,6 @@ type AtFilter = "all" | "at_risk" | "low_att" | "no_plan" | "members";
 const S = {
   inp: { width: "100%", background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", padding: "8px 12px", color: "#fff", fontSize: "0.82rem", fontFamily: "inherit", outline: "none", boxSizing: "border-box" } as React.CSSProperties,
   sel: { width: "100%", background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", padding: "8px 12px", color: "#fff", fontSize: "0.82rem", fontFamily: "inherit", outline: "none", cursor: "pointer", colorScheme: "dark" as const } as React.CSSProperties,
-  btn: (active = true): React.CSSProperties => ({ padding: "9px 20px", background: active ? "#e8620a" : "rgba(255,255,255,0.06)", border: "none", borderRadius: "6px", color: active ? "#fff" : "#888", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s" }),
   tag: (color: string, bg: string): React.CSSProperties => ({ fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "20px", background: bg, color, whiteSpace: "nowrap" as const }),
 };
 
@@ -110,23 +110,23 @@ function AuthGate({ onAuth }: { onAuth: (credential: string) => void }) {
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "2rem", width: "320px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.5rem" }}>
-          <Image src="/logo.png" alt="" width={32} height={32} className="rounded-full" />
-          <div>
-            <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "#fff" }}>Connected Steps</div>
-            <div style={{ fontSize: "10px", color: "#e8620a", letterSpacing: "0.1em", textTransform: "uppercase" }}>Coach Operations</div>
+      <div style={{ width: "320px" }}>
+        <Card>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.5rem" }}>
+            <Image src="/logo.png" alt="" width={32} height={32} className="rounded-full" />
+            <div>
+              <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "#fff" }}>Connected Steps</div>
+              <Badge color="orange" size="sm" style={{ marginTop: 3 }}>Coach Operations</Badge>
+            </div>
           </div>
-        </div>
-        <input type="password" placeholder="Admin password" value={pw}
-          onChange={e => { setPw(e.target.value); setErr(""); }}
-          onKeyDown={e => e.key === "Enter" && loginAdmin()}
-          style={{ ...S.inp, marginBottom: "0.75rem" }} />
-        {err && <div style={{ fontSize: "0.8rem", color: "#f09595", marginBottom: "0.75rem" }}>{err}</div>}
-        <button onClick={loginAdmin} disabled={busy} style={{ ...S.btn(), width: "100%", padding: "10px" }}>
-          {busy ? "Checking…" : "Access Dashboard"}
-        </button>
-        <Link href="/admin" style={{ display: "block", textAlign: "center", marginTop: "1rem", fontSize: "0.75rem", color: "#555", textDecoration: "none" }}>← Back to admin</Link>
+          <Input type="password" placeholder="Admin password" value={pw}
+            onChange={e => { setPw(e.target.value); setErr(""); }}
+            onKeyDown={e => e.key === "Enter" && loginAdmin()}
+            style={{ marginBottom: "0.75rem" }} />
+          {err && <Alert variant="error" style={{ marginBottom: "0.75rem" }}>{err}</Alert>}
+          <Button fullWidth loading={busy} onClick={loginAdmin}>Access Dashboard</Button>
+          <Link href="/admin" style={{ display: "block", textAlign: "center", marginTop: "1rem", fontSize: "0.75rem", color: "#555", textDecoration: "none" }}>← Back to admin</Link>
+        </Card>
       </div>
     </div>
   );
@@ -369,9 +369,9 @@ export default function CoachOpsDashboard() {
         </Link>
         <span style={{ color: "#333" }}>/</span>
         <span style={{ fontSize: "0.9rem", fontWeight: 600 }}>Coach Operations</span>
-        <button onClick={() => loadAthletes(pw)} style={{ marginLeft: "auto", fontSize: "0.72rem", color: "#555", background: "none", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "4px", padding: "4px 10px", cursor: "pointer", fontFamily: "inherit" }}>
+        <Button size="xs" variant="ghost" style={{ marginLeft: "auto" }} onClick={() => loadAthletes(pw)}>
           {loading ? "Loading…" : "Refresh"}
-        </button>
+        </Button>
       </header>
 
       <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "1.5rem 1rem" }}>
@@ -386,29 +386,23 @@ export default function CoachOpsDashboard() {
               { label: "Low Attendance",   value: stats.low_att,        color: "#fbbf24", filter: "low_att" as AtFilter },
               { label: "No Plan (members)",value: stats.no_plan,        color: "#818cf8", filter: "no_plan" as AtFilter },
             ].map(s => (
-              <button key={s.label} onClick={() => { setAtFilter(s.filter); setTab("athletes"); }}
-                style={{ background: atFilter === s.filter && tab === "athletes" ? "rgba(232,98,10,0.1)" : "#111", border: `1px solid ${atFilter === s.filter && tab === "athletes" ? "rgba(232,98,10,0.4)" : "rgba(255,255,255,0.07)"}`, borderRadius: "8px", padding: "1rem", textAlign: "left", cursor: "pointer", transition: "all 0.15s" }}>
-                <div style={{ fontSize: "1.6rem", fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.value}</div>
-                <div style={{ fontSize: "10px", color: "#555", textTransform: "uppercase", letterSpacing: "0.07em", marginTop: "5px" }}>{s.label}</div>
-              </button>
+              <StatCard key={s.label} label={s.label} value={s.value} color={s.color}
+                style={{ cursor: "pointer", borderColor: atFilter === s.filter && tab === "athletes" ? "rgba(232,98,10,0.4)" : undefined, background: atFilter === s.filter && tab === "athletes" ? "rgba(232,98,10,0.1)" : undefined }}
+                onClick={() => { setAtFilter(s.filter); setTab("athletes"); }} />
             ))}
           </div>
         )}
 
         {/* Tabs */}
-        <div style={{ display: "flex", gap: "2px", marginBottom: "1.25rem", background: "rgba(255,255,255,0.04)", borderRadius: "8px", padding: "3px", overflowX: "auto" }}>
-          {([
-            ["athletes",  "Athletes"],
-            ["cohorts",   "Cohorts"],
-            ["broadcast", "Bulk Actions"],
-            ["templates", "Plan Templates"],
-          ] as [Tab, string][]).map(([key, label]) => (
-            <button key={key} onClick={() => setTab(key)}
-              style={{ flex: 1, minWidth: "100px", padding: "8px 4px", borderRadius: "6px", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", border: "none", background: tab === key ? "#e8620a" : "transparent", color: tab === key ? "#fff" : "#666", whiteSpace: "nowrap", transition: "all 0.15s" }}>
-              {label}
-            </button>
-          ))}
-        </div>
+        <Tabs variant="pill" style={{ marginBottom: "1.25rem" }}
+          tabs={[
+            { key:"athletes",  label:"Athletes"      },
+            { key:"cohorts",   label:"Cohorts"       },
+            { key:"broadcast", label:"Bulk Actions"  },
+            { key:"templates", label:"Plan Templates" },
+          ]}
+          active={tab}
+          onChange={k => setTab(k as Tab)} />
 
         {/* ══ ATHLETES TAB ══════════════════════════════════════════════════════ */}
         {tab === "athletes" && (
@@ -659,9 +653,7 @@ export default function CoachOpsDashboard() {
                     style={{ width: "24px", height: "24px", borderRadius: "50%", background: col, border: newCColor === col ? "2px solid #fff" : "2px solid transparent", cursor: "pointer", padding: 0 }} />
                 ))}
               </div>
-              <button onClick={createCohort} disabled={cSaving || !newCName.trim()} style={{ ...S.btn(!!newCName.trim()), width: "100%" }}>
-                {cSaving ? "Creating…" : "Create Cohort"}
-              </button>
+              <Button fullWidth loading={cSaving} disabled={!newCName.trim()} onClick={createCohort}>Create Cohort</Button>
             </div>
           </div>
         )}
@@ -740,14 +732,13 @@ export default function CoachOpsDashboard() {
 
               {/* Step 4: Send */}
               <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
-                <button onClick={sendBroadcast} disabled={bcSending || !bcMessage.trim() || bcRecipients.length === 0}
-                  style={{ ...S.btn(!!bcMessage.trim() && bcRecipients.length > 0), padding: "10px 28px" }}>
-                  {bcSending ? "Sending…" : `Send to ${bcRecipients.length} athlete${bcRecipients.length !== 1 ? "s" : ""}`}
-                </button>
+                <Button loading={bcSending} disabled={!bcMessage.trim() || bcRecipients.length === 0} onClick={sendBroadcast}>
+                  {`Send to ${bcRecipients.length} athlete${bcRecipients.length !== 1 ? "s" : ""}`}
+                </Button>
                 {bcResult && (
-                  <span style={{ fontSize: "0.82rem", color: bcResult.failed === 0 ? "#4ade80" : "#fbbf24" }}>
-                    ✓ {bcResult.sent} sent{bcResult.failed > 0 ? `, ${bcResult.failed} failed` : ""}{bcResult.skipped > 0 ? `, ${bcResult.skipped} skipped (no phone)` : ""}
-                  </span>
+                  <Badge color={bcResult.failed === 0 ? "green" : "yellow"} size="sm">
+                    ✓ {bcResult.sent} sent{bcResult.failed > 0 ? `, ${bcResult.failed} failed` : ""}{bcResult.skipped > 0 ? `, ${bcResult.skipped} skipped` : ""}
+                  </Badge>
                 )}
               </div>
             </div>
@@ -780,9 +771,9 @@ export default function CoachOpsDashboard() {
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
               <div style={{ fontSize: "0.82rem", color: "#555" }}>{templates.length} template{templates.length !== 1 ? "s" : ""} saved</div>
-              <button onClick={() => setShowTplForm(f => !f)} style={S.btn()}>
+              <Button size="sm" variant={showTplForm ? "secondary" : "primary"} onClick={() => setShowTplForm(f => !f)}>
                 {showTplForm ? "Cancel" : "+ New Template"}
-              </button>
+              </Button>
             </div>
 
             {/* Create form */}
@@ -823,10 +814,8 @@ export default function CoachOpsDashboard() {
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                  <button onClick={saveTemplate} disabled={tplSaving || !tplName.trim()} style={S.btn(!!tplName.trim())}>
-                    {tplSaving ? "Saving…" : "Save Template"}
-                  </button>
-                  {tplMsg && <span style={{ fontSize: "0.82rem", color: "#f09595" }}>{tplMsg}</span>}
+                  <Button loading={tplSaving} disabled={!tplName.trim()} onClick={saveTemplate}>Save Template</Button>
+                  {tplMsg && <Alert variant="error">{tplMsg}</Alert>}
                 </div>
               </div>
             )}
@@ -834,9 +823,7 @@ export default function CoachOpsDashboard() {
             {/* Template grid */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: "1rem" }}>
               {templates.length === 0 && !showTplForm && (
-                <div style={{ gridColumn: "1/-1", padding: "3rem", textAlign: "center", color: "#444", fontSize: "0.875rem", background: "#111", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.07)" }}>
-                  No templates yet. Click "+ New Template" to create one.
-                </div>
+                <div style={{ gridColumn: "1/-1" }}><EmptyState title='No templates yet.' body='Click "+ New Template" to create one.' /></div>
               )}
               {templates.map(t => (
                 <div key={t.id} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "10px", padding: "1.1rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
@@ -845,7 +832,7 @@ export default function CoachOpsDashboard() {
                       <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>{t.name}</div>
                       {t.description && <div style={{ fontSize: "11px", color: "#555", marginTop: "2px" }}>{t.description}</div>}
                     </div>
-                    <button onClick={() => deleteTemplate(t.id)} style={{ background: "none", border: "none", color: "#333", cursor: "pointer", fontSize: "14px", padding: "2px 4px" }}>✕</button>
+                    <Button size="xs" variant="ghost" onClick={() => deleteTemplate(t.id)}>✕</Button>
                   </div>
 
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: "3px" }}>
@@ -857,10 +844,7 @@ export default function CoachOpsDashboard() {
                     ))}
                   </div>
 
-                  <button onClick={() => { setAssigningTpl(t); setTplTargets(new Set()); setTplAssignMsg(""); }}
-                    style={{ ...S.btn(), padding: "7px 14px", fontSize: "0.78rem" }}>
-                    Assign to Athletes
-                  </button>
+                  <Button size="sm" onClick={() => { setAssigningTpl(t); setTplTargets(new Set()); setTplAssignMsg(""); }}>Assign to Athletes</Button>
                 </div>
               ))}
             </div>
@@ -883,13 +867,11 @@ export default function CoachOpsDashboard() {
                     ))}
                   </div>
                   <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-                    <button onClick={() => assignTemplate(assigningTpl, Array.from(tplTargets))}
-                      disabled={tplAssigning || tplTargets.size === 0}
-                      style={{ ...S.btn(tplTargets.size > 0), padding: "9px 20px" }}>
-                      {tplAssigning ? "Assigning…" : `Assign to ${tplTargets.size} athlete${tplTargets.size !== 1 ? "s" : ""}`}
-                    </button>
-                    <button onClick={() => setAssigningTpl(null)} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: "0.82rem", fontFamily: "inherit" }}>Cancel</button>
-                    {tplAssignMsg && <span style={{ fontSize: "0.82rem", color: "#4ade80" }}>{tplAssignMsg}</span>}
+                    <Button loading={tplAssigning} disabled={tplTargets.size === 0} onClick={() => assignTemplate(assigningTpl, Array.from(tplTargets))}>
+                      {`Assign to ${tplTargets.size} athlete${tplTargets.size !== 1 ? "s" : ""}`}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setAssigningTpl(null)}>Cancel</Button>
+                    {tplAssignMsg && <Badge color="green" size="sm">{tplAssignMsg}</Badge>}
                   </div>
                 </div>
               </div>

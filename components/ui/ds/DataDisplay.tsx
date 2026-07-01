@@ -177,18 +177,19 @@ export function Tooltip({ children, label, placement = "top", style }: {
 
 // ── Stat Card ─────────────────────────────────────────────────────────────────
 
-export function StatCard({ label, value, sub, delta, icon, color: c, style }: {
-  label:  string;
-  value:  string | number;
-  sub?:   string;
-  delta?: { value: string; positive: boolean };
-  icon?:  string;
-  color?: string;
-  style?: React.CSSProperties;
+export function StatCard({ label, value, sub, delta, icon, color: c, style, onClick }: {
+  label:    string;
+  value:    string | number;
+  sub?:     string;
+  delta?:   { value: string; positive: boolean };
+  icon?:    string;
+  color?:   string;
+  style?:   React.CSSProperties;
+  onClick?: () => void;
 }) {
   const vc = c ?? color.orange;
   return (
-    <div style={{ background: color.dark, border: `1px solid ${color.border}`, borderRadius: "10px", padding: "16px 20px", display: "flex", flexDirection: "column", gap: "4px", ...style }}>
+    <div onClick={onClick} style={{ background: color.dark, border: `1px solid ${color.border}`, borderRadius: "10px", padding: "16px 20px", display: "flex", flexDirection: "column", gap: "4px", ...style }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: "10px", fontWeight: 700, color: color.textMuted, textTransform: "uppercase", letterSpacing: "0.09em", fontFamily: font.body }}>{label}</span>
         {icon && <span style={{ fontSize: "18px", opacity: 0.6 }}>{icon}</span>}
