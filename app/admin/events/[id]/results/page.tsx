@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { Card, Button, Badge, Tabs, StatCard, EmptyState, Alert, Spinner } from "@/components/ui/ds";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -26,20 +27,12 @@ interface Summary { total: number; finishers: number; dnf: number; dns: number; 
 const S = {
   page:   { minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "inherit" } as React.CSSProperties,
   header: { position: "sticky" as const, top: 0, zIndex: 40, background: "rgba(10,10,10,0.97)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 2rem", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" } as React.CSSProperties,
-  card:   { background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem" } as React.CSSProperties,
   input:  { width: "100%", padding: "9px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const } as React.CSSProperties,
-  btn:    (p = true): React.CSSProperties => ({ padding: "8px 18px", background: p ? "#e8620a" : "rgba(255,255,255,0.06)", border: p ? "none" : "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: p ? "#fff" : "#aaa", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }),
 };
 
 function statusBadge(s: string) {
-  const c: Record<string, { bg: string; color: string }> = {
-    finisher: { bg: "rgba(74,222,128,0.1)", color: "#4ade80" },
-    dnf:      { bg: "rgba(251,191,36,0.1)", color: "#fbbf24" },
-    dns:      { bg: "rgba(255,255,255,0.06)", color: "#666" },
-    dq:       { bg: "rgba(248,113,113,0.1)", color: "#f87171" },
-  };
-  const { bg, color } = c[s] ?? c.dns;
-  return <span style={{ padding: "2px 10px", borderRadius: 999, background: bg, color, fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const }}>{s}</span>;
+  const colorMap: Record<string, "green" | "yellow" | "gray" | "red"> = { finisher:"green", dnf:"yellow", dns:"gray", dq:"red" };
+  return <Badge color={colorMap[s] ?? "gray"} size="sm">{s.toUpperCase()}</Badge>;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -120,19 +113,14 @@ export default function ResultsPage() {
           <span style={{ fontWeight: 700, fontSize: 15 }}>Results & Certificates</span>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          {eventId && <Link href={`/events/[slug]/results`} style={{ padding: "5px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#888", fontSize: 12, fontWeight: 600, textDecoration: "none" }}>Public View ↗</Link>}
-          <button onClick={loadAll} style={{ ...S.btn(false), fontSize: 12, padding: "6px 14px" }}>Refresh</button>
+          <Button size="sm" variant="ghost" onClick={loadAll}>↻ Refresh</Button>
         </div>
       </header>
 
       {/* Tabs */}
       <div style={{ borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 2rem", background: "#0d0d0d" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex" }}>
-          {TABS.map(t => (
-            <button key={t.key} onClick={() => setTab(t.key as typeof tab)} style={{ padding: "12px 18px", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: tab === t.key ? 700 : 400, color: tab === t.key ? "#fff" : "#555", borderBottom: tab === t.key ? "2px solid #e8620a" : "2px solid transparent", marginBottom: -1 }}>
-              {t.label}
-            </button>
-          ))}
+        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+          <Tabs tabs={TABS.map(t => ({ key: t.key, label: t.label }))} active={tab} onChange={k => setTab(k as typeof tab)} />
         </div>
       </div>
 
@@ -149,25 +137,18 @@ export default function ResultsPage() {
                   { label: "DNF", value: summary.dnf, color: "#fbbf24" },
                   { label: "DNS", value: summary.dns, color: "#555" },
                 ].map(s => (
-                  <div key={s.label} style={S.card}>
-                    <div style={{ fontSize: 24, fontWeight: 900, color: s.color ?? "#fff" }}>{s.value}</div>
-                    <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", marginTop: 4, fontWeight: 600 }}>{s.label}</div>
-                  </div>
+                  <StatCard key={s.label} label={s.label} value={s.value} color={s.color} />
                 ))}
               </div>
             )}
 
             {loading ? (
-              <div style={{ textAlign: "center", padding: "4rem", color: "#555" }}>Loading…</div>
+              <div style={{ textAlign: "center", padding: "4rem" }}><Spinner /></div>
             ) : results.length === 0 ? (
-              <div style={{ ...S.card, textAlign: "center", padding: "4rem" }}>
-                <div style={{ fontSize: 48, marginBottom: 12 }}>📊</div>
-                <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No results yet</div>
-                <div style={{ fontSize: 13, color: "#555", marginBottom: 16 }}>Import results from a CSV file or enter them manually</div>
-                <button onClick={() => setTab("import")} style={S.btn()}>Import Results</button>
-              </div>
+              <EmptyState icon="📊" title="No results yet" body="Import results from a CSV file or enter them manually"
+                action={<Button onClick={() => setTab("import")}>Import Results</Button>} />
             ) : (
-              <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, overflow: "hidden" }}>
+              <Card style={{ padding: 0, overflow: "hidden" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
@@ -200,7 +181,7 @@ export default function ResultsPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+            </Card>
             )}
           </div>
         )}
@@ -208,8 +189,8 @@ export default function ResultsPage() {
         {/* Import Tab */}
         {tab === "import" && (
           <div style={{ maxWidth: 680 }}>
-            <div style={S.card}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#e8620a", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 14 }}>Import Results from CSV</div>
+            <Card>
+              <Badge color="orange" style={{ marginBottom: 14 }}>Import Results from CSV</Badge>
 
               <div style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 8, padding: "12px 14px", marginBottom: 16, fontSize: 12, color: "#666" }}>
                 <strong style={{ color: "#aaa" }}>Expected CSV columns</strong> (header row required):<br />
@@ -235,34 +216,25 @@ export default function ResultsPage() {
                 Auto-compute positions from gun_time_secs after import
               </label>
 
-              <button onClick={importCSV} disabled={importing || !csvText.trim()} style={S.btn()}>
-                {importing ? "Importing…" : "Import Results"}
-              </button>
-
+              <Button loading={importing} disabled={!csvText.trim()} onClick={importCSV}>Import Results</Button>
               {importResult && (
-                <div style={{ marginTop: 14, padding: "12px 14px", background: "rgba(74,222,128,0.07)", border: "1px solid rgba(74,222,128,0.2)", borderRadius: 8, fontSize: 13 }}>
+                <Alert variant="success" style={{ marginTop: 14 }}>
                   ✅ Imported <strong>{importResult.imported}</strong> results
                   {importResult.failed > 0 && ` · ❌ ${importResult.failed} failed`}
-                </div>
+                </Alert>
               )}
-            </div>
+            </Card>
           </div>
         )}
 
         {/* Certificates Tab */}
         {tab === "certificates" && (
           <div style={{ maxWidth: 560 }}>
-            <div style={{ ...S.card, marginBottom: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#e8620a", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 14 }}>Certificate Status</div>
+            <Card style={{ marginBottom: 16 }}>
+              <Badge color="orange" style={{ marginBottom: 14 }}>Certificate Status</Badge>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-                <div style={{ textAlign: "center", padding: "1rem", background: "#0d0d0d", borderRadius: 8 }}>
-                  <div style={{ fontSize: 28, fontWeight: 900, color: "#4ade80" }}>{certStatus.certificates_generated}</div>
-                  <div style={{ fontSize: 11, color: "#555", fontWeight: 600, textTransform: "uppercase" as const }}>Generated</div>
-                </div>
-                <div style={{ textAlign: "center", padding: "1rem", background: "#0d0d0d", borderRadius: 8 }}>
-                  <div style={{ fontSize: 28, fontWeight: 900 }}>{certStatus.total_finishers}</div>
-                  <div style={{ fontSize: 11, color: "#555", fontWeight: 600, textTransform: "uppercase" as const }}>Total Finishers</div>
-                </div>
+                <StatCard label="Generated"      value={certStatus.certificates_generated} color="#4ade80" />
+                <StatCard label="Total Finishers" value={certStatus.total_finishers} />
               </div>
               <p style={{ fontSize: 13, color: "#666", marginBottom: 16 }}>
                 Certificates are generated as printable HTML pages stored in Supabase Storage.
@@ -275,22 +247,19 @@ export default function ResultsPage() {
                 Email certificates to participants after generation
               </label>
 
-              <button onClick={generateCertificates} disabled={genLoading || certStatus.total_finishers === 0} style={S.btn()}>
-                {genLoading ? "Generating…" : `Generate ${certStatus.total_finishers - certStatus.certificates_generated} Missing Certificates`}
-              </button>
-
+              <Button loading={genLoading} disabled={certStatus.total_finishers === 0} onClick={generateCertificates}>
+                {`Generate ${certStatus.total_finishers - certStatus.certificates_generated} Missing Certificates`}
+              </Button>
               {certStatus.total_finishers === 0 && (
                 <p style={{ fontSize: 12, color: "#555", marginTop: 10 }}>Import results first to generate certificates.</p>
               )}
-            </div>
+            </Card>
 
-            <div style={{ ...S.card, background: "rgba(232,98,10,0.04)", border: "1px solid rgba(232,98,10,0.15)" }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#e8620a", marginBottom: 8 }}>Required: Create Storage Bucket</div>
-              <p style={{ fontSize: 12, color: "#666" }}>
-                In Supabase Dashboard → Storage → New bucket:<br />
-                Name: <code style={{ color: "#e8620a" }}>event-certificates</code> · Public: off (private)
-              </p>
-            </div>
+            <Alert variant="warning">
+              <strong>Required: Create Storage Bucket</strong><br />
+              In Supabase Dashboard → Storage → New bucket:<br />
+              Name: <code>event-certificates</code> · Public: off (private)
+            </Alert>
           </div>
         )}
       </div>

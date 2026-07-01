@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { Card, Button, Alert, Badge, StatCard, Spinner } from "@/components/ui/ds";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -28,8 +29,6 @@ interface EventAnalytics {
 const S = {
   page:   { minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "inherit" } as React.CSSProperties,
   header: { position: "sticky" as const, top: 0, zIndex: 40, background: "rgba(10,10,10,0.97)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 2rem", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" } as React.CSSProperties,
-  card:   { background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem" } as React.CSSProperties,
-  h2:     { fontSize: 11, fontWeight: 700, color: "#e8620a", textTransform: "uppercase" as const, letterSpacing: ".08em", marginBottom: 12 } as React.CSSProperties,
 };
 
 function fmtInr(n: number): string {
@@ -127,17 +126,8 @@ export default function EventAnalyticsPage() {
     finally   { setResending(false); }
   }
 
-  if (loading) return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center", color: "#555" }}>
-      Loading analytics…
-    </div>
-  );
-
-  if (!data) return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center", color: "#f87171" }}>
-      Failed to load analytics
-    </div>
-  );
+  if (loading) return <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center" }}><Spinner /></div>;
+  if (!data)   return <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}><Alert variant="error">Failed to load analytics</Alert></div>;
 
   const { event, funnel, revenue, capacity, race_day, email, by_race, registration_timeline } = data;
 
@@ -150,9 +140,9 @@ export default function EventAnalyticsPage() {
           <span style={{ fontWeight: 700, fontSize: 15 }}>Analytics — {event?.title}</span>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={loadData} title="Refresh" style={{ padding: "6px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#555", fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>↻</button>
-          <a href={`/api/admin/events/${eventId}/registrations/export`} download style={{ padding: "6px 14px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#aaa", fontSize: 12, fontWeight: 600, textDecoration: "none" }}>
-            Export CSV
+          <Button size="sm" variant="ghost" onClick={loadData}>↻ Refresh</Button>
+          <a href={`/api/admin/events/${eventId}/registrations/export`} download style={{ textDecoration: "none" }}>
+            <Button size="sm" variant="secondary">Export CSV</Button>
           </a>
         </div>
       </header>
@@ -168,9 +158,8 @@ export default function EventAnalyticsPage() {
             { label: "Avg per Paid",      value: fmtInr(revenue.avg_per_participant),                           color: "#fbbf24",  href: `/admin/events/${eventId}/registrations` },
             { label: "Capacity",          value: capacity.pct !== null ? `${capacity.pct}%` : "Unlimited",      color: capacity.pct && capacity.pct > 90 ? "#f87171" : "#60a5fa", href: `/admin/events/${eventId}/registrations` },
           ].map(k => (
-            <Link key={k.label} href={k.href} style={{ ...S.card, textDecoration: "none", display: "block" }}>
-              <div style={{ fontSize: 24, fontWeight: 900, color: k.color, lineHeight: 1, marginBottom: 4 }}>{k.value}</div>
-              <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", fontWeight: 600 }}>{k.label}</div>
+            <Link key={k.label} href={k.href} style={{ textDecoration: "none" }}>
+              <StatCard label={k.label} value={k.value} color={k.color} style={{ cursor: "pointer" }} />
             </Link>
           ))}
         </div>
@@ -178,8 +167,8 @@ export default function EventAnalyticsPage() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
 
           {/* Registration funnel */}
-          <div style={S.card}>
-            <div style={S.h2}>Registration Funnel</div>
+          <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#e8620a", textTransform: "uppercase" as const, letterSpacing: ".08em", marginBottom: 12 }}>Registration Funnel</div>
             {[
               { label: "Total Registrations", count: funnel.total,     pct: 100,                                                                                  color: "#fff" },
               { label: "Confirmed",           count: funnel.confirmed, pct: funnel.total > 0 ? Math.round(funnel.confirmed / funnel.total * 100) : 0,             color: "#4ade80" },
@@ -190,8 +179,8 @@ export default function EventAnalyticsPage() {
           </div>
 
           {/* Race day progression */}
-          <div style={S.card}>
-            <div style={S.h2}>Race Day Progression</div>
+          <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#e8620a", textTransform: "uppercase" as const, letterSpacing: ".08em", marginBottom: 12 }}>Race Day Progression</div>
             {[
               { label: "Checked In",         ...race_day.checked_in,    color: "#60a5fa" },
               { label: "BIB Collected",      ...race_day.bib_collected, color: "#a78bfa" },
@@ -202,21 +191,14 @@ export default function EventAnalyticsPage() {
           </div>
 
           {/* Email delivery */}
-          <div style={S.card}>
+          <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <div style={S.h2}>Email Delivery</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#e8620a", textTransform: "uppercase" as const, letterSpacing: ".08em", marginBottom: 12 }}>Email Delivery</div>
               {email.none > 0 && (
-                <button onClick={resendPending} disabled={resending}
-                  style={{ padding: "5px 12px", background: "#e8620a", border: "none", borderRadius: 6, color: "#fff", fontSize: 11, fontWeight: 700, cursor: resending ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: resending ? 0.6 : 1, flexShrink: 0 }}>
-                  {resending ? "Sending…" : `📧 Send to ${email.none} pending`}
-                </button>
+                <Button size="xs" loading={resending} onClick={resendPending}>📧 Send to {email.none} pending</Button>
               )}
             </div>
-            {resendResult && (
-              <div style={{ marginBottom: 10, padding: "8px 10px", borderRadius: 7, background: resendResult.startsWith("✅") ? "rgba(74,222,128,0.08)" : "rgba(248,113,113,0.08)", fontSize: 12, color: resendResult.startsWith("✅") ? "#4ade80" : "#f87171" }}>
-                {resendResult}
-              </div>
-            )}
+            {resendResult && <Alert variant={resendResult.startsWith("✅") ? "success" : "error"} style={{ marginBottom: 10 }}>{resendResult}</Alert>}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
               {[
                 { label: "Sent",    value: email.sent,   color: "#4ade80" },
@@ -239,8 +221,8 @@ export default function EventAnalyticsPage() {
           </div>
 
           {/* Race distribution */}
-          <div style={S.card}>
-            <div style={S.h2}>By Race / Distance</div>
+          <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#e8620a", textTransform: "uppercase" as const, letterSpacing: ".08em", marginBottom: 12 }}>By Race / Distance</div>
             {Object.entries(by_race).length === 0 ? (
               <div style={{ padding: "1.5rem", textAlign: "center" as const }}>
                 <div style={{ fontSize: 28, marginBottom: 8 }}>🏁</div>
@@ -276,8 +258,8 @@ export default function EventAnalyticsPage() {
         </div>
 
         {/* Registration timeline */}
-        <div style={S.card}>
-          <div style={S.h2}>Registration Timeline</div>
+        <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#e8620a", textTransform: "uppercase" as const, letterSpacing: ".08em", marginBottom: 12 }}>Registration Timeline</div>
           {registration_timeline.length ? (
             <>
               <TimelineChart data={registration_timeline} />
