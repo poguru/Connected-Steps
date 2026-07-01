@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import SessionShareSheet from "@/components/ui/SessionShareSheet";
+import { Card, Button, Input, Label, Alert, Badge, Modal, EmptyState, StatCard } from "@/components/ui/ds";
 
 interface Session { id: string; title: string; date: string; time: string; location: string; venue: string; photo_url?: string | null; }
 interface Attendee {
@@ -16,15 +17,6 @@ const inp: React.CSSProperties = {
   background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
   borderRadius: "6px", color: "#fff", fontSize: "0.825rem", outline: "none", boxSizing: "border-box",
 };
-const label: React.CSSProperties = {
-  display: "block", fontSize: "10px", color: "#888",
-  letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "5px",
-};
-const btn = (accent = false): React.CSSProperties => ({
-  padding: "9px 20px", borderRadius: "6px", border: "none", cursor: "pointer",
-  fontSize: "0.8rem", fontWeight: 700,
-  background: accent ? "#e8620a" : "rgba(255,255,255,0.08)", color: "#fff",
-});
 
 export default function AdminSessionsPage() {
   const [password,   setPassword]   = useState("");
@@ -345,19 +337,17 @@ export default function AdminSessionsPage() {
             <Image src="/logo.png" alt="Connected Steps" width={36} height={36} className="rounded-full" />
             <span style={{ fontSize: "1.1rem", fontWeight: 600, color: "#fff" }}>Connected Steps</span>
           </Link>
-          <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", padding: "2rem" }}>
-            <div style={{ fontSize: "10px", color: "#e8620a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.5rem", fontWeight: 600 }}>Admin Access</div>
+          <Card>
+            <Badge color="orange" style={{ marginBottom: "0.5rem" }}>Admin Access</Badge>
             <h1 style={{ fontSize: "1.4rem", fontWeight: 300, color: "#fff", marginBottom: "1.75rem" }}>Training Sessions</h1>
-            <form onSubmit={login}>
-              <label style={label}>Password</label>
-              <input type="password" value={password} onChange={(e) => { setPassword(e.target.value); setAuthErr(""); }}
-                placeholder="Enter admin password" autoFocus style={{ ...inp, marginBottom: "1rem" }} />
-              {authErr && <div style={{ background: "rgba(226,75,74,0.1)", border: "1px solid rgba(226,75,74,0.3)", borderRadius: "6px", padding: "9px 12px", marginBottom: "1rem", fontSize: "0.8rem", color: "#f09595" }}>{authErr}</div>}
-              <button type="submit" disabled={authLoad} style={{ ...btn(true), width: "100%", padding: "12px" }}>
-                {authLoad ? "Verifying…" : "Access Dashboard"}
-              </button>
+            <form onSubmit={login} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <Label>Password</Label>
+              <Input type="password" value={password} onChange={(e) => { setPassword(e.target.value); setAuthErr(""); }}
+                placeholder="Enter admin password" autoFocus />
+              {authErr && <Alert variant="error">{authErr}</Alert>}
+              <Button type="submit" loading={authLoad} fullWidth>Access Dashboard</Button>
             </form>
-          </div>
+          </Card>
           <p style={{ textAlign: "center", marginTop: "1rem" }}>
             <Link href="/admin/runs" style={{ fontSize: "0.8rem", color: "#888", textDecoration: "none" }}>→ Run Registrations admin</Link>
           </p>
@@ -389,34 +379,17 @@ export default function AdminSessionsPage() {
         <div className="admin-sessions-left">
 
           {/* Create new session */}
-          <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "1.25rem" }}>
-            <div style={{ fontSize: "10px", color: "#e8620a", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "1rem" }}>New Session</div>
+          <Card>
+            <Badge color="orange" style={{ marginBottom: "1rem" }}>New Session</Badge>
             <form onSubmit={createSession} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              <div>
-                <label style={label}>Title</label>
-                <input style={inp} value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="e.g. Morning Run" required />
-              </div>
-              <div>
-                <label style={label}>Date</label>
-                <input style={inp} type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} required />
-              </div>
-              <div>
-                <label style={label}>Time</label>
-                <input style={inp} type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} required />
-              </div>
-              <div>
-                <label style={label}>Location (area — used to filter users)</label>
-                <input style={inp} value={newLocation} onChange={(e) => setNewLocation(e.target.value)} placeholder="e.g. Kondapur" required />
-              </div>
-              <div>
-                <label style={label}>Venue / Meeting Point (shown in alert)</label>
-                <input style={inp} value={newVenue} onChange={(e) => setNewVenue(e.target.value)} placeholder="e.g. Botanical Garden, Kondapur" required />
-              </div>
-              <button type="submit" disabled={creating} style={{ ...btn(true), width: "100%" }}>
-                {creating ? "Creating…" : "Create Session"}
-              </button>
+              <div><Label>Title</Label><Input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="e.g. Morning Run" required /></div>
+              <div><Label>Date</Label><Input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} required /></div>
+              <div><Label>Time</Label><Input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} required /></div>
+              <div><Label>Location (area — used to filter users)</Label><Input value={newLocation} onChange={(e) => setNewLocation(e.target.value)} placeholder="e.g. Kondapur" required /></div>
+              <div><Label>Venue / Meeting Point (shown in alert)</Label><Input value={newVenue} onChange={(e) => setNewVenue(e.target.value)} placeholder="e.g. Botanical Garden, Kondapur" required /></div>
+              <Button type="submit" loading={creating} fullWidth>Create Session</Button>
             </form>
-          </div>
+          </Card>
 
           {/* Sessions list — sorted: upcoming (nearest first) then completed (most recent first) */}
           {(() => {
@@ -468,19 +441,17 @@ export default function AdminSessionsPage() {
                     {/* Inline edit form */}
                     {editingId === s.id && (
                       <div style={{ padding: "10px 12px", borderTop: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)", display: "flex", flexDirection: "column", gap: "6px" }}>
-                        <input style={inp} value={editFields.title} onChange={(e) => setEditFields((p) => ({ ...p, title: e.target.value }))} placeholder="Title" />
+                        <Input value={editFields.title} onChange={(e) => setEditFields((p) => ({ ...p, title: e.target.value }))} placeholder="Title" />
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
-                          <input style={inp} type="date" value={editFields.date} onChange={(e) => setEditFields((p) => ({ ...p, date: e.target.value }))} />
-                          <input style={inp} type="time" value={editFields.time} onChange={(e) => setEditFields((p) => ({ ...p, time: e.target.value }))} />
+                          <Input type="date" value={editFields.date} onChange={(e) => setEditFields((p) => ({ ...p, date: e.target.value }))} />
+                          <Input type="time" value={editFields.time} onChange={(e) => setEditFields((p) => ({ ...p, time: e.target.value }))} />
                         </div>
-                        <input style={inp} value={editFields.location} onChange={(e) => setEditFields((p) => ({ ...p, location: e.target.value }))} placeholder="Location" />
-                        <input style={inp} value={editFields.venue} onChange={(e) => setEditFields((p) => ({ ...p, venue: e.target.value }))} placeholder="Venue" />
+                        <Input value={editFields.location} onChange={(e) => setEditFields((p) => ({ ...p, location: e.target.value }))} placeholder="Location" />
+                        <Input value={editFields.venue} onChange={(e) => setEditFields((p) => ({ ...p, venue: e.target.value }))} placeholder="Venue" />
                         <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                          <button onClick={() => saveEdit(s.id)} disabled={editSaving} style={{ ...btn(true), padding: "6px 16px", fontSize: "0.75rem" }}>
-                            {editSaving ? "Saving…" : "Save"}
-                          </button>
-                          <button onClick={() => setEditingId(null)} style={{ ...btn(false), padding: "6px 12px", fontSize: "0.75rem" }}>Cancel</button>
-                          {editMsg && <span style={{ fontSize: "0.72rem", color: editMsg === "Saved!" ? "#4ade80" : "#f09595" }}>{editMsg}</span>}
+                          <Button size="sm" loading={editSaving} onClick={() => saveEdit(s.id)}>Save</Button>
+                          <Button size="sm" variant="secondary" onClick={() => setEditingId(null)}>Cancel</Button>
+                          {editMsg && <Badge color={editMsg === "Saved!" ? "green" : "red"}>{editMsg}</Badge>}
                         </div>
                       </div>
                     )}
@@ -488,30 +459,25 @@ export default function AdminSessionsPage() {
                     {/* Inline reschedule form */}
                     {reschedulingId === s.id && (
                       <div style={{ padding: "10px 12px", borderTop: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)", display: "flex", flexDirection: "column", gap: "6px" }}>
-                        <div style={{ fontSize: "10px", color: "#888", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "2px" }}>Reschedule</div>
+                        <Badge color="blue" style={{ marginBottom: "2px" }}>Reschedule</Badge>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
-                          <input style={inp} type="date" value={rescheduleFields.date} onChange={(e) => setRescheduleFields((p) => ({ ...p, date: e.target.value }))} />
-                          <input style={inp} type="time" value={rescheduleFields.time} onChange={(e) => setRescheduleFields((p) => ({ ...p, time: e.target.value }))} />
+                          <Input type="date" value={rescheduleFields.date} onChange={(e) => setRescheduleFields((p) => ({ ...p, date: e.target.value }))} />
+                          <Input type="time" value={rescheduleFields.time} onChange={(e) => setRescheduleFields((p) => ({ ...p, time: e.target.value }))} />
                         </div>
                         <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                          <button onClick={() => saveReschedule(s)} disabled={rescheduleSaving} style={{ ...btn(true), padding: "6px 16px", fontSize: "0.75rem" }}>
-                            {rescheduleSaving ? "Saving…" : "Save"}
-                          </button>
-                          <button onClick={() => setReschedulingId(null)} style={{ ...btn(false), padding: "6px 12px", fontSize: "0.75rem" }}>Cancel</button>
-                          {rescheduleMsg && <span style={{ fontSize: "0.72rem", color: rescheduleMsg === "Rescheduled!" ? "#4ade80" : "#f09595" }}>{rescheduleMsg}</span>}
+                          <Button size="sm" loading={rescheduleSaving} onClick={() => saveReschedule(s)}>Save</Button>
+                          <Button size="sm" variant="secondary" onClick={() => setReschedulingId(null)}>Cancel</Button>
+                          {rescheduleMsg && <Badge color={rescheduleMsg === "Rescheduled!" ? "green" : "red"}>{rescheduleMsg}</Badge>}
                         </div>
                       </div>
                     )}
 
                     {/* Delete confirm */}
                     {deleteConfirmId === s.id && (
-                      <div style={{ padding: "10px 12px", borderTop: "1px solid rgba(226,75,74,0.2)", background: "rgba(226,75,74,0.05)", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                      <div style={{ padding: "10px 12px", borderTop: "1px solid rgba(226,75,74,0.2)", background: "rgba(226,75,74,0.05)", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" as const }}>
                         <span style={{ fontSize: "0.75rem", color: "#f09595", flex: 1 }}>Delete this session and all its attendance records?</span>
-                        <button onClick={() => deleteSession(s.id)} disabled={deleting}
-                          style={{ ...btn(false), padding: "5px 14px", fontSize: "0.75rem", background: "rgba(226,75,74,0.2)", color: "#f09595", flexShrink: 0 }}>
-                          {deleting ? "Deleting…" : "Yes, delete"}
-                        </button>
-                        <button onClick={() => setDeleteConfirmId(null)} style={{ ...btn(false), padding: "5px 10px", fontSize: "0.75rem", flexShrink: 0 }}>Cancel</button>
+                        <Button size="sm" variant="danger" loading={deleting} onClick={() => deleteSession(s.id)}>Yes, delete</Button>
+                        <Button size="sm" variant="secondary" onClick={() => setDeleteConfirmId(null)}>Cancel</Button>
                       </div>
                     )}
                   </div>
@@ -521,45 +487,10 @@ export default function AdminSessionsPage() {
               {/* View More / Show Less button */}
               {(hasMore || isExpanded) && (
                 <div style={{ marginTop: "0.75rem", textAlign: "center" }}>
-                  {hasMore ? (
-                    <button
-                      onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
-                      style={{
-                        background: "none",
-                        border: "1px solid rgba(255,255,255,0.12)",
-                        borderRadius: "6px",
-                        color: "#888",
-                        cursor: "pointer",
-                        fontSize: "0.78rem",
-                        fontFamily: "inherit",
-                        padding: "7px 20px",
-                        transition: "border-color 0.15s, color 0.15s",
-                      }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(232,98,10,0.4)"; (e.currentTarget as HTMLButtonElement).style.color = "#e8620a"; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.12)"; (e.currentTarget as HTMLButtonElement).style.color = "#888"; }}
-                    >
-                      View More Sessions ({sortedSessions.length - visibleCount} remaining)
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setVisibleCount(INITIAL_VISIBLE)}
-                      style={{
-                        background: "none",
-                        border: "1px solid rgba(255,255,255,0.12)",
-                        borderRadius: "6px",
-                        color: "#555",
-                        cursor: "pointer",
-                        fontSize: "0.78rem",
-                        fontFamily: "inherit",
-                        padding: "7px 20px",
-                        transition: "border-color 0.15s, color 0.15s",
-                      }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.25)"; (e.currentTarget as HTMLButtonElement).style.color = "#aaa"; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.12)"; (e.currentTarget as HTMLButtonElement).style.color = "#555"; }}
-                    >
-                      Show Less
-                    </button>
-                  )}
+                  {hasMore
+                    ? <Button variant="ghost" size="sm" onClick={() => setVisibleCount(c => c + PAGE_SIZE)}>View More Sessions ({sortedSessions.length - visibleCount} remaining)</Button>
+                    : <Button variant="ghost" size="sm" onClick={() => setVisibleCount(INITIAL_VISIBLE)}>Show Less</Button>
+                  }
                 </div>
               )}
               </>
@@ -596,79 +527,58 @@ export default function AdminSessionsPage() {
                       <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { setPhotoFile(e.target.files?.[0] ?? null); setPhotoMsg(""); }} />
                     </label>
                     {photoFile && (
-                      <button onClick={uploadPhoto} disabled={photoUploading} style={{ ...btn(true), padding: "7px 14px", fontSize: "0.78rem" }}>
-                        {photoUploading ? "Uploading…" : "Upload"}
-                      </button>
+                      <Button size="sm" loading={photoUploading} onClick={uploadPhoto}>Upload</Button>
                     )}
                   </div>
-                  {photoMsg && <div style={{ fontSize: "0.75rem", color: photoMsg.startsWith("Error") ? "#f09595" : "#4ade80" }}>{photoMsg}</div>}
+                  {photoMsg && <Alert variant={photoMsg.startsWith("Error") ? "error" : "success"}>{photoMsg}</Alert>}
                 </div>
 
-                <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
-                  <button
-                    onClick={() => setShareSession(selected)}
-                    style={{ ...btn(false), display: "flex", alignItems: "center", gap: "6px" }}>
-                    ↗ Share Session
-                  </button>
-                  <button onClick={saveAttendance} disabled={saving} style={btn(true)}>
-                    {saving ? "Saving & updating leaderboard…" : "Save Attendance"}
-                  </button>
+                <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" as const, alignItems: "center" }}>
+                  <Button variant="secondary" onClick={() => setShareSession(selected)}>↗ Share Session</Button>
+                  <Button loading={saving} onClick={saveAttendance}>Save Attendance</Button>
                 </div>
               </div>
 
               {/* Messages */}
               {saveMsg && (
-                <div style={{ background: saveMsg.includes("failed") ? "rgba(226,75,74,0.08)" : "rgba(74,222,128,0.08)", border: `1px solid ${saveMsg.includes("failed") ? "rgba(226,75,74,0.3)" : "rgba(74,222,128,0.25)"}`, borderRadius: "6px", padding: "9px 14px", marginBottom: "1rem", fontSize: "0.8rem", color: saveMsg.includes("failed") ? "#f09595" : "#4ade80", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <Alert variant={saveMsg.includes("failed") ? "error" : "success"} style={{ marginBottom: "1rem" }}>
                   <span>{saveMsg}</span>
-                  {lastSavedAt && <span style={{ fontSize: "10px", color: "#666", flexShrink: 0, marginLeft: "1rem" }}>at {lastSavedAt}</span>}
-                </div>
+                  {lastSavedAt && <span style={{ fontSize: "10px", color: "#666", marginLeft: "1rem" }}>at {lastSavedAt}</span>}
+                </Alert>
               )}
 
               {/* Add user manually */}
-              <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", padding: "0.75rem 1rem", marginBottom: "1rem", display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-                <span style={{ fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.08em", flexShrink: 0 }}>Add member manually</span>
-                <input
-                  value={addEmail}
-                  onChange={(e) => { setAddEmail(e.target.value); setAddMsg(""); }}
-                  onKeyDown={(e) => e.key === "Enter" && addUser()}
-                  placeholder="Email address"
-                  style={{ ...inp, flex: 1, minWidth: "180px", padding: "6px 10px" }}
-                />
-                <button onClick={addUser} disabled={adding || !addEmail.trim()} style={{ ...btn(true), padding: "6px 16px", fontSize: "0.78rem", flexShrink: 0 }}>
-                  {adding ? "Adding…" : "Add"}
-                </button>
-                {addMsg && <span style={{ fontSize: "0.75rem", color: addMsg.startsWith("✓") ? "#4ade80" : "#f09595" }}>{addMsg}</span>}
-              </div>
+              <Card style={{ marginBottom: "1rem" }}>
+                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" as const }}>
+                  <Label style={{ flexShrink: 0 }}>Add member manually</Label>
+                  <Input value={addEmail} onChange={(e) => { setAddEmail(e.target.value); setAddMsg(""); }}
+                    onKeyDown={(e) => e.key === "Enter" && addUser()}
+                    placeholder="Email address" style={{ flex: 1, minWidth: "180px" }} />
+                  <Button size="sm" loading={adding} disabled={!addEmail.trim()} onClick={addUser}>Add</Button>
+                  {addMsg && <Badge color={addMsg.startsWith("✓") ? "green" : "red"}>{addMsg}</Badge>}
+                </div>
+              </Card>
 
               {/* Stats row */}
-              <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
-                {[
-                  { label: "Registered users at location", value: attendees.length },
-                  { label: "Attended",   value: attendCount },
-                  { label: "Points synced", value: syncedCount },
-                ].map((s) => (
-                  <div key={s.label} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", padding: "0.75rem 1.25rem", minWidth: "130px" }}>
-                    <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#e8620a" }}>{s.value}</div>
-                    <div style={{ fontSize: "10px", color: "#666", textTransform: "uppercase", letterSpacing: "0.06em" }}>{s.label}</div>
-                  </div>
-                ))}
+              <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" as const }}>
+                <StatCard label="Registered at location" value={attendees.length} />
+                <StatCard label="Attended" value={attendCount} />
+                <StatCard label="Points synced" value={syncedCount} />
               </div>
 
               {/* Bulk actions */}
               {attendees.length > 0 && (
-                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.75rem", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "10px", color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", marginRight: "4px" }}>Bulk:</span>
-                  <button onClick={markAllPresent} style={{ ...btn(true), padding: "6px 16px", fontSize: "0.78rem" }}>✓ Mark all present</button>
-                  <button onClick={markAllAbsent}  style={{ ...btn(false), padding: "6px 16px", fontSize: "0.78rem" }}>✗ Mark all absent</button>
+                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.75rem", flexWrap: "wrap" as const }}>
+                  <Label>Bulk:</Label>
+                  <Button size="sm" onClick={markAllPresent}>✓ Mark all present</Button>
+                  <Button size="sm" variant="secondary" onClick={markAllAbsent}>✗ Mark all absent</Button>
                 </div>
               )}
 
               {/* Attendance table */}
               {attendees.length === 0 ? (
-                <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", padding: "3rem", textAlign: "center", color: "#555", fontSize: "0.875rem" }}>
-                  No registered users found at <strong style={{ color: "#888" }}>{selected.location}</strong>.<br />
-                  <span style={{ fontSize: "0.75rem" }}>Make sure the session location matches the location users registered with.</span>
-                </div>
+                <EmptyState title={`No registered users at ${selected.location}`}
+                  body="Make sure the session location matches the location users registered with." />
               ) : (
                 <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", overflow: "hidden" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -724,8 +634,8 @@ export default function AdminSessionsPage() {
                           {/* Sync status */}
                           <td style={{ padding: "10px 16px", borderBottom: "1px solid rgba(255,255,255,0.04)", textAlign: "center" }}>
                             {a.points_synced
-                              ? <span style={{ fontSize: "0.72rem", color: "#4ade80", fontWeight: 600 }}>✓ Synced</span>
-                              : <span style={{ fontSize: "0.72rem", color: "#555" }}>Pending</span>}
+                              ? <Badge color="green" size="sm">✓ Synced</Badge>
+                              : <Badge color="gray" size="sm">Pending</Badge>}
                           </td>
                         </tr>
                       ))}
@@ -751,57 +661,47 @@ export default function AdminSessionsPage() {
 
     {/* QR Modal */}
     {qrSession && (
-      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: "1.5rem" }}>
-        <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "14px", padding: "2rem", width: "100%", maxWidth: "420px", position: "relative" }}>
-          <button onClick={() => { setQrSession(null); setQrData(null); setQrMsg(""); }}
-            style={{ position: "absolute", top: "1rem", right: "1rem", background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: "1.2rem", lineHeight: 1 }}>✕</button>
-
-          <div style={{ fontSize: "10px", color: "#60a5fa", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.4rem" }}>Attendance QR Code</div>
-          <div style={{ fontSize: "1rem", fontWeight: 600, color: "#fff", marginBottom: "1.5rem" }}>{qrSession.title}</div>
-
-          {qrLoading ? (
-            <div style={{ textAlign: "center", padding: "3rem 0", color: "#666" }}>Loading…</div>
-          ) : qrData ? (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
-              <div style={{ background: "#fff", borderRadius: "12px", padding: "12px", display: "inline-block" }}>
-                <img src={qrData.data_url} alt="QR Code" style={{ width: 240, height: 240, display: "block" }} />
-              </div>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: "0.78rem", color: "#888", marginBottom: "4px" }}>Expires</div>
-                <div style={{ fontSize: "0.9rem", color: new Date(qrData.expires_at) < new Date() ? "#f09595" : "#4ade80", fontWeight: 600 }}>
-                  {new Date(qrData.expires_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {new Date(qrData.expires_at).toLocaleDateString()}
-                </div>
-                {new Date(qrData.expires_at) < new Date() && (
-                  <div style={{ fontSize: "0.75rem", color: "#f09595", marginTop: "4px" }}>This QR has expired — generate a new one</div>
-                )}
-              </div>
-              <div style={{ width: "100%", background: "rgba(255,255,255,0.04)", borderRadius: "8px", padding: "8px 12px", display: "flex", alignItems: "center", gap: "8px", justifyContent: "space-between" }}>
-                <span style={{ fontSize: "0.7rem", color: "#666", wordBreak: "break-all" }}>{qrData.scan_url}</span>
-                <button onClick={() => navigator.clipboard.writeText(qrData.scan_url)}
-                  style={{ background: "none", border: "none", color: "#60a5fa", cursor: "pointer", fontSize: "0.75rem", flexShrink: 0 }}>Copy</button>
-              </div>
-            </div>
-          ) : (
-            <div style={{ textAlign: "center", padding: "2rem 0" }}>
-              <div style={{ fontSize: "0.85rem", color: "#888", marginBottom: "1.5rem" }}>No QR generated yet for this session.</div>
-            </div>
-          )}
-
-          {qrMsg && (
-            <div style={{ marginTop: "1rem", fontSize: "0.8rem", color: qrMsg.includes("failed") || qrMsg.includes("Failed") ? "#f09595" : "#4ade80", textAlign: "center" }}>{qrMsg}</div>
-          )}
-
-          <div style={{ marginTop: "1.5rem", display: "flex", gap: "0.75rem" }}>
-            <button onClick={generateQR} disabled={qrLoading}
-              style={{ ...btn(true), flex: 1, padding: "10px" }}>
-              {qrLoading ? "Generating…" : qrData ? "Regenerate QR" : "Generate QR"}
-            </button>
+      <Modal open onClose={() => { setQrSession(null); setQrData(null); setQrMsg(""); }}
+        title={qrSession.title} maxWidth={420}
+        footer={
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <Button fullWidth loading={qrLoading} onClick={generateQR}>
+              {qrData ? "Regenerate QR" : "Generate QR"}
+            </Button>
+            <p style={{ fontSize: "10px", color: "#555", textAlign: "center", margin: 0 }}>
+              QR is valid for 90 minutes. Members scan with their phone camera to auto-record attendance.
+            </p>
           </div>
-          <div style={{ marginTop: "0.75rem", fontSize: "10px", color: "#555", textAlign: "center" }}>
-            QR is valid for 90 minutes. Members scan with their phone camera to auto-record attendance.
+        }>
+        <Badge color="blue" style={{ marginBottom: "1rem" }}>Attendance QR Code</Badge>
+        {qrLoading ? (
+          <div style={{ textAlign: "center", padding: "3rem 0", color: "#666" }}>Loading…</div>
+        ) : qrData ? (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+            <div style={{ background: "#fff", borderRadius: "12px", padding: "12px", display: "inline-block" }}>
+              <img src={qrData.data_url} alt="QR Code" style={{ width: 240, height: 240, display: "block" }} />
+            </div>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "0.78rem", color: "#888", marginBottom: "4px" }}>Expires</div>
+              <div style={{ fontSize: "0.9rem", color: new Date(qrData.expires_at) < new Date() ? "#f09595" : "#4ade80", fontWeight: 600 }}>
+                {new Date(qrData.expires_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {new Date(qrData.expires_at).toLocaleDateString()}
+              </div>
+              {new Date(qrData.expires_at) < new Date() && (
+                <Alert variant="error" style={{ marginTop: "4px" }}>This QR has expired — generate a new one</Alert>
+              )}
+            </div>
+            <div style={{ width: "100%", background: "rgba(255,255,255,0.04)", borderRadius: "8px", padding: "8px 12px", display: "flex", alignItems: "center", gap: "8px", justifyContent: "space-between" }}>
+              <span style={{ fontSize: "0.7rem", color: "#666", wordBreak: "break-all" as const }}>{qrData.scan_url}</span>
+              <Button size="xs" variant="ghost" onClick={() => navigator.clipboard.writeText(qrData!.scan_url)}>Copy</Button>
+            </div>
           </div>
-        </div>
-      </div>
+        ) : (
+          <EmptyState title="No QR generated yet" body="Generate a QR code for this session." />
+        )}
+        {qrMsg && (
+          <Alert variant={qrMsg.includes("failed") || qrMsg.includes("Failed") ? "error" : "success"} style={{ marginTop: "1rem" }}>{qrMsg}</Alert>
+        )}
+      </Modal>
     )}
     </>
   );
