@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { getLifecycle } from "@/lib/event-lifecycle";
+import { Button, Alert, Badge, Card, EmptyState, Spinner } from "@/components/ui/ds";
 
 // ── Section error boundary ─────────────────────────────────────────────────────
 
@@ -26,10 +27,7 @@ class SectionBoundary extends Component<
         <div style={{ background: "#111", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, padding: "1rem 1.25rem", marginBottom: 16 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#f87171", marginBottom: 4 }}>⚠ Unable to load: {this.props.title}</div>
           <div style={{ fontSize: 11, color: "#555" }}>{this.state.msg}</div>
-          <button onClick={() => this.setState({ caught: false, msg: "" })}
-            style={{ marginTop: 8, fontSize: 11, color: "#e8620a", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: 0 }}>
-            Retry
-          </button>
+          <Button size="xs" variant="ghost" style={{ marginTop: 8 }} onClick={() => this.setState({ caught: false, msg: "" })}>Retry</Button>
         </div>
       );
     }
@@ -115,7 +113,7 @@ function getBadge(ev: EventOverview["event"]) {
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
-function StatCard({ label, value, color = "#fff", accent = false }: { label: string; value: string | number; color?: string; accent?: boolean }) {
+function EventStatCard({ label, value, color = "#fff", accent = false }: { label: string; value: string | number; color?: string; accent?: boolean }) {
   return (
     <div style={{ background: accent ? `${color}0d` : "#111", border: `1px solid ${accent ? `${color}22` : "rgba(255,255,255,0.07)"}`, borderRadius: 10, padding: "0.85rem 1rem" }}>
       <div style={{ fontSize: "1.4rem", fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
@@ -198,21 +196,14 @@ export default function EventManagePage() {
 
   // ── Loading ──────────────────────────────────────────────────────────────────
 
-  if (loading) return (
-    <div style={{ padding: "3rem 2rem", textAlign: "center", color: "#555", fontSize: 13 }}>
-      Loading event…
-    </div>
-  );
+  if (loading) return <div style={{ padding: "3rem 2rem", textAlign: "center" }}><Spinner /></div>;
 
   if (error || !data?.event) return (
     <div style={{ padding: "3rem 2rem", textAlign: "center" }}>
-      <div style={{ fontSize: 32, marginBottom: 12 }}>😕</div>
-      <div style={{ color: "#f87171", marginBottom: 8, fontSize: 14 }}>{error || "Event not found"}</div>
+      <Alert variant="error" style={{ marginBottom: 12 }}>{error || "Event not found"}</Alert>
       <Link href="/admin/events" style={{ color: "#e8620a", fontSize: 13, textDecoration: "none" }}>← All Events</Link>
       <div style={{ marginTop: 12 }}>
-        <button onClick={load} style={{ fontSize: 12, color: "#666", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "5px 12px", cursor: "pointer", fontFamily: "inherit" }}>
-          Retry
-        </button>
+        <Button size="sm" variant="secondary" onClick={load}>Retry</Button>
       </div>
     </div>
   );
@@ -264,10 +255,8 @@ export default function EventManagePage() {
           {(ev.distance_categories?.length ?? 0) > 0 && (
             <div style={{ fontSize: 10, color: "#e8620a", marginTop: 3 }}>{ev.distance_categories!.join(" · ")}</div>
           )}
-          <div style={{ marginTop: 8, display: "flex", gap: 4, flexWrap: "wrap" as const }}>
-            <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 999, background: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}>
-              {badge.label}
-            </span>
+          <div style={{ marginTop: 8 }}>
+            <Badge size="sm" style={{ background: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}>{badge.label}</Badge>
           </div>
         </div>
 
@@ -291,7 +280,7 @@ export default function EventManagePage() {
 
         {/* Footer */}
         <div style={{ padding: "8px 14px", borderTop: "1px solid rgba(255,255,255,0.05)", flexShrink: 0, display: "flex", flexDirection: "column", gap: 4 }}>
-          <button onClick={load} style={{ fontSize: 10, color: "#444", background: "none", border: "none", cursor: "pointer", textAlign: "left", fontFamily: "inherit", padding: 0 }}>↻ Refresh</button>
+          <Button size="xs" variant="ghost" onClick={load}>↻ Refresh</Button>
         </div>
       </aside>
 
@@ -313,19 +302,16 @@ export default function EventManagePage() {
           <span style={{ fontWeight: 700, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{ev.title}</span>
           <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
             {ev.share_slug && (
-              <Link href={`/events/${ev.share_slug}`} target="_blank"
-                style={{ padding: "4px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#888", fontSize: 11, fontWeight: 600, textDecoration: "none" }}>
-                Preview ↗
+              <Link href={`/events/${ev.share_slug}`} target="_blank">
+                <Button size="xs" variant="ghost">Preview ↗</Button>
               </Link>
             )}
-            <Link href={`/admin/events/new?edit=${eventId}`}
-              style={{ padding: "4px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#888", fontSize: 11, fontWeight: 600, textDecoration: "none" }}>
-              Edit
+            <Link href={`/admin/events/new?edit=${eventId}`}>
+              <Button size="xs" variant="secondary">Edit</Button>
             </Link>
-            <button onClick={togglePublish}
-              style={{ padding: "4px 12px", background: isPub ? "rgba(239,68,68,0.12)" : "#e8620a", border: "none", borderRadius: 6, color: isPub ? "#f87171" : "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+            <Button size="xs" variant={isPub ? "danger" : "primary"} onClick={togglePublish}>
               {isPub ? "Unpublish" : "Publish"}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -345,13 +331,13 @@ export default function EventManagePage() {
                     </div>
                   } />
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 10 }}>
-                    <StatCard label="Total"      value={fmt(reg.total)}      />
-                    <StatCard label="Confirmed"  value={fmt(reg.confirmed)}  color="#4ade80" accent />
-                    <StatCard label="Paid"       value={fmt(reg.paid)}       color="#4ade80" />
-                    <StatCard label="Free"       value={fmt(reg.free)}       color="#60a5fa" />
-                    <StatCard label="Pending"    value={fmt(reg.pending)}    color={reg.pending > 0 ? "#fbbf24" : "#555"} accent={reg.pending > 0} />
-                    <StatCard label="Checked In" value={fmt(reg.checked_in)} color="#a78bfa" accent />
-                    <StatCard label="Cancelled"  value={fmt(reg.cancelled)}  color={reg.cancelled > 0 ? "#f87171" : "#555"} />
+                    <EventStatCard label="Total"      value={fmt(reg.total)}      />
+                    <EventStatCard label="Confirmed"  value={fmt(reg.confirmed)}  color="#4ade80" accent />
+                    <EventStatCard label="Paid"       value={fmt(reg.paid)}       color="#4ade80" />
+                    <EventStatCard label="Free"       value={fmt(reg.free)}       color="#60a5fa" />
+                    <EventStatCard label="Pending"    value={fmt(reg.pending)}    color={reg.pending > 0 ? "#fbbf24" : "#555"} accent={reg.pending > 0} />
+                    <EventStatCard label="Checked In" value={fmt(reg.checked_in)} color="#a78bfa" accent />
+                    <EventStatCard label="Cancelled"  value={fmt(reg.cancelled)}  color={reg.cancelled > 0 ? "#f87171" : "#555"} />
                   </div>
                 </div>
               </SectionBoundary>
@@ -384,8 +370,8 @@ export default function EventManagePage() {
                 <div style={{ marginBottom: 18 }}>
                   <SecHead title="Revenue" />
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                    <StatCard label="Collected" value={fmtInr(rev.collected)} color="#e8620a" accent />
-                    <StatCard label="Pending"   value={fmtInr(rev.pending)}   color={rev.pending > 0 ? "#fbbf24" : "#555"} accent={rev.pending > 0} />
+                    <EventStatCard label="Collected" value={fmtInr(rev.collected)} color="#e8620a" accent />
+                    <EventStatCard label="Pending"   value={fmtInr(rev.pending)}   color={rev.pending > 0 ? "#fbbf24" : "#555"} accent={rev.pending > 0} />
                   </div>
                 </div>
               </SectionBoundary>
@@ -396,10 +382,10 @@ export default function EventManagePage() {
                     <Link href={`/admin/events/${eventId}/communicate`} style={{ fontSize: 11, color: "#e8620a", textDecoration: "none", fontWeight: 600 }}>Open Hub →</Link>
                   } />
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 10, marginBottom: 10 }}>
-                    <StatCard label="Campaigns"   value={fmt(emails.campaigns)}             />
-                    <StatCard label="Confirm. ✓"  value={fmt(emails.confirmation_sent)}   color="#4ade80" accent={emails.confirmation_sent > 0} />
-                    <StatCard label="Confirm. ✗"  value={fmt(emails.confirmation_failed)} color={emails.confirmation_failed > 0 ? "#f87171" : "#555"} />
-                    <StatCard label="Bulk Sent"   value={fmt(emails.campaign_delivered)}  color="#4ade80" accent={emails.campaign_delivered > 0} />
+                    <EventStatCard label="Campaigns"   value={fmt(emails.campaigns)}             />
+                    <EventStatCard label="Confirm. ✓"  value={fmt(emails.confirmation_sent)}   color="#4ade80" accent={emails.confirmation_sent > 0} />
+                    <EventStatCard label="Confirm. ✗"  value={fmt(emails.confirmation_failed)} color={emails.confirmation_failed > 0 ? "#f87171" : "#555"} />
+                    <EventStatCard label="Bulk Sent"   value={fmt(emails.campaign_delivered)}  color="#4ade80" accent={emails.campaign_delivered > 0} />
                   </div>
                   {data.recent_comms.length > 0 && (
                     <div style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, overflow: "hidden" }}>
@@ -433,10 +419,11 @@ export default function EventManagePage() {
                       { label: "Register Walk-in", icon: "➕", href: `/admin/events/${eventId}/registrations?action=register` },
                       { label: "Edit Event",       icon: "✏️", href: `/admin/events/new?edit=${eventId}`      },
                     ].map(a => (
-                      <Link key={a.label} href={a.href}
-                        style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, padding: "0.9rem 0.5rem", background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, textDecoration: "none" }}>
-                        <span style={{ fontSize: 18 }}>{a.icon}</span>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: "#777", textAlign: "center" as const }}>{a.label}</span>
+                      <Link key={a.label} href={a.href} style={{ textDecoration: "none" }}>
+                        <Card hoverable style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, padding: "0.9rem 0.5rem" }}>
+                          <span style={{ fontSize: 18 }}>{a.icon}</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: "#777", textAlign: "center" as const }}>{a.label}</span>
+                        </Card>
                       </Link>
                     ))}
                   </div>
@@ -451,11 +438,8 @@ export default function EventManagePage() {
               <div style={{ maxWidth: 780 }}>
                 <SecHead title={`Races (${races.length})`} action={<Link href={`/admin/events/new?edit=${eventId}`} style={{ fontSize: 11, color: "#e8620a", textDecoration: "none", fontWeight: 600 }}>Edit in wizard →</Link>} />
                 {races.length === 0 ? (
-                  <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "3rem", textAlign: "center" as const }}>
-                    <div style={{ fontSize: 32, marginBottom: 10 }}>🏁</div>
-                    <div style={{ fontSize: 13, color: "#555" }}>No races configured.</div>
-                    <Link href={`/admin/events/new?edit=${eventId}`} style={{ fontSize: 12, color: "#e8620a", textDecoration: "none", fontWeight: 600, display: "inline-block", marginTop: 10 }}>Add races →</Link>
-                  </div>
+                  <EmptyState icon="🏁" title="No races configured."
+                    action={<Link href={`/admin/events/new?edit=${eventId}`}><Button size="sm" variant="outline">Add races →</Button></Link>} />
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     {races.map(r => (
@@ -485,8 +469,8 @@ export default function EventManagePage() {
               <div style={{ maxWidth: 580 }}>
                 <SecHead title="Finance Summary" />
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-                  <StatCard label="Collected" value={fmtInr(rev.collected)} color="#e8620a" accent />
-                  <StatCard label="Pending"   value={fmtInr(rev.pending)}   color={rev.pending > 0 ? "#fbbf24" : "#555"} />
+                  <EventStatCard label="Collected" value={fmtInr(rev.collected)} color="#e8620a" accent />
+                  <EventStatCard label="Pending"   value={fmtInr(rev.pending)}   color={rev.pending > 0 ? "#fbbf24" : "#555"} />
                 </div>
                 <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, overflow: "hidden" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -539,9 +523,9 @@ export default function EventManagePage() {
                     </Link>
                   ))}
                   <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-                    <button onClick={duplicateEvent} style={{ width: "100%", padding: "11px 14px", background: "rgba(96,165,250,0.06)", border: "1px solid rgba(96,165,250,0.18)", borderRadius: 10, color: "#60a5fa", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", textAlign: "left" as const }}>📋 Duplicate Event</button>
-                    <button onClick={archiveEvent}   style={{ width: "100%", padding: "11px 14px", background: "rgba(107,114,128,0.06)", border: "1px solid rgba(107,114,128,0.18)", borderRadius: 10, color: "#9ca3af", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", textAlign: "left" as const }}>{ev.status === "archived" ? "♻️ Restore Event" : "📦 Archive Event"}</button>
-                    <button onClick={togglePublish}  style={{ width: "100%", padding: "11px 14px", background: isPub ? "rgba(239,68,68,0.08)" : "rgba(74,222,128,0.08)", border: `1px solid ${isPub ? "rgba(239,68,68,0.2)" : "rgba(74,222,128,0.2)"}`, borderRadius: 10, color: isPub ? "#f87171" : "#4ade80", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", textAlign: "left" as const }}>{isPub ? "⛔ Unpublish" : "🚀 Publish"}</button>
+                    <Button variant="ghost" fullWidth onClick={duplicateEvent}>📋 Duplicate Event</Button>
+                    <Button variant="secondary" fullWidth onClick={archiveEvent}>{ev.status === "archived" ? "♻️ Restore Event" : "📦 Archive Event"}</Button>
+                    <Button variant={isPub ? "danger" : "primary"} fullWidth onClick={togglePublish}>{isPub ? "⛔ Unpublish" : "🚀 Publish"}</Button>
                   </div>
                 </div>
               </div>
