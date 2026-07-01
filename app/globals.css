@@ -1474,3 +1474,147 @@ select.auth-input option {
   background: rgba(255,255,255,0.07);
   color: var(--foreground);
 }
+
+/* ═══════════════════════════════════════════════════════
+   COMMUNITY HIGHLIGHTS — mobile-first responsive layout
+   ═══════════════════════════════════════════════════════ */
+
+/* Hero: 16:9 on desktop, capped at 45vh on mobile so it
+   doesn't take up the full viewport */
+.cs-ch-hero-wrap {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  cursor: pointer;
+  background: rgba(255,255,255,0.04);
+}
+@media (max-width: 480px) {
+  .cs-ch-hero-wrap {
+    aspect-ratio: unset;
+    max-height: 44vh;
+    min-height: 180px;
+  }
+}
+
+/* Cards strip: 3-col grid on desktop, horizontal scroll on mobile */
+.cs-ch-cards-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+@media (max-width: 640px) {
+  .cs-ch-cards-strip {
+    display: flex;
+    overflow-x: auto;
+    gap: 10px;
+    padding-bottom: 6px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    /* add visible left padding so first card aligns with content */
+    margin-left: -14px;
+    margin-right: -14px;
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .cs-ch-cards-strip::-webkit-scrollbar { display: none; }
+}
+
+/* Each card wrapper: auto sizing on desktop, fixed width on mobile */
+.cs-ch-card-item {
+  min-width: 0; /* prevent grid blowout */
+}
+@media (max-width: 640px) {
+  .cs-ch-card-item {
+    flex-shrink: 0;
+    width: min(62vw, 200px);
+    scroll-snap-align: start;
+  }
+}
+
+/* Scroll hint on mobile — fades out after first interaction */
+.cs-ch-scroll-hint {
+  display: none;
+}
+@media (max-width: 640px) {
+  .cs-ch-scroll-hint {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 9px;
+    color: rgba(255,255,255,0.3);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   RUNNING ANIMATIONS — scroll-triggered fitness elements
+   ═══════════════════════════════════════════════════════ */
+
+@keyframes cs-run-across {
+  0%   { transform: translateX(-80px) scaleX(1);  opacity: 0; }
+  10%  { opacity: 0.4; }
+  90%  { opacity: 0.4; }
+  100% { transform: translateX(calc(100vw + 80px)) scaleX(1); opacity: 0; }
+}
+@keyframes cs-run-across-rtl {
+  0%   { transform: translateX(calc(100vw + 80px)) scaleX(-1); opacity: 0; }
+  10%  { opacity: 0.3; }
+  90%  { opacity: 0.3; }
+  100% { transform: translateX(-80px) scaleX(-1); opacity: 0; }
+}
+@keyframes cs-float-up {
+  0%   { transform: translateY(0)    scale(1);    opacity: 0.6; }
+  50%  { transform: translateY(-14px) scale(1.05); opacity: 0.9; }
+  100% { transform: translateY(0)    scale(1);    opacity: 0.6; }
+}
+@keyframes cs-heartbeat {
+  0%, 100% { transform: scale(1); }
+  15%       { transform: scale(1.18); }
+  30%       { transform: scale(1); }
+  45%       { transform: scale(1.12); }
+  60%       { transform: scale(1); }
+}
+@keyframes cs-distance-line {
+  from { width: 0; }
+  to   { width: 100%; }
+}
+@keyframes cs-footstep-fade {
+  0%   { opacity: 0;   transform: scale(0.7) rotate(-10deg); }
+  30%  { opacity: 0.5; transform: scale(1)   rotate(0deg); }
+  70%  { opacity: 0.5; }
+  100% { opacity: 0;   transform: scale(0.9) rotate(5deg); }
+}
+
+.cs-runner-silhouette {
+  position: fixed;
+  pointer-events: none;
+  z-index: 0;
+  font-size: 28px;
+  line-height: 1;
+  will-change: transform, opacity;
+}
+.cs-runner-silhouette.cs-run-ltr {
+  animation: cs-run-across 9s linear forwards;
+}
+.cs-runner-silhouette.cs-run-rtl {
+  animation: cs-run-across-rtl 11s linear forwards;
+}
+
+.cs-float-icon {
+  pointer-events: none;
+  will-change: transform, opacity;
+  animation: cs-float-up 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cs-runner-silhouette,
+  .cs-float-icon {
+    animation: none !important;
+    opacity: 0 !important;
+  }
+  @keyframes cs-distance-line { from { width: 0; } to { width: 0; } }
+}

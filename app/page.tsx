@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Navbar               from "@/components/layout/Navbar";
 import Footer               from "@/components/layout/Footer";
 import FloatingContact      from "@/components/layout/FloatingContact";
@@ -15,9 +16,19 @@ import FAQ                  from "@/components/home/FAQ";
 import FinalCTA             from "@/components/home/FinalCTA";
 import { SectionReveal }    from "@/components/home/SectionReveal";
 
+// RunningAnimations uses useScroll + fixed-position overlays — load client-only
+// so SSR never tries to read scrollY or matchMedia
+const RunningAnimations = dynamic(
+  () => import("@/components/home/RunningAnimations"),
+  { ssr: false },
+);
+
 export default function HomePage() {
   return (
     <>
+      {/* Scroll-triggered fitness animations (decorative, client-only) */}
+      <RunningAnimations />
+
       <Navbar />
 
       {/* 1 · Hero — full-viewport entry point */}
