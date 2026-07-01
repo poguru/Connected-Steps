@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { Card, Button, Alert, Badge, EmptyState, Spinner } from "@/components/ui/ds";
 
 interface EventSummary {
   id:                string;
@@ -80,12 +81,9 @@ export default function AdminEventRegistrationsIndex() {
           Event Registrations
         </h1>
 
-        {loading && <div style={{ textAlign: "center", padding: "4rem", color: "#555" }}>Loading events…</div>}
-        {error   && <div style={{ color: "#f87171", padding: "1rem" }}>{error}</div>}
-
-        {!loading && events.length === 0 && (
-          <div style={{ textAlign: "center", padding: "4rem", color: "#555" }}>No events found.</div>
-        )}
+        {loading && <div style={{ textAlign: "center", padding: "4rem" }}><Spinner /></div>}
+        {error   && <Alert variant="error">{error}</Alert>}
+        {!loading && events.length === 0 && <EmptyState title="No events found." />}
 
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           {events.map(ev => {
@@ -94,14 +92,12 @@ export default function AdminEventRegistrationsIndex() {
             const left   = ev.max_participants != null ? ev.max_participants - (ev.participant_count ?? 0) : null;
 
             return (
-              <div key={ev.id} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem 1.5rem" }}>
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+              <Card key={ev.id}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap" as const, gap: 12 }}>
                   <div style={{ flex: 1, minWidth: 200 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                       <span style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{ev.title}</span>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: badge.color, background: `${badge.color}18`, border: `1px solid ${badge.color}30`, padding: "1px 8px", borderRadius: 999 }}>
-                        {badge.label}
-                      </span>
+                      <Badge size="sm" style={{ color: badge.color, background: `${badge.color}18`, borderColor: `${badge.color}30` }}>{badge.label}</Badge>
                     </div>
                     <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>
                       📅 {fmtDate(ev.start_date)} &nbsp;·&nbsp; 📍 {ev.location}
@@ -113,25 +109,14 @@ export default function AdminEventRegistrationsIndex() {
                     )}
                   </div>
 
-                  {/* Stats */}
                   {s ? (
-                    <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
-                      <div style={{ textAlign: "center" }}>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{s.total}</div>
-                        <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase" }}>Total</div>
-                      </div>
-                      <div style={{ textAlign: "center" }}>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: "#4ade80" }}>{s.paid}</div>
-                        <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase" }}>Paid</div>
-                      </div>
-                      <div style={{ textAlign: "center" }}>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: "#60a5fa" }}>{s.free}</div>
-                        <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase" }}>Free</div>
-                      </div>
-                      <div style={{ textAlign: "center" }}>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: "#eab308" }}>{s.pending}</div>
-                        <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase" }}>Pending</div>
-                      </div>
+                    <div style={{ display: "flex", gap: 16, flexWrap: "wrap" as const, alignItems: "center" }}>
+                      {[{ v: s.total, l: "Total", c: "#fff" }, { v: s.paid, l: "Paid", c: "#4ade80" }, { v: s.free, l: "Free", c: "#60a5fa" }, { v: s.pending, l: "Pending", c: "#eab308" }].map(x => (
+                        <div key={x.l} style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: x.c }}>{x.v}</div>
+                          <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase" }}>{x.l}</div>
+                        </div>
+                      ))}
                       <div style={{ textAlign: "center" }}>
                         <div style={{ fontSize: 16, fontWeight: 800, color: "#e8620a" }}>₹{s.revenue.toLocaleString("en-IN")}</div>
                         <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase" }}>Revenue</div>
@@ -141,12 +126,11 @@ export default function AdminEventRegistrationsIndex() {
                     <div style={{ fontSize: 12, color: "#555" }}>No registrations yet</div>
                   )}
 
-                  <Link href={`/admin/events/${ev.id}/registrations`}
-                    style={{ display: "inline-block", padding: "8px 20px", background: "#e8620a", color: "#fff", borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: "none", flexShrink: 0 }}>
-                    View Registrations →
+                  <Link href={`/admin/events/${ev.id}/registrations`}>
+                    <Button size="sm">View Registrations →</Button>
                   </Link>
                 </div>
-              </div>
+              </Card>
             );
           })}
         </div>
