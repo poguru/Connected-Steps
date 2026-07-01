@@ -5,6 +5,8 @@ import Link from "next/link";
 import Image from "next/image";
 import SessionShareSheet from "@/components/ui/SessionShareSheet";
 import { Card, Button, Input, Label, Alert, Badge, Modal, EmptyState, StatCard } from "@/components/ui/ds";
+import dynamic from "next/dynamic";
+const MediaManager = dynamic(() => import("@/components/ui/MediaManager"), { ssr: false });
 
 interface Session { id: string; title: string; date: string; time: string; location: string; venue: string; photo_url?: string | null; }
 interface Attendee {
@@ -532,6 +534,25 @@ export default function AdminSessionsPage() {
                   </div>
                   {photoMsg && <Alert variant={photoMsg.startsWith("Error") ? "error" : "success"}>{photoMsg}</Alert>}
                 </div>
+
+                {/* ── Media Manager (photos + videos) ── */}
+                <details style={{ marginTop: "0.5rem" }}>
+                  <summary style={{
+                    cursor: "pointer", userSelect: "none" as const,
+                    fontSize: "0.78rem", fontWeight: 700, color: "var(--cs-orange)",
+                    padding: "6px 0", listStyle: "none",
+                    display: "flex", alignItems: "center", gap: 6,
+                  }}>
+                    🎬 Media Manager (photos &amp; videos)
+                  </summary>
+                  <div style={{ marginTop: "0.75rem" }}>
+                    <MediaManager
+                      sessionId={selected.id}
+                      uploaderEmail="admin@connectedsteps.in"
+                      onChange={() => {/* media changed — could reload session */}}
+                    />
+                  </div>
+                </details>
 
                 <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" as const, alignItems: "center" }}>
                   <Button variant="secondary" onClick={() => setShareSession(selected)}>↗ Share Session</Button>
