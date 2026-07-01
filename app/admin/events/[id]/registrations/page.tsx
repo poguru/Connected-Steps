@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import QRScannerModal from "@/components/ui/QRScannerModal";
+import { Card, Button, Input, Label, Alert, Badge, Tabs, EmptyState, StatCard, Modal } from "@/components/ui/ds";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -55,17 +56,12 @@ const RECIPIENT_LABELS: Record<RecipientFilter, string> = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const S: Record<string, React.CSSProperties> = {
-  card:  { background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "1.25rem" },
   input: { padding: "9px 13px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#fff", fontSize: "0.85rem", outline: "none", fontFamily: "inherit", width: "100%", boxSizing: "border-box" as const },
 };
 
-function btnStyle(active = true): React.CSSProperties {
-  return { padding: "9px 20px", background: active ? "#e8620a" : "rgba(255,255,255,0.06)", border: "none", borderRadius: 6, color: active ? "#fff" : "#888", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer", fontFamily: "inherit" };
-}
-
 function payBadge(s: string) {
-  const c = s === "paid" ? "#4ade80" : s === "free" ? "#60a5fa" : s === "pending" ? "#eab308" : "#888";
-  return <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: 999, background: `${c}18`, border: `1px solid ${c}30`, color: c, fontWeight: 700 }}>{s.toUpperCase()}</span>;
+  const color = s === "paid" ? "green" : s === "free" ? "blue" : s === "pending" ? "yellow" : "gray";
+  return <Badge color={color as "green" | "blue" | "yellow" | "gray"} size="sm">{s.toUpperCase()}</Badge>;
 }
 
 function fmtDate(d: string) {
@@ -378,35 +374,21 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
         <span style={{ color: "#888", fontSize: "0.85rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>
           Registrations{eventTitle ? ` — ${eventTitle}` : ""}
         </span>
-        <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          {genResult && <span style={{ fontSize: "0.72rem", color: genResult.startsWith("✅") ? "#4ade80" : "#f87171" }}>{genResult}</span>}
-          <button onClick={generateMissingQR} disabled={genLoading}
-            style={{ padding: "6px 12px", background: genLoading ? "#1a1a1a" : "rgba(74,222,128,0.12)", border: "1px solid rgba(74,222,128,0.3)", borderRadius: 6, color: genLoading ? "#444" : "#4ade80", cursor: genLoading ? "not-allowed" : "pointer", fontSize: "0.78rem", fontFamily: "inherit", fontWeight: 600, whiteSpace: "nowrap" }}>
-            {genLoading ? "Generating…" : "⚡ Generate Missing QR"}
-          </button>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" as const }}>
+          {genResult && <Badge color={genResult.startsWith("✅") ? "green" : "red"} size="sm">{genResult}</Badge>}
+          <Button size="sm" variant="ghost" loading={genLoading} onClick={generateMissingQR}>⚡ Generate Missing QR</Button>
           {bulkResult && (
             <span style={{ fontSize: "0.75rem", color: "#aaa" }}>
               ✅ {bulkResult.sent} &nbsp;❌ {bulkResult.failed} &nbsp;⏭ {bulkResult.skipped}
-              {bulkResult.details.length > 0 && <button onClick={() => setShowDetails(s => !s)} style={{ marginLeft: 8, background: "none", border: "none", color: "#e8620a", cursor: "pointer", fontSize: "0.72rem", fontFamily: "inherit" }}>{showDetails ? "Hide" : "View"} details</button>}
+              {bulkResult.details.length > 0 && <Button size="xs" variant="ghost" style={{ marginLeft: 8 }} onClick={() => setShowDetails(s => !s)}>{showDetails ? "Hide" : "View"} details</Button>}
             </span>
           )}
           {bulkResult && bulkResult.failed > 0 && (
-            <button onClick={() => resendAllQR(true)} disabled={bulkSending}
-              style={{ padding: "6px 12px", background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 6, color: "#f87171", cursor: "pointer", fontSize: "0.78rem", fontFamily: "inherit", fontWeight: 600 }}>
-              🔁 Retry {bulkResult.failed} Failed
-            </button>
+            <Button size="sm" variant="danger" loading={bulkSending} onClick={() => resendAllQR(true)}>🔁 Retry {bulkResult.failed} Failed</Button>
           )}
-          <button onClick={() => resendAllQR(false)} disabled={bulkSending}
-            style={{ padding: "6px 14px", background: bulkSending ? "#1a1a1a" : "rgba(96,165,250,0.15)", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 6, color: bulkSending ? "#444" : "#60a5fa", cursor: bulkSending ? "not-allowed" : "pointer", fontSize: "0.8rem", fontFamily: "inherit", fontWeight: 600 }}>
-            {bulkSending ? "Sending (batches of 10)…" : "📧 Resend QR to All"}
-          </button>
-          <button onClick={() => { setRegModal(true); setRegResult(null); }}
-            style={{ padding: "6px 14px", background: "#e8620a", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: "0.8rem", fontFamily: "inherit", fontWeight: 700, whiteSpace: "nowrap" }}>
-            + Register Participant
-          </button>
-          <button onClick={exportCSV} style={{ padding: "6px 16px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: "0.8rem", fontFamily: "inherit" }}>
-            Export CSV
-          </button>
+          <Button size="sm" variant="secondary" loading={bulkSending} onClick={() => resendAllQR(false)}>📧 Resend QR to All</Button>
+          <Button size="sm" onClick={() => { setRegModal(true); setRegResult(null); }}>+ Register Participant</Button>
+          <Button size="sm" variant="ghost" onClick={exportCSV}>Export CSV</Button>
         </div>
       </header>
 
@@ -414,7 +396,7 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
 
         {/* Email send details panel */}
         {showDetails && bulkResult && bulkResult.details.length > 0 && (
-          <div style={{ ...S.card, marginBottom: "1.5rem", borderColor: "rgba(96,165,250,0.2)" }}>
+          <div style={{ background: "#111", border: "1px solid rgba(96,165,250,0.2)", borderRadius: 10, padding: "1.25rem", marginBottom: "1.5rem" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
               <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#fff" }}>Email Send Results</div>
               {bulkResult.failed > 0 && (
@@ -455,55 +437,42 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
         {summary && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px,1fr))", gap: "0.875rem", marginBottom: "1.5rem" }}>
             {[
-              { label: "Total",      value: summary.total,     color: "#fff"     },
-              { label: "Paid",       value: summary.paid,      color: "#4ade80"  },
-              { label: "Free",       value: summary.free,      color: "#60a5fa"  },
-              { label: "Pending",    value: summary.pending,   color: "#eab308"  },
-              { label: "Checked In",       value: summary.checkedIn,       color: "#a78bfa"  },
-              { label: "Breakfast Issued", value: summary.breakfastIssued ?? 0, color: "#34d399"  },
-              { label: "Revenue",    value: `₹${summary.revenue.toLocaleString("en-IN")}`, color: "#e8620a" },
+              { label: "Total",            value: summary.total,                                         color: "#fff"     },
+              { label: "Paid",             value: summary.paid,                                          color: "#4ade80"  },
+              { label: "Free",             value: summary.free,                                          color: "#60a5fa"  },
+              { label: "Pending",          value: summary.pending,                                       color: "#eab308"  },
+              { label: "Checked In",       value: summary.checkedIn,                                     color: "#a78bfa"  },
+              { label: "Breakfast Issued", value: summary.breakfastIssued ?? 0,                          color: "#34d399"  },
+              { label: "Revenue",          value: `₹${summary.revenue.toLocaleString("en-IN")}`,        color: "#e8620a"  },
             ].map(({ label, value, color }) => (
-              <div key={label} style={{ ...S.card, textAlign: "center" }}>
-                <div style={{ fontSize: "1.4rem", fontWeight: 700, color }}>{value}</div>
-                <div style={{ fontSize: "11px", color: "#666", textTransform: "uppercase", letterSpacing: "0.07em", marginTop: 2 }}>{label}</div>
-              </div>
+              <StatCard key={label} label={label} value={value} color={color} />
             ))}
           </div>
         )}
 
         {/* Tabs */}
-        <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.04)", borderRadius: 8, padding: 4, marginBottom: "1.5rem", width: "fit-content" }}>
-          {([
+        <Tabs variant="pill" style={{ marginBottom: "1.5rem" }}
+          tabs={[
             { key: "registrations", label: "Registrations" },
             { key: "waitlist",      label: `📋 Waitlist${waitlist.filter(w => w.status === "waiting").length > 0 ? ` (${waitlist.filter(w => w.status === "waiting").length})` : ""}` },
             { key: "communicate",   label: "📧 Communicate" },
-          ] as { key: Tab; label: string }[]).map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)}
-              style={{ padding: "7px 18px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: "0.82rem", fontWeight: 600, background: tab === t.key ? "#e8620a" : "transparent", color: tab === t.key ? "#fff" : "#666", fontFamily: "inherit" }}>
-              {t.label}
-            </button>
-          ))}
-        </div>
+          ]}
+          active={tab}
+          onChange={(k) => setTab(k as Tab)} />
 
         {/* ══ REGISTRATIONS TAB ══════════════════════════════════════════════ */}
         {tab === "registrations" && (
           <>
             {/* Check-In Scanner */}
-            <div style={{ ...S.card, marginBottom: "1.5rem", borderColor: "rgba(74,222,128,0.2)" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem", flexWrap: "wrap", gap: 8 }}>
+            <Card style={{ marginBottom: "1.5rem", borderColor: "rgba(74,222,128,0.2)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem", flexWrap: "wrap" as const, gap: 8 }}>
                 <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#fff" }}>🔍 Event Check-In Scanner</div>
-                <button onClick={() => { setScanResult(null); setCameraOpen(true); }}
-                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "#e8620a", border: "none", borderRadius: 6, color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: "0.82rem", fontFamily: "inherit" }}>
-                  📷 Open Camera
-                </button>
+                <Button size="sm" onClick={() => { setScanResult(null); setCameraOpen(true); }}>📷 Open Camera</Button>
               </div>
               <form onSubmit={e => { e.preventDefault(); runCheckIn(scanToken); }} style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
                 <input value={scanToken} onChange={e => { setScanToken(e.target.value); setScanResult(null); }} placeholder="Or paste QR token manually…"
                   style={{ ...S.input, flex: "1 1 260px", fontFamily: "monospace", fontSize: "0.78rem" }} />
-                <button type="submit" disabled={scanLoading || !scanToken.trim()}
-                  style={{ padding: "9px 20px", background: "#4ade80", color: "#000", border: "none", borderRadius: 6, fontWeight: 700, cursor: scanLoading ? "not-allowed" : "pointer", fontSize: "0.85rem", fontFamily: "inherit", opacity: scanLoading ? 0.6 : 1 }}>
-                  {scanLoading ? "Checking…" : "Validate & Check In"}
-                </button>
+                <Button type="submit" loading={scanLoading} disabled={!scanToken.trim()}>Validate &amp; Check In</Button>
               </form>
               {scanResult && (
                 <div style={{ marginTop: "0.75rem", padding: "12px 16px", borderRadius: 8, background: scanResult.valid ? (scanResult.already_checked_in ? "rgba(234,179,8,0.1)" : "rgba(74,222,128,0.1)") : "rgba(239,68,68,0.1)", border: `1px solid ${scanResult.valid ? (scanResult.already_checked_in ? "rgba(234,179,8,0.3)" : "rgba(74,222,128,0.3)") : "rgba(239,68,68,0.3)"}` }}>
@@ -513,25 +482,19 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
                   )}
                 </div>
               )}
-            </div>
+            </Card>
 
             {/* ── Breakfast Scanner ── */}
-            <div style={{ ...S.card, marginBottom: "1.5rem", borderColor: "rgba(52,211,153,0.2)" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem", flexWrap: "wrap", gap: 8 }}>
+            <Card style={{ marginBottom: "1.5rem", borderColor: "rgba(52,211,153,0.2)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem", flexWrap: "wrap" as const, gap: 8 }}>
                 <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#fff" }}>🍽️ Breakfast / Refreshment Scanner</div>
-                <button onClick={() => { setBreakfastResult(null); setBreakfastCameraOpen(true); }}
-                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "#34d399", border: "none", borderRadius: "6px", color: "#000", fontWeight: 700, cursor: "pointer", fontSize: "0.82rem", fontFamily: "inherit" }}>
-                  📷 Open Camera
-                </button>
+                <Button size="sm" onClick={() => { setBreakfastResult(null); setBreakfastCameraOpen(true); }}>📷 Open Camera</Button>
               </div>
-              <form onSubmit={e => { e.preventDefault(); handleBreakfastCheckIn(breakfastToken); }} style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+              <form onSubmit={e => { e.preventDefault(); handleBreakfastCheckIn(breakfastToken); }} style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" as const }}>
                 <input value={breakfastToken} onChange={e => { setBreakfastToken(e.target.value); setBreakfastResult(null); }}
                   placeholder="Paste QR token manually…"
                   style={{ ...S.input, flex: "1 1 260px", fontFamily: "monospace", fontSize: "0.78rem" }} />
-                <button type="submit" disabled={breakfastLoading || !breakfastToken.trim()}
-                  style={{ padding: "9px 20px", background: "#34d399", color: "#000", border: "none", borderRadius: "6px", fontWeight: 700, cursor: breakfastLoading ? "not-allowed" : "pointer", fontSize: "0.85rem", fontFamily: "inherit", opacity: breakfastLoading ? 0.6 : 1 }}>
-                  {breakfastLoading ? "Checking…" : "Issue Breakfast"}
-                </button>
+                <Button type="submit" loading={breakfastLoading} disabled={!breakfastToken.trim()}>Issue Breakfast</Button>
               </form>
               {breakfastResult && (
                 <div style={{ marginTop: "0.75rem", padding: "12px 16px", borderRadius: 8,
@@ -548,7 +511,7 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
                   )}
                 </div>
               )}
-            </div>
+            </Card>
 
             {/* Filters */}
             <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.5rem", flexWrap: "wrap", alignItems: "center" }}>
@@ -564,7 +527,7 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
             </div>
 
             {/* Table */}
-            <div style={{ ...S.card, padding: 0, overflow: "hidden" }}>
+            <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: 0, overflow: "hidden" }}>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
                   <thead>
@@ -656,15 +619,13 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
                   {waitlist.filter(w => w.status === "waiting").length} waiting · {waitlist.filter(w => w.status === "approved").length} approved
                 </span>
               </div>
-              <button onClick={loadWaitlist} style={{ ...btnStyle(false), padding: "5px 12px", fontSize: "0.78rem" }}>
-                Refresh
-              </button>
+              <Button size="sm" variant="secondary" onClick={loadWaitlist}>Refresh</Button>
             </div>
 
             {waitlistLoading ? (
-              <div style={{ ...S.card, textAlign: "center", padding: "3rem", color: "#555" }}>Loading waitlist…</div>
+              <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, textAlign: "center", padding: "3rem", color: "#555" }}>Loading waitlist…</div>
             ) : waitlist.length === 0 ? (
-              <div style={{ ...S.card, textAlign: "center", padding: "3rem" }}>
+              <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, textAlign: "center", padding: "3rem" }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
                 <div style={{ fontWeight: 700, color: "#555", marginBottom: 6 }}>No waitlist entries</div>
                 <div style={{ fontSize: 12, color: "#444", lineHeight: 1.6 }}>
@@ -673,7 +634,7 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
                 </div>
               </div>
             ) : (
-              <div style={{ ...S.card, padding: 0, overflow: "hidden" }}>
+              <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: 0, overflow: "hidden" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
                   <thead>
                     <tr style={{ background: "rgba(255,255,255,0.04)" }}>
@@ -745,7 +706,7 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
           <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
 
             {/* Compose */}
-            <div style={S.card}>
+            <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "1.25rem" }}>
               <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#fff", marginBottom: "1rem" }}>📧 Send Email to Registrants</div>
 
               {/* Templates */}
@@ -813,16 +774,15 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
                   </div>
                 )}
 
-                <button type="submit" disabled={sending || !commSubject.trim() || !commBody.trim()}
-                  style={{ ...btnStyle(!sending && !!commSubject.trim() && !!commBody.trim()), alignSelf: "flex-start" }}>
-                  {sending ? "Sending…" : `Send to ${RECIPIENT_LABELS[recipient]}`}
-                </button>
+                <Button type="submit" loading={sending} disabled={!commSubject.trim() || !commBody.trim()}>
+                  {`Send to ${RECIPIENT_LABELS[recipient]}`}
+                </Button>
               </form>
             </div>
 
             {/* Email history */}
             {history.length > 0 && (
-              <div style={S.card}>
+              <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "1.25rem" }}>
                 <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#fff", marginBottom: "1rem" }}>📬 Email History</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {history.map(h => (
