@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import RoiCalculator from "@/components/pricing/RoiCalculator";
-import CoachCarouselSection from "@/components/coaches/CoachCarouselSection";
+import { motion } from "framer-motion";
+import type { MembershipPlan } from "@/app/api/membership-plans/route";
 
 declare global {
   interface Window {
@@ -13,98 +13,137 @@ declare global {
   }
 }
 
-const MONTHLY_RATE = 1200;
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-const plans = [
-  { id: "monthly",   label: "Monthly",   months: 1,  payFor: 1,   badge: null,          popular: false },
-  { id: "quarterly", label: "3 Months",  months: 3,  payFor: 2.5, badge: "Save ₹600",   popular: false },
-  { id: "biannual",  label: "6 Months",  months: 6,  payFor: 5,   badge: "Most Popular", popular: true  },
-  { id: "annual",    label: "12 Months", months: 12, payFor: 9,   badge: "Best Value",  popular: false },
+function fmtPrice(plan: MembershipPlan): string {
+  if (plan.is_contact_only || plan.price === null || plan.price === undefined) return "Contact Us";
+  return `₹${Number(plan.price).toLocaleString("en-IN")}`;
+}
+
+const WHY_ITEMS = [
+  { icon: "🏃", title: "Structured Training",      desc: "Personalised plans built for your goal — 5K, half, or full marathon — updated as you progress." },
+  { icon: "🎖️", title: "NIS-Certified Coaches",   desc: "National-level athletes and certified coaches who have competed and won at the highest levels." },
+  { icon: "👥", title: "Active Community",          desc: "Run with 150+ members every weekend. Real accountability. Real friendships." },
+  { icon: "📊", title: "Leaderboards & Badges",   desc: "Track your sessions, earn points, climb the leaderboard, and celebrate milestones." },
+  { icon: "📍", title: "Weekly Sessions",          desc: "Group runs across multiple locations in Hyderabad — every weekend, rain or shine." },
+  { icon: "💬", title: "Supportive Environment",  desc: "A WhatsApp community that shows up for each other. Ask anything, celebrate everything." },
 ];
 
-// What's FREE vs PREMIUM
-const comparisonRows = [
-  { feature: "Community & leaderboard",       free: true,  premium: true,  note: "" },
-  { feature: "Session discovery",              free: true,  premium: true,  note: "" },
-  { feature: "Attendance points & badges",     free: true,  premium: true,  note: "" },
-  { feature: "Activity feed",                  free: true,  premium: true,  note: "" },
-  { feature: "Group weekend runs",             free: "Pay per run", premium: "Free entry", note: "" },
-  { feature: "Personalised training plan",     free: false, premium: true,  note: "Updated weekly by your coach" },
-  { feature: "Weekly coach check-in",          free: false, premium: true,  note: "WhatsApp, every week" },
-  { feature: "Direct coach access",            free: false, premium: true,  note: "Ask anything, anytime" },
-  { feature: "Full analytics dashboard",       free: false, premium: true,  note: "" },
-  { feature: "Priority support",               free: false, premium: true,  note: "" },
+const TESTIMONIALS = [
+  { name: "Priya M.",   goal: "First 10K finisher",       quote: "I went from zero running experience to finishing a 10K in 8 weeks. The community made all the difference." },
+  { name: "Karthik R.", goal: "Sub-4 marathon",            quote: "Weekly check-ins and a coach who actually listens. Shaved 14 minutes off my PB." },
+  { name: "Ananya S.",  goal: "Lost 8 kg, gained pace",    quote: "More than a running club — it's a full life change. The coaches genuinely care about you." },
 ];
 
-const testimonials = [
-  { name: "Priya M.",   goal: "Ran her first 10K",     quote: "I'd never run a race in my life. 8 weeks with Connected Steps and I finished my first 10K.", rating: 5 },
-  { name: "Karthik R.", goal: "Sub-4 marathon finisher",quote: "The personalised plan and weekly check-ins made all the difference. Best ₹40/day I've ever spent.", rating: 5 },
-  { name: "Ananya S.",  goal: "Lost 8kg, gained pace",  quote: "More than a running club — it's a full transformation programme. The coaches actually care.", rating: 5 },
-];
-
-const afterJoin = [
-  { day: "Within 24h", icon: "💬", title: "Coach reaches out",    desc: "Your NIS-certified coach texts you on WhatsApp, learns your goal and current fitness level." },
-  { day: "Day 3",      icon: "📋", title: "Your plan is ready",   desc: "A personalised 7-day training schedule built for your exact goal lands on your dashboard." },
-  { day: "Week 1",     icon: "🏃", title: "First group run",      desc: "Join your first weekend run with the community. Coach is on-ground at every session." },
-  { day: "Week 4",     icon: "📊", title: "Progress review",      desc: "Coach reviews your data, adjusts intensity, and sets targets for the next month." },
+const FAQS = [
+  { q: "Do I need to be an experienced runner to join?",
+    a: "Not at all. Our Community Membership welcomes complete beginners. If you can walk, you can start with us. We have structured 5K beginner plans." },
+  { q: "How are the weekly sessions structured?",
+    a: "Sessions happen every weekend morning across Hyderabad. A warm-up, structured run, cool-down, and coach feedback. Mid-week virtual support is included for coaching members." },
+  { q: "How is pricing determined?",
+    a: "Community Membership pricing is displayed on the cards. For Personal Coaching and Corporate Wellness, pricing depends on your goals and team size — contact us for a personalised quote." },
+  { q: "Is there a free trial?",
+    a: "You can browse upcoming sessions, explore the leaderboard, and join community discussions without paying. Your first session as a guest is free to experience the community." },
+  { q: "How does the Corporate Wellness programme work?",
+    a: "We design a custom programme around your team's needs — from weekly sessions to marathon challenges. Reach out and we'll put together a proposal within 48 hours." },
+  { q: "Can I cancel or pause my membership?",
+    a: "Yes. Cancel before your next billing date at any time. No cancellation fees, no lock-in periods." },
 ];
 
 function FaqItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+    <div style={{ borderBottom: "1px solid rgba(255,255,255,0.07)", overflow: "hidden" }}>
       <button onClick={() => setOpen(v => !v)}
-        style={{ width: "100%", padding: "0.875rem 1.25rem", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", textAlign: "left", gap: "1rem" }}>
-        <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--foreground)" }}>{q}</span>
-        <span style={{ fontSize: "1rem", color: "var(--cs-orange)", flexShrink: 0, transition: "transform 0.2s", display: "inline-block", transform: open ? "rotate(45deg)" : "none" }}>+</span>
+        style={{ width: "100%", padding: "1.1rem 0", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", textAlign: "left", gap: "1rem" }}>
+        <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--foreground)", lineHeight: 1.4 }}>{q}</span>
+        <span style={{ fontSize: "1.2rem", color: "var(--cs-orange)", flexShrink: 0, transition: "transform 0.25s", display: "inline-block", transform: open ? "rotate(45deg)" : "none" }}>+</span>
       </button>
       {open && (
-        <div style={{ padding: "0 1.25rem 0.875rem", fontSize: "0.825rem", color: "var(--muted-foreground)", lineHeight: 1.7 }}>{a}</div>
+        <div style={{ paddingBottom: "1rem", fontSize: "0.875rem", color: "var(--muted-foreground)", lineHeight: 1.75 }}>{a}</div>
       )}
     </div>
   );
 }
 
-function CheckIcon({ color = "var(--cs-orange)" }: { color?: string }) {
-  return <span style={{ color, fontWeight: 700, fontSize: "0.9rem" }}>✓</span>;
+// ── Plan card accent colours ──────────────────────────────────────────────────
+
+const ACCENT: Record<string, { border: string; glow: string; badge: string; cta: string; ctaText: string }> = {
+  orange: {
+    border:   "rgba(232,98,10,0.5)",
+    glow:     "rgba(232,98,10,0.12)",
+    badge:    "var(--cs-orange)",
+    cta:      "var(--gradient-accent)",
+    ctaText:  "#fff",
+  },
+  blue: {
+    border:   "rgba(96,165,250,0.45)",
+    glow:     "rgba(96,165,250,0.08)",
+    badge:    "#60a5fa",
+    cta:      "transparent",
+    ctaText:  "var(--foreground)",
+  },
+  green: {
+    border:   "rgba(74,222,128,0.45)",
+    glow:     "rgba(74,222,128,0.08)",
+    badge:    "#4ade80",
+    cta:      "transparent",
+    ctaText:  "var(--foreground)",
+  },
+};
+
+function accent(plan: MembershipPlan) {
+  return ACCENT[plan.color_accent] ?? ACCENT.orange;
 }
-function CrossIcon() {
-  return <span style={{ color: "var(--muted-foreground)", fontSize: "0.85rem" }}>—</span>;
-}
+
+// ── Page component ────────────────────────────────────────────────────────────
 
 export default function PricingPage() {
   const router = useRouter();
-  const [paying,       setPaying]       = useState<string | null>(null);
-  const [success,      setSuccess]      = useState<string | null>(null);
-  const [errorMsg,     setErrorMsg]     = useState<string | null>(null);
+
+  const [plans,        setPlans]        = useState<MembershipPlan[]>([]);
+  const [plansLoading, setPlansLoading] = useState(true);
   const [userEmail,    setUserEmail]    = useState<string | null>(null);
   const [userName,     setUserName]     = useState<string>("");
   const [isMember,     setIsMember]     = useState(false);
+  const [paying,       setPaying]       = useState<string | null>(null);
+  const [success,      setSuccess]      = useState<string | null>(null);
+  const [errorMsg,     setErrorMsg]     = useState<string | null>(null);
   const [couponCode,   setCouponCode]   = useState("");
   const [couponData,   setCouponData]   = useState<{ coupon_id: string; discount_type: string; discount_value: number; description: string } | null>(null);
   const [couponErr,    setCouponErr]    = useState("");
-  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponLoading,setCouponLoading]= useState(false);
 
+  // Load plans + user state
   useEffect(() => {
+    fetch("/api/membership-plans")
+      .then(r => r.json())
+      .then(d => setPlans(d.plans ?? []))
+      .catch(() => {})
+      .finally(() => setPlansLoading(false));
+
     const stored = localStorage.getItem("cs_user");
     if (stored) {
       const u = JSON.parse(stored);
       setUserEmail(u.email);
-      setUserName(`${u.firstName} ${u.lastName}`.trim());
-      const pricingToken = localStorage.getItem("cs_user_token") ?? "";
-      fetch(`/api/membership?email=${encodeURIComponent(u.email)}`, { headers: { "x-user-token": pricingToken } })
+      setUserName(`${u.firstName ?? ""} ${u.lastName ?? ""}`.trim());
+      const tok = localStorage.getItem("cs_user_token") ?? "";
+      fetch(`/api/membership?email=${encodeURIComponent(u.email)}`, { headers: { "x-user-token": tok } })
         .then(r => r.json())
         .then(d => { if (d.membership?.isActive) setIsMember(true); })
         .catch(() => {});
     }
+
+    // Preload Razorpay
     if (!document.getElementById("razorpay-script")) {
-      const script = document.createElement("script");
-      script.id  = "razorpay-script";
-      script.src = "https://checkout.razorpay.com/v1/checkout.js";
-      document.body.appendChild(script);
+      const s = document.createElement("script");
+      s.id  = "razorpay-script";
+      s.src = "https://checkout.razorpay.com/v1/checkout.js";
+      document.body.appendChild(s);
     }
   }, []);
 
+  // Coupon validation
   async function validateCoupon() {
     if (!couponCode.trim()) return;
     setCouponLoading(true); setCouponErr(""); setCouponData(null);
@@ -115,27 +154,33 @@ export default function PricingPage() {
       });
       const data = await res.json();
       if (!res.ok) { setCouponErr(data.error ?? "Invalid coupon."); return; }
-      setCouponData({ coupon_id: data.coupon_id, discount_type: data.discount_type, discount_value: data.discount_value, description: data.description });
-    } catch { setCouponErr("Could not validate coupon. Please try again."); }
+      setCouponData(data);
+    } catch { setCouponErr("Could not validate coupon."); }
     finally { setCouponLoading(false); }
   }
 
-  function discountedAmount(baseAmountPaise: number): number {
-    if (!couponData) return baseAmountPaise;
-    if (couponData.discount_type === "percent") return Math.max(100, Math.round(baseAmountPaise * (1 - couponData.discount_value / 100)));
-    if (couponData.discount_type === "fixed")   return Math.max(100, baseAmountPaise - couponData.discount_value * 100);
-    return baseAmountPaise;
+  function discountedAmount(paise: number): number {
+    if (!couponData) return paise;
+    if (couponData.discount_type === "percent") return Math.max(100, Math.round(paise * (1 - couponData.discount_value / 100)));
+    if (couponData.discount_type === "fixed")   return Math.max(100, paise - couponData.discount_value * 100);
+    return paise;
   }
 
-  async function handleBuy(planId: string) {
+  // Razorpay payment flow
+  async function handleBuy(plan: MembershipPlan) {
     setErrorMsg(null);
-    if (!userEmail) { router.push(`/auth?redirect=/pricing`); return; }
-    setPaying(planId);
+    if (!userEmail) { router.push("/auth?redirect=/pricing"); return; }
+    if (!plan.razorpay_plan) {
+      // No Razorpay plan → open mailto or WhatsApp
+      window.open(`mailto:info@connectedsteps.in?subject=Enquiry: ${plan.name}`, "_blank");
+      return;
+    }
+    setPaying(plan.slug);
     try {
-      const userToken = localStorage.getItem("cs_user_token") ?? "";
+      const tok = localStorage.getItem("cs_user_token") ?? "";
       const orderRes = await fetch("/api/payment/create-order", {
-        method: "POST", headers: { "Content-Type": "application/json", "x-user-token": userToken },
-        body: JSON.stringify({ plan: planId, coupon_id: couponData?.coupon_id ?? null }),
+        method: "POST", headers: { "Content-Type": "application/json", "x-user-token": tok },
+        body: JSON.stringify({ plan: plan.razorpay_plan, coupon_id: couponData?.coupon_id ?? null }),
       });
       const order = await orderRes.json();
       if (!orderRes.ok) throw new Error(order.error ?? "Order creation failed");
@@ -145,20 +190,22 @@ export default function PricingPage() {
         amount:      order.amount,
         currency:    "INR",
         name:        "Connected Steps",
-        description: `${plans.find(p => p.id === planId)?.label} Membership`,
+        description: `${plan.name} Membership`,
         order_id:    order.orderId,
         prefill:     { email: userEmail, name: userName },
         theme:       { color: "#e8620a" },
         modal:       { ondismiss: () => setPaying(null) },
         handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
-          const verifyRes = await fetch("/api/payment/verify", {
+          const finalPaise = discountedAmount(order.amount);
+          const verifyRes  = await fetch("/api/payment/verify", {
             method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...response, plan: planId, email: userEmail, name: userName, amount: order.amount, coupon_id: couponData?.coupon_id ?? null }),
+            body: JSON.stringify({ ...response, plan: plan.razorpay_plan, email: userEmail, name: userName, amount: finalPaise, coupon_id: couponData?.coupon_id ?? null }),
           });
           const result = await verifyRes.json();
           if (!verifyRes.ok) throw new Error(result.error ?? "Verification failed");
           const expiry = new Date(result.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
           setSuccess(`Membership active until ${expiry}. Confirmation sent to ${userEmail}.`);
+          setIsMember(true);
           setPaying(null);
         },
       });
@@ -169,11 +216,15 @@ export default function PricingPage() {
     }
   }
 
+  // Stagger animation
+  const container = { hidden: {}, show: { transition: { staggerChildren: 0.1 } } };
+  const item = { hidden: { opacity: 0, y: 28 }, show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: "easeOut" as const } } };
+
   return (
     <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)" }}>
 
-      {/* ── Sticky nav ── */}
-      <header style={{ position: "sticky", top: 0, zIndex: 50, background: "oklch(0.18 0.015 270 / 80%)", backdropFilter: "blur(18px)", borderBottom: "1px solid var(--border)", padding: "0 1.5rem", height: "60px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      {/* ── Navigation ── */}
+      <header style={{ position: "sticky", top: 0, zIndex: 50, background: "oklch(0.18 0.015 270 / 80%)", backdropFilter: "blur(18px)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 1.5rem", height: "60px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.6rem", textDecoration: "none" }}>
           <Image src="/logo.png" alt="Connected Steps" width={32} height={32} className="rounded-full" />
           <span style={{ fontSize: "1rem", fontWeight: 600, color: "var(--foreground)", fontFamily: "var(--font-display)" }}>Connected Steps</span>
@@ -181,287 +232,280 @@ export default function PricingPage() {
         <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
           {userEmail
             ? <Link href="/dashboard" style={{ fontSize: "0.8rem", color: "var(--muted-foreground)", textDecoration: "none" }}>Dashboard →</Link>
-            : <Link href="/auth?tab=signup" style={{ fontSize: "0.8rem", padding: "6px 14px", background: "var(--gradient-accent)", color: "#fff", borderRadius: 6, textDecoration: "none", fontWeight: 600 }}>Join free</Link>
+            : <Link href="/auth?tab=signup" style={{ fontSize: "0.8rem", padding: "6px 16px", background: "var(--gradient-accent)", color: "#fff", borderRadius: 6, textDecoration: "none", fontWeight: 600 }}>Join free</Link>
           }
         </div>
       </header>
 
-      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "2.5rem 1.5rem 4rem" }}>
+      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "3rem 1.5rem 5rem" }}>
 
-        {/* ── 1. HERO ── */}
-        <div style={{ textAlign: "center", marginBottom: "3rem" }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, borderRadius: 20, background: "oklch(0.72 0.19 49 / 10%)", border: "1px solid oklch(0.72 0.19 49 / 25%)", padding: "4px 12px", fontSize: 11, color: "var(--cs-orange)", fontWeight: 600, letterSpacing: "0.06em", marginBottom: "1rem" }}>
-            From ₹40/day
+        {/* ── HERO ── */}
+        <div style={{ textAlign: "center", marginBottom: "4rem" }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, borderRadius: 20, background: "oklch(0.72 0.19 49 / 10%)", border: "1px solid oklch(0.72 0.19 49 / 25%)", padding: "5px 14px", fontSize: 11, color: "var(--cs-orange)", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.5rem" }}>
+            Membership Plans
           </div>
-          <h1 className="font-display" style={{ fontSize: "clamp(1.9rem, 5vw, 3rem)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.015em", marginBottom: "0.875rem" }}>
-            Runners who train alone plateau.<br />
-            <span className="text-gradient-accent">Runners with coaches improve.</span>
+          <h1 className="font-display" style={{ fontSize: "clamp(2rem, 5vw, 3.5rem)", fontWeight: 300, lineHeight: 1.05, letterSpacing: "-0.02em", marginBottom: "1rem" }}>
+            Invest in your{" "}
+            <em style={{ fontStyle: "normal", background: "linear-gradient(135deg, oklch(0.78 0.18 55), oklch(0.68 0.22 30))", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>
+              running.
+            </em>
           </h1>
-          <p style={{ fontSize: "1rem", color: "var(--muted-foreground)", maxWidth: "520px", margin: "0 auto 1.5rem", lineHeight: 1.7 }}>
-            Join free. Explore the community, leaderboard, and sessions at no cost.
-            Upgrade when you&apos;re ready for a personal coach.
+          <p style={{ fontSize: "1.05rem", color: "var(--muted-foreground)", maxWidth: "480px", margin: "0 auto 2rem", lineHeight: 1.7 }}>
+            Start free. Upgrade when you&apos;re ready. Cancel anytime.
           </p>
-          {!userEmail && (
-            <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap" }}>
-              <Link href="/auth?tab=signup" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 28px", background: "var(--gradient-accent)", color: "#fff", borderRadius: 8, textDecoration: "none", fontSize: "0.9rem", fontWeight: 700, boxShadow: "var(--shadow-orange)" }}>
-                Join free →
-              </Link>
-              <a href="#pricing" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 28px", background: "transparent", color: "var(--foreground)", borderRadius: 8, textDecoration: "none", fontSize: "0.9rem", fontWeight: 600, border: "1px solid var(--border)" }}>
-                See premium plans
-              </a>
-            </div>
-          )}
           {isMember && (
             <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 20px", background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.25)", borderRadius: 8, fontSize: "0.875rem", color: "#4ade80", fontWeight: 600 }}>
-              ✓ You&apos;re a Premium member
+              ✓ You&apos;re already a member
             </div>
           )}
         </div>
 
-        {/* ── 2. FREE vs PREMIUM COMPARISON ── */}
-        <div style={{ marginBottom: "3rem" }}>
-          <div style={{ fontSize: 10, color: "var(--cs-orange)", textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: 700, textAlign: "center", marginBottom: "1.25rem" }}>
-            Free vs Premium
+        {/* ── SUCCESS / ERROR ── */}
+        {success && (
+          <div style={{ background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.3)", borderRadius: 12, padding: "1rem 1.25rem", marginBottom: "2rem", fontSize: "0.875rem", color: "#4ade80", lineHeight: 1.6 }}>
+            ✅ {success}
+            <Link href="/dashboard" style={{ display: "block", marginTop: 8, color: "#4ade80", fontWeight: 700 }}>Go to Dashboard →</Link>
           </div>
-
-          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
-            {/* Header row */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 140px", borderBottom: "1px solid var(--border)" }}>
-              <div style={{ padding: "0.75rem 1.25rem", fontSize: "11px", color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.08em" }}>Feature</div>
-              <div style={{ padding: "0.75rem 0", textAlign: "center", fontSize: "12px", fontWeight: 700, color: "var(--muted-foreground)", borderLeft: "1px solid var(--border)" }}>Free</div>
-              <div style={{ padding: "0.75rem 0", textAlign: "center", fontSize: "12px", fontWeight: 700, color: "var(--cs-orange)", borderLeft: "1px solid var(--border)", background: "oklch(0.72 0.19 49 / 5%)" }}>
-                Premium ✦
-              </div>
-            </div>
-
-            {comparisonRows.map((row, i) => (
-              <div key={row.feature} style={{ display: "grid", gridTemplateColumns: "1fr 120px 140px", borderBottom: i < comparisonRows.length - 1 ? "1px solid var(--border)" : "none" }}>
-                <div style={{ padding: "0.7rem 1.25rem" }}>
-                  <div style={{ fontSize: "0.82rem", color: "var(--foreground)", fontWeight: 500 }}>{row.feature}</div>
-                  {row.note && <div style={{ fontSize: "10px", color: "var(--muted-foreground)", marginTop: 1 }}>{row.note}</div>}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", borderLeft: "1px solid var(--border)" }}>
-                  {row.free === true
-                    ? <CheckIcon color="#4ade80" />
-                    : row.free === false
-                    ? <CrossIcon />
-                    : <span style={{ fontSize: "10px", color: "var(--muted-foreground)", textAlign: "center", padding: "0 4px" }}>{row.free}</span>
-                  }
-                </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", borderLeft: "1px solid var(--border)", background: "oklch(0.72 0.19 49 / 3%)" }}>
-                  {row.premium === true
-                    ? <CheckIcon />
-                    : row.premium === false
-                    ? <CrossIcon />
-                    : <span style={{ fontSize: "10px", color: "var(--cs-orange)", fontWeight: 600, textAlign: "center", padding: "0 4px" }}>{row.premium}</span>
-                  }
-                </div>
-              </div>
-            ))}
-
-            {/* Bottom CTA row */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 140px", borderTop: "1px solid var(--border)" }}>
-              <div style={{ padding: "1rem 1.25rem" }} />
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", borderLeft: "1px solid var(--border)", padding: "0.875rem 0.5rem" }}>
-                {userEmail
-                  ? <span style={{ fontSize: "11px", color: "#4ade80", fontWeight: 600 }}>You&apos;re in ✓</span>
-                  : <Link href="/auth?tab=signup" style={{ fontSize: "11px", color: "var(--cs-orange)", fontWeight: 700, textDecoration: "none" }}>Join free →</Link>
-                }
-              </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", borderLeft: "1px solid var(--border)", padding: "0.875rem 0.5rem", background: "oklch(0.72 0.19 49 / 3%)" }}>
-                {isMember
-                  ? <span style={{ fontSize: "11px", color: "#4ade80", fontWeight: 600 }}>Active ✓</span>
-                  : <a href="#pricing" style={{ fontSize: "11px", color: "#fff", fontWeight: 700, textDecoration: "none", padding: "5px 12px", background: "var(--gradient-accent)", borderRadius: 6, boxShadow: "var(--shadow-orange)", whiteSpace: "nowrap" }}>See plans →</a>
-                }
-              </div>
-            </div>
+        )}
+        {errorMsg && (
+          <div style={{ background: "rgba(226,75,74,0.08)", border: "1px solid rgba(226,75,74,0.3)", borderRadius: 12, padding: "1rem 1.25rem", marginBottom: "2rem", fontSize: "0.875rem", color: "#f09595" }}>
+            ⚠️ {errorMsg}
           </div>
-        </div>
+        )}
 
-        {/* ── 3. TESTIMONIALS (before pricing) ── */}
-        <div style={{ marginBottom: "3rem" }}>
-          <div style={{ fontSize: 10, color: "var(--cs-orange)", textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: 700, textAlign: "center", marginBottom: "1rem" }}>
-            What members say
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 280px), 1fr))", gap: "0.75rem" }}>
-            {testimonials.map(t => (
-              <div key={t.name} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "1rem 1.125rem", borderTop: "2px solid var(--cs-orange)" }}>
-                <div style={{ display: "flex", gap: 2, marginBottom: 8 }}>
-                  {"★★★★★".split("").map((s, i) => <span key={i} style={{ fontSize: 13, color: "var(--cs-orange)" }}>{s}</span>)}
-                </div>
-                <p style={{ fontSize: "0.82rem", color: "var(--muted-foreground)", lineHeight: 1.65, margin: "0 0 0.75rem", fontStyle: "italic" }}>"{t.quote}"</p>
-                <div>
-                  <div style={{ fontSize: "0.8rem", fontWeight: 700 }}>{t.name}</div>
-                  <div style={{ fontSize: 10, color: "var(--cs-orange)", fontWeight: 600 }}>{t.goal}</div>
-                </div>
-              </div>
+        {/* ── PLAN CARDS ── */}
+        {plansLoading ? (
+          // Skeleton
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))", gap: "1.25rem", marginBottom: "4rem" }}>
+            {[1, 2, 3].map(i => (
+              <div key={i} style={{ borderRadius: 20, border: "1px solid rgba(255,255,255,0.07)", background: "var(--surface)", height: 420, animation: "cs-shimmer 1.4s infinite", backgroundSize: "200% 100%", backgroundImage: "linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%)" }} />
             ))}
           </div>
-        </div>
-
-        {/* ── 4. PRICING CARDS ── */}
-        <div id="pricing" style={{ marginBottom: "2rem" }}>
-          <div style={{ fontSize: 10, color: "var(--cs-orange)", textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: 700, textAlign: "center", marginBottom: "0.5rem" }}>
-            Premium plans
+        ) : plans.length === 0 ? (
+          // Fallback when DB not set up
+          <div style={{ textAlign: "center", padding: "3rem", color: "var(--muted-foreground)", fontSize: "0.875rem" }}>
+            <p>Membership plans are being configured. Please{" "}
+              <a href="mailto:info@connectedsteps.in" style={{ color: "var(--cs-orange)" }}>contact us</a>{" "}
+              for pricing details.
+            </p>
           </div>
-          <p style={{ textAlign: "center", fontSize: "0.85rem", color: "var(--muted-foreground)", margin: "0 auto 1.5rem", maxWidth: 400 }}>
-            All plans include every Premium feature. Choose a billing period.
-          </p>
-
-          {success && (
-            <div style={{ background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.3)", borderRadius: 10, padding: "0.875rem 1.25rem", marginBottom: "1.25rem", fontSize: "0.875rem", color: "#4ade80", lineHeight: 1.6 }}>
-              ✅ {success}
-              <Link href="/dashboard" style={{ display: "block", marginTop: 8, color: "#4ade80", fontWeight: 700, textDecoration: "underline" }}>Go to Dashboard →</Link>
-            </div>
-          )}
-          {errorMsg && (
-            <div style={{ background: "rgba(226,75,74,0.08)", border: "1px solid rgba(226,75,74,0.3)", borderRadius: 10, padding: "0.875rem 1.25rem", marginBottom: "1.25rem", fontSize: "0.875rem", color: "#f09595" }}>
-              ⚠️ {errorMsg}
-            </div>
-          )}
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 210px), 1fr))", gap: "0.75rem", alignItems: "start" }}>
+        ) : (
+          <motion.div
+            variants={container} initial="hidden" animate="show"
+            style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))", gap: "1.25rem", alignItems: "stretch", marginBottom: "2rem" }}
+          >
             {plans.map(plan => {
-              const total       = Math.round(plan.payFor * MONTHLY_RATE);
-              const totalPaise  = total * 100;
-              const finalPaise  = discountedAmount(totalPaise);
-              const finalTotal  = Math.round(finalPaise / 100);
-              const perMonth    = Math.round(finalTotal / plan.months);
-              const saving      = Math.round((plan.months - plan.payFor) * MONTHLY_RATE);
-              const isBuying    = paying === plan.id;
-              const hasDiscount = couponData && finalTotal < total;
+              const ac       = accent(plan);
+              const isBuying = paying === plan.slug;
+              const priceStr = fmtPrice(plan);
+              const isContact = plan.is_contact_only || plan.price === null || plan.price === undefined;
 
               return (
-                <div key={plan.id} style={{ position: "relative", background: plan.popular ? "oklch(0.19 0.03 40)" : "var(--surface)", border: `1px solid ${plan.popular ? "oklch(0.72 0.19 49 / 50%)" : "var(--border)"}`, borderRadius: 12, padding: plan.badge ? "1.5rem 1.25rem 1.25rem" : "1.25rem", boxShadow: plan.popular ? "var(--shadow-glow)" : "var(--shadow-md)" }}>
-                  {plan.badge && (
-                    <div style={{ position: "absolute", top: "-11px", left: "50%", transform: "translateX(-50%)", background: "var(--cs-orange)", color: "#fff", fontSize: "10px", fontWeight: 700, padding: "3px 12px", borderRadius: 20, whiteSpace: "nowrap" }}>
-                      {plan.badge}
+                <motion.div key={plan.id} variants={item}
+                  style={{
+                    position: "relative",
+                    borderRadius: 20,
+                    border: `1px solid ${plan.is_featured ? ac.border : "rgba(255,255,255,0.07)"}`,
+                    background: plan.is_featured ? `linear-gradient(160deg, oklch(0.20 0.025 40) 0%, var(--surface) 60%)` : "var(--surface)",
+                    padding: "2rem 1.75rem",
+                    display: "flex", flexDirection: "column",
+                    boxShadow: plan.is_featured ? `0 0 0 1px ${ac.border}, 0 20px 50px ${ac.glow}` : "none",
+                    transition: "box-shadow 0.3s ease, transform 0.25s ease",
+                  }}
+                  whileHover={{ y: -5, boxShadow: `0 0 0 1px ${ac.border}, 0 28px 60px ${ac.glow}` }}
+                >
+                  {/* Badge */}
+                  {plan.badge_label && (
+                    <div style={{ position: "absolute", top: -14, left: "50%", transform: "translateX(-50%)", background: ac.badge, color: plan.color_accent === "blue" ? "#fff" : "#fff", fontSize: 10, fontWeight: 800, padding: "4px 14px", borderRadius: 20, whiteSpace: "nowrap", letterSpacing: "0.06em", textTransform: "uppercase", boxShadow: "0 4px 12px rgba(0,0,0,0.3)" }}>
+                      {plan.badge_label}
                     </div>
                   )}
-                  <div style={{ fontSize: 10, color: plan.popular ? "var(--cs-orange)" : "var(--muted-foreground)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: "0.75rem" }}>
-                    {plan.label}
-                  </div>
-                  <div style={{ marginBottom: "0.35rem" }}>
-                    <span style={{ fontFamily: "var(--font-display)", fontSize: "2.2rem", fontWeight: 300, color: "var(--foreground)", lineHeight: 1 }}>₹{perMonth.toLocaleString("en-IN")}</span>
-                    <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginLeft: 4 }}>/mo</span>
-                  </div>
-                  {hasDiscount
-                    ? (
-                      <div style={{ fontSize: "0.75rem", marginBottom: "0.25rem" }}>
-                        <span style={{ color: "var(--muted-foreground)", textDecoration: "line-through", marginRight: 6 }}>₹{total.toLocaleString("en-IN")}</span>
-                        <span style={{ color: "#4ade80", fontWeight: 700 }}>₹{finalTotal.toLocaleString("en-IN")}</span>
-                      </div>
-                    )
-                    : (
-                      <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginBottom: saving > 0 ? "0.25rem" : "1rem" }}>
-                        ₹{total.toLocaleString("en-IN")} billed {plan.months === 1 ? "monthly" : `every ${plan.months} months`}
-                      </div>
-                    )
-                  }
-                  {saving > 0 && (
-                    <div style={{ fontSize: "0.72rem", color: "#4ade80", fontWeight: 600, marginBottom: "1rem" }}>
-                      Save ₹{saving.toLocaleString("en-IN")}{hasDiscount ? " + coupon" : ""}
+
+                  {/* Plan name + tagline */}
+                  <div style={{ marginBottom: "1.25rem" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: plan.is_featured ? "var(--cs-orange)" : "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 6 }}>
+                      {plan.name}
                     </div>
+                    {plan.tagline && (
+                      <div style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", lineHeight: 1.4 }}>{plan.tagline}</div>
+                    )}
+                  </div>
+
+                  {/* Price */}
+                  <div style={{ marginBottom: "0.5rem" }}>
+                    {isContact ? (
+                      <div style={{ fontSize: "clamp(1.6rem, 3vw, 2rem)", fontWeight: 700, color: "var(--foreground)", lineHeight: 1, fontFamily: "var(--font-body)" }}>
+                        Contact Us
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                        <span style={{ fontFamily: "var(--font-display)", fontSize: "clamp(1.8rem, 3.5vw, 2.5rem)", fontWeight: 300, color: "var(--foreground)", lineHeight: 1 }}>{priceStr}</span>
+                        {plan.billing_label && (
+                          <span style={{ fontSize: "0.78rem", color: "var(--muted-foreground)" }}>/{plan.billing_label.replace("per ", "")}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Description */}
+                  {plan.description && (
+                    <p style={{ fontSize: "0.8rem", color: "var(--muted-foreground)", lineHeight: 1.65, marginBottom: "1.5rem" }}>{plan.description}</p>
                   )}
-                  <button
-                    onClick={() => handleBuy(plan.id)}
-                    disabled={!!paying || !!success || isMember}
-                    style={{ display: "block", width: "100%", textAlign: "center", padding: "11px", borderRadius: 8, fontSize: "0.82rem", fontWeight: 700, cursor: paying || success || isMember ? "not-allowed" : "pointer", opacity: paying && !isBuying ? 0.5 : 1, background: plan.popular ? "var(--gradient-accent)" : "transparent", color: plan.popular ? "#fff" : "var(--foreground)", border: plan.popular ? "none" : "1px solid var(--border)", boxShadow: plan.popular ? "var(--shadow-orange)" : "none", fontFamily: "var(--font-body)" }}>
-                    {isBuying ? "Opening checkout…" : success || isMember ? "Active ✓" : userEmail ? "Get started" : "Create free account"}
-                  </button>
-                </div>
+
+                  {/* Features */}
+                  <ul style={{ listStyle: "none", padding: 0, margin: "0 0 1.75rem", display: "flex", flexDirection: "column", gap: "0.6rem", flex: 1 }}>
+                    {(plan.features ?? []).map((f, i) => (
+                      <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: "0.82rem", color: "var(--foreground)" }}>
+                        <svg width="14" height="14" viewBox="0 0 14 14" style={{ flexShrink: 0, marginTop: 2 }}>
+                          <circle cx="7" cy="7" r="6.25" fill={`${ac.badge}22`} stroke={`${ac.badge}50`} strokeWidth="0.75" />
+                          <polyline points="3.5,7 6,9.5 10.5,4.5" fill="none" stroke={ac.badge} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+
+                  {/* CTA */}
+                  {plan.cta_href ? (
+                    <a href={plan.cta_href} target="_blank" rel="noopener noreferrer"
+                      style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "13px", borderRadius: 12, fontWeight: 700, fontSize: "0.9rem", textDecoration: "none", background: plan.color_accent === "blue" ? "rgba(96,165,250,0.12)" : "rgba(255,255,255,0.05)", color: plan.color_accent === "blue" ? "#60a5fa" : "var(--foreground)", border: `1px solid ${plan.color_accent === "blue" ? "rgba(96,165,250,0.3)" : "rgba(255,255,255,0.1)"}`, transition: "background 0.2s, border-color 0.2s" }}>
+                      {plan.cta_label} →
+                    </a>
+                  ) : (
+                    <button
+                      onClick={() => handleBuy(plan)}
+                      disabled={!!paying || !!success}
+                      style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "13px", borderRadius: 12, fontWeight: 700, fontSize: "0.9rem", cursor: paying || success ? "not-allowed" : "pointer", opacity: paying && !isBuying ? 0.55 : 1, background: plan.is_featured ? ac.cta : "rgba(255,255,255,0.05)", color: plan.is_featured ? ac.ctaText : "var(--foreground)", border: plan.is_featured ? "none" : "1px solid rgba(255,255,255,0.1)", boxShadow: plan.is_featured ? "0 6px 20px rgba(232,98,10,0.35)" : "none", fontFamily: "var(--font-body)", transition: "opacity 0.15s" }}>
+                      {isBuying ? "Opening checkout…" : (success || isMember) && plan.razorpay_plan ? "Active ✓" : plan.cta_label}
+                    </button>
+                  )}
+                </motion.div>
               );
             })}
-          </div>
+          </motion.div>
+        )}
 
-          {/* ── Coupon code ── */}
-          <div style={{ marginTop: "1.25rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
+        {/* ── Coupon code (only shown when Razorpay plans exist) ── */}
+        {plans.some(p => p.razorpay_plan && !p.is_contact_only) && (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem", marginBottom: "1rem" }}>
             {couponData ? (
-              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.25)", borderRadius: 8, padding: "8px 14px", fontSize: "0.8rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", background: "rgba(74,222,128,0.07)", border: "1px solid rgba(74,222,128,0.22)", borderRadius: 8, padding: "8px 14px", fontSize: "0.8rem" }}>
                 <span style={{ color: "#4ade80", fontWeight: 700 }}>✓ {couponData.description || "Coupon applied"}</span>
                 <button onClick={() => { setCouponData(null); setCouponCode(""); }} style={{ background: "none", border: "none", color: "var(--muted-foreground)", cursor: "pointer", fontSize: "0.75rem", padding: 0 }}>Remove</button>
               </div>
             ) : (
-              <div style={{ display: "flex", gap: "0.5rem", width: "100%", maxWidth: 360 }}>
-                <input
-                  value={couponCode} onChange={e => { setCouponCode(e.target.value); setCouponErr(""); }}
+              <div style={{ display: "flex", gap: "0.5rem", width: "100%", maxWidth: 340 }}>
+                <input value={couponCode} onChange={e => { setCouponCode(e.target.value); setCouponErr(""); }}
                   onKeyDown={e => e.key === "Enter" && validateCoupon()}
                   placeholder="Have a coupon code?"
-                  style={{ flex: 1, padding: "9px 12px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--foreground)", fontSize: "0.82rem", fontFamily: "var(--font-body)", outline: "none" }}
-                />
-                <button onClick={validateCoupon} disabled={couponLoading || !couponCode.trim()} style={{ padding: "9px 16px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--foreground)", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)", opacity: couponLoading || !couponCode.trim() ? 0.5 : 1 }}>
+                  style={{ flex: 1, padding: "9px 12px", background: "var(--surface)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "var(--foreground)", fontSize: "0.82rem", fontFamily: "var(--font-body)", outline: "none" }} />
+                <button onClick={validateCoupon} disabled={couponLoading || !couponCode.trim()}
+                  style={{ padding: "9px 16px", background: "var(--surface)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "var(--foreground)", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)", opacity: couponLoading || !couponCode.trim() ? 0.5 : 1 }}>
                   {couponLoading ? "…" : "Apply"}
                 </button>
               </div>
             )}
             {couponErr && <div style={{ fontSize: "0.78rem", color: "#f09595" }}>{couponErr}</div>}
           </div>
+        )}
 
-          <p style={{ textAlign: "center", fontSize: 11, color: "var(--muted-foreground)", marginTop: "1rem" }}>
-            All prices include GST. Not sure?{" "}
-            <Link href="https://wa.me/9703620570" target="_blank" rel="noopener noreferrer" style={{ color: "var(--cs-orange)", textDecoration: "none" }}>Chat with us →</Link>
-          </p>
-        </div>
+        <p style={{ textAlign: "center", fontSize: 11, color: "var(--muted-foreground)", marginBottom: "4rem" }}>
+          All prices inclusive of GST. Questions?{" "}
+          <a href="https://wa.me/9703620570" target="_blank" rel="noopener noreferrer" style={{ color: "var(--cs-orange)", textDecoration: "none" }}>Chat with us on WhatsApp →</a>
+        </p>
 
-        {/* ── 5. WHAT HAPPENS AFTER YOU JOIN ── */}
-        <div style={{ marginBottom: "3rem" }}>
-          <div style={{ fontSize: 10, color: "var(--cs-orange)", textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: 700, textAlign: "center", marginBottom: "1.25rem" }}>
-            What happens after you join
+        {/* ── WHY JOIN CONNECTED STEPS ── */}
+        <section style={{ marginBottom: "4rem" }}>
+          <div style={{ textAlign: "center", marginBottom: "2.5rem" }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, borderRadius: 20, background: "oklch(0.72 0.19 49 / 10%)", border: "1px solid oklch(0.72 0.19 49 / 25%)", padding: "5px 14px", fontSize: 11, color: "var(--cs-orange)", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1rem" }}>
+              Why Connected Steps
+            </div>
+            <h2 className="font-display" style={{ fontSize: "clamp(1.75rem, 4vw, 2.75rem)", fontWeight: 300, lineHeight: 1.1, marginBottom: "0.875rem" }}>
+              More than a running club.
+            </h2>
+            <p style={{ fontSize: "0.95rem", color: "var(--muted-foreground)", maxWidth: "440px", margin: "0 auto", lineHeight: 1.7 }}>
+              We build runners from scratch and take them to finish lines they never thought possible.
+            </p>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: "0.75rem" }}>
-            {afterJoin.map((step, i) => (
-              <div key={i} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "1rem 1.125rem" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "0.6rem" }}>
-                  <span style={{ fontSize: "1.4rem" }}>{step.icon}</span>
-                  <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--cs-orange)", textTransform: "uppercase", letterSpacing: "0.08em" }}>{step.day}</div>
-                </div>
-                <div style={{ fontSize: "0.82rem", fontWeight: 700, marginBottom: 4 }}>{step.title}</div>
-                <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", lineHeight: 1.6 }}>{step.desc}</div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 280px), 1fr))", gap: "1rem" }}>
+            {WHY_ITEMS.map((w, i) => (
+              <div key={i} style={{ background: "var(--surface)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "1.375rem 1.5rem", transition: "border-color 0.2s, transform 0.25s" }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(232,98,10,0.35)"; (e.currentTarget as HTMLElement).style.transform = "translateY(-3px)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.07)"; (e.currentTarget as HTMLElement).style.transform = ""; }}>
+                <div style={{ fontSize: "1.75rem", marginBottom: "0.75rem" }}>{w.icon}</div>
+                <div style={{ fontSize: "0.9rem", fontWeight: 700, marginBottom: "0.4rem", color: "var(--foreground)" }}>{w.title}</div>
+                <div style={{ fontSize: "0.8rem", color: "var(--muted-foreground)", lineHeight: 1.65 }}>{w.desc}</div>
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
-        {/* ── 6. MEET YOUR COACHES ── */}
-        <div style={{ marginBottom: "3rem" }}>
-          <CoachCarouselSection
-            sectionLabel="YOUR COACHING TEAM"
-            title="Train with the best"
-            subtitle="National-level athletes and NIS-certified coaches. Every premium member trains with one of these coaches directly."
-            ctaLabel="Start Your Training"
-            ctaHref="/auth?tab=register"
-          />
-        </div>
-
-        {/* ── 7. ROI CALCULATOR ── */}
-        <div style={{ marginBottom: "3rem" }}>
-          <RoiCalculator />
-        </div>
-
-        {/* ── 9. GUARANTEE ── */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", padding: "1rem 1.25rem", background: "rgba(74,222,128,0.05)", border: "1px solid rgba(74,222,128,0.18)", borderRadius: 12, marginBottom: "2.5rem", maxWidth: 480, margin: "0 auto 2.5rem" }}>
-          <span style={{ fontSize: "1.5rem", flexShrink: 0 }}>🛡️</span>
-          <div>
-            <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "#4ade80", marginBottom: 2 }}>30-Day Money-Back Guarantee</div>
-            <div style={{ fontSize: "0.72rem", color: "var(--muted-foreground)", lineHeight: 1.5 }}>Not happy in your first month? Full refund, no questions asked.</div>
+        {/* ── TESTIMONIALS ── */}
+        <section style={{ marginBottom: "4rem" }}>
+          <div style={{ textAlign: "center", marginBottom: "2rem" }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, borderRadius: 20, background: "oklch(0.72 0.19 49 / 10%)", border: "1px solid oklch(0.72 0.19 49 / 25%)", padding: "5px 14px", fontSize: 11, color: "var(--cs-orange)", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.875rem" }}>
+              Member Stories
+            </div>
+            <h2 className="font-display" style={{ fontSize: "clamp(1.5rem, 3.5vw, 2.5rem)", fontWeight: 300, lineHeight: 1.1 }}>
+              Real runners. Real results.
+            </h2>
           </div>
-        </div>
 
-        {/* ── 10. FAQ ── */}
-        <div style={{ maxWidth: "640px", margin: "0 auto" }}>
-          <div style={{ fontSize: 10, color: "var(--cs-orange)", textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: 700, textAlign: "center", marginBottom: "1rem" }}>FAQ</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            {[
-              { q: "Is there really a free tier?",        a: "Yes. You can join the community, view the leaderboard, discover sessions, and register for weekend runs (at the standard walk-up price). No credit card needed." },
-              { q: "What do I get that's different with Premium?", a: "A personalised training plan written for your goal, updated every week. Direct WhatsApp access to your coach. Weekly check-ins. Free entry to all weekend runs." },
-              { q: "Can I cancel anytime?",               a: "Yes — cancel before your next billing date with no charges. No lock-ins, no cancellation fees." },
-              { q: "What happens after I sign up?",       a: "Within 24 hours your coach will reach out on WhatsApp, learn your goal, and send a personalised training plan. First session typically within a week." },
-              { q: "Do I need to be a runner already?",  a: "Not at all. Our 5K plan is built for complete beginners. Many members had never run before — and finished their first race within 8 weeks." },
-              { q: "Are sessions in-person or online?",  a: "Connected Steps runs in-person sessions across multiple locations in Hyderabad. Your plan, check-ins, and analytics are online." },
-              { q: "Corporate / group rates?",            a: "We offer group and corporate programmes. Message us on WhatsApp for group pricing." },
-            ].map((item, i) => <FaqItem key={i} q={item.q} a={item.a} />)}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 280px), 1fr))", gap: "1rem" }}>
+            {TESTIMONIALS.map((t, i) => (
+              <div key={i} style={{ background: "var(--surface)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "1.375rem 1.5rem", borderTop: "2px solid var(--cs-orange)" }}>
+                <div style={{ display: "flex", gap: 2, marginBottom: "0.75rem" }}>
+                  {"★★★★★".split("").map((s, j) => <span key={j} style={{ fontSize: 13, color: "var(--cs-orange)" }}>{s}</span>)}
+                </div>
+                <p style={{ fontSize: "0.82rem", color: "var(--muted-foreground)", lineHeight: 1.7, margin: "0 0 0.875rem", fontStyle: "italic" }}>
+                  &ldquo;{t.quote}&rdquo;
+                </p>
+                <div>
+                  <div style={{ fontSize: "0.82rem", fontWeight: 700 }}>{t.name}</div>
+                  <div style={{ fontSize: 10, color: "var(--cs-orange)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 2 }}>{t.goal}</div>
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
+        </section>
+
+        {/* ── FAQ ── */}
+        <section style={{ maxWidth: "680px", margin: "0 auto 4rem" }}>
+          <div style={{ textAlign: "center", marginBottom: "2rem" }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, borderRadius: 20, background: "oklch(0.72 0.19 49 / 10%)", border: "1px solid oklch(0.72 0.19 49 / 25%)", padding: "5px 14px", fontSize: 11, color: "var(--cs-orange)", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.875rem" }}>
+              FAQ
+            </div>
+            <h2 className="font-display" style={{ fontSize: "clamp(1.5rem, 3.5vw, 2.5rem)", fontWeight: 300, lineHeight: 1.1 }}>
+              Common questions
+            </h2>
+          </div>
+          <div style={{ border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, background: "var(--surface)", padding: "0 1.5rem" }}>
+            {FAQS.map((f, i) => <FaqItem key={i} q={f.q} a={f.a} />)}
+          </div>
+        </section>
+
+        {/* ── FINAL CTA ── */}
+        <section style={{ textAlign: "center", padding: "3rem 1.5rem", background: "linear-gradient(135deg, oklch(0.20 0.025 40) 0%, oklch(0.17 0.015 250) 100%)", borderRadius: 24, border: "1px solid rgba(232,98,10,0.2)", position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", top: -60, right: -60, width: 240, height: 240, borderRadius: "50%", background: "radial-gradient(circle, rgba(232,98,10,0.12) 0%, transparent 70%)", pointerEvents: "none" }} />
+          <h2 className="font-display" style={{ fontSize: "clamp(1.75rem, 4vw, 2.75rem)", fontWeight: 300, lineHeight: 1.1, marginBottom: "0.875rem", position: "relative" }}>
+            Your next milestone starts here.
+          </h2>
+          <p style={{ fontSize: "0.95rem", color: "var(--muted-foreground)", maxWidth: "400px", margin: "0 auto 2rem", lineHeight: 1.7, position: "relative" }}>
+            Join hundreds of runners who found their community and hit goals they never thought possible.
+          </p>
+          <div style={{ display: "flex", gap: "0.875rem", justifyContent: "center", flexWrap: "wrap", position: "relative" }}>
+            <Link href="/auth?tab=signup" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 30px", background: "var(--gradient-accent)", color: "#fff", borderRadius: 10, textDecoration: "none", fontSize: "0.95rem", fontWeight: 700, boxShadow: "0 8px 24px rgba(232,98,10,0.35)" }}>
+              Join the Community →
+            </Link>
+            <a href="https://wa.me/9703620570" target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 24px", background: "transparent", color: "var(--foreground)", borderRadius: 10, textDecoration: "none", fontSize: "0.95rem", fontWeight: 600, border: "1px solid rgba(255,255,255,0.15)" }}>
+              Chat with us
+            </a>
+          </div>
+          <p style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: "1.5rem" }}>
+            No credit card required to browse. Cancel your membership anytime.
+          </p>
+        </section>
 
       </div>
     </div>
