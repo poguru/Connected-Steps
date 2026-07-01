@@ -719,6 +719,8 @@ select.auth-input option {
   .cs-db-right { order: 2; }
 }
 
+.hero-slider-arrow:hover { border-color: rgba(232,98,10,0.6) !important; background: rgba(232,98,10,0.2) !important; }
+
 @media (max-width: 768px) {
   /* HeroSlider: hide arrows on mobile, use swipe instead */
   .hero-slider-arrow { display: none !important; }

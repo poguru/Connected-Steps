@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { Chip } from "@/components/ui/ds";
 
 interface RecentSession {
   id: string; title: string; date: string; time: string | null;
@@ -169,9 +170,8 @@ export default function HeroSlider() {
               {/* Content */}
               <div className="container relative z-10" style={{ paddingTop: "8rem", paddingBottom: "7rem", height: "100%", minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
                 <div style={{ maxWidth: "700px" }}>
-                  <div style={{ fontSize: "11px", color: "var(--cs-orange)", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.75rem" }}>
-                    Community · Recent Session
-                  </div>
+                  <Chip label="Community · Recent Session" size="xs" color="var(--cs-orange)"
+                    style={{ marginBottom: "0.75rem", letterSpacing: "0.12em", textTransform: "uppercase" }} />
                   <h2 className="font-display" style={{ fontSize: "clamp(2rem, 5vw, 4rem)", fontWeight: 300, color: "#fff", lineHeight: 1.1, marginBottom: "0.75rem" }}>
                     {s.title}
                   </h2>
@@ -210,9 +210,7 @@ export default function HeroSlider() {
               width: "44px", height: "44px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.2)",
               background: "rgba(13,13,16,0.7)", color: "#fff", cursor: "pointer", fontSize: "1.1rem",
               display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(6px)",
-              transition: "border-color 0.15s, background 0.15s" }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(232,98,10,0.6)"; e.currentTarget.style.background = "rgba(232,98,10,0.2)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; e.currentTarget.style.background = "rgba(13,13,16,0.7)"; }}>
+              transition: "border-color 0.15s, background 0.15s" }}>
             ←
           </button>
           <button onClick={next} aria-label="Next" className="hero-slider-arrow"
@@ -220,9 +218,7 @@ export default function HeroSlider() {
               width: "44px", height: "44px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.2)",
               background: "rgba(13,13,16,0.7)", color: "#fff", cursor: "pointer", fontSize: "1.1rem",
               display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(6px)",
-              transition: "border-color 0.15s, background 0.15s" }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(232,98,10,0.6)"; e.currentTarget.style.background = "rgba(232,98,10,0.2)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; e.currentTarget.style.background = "rgba(13,13,16,0.7)"; }}>
+              transition: "border-color 0.15s, background 0.15s" }}>
             →
           </button>
         </>
@@ -243,11 +239,9 @@ export default function HeroSlider() {
 
       {/* ── Slide label (top-right) ── */}
       {total > 1 && (
-        <div style={{ position: "absolute", top: "5rem", right: "1.5rem", zIndex: 20,
-          background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)",
-          border: "1px solid rgba(255,255,255,0.1)", borderRadius: "20px",
-          padding: "4px 12px", fontSize: "11px", color: "rgba(255,255,255,0.6)", letterSpacing: "0.06em" }}>
-          {current + 1} / {total}
+        <div style={{ position: "absolute", top: "5rem", right: "1.5rem", zIndex: 20 }}>
+          <Chip label={`${current + 1} / ${total}`} size="xs" color="rgba(255,255,255,0.6)"
+            style={{ backdropFilter: "blur(6px)", background: "rgba(0,0,0,0.4)" }} />
         </div>
       )}
     </section>
