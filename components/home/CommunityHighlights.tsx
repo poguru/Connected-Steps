@@ -98,20 +98,59 @@ function HeroMedia({ session, onClick }: { session: Session; onClick: () => void
   };
 
   return (
-    // cs-ch-hero-wrap → globals.css: 16:9 desktop, max-height:44vh mobile
-    <div className="cs-ch-hero-wrap" onClick={onClick}
-      role="button" aria-label={`View gallery for ${session.title}`}
-    >
-      {/* Background image / poster */}
-      {imageUrl && (
-        <>
-          {/* Blurred backdrop — hidden on desktop, fills container on mobile */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={imageUrl} alt="" aria-hidden className="cs-ch-blur-bg" />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+    <>
+      {/* ── Mobile layout: image on top, text below, no overlay ── */}
+      <div
+        className="cs-ch-hero-mobile"
+        onClick={onClick}
+        role="button"
+        aria-label={`View gallery for ${session.title}`}
+        style={{
+          cursor: "pointer", borderRadius: 12, overflow: "hidden",
+          background: "rgba(255,255,255,0.03)",
+          border: "1px solid rgba(255,255,255,0.07)",
+        }}
+      >
+        {imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={imageUrl} alt={session.title} loading="lazy"
-            className="cs-ch-hero-img"
+            style={{ width: "100%", height: "auto", display: "block" }}
+          />
+        )}
+        <div style={{ padding: "10px 12px 13px" }}>
+          <div style={{
+            fontSize: "0.9rem", fontWeight: 700, color: "#fff",
+            lineHeight: 1.3, marginBottom: 5,
+          }}>
+            {session.title}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "rgba(255,255,255,0.55)" }}>
+              <MapPin size={8} />{session.venue || session.location || "Hyderabad"}
+            </span>
+            <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "rgba(255,255,255,0.55)" }}>
+              <Calendar size={8} />{fmtDate(session.date)}
+            </span>
+          </div>
+          <div style={{ marginTop: 7, fontSize: 10, fontWeight: 600, color: "rgba(232,98,10,0.85)" }}>
+            Tap to view gallery →
+          </div>
+        </div>
+      </div>
+
+      {/* ── Desktop layout: existing full-bleed overlay design ── */}
+      <div
+        className="cs-ch-hero-desktop cs-ch-hero-wrap"
+        onClick={onClick}
+        role="button"
+        aria-label={`View gallery for ${session.title}`}
+      >
+        {/* Background image / poster */}
+        {imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={imageUrl} alt={session.title} loading="lazy"
             onLoad={() => setLoaded(true)}
             style={{
               position: "absolute", inset: 0, width: "100%", height: "100%",
@@ -120,75 +159,72 @@ function HeroMedia({ session, onClick }: { session: Session; onClick: () => void
               transform: loaded ? "scale(1.05)" : "scale(1)",
             }}
           />
-        </>
-      )}
-
-      {/* Video layer */}
-      {videoUrl && (
-        <video ref={videoRef} src={videoUrl} muted loop playsInline preload="metadata"
-          poster={imageUrl ?? undefined} onLoadedData={() => setLoaded(true)}
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-        />
-      )}
-
-      {/* Gradient */}
-      <div style={{
-        position: "absolute", inset: 0, pointerEvents: "none",
-        background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.35) 55%, rgba(0,0,0,0.06) 100%)",
-      }} />
-
-      {/* Top badges row */}
-      <div style={{
-        position: "absolute", top: 10, left: 10, right: 10,
-        display: "flex", alignItems: "center", gap: 6,
-      }}>
-        {/* Video indicator */}
-        {videoUrl && (
-          <button onClick={togglePlay} style={{
-            display: "flex", alignItems: "center", gap: 5,
-            padding: "4px 10px", borderRadius: 999,
-            background: isPlaying ? "rgba(232,98,10,0.85)" : "rgba(0,0,0,0.55)",
-            backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.15)",
-            color: "#fff", fontSize: 10, fontWeight: 700, cursor: "pointer",
-            letterSpacing: "0.06em", textTransform: "uppercase" as const,
-          }} aria-label={isPlaying ? "Pause video" : "Play video"}>
-            {isPlaying ? <><Pause size={9} />&nbsp;Live</> : <><Play size={9} />&nbsp;Video</>}
-          </button>
         )}
 
-        {/* Gallery badge — right side */}
-        <div style={{
-          marginLeft: "auto",
-          display: "flex", alignItems: "center", gap: 4,
-          padding: "4px 10px", borderRadius: 999,
-          background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)",
-          border: "1px solid rgba(255,255,255,0.12)",
-          fontSize: 10, color: "rgba(255,255,255,0.85)", fontWeight: 600,
-          minHeight: 28, /* iOS tap target */
-        }}>
-          <Camera size={10} /> Gallery
-        </div>
-      </div>
+        {/* Video layer */}
+        {videoUrl && (
+          <video ref={videoRef} src={videoUrl} muted loop playsInline preload="metadata"
+            poster={imageUrl ?? undefined} onLoadedData={() => setLoaded(true)}
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          />
+        )}
 
-      {/* Bottom content */}
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "18px 14px 14px" }}>
+        {/* Gradient */}
         <div style={{
-          fontSize: "clamp(0.875rem, 3.5vw, 1rem)", fontWeight: 700, color: "#fff",
-          lineHeight: 1.25, marginBottom: 6,
-          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const,
+          position: "absolute", inset: 0, pointerEvents: "none",
+          background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.35) 55%, rgba(0,0,0,0.06) 100%)",
+        }} />
+
+        {/* Top badges row */}
+        <div style={{
+          position: "absolute", top: 10, left: 10, right: 10,
+          display: "flex", alignItems: "center", gap: 6,
         }}>
-          {session.title}
+          {videoUrl && (
+            <button onClick={togglePlay} style={{
+              display: "flex", alignItems: "center", gap: 5,
+              padding: "4px 10px", borderRadius: 999,
+              background: isPlaying ? "rgba(232,98,10,0.85)" : "rgba(0,0,0,0.55)",
+              backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.15)",
+              color: "#fff", fontSize: 10, fontWeight: 700, cursor: "pointer",
+              letterSpacing: "0.06em", textTransform: "uppercase" as const,
+            }} aria-label={isPlaying ? "Pause video" : "Play video"}>
+              {isPlaying ? <><Pause size={9} />&nbsp;Live</> : <><Play size={9} />&nbsp;Video</>}
+            </button>
+          )}
+          <div style={{
+            marginLeft: "auto",
+            display: "flex", alignItems: "center", gap: 4,
+            padding: "4px 10px", borderRadius: 999,
+            background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            fontSize: 10, color: "rgba(255,255,255,0.85)", fontWeight: 600,
+            minHeight: 28,
+          }}>
+            <Camera size={10} /> Gallery
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11, color: "rgba(255,255,255,0.65)" }}>
-            <MapPin size={9} />{session.venue || session.location || "Hyderabad"}
-          </span>
-          <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11, color: "rgba(255,255,255,0.65)" }}>
-            <Calendar size={9} />{fmtDate(session.date)}
-          </span>
+
+        {/* Bottom content */}
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "18px 14px 14px" }}>
+          <div style={{
+            fontSize: "clamp(0.875rem, 3.5vw, 1rem)", fontWeight: 700, color: "#fff",
+            lineHeight: 1.25, marginBottom: 6,
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const,
+          }}>
+            {session.title}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11, color: "rgba(255,255,255,0.65)" }}>
+              <MapPin size={9} />{session.venue || session.location || "Hyderabad"}
+            </span>
+            <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11, color: "rgba(255,255,255,0.65)" }}>
+              <Calendar size={9} />{fmtDate(session.date)}
+            </span>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -243,22 +279,17 @@ function SessionCard({
       {/* Media */}
       <div className="cs-ch-card-media" style={{ position: "relative", aspectRatio: "4/3", overflow: "hidden", flexShrink: 0 }}>
         {imageUrl && (
-          <>
-            {/* Blurred backdrop — hidden on desktop, visible on mobile */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={imageUrl} alt="" aria-hidden className="cs-ch-blur-bg" />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={imageUrl} alt={session.title} loading="lazy"
-              className="cs-ch-card-img"
-              style={{
-                width: "100%", height: "100%", objectFit: "cover",
-                objectPosition: "center 25%", display: "block",
-                transition: "transform 0.5s ease, filter 0.3s ease",
-                transform: hovered ? "scale(1.06)" : "scale(1)",
-                filter:    hovered ? "brightness(0.68)" : "brightness(1)",
-              }}
-            />
-          </>
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={imageUrl} alt={session.title} loading="lazy"
+            className="cs-ch-card-img"
+            style={{
+              width: "100%", height: "100%", objectFit: "cover",
+              objectPosition: "center 25%", display: "block",
+              transition: "transform 0.5s ease, filter 0.3s ease",
+              transform: hovered ? "scale(1.06)" : "scale(1)",
+              filter:    hovered ? "brightness(0.68)" : "brightness(1)",
+            }}
+          />
         )}
         {videoUrl && (
           <video ref={videoRef} src={videoUrl} muted playsInline preload="metadata"

@@ -1519,54 +1519,29 @@ select.auth-input option {
   cursor: pointer;
   background: rgba(255,255,255,0.04);
 }
-/* Blurred backdrop: hidden on desktop */
-.cs-ch-blur-bg { display: none; }
+/* ── Community Highlights: dual mobile/desktop layouts ──────────────────── */
+
+/* Hero: mobile layout hidden on desktop, desktop overlay hidden on mobile */
+.cs-ch-hero-mobile  { display: none; }
+.cs-ch-hero-desktop { display: block; }
 
 @media (max-width: 640px) {
-  /* Hero: let it grow to show portrait/group photos fully */
-  .cs-ch-hero-wrap {
-    aspect-ratio: unset;
-    height: min(72vw, 360px);
-    min-height: 200px;
-    max-height: none;
-  }
+  .cs-ch-hero-mobile  { display: block; }
+  .cs-ch-hero-desktop { display: none; }
 
-  /* Blurred backdrop fills container */
-  .cs-ch-blur-bg {
-    display: block !important;
-    position: absolute !important;
-    inset: -8px !important;
-    width: calc(100% + 16px) !important;
-    height: calc(100% + 16px) !important;
-    object-fit: cover !important;
-    filter: blur(22px) brightness(0.25) saturate(1.2) !important;
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  /* Hero foreground: contain so full image is visible */
-  .cs-ch-hero-img {
-    object-fit: contain !important;
-    object-position: center center !important;
-    transform: none !important;
-    z-index: 1;
-    position: relative !important;
-  }
-
-  /* Card media container: fixed portrait-friendly height */
+  /* Session cards: show full image, no cropping */
   .cs-ch-card-media {
     aspect-ratio: unset !important;
-    height: min(58vw, 170px) !important;
+    height: auto !important;
+    min-height: unset !important;
   }
-
-  /* Card foreground: contain */
   .cs-ch-card-img {
+    width: 100% !important;
+    height: auto !important;
     object-fit: contain !important;
-    object-position: center center !important;
+    object-position: center !important;
     transform: none !important;
     filter: none !important;
-    z-index: 1;
-    position: relative !important;
   }
 }
 
