@@ -1,10 +1,10 @@
-// Cron: daily at 7:00 AM IST (01:30 UTC)
+// Cron: daily at 9:00 AM IST (03:30 UTC)
 // Finds users whose birth_day and birth_month match today's IST date,
 // sends them a birthday email and/or WhatsApp based on app_settings toggles,
-// and records the send date to prevent duplicate sends on the same day.
+// and records the send date to prevent duplicate sends on the same calendar day.
 //
 // vercel.json entry:
-// { "path": "/api/cron/birthday-wishes", "schedule": "30 1 * * *" }
+// { "path": "/api/cron/birthday-wishes", "schedule": "30 3 * * *" }
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
@@ -20,16 +20,19 @@ export async function GET(req: NextRequest) {
   const db = getSupabaseServer();
 
   // Today in IST (UTC+5:30)
-  const nowUtc   = new Date();
+  const nowUtc    = new Date();
   const istOffset = 5.5 * 60 * 60 * 1000;
-  const nowIst   = new Date(nowUtc.getTime() + istOffset);
+  const nowIst    = new Date(nowUtc.getTime() + istOffset);
   const todayDay   = nowIst.getUTCDate();
   const todayMonth = nowIst.getUTCMonth() + 1;
   const todayStr   = nowIst.toISOString().slice(0, 10);   // YYYY-MM-DD in IST
 
+  console.log(`[birthday-wishes] starting for IST date=${todayStr} (day=${todayDay} month=${todayMonth})`);
+
   // ── Cron lock (dedup across retries) ────────────────────────────────────────
   const locked = await acquireCronLock("birthday-wishes", todayStr);
   if (!locked) {
+    console.log(`[birthday-wishes] already ran for ${todayStr} — skipping`);
     return NextResponse.json({ skipped: true, reason: "already_ran_today" });
   }
 
@@ -47,60 +50,76 @@ export async function GET(req: NextRequest) {
     const waEnabled    = settingsMap["birthday_wa_enabled"]    !== "false";
     const waTemplate   = settingsMap["birthday_wa_template"]   ?? "birthday_wishes";
 
+    console.log(`[birthday-wishes] channels: email=${emailEnabled} whatsapp=${waEnabled}`);
+
     if (!emailEnabled && !waEnabled) {
       await releaseCronLock("birthday-wishes", todayStr);
+      console.log("[birthday-wishes] both channels disabled — releasing lock and skipping");
       return NextResponse.json({ skipped: true, reason: "both_channels_disabled" });
     }
 
     // ── Fetch birthday users ──────────────────────────────────────────────────
-    // Exclude users who already received the notification today (dedup columns).
+    // Match only birth_day and birth_month — never the year.
+    // Excludes users who already received the notification today (dedup columns).
     const { data: users, error: fetchError } = await db
       .from("users")
       .select("email, first_name, phone, birthday_email_sent, birthday_wa_sent")
       .eq("birth_day",   todayDay)
-      .eq("birth_month", todayMonth);
+      .eq("birth_month", todayMonth)
+      .not("email", "is", null);
 
     if (fetchError) {
+      console.error(`[birthday-wishes] failed to fetch users: ${fetchError.message}`);
       await releaseCronLock("birthday-wishes", todayStr);
       return NextResponse.json({ error: fetchError.message }, { status: 500 });
     }
 
     const birthday = users ?? [];
+    console.log(`[birthday-wishes] matched ${birthday.length} users with birthday today (${todayStr})`);
 
     const results = {
       total:        birthday.length,
       emailSent:    0,
       emailSkipped: 0,
+      emailFailed:  0,
       waSent:       0,
       waSkipped:    0,
+      waFailed:     0,
       errors:       [] as string[],
     };
 
     for (const user of birthday) {
-      const firstName = (user.first_name as string) ?? "Runner";
+      const firstName = (user.first_name as string | null) ?? "Runner";
       const email     = user.email as string;
-      const phone     = (user.phone as string) ?? "";
+      const phone     = (user.phone as string | null) ?? "";
 
       // ── Birthday email ────────────────────────────────────────────────────
       if (emailEnabled) {
         if (user.birthday_email_sent === todayStr) {
+          console.log(`[birthday-wishes] email already sent today for ${email} — skipping`);
           results.emailSkipped++;
         } else {
-          try {
-            await sendEmail(
-              email, firstName,
-              `🎉 Happy Birthday, ${firstName}! From Connected Steps`,
-              birthdayEmailHTML(firstName),
-              false,  // isOtp
-              false,  // isTransactional — birthday emails are non-transactional
-              `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in"}/api/unsubscribe?email=${encodeURIComponent(email)}`,
-            );
+          // sendEmail never throws — always returns { ok, error }
+          const result = await sendEmail(
+            email, firstName,
+            `🎉 Happy Birthday, ${firstName}! From Connected Steps`,
+            birthdayEmailHTML(firstName),
+            false,  // isOtp
+            false,  // isTransactional — birthday emails are non-transactional
+            `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in"}/api/unsubscribe?email=${encodeURIComponent(email)}`,
+          );
+
+          if (result.ok) {
             await db.from("users")
               .update({ birthday_email_sent: todayStr })
               .eq("email", email);
             results.emailSent++;
-          } catch (err) {
-            results.errors.push(`email:${email}:${String(err)}`);
+            console.log(`[birthday-wishes] email sent to ${email}`);
+          } else {
+            results.emailFailed++;
+            const errMsg = `email:${email}:${result.error ?? "unknown"}`;
+            results.errors.push(errMsg);
+            console.error(`[birthday-wishes] email FAILED for ${email}: ${result.error}`);
           }
         }
       }
@@ -109,27 +128,39 @@ export async function GET(req: NextRequest) {
       if (waEnabled && phone) {
         const phoneDigits = phone.replace(/\D/g, "");
         if (user.birthday_wa_sent === todayStr) {
+          console.log(`[birthday-wishes] WhatsApp already sent today for ${email} — skipping`);
           results.waSkipped++;
-        } else if (phoneDigits.length === 10) {
-          try {
-            await sendWhatsApp(
-              `91${phoneDigits}`,
-              birthdayWAParams(firstName),
-              waTemplate,
-            );
+        } else if (phoneDigits.length >= 10) {
+          const normalized = phoneDigits.length === 10 ? `91${phoneDigits}` : phoneDigits;
+          const waResult = await sendWhatsApp(
+            normalized,
+            birthdayWAParams(firstName),
+            waTemplate,
+          );
+
+          if (waResult.ok) {
             await db.from("users")
               .update({ birthday_wa_sent: todayStr })
               .eq("email", email);
             results.waSent++;
-          } catch (err) {
-            results.errors.push(`wa:${email}:${String(err)}`);
+            console.log(`[birthday-wishes] WhatsApp sent to ${normalized} (${email})`);
+          } else {
+            results.waFailed++;
+            const errMsg = `wa:${email}:${waResult.error ?? "unknown"}`;
+            results.errors.push(errMsg);
+            console.error(`[birthday-wishes] WhatsApp FAILED for ${email} (${normalized}): ${waResult.error}`);
           }
+        } else {
+          console.log(`[birthday-wishes] skipping WhatsApp for ${email} — invalid phone: "${phone}"`);
         }
       }
     }
 
+    console.log(`[birthday-wishes] done date=${todayStr} emailSent=${results.emailSent} emailFailed=${results.emailFailed} waSent=${results.waSent} waFailed=${results.waFailed} errors=${results.errors.length}`);
+
     return NextResponse.json({ ok: true, date: todayStr, ...results });
   } catch (err) {
+    console.error(`[birthday-wishes] unexpected error:`, err);
     await releaseCronLock("birthday-wishes", todayStr);
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
