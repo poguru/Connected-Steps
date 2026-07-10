@@ -15,7 +15,7 @@
   "crons": [
     {
       "path": "/api/cron/job-worker",
-      "schedule": "* * * * *"
+      "schedule": "0 12 * * *"
     },
     {
       "path": "/api/cron/payment-reconcile",
@@ -47,7 +47,7 @@
     },
     {
       "path": "/api/cron/hourly-session-alerts",
-      "schedule": "0 * * * *"
+      "schedule": "0 8 * * *"
     },
     {
       "path": "/api/cron/slot-expiry",

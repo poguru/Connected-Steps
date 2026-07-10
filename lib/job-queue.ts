@@ -186,6 +186,17 @@ export async function enqueueJob<T extends JobType>(
     return null;
   }
 
+  // Self-trigger the worker immediately so jobs process in real-time rather than
+  // waiting for the daily cron sweep (Vercel Hobby plan only allows once-daily crons).
+  // Fire-and-forget — the daily cron is the fallback for any failures here.
+  const appUrl     = process.env.NEXT_PUBLIC_APP_URL;
+  const cronSecret = process.env.CRON_SECRET;
+  if (appUrl && cronSecret) {
+    fetch(`${appUrl}/api/cron/job-worker`, {
+      headers: { authorization: `Bearer ${cronSecret}` },
+    }).catch(() => {});
+  }
+
   return (data as { id: string }).id;
 }
 
