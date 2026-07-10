@@ -156,15 +156,22 @@ export async function sendSingleEmail(msg: EmailMessage): Promise<SendResult> {
       body: JSON.stringify(payload),
     });
 
-    const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+    let data: Record<string, unknown> = {};
+    let rawBody = "";
+    try {
+      rawBody = await res.text();
+      data = JSON.parse(rawBody);
+    } catch {
+      // data stays {}
+    }
 
     if (!res.ok) {
       const { category, isTransient } = classifyError(res.status, data);
       const errMsg = extractError(data) ?? `HTTP ${res.status}`;
-      console.error(`[ZeptoMail] failed to=${msg.to} status=${res.status}: ${errMsg} | body=${JSON.stringify(data)}`);
+      console.error(`[ZeptoMail] failed to=${msg.to} status=${res.status}: ${errMsg} | raw=${rawBody}`);
       return {
         ok: false, to: msg.to,
-        error: `ZeptoMail ${res.status}: ${errMsg} | ${JSON.stringify(data)}`,
+        error: `ZeptoMail ${res.status}: ${errMsg} | raw=${rawBody}`,
         errorCategory: category, httpStatus: res.status,
         isTransient, provider: "zeptomail",
       };
