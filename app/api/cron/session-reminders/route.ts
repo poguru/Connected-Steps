@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
       const user = a.users as unknown as { first_name: string; phone: string } | null;
       if (!user?.phone) continue;
       const params = sessionWAParams(
-        user.first_name, session.title, session.date, session.time, venue, String(session.id)
+        user.first_name, session.title, session.date, session.time, venue
       );
       const result = await sendWhatsApp(user.phone, params).catch(() => ({ ok: false }));
       if (result.ok) waCount++;

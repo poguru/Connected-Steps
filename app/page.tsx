@@ -7,7 +7,7 @@ import FloatingContact      from "@/components/layout/FloatingContact";
 import Hero                 from "@/components/home/Hero";
 import RunningJourney       from "@/components/home/RunningJourney";
 import Features             from "@/components/home/Features";
-import UpcomingEvents       from "@/components/home/UpcomingEvents";
+import UpcomingSection      from "@/components/home/UpcomingSection";
 import Coaches              from "@/components/home/Coaches";
 import StatsAndTestimonials from "@/components/home/StatsAndTestimonials";
 import CommunityQA          from "@/components/home/CommunityQA";
@@ -34,17 +34,17 @@ export default function HomePage() {
       {/* 1 · Hero — full-viewport entry point */}
       <Hero />
 
-      {/* 2 · Running Journey — show the progression */}
-      <RunningJourney />
-
-      {/* 3 · Why Connected Steps — programs + sessions */}
+      {/* 2 · Upcoming Sessions & Events — highest-priority engagement section */}
       <SectionReveal>
-        <Features />
+        <UpcomingSection />
       </SectionReveal>
 
-      {/* 4 · Upcoming Events */}
+      {/* 3 · Running Journey — show the progression */}
+      <RunningJourney />
+
+      {/* 4 · Why Connected Steps — programs + sessions */}
       <SectionReveal>
-        <UpcomingEvents />
+        <Features />
       </SectionReveal>
 
       {/* 5 · Coaches */}

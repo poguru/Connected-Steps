@@ -253,7 +253,7 @@ async function notifyUsers(
       .filter((u) => u.phone?.trim())
       .map((u) => {
         const name = `${u.first_name} ${u.last_name}`.trim() || "there";
-        return sendWhatsApp(u.phone!, sessionWAParams(name, title, date, time, displayLocation, sessionId));
+        return sendWhatsApp(u.phone!, sessionWAParams(name, title, date, time, displayLocation));
       })
   );
   const waSent = waResults.filter((r) => r.status === "fulfilled" && (r as PromiseFulfilledResult<{ ok: boolean }>).value.ok).length;

@@ -210,7 +210,7 @@ export default function Hero() {
         </div>
 
         {/* ══ RIGHT — community card ════════════════════════════════════════ */}
-        <div className="relative hidden lg:block animate-fade-up-2" style={{ position: "relative" }}>
+        <div className="relative animate-fade-up-2" style={{ position: "relative" }}>
           {/* Glow behind card */}
           <div style={{
             position: "absolute",

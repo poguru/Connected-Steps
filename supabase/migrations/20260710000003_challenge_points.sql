@@ -30,12 +30,25 @@ CREATE INDEX IF NOT EXISTS session_challenges_email_idx   ON public.session_chal
 
 ALTER TABLE public.session_challenges ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "service_role_all" ON public.session_challenges
-  FOR ALL TO service_role USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'session_challenges' AND policyname = 'service_role_all'
+  ) THEN
+    EXECUTE 'CREATE POLICY "service_role_all" ON public.session_challenges FOR ALL TO service_role USING (true) WITH CHECK (true)';
+  END IF;
+END $$;
 
-CREATE POLICY "admin_read" ON public.session_challenges
-  FOR SELECT TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM public.users
-    WHERE email = auth.email() AND role IN ('admin', 'coach')
-  ));
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'session_challenges' AND policyname = 'admin_read'
+  ) THEN
+    EXECUTE $p$CREATE POLICY "admin_read" ON public.session_challenges
+      FOR SELECT TO authenticated
+      USING (EXISTS (
+        SELECT 1 FROM public.users
+        WHERE email = auth.email() AND role IN ('admin', 'coach')
+      ))$p$;
+  END IF;
+END $$;

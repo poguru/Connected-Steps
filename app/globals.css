@@ -478,6 +478,36 @@ select.auth-input option {
   .us-track::-webkit-scrollbar { display: none; }
 }
 
+/* ─── UpcomingSection (new unified) ─────────────────── */
+.us-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 1rem;
+}
+.us-carousel-wrap  { display: none; }
+.us-view-links     { display: flex; }
+
+@media (max-width: 860px) {
+  .us-grid           { display: none; }
+  .us-carousel-wrap  { display: block; }
+  .us-carousel-track {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+  }
+  .us-carousel-track::-webkit-scrollbar { display: none; }
+  .us-carousel-item {
+    flex-shrink: 0;
+    width: min(78vw, 300px);
+    scroll-snap-align: start;
+  }
+  .us-view-links     { display: none; }
+}
+
 /* ─── Training Plans carousel ───────────────────────── */
 .tp-desktop-grid {
   display: grid;

@@ -26,7 +26,7 @@ export async function sendWhatsApp(
   templateName?: string,
 ): Promise<NotifyResult> {
   const { sendWhatsAppTemplate } = await import("@/lib/whatsapp");
-  const template = templateName ?? process.env.WHATSAPP_SESSION_TEMPLATE ?? "session_alert";
+  const template = templateName ?? process.env.WHATSAPP_SESSION_TEMPLATE ?? "session_alert_v3";
   const result   = await sendWhatsAppTemplate(phone, template, params);
   return {
     to:         phone,
@@ -93,15 +93,15 @@ function formatDate(date: string): string {
   });
 }
 
-/** WhatsApp params for session_alert template
- *  Template variables: {{1}}=name {{2}}=title {{3}}=date+time {{4}}=location {{5}}=join URL
+/** WhatsApp params for session_alert_v4 template
+ *  Template variables: {{1}}=name {{2}}=title {{3}}=date+time {{4}}=location
+ *  Registration URL is static in the template body (connectedsteps.in)
  */
 export function sessionWAParams(
-  name: string, title: string, date: string, time: string | null, location: string, sessionId: string
+  name: string, title: string, date: string, time: string | null, location: string
 ): string[] {
   const dateStr = time ? `${formatDate(date)} at ${time}` : formatDate(date);
-  const joinUrl = `https://www.connectedsteps.in/join/${sessionId}`;
-  return [name, title, dateStr, location, joinUrl];
+  return [name, title, dateStr, location];
 }
 
 /** WhatsApp params for run_registration template
