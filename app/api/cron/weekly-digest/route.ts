@@ -283,7 +283,7 @@ export async function GET(req: NextRequest) {
   type EmailJob = { from: string; to: string[]; subject: string; html: string; listUnsubscribeUrl?: string };
   const emailBatch: EmailJob[] = [];
 
-  const fromEmail = process.env.RESEND_FROM_EMAIL ?? "Connected Steps <noreply@connectedsteps.in>";
+  const fromEmail = `${process.env.ZEPTOMAIL_FROM_NAME ?? "Connected Steps"} <${process.env.ZEPTOMAIL_FROM_EMAIL ?? "info@connectedsteps.in"}>`;
 
   for (const user of users) {
     const email     = user.email.toLowerCase();

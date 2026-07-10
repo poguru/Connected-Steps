@@ -15,7 +15,7 @@
   "crons": [
     {
       "path": "/api/cron/job-worker",
-      "schedule": "0 21 * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/payment-reconcile",
