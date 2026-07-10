@@ -12,9 +12,8 @@
  * Setup checklist before going live:
  *   1. Create account at https://zeptomail.zoho.in
  *   2. Add & verify the "connectedsteps.in" send-mail domain (DNS + DKIM)
- *   3. Copy the API token from Send Mail → API Token and set ZEPTOMAIL_API_KEY
- *   4. Set ZEPTOMAIL_FROM_EMAIL=info@connectedsteps.in in Vercel env vars
- *   5. Remove (or ignore) the old AWS_SES_* and RESEND_API_KEY vars
+ *   3. Copy the API token from Mail Agent → SMTP/API → Send Mail token
+ *   4. Set ZEPTOMAIL_API_KEY, ZEPTOMAIL_FROM_EMAIL, ZEPTOMAIL_FROM_NAME in Vercel env vars
  */
 
 // ── Types ─────────────────────────────────────────────────────────────────────

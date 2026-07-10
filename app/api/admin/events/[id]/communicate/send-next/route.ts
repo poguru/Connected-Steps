@@ -7,8 +7,8 @@ import { sendSingleEmail } from "@/lib/email-service";
 const MAX_ATTEMPTS = 3;
 
 // Sends exactly ONE email from the batch queue.
-// The admin UI calls this endpoint once per second to respect SES sandbox rate limits.
-// Each call is fast (<3s): auth + DB claim + SES send + DB update.
+// The admin UI calls this endpoint once per second to throttle sends.
+// Each call is fast (<3s): auth + DB claim + send + DB update.
 // When the queue is empty, returns { done: true } with final counts.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -40,16 +40,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ done: true, delivered, failed, total: all.length });
   }
 
-  // Send this email via SES (with Resend fallback)
   const result = await sendSingleEmail({
     to:      email.recipient_email,
     subject: email.subject,
     html:    email.html_body,
   });
 
-  // Transient failures (ThrottlingException, network timeout) are automatically
-  // re-queued up to MAX_ATTEMPTS times. Permanent failures (invalid address,
-  // sandbox rejection) are never retried.
+  // Transient failures (network timeout, rate limit) are automatically
+  // re-queued up to MAX_ATTEMPTS times. Permanent failures (invalid address)
+  // are never retried.
   const willRetry  = !result.ok && result.isTransient === true && email.attempts < MAX_ATTEMPTS;
   const finalStatus = result.ok ? "delivered" : willRetry ? "queued" : "failed";
 
