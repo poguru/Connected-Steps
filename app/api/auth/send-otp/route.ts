@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { sendEmail, sendWhatsAppOTP } from "@/lib/notify";
+import { sendEmail, sendWhatsAppOTP, sendSMSOTP } from "@/lib/notify";
 import {
   isRateLimited, recordFailure, getClientIp,
   isRateLimitedCustom, recordFailureCustom,
@@ -156,7 +156,22 @@ export async function POST(req: NextRequest) {
       }
       console.log(`[send-otp] OTP email delivered to ${identifier}`);
     } else {
-      await sendWhatsAppOTP(identifier, displayName, code);
+      // Try WhatsApp first; fall back to SMS if WhatsApp is not configured or fails
+      const waResult = await sendWhatsAppOTP(identifier, displayName, code);
+      if (!waResult.ok) {
+        console.warn(`[send-otp] WhatsApp failed for ${identifier}: ${waResult.error} — trying SMS`);
+        const smsResult = await sendSMSOTP(identifier, code);
+        if (!smsResult.ok) {
+          console.error(`[send-otp] SMS also failed for ${identifier}: ${smsResult.error}`);
+          return NextResponse.json(
+            { error: "Failed to send OTP. Please check your number and try again." },
+            { status: 500 },
+          );
+        }
+        console.log(`[send-otp] OTP sent via SMS to ${identifier}`);
+      } else {
+        console.log(`[send-otp] OTP sent via WhatsApp to ${identifier}`);
+      }
     }
 
     return NextResponse.json({ success: true });
