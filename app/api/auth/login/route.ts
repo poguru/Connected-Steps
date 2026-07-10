@@ -29,10 +29,19 @@ export async function POST(req: NextRequest) {
 
   const val = identifier.trim();
 
-  // Try email first, then phone — use limit(1) to handle any duplicate rows gracefully
+  // Try phone first (primary identity), then email as fallback.
+  // Phone: accept raw 10-digit or +91/91 prefix.
+  const phoneDigits = val.replace(/\D/g, "");
+  const phone10 = phoneDigits.length === 12 && phoneDigits.startsWith("91")
+    ? phoneDigits.slice(2)
+    : phoneDigits.length === 13 && phoneDigits.startsWith("091")
+      ? phoneDigits.slice(3)
+      : phoneDigits;
+  const byPhone = phone10.length === 10
+    ? await supabaseServer.from("users").select("*").eq("phone", phone10).limit(1)
+    : { data: [] };
   const byEmail = await supabaseServer.from("users").select("*").eq("email", val.toLowerCase()).limit(1);
-  const byPhone = await supabaseServer.from("users").select("*").eq("phone", val).limit(1);
-  const user = byEmail.data?.[0] ?? byPhone.data?.[0] ?? null;
+  const user = byPhone.data?.[0] ?? byEmail.data?.[0] ?? null;
 
   if (!user) {
     await recordFailure(key);

@@ -13,8 +13,8 @@ const labelMap: Record<string, string> = {
 
 const descMap: Record<string, string> = {
   birthday_email_enabled: "Send a personalised birthday email to members on their birthday.",
-  birthday_wa_enabled:    "Send a WhatsApp message to members on their birthday via MSG91.",
-  birthday_wa_template:   "The MSG91 template name registered for birthday wishes.",
+  birthday_wa_enabled:    "Send a WhatsApp message to members on their birthday via Meta WhatsApp Cloud API.",
+  birthday_wa_template:   "The Meta WhatsApp template name approved for birthday wishes.",
 };
 
 const toggleKeys = ["birthday_email_enabled", "birthday_wa_enabled"] as const;

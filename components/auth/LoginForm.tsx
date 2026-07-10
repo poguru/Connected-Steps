@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, FormEvent, ChangeEvent } from "react";
+import { useState, useRef, useEffect, useCallback, FormEvent, ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import OtpInput from "./OtpInput";
@@ -9,20 +9,34 @@ import { Alert, Input, PasswordInput } from "@/components/ui/ds";
 type Mode    = "password" | "otp";
 type OtpStep = "identifier" | "code";
 
+const RESEND_COOLDOWN = 30;
+
 interface Props { onSwitchToSignUp: () => void; }
+
+function isPhoneInput(val: string): boolean {
+  const digits = val.replace(/\D/g, "");
+  // Treat as phone if: all digits, or starts with +91/91, and 10-13 digits
+  if (val.includes("@")) return false;
+  return digits.length >= 10 && digits.length <= 13;
+}
+
+function maskPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  const local  = digits.startsWith("91") ? digits.slice(2) : digits;
+  if (local.length < 4) return `+91 ${local}`;
+  return `+91 ${"X".repeat(local.length - 3)}${local.slice(-3)}`;
+}
 
 export default function LoginForm({ onSwitchToSignUp }: Props) {
   const router       = useRouter();
   const searchParams = useSearchParams();
 
   // ── Password mode ──────────────────────────────────────────────────────────
-  const [form, setForm]       = useState({ identifier: "", password: "" });
-  const [showPw, setShowPw]   = useState(false);
+  const [form, setForm]           = useState({ identifier: "", password: "" });
+  const [showPw, setShowPw]       = useState(false);
   const [pwLoading, setPwLoading] = useState(false);
   const [pwError,   setPwError]   = useState("");
-  // Ref-based guard prevents double-fire from onTouchEnd + onClick both firing
-  // on Android tablets (React state updates are batched — refs update synchronously)
-  const submittingRef = useRef(false);
+  const submittingRef             = useRef(false);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     setForm(p => ({ ...p, [e.target.name]: e.target.value }));
@@ -33,13 +47,17 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
     if (submittingRef.current) return;
     submittingRef.current = true;
     if (!form.identifier || !form.password) {
-      setPwError("Please enter your email and password.");
+      setPwError("Please enter your mobile number or email, and password.");
       submittingRef.current = false;
       return;
     }
     setPwLoading(true);
     try {
-      const res  = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier: form.identifier, password: form.password }) });
+      const res  = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier: form.identifier, password: form.password }),
+      });
       const data = await res.json();
       if (!res.ok) { setPwError(data.error); return; }
       saveAndRedirect(data.user, data.requiresPhoneVerification);
@@ -57,45 +75,54 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
   const [sending,    setSending]    = useState(false);
   const [verifying,  setVerifying]  = useState(false);
   const [otpError,   setOtpError]   = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
+
+  const isPhone = isPhoneInput(identifier.trim());
 
   function saveAndRedirect(user: Record<string, unknown>, requiresPhoneVerification?: boolean) {
     const photo = localStorage.getItem("cs_pending_photo") ?? null;
     const { userToken, coachToken, ...rest } = user;
-    // Persist phone_verified so the banner and profile page can read it
     const userData = {
       ...rest,
-      photo:         photo || rest.photo || null,
+      photo:          photo || rest.photo || null,
       phone_verified: rest.phone_verified ?? false,
     };
     localStorage.setItem("cs_user", JSON.stringify(userData));
-    if (userToken)  localStorage.setItem("cs_user_token",   userToken  as string);
-    if (coachToken) localStorage.setItem("cs_coach_token",  coachToken as string);
-    // Set auth cookie for server-side middleware route protection (90 days, matches token TTL)
+    if (userToken)  localStorage.setItem("cs_user_token",  userToken  as string);
+    if (coachToken) localStorage.setItem("cs_coach_token", coachToken as string);
     if (userToken) {
       const secure = window.location.protocol === "https:" ? "; Secure" : "";
       document.cookie = `cs_auth=${userToken as string}; path=/; max-age=7776000; SameSite=Lax${secure}`;
     }
-    localStorage.removeItem("cs_requires_phone_verification");
+    // Set flag for PhoneVerifyBanner if phone is unverified
+    if (requiresPhoneVerification) {
+      localStorage.setItem("cs_requires_phone_verification", "true");
+    } else {
+      localStorage.removeItem("cs_requires_phone_verification");
+    }
     localStorage.removeItem("cs_pending_photo");
     localStorage.removeItem(`cs_member_${user.email}`);
-    // Save pending preferred training location from signup (fire-and-forget)
     const pendingLocation = localStorage.getItem("cs_pending_location");
     if (pendingLocation && userToken) {
       localStorage.removeItem("cs_pending_location");
       fetch("/api/user/location", {
-        method: "POST",
+        method:  "POST",
         headers: { "Content-Type": "application/json", "x-user-token": userToken as string },
-        body: JSON.stringify({ location_id: pendingLocation }),
+        body:    JSON.stringify({ location_id: pendingLocation }),
       }).catch(() => {});
     }
     const savedStrava = localStorage.getItem(`cs_strava_${user.email}`);
     if (savedStrava) localStorage.setItem("cs_strava", savedStrava);
-    // Prefer sessionStorage redirect (set by Register buttons), then URL param
     const stored = sessionStorage.getItem("cs_post_login_redirect") ?? "";
     sessionStorage.removeItem("cs_post_login_redirect");
     const param  = searchParams.get("redirect") ?? "";
     const dest   = stored || param;
-    // Coaches go to /coach portal; regular users go to /dashboard
     const role   = (user.role as string | undefined) ?? "user";
     const defaultDest = role === "coach" ? "/coach" : "/dashboard";
     const safe   = dest.startsWith("/") && !dest.startsWith("//") ? dest : defaultDest;
@@ -103,40 +130,72 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
   }
 
   async function sendOtp() {
-    if (!identifier.trim()) { setOtpError("Please enter your email or phone number."); return; }
+    const val = identifier.trim();
+    if (!val) { setOtpError("Please enter your mobile number or email."); return; }
     setSending(true); setOtpError("");
     try {
-      const res  = await fetch("/api/auth/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "email", value: identifier.trim(), purpose: "login" }),
-      });
+      let res: Response;
+      if (isPhone) {
+        // Phone OTP — use the new Meta WhatsApp endpoint
+        const digits = val.replace(/\D/g, "");
+        const phone10 = digits.length === 12 && digits.startsWith("91") ? digits.slice(2)
+          : digits.length === 13 && digits.startsWith("091") ? digits.slice(3)
+          : digits;
+        res = await fetch("/api/auth/send-phone-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: phone10, purpose: "login" }),
+        });
+      } else {
+        // Email OTP — existing endpoint
+        res = await fetch("/api/auth/send-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "email", value: val, purpose: "login" }),
+        });
+      }
       const data = await res.json();
       if (!res.ok) { setOtpError(data.error ?? "Failed to send OTP."); return; }
       setOtpStep("code");
+      setResendCooldown(RESEND_COOLDOWN);
     } catch { setOtpError("Network error. Please try again."); }
     finally { setSending(false); }
   }
 
-  async function verifyOtp() {
-    if (otpCode.length !== 6) { setOtpError("Please enter the 6-digit OTP."); return; }
+  const verifyOtp = useCallback(async (code: string) => {
+    if (code.length !== 6 || verifying) return;
     setVerifying(true); setOtpError("");
     try {
-      const res  = await fetch("/api/auth/login-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier: identifier.trim(), code: otpCode }),
-      });
+      const val = identifier.trim();
+      let res: Response;
+      if (isPhone) {
+        const digits = val.replace(/\D/g, "");
+        const phone10 = digits.length === 12 && digits.startsWith("91") ? digits.slice(2)
+          : digits.length === 13 && digits.startsWith("091") ? digits.slice(3)
+          : digits;
+        res = await fetch("/api/auth/verify-phone-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: phone10, code, purpose: "login" }),
+        });
+      } else {
+        res = await fetch("/api/auth/login-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ identifier: val, code }),
+        });
+      }
       const data = await res.json();
       if (!res.ok) { setOtpError(data.error ?? "Verification failed."); return; }
       saveAndRedirect(data.user, data.requiresPhoneVerification);
     } catch { setOtpError("Something went wrong. Please try again."); }
     finally { setVerifying(false); }
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identifier, isPhone, verifying]);
 
   function switchMode(m: Mode) {
     setMode(m); setOtpStep("identifier");
-    setOtpCode(""); setOtpError(""); setPwError("");
+    setOtpCode(""); setOtpError(""); setPwError(""); setResendCooldown(0);
   }
 
   // ── Mode toggle ─────────────────────────────────────────────────────────────
@@ -161,7 +220,8 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
     <form onSubmit={handlePasswordSubmit} noValidate style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <ModeToggle />
 
-      <Input name="identifier" type="text" placeholder="Email address"
+      <Input name="identifier" type="text"
+        placeholder="Mobile number or email"
         value={form.identifier} onChange={handleChange} autoComplete="username" />
 
       <PasswordInput placeholder="Password" name="password"
@@ -175,7 +235,10 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
 
       {pwError && <Alert variant="error">{pwError}</Alert>}
 
-      <button type="button" onClick={submitLogin} onTouchEnd={submitLogin} disabled={pwLoading} style={{ width: "100%", padding: "13px", borderRadius: 999, background: pwLoading ? "oklch(0.72 0.19 49 / 60%)" : "var(--gradient-accent)", color: "var(--accent-foreground)", border: "none", cursor: pwLoading ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem", boxShadow: pwLoading ? "none" : "var(--shadow-orange)", transition: "opacity 0.2s" }}>
+      <button
+        type="button" onClick={submitLogin} onTouchEnd={submitLogin} disabled={pwLoading}
+        style={{ width: "100%", padding: "13px", borderRadius: 999, background: pwLoading ? "oklch(0.72 0.19 49 / 60%)" : "var(--gradient-accent)", color: "var(--accent-foreground)", border: "none", cursor: pwLoading ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem", boxShadow: pwLoading ? "none" : "var(--shadow-orange)", transition: "opacity 0.2s" }}
+      >
         {pwLoading ? "Signing in…" : "Sign in"}
       </button>
     </form>
@@ -186,9 +249,10 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <ModeToggle />
       <p style={{ margin: 0, fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.6 }}>
-        Enter your registered email and we&apos;ll send you a one-time code.
+        Enter your registered mobile number or email and we&apos;ll send you a one-time code.
       </p>
-      <Input type="email" placeholder="Email address"
+      <Input type="text"
+        placeholder="Mobile number or email"
         value={identifier} onChange={e => { setIdentifier(e.target.value); setOtpError(""); }}
         autoComplete="username" />
       {otpError && <Alert variant="error">{otpError}</Alert>}
@@ -202,27 +266,44 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
   );
 
   // ══ OTP MODE — code step ═══════════════════════════════════════════════════
+  const displayTarget = isPhone ? maskPhone(identifier.trim()) : identifier.trim();
+  const channel       = isPhone ? "WhatsApp" : "email";
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <ModeToggle />
       <p style={{ margin: 0, fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.6 }}>
-        OTP sent to <strong style={{ color: "var(--foreground)" }}>{identifier}</strong>.{" "}
-        {"Check your inbox."}
+        OTP sent to{" "}
+        <strong style={{ color: "var(--foreground)", fontFamily: isPhone ? "monospace" : "inherit" }}>
+          {displayTarget}
+        </strong>{" "}
+        via {channel}.
       </p>
-      <OtpInput value={otpCode} onChange={v => { setOtpCode(v); setOtpError(""); }} />
+      <OtpInput
+        value={otpCode}
+        onChange={v => { setOtpCode(v); setOtpError(""); }}
+        onComplete={verifyOtp}
+        disabled={verifying}
+      />
       {otpError && <Alert variant="error">{otpError}</Alert>}
       <button
-        type="button" onClick={verifyOtp} disabled={verifying || otpCode.length !== 6}
-        style={{ width: "100%", padding: "13px", borderRadius: 999, background: otpCode.length === 6 ? "var(--gradient-accent)" : "oklch(0.72 0.19 49 / 30%)", color: "var(--accent-foreground)", border: "none", cursor: otpCode.length === 6 ? "pointer" : "not-allowed", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem", boxShadow: otpCode.length === 6 ? "var(--shadow-orange)" : "none" }}
+        type="button" onClick={() => verifyOtp(otpCode)} disabled={verifying || otpCode.length !== 6}
+        style={{ width: "100%", padding: "13px", borderRadius: 999, background: otpCode.length === 6 ? "var(--gradient-accent)" : "oklch(0.72 0.19 49 / 30%)", color: "var(--accent-foreground)", border: "none", cursor: otpCode.length === 6 && !verifying ? "pointer" : "not-allowed", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem", boxShadow: otpCode.length === 6 ? "var(--shadow-orange)" : "none" }}
       >
         {verifying ? "Verifying…" : "Verify & Sign in →"}
       </button>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <button type="button" onClick={() => { setOtpStep("identifier"); setOtpCode(""); setOtpError(""); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--muted-foreground)", fontFamily: "var(--font-body)" }}>
+        <button type="button" onClick={() => { setOtpStep("identifier"); setOtpCode(""); setOtpError(""); setResendCooldown(0); }}
+          style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "var(--muted-foreground)", fontFamily: "var(--font-body)" }}>
           ← Change
         </button>
-        <button type="button" onClick={sendOtp} disabled={sending} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--muted-foreground)", fontFamily: "var(--font-body)", textDecoration: "underline" }}>
-          {sending ? "Sending…" : "Resend OTP"}
+        <button
+          type="button"
+          onClick={sendOtp}
+          disabled={sending || resendCooldown > 0}
+          style={{ background: "none", border: "none", cursor: resendCooldown > 0 || sending ? "not-allowed" : "pointer", fontSize: 12, color: resendCooldown > 0 ? "var(--muted-foreground)" : "var(--primary)", fontFamily: "var(--font-body)", textDecoration: resendCooldown > 0 ? "none" : "underline" }}
+        >
+          {sending ? "Sending…" : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend OTP"}
         </button>
       </div>
     </div>

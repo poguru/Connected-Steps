@@ -1,17 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
+import { sendWhatsAppTemplate } from "@/lib/whatsapp";
 
 interface Recipient { email: string; name: string; phone?: string }
 
 function personalise(msg: string, name: string) {
   return msg.replace(/\{\{name\}\}/gi, name.split(" ")[0] || "there");
-}
-
-function normalisePhone(p: string) {
-  const d = p.replace(/\D/g, "");
-  if (d.length === 10) return `91${d}`;
-  if (d.length === 12 && d.startsWith("91")) return d;
-  return d;
 }
 
 function emailHtml(body: string) {
@@ -66,27 +60,15 @@ export async function POST(req: NextRequest) {
     }
 
   } else if (channel === "whatsapp") {
-    const authKey    = process.env.MSG91_AUTH_KEY;
-    const fromNumber = process.env.MSG91_WHATSAPP_NUMBER;
-    if (!authKey || !fromNumber) return NextResponse.json({ error: "WhatsApp not configured" }, { status: 500 });
+    const templateName = process.env.WHATSAPP_BROADCAST_TEMPLATE_NAME ?? "cs_broadcast";
 
     for (const r of recipients) {
       if (!r.phone?.trim()) { results.skipped++; continue; }
-      const to  = normalisePhone(r.phone);
       const txt = personalise(message, r.name);
       try {
-        const res = await fetch("https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/", {
-          method: "POST",
-          headers: { authkey: authKey, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            integrated_number: fromNumber,
-            content_type: "text",
-            payload: { messaging_product: "whatsapp", to, type: "text", text: { body: txt } },
-          }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && !data.hasError) results.sent++;
-        else results.failed++;
+        const waResult = await sendWhatsAppTemplate(r.phone, templateName, [txt]);
+        if (waResult.ok) results.sent++;
+        else { console.error(`[broadcast] WA failed phone=${r.phone} error="${waResult.error}"`); results.failed++; }
       } catch { results.failed++; }
     }
   } else {

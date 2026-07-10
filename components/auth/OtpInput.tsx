@@ -3,21 +3,32 @@
 import { useRef } from "react";
 
 interface OtpInputProps {
-  value:    string;
-  onChange: (v: string) => void;
-  length?:  number;
+  value:       string;
+  onChange:    (v: string) => void;
+  onComplete?: (v: string) => void;  // called when all digits are filled
+  length?:     number;
+  disabled?:   boolean;
 }
 
-export default function OtpInput({ value, onChange, length = 6 }: OtpInputProps) {
-  const refs = useRef<(HTMLInputElement | null)[]>(Array(length).fill(null));
+export default function OtpInput({ value, onChange, onComplete, length = 6, disabled = false }: OtpInputProps) {
+  const refs   = useRef<(HTMLInputElement | null)[]>(Array(length).fill(null));
   const digits = Array(length).fill("").map((_, i) => value[i] ?? "");
 
   function handleChange(index: number, raw: string) {
     const char = raw.replace(/\D/g, "").slice(-1);
     const next = [...digits];
     next[index] = char;
-    onChange(next.join(""));
-    if (char && index < length - 1) refs.current[index + 1]?.focus();
+    const joined = next.join("");
+    onChange(joined);
+    if (char) {
+      if (index < length - 1) {
+        refs.current[index + 1]?.focus();
+      } else if (joined.length === length && onComplete) {
+        // All digits filled — trigger auto-submit after a microtask so the
+        // state update from onChange has settled first.
+        setTimeout(() => onComplete(joined), 0);
+      }
+    }
   }
 
   function handleKeyDown(index: number, e: React.KeyboardEvent<HTMLInputElement>) {
@@ -37,9 +48,13 @@ export default function OtpInput({ value, onChange, length = 6 }: OtpInputProps)
   function handlePaste(e: React.ClipboardEvent) {
     e.preventDefault();
     const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, length);
-    onChange(pasted.padEnd(length, "").slice(0, length));
+    const joined = pasted.padEnd(length, "").slice(0, length);
+    onChange(joined);
     const focusIdx = Math.min(pasted.length, length - 1);
     refs.current[focusIdx]?.focus();
+    if (pasted.length === length && onComplete) {
+      setTimeout(() => onComplete(joined), 0);
+    }
   }
 
   function handleFocus(e: React.FocusEvent<HTMLInputElement>) {
@@ -56,13 +71,14 @@ export default function OtpInput({ value, onChange, length = 6 }: OtpInputProps)
           inputMode="numeric"
           maxLength={1}
           value={d}
+          disabled={disabled}
           onChange={e => handleChange(i, e.target.value)}
           onKeyDown={e => handleKeyDown(i, e)}
           onPaste={handlePaste}
           onFocus={handleFocus}
           autoComplete="one-time-code"
           style={{
-            width: 48, height: 56,
+            width: 44, height: 54,
             textAlign: "center",
             fontSize: d ? "1.4rem" : "1rem",
             fontWeight: 700,
@@ -75,8 +91,10 @@ export default function OtpInput({ value, onChange, length = 6 }: OtpInputProps)
             transition: "border-color 0.15s, background 0.15s",
             caretColor: "transparent",
             boxSizing: "border-box",
+            opacity: disabled ? 0.5 : 1,
+            cursor: disabled ? "not-allowed" : "text",
           }}
-          onFocusCapture={e => { e.currentTarget.style.borderColor = "var(--primary)"; e.currentTarget.style.boxShadow = "0 0 0 3px oklch(0.72 0.19 49 / 15%)"; }}
+          onFocusCapture={e => { if (!disabled) { e.currentTarget.style.borderColor = "var(--primary)"; e.currentTarget.style.boxShadow = "0 0 0 3px oklch(0.72 0.19 49 / 15%)"; } }}
           onBlurCapture={e  => { e.currentTarget.style.boxShadow = "none"; if (!e.currentTarget.value) e.currentTarget.style.borderColor = "var(--border)"; }}
         />
       ))}

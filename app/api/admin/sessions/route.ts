@@ -230,7 +230,7 @@ function buildAnnouncementEmail(
 </html>`;
 }
 
-// ── WhatsApp + push (paused — enable when MSG91 templates are approved) ───────
+// ── WhatsApp + push ────────────────────────────────────────────────────────────
 
 async function notifyUsers(
   db: ReturnType<typeof import("@/lib/supabase-server").getSupabaseServer>,

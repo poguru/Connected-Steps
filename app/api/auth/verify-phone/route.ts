@@ -77,9 +77,12 @@ export async function POST(req: NextRequest) {
     // ── Mark OTP used ─────────────────────────────────────────────────────────
     await db.from("otp_verifications").update({ verified: true }).eq("id", otpRecord.id);
 
-    // ── Update user: set phone + phone_verified ───────────────────────────────
+    // ── Update user: set phone + phone_verified + phone_verified_at ───────────
     // For change_phone: also update the phone number itself.
-    const updatePayload: Record<string, unknown> = { phone_verified: true };
+    const updatePayload: Record<string, unknown> = {
+      phone_verified:    true,
+      phone_verified_at: new Date().toISOString(),
+    };
     if (purpose === "change_phone") {
       updatePayload.phone = normalizedPhone;
     }
@@ -94,8 +97,8 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({
-      success:       true,
-      phone:         normalizedPhone,
+      success:        true,
+      phone:          normalizedPhone,
       phone_verified: true,
     });
   } catch (e: unknown) {

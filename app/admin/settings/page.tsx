@@ -7,7 +7,7 @@ const SETTINGS = [
   {
     href:  "/admin/settings/notifications",
     title: "Notification Settings",
-    desc:  "Birthday emails, WhatsApp automation, and MSG91 template names.",
+    desc:  "Birthday emails and WhatsApp automation via Meta WhatsApp Cloud API.",
   },
 ];
 

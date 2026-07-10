@@ -81,7 +81,7 @@ export async function proxy(request: NextRequest) {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://checkout.razorpay.com https://api.zeptomail.in https://api.msg91.com",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://checkout.razorpay.com https://api.zeptomail.in https://graph.facebook.com",
     "frame-src https://checkout.razorpay.com",
     "frame-ancestors 'self'",
     "base-uri 'self'",

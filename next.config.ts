@@ -20,7 +20,7 @@ const securityHeaders = [
   //   script-src 'unsafe-inline' 'unsafe-eval' — Next.js App Router requires
   //     both for hydration and dynamic imports.
   //   connect-src — covers Supabase PostgREST, Upstash Redis REST, Razorpay,
-  //     MSG91 (WhatsApp/SMS), AWS SES (all go through our server-side routes).
+  //     Meta WhatsApp Cloud API (all go through our server-side routes).
   //   img-src data: — Next.js <Image> uses data: URIs for blur placeholder.
   {
     key:   "Content-Security-Policy-Report-Only",

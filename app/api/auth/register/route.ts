@@ -8,12 +8,13 @@ import { sendEmail, welcomeEmailHTML, adminNewUserEmailHTML } from "@/lib/notify
 
 export async function POST(req: NextRequest) {
   try {
-    // phoneVerified is set to true only when the signup form has already gone
-    // through the phone OTP step before calling this endpoint.
+    // phoneVerified: true signals that the client completed the WhatsApp OTP step.
+    // The server re-checks otp_verifications to prevent spoofing.
     const { firstName, lastName, email, phone, goal, location, password, phoneVerified, referralCode, dob } = await req.json();
 
-    if (!email || !password || !firstName || !lastName || !phone) {
-      return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
+    // phone is required; email is optional (users log in via phone)
+    if (!password || !firstName || !lastName || !phone) {
+      return NextResponse.json({ error: "Full name, mobile number, and password are required." }, { status: 400 });
     }
 
     // DOB validation
@@ -32,9 +33,15 @@ export async function POST(req: NextRequest) {
     const birthDay   = dobDate.getDate();
     const birthMonth = dobDate.getMonth() + 1;
 
+    // Normalise phone to 10 digits
     const phoneDigits = (phone as string).replace(/\D/g, "");
-    if (phoneDigits.length !== 10) {
-      return NextResponse.json({ error: "Please enter a valid 10-digit mobile number." }, { status: 400 });
+    const phone10 = phoneDigits.length === 12 && phoneDigits.startsWith("91")
+      ? phoneDigits.slice(2)
+      : phoneDigits.length === 13 && phoneDigits.startsWith("091")
+        ? phoneDigits.slice(3)
+        : phoneDigits;
+    if (phone10.length !== 10 || !/^[6-9]\d{9}$/.test(phone10)) {
+      return NextResponse.json({ error: "Please enter a valid 10-digit Indian mobile number." }, { status: 400 });
     }
 
     // Server-side password strength validation (mirrors client-side rules)
@@ -50,19 +57,52 @@ export async function POST(req: NextRequest) {
 
     const supabaseServer = getSupabaseServer();
 
-    // Check if email already registered
-    const { data: existing, error: checkError } = await supabaseServer
-      .from("users")
-      .select("id")
-      .eq("email", email.toLowerCase())
-      .single();
+    // ── Server-side phone OTP verification check ──────────────────────────────
+    // When phoneVerified=true, confirm the OTP was actually verified in the DB.
+    // This prevents the client from bypassing the OTP step by sending phoneVerified:true.
+    let confirmedPhoneVerified = false;
+    if (phoneVerified === true) {
+      const { data: otpRecord } = await supabaseServer
+        .from("otp_verifications")
+        .select("verified, expires_at")
+        .eq("identifier", phone10)
+        .eq("type", "phone")
+        .maybeSingle();
 
-    if (checkError && checkError.code !== "PGRST116") {
-      return NextResponse.json({ error: "DB check failed: " + checkError.message }, { status: 500 });
+      if (otpRecord?.verified) {
+        confirmedPhoneVerified = true;
+        // Clean up the OTP record now that the account is being created
+        await supabaseServer
+          .from("otp_verifications")
+          .delete()
+          .eq("identifier", phone10)
+          .eq("type", "phone");
+      }
+      // If OTP record not found or not verified, proceed but mark phone_verified=false
     }
 
-    if (existing) {
-      return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
+    // ── Duplicate checks ──────────────────────────────────────────────────────
+    const { data: existingPhone } = await supabaseServer
+      .from("users")
+      .select("id")
+      .eq("phone", phone10)
+      .maybeSingle();
+    if (existingPhone) {
+      return NextResponse.json({ error: "An account with this mobile number already exists." }, { status: 409 });
+    }
+
+    if (email) {
+      const { data: existingEmail, error: checkError } = await supabaseServer
+        .from("users")
+        .select("id")
+        .eq("email", (email as string).toLowerCase())
+        .single();
+      if (checkError && checkError.code !== "PGRST116") {
+        return NextResponse.json({ error: "DB check failed: " + checkError.message }, { status: 500 });
+      }
+      if (existingEmail) {
+        return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
+      }
     }
 
     const hashed = await bcrypt.hash(password, 12);
@@ -70,17 +110,18 @@ export async function POST(req: NextRequest) {
     const registeredAt = new Date().toISOString();
 
     const { error } = await supabaseServer.from("users").insert({
-      first_name:    firstName,
-      last_name:     lastName,
-      email:         email.toLowerCase(),
-      phone,
+      first_name:         firstName,
+      last_name:          lastName,
+      email:              email ? (email as string).toLowerCase() : null,
+      phone:              phone10,
       goal,
       location,
-      password:      hashed,
-      phone_verified: phoneVerified === true,
-      date_of_birth:  dob,
-      birth_day:      birthDay,
-      birth_month:    birthMonth,
+      password:           hashed,
+      phone_verified:     confirmedPhoneVerified,
+      phone_verified_at:  confirmedPhoneVerified ? new Date().toISOString() : null,
+      date_of_birth:      dob,
+      birth_day:          birthDay,
+      birth_month:        birthMonth,
     });
 
     if (error) {
@@ -88,38 +129,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Registration failed. Please try again." }, { status: 500 });
     }
 
-    autoFeedMemberJoined(email.toLowerCase(), firstName, lastName, location ?? null)
-      .catch(() => {});
+    const userEmail = email ? (email as string).toLowerCase() : null;
 
-    // Pre-generate referral code so the user can share immediately from the dashboard
-    getOrCreateCode(email.toLowerCase()).catch(() => {});
+    if (userEmail) {
+      autoFeedMemberJoined(userEmail, firstName, lastName, location ?? null).catch(() => {});
+      getOrCreateCode(userEmail).catch(() => {});
+    }
 
-    if (referralCode && typeof referralCode === "string") {
+    if (referralCode && typeof referralCode === "string" && userEmail) {
       const referralPayload = {
-        referralCode:      referralCode.trim(),
-        referredEmail:     email.toLowerCase(),
+        referralCode:      (referralCode as string).trim(),
+        referredEmail:     userEmail,
         referredFirstName: firstName,
       };
-      // Enqueue for durability/retry and fire immediately
-      await enqueueJob("referral_reward", referralPayload, { idempotencyKey: `referral_reward:${email.toLowerCase()}` });
+      await enqueueJob("referral_reward", referralPayload, { idempotencyKey: `referral_reward:${userEmail}` });
       void processReferral(referralPayload.referralCode, referralPayload.referredEmail, referralPayload.referredFirstName).catch(console.error);
     }
 
-    // Welcome email to new user (non-blocking)
-    sendEmail(
-      email.toLowerCase(), firstName,
-      "Welcome to Connected Steps! 🎉",
-      welcomeEmailHTML(firstName),
-    ).catch(() => {});
+    // Welcome email (only if email provided)
+    if (userEmail) {
+      sendEmail(
+        userEmail, firstName,
+        "Welcome to Connected Steps! 🎉",
+        welcomeEmailHTML(firstName),
+      ).catch(() => {});
+    }
 
-    // Admin notification to info@connectedsteps.in (non-blocking)
+    // Admin notification
     sendEmail(
       "info@connectedsteps.in", "Connected Steps Admin",
       `New Registration: ${firstName} ${lastName}`,
       adminNewUserEmailHTML({
         firstName, lastName,
-        email:        email.toLowerCase(),
-        phone,
+        email:        userEmail ?? "(no email)",
+        phone:        phone10,
         dob:          dob ?? null,
         location:     location ?? null,
         referralCode: referralCode ?? null,

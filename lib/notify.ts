@@ -1,25 +1,13 @@
 /**
- * MSG91 notification helper — WhatsApp, SMS, Email
- * NOTIFICATIONS_PAUSED = true disables all outbound alerts temporarily.
- * Set to false when MSG91 templates are approved and ready to go live.
+ * Notification helpers — WhatsApp (Meta Cloud API) + Email (ZeptoMail).
+ * MSG91 and SMS have been removed; all WhatsApp messages now go through Meta.
  */
-const NOTIFICATIONS_PAUSED = false;
-
-// ── Phone normalisation (Indian numbers → 91XXXXXXXXXX, no +) ────────────────
-
-function normalisePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length === 10)                              return `91${digits}`;
-  if (digits.length === 12 && digits.startsWith("91"))   return digits;
-  if (digits.length === 13 && digits.startsWith("091"))  return digits.slice(1);
-  return digits;
-}
 
 // ── Result type ───────────────────────────────────────────────────────────────
 
 export interface NotifyResult {
   to:          string;
-  channel:     "whatsapp" | "sms" | "email";
+  channel:     "whatsapp" | "email";
   ok:          boolean;
   error?:      string;
   messageId?:  string;
@@ -27,122 +15,28 @@ export interface NotifyResult {
   httpStatus?: number;
 }
 
-// ── WhatsApp ──────────────────────────────────────────────────────────────────
-// MSG91 WhatsApp outbound — requires a pre-approved template in MSG91 dashboard.
-// Template name is set via MSG91_WHATSAPP_TEMPLATE.
-//
-// Create this template in MSG91 → WhatsApp → Templates:
-//   Name:     session_alert
-//   Category: Utility
-//   Body:
-//     Hi {{1}}, a new *Connected Steps* Weekend Special Long Run has been scheduled!
-//
-//     📅 *Date:* {{2}}
-//     📍 *Location:* {{3}}
-//     🏃 *Run:* {{4}}
-//
-//     Lace up and join us for the long run! 💪
-//     Register: https://www.connectedsteps.in/weekend-run
-//
-//     — Connected Steps Team
+// ── WhatsApp (Meta Cloud API) ─────────────────────────────────────────────────
+// Delegates to lib/whatsapp.ts which uses Meta's Graph API directly.
+// Templates must be pre-approved in Meta Business Manager.
+// See lib/whatsapp.ts for the list of template bodies to register.
 
 export async function sendWhatsApp(
-  phone: string,
-  params: string[],
-  templateName?: string
+  phone:         string,
+  params:        string[],
+  templateName?: string,
 ): Promise<NotifyResult> {
-  if (NOTIFICATIONS_PAUSED) return { to: phone, channel: "whatsapp", ok: true };
-  const authKey    = process.env.MSG91_AUTH_KEY;
-  const fromNumber = process.env.MSG91_WHATSAPP_NUMBER;
-  const namespace  = process.env.MSG91_NAMESPACE;
-  const template   = templateName ?? process.env.MSG91_WHATSAPP_TEMPLATE ?? "session_alert";
-
-  if (!authKey || !fromNumber) {
-    console.error("[MSG91 WA] SKIPPED — MSG91_AUTH_KEY or MSG91_WHATSAPP_NUMBER not set");
-    return { to: phone, channel: "whatsapp", ok: false, error: "MSG91 WhatsApp not configured." };
-  }
-
-  const to = normalisePhone(phone);
-
-  // Build body_1, body_2, ... from params array
-  const components: Record<string, { type: string; value: string }> = {};
-  params.forEach((value, i) => {
-    components[`body_${i + 1}`] = { type: "text", value };
-  });
-
-  const body = {
-    integrated_number: fromNumber,
-    content_type: "template",
-    payload: {
-      messaging_product: "whatsapp",
-      type: "template",
-      template: {
-        name: template,
-        language: { code: "en_US", policy: "deterministic" },
-        ...(namespace ? { namespace } : {}),
-        to_and_components: [{ to: [to], components }],
-      },
-    },
+  const { sendWhatsAppTemplate } = await import("@/lib/whatsapp");
+  const template = templateName ?? process.env.WHATSAPP_SESSION_TEMPLATE ?? "session_alert";
+  const result   = await sendWhatsAppTemplate(phone, template, params);
+  return {
+    to:         phone,
+    channel:    "whatsapp",
+    ok:         result.ok,
+    error:      result.error,
+    messageId:  result.messageId,
+    provider:   "meta",
+    httpStatus: result.httpStatus,
   };
-
-  try {
-    const res = await fetch(
-      "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/",
-      {
-        method: "POST",
-        headers: { authkey: authKey, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }
-    );
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.hasError) {
-      const errMsg = data.message ?? data.errors ?? JSON.stringify(data) ?? String(res.status);
-      console.error("[MSG91 WA] error:", errMsg);
-      return { to: phone, channel: "whatsapp", ok: false, error: errMsg };
-    }
-    return { to: phone, channel: "whatsapp", ok: true };
-  } catch (e: unknown) {
-    return { to: phone, channel: "whatsapp", ok: false, error: String(e) };
-  }
-}
-
-// ── SMS ───────────────────────────────────────────────────────────────────────
-// MSG91 transactional SMS (route 4).
-// Note: In India, SMS requires DLT-registered sender ID and template.
-// Register at trai.gov.in or through MSG91's DLT portal.
-
-export async function sendSMS(phone: string, message: string): Promise<NotifyResult> {
-  if (NOTIFICATIONS_PAUSED) return { to: phone, channel: "sms", ok: true };
-  const authKey  = process.env.MSG91_AUTH_KEY;
-  const senderId = process.env.MSG91_SENDER_ID;
-
-  if (!authKey || !senderId) {
-    return { to: phone, channel: "sms", ok: false, error: "MSG91 SMS not configured." };
-  }
-
-  const to = normalisePhone(phone);
-
-  const body = {
-    sender:  senderId,
-    route:   "4",           // 4 = Transactional
-    country: "91",
-    sms: [{ message, to: [to] }],
-  };
-
-  try {
-    const res = await fetch("https://api.msg91.com/api/v5/sms", {
-      method: "POST",
-      headers: { authkey: authKey, "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.type === "error") {
-      return { to: phone, channel: "sms", ok: false, error: data.message ?? String(res.status) };
-    }
-    return { to: phone, channel: "sms", ok: true };
-  } catch (e: unknown) {
-    return { to: phone, channel: "sms", ok: false, error: String(e) };
-  }
 }
 
 // ── Email ─────────────────────────────────────────────────────────────────────
@@ -160,8 +54,6 @@ export async function sendEmail(
   isTransactional = false,   // true = bypass NON_OTP_EMAILS_DISABLED (QR, registration, payment)
   listUnsubscribeUrl?: string, // set for non-transactional bulk/digest emails
 ): Promise<NotifyResult> {
-  if (NOTIFICATIONS_PAUSED) return { to, channel: "email", ok: true };
-
   // NON_OTP_EMAILS_DISABLED suppresses optional emails (marketing, digests, notifications).
   // Transactional emails (QR codes, registration confirmation, payment receipts) are NEVER
   // suppressed — users must receive these to use the product.
@@ -176,61 +68,21 @@ export async function sendEmail(
 }
 
 // ── WhatsApp OTP ──────────────────────────────────────────────────────────────
-// Requires a MSG91 WhatsApp Authentication template named "otp_verification" (or MSG91_OTP_TEMPLATE env):
-//   Category: Authentication
-//   Body:    Your Connected Steps verification code is {{1}}. Do not share this code.
-//   Footer:  This code expires in 10 minutes.
-//   Button:  Copy Code (OTP type)
-// {{1}} = the 6-digit code only (Authentication templates don't support name variables)
+// Sends a phone OTP via the Meta WhatsApp authentication template.
+// Template: cs_otp_verification (see lib/whatsapp.ts for the required body).
 
 export async function sendWhatsAppOTP(phone: string, _name: string, code: string): Promise<NotifyResult> {
-  const template = process.env.MSG91_OTP_TEMPLATE ?? "otp_verification";
-  return sendWhatsApp(phone, [code], template);
-}
-
-// ── SMS OTP ───────────────────────────────────────────────────────────────────
-// MSG91 dedicated OTP API — simpler than transactional SMS.
-// Requires a DLT-registered template in MSG91 → SMS → Templates with ##OTP## placeholder.
-// Set MSG91_DLT_TEMPLATE_ID to the template ID from your MSG91 dashboard.
-//
-// Example DLT template body:
-//   Your Connected Steps verification code is ##OTP##. Do not share this code. - Connected Steps
-
-export async function sendSMSOTP(phone: string, code: string): Promise<NotifyResult> {
-  if (NOTIFICATIONS_PAUSED) return { to: phone, channel: "sms", ok: true };
-
-  const authKey    = process.env.MSG91_AUTH_KEY;
-  const templateId = process.env.MSG91_DLT_TEMPLATE_ID;
-  const senderId   = process.env.MSG91_SENDER_ID;
-
-  if (!authKey || !templateId) {
-    console.error("[MSG91 OTP SMS] SKIPPED — MSG91_AUTH_KEY or MSG91_DLT_TEMPLATE_ID not set");
-    return { to: phone, channel: "sms", ok: false, error: "MSG91 OTP SMS not configured." };
-  }
-
-  const to = normalisePhone(phone);
-
-  try {
-    const res = await fetch("https://api.msg91.com/api/v5/otp", {
-      method: "POST",
-      headers: { authkey: authKey, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        mobile:      to,
-        otp:         code,
-        template_id: templateId,
-        ...(senderId ? { sender: senderId } : {}),
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.type === "error") {
-      const errMsg = data.message ?? JSON.stringify(data) ?? String(res.status);
-      console.error("[MSG91 OTP SMS] error:", errMsg);
-      return { to: phone, channel: "sms", ok: false, error: errMsg };
-    }
-    return { to: phone, channel: "sms", ok: true };
-  } catch (e: unknown) {
-    return { to: phone, channel: "sms", ok: false, error: String(e) };
-  }
+  const { sendWhatsAppOTP: metaSend } = await import("@/lib/whatsapp");
+  const result = await metaSend(phone, code);
+  return {
+    to:         phone,
+    channel:    "whatsapp",
+    ok:         result.ok,
+    error:      result.error,
+    messageId:  result.messageId,
+    provider:   "meta",
+    httpStatus: result.httpStatus,
+  };
 }
 
 // ── Message builders ──────────────────────────────────────────────────────────
@@ -253,7 +105,7 @@ export function sessionWAParams(
 }
 
 /** WhatsApp params for run_registration template
- *  MSG91 template body (create in MSG91 → WhatsApp → Templates):
+ *  Meta WhatsApp template (create in Meta Business Manager → WhatsApp → Message Templates):
  *    Name: run_registration | Category: Utility
  *    Hi {{1}}, you're registered for *{{2}}*! 🏃
  *    📅 Date: {{3}}
@@ -267,7 +119,7 @@ export function runRegistrationWAParams(
 }
 
 /** WhatsApp params for membership_confirmation template
- *  MSG91 template body (create in MSG91 → WhatsApp → Templates):
+ *  Meta WhatsApp template (create in Meta Business Manager → WhatsApp → Message Templates):
  *    Name: membership_confirmation | Category: Utility
  *    Hi {{1}}, your *Connected Steps* {{2}} membership is confirmed! ✅
  *    💳 Amount paid: ₹{{3}}
@@ -282,7 +134,7 @@ export function membershipWAParams(
 }
 
 /** WhatsApp params for birthday_wishes template
- *  MSG91 template body (create in MSG91 → WhatsApp → Templates):
+ *  Meta WhatsApp template (create in Meta Business Manager → WhatsApp → Message Templates):
  *    Name:     birthday_wishes
  *    Category: Utility
  *    Body:
