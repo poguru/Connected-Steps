@@ -131,8 +131,7 @@ export async function sendSingleEmail(msg: EmailMessage): Promise<SendResult> {
 
   const payload: Record<string, unknown> = {
     from:     { address: fromAddress, name: fromName },
-    to:       [{ email_address: { address: msg.to } }],
-    reply_to: [{ address: msg.replyTo ?? "info@connectedsteps.in" }],
+    to:       [{ email_address: { address: msg.to, name: "" } }],
     subject:  msg.subject,
     htmlbody: msg.html,
     textbody: textBody,
