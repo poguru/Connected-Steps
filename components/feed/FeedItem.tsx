@@ -177,20 +177,53 @@ export default function FeedItem({ event, currentUserEmail, compact = false }: P
           onClick={() => setImgExpanded(true)}
           style={{ display: "block", width: "100%", padding: 0, border: "none", background: "none", cursor: "pointer" }}>
           <div style={{
-            height: 160, overflow: "hidden",
-            background: `url(${photoUrl}) center/cover no-repeat`,
-            opacity: 0.85,
-          }} />
+            position: "relative", width: "100%", height: 210,
+            overflow: "hidden", background: "#0a0a0a", lineHeight: 0,
+          }}>
+            {/* Blurred background fill */}
+            <div style={{
+              position: "absolute", inset: 0,
+              backgroundImage: `url(${photoUrl})`,
+              backgroundSize: "cover", backgroundPosition: "center",
+              filter: "blur(18px)", opacity: 0.3, transform: "scale(1.12)",
+            }} />
+            <img
+              src={photoUrl}
+              alt="Activity photo"
+              style={{
+                position: "relative", zIndex: 1,
+                display: "block", width: "100%", height: "210px",
+                objectFit: "contain",
+              }}
+            />
+          </div>
         </button>
       )}
 
       {/* ── Expanded full photo ── */}
       {hasPhoto && imgExpanded && (
-        <img
-          src={photoUrl}
-          alt="Activity photo"
-          style={{ width: "100%", maxHeight: compact ? 200 : 340, objectFit: "cover", display: "block" }}
-        />
+        <div style={{
+          position: "relative", width: "100%",
+          overflow: "hidden", background: "#0a0a0a", lineHeight: 0,
+        }}>
+          {/* Blurred background fill */}
+          <div style={{
+            position: "absolute", inset: 0,
+            backgroundImage: `url(${photoUrl})`,
+            backgroundSize: "cover", backgroundPosition: "center",
+            filter: "blur(22px)", opacity: 0.28, transform: "scale(1.12)",
+          }} />
+          <img
+            src={photoUrl}
+            alt="Activity photo"
+            style={{
+              position: "relative", zIndex: 1,
+              display: "block", width: "100%",
+              maxHeight: compact ? 220 : 700,
+              objectFit: "contain",
+            }}
+          />
+        </div>
       )}
 
       {/* ── Reactions bar ── */}

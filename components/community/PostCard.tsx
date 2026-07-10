@@ -217,11 +217,29 @@ export default function PostCard({ post, currentUserEmail, onDeleted }: Props) {
       {post.photo_url && (
         <button onClick={() => setPhotoOpen(p => !p)}
           style={{ display: "block", width: "100%", padding: 0, border: "none", background: "none", cursor: "pointer", marginTop: "0.6rem" }}>
-          <img
-            src={post.photo_url}
-            alt="Post photo"
-            style={{ width: "100%", maxHeight: photoOpen ? 500 : 220, objectFit: "cover", display: "block" }}
-          />
+          <div style={{
+            position: "relative", width: "100%", overflow: "hidden",
+            maxHeight: photoOpen ? 700 : 320,
+            background: "#0a0a0a", lineHeight: 0,
+          }}>
+            {/* Blurred background fill for letterbox areas */}
+            <div style={{
+              position: "absolute", inset: 0,
+              backgroundImage: `url(${post.photo_url})`,
+              backgroundSize: "cover", backgroundPosition: "center",
+              filter: "blur(22px)", opacity: 0.28, transform: "scale(1.12)",
+            }} />
+            <img
+              src={post.photo_url}
+              alt="Post photo"
+              style={{
+                position: "relative", zIndex: 1,
+                display: "block", width: "100%",
+                maxHeight: photoOpen ? 700 : 320,
+                objectFit: "contain",
+              }}
+            />
+          </div>
         </button>
       )}
 
