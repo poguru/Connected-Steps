@@ -148,7 +148,7 @@ export async function sendSingleEmail(msg: EmailMessage): Promise<SendResult> {
     const res = await fetch(ZEPTOMAIL_URL, {
       method:  "POST",
       headers: {
-        "Authorization": `Zoho-enczapikey ${apiKey}`,
+        "Authorization": apiKey.startsWith("Zoho-enczapikey ") ? apiKey : `Zoho-enczapikey ${apiKey}`,
         "Content-Type":  "application/json",
         "Accept":        "application/json",
       },
