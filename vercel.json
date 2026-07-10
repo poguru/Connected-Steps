@@ -15,7 +15,7 @@
   "crons": [
     {
       "path": "/api/cron/job-worker",
-      "schedule": "30 14 * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/cron/payment-reconcile",
@@ -47,11 +47,15 @@
     },
     {
       "path": "/api/cron/hourly-session-alerts",
-      "schedule": "0 5 * * *"
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/cron/slot-expiry",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/media-cleanup",
+      "schedule": "30 20 * * *"
     }
   ]
 }

@@ -154,13 +154,6 @@ export function birthdayWAParams(firstName: string): string[] {
   return [firstName];
 }
 
-/** Short SMS text (DLT-registered template content) */
-export function sessionSMSText(
-  name: string, title: string, date: string, location: string
-): string {
-  return `Hi ${name}, Connected Steps session "${title}" scheduled on ${formatDate(date)} at ${location}. Register: connectedsteps.in/weekend-run`;
-}
-
 /** Payment confirmation HTML email */
 export function paymentEmailHTML(
   name: string, plan: string, amountINR: number, expiresAt: string
