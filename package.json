@@ -13,7 +13,6 @@
     "cap:ios": "npx cap open ios"
   },
   "dependencies": {
-    "@aws-sdk/client-sesv2": "^3.1075.0",
     "@capacitor/android": "^8.4.0",
     "@capacitor/app": "^8.1.0",
     "@capacitor/camera": "^8.2.0",

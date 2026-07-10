@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
-  const from   = process.env.AWS_SES_FROM_EMAIL ?? process.env.RESEND_FROM_EMAIL ?? "Connected Steps <info@connectedsteps.in>";
+  const from   = `${process.env.ZEPTOMAIL_FROM_NAME ?? "Connected Steps"} <${process.env.ZEPTOMAIL_FROM_EMAIL ?? "info@connectedsteps.in"}>`;
 
   // Send a minimal test email and capture the full diagnostic response
   const result = await sendSingleEmail({
@@ -46,18 +46,17 @@ export async function POST(req: NextRequest) {
     diagnosis: result.ok
       ? `✅ Email accepted by ${result.provider} (messageId: ${result.messageId}). Check ${to} inbox.`
       : `❌ Email failed. Provider: ${result.provider ?? "none"}. Error: ${result.error}. ${
-          result.error?.includes("MessageRejected") || result.error?.includes("not verified")
-            ? "SES Sandbox is active — recipient email must be verified in AWS SES Console, OR wait for production access approval."
-            : result.error?.includes("not configured")
-            ? "No email provider configured. Check RESEND_API_KEY and AWS_SES_ACCESS_KEY_ID in Vercel env vars."
+          result.error?.includes("not configured")
+            ? "ZEPTOMAIL_API_KEY is not set — add it to Vercel environment variables."
+            : result.error?.includes("401") || result.error?.includes("403")
+            ? "Invalid API key — check ZEPTOMAIL_API_KEY in Vercel env vars."
             : "Check Vercel function logs for details."
         }`,
     env_check: {
-      ses_configured:    !!process.env.AWS_SES_ACCESS_KEY_ID,
-      ses_region:        process.env.AWS_SES_REGION ?? "not set",
-      ses_from:          process.env.AWS_SES_FROM_EMAIL ?? "not set",
-      resend_configured: !!process.env.RESEND_API_KEY,
-      non_otp_disabled:  process.env.NON_OTP_EMAILS_DISABLED === "true",
+      zeptomail_configured: !!process.env.ZEPTOMAIL_API_KEY,
+      zeptomail_from_email: process.env.ZEPTOMAIL_FROM_EMAIL ?? "not set",
+      zeptomail_from_name:  process.env.ZEPTOMAIL_FROM_NAME  ?? "not set",
+      non_otp_disabled:     process.env.NON_OTP_EMAILS_DISABLED === "true",
     },
   });
 }

@@ -1,34 +1,21 @@
 /**
- * EmailService — provider-agnostic email abstraction.
- *
- * Current provider: Amazon SES v2 (@aws-sdk/client-sesv2).
- * Fallback:         Resend (RESEND_API_KEY).
+ * EmailService — ZeptoMail (Zoho Transactional Email) provider.
  *
  * Required env vars:
- *   AWS_SES_ACCESS_KEY_ID     — IAM user access key (SES:SendEmail permission)
- *   AWS_SES_SECRET_ACCESS_KEY — IAM user secret key
- *   AWS_SES_REGION            — e.g. ap-south-1 or us-east-1
- *   AWS_SES_FROM_EMAIL        — verified sender, e.g. "Connected Steps <info@connectedsteps.in>"
+ *   ZEPTOMAIL_API_KEY    — API token from ZeptoMail dashboard → Send Mail → API Token
+ *   ZEPTOMAIL_FROM_EMAIL — verified sender address, e.g. "info@connectedsteps.in"
+ *   ZEPTOMAIL_FROM_NAME  — sender display name (default: "Connected Steps")
  *
- * Rate limits:
- *   SES production:  14 emails/second (default; may be higher after account review)
- *   SES sandbox:     1 email/second to VERIFIED addresses only
- *   Resend free:     3 emails/second; 100 emails/month total quota
+ * Endpoint (India region): https://api.zeptomail.in/v1.1/email
+ * Auth header:             Authorization: Zoho-enczapikey {API_KEY}
  *
- * The previous implementation had NO inter-batch delay which caused
- * ThrottlingException from SES after ~25 emails when sending to 100+ recipients.
- * Root cause: 101 emails ÷ concurrency=5 = 21 consecutive batches fired with no
- * pause. SES rate limit hit after ~6 batches (30 emails) → remaining 76 failed.
- *
- * Fix: configurable inter-batch delay (default 400 ms → ≤12 emails/sec with
- * concurrency=5, safely under the 14/sec SES limit with headroom for retries).
+ * Setup checklist before going live:
+ *   1. Create account at https://zeptomail.zoho.in
+ *   2. Add & verify the "connectedsteps.in" send-mail domain (DNS + DKIM)
+ *   3. Copy the API token from Send Mail → API Token and set ZEPTOMAIL_API_KEY
+ *   4. Set ZEPTOMAIL_FROM_EMAIL=info@connectedsteps.in in Vercel env vars
+ *   5. Remove (or ignore) the old AWS_SES_* and RESEND_API_KEY vars
  */
-
-import {
-  SESv2Client,
-  SendEmailCommand,
-  type SendEmailCommandInput,
-} from "@aws-sdk/client-sesv2";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -36,12 +23,12 @@ export interface EmailMessage {
   to:       string;
   subject:  string;
   html:     string;
-  from?:    string;
+  from?:    string;   // "Name <addr@domain>" or plain address
   replyTo?: string;
   /**
-   * When set, adds RFC 2369 List-Unsubscribe and List-Unsubscribe-Post headers.
-   * Required by Amazon SES for bulk / non-transactional emails (digests, reminders, etc.).
-   * Transactional emails (OTP, QR codes, payment receipts) must NOT include this.
+   * When set, adds RFC 2369 List-Unsubscribe headers.
+   * Use for bulk / non-transactional emails (digests, reminders).
+   * Never set for OTP, QR codes, or payment receipts.
    */
   listUnsubscribeUrl?: string;
 }
@@ -51,218 +38,173 @@ export interface BatchEmailJob {
   to:                  string[];
   subject:             string;
   html:                string;
-  listUnsubscribeUrl?: string;   // per-recipient unsubscribe URL (for bulk non-transactional sends)
+  listUnsubscribeUrl?: string;
 }
 
-/** Error category for failure classification and retry decisions */
 export type EmailErrorCategory =
-  | "rate_limit"        // ThrottlingException — transient, back off and retry
-  | "invalid_address"   // invalid recipient — permanent, never retry
-  | "sandbox_rejection" // SES sandbox, address not verified — permanent
-  | "auth_error"        // wrong credentials — permanent until config fixed
-  | "quota_exceeded"    // account sending limit — wait until quota resets
-  | "network_error"     // transient network issue
-  | "provider_error"    // SES/Resend API error not otherwise classified
-  | "both_providers_failed"; // SES + Resend both failed
+  | "rate_limit"      // 429 — back off and retry
+  | "invalid_address" // bad recipient — don't retry
+  | "auth_error"      // wrong API key — fix config
+  | "quota_exceeded"  // plan limit hit
+  | "network_error"   // transient — retry
+  | "provider_error"; // ZeptoMail API error
 
 export interface SendResult {
-  ok:            boolean;
-  to:            string;
-  error?:        string;
+  ok:             boolean;
+  to:             string;
+  error?:         string;
   errorCategory?: EmailErrorCategory;
-  messageId?:    string;
-  provider?:     "ses" | "resend";
-  httpStatus?:   number;
-  /** true = retry may succeed; false = don't retry */
-  isTransient?:  boolean;
+  messageId?:     string;
+  provider?:      "zeptomail";
+  httpStatus?:    number;
+  isTransient?:   boolean;
 }
 
 export interface BatchSendResult {
   sent:    number;
   failed:  number;
-  results: SendResult[];  // per-email results with failure reasons
+  results: SendResult[];
 }
 
-// ── Lazy SES client ────────────────────────────────────────────────────────────
+// ── Internals ─────────────────────────────────────────────────────────────────
 
-let _client: SESv2Client | null = null;
+const ZEPTOMAIL_URL = "https://api.zeptomail.in/v1.1/email";
 
-function getClient(): SESv2Client {
-  if (!_client) {
-    _client = new SESv2Client({
-      region:      process.env.AWS_SES_REGION ?? "ap-south-1",
-      credentials: {
-        accessKeyId:     process.env.AWS_SES_ACCESS_KEY_ID     ?? "",
-        secretAccessKey: process.env.AWS_SES_SECRET_ACCESS_KEY ?? "",
-      },
-    });
+/** Parse "Name <addr>" or plain "addr" into { name, address }. */
+function parseFrom(raw: string): { name: string; address: string } {
+  const match = raw.match(/^(.+?)\s*<([^>]+)>\s*$/);
+  if (match) return { name: match[1].trim(), address: match[2].trim() };
+  return { name: "Connected Steps", address: raw.trim() };
+}
+
+function defaultFrom(): { name: string; address: string } {
+  const email = process.env.ZEPTOMAIL_FROM_EMAIL ?? "info@connectedsteps.in";
+  const name  = process.env.ZEPTOMAIL_FROM_NAME  ?? "Connected Steps";
+  return { name, address: email };
+}
+
+function classifyError(status: number, body: unknown): { category: EmailErrorCategory; isTransient: boolean } {
+  if (status === 429) return { category: "rate_limit",      isTransient: true  };
+  if (status === 401 || status === 403)
+                        return { category: "auth_error",     isTransient: false };
+
+  const msg = JSON.stringify(body).toLowerCase();
+  if (msg.includes("invalid") && (msg.includes("address") || msg.includes("email")))
+    return { category: "invalid_address", isTransient: false };
+  if (msg.includes("quota") || msg.includes("limit") || msg.includes("exceeded"))
+    return { category: "quota_exceeded",  isTransient: false };
+  if (status >= 500)
+    return { category: "provider_error",  isTransient: true  };
+
+  return { category: "provider_error", isTransient: false };
+}
+
+function extractError(body: unknown): string | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const b = body as Record<string, unknown>;
+  if (b.error && typeof b.error === "object") {
+    const e = b.error as Record<string, unknown>;
+    return `${e.code ?? ""} ${e.message ?? ""}`.trim() || undefined;
   }
-  return _client;
-}
-
-function defaultFrom(): string {
-  return (
-    process.env.AWS_SES_FROM_EMAIL ??
-    process.env.RESEND_FROM_EMAIL  ??
-    "Connected Steps <noreply@connectedsteps.in>"
-  );
-}
-
-// ── Error classifier ──────────────────────────────────────────────────────────
-
-function classifySesError(err: unknown): { category: EmailErrorCategory; isTransient: boolean } {
-  const msg = err instanceof Error ? err.message : String(err);
-  const name = (err as { name?: string }).name ?? "";
-
-  if (name === "ThrottlingException" || msg.includes("Throttling") || msg.includes("rate"))
-    return { category: "rate_limit",        isTransient: true  };
-  if (msg.includes("Invalid") && msg.includes("address") || msg.includes("invalid email"))
-    return { category: "invalid_address",   isTransient: false };
-  if (msg.includes("Email address is not verified") || msg.includes("sandbox"))
-    return { category: "sandbox_rejection", isTransient: false };
-  if (name === "InvalidClientTokenId" || msg.includes("credentials") || msg.includes("AuthFailure"))
-    return { category: "auth_error",        isTransient: false };
-  if (msg.includes("Daily maximum") || msg.includes("account-level"))
-    return { category: "quota_exceeded",    isTransient: false };
-  if (name === "NetworkingError" || msg.includes("ECONNRESET") || msg.includes("timeout"))
-    return { category: "network_error",     isTransient: true  };
-
-  return { category: "provider_error", isTransient: true };
-}
-
-// ── Resend fallback ───────────────────────────────────────────────────────────
-
-async function sendViaResend(msg: EmailMessage, from: string): Promise<SendResult> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return { ok: false, to: msg.to, error: "Resend not configured", errorCategory: "provider_error", isTransient: false };
-
-  try {
-    const res  = await fetch("https://api.resend.com/emails", {
-      method:  "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body:    JSON.stringify({
-        from,
-        to:       [msg.to],
-        subject:  msg.subject,
-        html:     msg.html,
-        reply_to: msg.replyTo ?? "info@connectedsteps.in",
-        ...(msg.listUnsubscribeUrl ? {
-          headers: {
-            "List-Unsubscribe":      `<${msg.listUnsubscribeUrl}>, <mailto:unsubscribe@connectedsteps.in?subject=Unsubscribe>`,
-            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-          },
-        } : {}),
-      }),
-    });
-    const data = await res.json().catch(() => ({})) as { message?: string; id?: string };
-
-    if (!res.ok) {
-      const errMsg  = data.message ?? String(res.status);
-      const isRate  = res.status === 429;
-      const isQuota = errMsg.toLowerCase().includes("quota") || errMsg.toLowerCase().includes("limit");
-      console.error(`[Resend] failed to=${msg.to} status=${res.status}: ${errMsg}`);
-      return {
-        ok:            false,
-        to:            msg.to,
-        error:         `Resend ${res.status}: ${errMsg}`,
-        errorCategory: isRate || isQuota ? "rate_limit" : "provider_error",
-        httpStatus:    res.status,
-        isTransient:   isRate,
-        provider:      "resend",
-      };
-    }
-
-    console.log(`[Resend] sent to=${msg.to} id=${data.id}`);
-    return { ok: true, to: msg.to, messageId: data.id, provider: "resend", httpStatus: res.status };
-  } catch (e: unknown) {
-    return { ok: false, to: msg.to, error: String(e), errorCategory: "network_error", isTransient: true };
-  }
+  if (typeof b.message === "string" && b.message !== "OK") return b.message;
+  return undefined;
 }
 
 // ── Core single send ──────────────────────────────────────────────────────────
 
 export async function sendSingleEmail(msg: EmailMessage): Promise<SendResult> {
-  const from = msg.from ?? defaultFrom();
-
-  if (process.env.AWS_SES_ACCESS_KEY_ID) {
-    // Build optional List-Unsubscribe headers for non-transactional bulk emails.
-    // SES requires these for digests, reminders, and marketing-adjacent emails.
-    // Never add to OTP, QR, or payment confirmation emails (isTransactional=true callers).
-    const unsubscribeHeaders = msg.listUnsubscribeUrl
-      ? [
-          { Name: "List-Unsubscribe",      Value: `<${msg.listUnsubscribeUrl}>, <mailto:unsubscribe@connectedsteps.in?subject=Unsubscribe>` },
-          { Name: "List-Unsubscribe-Post", Value: "List-Unsubscribe=One-Click" },
-        ]
-      : undefined;
-
-    const input: SendEmailCommandInput = {
-      FromEmailAddress: from,
-      Destination:      { ToAddresses: [msg.to] },
-      ReplyToAddresses: msg.replyTo ? [msg.replyTo] : ["info@connectedsteps.in"],
-      Content: {
-        Simple: {
-          Subject: { Data: msg.subject, Charset: "UTF-8" },
-          Body: {
-            Html: { Data: msg.html,                           Charset: "UTF-8" },
-            Text: { Data: msg.html.replace(/<[^>]*>/g, " "), Charset: "UTF-8" },
-          },
-          ...(unsubscribeHeaders ? { Headers: unsubscribeHeaders } : {}),
-        },
-      },
+  const apiKey = process.env.ZEPTOMAIL_API_KEY;
+  if (!apiKey) {
+    console.error("[ZeptoMail] ZEPTOMAIL_API_KEY not set");
+    return {
+      ok: false, to: msg.to,
+      error: "ZeptoMail not configured — set ZEPTOMAIL_API_KEY in environment variables",
+      errorCategory: "provider_error", isTransient: false,
     };
+  }
 
-    try {
-      const sesResult  = await getClient().send(new SendEmailCommand(input));
-      const messageId  = sesResult.MessageId;
-      const httpStatus = sesResult.$metadata?.httpStatusCode;
-      console.log(`[SES] sent to=${msg.to} messageId=${messageId} status=${httpStatus}`);
-      return { ok: true, to: msg.to, messageId, provider: "ses", httpStatus };
-    } catch (e: unknown) {
-      const { category, isTransient } = classifySesError(e);
-      const err = e instanceof Error ? e.message : String(e);
-      console.error(`[SES] failed to=${msg.to} category=${category}: ${err}`);
+  const { name: fromName, address: fromAddress } = msg.from
+    ? parseFrom(msg.from)
+    : defaultFrom();
 
-      // For permanent SES failures (invalid address, sandbox rejection), don't try Resend
-      if (category === "invalid_address" || category === "auth_error") {
-        return { ok: false, to: msg.to, error: err, errorCategory: category, isTransient: false };
-      }
+  const textBody = msg.html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
-      // Fall through to Resend for transient errors and sandbox issues
+  const payload: Record<string, unknown> = {
+    from:     { address: fromAddress, name: fromName },
+    to:       [{ email_address: { address: msg.to } }],
+    reply_to: [{ address: msg.replyTo ?? "info@connectedsteps.in" }],
+    subject:  msg.subject,
+    htmlbody: msg.html,
+    textbody: textBody,
+  };
+
+  if (msg.listUnsubscribeUrl) {
+    payload.mime_headers = {
+      "List-Unsubscribe":      `<${msg.listUnsubscribeUrl}>, <mailto:unsubscribe@connectedsteps.in?subject=Unsubscribe>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    };
+  }
+
+  try {
+    const res = await fetch(ZEPTOMAIL_URL, {
+      method:  "POST",
+      headers: {
+        "Authorization": `Zoho-enczapikey ${apiKey}`,
+        "Content-Type":  "application/json",
+        "Accept":        "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+
+    if (!res.ok) {
+      const { category, isTransient } = classifyError(res.status, data);
+      const errMsg = extractError(data) ?? `HTTP ${res.status}`;
+      console.error(`[ZeptoMail] failed to=${msg.to} status=${res.status}: ${errMsg}`);
+      return {
+        ok: false, to: msg.to,
+        error: `ZeptoMail ${res.status}: ${errMsg}`,
+        errorCategory: category, httpStatus: res.status,
+        isTransient, provider: "zeptomail",
+      };
     }
-  } else {
-    console.warn(`[SES] AWS_SES_ACCESS_KEY_ID not set — using Resend fallback`);
-  }
 
-  const resendResult = await sendViaResend(msg, from);
-  if (!resendResult.ok) {
-    resendResult.errorCategory = resendResult.errorCategory ?? "both_providers_failed";
+    // Extract request_id from response data array
+    const dataArr = (data.data ?? []) as Array<{ request_id?: string }>;
+    const messageId = dataArr[0]?.request_id;
+    console.log(`[ZeptoMail] sent to=${msg.to} request_id=${messageId}`);
+    return { ok: true, to: msg.to, messageId, provider: "zeptomail", httpStatus: res.status };
+
+  } catch (e: unknown) {
+    const err = e instanceof Error ? e.message : String(e);
+    console.error(`[ZeptoMail] network error to=${msg.to}: ${err}`);
+    return {
+      ok: false, to: msg.to,
+      error: err, errorCategory: "network_error",
+      isTransient: true, provider: "zeptomail",
+    };
   }
-  return resendResult;
 }
 
-// ── Batch send with rate-limit-safe inter-batch delay ─────────────────────────
+// ── Batch send ────────────────────────────────────────────────────────────────
 //
-// Root cause of the 76/101 failure: NO delay between batches caused SES
-// ThrottlingException after ~25 emails.
-//
-// Fix: interBatchDelayMs=400 → with concurrency=5: 5 emails / 0.4 s = 12.5/sec
-// — safely under SES's default 14/sec limit with ~12% headroom.
-//
-// Returns per-email results so callers can store failure reasons and retry
-// transient failures later without re-sending already-delivered emails.
+// ZeptoMail free plan: 500 emails lifetime; paid plans are usage-based.
+// Default: concurrency=5, interBatchDelayMs=200 → ~25 emails/sec — well
+// within ZeptoMail's limits on any paid plan.
 
 export async function sendBatchEmails(
-  jobs:               BatchEmailJob[],
-  concurrency         = 5,
-  interBatchDelayMs   = 400,   // pause between chunks to respect SES rate limits
+  jobs:             BatchEmailJob[],
+  concurrency       = 5,
+  interBatchDelayMs = 200,
 ): Promise<BatchSendResult> {
   const messages: EmailMessage[] = jobs.flatMap(j =>
     j.to.map(to => ({
       to,
-      subject:             j.subject,
-      html:                j.html,
-      from:                j.from,
-      listUnsubscribeUrl:  j.listUnsubscribeUrl,
+      subject:            j.subject,
+      html:               j.html,
+      from:               j.from,
+      listUnsubscribeUrl: j.listUnsubscribeUrl,
     }))
   );
 
@@ -278,14 +220,12 @@ export async function sendBatchEmails(
         allResults.push(r.value);
         if (r.value.ok) sent++; else failed++;
       } else {
-        // Promise itself rejected (should not happen — sendSingleEmail catches internally)
         const errMsg = r.reason instanceof Error ? r.reason.message : String(r.reason);
         allResults.push({ ok: false, to: "unknown", error: errMsg, errorCategory: "provider_error", isTransient: true });
         failed++;
       }
     }
 
-    // Rate-limit-safe pause between batches (skip after last chunk)
     if (i + concurrency < messages.length && interBatchDelayMs > 0) {
       await new Promise(r => setTimeout(r, interBatchDelayMs));
     }
@@ -304,10 +244,7 @@ export async function sendBatchEmails(
     level:   "info",
     service: "email-service/batch",
     msg:     "Batch email complete",
-    total:   messages.length,
-    sent,
-    failed,
-    failedByCategory,
+    total:   messages.length, sent, failed, failedByCategory,
   }));
 
   return { sent, failed, results: allResults };
