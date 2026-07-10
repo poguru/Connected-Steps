@@ -166,11 +166,11 @@ export async function sendSingleEmail(msg: EmailMessage): Promise<SendResult> {
 
     if (!res.ok) {
       const { category, isTransient } = classifyError(res.status, data);
-      const errMsg = extractError(data) ?? `HTTP ${res.status}`;
-      console.error(`[ZeptoMail] failed to=${msg.to} status=${res.status}: ${errMsg} | raw=${rawBody}`);
+      const errMsg = extractError(data) ?? rawBody || `HTTP ${res.status}`;
+      console.error(`[ZeptoMail] failed to=${msg.to} status=${res.status}: ${errMsg}`);
       return {
         ok: false, to: msg.to,
-        error: `ZeptoMail ${res.status}: ${errMsg} | raw=${rawBody}`,
+        error: `ZeptoMail ${res.status}: ${errMsg}`,
         errorCategory: category, httpStatus: res.status,
         isTransient, provider: "zeptomail",
       };
