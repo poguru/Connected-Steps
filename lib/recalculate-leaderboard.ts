@@ -120,10 +120,27 @@ export async function recalculateMonth(
     allAttIds.push(att.id);
   }
 
+  // Fetch challenge/referral/admin_adjustment points from points_ledger for this month.
+  // 'bonus' is deliberately excluded — bonus_points are already in session_attendance
+  // and summed in basePoints above; including them again would double-count.
+  const { data: ledgerRows } = await db
+    .from("points_ledger")
+    .select("user_email, points")
+    .in("user_email", emails)
+    .in("category", ["challenge", "referral", "admin_adjustment"])
+    .gte("created_at", rangeStart + "T00:00:00Z")
+    .lte("created_at", rangeEnd);
+
+  const ledgerMap = new Map<string, number>();
+  for (const row of ledgerRows ?? []) {
+    ledgerMap.set(row.user_email, (ledgerMap.get(row.user_email) ?? 0) + row.points);
+  }
+
   // ── Build all leaderboard rows in memory ──────────────────────────────────
-  // Scoring rules are unchanged:
-  //   Base:          5 pts per attended session + manual bonus_points
+  // Scoring rules:
+  //   Base:          5 pts per attended session + manual bonus_points (from session_attendance)
   //   Weekly bonus:  +5 if user attended 4+ sessions in any calendar week
+  //   Extra:         challenge / referral / admin_adjustment from points_ledger
   //   Total:         preserved across months (old_total - old_month + new_month)
 
   const upsertRows: Record<string, unknown>[] = [];
@@ -165,7 +182,8 @@ export async function recalculateMonth(
       if (count >= 4) weeklyBonus += 5;
     }
 
-    const newMonthPts = basePoints + weeklyBonus;
+    const extraPoints = ledgerMap.get(email) ?? 0;
+    const newMonthPts = basePoints + weeklyBonus + extraPoints;
     const oldMonthPts = lb && lb.points_month === month ? (lb.month_points ?? 0) : 0;
     const oldTotal    = lb?.total_points ?? 0;
     const newTotal    = Math.max(0, oldTotal - oldMonthPts + newMonthPts);

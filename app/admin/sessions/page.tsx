@@ -13,6 +13,19 @@ interface Attendee {
   email: string; name: string; location: string;
   attended: boolean; bonus_points: number; bonus_reason: string; points_synced: boolean;
 }
+interface Challenge {
+  id: string; user_email: string; challenge_type: string;
+  challenge_name: string; points: number; created_at: string;
+}
+
+const CHALLENGE_TYPES = [
+  { value: "fastest_runner",   label: "Fastest Runner"         },
+  { value: "longest_distance", label: "Longest Distance"       },
+  { value: "best_improvement", label: "Best Improvement"       },
+  { value: "best_attendance",  label: "Best Attendance Streak" },
+  { value: "coach_choice",     label: "Coach's Choice"         },
+  { value: "custom",           label: "Custom"                 },
+];
 
 const inp: React.CSSProperties = {
   width: "100%", padding: "9px 12px",
@@ -66,6 +79,16 @@ export default function AdminSessionsPage() {
   const [addEmail,    setAddEmail]    = useState("");
   const [addMsg,      setAddMsg]      = useState("");
   const [adding,      setAdding]      = useState(false);
+
+  // Session challenges
+  const [challenges,        setChallenges]        = useState<Challenge[]>([]);
+  const [challengeType,     setChallengeType]     = useState("fastest_runner");
+  const [challengeName,     setChallengeName]     = useState("Fastest Runner");
+  const [challengeEmail,    setChallengeEmail]    = useState("");
+  const [challengePoints,   setChallengePoints]   = useState(10);
+  const [challengeSaving,   setChallengeSaving]   = useState(false);
+  const [challengeMsg,      setChallengeMsg]      = useState("");
+  const [challengeRemoving, setChallengeRemoving] = useState<string | null>(null);
 
   const headers = { "Content-Type": "application/json" };
 
@@ -201,13 +224,19 @@ export default function AdminSessionsPage() {
     setAdding(false);
   };
 
-  /* ── Select session → load users ── */
+  /* ── Select session → load users + challenges ── */
   const openSession = async (s: Session) => {
-    setSelected(s); setAttendees([]); setSaveMsg(""); setLastSavedAt(null);
+    setSelected(s); setAttendees([]); setChallenges([]); setSaveMsg(""); setLastSavedAt(null);
+    setChallengeMsg(""); setChallengeEmail("");
     setSessionLoad(true);
-    const res  = await fetch(`/api/admin/sessions/${s.id}/attendance`, { headers });
-    const json = await res.json();
-    setAttendees(json.users ?? []);
+    const [attRes, chalRes] = await Promise.all([
+      fetch(`/api/admin/sessions/${s.id}/attendance`, { headers }),
+      fetch(`/api/admin/sessions/${s.id}/challenges`, { headers }),
+    ]);
+    const attJson  = await attRes.json();
+    const chalJson = await chalRes.json();
+    setAttendees(attJson.users      ?? []);
+    setChallenges(chalJson.challenges ?? []);
     setSessionLoad(false);
   };
 
@@ -265,6 +294,41 @@ export default function AdminSessionsPage() {
     // Reload attendance to reflect new synced status
     await openSession(selected);
     setSaving(false);
+  };
+
+  /* ── Award a session challenge ── */
+  const awardChallenge = async () => {
+    if (!selected || !challengeEmail || !challengeName.trim()) return;
+    setChallengeSaving(true); setChallengeMsg("");
+    const res  = await fetch(`/api/admin/sessions/${selected.id}/challenges`, {
+      method: "POST", headers,
+      body: JSON.stringify({ user_email: challengeEmail, challenge_type: challengeType, challenge_name: challengeName.trim(), points: challengePoints }),
+    });
+    const json = await res.json();
+    if (res.ok) {
+      setChallengeMsg(`+${challengePoints} pts awarded! Leaderboard updated.`);
+      setChallengeEmail("");
+      const chalRes  = await fetch(`/api/admin/sessions/${selected.id}/challenges`, { headers });
+      const chalJson = await chalRes.json();
+      setChallenges(chalJson.challenges ?? []);
+    } else {
+      setChallengeMsg(json.error ?? "Failed to award challenge.");
+    }
+    setChallengeSaving(false);
+  };
+
+  /* ── Remove a session challenge award ── */
+  const removeChallenge = async (challengeId: string) => {
+    if (!selected) return;
+    setChallengeRemoving(challengeId);
+    await fetch(`/api/admin/sessions/${selected.id}/challenges`, {
+      method: "DELETE", headers,
+      body: JSON.stringify({ challengeId }),
+    });
+    const chalRes  = await fetch(`/api/admin/sessions/${selected.id}/challenges`, { headers });
+    const chalJson = await chalRes.json();
+    setChallenges(chalJson.challenges ?? []);
+    setChallengeRemoving(null);
   };
 
   const uploadPhoto = async () => {
@@ -665,7 +729,95 @@ export default function AdminSessionsPage() {
                 </div>
               )}
 
-              <p style={{ fontSize: "11px", color: "#444", marginTop: "1rem" }}>
+              {/* ── Session Challenges ─────────────────────────────────────── */}
+              <div style={{ marginTop: "2rem", borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: "1.5rem" }}>
+                <div style={{ fontSize: "10px", color: "#e8620a", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: "1rem" }}>
+                  Session Challenges
+                </div>
+
+                {/* Award form */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", padding: "1rem", background: "rgba(255,255,255,0.02)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.07)", marginBottom: "1rem" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.75rem" }}>
+                    <div>
+                      <Label>Challenge</Label>
+                      <select
+                        value={challengeType}
+                        onChange={(e) => {
+                          const t = e.target.value;
+                          setChallengeType(t);
+                          if (t !== "custom") setChallengeName(CHALLENGE_TYPES.find(c => c.value === t)?.label ?? "");
+                        }}
+                        style={{ ...inp }}
+                      >
+                        {CHALLENGE_TYPES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      </select>
+                    </div>
+                    {challengeType === "custom" && (
+                      <div>
+                        <Label>Challenge name</Label>
+                        <Input value={challengeName} onChange={(e) => setChallengeName(e.target.value)} placeholder="e.g. Most Consistent" />
+                      </div>
+                    )}
+                    <div>
+                      <Label>Winner (attended)</Label>
+                      <select value={challengeEmail} onChange={(e) => setChallengeEmail(e.target.value)} style={{ ...inp }}>
+                        <option value="">Select attendee…</option>
+                        {attendees.filter(a => a.attended).map(a => (
+                          <option key={a.email} value={a.email}>{a.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <Label>Points</Label>
+                      <Input type="number" min={1} max={100} value={challengePoints}
+                        onChange={(e) => setChallengePoints(Math.max(1, parseInt(e.target.value) || 1))} />
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" as const }}>
+                    <Button size="sm" loading={challengeSaving} disabled={!challengeEmail || !challengeName.trim()} onClick={awardChallenge}>
+                      Award Points
+                    </Button>
+                    {challengeMsg && (
+                      <Badge color={challengeMsg.includes("pts") ? "green" : "red"}>{challengeMsg}</Badge>
+                    )}
+                  </div>
+                </div>
+
+                {/* Awarded challenges list */}
+                {challenges.length > 0 ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    {challenges.map(c => {
+                      const winner = attendees.find(a => a.email === c.user_email);
+                      return (
+                        <div key={c.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", padding: "10px 14px", background: "rgba(232,98,10,0.05)", border: "1px solid rgba(232,98,10,0.15)", borderRadius: "7px" }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#e8620a" }}>{c.challenge_name}</div>
+                            <div style={{ fontSize: "0.75rem", color: "#888", marginTop: "2px" }}>
+                              {winner?.name ?? c.user_email}
+                              {" · "}
+                              <span style={{ color: "#4ade80" }}>+{c.points} pts</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => removeChallenge(c.id)}
+                            disabled={challengeRemoving === c.id}
+                            aria-label="Remove challenge award"
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "#555", padding: "4px 8px", fontSize: "0.8rem", flexShrink: 0, opacity: challengeRemoving === c.id ? 0.4 : 1 }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: "0.78rem", color: "#444", textAlign: "center", padding: "0.75rem" }}>
+                    No challenges awarded yet for this session.
+                  </div>
+                )}
+              </div>
+
+              <p style={{ fontSize: "11px", color: "#444", marginTop: "1.5rem" }}>
                 Attendance = 5 pts per person. Click <strong style={{ color: "#888" }}>Save Attendance</strong> — leaderboard updates automatically. Already-synced rows are locked.
               </p>
             </>
