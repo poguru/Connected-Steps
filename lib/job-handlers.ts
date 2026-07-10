@@ -131,12 +131,38 @@ export async function handleReferralReward(p: JobPayloads["referral_reward"]): P
 }
 
 // ── weekly_digest_email ───────────────────────────────────────────────────────
-// Stub — the weekly-digest cron already handles batching and personalisation.
-// This handler enables targeted re-delivery of one user's digest via the queue.
-// Full implementation: pass pre-rendered HTML in the payload.
+// Targeted re-delivery of the weekly digest for a single user.
+// Called when the cron's batch send fails for an individual user (retry flow)
+// or when an admin manually re-queues a digest.
 
 export async function handleWeeklyDigestEmail(p: JobPayloads["weekly_digest_email"]): Promise<void> {
-  console.log(`[job-worker] weekly_digest_email stub — user=${p.userEmail}`);
+  const { fetchWeeklyDigestDataForUser, buildWeeklyDigestHTML } = await import("@/lib/weekly-digest-email");
+
+  const data = await fetchWeeklyDigestDataForUser(p.userEmail);
+  if (!data) {
+    console.warn(`[weekly_digest_email] user not found or inactive: ${p.userEmail} — skipping`);
+    return;
+  }
+
+  const html    = buildWeeklyDigestHTML({ name: data.firstName, ...data });
+  const subject = `Your Connected Steps week — re-delivery`;
+
+  const result = await sendEmail(
+    p.userEmail,
+    data.firstName,
+    subject,
+    html,
+    false,  // isOtp
+    false,  // isTransactional — digest is non-transactional
+    data.unsubUrl,
+  );
+
+  if (!result.ok) {
+    console.error(`[weekly_digest_email] failed to=${p.userEmail} error="${result.error ?? "unknown"}"`);
+    throw new Error(`Weekly digest email failed: ${result.error ?? "unknown"}`);
+  }
+
+  console.log(`[weekly_digest_email] sent to=${p.userEmail} msgId=${result.messageId}`);
 }
 
 // ── bulk_email ────────────────────────────────────────────────────────────────
