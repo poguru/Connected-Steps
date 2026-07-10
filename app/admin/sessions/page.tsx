@@ -703,17 +703,15 @@ export default function AdminSessionsPage() {
                           {/* Bonus points input */}
                           <td style={{ padding: "8px 16px", borderBottom: "1px solid rgba(255,255,255,0.04)", textAlign: "center" }}>
                             <input type="number" min={0} value={a.bonus_points || ""} placeholder="0"
-                              disabled={a.points_synced}
                               onChange={(e) => setBonus(a.email, parseInt(e.target.value) || 0)}
-                              style={{ ...inp, width: "70px", textAlign: "center", padding: "5px 8px", opacity: a.points_synced ? 0.4 : 1 }} />
+                              style={{ ...inp, width: "70px", textAlign: "center", padding: "5px 8px" }} />
                           </td>
 
                           {/* Bonus reason */}
                           <td style={{ padding: "8px 16px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
                             <input value={a.bonus_reason} placeholder="e.g. 1st place sprint"
-                              disabled={a.points_synced}
                               onChange={(e) => setReason(a.email, e.target.value)}
-                              style={{ ...inp, width: "100%", minWidth: "160px", padding: "5px 8px", opacity: a.points_synced ? 0.4 : 1 }} />
+                              style={{ ...inp, width: "100%", minWidth: "160px", padding: "5px 8px" }} />
                           </td>
 
                           {/* Sync status */}

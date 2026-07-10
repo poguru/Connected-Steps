@@ -71,16 +71,16 @@ export async function POST(
     .select("user_email, attended, points_synced")
     .eq("session_id", id);
 
-  const syncedEmails    = new Set(
-    (existing ?? []).filter((r) => r.points_synced).map((r) => r.user_email)
+  const syncedMap = new Map(
+    (existing ?? []).filter((r) => r.points_synced).map((r) => [r.user_email, true])
   );
   const previouslyAttended = new Set(
     (existing ?? []).filter((r) => r.attended).map((r) => r.user_email)
   );
 
-  // Only upsert rows that are not already synced
+  // Rows not yet synced: full upsert (attendance + bonus)
   const toUpsert = users
-    .filter((u) => !syncedEmails.has(u.email))
+    .filter((u) => !syncedMap.has(u.email))
     .map((u) => ({
       session_id:    id,
       user_email:    u.email,
@@ -96,6 +96,17 @@ export async function POST(
       .from("session_attendance")
       .upsert(toUpsert, { onConflict: "session_id,user_email", ignoreDuplicates: false });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Rows already synced: only update bonus_points + bonus_reason, reset synced flag
+  // so the next recalculate picks up the new bonus. Attendance is NOT changed.
+  const syncedBonusUsers = users.filter((u) => syncedMap.has(u.email));
+  for (const u of syncedBonusUsers) {
+    await db
+      .from("session_attendance")
+      .update({ bonus_points: u.bonus_points ?? 0, bonus_reason: u.bonus_reason ?? "", points_synced: false })
+      .eq("session_id", id)
+      .eq("user_email", u.email);
   }
 
   // Auto-feed: generate posts for users newly marked as attended (false → true).
@@ -150,8 +161,8 @@ export async function POST(
 
   return NextResponse.json({
     success: true,
-    saved:   toUpsert.length,
-    skipped: syncedEmails.size,
+    saved:   toUpsert.length + syncedBonusUsers.length,
+    skipped: 0,
   });
 }
 
