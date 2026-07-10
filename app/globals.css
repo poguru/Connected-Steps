@@ -1519,11 +1519,54 @@ select.auth-input option {
   cursor: pointer;
   background: rgba(255,255,255,0.04);
 }
-@media (max-width: 480px) {
+/* Blurred backdrop: hidden on desktop */
+.cs-ch-blur-bg { display: none; }
+
+@media (max-width: 640px) {
+  /* Hero: let it grow to show portrait/group photos fully */
   .cs-ch-hero-wrap {
     aspect-ratio: unset;
-    max-height: 44vh;
-    min-height: 180px;
+    height: min(72vw, 360px);
+    min-height: 200px;
+    max-height: none;
+  }
+
+  /* Blurred backdrop fills container */
+  .cs-ch-blur-bg {
+    display: block !important;
+    position: absolute !important;
+    inset: -8px !important;
+    width: calc(100% + 16px) !important;
+    height: calc(100% + 16px) !important;
+    object-fit: cover !important;
+    filter: blur(22px) brightness(0.25) saturate(1.2) !important;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Hero foreground: contain so full image is visible */
+  .cs-ch-hero-img {
+    object-fit: contain !important;
+    object-position: center center !important;
+    transform: none !important;
+    z-index: 1;
+    position: relative !important;
+  }
+
+  /* Card media container: fixed portrait-friendly height */
+  .cs-ch-card-media {
+    aspect-ratio: unset !important;
+    height: min(58vw, 170px) !important;
+  }
+
+  /* Card foreground: contain */
+  .cs-ch-card-img {
+    object-fit: contain !important;
+    object-position: center center !important;
+    transform: none !important;
+    filter: none !important;
+    z-index: 1;
+    position: relative !important;
   }
 }
 

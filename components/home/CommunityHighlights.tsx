@@ -104,17 +104,23 @@ function HeroMedia({ session, onClick }: { session: Session; onClick: () => void
     >
       {/* Background image / poster */}
       {imageUrl && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={imageUrl} alt={session.title} loading="lazy"
-          onLoad={() => setLoaded(true)}
-          style={{
-            position: "absolute", inset: 0, width: "100%", height: "100%",
-            objectFit: "cover", objectPosition: "center 25%", display: "block",
-            transition: "transform 8s ease",
-            transform: loaded ? "scale(1.05)" : "scale(1)",
-          }}
-        />
+        <>
+          {/* Blurred backdrop — hidden on desktop, fills container on mobile */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={imageUrl} alt="" aria-hidden className="cs-ch-blur-bg" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={imageUrl} alt={session.title} loading="lazy"
+            className="cs-ch-hero-img"
+            onLoad={() => setLoaded(true)}
+            style={{
+              position: "absolute", inset: 0, width: "100%", height: "100%",
+              objectFit: "cover", objectPosition: "center 25%", display: "block",
+              transition: "transform 8s ease",
+              transform: loaded ? "scale(1.05)" : "scale(1)",
+            }}
+          />
+        </>
       )}
 
       {/* Video layer */}
@@ -235,18 +241,24 @@ function SessionCard({
       role="button" aria-label={`View ${session.title}`}
     >
       {/* Media */}
-      <div style={{ position: "relative", aspectRatio: "4/3", overflow: "hidden", flexShrink: 0 }}>
+      <div className="cs-ch-card-media" style={{ position: "relative", aspectRatio: "4/3", overflow: "hidden", flexShrink: 0 }}>
         {imageUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={imageUrl} alt={session.title} loading="lazy"
-            style={{
-              width: "100%", height: "100%", objectFit: "cover",
-              objectPosition: "center 25%", display: "block",
-              transition: "transform 0.5s ease, filter 0.3s ease",
-              transform: hovered ? "scale(1.06)" : "scale(1)",
-              filter:    hovered ? "brightness(0.68)" : "brightness(1)",
-            }}
-          />
+          <>
+            {/* Blurred backdrop — hidden on desktop, visible on mobile */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={imageUrl} alt="" aria-hidden className="cs-ch-blur-bg" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={imageUrl} alt={session.title} loading="lazy"
+              className="cs-ch-card-img"
+              style={{
+                width: "100%", height: "100%", objectFit: "cover",
+                objectPosition: "center 25%", display: "block",
+                transition: "transform 0.5s ease, filter 0.3s ease",
+                transform: hovered ? "scale(1.06)" : "scale(1)",
+                filter:    hovered ? "brightness(0.68)" : "brightness(1)",
+              }}
+            />
+          </>
         )}
         {videoUrl && (
           <video ref={videoRef} src={videoUrl} muted playsInline preload="metadata"
