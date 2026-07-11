@@ -24,11 +24,11 @@ export default function FloatingContact() {
         .fab-btn:hover { transform:scale(1.1) !important; }
       `}</style>
 
-      {/* Fixed cluster — right edge, well above page bottom so it never covers CTAs */}
-      <div style={{
+      {/* Fixed cluster — right edge, above safe area */}
+      <div className="cs-fab-cluster" style={{
         position: "fixed",
-        bottom: "72px",   /* clear any bottom nav / tall CTA buttons */
-        right:  "18px",
+        bottom: "calc(env(safe-area-inset-bottom) + 24px)",
+        right:  "16px",
         display: "flex",
         flexDirection: "column",
         gap: "10px",

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
-import { Play, Users, MapPin, Calendar, Camera, ArrowRight, Pause, ChevronRight } from "lucide-react";
+import { Play, Users, MapPin, Calendar, Camera, ArrowRight, Pause } from "lucide-react";
 import MediaGallery, { type GalleryItem } from "./MediaGallery";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -369,7 +369,6 @@ export default function CommunityHighlights() {
   const [stats,    setStats]    = useState<Stats | null>(null);
   const [loading,  setLoading]  = useState(true);
   const [gallery,  setGallery]  = useState<{ session: Session; items: GalleryItem[]; startIndex: number } | null>(null);
-  const [scrolled, setScrolled] = useState(false);
   const cardsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -392,15 +391,6 @@ export default function CommunityHighlights() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
-
-  // Hide the "swipe →" hint once user has scrolled the strip
-  useEffect(() => {
-    const el = cardsRef.current;
-    if (!el) return;
-    const handler = () => { if (el.scrollLeft > 20) setScrolled(true); };
-    el.addEventListener("scroll", handler, { passive: true });
-    return () => el.removeEventListener("scroll", handler);
   }, []);
 
   const openGallery = useCallback(async (session: Session, startIndex = 0) => {
@@ -516,17 +506,11 @@ export default function CommunityHighlights() {
           {/* ── Recent session cards ── */}
           {recent.length > 0 && (
             <div>
-              {/* Label + swipe hint (mobile only) */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              {/* Label */}
+              <div style={{ marginBottom: 8 }}>
                 <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: "var(--muted-foreground)" }}>
                   Recent · {recent.length} session{recent.length !== 1 ? "s" : ""}
                 </span>
-                {/* "swipe →" hint visible on mobile until user scrolls */}
-                {!scrolled && (
-                  <span className="cs-ch-scroll-hint" aria-hidden>
-                    Swipe <ChevronRight size={10} />
-                  </span>
-                )}
               </div>
 
               {/* Cards — horizontal scroll on mobile, 3-col grid on desktop */}

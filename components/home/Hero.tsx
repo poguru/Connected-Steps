@@ -210,11 +210,11 @@ export default function Hero() {
         </div>
 
         {/* ══ RIGHT — community card ════════════════════════════════════════ */}
-        <div className="relative animate-fade-up-2" style={{ position: "relative" }}>
+        <div className="relative animate-fade-up-2" style={{ position: "relative", overflow: "hidden", maxWidth: "100%" }}>
           {/* Glow behind card */}
           <div style={{
             position: "absolute",
-            inset: "-24px",
+            inset: 0,
             borderRadius: 32,
             background: "radial-gradient(ellipse at 60% 50%, oklch(0.72 0.19 49 / 18%) 0%, transparent 70%)",
             filter: "blur(20px)",

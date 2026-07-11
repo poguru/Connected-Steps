@@ -87,6 +87,7 @@ body {
   color: var(--foreground);
   line-height: 1.7;
   overflow-x: hidden;
+  max-width: 100%;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -926,8 +927,9 @@ select.auth-input option {
   .cs-ask-fab-label { display: none; }
 }
 
-/* In native-app, push FAB above the bottom nav */
-.native-app .cs-ask-fab-btn {
+/* In native-app, push FABs above the bottom nav */
+.native-app .cs-ask-fab-btn,
+.native-app .cs-fab-cluster {
   bottom: calc(64px + env(safe-area-inset-bottom) + 14px);
   right: 16px;
 }
@@ -1698,6 +1700,15 @@ select.auth-input option {
    COMMUNITY HIGHLIGHTS — mobile-first responsive layout
    ═══════════════════════════════════════════════════════ */
 
+/* Top-level containment: never expand beyond viewport */
+.cs-ch-hero-mobile,
+.cs-ch-hero-mobile img,
+.cs-ch-card-media-mobile,
+.cs-ch-card-media-mobile img {
+  max-width: 100%;
+  width: 100%;
+}
+
 /* Hero: 16:9 on desktop, capped at 45vh on mobile so it
    doesn't take up the full viewport */
 .cs-ch-hero-wrap {
@@ -1726,7 +1737,7 @@ select.auth-input option {
   .cs-ch-card-media-desktop { display: none; }
 }
 
-/* Cards strip: 3-col grid on desktop, horizontal scroll on mobile */
+/* Cards strip: 3-col grid on desktop, single-col stack on mobile */
 .cs-ch-cards-strip {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1734,49 +1745,23 @@ select.auth-input option {
 }
 @media (max-width: 640px) {
   .cs-ch-cards-strip {
-    display: flex;
-    overflow-x: auto;
-    gap: 10px;
-    padding-bottom: 6px;
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    /* add visible left padding so first card aligns with content */
-    margin-left: -14px;
-    margin-right: -14px;
-    padding-left: 14px;
-    padding-right: 14px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    /* No negative margins, no horizontal scroll — prevents iOS overflow */
+    overflow-x: visible;
   }
-  .cs-ch-cards-strip::-webkit-scrollbar { display: none; }
 }
 
-/* Each card wrapper: auto sizing on desktop, fixed width on mobile */
+/* Each card wrapper: auto sizing on desktop, full-width on mobile */
 .cs-ch-card-item {
   min-width: 0; /* prevent grid blowout */
-}
-@media (max-width: 640px) {
-  .cs-ch-card-item {
-    flex-shrink: 0;
-    width: min(62vw, 200px);
-    scroll-snap-align: start;
-  }
+  width: 100%;
 }
 
-/* Scroll hint on mobile — fades out after first interaction */
+/* Scroll hint — always hidden (no horizontal scroll on mobile) */
 .cs-ch-scroll-hint {
-  display: none;
-}
-@media (max-width: 640px) {
-  .cs-ch-scroll-hint {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 9px;
-    color: rgba(255,255,255,0.3);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    font-weight: 600;
-  }
+  display: none !important;
 }
 
 /* ═══════════════════════════════════════════════════════
