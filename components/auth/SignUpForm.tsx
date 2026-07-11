@@ -54,6 +54,7 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
   const [sending,     setSending]     = useState(false);
   const [verifying,   setVerifying]   = useState(false);
   const [otpError,    setOtpError]    = useState("");
+  const [otpSendFailed, setOtpSendFailed] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
 
   // Details step fields
@@ -139,7 +140,7 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
 
   // ── Send phone OTP ────────────────────────────────────────────────────────
   async function sendOtp(isResend = false) {
-    setSending(true); setOtpError("");
+    setSending(true); setOtpError(""); setOtpSendFailed(false);
     try {
       const res  = await fetch("/api/auth/send-phone-otp", {
         method: "POST",
@@ -147,12 +148,29 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
         body: JSON.stringify({ phone: phone10, purpose: "register", name: firstName }),
       });
       const data = await res.json();
-      if (!res.ok) { setOtpError(data.error ?? "Failed to send OTP. Please try again."); return false; }
+      if (!res.ok) {
+        const msg = data.error ?? "Failed to send OTP. Please try again.";
+        setOtpError(msg);
+        if (!isResend) { setFormError(msg); setOtpSendFailed(true); }
+        return false;
+      }
       if (!isResend) setStep("phone-otp");
       setResendCooldown(RESEND_COOLDOWN);
       return true;
-    } catch { setOtpError("Network error. Please try again."); return false; }
+    } catch {
+      const msg = "Network error. Please try again.";
+      setOtpError(msg);
+      if (!isResend) { setFormError(msg); setOtpSendFailed(true); }
+      return false;
+    }
     finally { setSending(false); }
+  }
+
+  // ── Skip phone verification ───────────────────────────────────────────────
+  function skipPhoneVerification() {
+    setPhoneVerified(false);
+    setOtpError("");
+    setStep("details");
   }
 
   // ── Verify phone OTP ──────────────────────────────────────────────────────
@@ -279,7 +297,7 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
       <button
         type="button"
         onClick={async () => {
-          setFormError("");
+          setFormError(""); setOtpSendFailed(false);
           const err = validateBasic();
           if (err) { setFormError(err); return; }
           await sendOtp();
@@ -289,6 +307,16 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
       >
         {sending ? "Sending OTP…" : "Verify WhatsApp Number →"}
       </button>
+
+      {otpSendFailed && (
+        <p style={{ fontSize: 11, textAlign: "center", color: "var(--muted-foreground)", margin: 0 }}>
+          WhatsApp OTP unavailable.{" "}
+          <button type="button" onClick={skipPhoneVerification}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--primary)", fontSize: 11, fontFamily: "var(--font-body)", textDecoration: "underline" }}>
+            Continue without verification →
+          </button>
+        </p>
+      )}
 
       <p style={{ fontSize: 11, textAlign: "center", color: "var(--muted-foreground)", margin: 0 }}>
         Already have an account?{" "}
@@ -353,6 +381,14 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
 
       <p style={{ margin: 0, fontSize: 11, color: "var(--muted-foreground)", textAlign: "center" }}>
         Code expires in 5 minutes. Check your WhatsApp.
+      </p>
+
+      <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--muted-foreground)", textAlign: "center" }}>
+        Didn&apos;t receive it?{" "}
+        <button type="button" onClick={skipPhoneVerification}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted-foreground)", fontSize: 11, fontFamily: "var(--font-body)", textDecoration: "underline" }}>
+          Skip for now
+        </button>
       </p>
     </div>
   );

@@ -26,7 +26,7 @@ export async function sendWhatsApp(
   templateName?: string,
 ): Promise<NotifyResult> {
   const { sendWhatsAppTemplate } = await import("@/lib/whatsapp");
-  const template = templateName ?? process.env.WHATSAPP_SESSION_TEMPLATE ?? "session_alert_v3";
+  const template = templateName ?? process.env.WHATSAPP_SESSION_TEMPLATE ?? "session_alert_v4";
   const result   = await sendWhatsAppTemplate(phone, template, params);
   return {
     to:         phone,
