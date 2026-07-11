@@ -202,13 +202,14 @@ function SessionCard({
       }}
     >
       {/* ── Image ── */}
-      <div style={{ position: "relative", height: 170, flexShrink: 0, background: gradient, overflow: "hidden" }}>
+      <div className="cs-scard-img-wrap" style={{ position: "relative", height: 170, flexShrink: 0, background: gradient, overflow: "hidden" }}>
         {s.photo_url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={s.photo_url}
             alt={s.title}
             loading="lazy"
+            className="cs-scard-img"
             style={{
               width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 25%",
               display: "block",

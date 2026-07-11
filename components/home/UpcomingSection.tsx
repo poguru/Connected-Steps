@@ -176,7 +176,7 @@ function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (i
       }}
     >
       {/* ── Image ──────────────────────────────────────────────────────────── */}
-      <div style={{
+      <div className="cs-scard-img-wrap" style={{
         position: "relative",
         height: 160,
         flexShrink: 0,
@@ -189,6 +189,7 @@ function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (i
             src={imageUrl}
             alt={item.title}
             loading="lazy"
+            className="cs-scard-img"
             style={{
               width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 25%",
               display: "block",
