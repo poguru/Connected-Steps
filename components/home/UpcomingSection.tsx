@@ -505,7 +505,7 @@ export default function UpcomingSection() {
           </div>
 
           <div className="us-view-links" style={{ display: "flex", gap: 12 }}>
-            <a href="/weekend-run" style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--muted-foreground)", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>
+            <a href="/sessions" style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--muted-foreground)", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>
               All Sessions <ArrowRight size={12} />
             </a>
             <a href="/events" style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--muted-foreground)", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>
@@ -587,7 +587,7 @@ export default function UpcomingSection() {
                 </div>
 
                 <div style={{ display: "flex", gap: 14 }}>
-                  <a href="/weekend-run" style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted-foreground)", textDecoration: "none" }}>
+                  <a href="/sessions" style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted-foreground)", textDecoration: "none" }}>
                     Sessions →
                   </a>
                   <a href="/events" style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted-foreground)", textDecoration: "none" }}>
