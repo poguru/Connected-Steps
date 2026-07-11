@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
@@ -198,25 +198,8 @@ function SessionCard({
   session: s, onJoin, now,
 }: { session: Session; onJoin: (id: string) => void; now: Date }) {
   const [hovered, setHovered] = useState(false);
-  const [orientation, setOrientation] = useState<"landscape" | "portrait" | "square" | "unknown">("unknown");
   const cd = countdown(s.date, s.time, now);
   const gradient = categoryGradient(s.title);
-
-  function onImgLoad(e: React.SyntheticEvent<HTMLImageElement>) {
-    const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
-    if (!w || !h) return;
-    const r = w / h;
-    if      (r > 1.2)  setOrientation("landscape");
-    else if (r < 0.85) setOrientation("portrait");
-    else               setOrientation("square");
-  }
-
-  const imgContainerStyle: React.CSSProperties = (() => {
-    const base: React.CSSProperties = { position: "relative", overflow: "hidden", flexShrink: 0, background: gradient };
-    if (orientation === "portrait") return { ...base, aspectRatio: "3/4", maxHeight: 300 };
-    if (orientation === "square")   return { ...base, aspectRatio: "1/1" };
-    return { ...base, height: 180 };
-  })();
 
   return (
     <div
@@ -244,22 +227,23 @@ function SessionCard({
       }}
     >
       {/* ── Image ── */}
-      <div className="cs-scard-img-wrap" style={imgContainerStyle}>
+      <div className="cs-scard-img-wrap" style={{
+        position: "relative", aspectRatio: "4/3", overflow: "hidden", flexShrink: 0, background: gradient,
+      }}>
         {s.photo_url ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={s.photo_url}
             alt={s.title}
             loading="lazy"
-            onLoad={onImgLoad}
             style={{
               position: "absolute", inset: 0,
               width: "100%", height: "100%",
               objectFit: "cover",
-              objectPosition: orientation === "portrait" ? "center top" : "center",
+              objectPosition: "center 25%",
               display: "block",
               transition: "transform 0.5s ease",
-              transform: hovered ? "scale(1.03)" : "scale(1)",
+              transform: hovered ? "scale(1.06)" : "scale(1)",
             }}
           />
         ) : (
