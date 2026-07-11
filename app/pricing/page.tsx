@@ -113,6 +113,11 @@ export default function PricingPage() {
   const [couponData,   setCouponData]   = useState<{ coupon_id: string; discount_type: string; discount_value: number; description: string } | null>(null);
   const [couponErr,    setCouponErr]    = useState("");
   const [couponLoading,setCouponLoading]= useState(false);
+  const [isTouch,      setIsTouch]      = useState(false);
+
+  useEffect(() => {
+    setIsTouch(window.matchMedia("(hover: none) and (pointer: coarse)").matches);
+  }, []);
 
   // Load plans + user state
   useEffect(() => {
@@ -312,7 +317,7 @@ export default function PricingPage() {
                     boxShadow: plan.is_featured ? `0 0 0 1px ${ac.border}, 0 20px 50px ${ac.glow}` : "none",
                     transition: "box-shadow 0.3s ease, transform 0.25s ease",
                   }}
-                  whileHover={{ y: -5, boxShadow: `0 0 0 1px ${ac.border}, 0 28px 60px ${ac.glow}` }}
+                  whileHover={isTouch ? {} : { y: -5, boxShadow: `0 0 0 1px ${ac.border}, 0 28px 60px ${ac.glow}` }}
                 >
                   {/* Badge */}
                   {plan.badge_label && (

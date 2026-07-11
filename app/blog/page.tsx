@@ -4,6 +4,7 @@ import Image from "next/image";
 export const metadata = {
   title: "Blog – Connected Steps",
   description: "Running tips, training guides, and community stories from the Connected Steps coaches.",
+  alternates: { canonical: "/blog" },
 };
 
 const POSTS = [

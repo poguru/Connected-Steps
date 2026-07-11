@@ -1306,6 +1306,10 @@ select.auth-input option {
   pointer-events: none;
   animation: cs-glow-drift 10s ease-in-out infinite alternate-reverse;
 }
+/* Only promote glow blobs to GPU layer on devices that likely have enough VRAM */
+@media (min-width: 768px) and (hover: hover) {
+  .cs-hero-glow-a, .cs-hero-glow-b { will-change: transform; }
+}
 @keyframes cs-glow-drift {
   from { transform: translate(0, 0) scale(1); }
   to   { transform: translate(2%, 3%) scale(1.06); }

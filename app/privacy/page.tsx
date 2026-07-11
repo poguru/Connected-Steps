@@ -4,6 +4,7 @@ import Image from "next/image";
 export const metadata = {
   title: "Privacy Policy – Connected Steps",
   description: "How Connected Steps collects, uses, and protects your personal information.",
+  alternates: { canonical: "/privacy" },
 };
 
 export default function PrivacyPage() {
@@ -26,7 +27,7 @@ export default function PrivacyPage() {
         <p style={{ fontSize: "0.8rem", color: "var(--cs-muted)", marginBottom: "3rem" }}>Last updated: {updated}</p>
 
         <Section title="1. Who We Are">
-          <p>Connected Steps ("we", "us", "our") operates the website connectedsteps.in and provides running coaching and community services. Our contact email is connected.steps2106@gmail.com.</p>
+          <p>Connected Steps ("we", "us", "our") operates the website connectedsteps.in and provides running coaching and community services. Our contact email is info@connectedsteps.in.</p>
         </Section>
 
         <Section title="2. Information We Collect">
@@ -68,7 +69,7 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title="5. Data Retention">
-          <p>Your account data is retained for as long as your account is active. Aggregated Strava summaries are retained as long as you remain connected to Strava. You may request deletion of all your data by emailing connected.steps2106@gmail.com.</p>
+          <p>Your account data is retained for as long as your account is active. Aggregated Strava summaries are retained as long as you remain connected to Strava. You may request deletion of all your data by emailing info@connectedsteps.in.</p>
         </Section>
 
         <Section title="6. Data Security">
@@ -85,7 +86,7 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title="8. Your Rights">
-          <p>You have the right to access, correct, or delete your personal data. To exercise any of these rights, email us at connected.steps2106@gmail.com.</p>
+          <p>You have the right to access, correct, or delete your personal data. To exercise any of these rights, email us at info@connectedsteps.in.</p>
         </Section>
 
         <Section title="9. Changes to This Policy">
@@ -93,7 +94,7 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title="10. Contact">
-          <p>For any privacy-related queries, email us at <a href="mailto:connected.steps2106@gmail.com" style={{ color: "var(--cs-orange)" }}>connected.steps2106@gmail.com</a>.</p>
+          <p>For any privacy-related queries, email us at <a href="mailto:info@connectedsteps.in" style={{ color: "var(--cs-orange)" }}>info@connectedsteps.in</a>.</p>
         </Section>
       </div>
     </div>

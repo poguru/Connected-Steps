@@ -5,6 +5,7 @@ import EventsClient from "@/components/events/EventsClient";
 export const metadata: Metadata = {
   title: "Events | Connected Steps",
   description: "Discover upcoming running, cycling, training, and community events from Connected Steps in Hyderabad.",
+  alternates: { canonical: "/events" },
 };
 
 export const revalidate = 60;

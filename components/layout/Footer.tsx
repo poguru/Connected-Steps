@@ -121,8 +121,9 @@ export default function Footer() {
         <div style={{ marginTop: "2.5rem", paddingTop: "1.5rem", borderTop: "1px solid var(--border)", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem", fontSize: "0.72rem", color: "var(--muted-foreground)" }}>
           <div>© {new Date().getFullYear()} Connected Steps · Hyderabad, India</div>
           <div style={{ display: "flex", gap: "1.25rem" }}>
-            <Link href="/privacy" style={{ color: "var(--muted-foreground)", textDecoration: "none" }}>Privacy</Link>
-            <Link href="/terms"   style={{ color: "var(--muted-foreground)", textDecoration: "none" }}>Terms</Link>
+            <Link href="/privacy"       style={{ color: "var(--muted-foreground)", textDecoration: "none" }}>Privacy</Link>
+            <Link href="/terms"         style={{ color: "var(--muted-foreground)", textDecoration: "none" }}>Terms</Link>
+            <Link href="/refund-policy" style={{ color: "var(--muted-foreground)", textDecoration: "none" }}>Refunds</Link>
           </div>
         </div>
       </div>

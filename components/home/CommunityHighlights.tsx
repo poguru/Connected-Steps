@@ -263,7 +263,7 @@ function SessionCard({
       onClick={handleTap}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      whileHover={{ y: -4, scale: 1.02 }}
+      whileHover={isTouch ? {} : { y: -4, scale: 1.02 }}
       transition={{ type: "spring", stiffness: 400, damping: 25 }}
       style={{
         borderRadius: 14, overflow: "hidden",
@@ -370,7 +370,12 @@ export default function CommunityHighlights() {
   const [loading,  setLoading]  = useState(true);
   const [gallery,  setGallery]  = useState<{ session: Session; items: GalleryItem[]; startIndex: number } | null>(null);
   const [swiped,   setSwiped]   = useState(false);
+  const [isTouch,  setIsTouch]  = useState(false);
   const cardsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setIsTouch(window.matchMedia("(hover: none) and (pointer: coarse)").matches);
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -582,7 +587,7 @@ export default function CommunityHighlights() {
               window.location.href = user ? "/sessions" : "/auth?tab=register";
             }}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
-            whileHover={{ scale: 1.02 }}
+            whileHover={isTouch ? {} : { scale: 1.02 }}
             style={{
               display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
               padding: "11px 14px", borderRadius: 10, width: "100%",

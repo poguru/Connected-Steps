@@ -7,6 +7,7 @@ import CoachListCard from "@/components/coaches/CoachListCard";
 export const metadata: Metadata = {
   title: "Our Coaches — Connected Steps",
   description: "Meet Hyderabad's elite running coaches — national medallists, NIS-certified professionals dedicated to your personal running goals.",
+  alternates: { canonical: "/coaches" },
 };
 
 export default async function CoachesPage() {

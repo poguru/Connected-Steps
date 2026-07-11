@@ -4,6 +4,7 @@ import Image from "next/image";
 export const metadata = {
   title: "Terms of Use – Connected Steps",
   description: "Terms and conditions for using the Connected Steps platform.",
+  alternates: { canonical: "/terms" },
 };
 
 export default function TermsPage() {
@@ -63,7 +64,7 @@ export default function TermsPage() {
         </Section>
 
         <Section title="6. Payments and Subscriptions">
-          <p>Certain features require a paid subscription. Prices are displayed on the <Link href="/pricing" style={{ color: "var(--cs-orange)" }}>Pricing page</Link>. Payments are non-refundable unless required by applicable law. We reserve the right to change pricing with reasonable notice.</p>
+          <p>Certain features require a paid subscription. Prices are displayed on the <Link href="/pricing" style={{ color: "var(--cs-orange)" }}>Pricing page</Link>. For our cancellation and refund terms, see the <Link href="/refund-policy" style={{ color: "var(--cs-orange)" }}>Refund Policy</Link>. We reserve the right to change pricing with reasonable notice.</p>
         </Section>
 
         <Section title="7. Intellectual Property">
@@ -75,7 +76,7 @@ export default function TermsPage() {
         </Section>
 
         <Section title="9. Termination">
-          <p>We reserve the right to suspend or delete accounts that violate these terms. You may delete your account at any time by contacting connected.steps2106@gmail.com.</p>
+          <p>We reserve the right to suspend or delete accounts that violate these terms. You may delete your account at any time by contacting info@connectedsteps.in.</p>
         </Section>
 
         <Section title="10. Governing Law">
@@ -83,7 +84,7 @@ export default function TermsPage() {
         </Section>
 
         <Section title="11. Contact">
-          <p>Questions about these terms? Email us at <a href="mailto:connected.steps2106@gmail.com" style={{ color: "var(--cs-orange)" }}>connected.steps2106@gmail.com</a>.</p>
+          <p>Questions about these terms? Email us at <a href="mailto:info@connectedsteps.in" style={{ color: "var(--cs-orange)" }}>info@connectedsteps.in</a>.</p>
         </Section>
       </div>
     </div>

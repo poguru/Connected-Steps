@@ -46,7 +46,7 @@ export default function ContactPage() {
           </a>
 
           {/* Email */}
-          <a href="mailto:connected.steps2106@gmail.com"
+          <a href="mailto:info@connectedsteps.in"
             style={{ display: "flex", alignItems: "flex-start", gap: "1rem", background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "10px", padding: "1.5rem", textDecoration: "none", transition: "border-color 0.2s" }}
             onMouseEnter={(e) => (e.currentTarget.style.borderColor = "rgba(232,98,10,0.4)")}
             onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)")}>
@@ -59,7 +59,7 @@ export default function ContactPage() {
             <div>
               <div style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--cs-white)", marginBottom: "4px" }}>Email</div>
               <div style={{ fontSize: "0.82rem", color: "var(--cs-muted)", marginBottom: "8px" }}>For general enquiries, billing questions, or feedback.</div>
-              <div style={{ fontSize: "0.8rem", color: "var(--cs-orange)", fontWeight: 600 }}>connected.steps2106@gmail.com</div>
+              <div style={{ fontSize: "0.8rem", color: "var(--cs-orange)", fontWeight: 600 }}>info@connectedsteps.in</div>
             </div>
           </a>
 
@@ -107,7 +107,7 @@ export default function ContactPage() {
             {[
               { q: "How do I join Connected Steps?", a: "Create a free account at connectedsteps.in and your coach will reach out to schedule your first session." },
               { q: "Can I try before subscribing?", a: "Yes — your first session is free. After that, choose a membership plan that fits your commitment level." },
-              { q: "How do I cancel or change my plan?", a: "Email us at connected.steps2106@gmail.com and we'll sort it out within 24 hours." },
+              { q: "How do I cancel or change my plan?", a: "Email us at info@connectedsteps.in and we'll sort it out within 24 hours." },
               { q: "Where are sessions held?", a: "We run sessions across multiple locations in Hyderabad. Your coach will share exact meeting points after you sign up." },
               { q: "I found a bug or have a feature request.", a: "Email us or message on WhatsApp — we read everything and regularly ship improvements based on community feedback." },
             ].map((item, i) => (

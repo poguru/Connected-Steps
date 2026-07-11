@@ -5,6 +5,7 @@ import CoachCarouselSection from "@/components/coaches/CoachCarouselSection";
 export const metadata = {
   title: "Running Club Hyderabad",
   description: "Join Hyderabad's most coached running club. Expert coaches, personalised training plans, and a community that shows up — for 5K beginners to marathon runners.",
+  alternates: { canonical: "/running-club-hyderabad" },
 };
 
 const faqs = [

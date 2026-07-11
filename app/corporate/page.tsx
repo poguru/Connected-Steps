@@ -5,6 +5,7 @@ import CorporateForm from "@/components/corporate/CorporateForm";
 export const metadata = {
   title: "Corporate Fitness & Wellness",
   description: "Connected Steps corporate wellness programmes for Hyderabad companies — on-site fitness, desk ergonomics, sports leagues, and monthly walk/run events. Building fitter workplaces and stronger teams.",
+  alternates: { canonical: "/corporate" },
 };
 
 const programApproach = [

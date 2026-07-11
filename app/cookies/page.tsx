@@ -4,6 +4,7 @@ import Image from "next/image";
 export const metadata = {
   title: "Cookie Policy – Connected Steps",
   description: "How Connected Steps uses cookies and similar technologies on its platform.",
+  alternates: { canonical: "/cookies" },
 };
 
 export default function CookiesPage() {
@@ -73,7 +74,7 @@ export default function CookiesPage() {
         </Section>
 
         <Section title="7. Contact">
-          <p>Questions about cookies or data storage? Email us at <a href="mailto:connected.steps2106@gmail.com" style={{ color: "var(--cs-orange)" }}>connected.steps2106@gmail.com</a>.</p>
+          <p>Questions about cookies or data storage? Email us at <a href="mailto:info@connectedsteps.in" style={{ color: "var(--cs-orange)" }}>info@connectedsteps.in</a>.</p>
         </Section>
       </div>
     </div>
