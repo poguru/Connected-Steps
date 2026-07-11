@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Calendar, MapPin, Users, ChevronLeft, ChevronRight,
@@ -150,8 +150,50 @@ const EVENT_GRADIENTS: Record<string, string> = {
 
 // ── Card ──────────────────────────────────────────────────────────────────────
 
+// ── Orientation-aware image container ─────────────────────────────────────────
+// Detects portrait / landscape / square from naturalWidth/naturalHeight on load.
+// Portrait → taller card, objectPosition: top (faces stay visible)
+// Landscape → fixed 180px banner, objectFit: cover
+// Square → near-square container
+// No blur. No contain-in-fixed-height. No empty space.
+
+type ImgOrientation = "landscape" | "portrait" | "square" | "unknown";
+
+function useImgOrientation(): [ImgOrientation, (e: React.SyntheticEvent<HTMLImageElement>) => void] {
+  const [orientation, setOrientation] = useState<ImgOrientation>("unknown");
+  function onLoad(e: React.SyntheticEvent<HTMLImageElement>) {
+    const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+    if (!w || !h) return;
+    const r = w / h;
+    if      (r > 1.2)  setOrientation("landscape");
+    else if (r < 0.85) setOrientation("portrait");
+    else               setOrientation("square");
+  }
+  return [orientation, onLoad];
+}
+
+function cardImgContainerStyle(orientation: ImgOrientation, bg: string | undefined): React.CSSProperties {
+  const base: React.CSSProperties = { position: "relative", overflow: "hidden", flexShrink: 0, background: bg };
+  if (orientation === "portrait") return { ...base, aspectRatio: "3/4", maxHeight: 300 };
+  if (orientation === "square")   return { ...base, aspectRatio: "1/1" };
+  return { ...base, height: 180 }; // landscape + unknown default
+}
+
+function cardImgStyle(orientation: ImgOrientation, hovered: boolean): React.CSSProperties {
+  return {
+    position: "absolute", inset: 0,
+    width: "100%", height: "100%",
+    objectFit: "cover",
+    objectPosition: orientation === "portrait" ? "center top" : "center",
+    display: "block",
+    transition: "transform 0.5s ease",
+    transform: hovered ? "scale(1.03)" : "scale(1)",
+  };
+}
+
 function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (item: Item) => void }) {
   const [hovered, setHovered] = useState(false);
+  const [orientation, onImgLoad] = useImgOrientation();
   const cd = countdown(item.date, item.time, now);
 
   const imageUrl = item.kind === "session" ? item.photo_url : item.cover_image;
@@ -199,47 +241,16 @@ function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (i
       }}
     >
       {/* ── Image ──────────────────────────────────────────────────────────── */}
-      <div className="cs-scard-img-wrap" style={{
-        position: "relative",
-        height: 180,
-        flexShrink: 0,
-        background: bg,
-        overflow: "hidden",
-      }}>
+      <div className="cs-scard-img-wrap" style={cardImgContainerStyle(orientation, bg)}>
         {imageUrl ? (
-          <>
-            {/* Blurred background layer — fills empty space for any aspect ratio */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={imageUrl}
-              alt=""
-              aria-hidden
-              style={{
-                position: "absolute", inset: 0,
-                width: "100%", height: "100%",
-                objectFit: "cover", objectPosition: "center",
-                filter: "blur(22px)",
-                transform: "scale(1.18)",
-                opacity: 0.65,
-              }}
-            />
-            {/* Sharp full image — always fully visible, no face cropping */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={imageUrl}
-              alt={item.title}
-              loading="lazy"
-              className="cs-scard-img"
-              style={{
-                position: "absolute", inset: 0,
-                width: "100%", height: "100%",
-                objectFit: "contain", objectPosition: "center",
-                display: "block",
-                transition: "transform 0.5s ease",
-                transform: hovered ? "scale(1.03)" : "scale(1)",
-              }}
-            />
-          </>
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={imageUrl}
+            alt={item.title}
+            loading="lazy"
+            onLoad={onImgLoad}
+            style={cardImgStyle(orientation, hovered)}
+          />
         ) : item.kind === "session" && (
           <div style={{
             position: "absolute", inset: 0,

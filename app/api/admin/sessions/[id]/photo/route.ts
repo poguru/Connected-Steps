@@ -27,10 +27,11 @@ export async function POST(
   if (upErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   const { data: urlData } = db.storage.from("session-photos").getPublicUrl(fileName);
-  const photo_url = urlData.publicUrl;
+  const cover_image_url = urlData.publicUrl;
 
-  const { error: dbErr } = await db.from("sessions").update({ photo_url }).eq("id", id);
+  // Save to cover_image_url (card cover) — separate from photo_url (gallery photos)
+  const { error: dbErr } = await db.from("sessions").update({ cover_image_url }).eq("id", id);
   if (dbErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
-  return NextResponse.json({ success: true, photo_url });
+  return NextResponse.json({ success: true, photo_url: cover_image_url, cover_image_url });
 }

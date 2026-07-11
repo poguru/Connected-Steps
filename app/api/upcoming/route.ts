@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   // ── Round 1: sessions + events ────────────────────────────────────────────────
   const [sessRes, evtRes] = await Promise.all([
     db.from("sessions")
-      .select("id, title, date, time, venue, location, photo_url, difficulty")
+      .select("id, title, date, time, venue, location, cover_image_url, photo_url, difficulty")
       .gte("date", today)
       .order("date", { ascending: true })
       .limit(8),
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
   const eventIds   = events.map((e) => e.id as string);
 
   // Titles for photo / count lookups
-  const titlesWithoutPhoto = [...new Set(sessions.filter(s => !s.photo_url).map(s => s.title as string))];
+  const titlesWithoutPhoto = [...new Set(sessions.filter(s => !s.cover_image_url && !s.photo_url).map(s => s.title as string))];
   const sessionTitles      = [...new Set(sessions.map(s => s.title as string))];
 
   // ── Round 2: counts, personalization, prev photos, past sessions ──────────────
@@ -186,7 +186,13 @@ export async function GET(req: NextRequest) {
     time:               (s.time  ?? null) as string | null,
     venue:              (s.venue ?? null) as string | null,
     location:           s.location as string,
-    photo_url:          thumbUrl(s.photo_url ?? prevPhotoByTitleLoc[`${s.title as string}||${s.location as string}`] ?? prevPhotoMap[s.title as string] ?? null),
+    photo_url:          thumbUrl(
+      (s.cover_image_url as string | null) ??
+      (s.photo_url as string | null) ??
+      prevPhotoByTitleLoc[`${s.title as string}||${s.location as string}`] ??
+      prevPhotoMap[s.title as string] ??
+      null
+    ),
     difficulty:         (s.difficulty ?? null) as string | null,
     registered_count:   sessionCountMap[s.id as string] ?? 0,
     registered:         regSessionSet.has(s.id as string),

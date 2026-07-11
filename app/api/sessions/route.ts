@@ -21,7 +21,7 @@ export async function GET() {
 
   const { data, error } = await db
     .from("sessions")
-    .select("id, title, date, time, venue, location, photo_url, difficulty")
+    .select("id, title, date, time, venue, location, cover_image_url, photo_url, difficulty")
     .gte("date", today)
     .order("date", { ascending: true })
     .limit(20);
@@ -39,7 +39,8 @@ export async function GET() {
   if (filtered.length === 0) return NextResponse.json({ data: [] });
 
   const sessionIds    = filtered.map(s => s.id as string);
-  const noPhotoTitles = [...new Set(filtered.filter(s => !s.photo_url).map(s => s.title as string))];
+  // Only fall back to previous sessions for titles without ANY cover (cover_image_url preferred, then photo_url)
+  const noPhotoTitles = [...new Set(filtered.filter(s => !s.cover_image_url && !s.photo_url).map(s => s.title as string))];
 
   // â”€â”€ Round 2: attendance counts + exact-title photo fallback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [attRes, prevPhotoRes] = await Promise.all([
@@ -109,7 +110,13 @@ export async function GET() {
     time:             (s.time ?? null) as string | null,
     venue:            (s.venue ?? null) as string | null,
     location:         s.location as string,
-    photo_url:        thumbUrl(s.photo_url ?? prevPhotoByTitleLoc[`${s.title as string}||${s.location as string}`] ?? prevPhotoMap[s.title as string] ?? null),
+    photo_url:        thumbUrl(
+      (s.cover_image_url as string | null) ??
+      (s.photo_url as string | null) ??
+      prevPhotoByTitleLoc[`${s.title as string}||${s.location as string}`] ??
+      prevPhotoMap[s.title as string] ??
+      null
+    ),
     registered_count: attMap[s.id as string] ?? 0,
     difficulty:       (s.difficulty ?? null) as string | null,
   }));
