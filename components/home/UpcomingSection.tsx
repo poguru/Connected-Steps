@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Calendar, MapPin, Users, ChevronLeft, ChevronRight,
@@ -152,6 +152,18 @@ const EVENT_GRADIENTS: Record<string, string> = {
 
 function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (item: Item) => void }) {
   const [hovered, setHovered] = useState(false);
+  // Portrait phone photos have subjects at the bottom (sky/trees at top).
+  // Landscape photos have subjects in the center-upper area.
+  // objectPosition adapts; the 4/3 container stays fixed.
+  const [objPos, setObjPos] = useState("center");
+  function onImgLoad(e: React.SyntheticEvent<HTMLImageElement>) {
+    const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+    if (!w || !h) return;
+    const r = w / h;
+    if (r < 0.85)     setObjPos("center 70%"); // portrait: show lower portion
+    else if (r > 1.2) setObjPos("center 30%"); // landscape: slight top bias
+    else              setObjPos("center");       // square: dead center
+  }
   const cd = countdown(item.date, item.time, now);
 
   const imageUrl = item.kind === "session" ? item.photo_url : item.cover_image;
@@ -208,11 +220,12 @@ function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (i
             src={imageUrl}
             alt={item.title}
             loading="lazy"
+            onLoad={onImgLoad}
             style={{
               position: "absolute", inset: 0,
               width: "100%", height: "100%",
               objectFit: "cover",
-              objectPosition: "center 25%",
+              objectPosition: objPos,
               display: "block",
               transition: "transform 0.5s ease",
               transform: hovered ? "scale(1.06)" : "scale(1)",

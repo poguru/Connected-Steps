@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
@@ -198,6 +198,15 @@ function SessionCard({
   session: s, onJoin, now,
 }: { session: Session; onJoin: (id: string) => void; now: Date }) {
   const [hovered, setHovered] = useState(false);
+  const [objPos, setObjPos] = useState("center");
+  function onImgLoad(e: React.SyntheticEvent<HTMLImageElement>) {
+    const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+    if (!w || !h) return;
+    const r = w / h;
+    if (r < 0.85)     setObjPos("center 70%");
+    else if (r > 1.2) setObjPos("center 30%");
+    else              setObjPos("center");
+  }
   const cd = countdown(s.date, s.time, now);
   const gradient = categoryGradient(s.title);
 
@@ -236,11 +245,12 @@ function SessionCard({
             src={s.photo_url}
             alt={s.title}
             loading="lazy"
+            onLoad={onImgLoad}
             style={{
               position: "absolute", inset: 0,
               width: "100%", height: "100%",
               objectFit: "cover",
-              objectPosition: "center 25%",
+              objectPosition: objPos,
               display: "block",
               transition: "transform 0.5s ease",
               transform: hovered ? "scale(1.06)" : "scale(1)",
