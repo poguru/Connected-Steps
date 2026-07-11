@@ -73,7 +73,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .select("id, title, share_slug")
     .single();
 
-  if (evErr || !newEv) return NextResponse.json({ error: evErr?.message ?? "Failed to create event" }, { status: 500 });
+  if (evErr || !newEv) return NextResponse.json({ error: "Failed to create event" }, { status: 500 });
 
   // ── Copy races ──────────────────────────────────────────────────────────────
   if (srcRaces?.length) {

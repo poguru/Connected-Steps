@@ -60,7 +60,7 @@ export async function POST(
     .insert({ session_id: id, user_email, challenge_type, challenge_name, points })
     .select("id")
     .single();
-  if (cErr) return NextResponse.json({ error: cErr.message }, { status: 500 });
+  if (cErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   // Write to points_ledger as the audit/aggregation record that recalculateMonth() reads
   const { error: lErr } = await db.from("points_ledger").insert({
@@ -71,7 +71,7 @@ export async function POST(
     category: "challenge",
     metadata: { challenge_id: challenge.id, challenge_type },
   });
-  if (lErr) return NextResponse.json({ error: lErr.message }, { status: 500 });
+  if (lErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   // Auto-recalculate leaderboard so the award is visible immediately
   const month = session.date.slice(0, 7);

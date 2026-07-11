@@ -18,7 +18,7 @@ export async function GET(
     .select("*")
     .eq("id", id)
     .single();
-  if (sessionErr) return NextResponse.json({ error: sessionErr.message }, { status: 500 });
+  if (sessionErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   // Only show users who registered via the join link
   const { data: attendance } = await db

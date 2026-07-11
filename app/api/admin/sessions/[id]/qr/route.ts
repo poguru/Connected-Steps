@@ -57,7 +57,7 @@ export async function POST(
     .select("token, expires_at")
     .single();
 
-  if (error || !data) return NextResponse.json({ error: error?.message ?? "Failed to create QR" }, { status: 500 });
+  if (error || !data) return NextResponse.json({ error: "Failed to create QR" }, { status: 500 });
 
   const scanUrl = `${APP_URL}/scan?token=${data.token}`;
   const dataUrl = await QRCode.toDataURL(scanUrl, {

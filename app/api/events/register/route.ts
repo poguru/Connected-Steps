@@ -225,7 +225,7 @@ export async function POST(req: NextRequest) {
         .select("registration_code, qr_token")
         .single();
 
-      if (regErr) return NextResponse.json({ error: regErr.message }, { status: 500 });
+      if (regErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
       const finalCode  = reg?.registration_code ?? code;
       const finalQr    = reg?.qr_token          ?? qrToken;
@@ -321,7 +321,7 @@ export async function POST(req: NextRequest) {
         distance_category: chosenCategory,
       }, { onConflict: "event_id,user_email", ignoreDuplicates: false });
 
-    if (regErr2) return NextResponse.json({ error: regErr2.message }, { status: 500 });
+    if (regErr2) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
     return NextResponse.json({
       success: true,

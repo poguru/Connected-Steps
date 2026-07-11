@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     .eq("user_email", userEmail.toLowerCase())
     .order("created_at", { ascending: false });
 
-  if (regErr) return NextResponse.json({ error: regErr.message }, { status: 500 });
+  if (regErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
   if (!regs || regs.length === 0) return NextResponse.json({ registrations: [] });
 
   // Step 2: fetch the events for those registration IDs

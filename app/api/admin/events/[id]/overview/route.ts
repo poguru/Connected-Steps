@@ -45,8 +45,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .eq("event_id", id),
   ]);
 
-  if (evErr) return NextResponse.json({ error: evErr.message }, { status: 500 });
-  if (regErr) return NextResponse.json({ error: regErr.message }, { status: 500 });
+  if (evErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
+  if (regErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   // ── Compute registration stats from raw rows (accurate, no pagination gaps) ──
   const all = regs ?? [];

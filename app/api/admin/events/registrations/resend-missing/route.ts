@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
   q = q.order("created_at", { ascending: true }).limit(500) as typeof q;
 
   const { data: registrations, error: fetchErr } = await q;
-  if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
+  if (fetchErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   const targets = (registrations as unknown as Array<{
     id:                         string;

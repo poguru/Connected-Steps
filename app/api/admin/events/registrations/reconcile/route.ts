@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     const result = await runReconciliation({ eventId, dryRun: true, callerLabel: "admin-manual" });
     return NextResponse.json({ ...result, dry_run: true });
   } catch (e: unknown) {
-    return NextResponse.json({ error: (e instanceof Error ? e.message : String(e)) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
 
@@ -34,6 +34,6 @@ export async function POST(req: NextRequest) {
     const result = await runReconciliation({ eventId, dryRun, callerLabel: "admin-manual" });
     return NextResponse.json({ ...result, dry_run: dryRun });
   } catch (e: unknown) {
-    return NextResponse.json({ error: (e instanceof Error ? e.message : String(e)) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

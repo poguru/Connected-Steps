@@ -52,7 +52,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     query,
     db.from("events").select("title").eq("id", id).single(),
   ]);
-  if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
+  if (fetchErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
   if (!registrants?.length)
     return NextResponse.json({ queued: 0, batch_id: null, message: "No recipients matched the filter." });
 
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   });
 
   const { error: insertErr } = await db.from("email_queue").insert(rows);
-  if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+  if (insertErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   // Create history entry in 'queued' state; updated to 'sent'/'failed' when processing completes
   void db.from("event_comm_history").insert({

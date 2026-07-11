@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
     if (fetchError) {
       console.error(`[birthday-wishes] failed to fetch users: ${fetchError.message}`);
       await releaseCronLock("birthday-wishes", todayStr);
-      return NextResponse.json({ error: fetchError.message }, { status: 500 });
+      return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
     const birthday = users ?? [];

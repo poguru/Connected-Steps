@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
   });
 
   if (insertErr) {
-    return NextResponse.json({ error: insertErr.message }, { status: 500 });
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
 
   // Extend / grant memberships for both users

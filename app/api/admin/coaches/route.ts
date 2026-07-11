@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
     { onConflict: "email" },
   );
 
-  if (coachErr) return NextResponse.json({ error: coachErr.message }, { status: 500 });
+  if (coachErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   return NextResponse.json({ ok: true });
 }

@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
     .eq("id", reg.id);
 
   if (updateErr) {
-    return NextResponse.json({ error: updateErr.message }, { status: 500 });
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
 
   return NextResponse.json({

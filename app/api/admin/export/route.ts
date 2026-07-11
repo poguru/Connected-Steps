@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     .select("id")
     .single();
 
-  if (createErr) return NextResponse.json({ error: createErr.message }, { status: 500 });
+  if (createErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   const exportId = (exportRow as { id: string }).id;
 

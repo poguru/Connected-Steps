@@ -47,8 +47,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .eq("event_id", id),
   ]);
 
-  if (evErr)   return NextResponse.json({ error: evErr.message },  { status: 500 });
-  if (coreErr) return NextResponse.json({ error: coreErr.message }, { status: 500 });
+  if (evErr)   return NextResponse.json({ error: "Database error" }, { status: 500 });
+  if (coreErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   const stats    = (coreStats  as Record<string, number | object> | null) ?? {};
   const raceDay  = (raceDayRaw as Record<string, number> | null) ?? {};

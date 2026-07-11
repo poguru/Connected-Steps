@@ -62,7 +62,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .from("session-photos")
       .upload(key, buf, { contentType: file.type, upsert: false });
 
-    if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
+    if (upErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
     const { data: urlData } = db.storage.from("session-photos").getPublicUrl(key);
 
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .select()
       .single();
 
-    if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 });
+    if (dbErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
     return NextResponse.json({ photo: { ...data, likes: 0 } });
   } catch (e: unknown) {
     return NextResponse.json({ error: "Server error" }, { status: 500 });

@@ -120,7 +120,7 @@ export async function POST(
       .select()
       .single();
 
-    if (msgErr) return NextResponse.json({ error: msgErr.message }, { status: 500 });
+    if (msgErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
     const unreadField    = sender_type === "user" ? "coach_unread" : "user_unread";
     const { data: conv2 } = await db

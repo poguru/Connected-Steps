@@ -151,7 +151,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .select("registration_code, qr_token")
     .single();
 
-  if (regErr) return NextResponse.json({ error: regErr.message }, { status: 500 });
+  if (regErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   const finalCode = reg?.registration_code ?? code;
   const finalQr   = reg?.qr_token          ?? qrToken;

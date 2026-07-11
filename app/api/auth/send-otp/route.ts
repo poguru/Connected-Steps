@@ -135,7 +135,7 @@ export async function POST(req: NextRequest) {
       expires_at: expiresAt,
       verified:   false,
     });
-    if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+    if (insertErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
     // â”€â”€ Dispatch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const displayName = (name as string | undefined)?.trim() || "there";

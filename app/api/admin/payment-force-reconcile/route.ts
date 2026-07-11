@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
     if (updateErr.code === "23505") {
       return NextResponse.json({ success: true, already_confirmed: true, message: "Duplicate — already processed" });
     }
-    return NextResponse.json({ error: updateErr.message }, { status: 500 });
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
 
   // Audit log

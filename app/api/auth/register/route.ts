@@ -109,7 +109,8 @@ export async function POST(req: NextRequest) {
         .eq("email", (email as string).toLowerCase())
         .single();
       if (checkError && checkError.code !== "PGRST116") {
-        return NextResponse.json({ error: "DB check failed: " + checkError.message }, { status: 500 });
+        console.error("[register] email check error:", checkError.message);
+        return NextResponse.json({ error: "Registration failed. Please try again." }, { status: 500 });
       }
       if (existingEmail) {
         return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });

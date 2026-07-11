@@ -47,8 +47,8 @@ export async function GET(req: NextRequest) {
       .order("rank",  { ascending: true }),
   ]);
 
-  if (liveRes.error)    return NextResponse.json({ error: liveRes.error.message },    { status: 500 });
-  if (archiveRes.error) return NextResponse.json({ error: archiveRes.error.message }, { status: 500 });
+  if (liveRes.error)    return NextResponse.json({ error: "Database error" }, { status: 500 });
+  if (archiveRes.error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   return NextResponse.json({
     live:     liveRes.data    ?? [],
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
     .gt("month_points", 0)
     .order("month_points", { ascending: false });
 
-  if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
+  if (fetchErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
   if (!entries || entries.length === 0) {
     return NextResponse.json({ error: "No participants with points for this month." }, { status: 400 });
   }
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
   }));
 
   const { error: insertErr } = await db.from("monthly_leaderboard_archive").insert(rows);
-  if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+  if (insertErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   return NextResponse.json({ saved: rows.length, month });
 }

@@ -117,7 +117,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   if (updateErr) {
     console.error(`[bib/scan] DB error reg=${reg.registration_code}:`, updateErr.message);
-    return NextResponse.json({ error: updateErr.message }, { status: 500 });
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
 
   console.log(`[bib/scan] ✅ BIB ${reg.bib_number} collected — reg=${reg.registration_code} by=${collectedBy}`);

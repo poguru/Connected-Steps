@@ -20,7 +20,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // Atomically claim the next queued email (FOR UPDATE SKIP LOCKED prevents double-send)
   const { data: claimed, error: claimErr } = await db.rpc("claim_next_email", { p_batch_id: batch_id });
-  if (claimErr) return NextResponse.json({ error: claimErr.message }, { status: 500 });
+  if (claimErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   type ClaimedRow = {
     id: string; recipient_email: string; recipient_name: string | null;

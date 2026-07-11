@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
     })
     .eq("id", reg.id);
 
-  if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
+  if (updateErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   console.log(`[breakfast] ✅ issued to=${reg.user_name} (${reg.registration_code}) by=${adminEmail}`);
 

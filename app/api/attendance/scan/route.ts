@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       .eq("session_id", qr.session_id)
       .eq("user_email", userEmail.toLowerCase());
 
-    if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
+    if (upErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
   } else {
     // Not registered — auto-register + mark attended
     const { data: user } = await db
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
         check_in_method: "qr",
       });
 
-    if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
+    if (insErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
 
   // Write attendance ledger entry (fire-and-forget — failure must not block the scan).

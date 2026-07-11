@@ -75,7 +75,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     .from(bucket)
     .upload(key, buf, { contentType: file.type, upsert: false });
 
-  if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
+  if (upErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   const { data: urlData } = db.storage.from(bucket).getPublicUrl(key);
   const publicUrl = urlData.publicUrl;
@@ -111,6 +111,6 @@ export async function POST(req: NextRequest, { params }: Params) {
     .select()
     .single();
 
-  if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 });
+  if (dbErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ media: inserted }, { status: 201 });
 }

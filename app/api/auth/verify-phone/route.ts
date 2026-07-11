@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
       .eq("email", (email as string).toLowerCase().trim());
 
     if (updateErr) {
-      return NextResponse.json({ error: "Failed to update account: " + updateErr.message }, { status: 500 });
+      return NextResponse.json({ error: "Failed to update account" }, { status: 500 });
     }
 
     return NextResponse.json({
