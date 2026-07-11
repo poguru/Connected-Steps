@@ -203,32 +203,20 @@ function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (i
         position: "relative", aspectRatio: "4/3", overflow: "hidden", flexShrink: 0, background: bg,
       }}>
         {imageUrl ? (
-          <>
-            {/* Blurred fill — covers empty space around the contained image */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={imageUrl} alt="" aria-hidden style={{
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={imageUrl}
+            alt={item.title}
+            loading="lazy"
+            style={{
               position: "absolute", inset: 0,
               width: "100%", height: "100%",
-              objectFit: "cover", objectPosition: "center",
-              filter: "blur(18px)", transform: "scale(1.12)",
-              opacity: 0.6,
-            }} />
-            {/* Full image — never cropped, never resized */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={imageUrl}
-              alt={item.title}
-              loading="lazy"
-              style={{
-                position: "absolute", inset: 0,
-                width: "100%", height: "100%",
-                objectFit: "contain", objectPosition: "center",
-                display: "block",
-                transition: "transform 0.5s ease",
-                transform: hovered ? "scale(1.04)" : "scale(1)",
-              }}
-            />
-          </>
+              objectFit: "cover", objectPosition: "center 25%",
+              display: "block",
+              transition: "transform 0.5s ease",
+              transform: hovered ? "scale(1.06)" : "scale(1)",
+            }}
+          />
         ) : item.kind === "session" && (
           <div style={{
             position: "absolute", inset: 0,

@@ -203,7 +203,7 @@ export default function PricingPage() {
         handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
           const finalPaise = discountedAmount(order.amount);
           const verifyRes  = await fetch("/api/payment/verify", {
-            method: "POST", headers: { "Content-Type": "application/json" },
+            method: "POST", headers: { "Content-Type": "application/json", "x-user-token": tok },
             body: JSON.stringify({ ...response, plan: plan.razorpay_plan, email: userEmail, name: userName, amount: finalPaise, coupon_id: couponData?.coupon_id ?? null }),
           });
           const result = await verifyRes.json();

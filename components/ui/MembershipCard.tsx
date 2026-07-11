@@ -66,10 +66,11 @@ export default function MembershipCard({ email, name }: Props) {
     setError("");
     setPaying(true);
     try {
+      const tok = (typeof localStorage !== "undefined" ? localStorage.getItem("cs_user_token") : null) ?? "";
       const orderRes = await fetch("/api/payment/create-order", {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ plan: planId, email }),
+        headers: { "Content-Type": "application/json", "x-user-token": tok },
+        body:    JSON.stringify({ plan: planId }),
       });
       const order = await orderRes.json();
       if (!orderRes.ok) throw new Error(order.error ?? "Order creation failed");
@@ -93,7 +94,7 @@ export default function MembershipCard({ email, name }: Props) {
         }) => {
           const verifyRes = await fetch("/api/payment/verify", {
             method:  "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", "x-user-token": tok },
             body:    JSON.stringify({ ...response, plan: planId, email, name, amount: order.amount }),
           });
           const result = await verifyRes.json();

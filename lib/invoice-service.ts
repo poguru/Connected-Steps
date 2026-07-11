@@ -305,7 +305,7 @@ function generateInvoiceHTML(inv: {
       <thead>
         <tr>
           <th style="width:32px">#</th>
-          <th>Description of Service</th>
+          <th>Description of Service (SAC Code)</th>
           <th style="text-align:right;width:50px">Qty</th>
           <th style="text-align:right;width:120px">Rate (₹)</th>
           <th style="text-align:right;width:130px">Amount (₹)</th>
@@ -317,6 +317,7 @@ function generateInvoiceHTML(inv: {
           <td>
             <div class="desc-name">${inv.productName}</div>
             <div class="desc-sub">${typeLabel} · ${b.name}</div>
+            <div class="desc-sub" style="margin-top:2px">SAC: 999723</div>
           </td>
           <td class="tr">1</td>
           <td class="amt">${totalAmt.toFixed(2)}</td>

@@ -231,30 +231,20 @@ function SessionCard({
         position: "relative", aspectRatio: "4/3", overflow: "hidden", flexShrink: 0, background: gradient,
       }}>
         {s.photo_url ? (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={s.photo_url} alt="" aria-hidden style={{
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={s.photo_url}
+            alt={s.title}
+            loading="lazy"
+            style={{
               position: "absolute", inset: 0,
               width: "100%", height: "100%",
-              objectFit: "cover", objectPosition: "center",
-              filter: "blur(18px)", transform: "scale(1.12)",
-              opacity: 0.6,
-            }} />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={s.photo_url}
-              alt={s.title}
-              loading="lazy"
-              style={{
-                position: "absolute", inset: 0,
-                width: "100%", height: "100%",
-                objectFit: "contain", objectPosition: "center",
-                display: "block",
-                transition: "transform 0.5s ease",
-                transform: hovered ? "scale(1.04)" : "scale(1)",
-              }}
-            />
-          </>
+              objectFit: "cover", objectPosition: "center 25%",
+              display: "block",
+              transition: "transform 0.5s ease",
+              transform: hovered ? "scale(1.06)" : "scale(1)",
+            }}
+          />
         ) : (
           <div style={{
             position: "absolute", inset: 0,
