@@ -236,7 +236,7 @@ function SessionCard({
             loading="lazy"
             className="cs-scard-img"
             style={{
-              width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 25%",
+              width: "100%", height: "100%", objectFit: "cover", objectPosition: "center center",
               display: "block",
               transition: "transform 0.5s ease",
               transform: hovered ? "scale(1.05)" : "scale(1)",
