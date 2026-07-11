@@ -172,6 +172,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (e: unknown) {
-    return NextResponse.json({ error: "Server error: " + (e instanceof Error ? e.message : String(e)) }, { status: 500 });
+    console.error("[register] unexpected error:", e);
+    return NextResponse.json({ error: "An error occurred, please try again." }, { status: 500 });
   }
 }

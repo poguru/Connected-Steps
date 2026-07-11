@@ -509,20 +509,16 @@ select.auth-input option {
   .us-view-links     { display: none; }
 }
 
-/* ─── Session card images: no-crop on mobile ────────── */
-/* Desktop: cover + hover-zoom (inline styles take effect).
-   Mobile:  aspect-ratio container + contain so group photos
-            never lose faces or context. The gradient bg fills
-            any letterbox area naturally. */
+/* ─── Session card images: blurred-bg technique ─────── */
+/* Both layers are position:absolute inset:0.
+   Mobile gets an aspect-ratio wrapper so portrait photos
+   don't make cards excessively tall. */
 @media (max-width: 860px) {
   .cs-scard-img-wrap {
     height: auto !important;
-    aspect-ratio: 16 / 9;
+    aspect-ratio: 4 / 3;
   }
   .cs-scard-img {
-    object-fit: contain !important;
-    height: 100% !important;
-    object-position: center !important;
     transform: none !important;
   }
 }

@@ -196,7 +196,7 @@ export default function Leaderboard() {
 
   useEffect(() => {
     const stored = localStorage.getItem("cs_user");
-    if (!stored) { router.push("/auth"); return; }
+    if (!stored) { router.push("/auth?redirect=/leaderboard"); return; }
     let u: User;
     try { u = JSON.parse(stored); } catch { localStorage.removeItem("cs_user"); router.push("/auth"); return; }
     setUser(u);

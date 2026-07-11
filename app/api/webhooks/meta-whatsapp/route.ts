@@ -47,13 +47,17 @@ export async function POST(req: NextRequest) {
   const signature = req.headers.get("x-hub-signature-256");
   const valid     = await verifyWebhookSignature(rawBody, signature);
   if (!valid) {
-    // Signature verification requires WHATSAPP_APP_SECRET.
-    // If the env var is not set we log a warning and continue (development mode).
     if (process.env.WHATSAPP_APP_SECRET) {
+      // Secret configured but signature doesn't match — reject
       console.error("[wa-webhook] invalid signature — rejecting payload");
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    } else if (process.env.NODE_ENV === "production") {
+      // Production must always have the secret; missing it is a misconfiguration
+      console.error("[wa-webhook] WHATSAPP_APP_SECRET missing in production — rejecting");
+      return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
+    } else {
+      console.warn("[wa-webhook] WHATSAPP_APP_SECRET not set — skipping signature check (dev only)");
     }
-    console.warn("[wa-webhook] WHATSAPP_APP_SECRET not set — skipping signature check");
   }
 
   let payload: unknown;

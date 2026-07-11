@@ -119,10 +119,10 @@ export async function sendWhatsAppOTP(phone: string, code: string): Promise<WARe
           type: "body",
           parameters: [{ type: "text", text: code }],
         },
-        // Authentication templates with Copy Code button require a button component
+        // Authentication templates with Copy Code button require sub_type "copy_code"
         {
           type:      "button",
-          sub_type:  "url",
+          sub_type:  "copy_code",
           index:     "0",
           parameters: [{ type: "text", text: code }],
         },

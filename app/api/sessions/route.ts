@@ -47,22 +47,26 @@ export async function GET() {
 
     noPhotoTitles.length
       ? db.from("sessions")
-          .select("title, photo_url")
+          .select("title, location, photo_url")
           .in("title", noPhotoTitles)
           .lt("date", today)
           .not("photo_url", "is", null)
           .order("date", { ascending: false })
-          .limit(noPhotoTitles.length * 5)
+          .limit(noPhotoTitles.length * 10)
       : Promise.resolve({ data: [] }),
   ]);
 
-  // Build exact-title photo map
-  const prevPhotoMap: Record<string, string> = {};
+  // Two-tier photo map: (title+location) preferred over (title-only)
+  const prevPhotoByTitleLoc: Record<string, string> = {};
+  const prevPhotoByTitle: Record<string, string> = {};
   for (const r of (prevPhotoRes.data ?? [])) {
-    if (r.photo_url && !prevPhotoMap[r.title as string]) {
-      prevPhotoMap[r.title as string] = r.photo_url as string;
+    if (r.photo_url) {
+      const tlKey = `${r.title as string}||${(r.location as string) ?? ""}`;
+      if (!prevPhotoByTitleLoc[tlKey]) prevPhotoByTitleLoc[tlKey] = r.photo_url as string;
+      if (!prevPhotoByTitle[r.title as string]) prevPhotoByTitle[r.title as string] = r.photo_url as string;
     }
   }
+  const prevPhotoMap = prevPhotoByTitle;
 
   // ── Round 3: keyword fallback for titles still missing a photo ────────────
   const stillMissing = noPhotoTitles.filter(t => !prevPhotoMap[t]);
@@ -105,7 +109,7 @@ export async function GET() {
     time:             (s.time ?? null) as string | null,
     venue:            (s.venue ?? null) as string | null,
     location:         s.location as string,
-    photo_url:        thumbUrl(s.photo_url ?? prevPhotoMap[s.title as string] ?? null),
+    photo_url:        thumbUrl(s.photo_url ?? prevPhotoByTitleLoc[`${s.title as string}||${s.location as string}`] ?? prevPhotoMap[s.title as string] ?? null),
     registered_count: attMap[s.id as string] ?? 0,
     difficulty:       (s.difficulty ?? null) as string | null,
   }));

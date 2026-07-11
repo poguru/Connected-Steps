@@ -1,5 +1,7 @@
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { signAdminSession, verifyAdminSession, ADMIN_SESSION_COOKIE } from "@/lib/admin-auth";
+import { isRateLimited, recordFailure, getClientIp } from "@/lib/rate-limit";
 
 const COOKIE_OPTS = {
   httpOnly:  true,
@@ -20,18 +22,35 @@ export async function GET(req: NextRequest) {
 
 // POST — validate email+password, issue httpOnly session cookie
 export async function POST(req: NextRequest) {
+  const ip  = getClientIp(req);
+  const key = `admin-login:${ip}`;
+
+  if (await isRateLimited(key)) {
+    return NextResponse.json(
+      { error: "Too many attempts. Please try again in 15 minutes." },
+      { status: 429, headers: { "Retry-After": "900" } },
+    );
+  }
+
   try {
     const { email, password } = await req.json();
-    if (!password) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
 
-    const adminPw    = process.env.ADMIN_PASSWORD;
+    const adminPw    = process.env.ADMIN_PASSWORD ?? "";
     const adminEmail = process.env.ADMIN_EMAIL;
 
-    if (!adminPw || password !== adminPw) {
+    // Timing-safe password comparison — always compare same-length buffers
+    const validPw = adminPw.length > 0 &&
+      password?.length === adminPw.length &&
+      crypto.timingSafeEqual(Buffer.from(password as string), Buffer.from(adminPw));
+
+    if (!validPw) {
+      await recordFailure(key);
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
+
     // If ADMIN_EMAIL is configured, require it to match
-    if (adminEmail && (!email || email.toLowerCase().trim() !== adminEmail.toLowerCase())) {
+    if (adminEmail && (!email || (email as string).toLowerCase().trim() !== adminEmail.toLowerCase())) {
+      await recordFailure(key);
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 

@@ -201,25 +201,45 @@ function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (i
       {/* ── Image ──────────────────────────────────────────────────────────── */}
       <div className="cs-scard-img-wrap" style={{
         position: "relative",
-        height: 160,
+        height: 180,
         flexShrink: 0,
         background: bg,
         overflow: "hidden",
       }}>
         {imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={imageUrl}
-            alt={item.title}
-            loading="lazy"
-            className="cs-scard-img"
-            style={{
-              width: "100%", height: "100%", objectFit: "cover", objectPosition: "center center",
-              display: "block",
-              transition: "transform 0.5s ease",
-              transform: hovered ? "scale(1.05)" : "scale(1)",
-            }}
-          />
+          <>
+            {/* Blurred background layer — fills empty space for any aspect ratio */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imageUrl}
+              alt=""
+              aria-hidden
+              style={{
+                position: "absolute", inset: 0,
+                width: "100%", height: "100%",
+                objectFit: "cover", objectPosition: "center",
+                filter: "blur(22px)",
+                transform: "scale(1.18)",
+                opacity: 0.65,
+              }}
+            />
+            {/* Sharp full image — always fully visible, no face cropping */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imageUrl}
+              alt={item.title}
+              loading="lazy"
+              className="cs-scard-img"
+              style={{
+                position: "absolute", inset: 0,
+                width: "100%", height: "100%",
+                objectFit: "contain", objectPosition: "center",
+                display: "block",
+                transition: "transform 0.5s ease",
+                transform: hovered ? "scale(1.03)" : "scale(1)",
+              }}
+            />
+          </>
         ) : item.kind === "session" && (
           <div style={{
             position: "absolute", inset: 0,
@@ -481,7 +501,7 @@ export default function UpcomingSection() {
   }, []);
 
   const fetchItems = useCallback(async () => {
-    const token   = typeof window !== "undefined" ? localStorage.getItem("cs_token") : null;
+    const token   = typeof window !== "undefined" ? localStorage.getItem("cs_user_token") : null;
     const headers: HeadersInit = token ? { "x-user-token": token } : {};
     try {
       const res  = await fetch("/api/upcoming", { headers });

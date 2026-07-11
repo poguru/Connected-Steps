@@ -120,6 +120,7 @@ export default function ProfilePage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [user,      setUser]      = useState<AppUser | null>(null);
+  const [userToken,  setUserToken]  = useState<string>("");
   const [photo,      setPhoto]      = useState<string | null>(null);
   const [photoFile,  setPhotoFile]  = useState<string | null>(null);
   const [photoError, setPhotoError] = useState("");
@@ -171,6 +172,7 @@ export default function ProfilePage() {
 
     // Fetch stats — rank comes directly from /api/leaderboard/user (no full leaderboard fetch)
     const tok = localStorage.getItem("cs_user_token") ?? "";
+    setUserToken(tok);
     const authH = { "x-user-token": tok };
     Promise.all([
       fetch("/api/leaderboard/user", { headers: authH }).then(r => r.json()).catch(() => ({})),
@@ -339,8 +341,10 @@ export default function ProfilePage() {
     localStorage.removeItem("cs_user");
     localStorage.removeItem("cs_user_token");
     localStorage.removeItem("cs_strava");
+    localStorage.removeItem("cs_coach_token");
     if (email) localStorage.removeItem(`cs_member_${email}`);
     document.cookie = "cs_auth=; path=/; max-age=0; SameSite=Lax";
+    document.cookie = "cs_coach_session=; path=/; max-age=0; SameSite=Lax";
     router.replace("/auth");
   }
 
@@ -645,7 +649,7 @@ export default function ProfilePage() {
         </section>
 
         {/* ── Training Location ── */}
-        <TrainingLocationSection token={localStorage.getItem("cs_user_token") ?? ""} />
+        <TrainingLocationSection token={userToken} />
 
         {/* ── Log out ── */}
         <button

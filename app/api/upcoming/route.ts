@@ -89,12 +89,12 @@ export async function GET(req: NextRequest) {
     // Most recent photo from past sessions for titles that have no current photo
     titlesWithoutPhoto.length
       ? db.from("sessions")
-          .select("title, photo_url")
+          .select("title, location, photo_url")
           .in("title", titlesWithoutPhoto)
           .lt("date", today)
           .not("photo_url", "is", null)
           .order("date", { ascending: false })
-          .limit(titlesWithoutPhoto.length * 5)
+          .limit(titlesWithoutPhoto.length * 10)
       : Promise.resolve({ data: [] }),
 
     // Past sessions IDs+titles for user attendance history
@@ -127,12 +127,18 @@ export async function GET(req: NextRequest) {
     sessionCountMap[r.session_id as string] = (sessionCountMap[r.session_id as string] ?? 0) + 1;
   }
 
-  const prevPhotoMap: Record<string, string> = {};
+  // Two-tier photo map: (title+location) preferred over (title-only)
+  const prevPhotoByTitleLoc: Record<string, string> = {};
+  const prevPhotoByTitle: Record<string, string> = {};
   for (const r of (prevPhotoRes.data ?? [])) {
-    if (r.photo_url && !prevPhotoMap[r.title as string]) {
-      prevPhotoMap[r.title as string] = r.photo_url as string;
+    if (r.photo_url) {
+      const tlKey = `${r.title as string}||${(r.location as string) ?? ""}`;
+      if (!prevPhotoByTitleLoc[tlKey]) prevPhotoByTitleLoc[tlKey] = r.photo_url as string;
+      if (!prevPhotoByTitle[r.title as string]) prevPhotoByTitle[r.title as string] = r.photo_url as string;
     }
   }
+  // Keep prevPhotoMap as alias for keyword fallback compat
+  const prevPhotoMap = prevPhotoByTitle;
 
   // ── Keyword fallback: fill photos for titles that exact-match missed ──────
   const stillMissingTitles = titlesWithoutPhoto.filter(t => !prevPhotoMap[t]);
@@ -180,7 +186,7 @@ export async function GET(req: NextRequest) {
     time:               (s.time  ?? null) as string | null,
     venue:              (s.venue ?? null) as string | null,
     location:           s.location as string,
-    photo_url:          thumbUrl(s.photo_url ?? prevPhotoMap[s.title as string] ?? null),
+    photo_url:          thumbUrl(s.photo_url ?? prevPhotoByTitleLoc[`${s.title as string}||${s.location as string}`] ?? prevPhotoMap[s.title as string] ?? null),
     difficulty:         (s.difficulty ?? null) as string | null,
     registered_count:   sessionCountMap[s.id as string] ?? 0,
     registered:         regSessionSet.has(s.id as string),

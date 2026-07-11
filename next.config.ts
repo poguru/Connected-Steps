@@ -41,13 +41,20 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   images: {
+    formats: ["image/avif", "image/webp"],
     remotePatterns: [
       // Supabase storage (project URL varies — match any project)
       { protocol: "https", hostname: "*.supabase.co",  pathname: "/storage/v1/object/**" },
       { protocol: "https", hostname: "*.supabase.in",  pathname: "/storage/v1/object/**" },
+      // Supabase image transform endpoint (used by thumbUrl utility)
+      { protocol: "https", hostname: "*.supabase.co",  pathname: "/storage/v1/render/**" },
+      { protocol: "https", hostname: "*.supabase.in",  pathname: "/storage/v1/render/**" },
       // Google user photos (OAuth profile pictures)
       { protocol: "https", hostname: "lh3.googleusercontent.com" },
     ],
+  },
+  experimental: {
+    optimizePackageImports: ["lucide-react", "framer-motion"],
   },
   async headers() {
     return [

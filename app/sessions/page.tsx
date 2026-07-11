@@ -227,21 +227,41 @@ function SessionCard({
       }}
     >
       {/* ── Image ── */}
-      <div className="cs-scard-img-wrap" style={{ position: "relative", height: 170, flexShrink: 0, background: gradient, overflow: "hidden" }}>
+      <div className="cs-scard-img-wrap" style={{ position: "relative", height: 180, flexShrink: 0, background: gradient, overflow: "hidden" }}>
         {s.photo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={s.photo_url}
-            alt={s.title}
-            loading="lazy"
-            className="cs-scard-img"
-            style={{
-              width: "100%", height: "100%", objectFit: "cover", objectPosition: "center center",
-              display: "block",
-              transition: "transform 0.5s ease",
-              transform: hovered ? "scale(1.05)" : "scale(1)",
-            }}
-          />
+          <>
+            {/* Blurred background — fills space for any aspect ratio */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={s.photo_url}
+              alt=""
+              aria-hidden
+              style={{
+                position: "absolute", inset: 0,
+                width: "100%", height: "100%",
+                objectFit: "cover", objectPosition: "center",
+                filter: "blur(22px)",
+                transform: "scale(1.18)",
+                opacity: 0.65,
+              }}
+            />
+            {/* Sharp full image — never cropped */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={s.photo_url}
+              alt={s.title}
+              loading="lazy"
+              className="cs-scard-img"
+              style={{
+                position: "absolute", inset: 0,
+                width: "100%", height: "100%",
+                objectFit: "contain", objectPosition: "center",
+                display: "block",
+                transition: "transform 0.5s ease",
+                transform: hovered ? "scale(1.03)" : "scale(1)",
+              }}
+            />
+          </>
         ) : (
           <div style={{
             position: "absolute", inset: 0,
