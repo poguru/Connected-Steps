@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession, ADMIN_SESSION_COOKIE } from "@/lib/admin-auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
@@ -7,16 +7,16 @@ function requireAdmin(req: NextRequest): boolean {
   return !!(token && verifyAdminSession(token));
 }
 
-// GET — return all app_settings rows
+// GET â€” return all app_settings rows
 export async function GET(req: NextRequest) {
   if (!requireAdmin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const db = getSupabaseServer();
   const { data, error } = await db.from("app_settings").select("key, value, updated_at").order("key");
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ settings: data ?? [] });
 }
 
-// PUT — upsert a single setting: { key, value }
+// PUT â€” upsert a single setting: { key, value }
 export async function PUT(req: NextRequest) {
   if (!requireAdmin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
@@ -27,7 +27,7 @@ export async function PUT(req: NextRequest) {
       { key, value: String(value), updated_at: new Date().toISOString() },
       { onConflict: "key" },
     );
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "Server error" }, { status: 500 });

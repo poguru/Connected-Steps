@@ -59,7 +59,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const { data: regs, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   if (!regs?.length) return NextResponse.json({ sent: 0, failed: 0, skipped: 0, total: 0, message: "No confirmed registrations found." });
 
   const rows = regs as unknown as RegRow[];
@@ -188,7 +188,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     .order("sent_at", { ascending: false })
     .limit(500);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   const summary = {
     sent:    (data ?? []).filter(l => l.status === "sent").length,

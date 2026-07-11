@@ -11,6 +11,6 @@ export async function GET(req: NextRequest) {
     .select("id, coach_name, user_email, rating, feedback, created_at")
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ ratings: data ?? [] });
 }

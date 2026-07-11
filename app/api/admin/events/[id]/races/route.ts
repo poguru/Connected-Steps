@@ -20,7 +20,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     .order("display_order", { ascending: true })
     .order("created_at", { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ races: data ?? [] });
 }
 
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   // Sync distance_categories array for backward compat with existing code
   await syncDistanceCategories(db, event_id);
@@ -126,7 +126,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   if (!data)  return NextResponse.json({ error: "Race not found" }, { status: 404 });
 
   await syncDistanceCategories(db, event_id);
@@ -153,7 +153,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     .eq("id", raceId)
     .eq("event_id", event_id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   await syncDistanceCategories(db, event_id);
 

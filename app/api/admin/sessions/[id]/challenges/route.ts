@@ -18,7 +18,7 @@ export async function GET(
     .eq("session_id", id)
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ challenges: data ?? [] });
 }
 

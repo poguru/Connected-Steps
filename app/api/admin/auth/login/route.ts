@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { signCoachToken, COOKIE_NAME } from "@/lib/admin-auth";
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     const key = `coachlogin:${ip}`;
 
     if (await isRateLimited(key)) {
-      console.warn(`[rate-limit] BLOCKED IP=${ip} — exceeded ${MAX_FAILURES} failed coach-login attempts`);
+      console.warn(`[rate-limit] BLOCKED IP=${ip} â€” exceeded ${MAX_FAILURES} failed coach-login attempts`);
       return NextResponse.json(
         { error: "Too many failed attempts. Try again in 15 minutes." },
         { status: 429 },
@@ -58,6 +58,6 @@ export async function POST(req: NextRequest) {
     });
     return res;
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
-// GET /api/training-locations — public list of active training locations
+// GET /api/training-locations â€” public list of active training locations
 // Used by: session creation form, user profile, leaderboard filter
 export async function GET() {
   const db = getSupabaseServer();
@@ -11,6 +11,6 @@ export async function GET() {
     .eq("status", "active")
     .order("display_order", { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ locations: data ?? [] });
 }

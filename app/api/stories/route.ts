@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
 
-// GET /api/stories — fetch approved stories + avg rating
+// GET /api/stories â€” fetch approved stories + avg rating
 export async function GET() {
   const db = getSupabaseServer();
   const { data, error } = await db
@@ -12,7 +12,7 @@ export async function GET() {
     .order("created_at", { ascending: false })
     .limit(50);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   const stories = data ?? [];
   const rated   = stories.filter((s) => s.rating != null);
@@ -23,7 +23,7 @@ export async function GET() {
   return NextResponse.json({ stories, avg_rating });
 }
 
-// POST /api/stories — submit a story with optional rating
+// POST /api/stories â€” submit a story with optional rating
 export async function POST(req: NextRequest) {
   try {
     const user_email = verifyUserToken(req.headers.get("x-user-token") ?? "");
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     if (quote.length > 1000)
       return NextResponse.json({ error: "Story must be under 1000 characters" }, { status: 400 });
     if (rating != null && (rating < 1 || rating > 5))
-      return NextResponse.json({ error: "Rating must be 1–5" }, { status: 400 });
+      return NextResponse.json({ error: "Rating must be 1â€“5" }, { status: 400 });
 
     const db = getSupabaseServer();
 
@@ -57,6 +57,6 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ success: true });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

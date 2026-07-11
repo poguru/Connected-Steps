@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
@@ -32,12 +32,12 @@ export async function POST(req: NextRequest) {
       distance_category,
     } = await req.json();
 
-    // ── Release expired slots (compensates for Hobby-plan daily-only cron) ───────
+    // â”€â”€ Release expired slots (compensates for Hobby-plan daily-only cron) â”€â”€â”€â”€â”€â”€â”€
     // Fire-and-forget: frees pending_payment slots whose TTL has elapsed so the
     // capacity check below sees an accurate available count.
     void (async () => { try { await getSupabaseServer().rpc("release_expired_slots"); } catch { /* non-critical */ } })();
 
-    // ── Rate limiting ──────────────────────────────────────────────────────────
+    // â”€â”€ Rate limiting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Prevents spam registrations and capacity exhaustion attacks.
     // Per-email: max 3 registration attempts per 15 minutes (handles retries without abuse).
     // Per-IP: max 20 registration attempts per minute (allows family/group registrations).
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
 
     const db = getSupabaseServer();
 
-    // ── Verify user ────────────────────────────────────────────────────────────
+    // â”€â”€ Verify user â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const { data: user } = await db
       .from("users")
       .select("email, first_name, last_name")
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
       .single();
     if (!user) return NextResponse.json({ error: "Account not found. Please sign up first." }, { status: 404 });
 
-    // ── Verify event ───────────────────────────────────────────────────────────
+    // â”€â”€ Verify event â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const { data: ev } = await db
       .from("events")
       .select("id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories")
@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Event not found." }, { status: 404 });
     }
 
-    // ── Registration deadline enforcement (IST-aware) ──────────────────────────
+    // â”€â”€ Registration deadline enforcement (IST-aware) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (ev.registration_closes_at && new Date() >= new Date(ev.registration_closes_at)) {
       return NextResponse.json({ error: "Registration for this event is now closed." }, { status: 403 });
     }
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "This event has already ended." }, { status: 403 });
     }
 
-    // ── Distance category validation ──────────────────────────────────────────
+    // â”€â”€ Distance category validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const cats = (ev as { distance_categories?: string[] }).distance_categories ?? [];
     if (cats.length > 1 && !distance_category) {
       return NextResponse.json({ error: "Please select a distance category." }, { status: 400 });
@@ -124,14 +124,14 @@ export async function POST(req: NextRequest) {
     }
     const chosenCategory: string | null = cats.length > 0 ? (distance_category || cats[0]) : null;
 
-    // ── Atomic slot check — uses participant_count maintained by DB trigger ────
+    // â”€â”€ Atomic slot check â€” uses participant_count maintained by DB trigger â”€â”€â”€â”€
     // participant_count is incremented by the trigger on INSERT/UPDATE status='confirmed'.
     // We still gate here as a fast early-exit; the trigger is the ground truth.
     if (ev.max_participants && (ev.participant_count ?? 0) >= ev.max_participants) {
       return NextResponse.json({ error: "This event is fully booked." }, { status: 409 });
     }
 
-    // ── Duplicate check ────────────────────────────────────────────────────────
+    // â”€â”€ Duplicate check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const { data: existing } = await db
       .from("event_registrations")
       .select("id, registration_code, payment_status")
@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
     }
     // If pending payment, allow them to re-attempt payment (fall through to paid flow below)
 
-    // ── Coupon validation ──────────────────────────────────────────────────────
+    // â”€â”€ Coupon validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let couponId: string | null = null;
     let discount   = 0;
     let discountType = "";
@@ -192,11 +192,11 @@ export async function POST(req: NextRequest) {
     const originalPrice = ev.price;
     const finalPrice    = Math.max(0, originalPrice - discount);
 
-    // ── Free event: create confirmed registration immediately ──────────────────
+    // â”€â”€ Free event: create confirmed registration immediately â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (finalPrice === 0) {
       const code    = genCode();
       // Generate QR token before insert so it is saved atomically with the registration.
-      // If this throws (bad env secret), the registration is never created — no orphaned records.
+      // If this throws (bad env secret), the registration is never created â€” no orphaned records.
       const qrToken = signEventQR(code, event_id);
 
       const { data: reg, error: regErr } = await db
@@ -236,22 +236,22 @@ export async function POST(req: NextRequest) {
         redeemCoupon(couponId, email.toLowerCase()).catch(console.error);
       }
 
-      // ── ROOT CAUSE FIX ────────────────────────────────────────────────────────
+      // â”€â”€ ROOT CAUSE FIX â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       // Previously: an unawaited IIFE sent the email after the response returned.
       // Vercel freezes the function immediately after NextResponse.json(), so SES
-      // was never reached — users received no confirmation email.
+      // was never reached â€” users received no confirmation email.
       //
       // Fix: after() keeps the function alive until the callback completes, even
       // after the response has been sent. This is the Next.js-designed solution.
       after(async () => {
         if (!finalQr) {
-          console.error(`[event-register] no QR token for ${finalCode} — email not sent`);
+          console.error(`[event-register] no QR token for ${finalCode} â€” email not sent`);
           await db.from("event_registrations")
             .update({ email_status: "failed", qr_generated_at: null })
             .eq("registration_code", finalCode);
           return;
         }
-        const subject = `Event Registration Confirmed – ${ev.title}`;
+        const subject = `Event Registration Confirmed â€“ ${ev.title}`;
         try {
           const result = await sendEmail(
             email.toLowerCase().trim(),
@@ -267,10 +267,10 @@ export async function POST(req: NextRequest) {
               distanceCategory: chosenCategory,
               qrToken:          finalQr,
             }),
-            false, true,  // isOtp=false, isTransactional=true — never suppressed
+            false, true,  // isOtp=false, isTransactional=true â€” never suppressed
           );
           if (result.ok) {
-            console.log(`[event-register] ✅ email sent to=${email} msgId=${result.messageId} provider=${result.provider}`);
+            console.log(`[event-register] âœ… email sent to=${email} msgId=${result.messageId} provider=${result.provider}`);
             await db.from("event_registrations").update({
               confirmation_email_sent_at: new Date().toISOString(),
               email_status:               "sent",
@@ -278,7 +278,7 @@ export async function POST(req: NextRequest) {
               qr_generated_at:            new Date().toISOString(),
             }).eq("registration_code", finalCode);
           } else {
-            console.error(`[event-register] ❌ email FAILED to=${email} error=${result.error} provider=${result.provider}`);
+            console.error(`[event-register] âŒ email FAILED to=${email} error=${result.error} provider=${result.provider}`);
             await db.from("event_registrations")
               .update({ email_status: "failed", qr_generated_at: new Date().toISOString() })
               .eq("registration_code", finalCode);
@@ -294,7 +294,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, free: true, registration_code: finalCode });
     }
 
-    // ── Paid event: create pending_payment registration, caller creates Razorpay order ─
+    // â”€â”€ Paid event: create pending_payment registration, caller creates Razorpay order â”€
     // status = "pending_payment" so slot count (which only counts "confirmed") is not affected
     // until payment succeeds and verify-payment sets status = "confirmed"
     const code = existing?.registration_code ?? genCode();
@@ -334,6 +334,6 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

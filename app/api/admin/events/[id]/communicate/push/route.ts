@@ -45,7 +45,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (recipientFilter === "free")           q = q.eq("payment_status", "free")    as typeof q;
 
   const { data: registrants, error } = await q;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   if (!registrants?.length) {
     return NextResponse.json({ sent: 0, message: "No recipients found for this filter" });

@@ -29,7 +29,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const newStatus = action === "archive" ? "archived" : "draft";
 
   const { error } = await db.from("events").update({ status: newStatus }).eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   // Audit log
   void (async () => {

@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type EventType =
   | "session_attended"
@@ -22,22 +22,22 @@ export interface FeedEvent {
 
 // Session milestone badges (matches Achievements.tsx)
 const SESSION_BADGES: Record<number, { label: string; icon: string }> = {
-  1:  { label: "First Session",   icon: "🎯" },
-  5:  { label: "5 Sessions",      icon: "🌟" },
-  10: { label: "10 Sessions",     icon: "💪" },
-  25: { label: "25 Sessions",     icon: "🔑" },
-  50: { label: "50 Sessions",     icon: "🏅" },
+  1:  { label: "First Session",   icon: "ðŸŽ¯" },
+  5:  { label: "5 Sessions",      icon: "ðŸŒŸ" },
+  10: { label: "10 Sessions",     icon: "ðŸ’ª" },
+  25: { label: "25 Sessions",     icon: "ðŸ”‘" },
+  50: { label: "50 Sessions",     icon: "ðŸ…" },
 };
 const MILESTONE_COUNTS = [1, 5, 10, 25, 50];
 
 const PAGE_SIZE = 15;
 
-// ── GET /api/feed ─────────────────────────────────────────────────────────────
+// â”€â”€ GET /api/feed â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Params:
-//   email  – current user email (for reactions + scope=following filter)
-//   scope  – "following" | "global"  (default: "following")
-//   before – ISO timestamp cursor    (default: now)
-//   limit  – items per page          (default: 15, max: 30)
+//   email  â€“ current user email (for reactions + scope=following filter)
+//   scope  â€“ "following" | "global"  (default: "following")
+//   before â€“ ISO timestamp cursor    (default: now)
+//   limit  â€“ items per page          (default: 15, max: 30)
 
 export async function GET(req: NextRequest) {
   try {
@@ -49,8 +49,8 @@ export async function GET(req: NextRequest) {
 
     const db = getSupabaseServer();
 
-    // ── Build the email pool (following scope only) ───────────────────────────
-    // Global scope: no email filter needed — query all events directly.
+    // â”€â”€ Build the email pool (following scope only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Global scope: no email filter needed â€” query all events directly.
     // Following scope: filter by the set of people this user follows.
 
     let emailPool: string[] | null = null; // null = global (no filter)
@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
       if (emailPool.length === 0) return NextResponse.json({ events: [], next_cursor: null, has_more: false });
     }
 
-    // ── Fetch raw event sources in parallel ───────────────────────────────────
+    // â”€â”€ Fetch raw event sources in parallel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     const fetchSize = limit * 3; // over-fetch to allow for deduplication and sorting
 
@@ -105,7 +105,7 @@ export async function GET(req: NextRequest) {
       emailPool ? postsQ.in("author_email", emailPool) : postsQ,
     ]);
 
-    // ── Build event objects ───────────────────────────────────────────────────
+    // â”€â”€ Build event objects â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     const events: Omit<FeedEvent, "reactions">[] = [];
 
@@ -185,7 +185,7 @@ export async function GET(req: NextRequest) {
     // Badge earned: synthesise milestone badge events from session counts.
     await appendBadgeEvents(db, emailPool, before, events);
 
-    // ── Sort descending, paginate ─────────────────────────────────────────────
+    // â”€â”€ Sort descending, paginate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     events.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
@@ -194,7 +194,7 @@ export async function GET(req: NextRequest) {
     const last      = page[page.length - 1];
     const next_cursor = has_more && last ? last.created_at : null;
 
-    // ── Attach reaction counts ────────────────────────────────────────────────
+    // â”€â”€ Attach reaction counts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     const eventIds = page.map(e => e.id);
     const reactionsRes = await db
@@ -216,11 +216,11 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ events: result, next_cursor, has_more });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
 
-// ── Badge event synthesis ─────────────────────────────────────────────────────
+// â”€â”€ Badge event synthesis â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Single query replaces the previous N+1 pattern (one per-user query for the nth session date).
 
 async function appendBadgeEvents(

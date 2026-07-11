@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/events/past — recently completed published events (last 30 days)
+// GET /api/events/past â€” recently completed published events (last 30 days)
 export async function GET() {
   const db = getSupabaseServer();
 
@@ -27,6 +27,6 @@ export async function GET() {
     .order("start_date", { ascending: false })
     .limit(20);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ events: data ?? [] });
 }

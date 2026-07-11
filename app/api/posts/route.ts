@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireActiveUser } from "@/lib/active-user";
 import { verifyUserToken } from "@/lib/admin-auth";
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
   }
 
   const { data: posts, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   if (!posts?.length) return NextResponse.json({ posts: [], has_more: false, next_cursor: null });
 
@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
   });
 }
 
-// POST /api/posts  — multipart/form-data: body, post_type, author_name, photo (optional)
+// POST /api/posts  â€” multipart/form-data: body, post_type, author_name, photo (optional)
 export async function POST(req: NextRequest) {
   try {
     const author_email = verifyUserToken(req.headers.get("x-user-token") ?? "");
@@ -146,12 +146,12 @@ export async function POST(req: NextRequest) {
       approved: true,
     }).select("id, author_email, author_name, post_type, body, photo_url, created_at").single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
     return NextResponse.json({
       post: { ...data, likes: 0, celebrates: 0, comments: 0, my_reaction: null },
     }, { status: 201 });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

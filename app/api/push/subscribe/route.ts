@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 export async function POST(req: NextRequest) {
@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
 
   const db = getSupabaseServer();
 
-  // Upsert — one subscription per email (latest device wins)
+  // Upsert â€” one subscription per email (latest device wins)
   const { error } = await db
     .from("push_subscriptions")
     .upsert(
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       { onConflict: "user_email" }
     );
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ success: true });
 }
 

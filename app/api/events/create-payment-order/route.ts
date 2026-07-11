@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import Razorpay from "razorpay";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
@@ -44,12 +44,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Registration not found or already paid." }, { status: 404 });
     }
 
-    // ── Atomic slot reservation ───────────────────────────────────────────────
+    // â”€â”€ Atomic slot reservation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // reserve_event_slot() acquires a FOR UPDATE lock on the events row so that
     // concurrent calls for the same event serialize.  Only the first N callers
     // (where N = max_participants) get 'reserved'; the rest get 'full'.
     // This prevents users from reaching the Razorpay payment screen for a full
-    // event — they never pay for a slot that doesn't exist.
+    // event â€” they never pay for a slot that doesn't exist.
     const { data: reservation, error: reserveErr } = await db
       .rpc("reserve_event_slot", {
         p_registration_id: reg.id,
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
         { status: 409 },
       );
     }
-    // 'reserved' or 'already_reserved' — proceed to payment
+    // 'reserved' or 'already_reserved' â€” proceed to payment
 
     // Amount in paise
     const amountPaise = reg.final_price * 100;
@@ -96,6 +96,6 @@ export async function POST(req: NextRequest) {
       key:      process.env.RAZORPAY_KEY_ID,
     });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

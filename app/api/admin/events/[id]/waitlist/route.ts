@@ -14,7 +14,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     .select("*")
     .eq("event_id", id)
     .order("position");
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   const waiting  = (data ?? []).filter(r => r.status === "waiting").length;
   const approved = (data ?? []).filter(r => r.status === "approved").length;

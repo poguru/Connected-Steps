@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 // POST /api/user/change-email
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 
     const db = getSupabaseServer();
 
-    // ── 1. Verify OTP ─────────────────────────────────────────────────────────
+    // â”€â”€ 1. Verify OTP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const { data: otpRow, error: otpErr } = await db
       .from("otp_verifications")
       .select("id, code, expires_at, verified")
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Incorrect code. Please try again." }, { status: 400 });
     }
 
-    // ── 2. Update email across all tables (single DB transaction) ─────────────
+    // â”€â”€ 2. Update email across all tables (single DB transaction) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const { error: rpcErr } = await db.rpc("change_user_email", {
       p_old_email: oldEmail,
       p_new_email: nextEmail,
@@ -61,11 +61,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: msg }, { status: 400 });
     }
 
-    // ── 3. Mark OTP as used ───────────────────────────────────────────────────
+    // â”€â”€ 3. Mark OTP as used â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     await db.from("otp_verifications").update({ verified: true }).eq("id", otpRow.id);
 
     return NextResponse.json({ success: true, email: nextEmail });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

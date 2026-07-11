@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
 
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ coaches });
     }
 
-    // No token — return all active coaches (for admin panel)
+    // No token â€” return all active coaches (for admin panel)
     const { data, error } = await db
       .from("coaches")
       .select("id, name, specialization, email, avatar_url, bio, is_admin")
@@ -59,9 +59,9 @@ export async function GET(req: NextRequest) {
       .order("is_admin", { ascending: false })
       .order("name");
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
     return NextResponse.json({ coaches: data ?? [] });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

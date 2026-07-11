@@ -24,7 +24,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (cat) q = q.eq("distance_category", cat) as typeof q;
 
   const { data, error } = await q;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   const results   = data ?? [];
   const finishers = results.filter(r => r.status === "finisher").length;
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ result: data }, { status: 201 });
 }
 
@@ -114,7 +114,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     .eq("event_id", eventId)
     .select().single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ result: data });
 }
 
@@ -128,6 +128,6 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
   const db = getSupabaseServer();
   const { error } = await db.from("event_results").delete().eq("id", resultId).eq("event_id", eventId);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

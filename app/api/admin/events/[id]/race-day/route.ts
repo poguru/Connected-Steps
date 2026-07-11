@@ -34,7 +34,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     .in("payment_status", ["paid", "free"])
     .order("checked_in_at", { ascending: false, nullsFirst: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   const all             = regs ?? [];
   const total           = all.length;

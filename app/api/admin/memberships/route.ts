@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 
 // GET /api/admin/memberships
-// Query params (all optional — defaults maintain backward compatibility):
+// Query params (all optional â€” defaults maintain backward compatibility):
 //   page    int  0-based page index          (default 0)
 //   limit   int  rows per page, max 200      (default 50)
 //   q       str  ilike search on email/name  (default "")
@@ -13,7 +13,7 @@ import { isAdminOrCoach } from "@/lib/admin-auth";
 //
 // Response: { memberships[], stats{}, total, page, limit, has_more }
 // Stats always reflect the FULL table (not just the current page) via
-// the membership_stats() RPC — one SQL pass, no N+1 count queries.
+// the membership_stats() RPC â€” one SQL pass, no N+1 count queries.
 
 const VALID_SORT = new Set(["created_at", "expires_at", "amount_paid", "plan", "user_email"]);
 const PAGE_LIMIT  = 50;
@@ -36,11 +36,11 @@ export async function GET(req: NextRequest) {
   const nowISO = now.toISOString();
   const in7ISO = in7.toISOString();
 
-  // ── Build paginated data query ────────────────────────────────────────────
+  // â”€â”€ Build paginated data query â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   let q1 = db.from("memberships").select("*", { count: "exact" });
 
   if (q) {
-    // Search on email — name search handled post-enrich from the users table
+    // Search on email â€” name search handled post-enrich from the users table
     q1 = q1.ilike("user_email", `%${q}%`);
   }
 
@@ -50,15 +50,15 @@ export async function GET(req: NextRequest) {
 
   q1 = q1.order(sort, { ascending: asc }).range(page * limit, page * limit + limit - 1);
 
-  // ── Stats RPC (one SQL pass over memberships table) ───────────────────────
+  // â”€â”€ Stats RPC (one SQL pass over memberships table) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [{ data: memberships, count, error }, { data: statsRaw }] = await Promise.all([
     q1,
     db.rpc("membership_stats"),
   ]);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
-  // ── Enrich only this page's rows with user details ────────────────────────
+  // â”€â”€ Enrich only this page's rows with user details â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const emails = (memberships ?? []).map(m => m.user_email);
   const { data: users } = emails.length
     ? await db.from("users").select("email, first_name, last_name, phone, location").in("email", emails)

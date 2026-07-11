@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 
@@ -12,7 +12,7 @@ import { isAdminOrCoach } from "@/lib/admin-auth";
 //   order   str  asc | desc (default "desc")
 //
 // Response: { referrals[], summary{}, topReferrers[], total, page, limit, has_more }
-// summary uses referral_summary() RPC — one SQL pass.
+// summary uses referral_summary() RPC â€” one SQL pass.
 // topReferrers loaded separately (top 10 only, no pagination needed).
 
 const VALID_SORT = new Set(["created_at", "rewarded_at", "referrer_email", "referred_email", "status"]);
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
 
   const db = getSupabaseServer();
 
-  // ── Paginated referrals + summary RPC (parallel) ──────────────────────────
+  // â”€â”€ Paginated referrals + summary RPC (parallel) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   let q1 = db
     .from("referrals")
     .select("id, referral_code, referrer_email, referred_email, status, reward_granted, created_at, rewarded_at", { count: "exact" })
@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: false }),
   ]);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   // Compute top referrers from the lightweight referrer_email-only result
   const tally: Record<string, number> = {};

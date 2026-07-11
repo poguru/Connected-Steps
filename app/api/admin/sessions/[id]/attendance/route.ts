@@ -95,7 +95,7 @@ export async function POST(
     const { error } = await db
       .from("session_attendance")
       .upsert(toUpsert, { onConflict: "session_id,user_email", ignoreDuplicates: false });
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
 
   // Rows already synced: only update bonus_points + bonus_reason, reset synced flag
@@ -196,6 +196,6 @@ export async function PUT(
     points_synced: false,
   }, { onConflict: "session_id,user_email", ignoreDuplicates: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ success: true, name: `${user.first_name} ${user.last_name}`.trim() });
 }

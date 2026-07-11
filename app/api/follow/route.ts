@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireActiveUser } from "@/lib/active-user";
 import { verifyUserToken } from "@/lib/admin-auth";
 
-// POST /api/follow — follow or unfollow
+// POST /api/follow â€” follow or unfollow
 export async function POST(req: NextRequest) {
   try {
     const follower_email = verifyUserToken(req.headers.get("x-user-token") ?? "");
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
         .eq("following_email", following_email);
       return NextResponse.json({ action: "unfollowed" });
     } else {
-      // Follow — ON CONFLICT DO NOTHING handles a concurrent double-click
+      // Follow â€” ON CONFLICT DO NOTHING handles a concurrent double-click
       // that races past the SELECT above before either INSERT commits.
       await db.from("follows").upsert(
         { follower_email, following_email },
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ action: "followed" });
     }
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
 
@@ -87,6 +87,6 @@ export async function GET(req: NextRequest) {
       users: emails.map((e) => ({ email: e, name: nameMap.get(e) || e })),
     });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

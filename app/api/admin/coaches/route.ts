@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdmin } from "@/lib/admin-auth";
 
-// GET /api/admin/coaches — list all coaches
+// GET /api/admin/coaches â€” list all coaches
 export async function GET(req: NextRequest) {
   if (!isAdmin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     .select("id, name, email, specialization, avatar_url, is_active, is_admin, created_at")
     .order("created_at", { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   // Enrich with whether they have a login (exist in users table with role=coach)
   const emails = (data ?? []).map(c => c.email);
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
   });
 }
 
-// POST /api/admin/coaches — create or update coach login
+// POST /api/admin/coaches â€” create or update coach login
 export async function POST(req: NextRequest) {
   if (!isAdmin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     }
     // Reset password for existing coach
     const { error } = await db.from("users").update({ password: hashed }).eq("email", emailClean);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   } else {
     // Create new user with coach role
     const { error } = await db.from("users").insert({
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
       password:   hashed,
       role:       "coach",
     });
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
 
   // Upsert coaches profile row

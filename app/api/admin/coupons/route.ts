@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     .from("coupons")
     .select("*, coupon_uses(count)")
     .order("created_at", { ascending: false });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ data });
 }
 
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       max_uses: Number(max_uses) || 999,
       expires_at: expires_at || null,
     }).select().single();
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
     return NextResponse.json({ data });
   }
 
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     }));
 
     const { data, error } = await db.from("coupons").insert(rows).select();
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
     return NextResponse.json({ data });
   }
 
@@ -84,6 +84,6 @@ export async function DELETE(req: NextRequest) {
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   const db = getSupabaseServer();
   const { error } = await db.from("coupons").delete().eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ success: true });
 }

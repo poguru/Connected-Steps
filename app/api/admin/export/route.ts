@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach, getAdminEmail } from "@/lib/admin-auth";
 import { enqueueJob } from "@/lib/job-queue";
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
 
   const exportId = (exportRow as { id: string }).id;
 
-  // Enqueue background job — no idempotency key so multiple exports of the
+  // Enqueue background job â€” no idempotency key so multiple exports of the
   // same dataset can coexist (admin may want fresh copies).
   await enqueueJob("admin_export", {
     exportId,
@@ -69,6 +69,6 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: false })
     .limit(20);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ exports: data ?? [] });
 }

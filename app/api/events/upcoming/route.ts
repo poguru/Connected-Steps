@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -13,8 +13,8 @@ export async function GET() {
   // Show events that haven't ended yet (in IST):
   //   1. end_date is a future date
   //   2. end_date is today but end_time hasn't passed
-  //   3. end_date is today with no end_time (all-day / unknown end — keep showing)
-  //   4. no end_date set — fall back to start_date >= today
+  //   3. end_date is today with no end_time (all-day / unknown end â€” keep showing)
+  //   4. no end_date set â€” fall back to start_date >= today
   const { data, error } = await db
     .from("events")
     .select("id, title, description, event_type, cover_image, start_date, start_time, end_date, end_time, registration_closes_at, location, organizer, max_participants, participant_count, registration_required, price, featured, share_slug, share_count, distance_categories")
@@ -29,6 +29,6 @@ export async function GET() {
     .order("start_date", { ascending: true })
     .limit(4);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ events: data ?? [] });
 }

@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     .order("created_at", { ascending: true })
     .limit(50);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ comments: data ?? [] });
 }
 
@@ -43,6 +43,6 @@ export async function POST(req: NextRequest, { params }: Params) {
     .select("id, author_name, author_email, body, created_at")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ comment: data }, { status: 201 });
 }

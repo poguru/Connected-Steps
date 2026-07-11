@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const page      = Math.max(0, parseInt(sp.get("page") ?? "0", 10));
   const search    = sp.get("q")?.trim().toLowerCase() ?? "";
 
-  // Paginated user query — prevents loading entire user table at scale
+  // Paginated user query â€” prevents loading entire user table at scale
   let userQuery = db
     .from("users")
     .select("email, first_name, last_name, phone, goal, location, created_at, is_active, phone_verified, phone_verified_at")
@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ users, stats });
 }
 
-// PATCH /api/admin/users — { email, is_active: boolean }
+// PATCH /api/admin/users â€” { email, is_active: boolean }
 // Deactivates or re-enables a user account.
 export async function PATCH(req: NextRequest) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -93,11 +93,11 @@ export async function PATCH(req: NextRequest) {
     .update({ is_active })
     .eq("email", email.toLowerCase().trim());
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ success: true, email: email.toLowerCase().trim(), is_active });
 }
 
-// PUT /api/admin/users — { email, action: "verify_phone" | "resend_otp" }
+// PUT /api/admin/users â€” { email, action: "verify_phone" | "resend_otp" }
 // Admin phone verification management actions.
 export async function PUT(req: NextRequest) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -111,7 +111,7 @@ export async function PUT(req: NextRequest) {
   const cleaned = (email as string).toLowerCase().trim();
 
   if (action === "verify_phone") {
-    // Manually mark phone as verified (admin override — no OTP required)
+    // Manually mark phone as verified (admin override â€” no OTP required)
     const { error } = await db
       .from("users")
       .update({
@@ -120,7 +120,7 @@ export async function PUT(req: NextRequest) {
       })
       .eq("email", cleaned);
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
     console.log(`[admin] manual phone verify for ${cleaned}`);
     return NextResponse.json({ success: true, action: "verify_phone", email: cleaned });
   }
@@ -147,7 +147,7 @@ export async function PUT(req: NextRequest) {
     const data = await res.json() as { success?: boolean; error?: string };
     if (!res.ok) return NextResponse.json({ error: data.error ?? "OTP send failed." }, { status: res.status });
 
-    console.log(`[admin] OTP resent for ${cleaned} → ${user.phone}`);
+    console.log(`[admin] OTP resent for ${cleaned} â†’ ${user.phone}`);
     return NextResponse.json({ success: true, action: "resend_otp", email: cleaned });
   }
 

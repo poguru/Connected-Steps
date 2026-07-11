@@ -50,7 +50,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!force) q = q.is("bib_number", null) as typeof q;
 
   const { data: registrations, error } = await q;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   if (!registrations?.length) {
     return NextResponse.json({ assigned: 0, skipped: 0, preview, assignments: [] });

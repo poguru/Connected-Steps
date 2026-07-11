@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 import { signEventQR } from "@/lib/event-qr";
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     }>();
 
   if (!reg) return NextResponse.json({ error: "Registration not found" }, { status: 404 });
-  if (reg.status !== "confirmed") return NextResponse.json({ error: "Registration is not confirmed — QR only sent for confirmed registrations" }, { status: 400 });
+  if (reg.status !== "confirmed") return NextResponse.json({ error: "Registration is not confirmed â€” QR only sent for confirmed registrations" }, { status: 400 });
 
   try {
     const qrToken   = signEventQR(reg.registration_code, reg.event_id);
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     const result = await sendEmail(
       reg.user_email,
       reg.user_name,
-      `Your Registration & QR Code — ${ev?.title ?? "Connected Steps Event"}`,
+      `Your Registration & QR Code â€” ${ev?.title ?? "Connected Steps Event"}`,
       eventRegistrationEmailHTML({
         name:             reg.user_name,
         eventTitle:       ev?.title ?? "Connected Steps Event",
@@ -58,6 +58,6 @@ export async function POST(req: NextRequest) {
     if (!result.ok) return NextResponse.json({ error: `Email failed: ${result.error}` }, { status: 500 });
     return NextResponse.json({ ok: true, message: `QR resent to ${reg.user_email}` });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

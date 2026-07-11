@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import crypto from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
@@ -67,9 +67,9 @@ export async function POST(req: NextRequest) {
 
     // Update registration to paid.
     // The DB BEFORE trigger (check_event_capacity) enforces the slot limit here
-    // with a FOR UPDATE lock — fully atomic against concurrent confirmations.
+    // with a FOR UPDATE lock â€” fully atomic against concurrent confirmations.
     // The UNIQUE index on razorpay_payment_id catches concurrent duplicate calls
-    // (code 23505 → treated as idempotent success).
+    // (code 23505 â†’ treated as idempotent success).
     const { error } = await db
       .from("event_registrations")
       .update({
@@ -95,10 +95,10 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
-    // Redeem coupon atomically (fire-and-forget — fast, non-critical)
+    // Redeem coupon atomically (fire-and-forget â€” fast, non-critical)
     if (reg.coupon_id) {
       redeemCoupon(reg.coupon_id, reg.user_email).catch(console.error);
     }
@@ -131,13 +131,13 @@ export async function POST(req: NextRequest) {
       eventVenue:      ev?.location,
     };
 
-    // Enqueue for durability/retry — survives function restarts.
+    // Enqueue for durability/retry â€” survives function restarts.
     // Jobs are the fallback: if after() succeeds they no-op (idempotency guard).
     // If after() fails, the daily cron picks them up.
     await enqueueJob("event_qr_email",   qrPayload,      { idempotencyKey: `event_qr_email:${reg.id}`, priority: 10 });
     await enqueueJob("invoice_generate", invoicePayload, { idempotencyKey: `invoice_generate:${razorpay_payment_id}` });
 
-    // ── ROOT CAUSE FIX ────────────────────────────────────────────────────────
+    // â”€â”€ ROOT CAUSE FIX â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Previously: `void handleEventQrEmail(...).catch()` fired then returned the
     // response. Vercel freezes the function immediately after the response is
     // sent, killing the email BEFORE SES is called. This is why users were not
@@ -149,29 +149,29 @@ export async function POST(req: NextRequest) {
     after(async () => {
       try {
         await handleEventQrEmail(qrPayload);
-        console.log(`[verify-payment] ✅ QR email sent reg=${reg.id}`);
+        console.log(`[verify-payment] âœ… QR email sent reg=${reg.id}`);
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
-        console.error(`[verify-payment] ❌ QR email failed reg=${reg.id}:`, msg);
+        console.error(`[verify-payment] âŒ QR email failed reg=${reg.id}:`, msg);
         // Record failure so admin can see and resend
         try {
           await getSupabaseServer()
             .from("event_registrations")
             .update({ email_status: "failed" })
             .eq("id", reg.id);
-        } catch { /* non-critical — failure already logged */ }
+        } catch { /* non-critical â€” failure already logged */ }
       }
 
       try {
         await handleInvoiceGenerate(invoicePayload);
-        console.log(`[verify-payment] ✅ Invoice generated reg=${reg.id}`);
+        console.log(`[verify-payment] âœ… Invoice generated reg=${reg.id}`);
       } catch (e: unknown) {
-        console.error(`[verify-payment] ❌ Invoice failed reg=${reg.id}:`, e instanceof Error ? e.message : String(e));
+        console.error(`[verify-payment] âŒ Invoice failed reg=${reg.id}:`, e instanceof Error ? e.message : String(e));
       }
     });
 
     return NextResponse.json({ success: true });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

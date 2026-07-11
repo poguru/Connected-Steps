@@ -43,8 +43,7 @@ export default function RegisterButton({ slug, price = 0, startDate, endDate, en
     if (user) {
       router.push(dest);
     } else {
-      sessionStorage.setItem("cs_post_login_redirect", dest);
-      router.push("/auth?tab=login");
+      router.push(`/auth?tab=login&redirect=${encodeURIComponent(dest)}`);
     }
   }
 

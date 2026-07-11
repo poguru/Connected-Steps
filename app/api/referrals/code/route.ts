@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getOrCreateCode } from "@/lib/referrals";
 import { verifyUserToken } from "@/lib/admin-auth";
 
@@ -16,6 +16,6 @@ export async function GET(req: NextRequest) {
     const shareUrl = `${appUrl}/invite/${code}`;
     return NextResponse.json({ code, shareUrl });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail, sendWhatsAppOTP } from "@/lib/notify";
 import {
@@ -16,7 +16,7 @@ function generateOTP(): string {
 function otpEmailHTML(name: string, code: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>Your OTP – Connected Steps</title></head>
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>Your OTP â€“ Connected Steps</title></head>
 <body style="margin:0;padding:0;background:#f4f4f5;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
   <tr><td align="center">
@@ -37,7 +37,7 @@ function otpEmailHTML(name: string, code: string): string {
         <p style="margin:0;font-size:12px;color:#aaa;text-align:center;">Do not share this OTP with anyone. Connected Steps will never ask for it.</p>
       </td></tr>
       <tr><td style="background:#f9f9f9;border-top:1px solid #e5e5e5;padding:16px 40px;text-align:center;">
-        <p style="margin:0;font-size:11px;color:#aaa;">Connected Steps · Hyderabad, India</p>
+        <p style="margin:0;font-size:11px;color:#aaa;">Connected Steps Â· Hyderabad, India</p>
       </td></tr>
     </table>
   </td></tr>
@@ -51,11 +51,11 @@ function otpEmailHTML(name: string, code: string): string {
  * Body: { type, value, name?, purpose }
  *
  * purpose values:
- *   "register"      – email/phone must NOT already exist
- *   "login"         – email/phone MUST exist
- *   "change_email"  – new email must NOT already exist
- *   "verify_phone"  – no existence check; used by logged-in users to verify/re-verify their phone
- *   "change_phone"  – new phone must NOT already exist (user is changing to a different number)
+ *   "register"      â€“ email/phone must NOT already exist
+ *   "login"         â€“ email/phone MUST exist
+ *   "change_email"  â€“ new email must NOT already exist
+ *   "verify_phone"  â€“ no existence check; used by logged-in users to verify/re-verify their phone
+ *   "change_phone"  â€“ new phone must NOT already exist (user is changing to a different number)
  *
  * Phone OTPs expire in 5 minutes.
  * Email OTPs expire in 10 minutes.
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
       ? (value as string).toLowerCase().trim()
       : (value as string).trim();
 
-    // ── General send-rate limit (shared across all purposes) ──────────────────
+    // â”€â”€ General send-rate limit (shared across all purposes) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const sendKey = `send-otp:${ip}:${identifier}`;
     if (await isRateLimited(sendKey)) {
       return NextResponse.json(
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
     }
     await recordFailure(sendKey);
 
-    // ── Extra phone resend limit: max 3 per hour ───────────────────────────────
+    // â”€â”€ Extra phone resend limit: max 3 per hour â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (type === "phone") {
       const phoneKey = `phone-otp-resend:${ip}:${identifier}`;
       if (await isRateLimitedCustom(phoneKey, PHONE_RESEND_MAX, PHONE_RESEND_WINDOW)) {
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
 
     const db = getSupabaseServer();
 
-    // ── Existence check (skipped for verify_phone — caller is already logged in) ──
+    // â”€â”€ Existence check (skipped for verify_phone â€” caller is already logged in) â”€â”€
     if (purpose !== "verify_phone") {
       if (type === "email") {
         const { data: existing } = await db.from("users").select("id").eq("email", identifier).single();
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── Generate & store OTP ──────────────────────────────────────────────────
+    // â”€â”€ Generate & store OTP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const code = generateOTP();
     // Phone OTPs expire in 5 minutes; email OTPs in 10 minutes (per security spec)
     const expiryMs  = type === "phone" ? 5 * 60 * 1000 : 10 * 60 * 1000;
@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
     });
     if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
 
-    // ── Dispatch ──────────────────────────────────────────────────────────────
+    // â”€â”€ Dispatch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const displayName = (name as string | undefined)?.trim() || "there";
     if (type === "email") {
       const result = await sendEmail(
@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
         displayName,
         "Your Connected Steps verification code",
         otpEmailHTML(displayName, code),
-        true, // isOtp — must always send regardless of NON_OTP_EMAILS_DISABLED
+        true, // isOtp â€” must always send regardless of NON_OTP_EMAILS_DISABLED
       );
       if (!result.ok) {
         console.error(`[send-otp] email delivery failed for ${identifier}: ${result.error}`);
@@ -170,6 +170,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

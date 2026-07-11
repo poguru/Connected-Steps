@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     .eq("event_id", eventId)
     .order("display_order", { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ centers: data ?? [] });
 }
 
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     .insert({ event_id: eventId, name: String(name).trim(), address: address ? String(address) : null, maps_url: maps_url ? String(maps_url) : null, contact_name: contact_name ? String(contact_name) : null, contact_phone: contact_phone ? String(contact_phone) : null, notes: notes ? String(notes) : null, display_order: Number(display_order) || 0 })
     .select().single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ center: data }, { status: 201 });
 }
 
@@ -54,7 +54,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const db = getSupabaseServer();
   const { data, error } = await db.from("bib_collection_centers").update(allowed).eq("id", String(centerId)).eq("event_id", eventId).select().single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ center: data });
 }
 
@@ -67,6 +67,6 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
   const db = getSupabaseServer();
   const { error } = await db.from("bib_collection_centers").delete().eq("id", centerId).eq("event_id", eventId);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

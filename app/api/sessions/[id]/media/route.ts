@@ -16,7 +16,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     .eq("session_id", id)
     .order("display_order", { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ media: data ?? [] });
 }
 

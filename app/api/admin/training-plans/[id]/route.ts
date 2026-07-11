@@ -11,6 +11,6 @@ export async function DELETE(
   const { id } = await params;
   const db = getSupabaseServer();
   const { error } = await db.from("training_plans").delete().eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ success: true });
 }

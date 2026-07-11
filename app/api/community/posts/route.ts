@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireActiveUser } from "@/lib/active-user";
 import { verifyUserToken } from "@/lib/admin-auth";
@@ -23,13 +23,13 @@ async function notifyAdmin(p: { user_name: string; user_email: string; category:
             <div style="font-size:1rem;font-weight:600;color:#fff;margin-bottom:8px;">${p.title}</div>
             <div style="font-size:0.85rem;color:#aaa;line-height:1.6;">${p.body}</div>
           </div>
-          <a href="https://www.connectedsteps.in/admin/community" style="display:inline-block;padding:10px 24px;background:#e8620a;color:#fff;border-radius:6px;text-decoration:none;font-size:0.85rem;font-weight:600;">View in Admin →</a>
+          <a href="https://www.connectedsteps.in/admin/community" style="display:inline-block;padding:10px 24px;background:#e8620a;color:#fff;border-radius:6px;text-decoration:none;font-size:0.85rem;font-weight:600;">View in Admin â†’</a>
         </div>
       </div>`,
   });
 }
 
-// GET — approved posts (public)
+// GET â€” approved posts (public)
 export async function GET() {
   const db = getSupabaseServer();
   const { data, error } = await db
@@ -39,11 +39,11 @@ export async function GET() {
     .order("created_at", { ascending: false })
     .limit(50);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ posts: data ?? [] });
 }
 
-// POST — submit a question/post
+// POST â€” submit a question/post
 export async function POST(req: NextRequest) {
   try {
     const user_email = verifyUserToken(req.headers.get("x-user-token") ?? "");
@@ -67,11 +67,11 @@ export async function POST(req: NextRequest) {
       approved: true,
     });
 
-    // Notify admin — fire and forget
+    // Notify admin â€” fire and forget
     notifyAdmin({ user_name, user_email, category, title: title.trim(), body: body.trim() }).catch(() => {});
 
     return NextResponse.json({ success: true });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

@@ -5,8 +5,19 @@ import { autoFeedMemberJoined } from "@/lib/auto-feed";
 import { getOrCreateCode, processReferral } from "@/lib/referrals";
 import { enqueueJob } from "@/lib/job-queue";
 import { sendEmail, welcomeEmailHTML, adminNewUserEmailHTML } from "@/lib/notify";
+import { isRateLimited, recordFailure, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
+  // Rate limit registrations per IP to prevent bulk account creation / enumeration
+  const ip  = getClientIp(req);
+  const key = `register:${ip}`;
+  if (await isRateLimited(key, 10)) {
+    return NextResponse.json(
+      { error: "Too many attempts. Please try again in 15 minutes." },
+      { status: 429, headers: { "Retry-After": "900" } },
+    );
+  }
+
   try {
     // phoneVerified: true signals that the client completed the WhatsApp OTP step.
     // The server re-checks otp_verifications to prevent spoofing.

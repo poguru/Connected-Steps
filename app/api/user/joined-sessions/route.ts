@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
 import { cacheGet, cacheSet, CK, TTL } from "@/lib/cache";
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   const key      = email.toLowerCase();
   const cacheKey = CK.userJoinedSessions(key);
 
-  // ── Cache read ──────────────────────────────────────────────────────────────
+  // â”€â”€ Cache read â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const cached = await cacheGet<JoinedSessionsPayload>(cacheKey);
   if (cached) {
     return NextResponse.json(cached, { headers: { "X-Cache": "HIT" } });
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     .select("session_id, attended")
     .eq("user_email", key);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   const rows = data ?? [];
   const body: JoinedSessionsPayload = {

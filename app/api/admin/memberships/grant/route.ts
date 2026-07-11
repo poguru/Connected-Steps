@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdmin } from "@/lib/admin-auth";
 
@@ -9,7 +9,7 @@ const PLAN_MONTHS: Record<string, number> = {
   annual:    12,
 };
 
-// POST /api/admin/memberships/grant — manually grant a paid membership
+// POST /api/admin/memberships/grant â€” manually grant a paid membership
 export async function POST(req: NextRequest) {
   if (!isAdmin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     razorpay_payment_id: "manual_grant",
   });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   return NextResponse.json({ ok: true, expires_at: expires.toISOString() });
 }

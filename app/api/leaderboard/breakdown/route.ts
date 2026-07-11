@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { verifyUserToken, isAdmin } from "@/lib/admin-auth";
 
 export interface ScoreBreakdown {
   user_email:     string;
@@ -21,11 +22,25 @@ export interface ScoreBreakdown {
 
 // GET /api/leaderboard/breakdown?email=&month=YYYY-MM
 export async function GET(req: NextRequest) {
+  // Require auth: users may only view their own breakdown; admins can view any
+  const userToken  = req.headers.get("x-user-token");
+  const tokenEmail = userToken ? verifyUserToken(userToken) : null;
+  const adminOk    = !tokenEmail && isAdmin(req);
+
+  if (!tokenEmail && !adminOk) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
   const email  = searchParams.get("email");
   const month  = searchParams.get("month") ?? new Date().toISOString().slice(0, 7);
 
   if (!email) return NextResponse.json({ error: "email required" }, { status: 400 });
+
+  // Non-admin users may only view their own breakdown
+  if (tokenEmail && tokenEmail.toLowerCase() !== email.toLowerCase()) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const db = getSupabaseServer();
 

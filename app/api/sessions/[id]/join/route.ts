@@ -97,7 +97,7 @@ export async function POST(
     points_synced: false,
   });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   // Invalidate the user's joined-sessions cache so the next read reflects the new join
   await cacheDel(CK.userJoinedSessions(user.email));
@@ -172,7 +172,7 @@ export async function DELETE(
     .eq("session_id", id)
     .eq("user_email", email.toLowerCase().trim());
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   // Invalidate the user's joined-sessions cache so the next read is correct
   await cacheDel(CK.userJoinedSessions(email.toLowerCase().trim()));

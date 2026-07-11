@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
 
-// GET /api/user/location — returns the caller's training location assignment(s)
+// GET /api/user/location â€” returns the caller's training location assignment(s)
 export async function GET(req: NextRequest) {
   const token = req.headers.get("x-user-token");
   if (!token) return NextResponse.json({ locations: [] });
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ locations: data ?? [] });
 }
 
-// POST /api/user/location — set / update the caller's preferred training location
+// POST /api/user/location â€” set / update the caller's preferred training location
 export async function POST(req: NextRequest) {
   const token = req.headers.get("x-user-token");
   if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     { onConflict: "user_email,location_id" }
   );
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   console.log(`[location] user ${email} set preferred location to ${loc.name}`);
   return NextResponse.json({ ok: true, location: loc });

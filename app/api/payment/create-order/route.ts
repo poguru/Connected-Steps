@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import Razorpay from "razorpay";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { redeemCoupon } from "@/lib/coupon-redeem";
@@ -11,7 +11,7 @@ function getRazorpay() {
   return new Razorpay({ key_id, key_secret });
 }
 
-// Amount in paise (INR × 100)
+// Amount in paise (INR Ã— 100)
 const PLAN_AMOUNTS: Record<string, number> = {
   monthly:   120000,
   quarterly: 300000,
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if this user already has a coupon_use entry for this coupon
-    // (e.g. they refreshed during checkout — avoid double-claiming).
+    // (e.g. they refreshed during checkout â€” avoid double-claiming).
     const { data: existingUse } = await db
       .from("coupon_uses")
       .select("id")
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (existingUse) {
-      // Already claimed in a prior order — re-apply the discount without re-claiming.
+      // Already claimed in a prior order â€” re-apply the discount without re-claiming.
       amount          = applyDiscount(originalAmount, coupon.discount_type, coupon.discount_value);
       discountApplied = originalAmount - amount;
     } else {
@@ -86,6 +86,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ orderId: order.id, amount, originalAmount, discountApplied, currency: "INR" });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

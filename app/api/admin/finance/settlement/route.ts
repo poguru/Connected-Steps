@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 
@@ -16,8 +16,8 @@ function calcRazorpayDeduction(grossAmount: number) {
 }
 
 // GET /api/admin/finance/settlement
-// Internal settlement report — shows Razorpay deductions per invoice.
-// Never exposed to customers — admin only.
+// Internal settlement report â€” shows Razorpay deductions per invoice.
+// Never exposed to customers â€” admin only.
 export async function GET(req: NextRequest) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
   if (type)  query = query.eq("product_type", type);
 
   const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   const rows = (data ?? []).map(inv => {
     const d = calcRazorpayDeduction(inv.total_amount ?? 0);

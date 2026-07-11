@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
 import { cacheGet, cacheSet, CK, TTL, type LbCacheRow, decorateLb } from "@/lib/cache";
 
-// ── IST timezone helpers ──────────────────────────────────────────────────────
+// â”€â”€ IST timezone helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // The application serves a running club in Hyderabad (IST, UTC+05:30).
 // All calendar-boundary decisions (month start, week start) must use the IST
 // wall-clock date, NOT the server's UTC clock, to avoid serving last month's
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
 
   const cacheKey = CK.leaderboard(locationId, friendsOf);
 
-  // ── Cache read ──────────────────────────────────────────────────────────────
+  // â”€â”€ Cache read â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const cached = await cacheGet<LbCacheRow[]>(cacheKey);
   if (cached) {
     return NextResponse.json(
@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // ── Base leaderboard entries ──────────────────────────────────────────────
+  // â”€â”€ Base leaderboard entries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // IMPORTANT: also select `points_month` so we can validate whether the
   // cached `month_points` value belongs to the current calendar month (IST).
   let q = db
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
     .select("id, user_email, user_name, location, goal, month_points, points_month, total_points, week_points, prev_month_rank, updated_at");
 
   if (friendsOf) {
-    // Friends tab — get followed emails first
+    // Friends tab â€” get followed emails first
     const { data: follows } = await db
       .from("follows")
       .select("following_email")
@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
     if (!emails.length) return NextResponse.json({ entries: [] });
     q = q.in("user_email", emails);
   } else if (locationId) {
-    // Training location tab — filter to users assigned to this location
+    // Training location tab â€” filter to users assigned to this location
     const { data: members } = await db
       .from("user_location_assignments")
       .select("user_email")
@@ -87,17 +87,17 @@ export async function GET(req: NextRequest) {
   }
 
   const { data: entries, error } = await q.order("month_points", { ascending: false }).limit(500);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   if (!entries?.length) return NextResponse.json({ entries: [] });
 
-  // ── Determine current IST calendar month ──────────────────────────────────
+  // â”€â”€ Determine current IST calendar month â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // `month_points` in the leaderboard table is a cached value from the last
   // recalculation. `points_month` records which YYYY-MM that calculation was
   // for. If `points_month` does not match today's IST month the cached value
   // is stale (e.g. June data shown on 1 July) and must be treated as 0.
   const curMonth = currentMonthIST();
 
-  // ── Compute week_points from session attendance (current IST ISO week) ─────
+  // â”€â”€ Compute week_points from session attendance (current IST ISO week) â”€â”€â”€â”€â”€
   // Always recomputed live (not read from the cached leaderboard column) to
   // guarantee correctness across week boundaries without waiting for a sync.
   const weekStart = isoWeekStartIST();
@@ -119,7 +119,7 @@ export async function GET(req: NextRequest) {
     weekMap[row.user_email] = (weekMap[row.user_email] ?? 0) + pts;
   }
 
-  // ── Fetch user photos ─────────────────────────────────────────────────────
+  // â”€â”€ Fetch user photos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const emails = entries.map(e => e.user_email);
   const { data: users } = await db
     .from("users")
@@ -128,7 +128,7 @@ export async function GET(req: NextRequest) {
   const photoMap: Record<string, string | null> = {};
   for (const u of users ?? []) photoMap[u.email] = u.photo ?? null;
 
-  // ── Build cache rows (email stored as _raw_email, never sent to clients) ──
+  // â”€â”€ Build cache rows (email stored as _raw_email, never sent to clients) â”€â”€
   const toCache: LbCacheRow[] = entries.map(e => ({
     id:              e.id,
     _raw_email:      e.user_email,
@@ -137,7 +137,7 @@ export async function GET(req: NextRequest) {
     goal:            e.goal ?? null,
     // Gate month_points on points_month matching the current IST calendar month.
     // If the last recalculation was for a previous month (e.g. June) and no
-    // July sessions have been synced yet, month_points must be 0 — not the
+    // July sessions have been synced yet, month_points must be 0 â€” not the
     // stale June value stored in the table.
     month_points:    e.points_month === curMonth ? (e.month_points ?? 0) : 0,
     total_points:    e.total_points,
@@ -147,7 +147,7 @@ export async function GET(req: NextRequest) {
     photo:           photoMap[e.user_email] ?? null,
   }));
 
-  // Store in cache (fire-and-forget — never blocks the response)
+  // Store in cache (fire-and-forget â€” never blocks the response)
   void cacheSet(cacheKey, toCache, TTL.leaderboard);
 
   return NextResponse.json(

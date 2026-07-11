@@ -30,7 +30,7 @@ export async function DELETE(req: NextRequest, { params }: Ctx) {
     await db.from("session_photos").delete().eq("id", photoId);
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
 
@@ -62,6 +62,6 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       return NextResponse.json({ action: "liked" });
     }
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

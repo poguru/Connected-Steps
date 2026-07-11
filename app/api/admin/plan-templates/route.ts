@@ -1,4 +1,4 @@
-// Required Supabase table (run once in SQL editor):
+﻿// Required Supabase table (run once in SQL editor):
 //
 // create table plan_templates (
 //   id          uuid primary key default gen_random_uuid(),
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     days,
   }).select().single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ template: data });
 }
 

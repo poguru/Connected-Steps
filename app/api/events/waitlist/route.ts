@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
-// POST /api/events/waitlist — public endpoint to join waitlist for a sold-out event
+// POST /api/events/waitlist â€” public endpoint to join waitlist for a sold-out event
 export async function POST(req: NextRequest) {
   try {
     const { event_id, name, email, phone, distance_category, notes } =
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     if (!ev) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
     const isFull = ev.max_participants !== null && (ev.participant_count ?? 0) >= ev.max_participants;
-    if (!isFull) return NextResponse.json({ error: "Event still has spots — please register directly" }, { status: 400 });
+    if (!isFull) return NextResponse.json({ error: "Event still has spots â€” please register directly" }, { status: 400 });
 
     // Check already registered
     const { data: existing } = await db
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
       .select("position")
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
     return NextResponse.json({
       success:  true,
@@ -68,6 +68,6 @@ export async function POST(req: NextRequest) {
       message:  `You're on the waitlist at position #${entry?.position}. We'll notify you if a spot opens up.`,
     });
   } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

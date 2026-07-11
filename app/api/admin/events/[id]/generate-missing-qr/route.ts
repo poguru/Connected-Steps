@@ -19,7 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .eq("status", "confirmed")
     .is("qr_token", null);          // only those without a token
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   if (!regs?.length) return NextResponse.json({ generated: 0, message: "All confirmed registrations already have a QR token." });
 
   let generated = 0, failed = 0;

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 
@@ -9,10 +9,10 @@ import { isAdminOrCoach } from "@/lib/admin-auth";
 // Query params:
 //   limit     int   max rows (default 50, max 200)
 //   job_type  str   filter by job type (optional)
-//   since     str   ISO timestamp — only show jobs failed after this time
+//   since     str   ISO timestamp â€” only show jobs failed after this time
 //
 // POST /api/admin/dead-letters/[id]/retry
-// (See /api/admin/dead-letters/[id]/route.ts — not implemented here)
+// (See /api/admin/dead-letters/[id]/route.ts â€” not implemented here)
 // Resets a dead job to 'pending' so the worker retries it.
 
 export async function GET(req: NextRequest) {
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
   if (since)   q = q.gte("created_at", since)  as typeof q;
 
   const { data, error } = await q;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   // Summary counts by job type
   type DeadJob = { id: string; job_type: string; last_error: string | null; created_at: string; attempts: number; max_attempts: number };
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
   });
 }
 
-// POST /api/admin/dead-letters — retry a specific dead job by ID.
+// POST /api/admin/dead-letters â€” retry a specific dead job by ID.
 // Resets status to 'pending' and clears last_error so the worker picks it up.
 // Does NOT reset attempts, preserving the audit trail.
 
@@ -93,12 +93,12 @@ export async function POST(req: NextRequest) {
     })
     .eq("id", id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   return NextResponse.json({
     ok:       true,
     id,
     job_type: job.job_type,
-    message:  "Job reset to pending — will be claimed on next worker run",
+    message:  "Job reset to pending â€” will be claimed on next worker run",
   });
 }

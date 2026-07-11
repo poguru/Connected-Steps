@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken, verifyCoachToken } from "@/lib/admin-auth";
 
-// GET  /api/messages/conversations?email=...       → user's conversations (requires x-user-token)
-// GET  /api/messages/conversations?coach_email=... → coach's inbox (requires x-coach-token)
+// GET  /api/messages/conversations?email=...       â†’ user's conversations (requires x-user-token)
+// GET  /api/messages/conversations?coach_email=... â†’ coach's inbox (requires x-coach-token)
 export async function GET(req: NextRequest) {
   try {
     const db = getSupabaseServer();
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
         .eq("coach_id", coach.id)
         .order("last_message_at", { ascending: false });
 
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
       return NextResponse.json({ conversations: data ?? [] });
     }
 
@@ -49,14 +49,14 @@ export async function GET(req: NextRequest) {
       .eq("user_email", userEmail.toLowerCase())
       .order("last_message_at", { ascending: false });
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
     return NextResponse.json({ conversations: data ?? [] });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
 
-// POST /api/messages/conversations — create or return existing conversation
+// POST /api/messages/conversations â€” create or return existing conversation
 export async function POST(req: NextRequest) {
   const userToken = req.headers.get("x-user-token");
   if (!userToken) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -74,9 +74,9 @@ export async function POST(req: NextRequest) {
       .select("id, user_email, coach_id, last_message_at, last_message_preview, user_unread")
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
     return NextResponse.json({ conversation: data });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

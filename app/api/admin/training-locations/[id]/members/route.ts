@@ -48,7 +48,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     { user_email: user_email.toLowerCase(), location_id, is_primary },
     { onConflict: "user_email,location_id" }
   );
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ ok: true });
 }
 
@@ -64,6 +64,6 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     .delete()
     .eq("location_id", location_id)
     .eq("user_email", user_email.toLowerCase());
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

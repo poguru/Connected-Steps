@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     .select("id, user_email, title, coach_name, active, created_at")
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ plans: data ?? [] });
 }
 
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     updated_at:  new Date().toISOString(),
   }).select().single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   // Fetch user's name for personalised email
   const { data: user } = await db
@@ -87,7 +87,7 @@ async function sendTrainingPlanEmail(p: {
           <span style="margin-right:6px;">${d.emoji}</span>
           <span style="color:${isRest ? "#666" : "#e0e0e0"};">${d.type}</span>
         </td>
-        <td style="padding:10px 14px;font-size:12px;color:#999;line-height:1.5;">${isRest ? "—" : d.detail}</td>
+        <td style="padding:10px 14px;font-size:12px;color:#999;line-height:1.5;">${isRest ? "â€”" : d.detail}</td>
       </tr>
     `;
   }).join("");
@@ -123,7 +123,7 @@ async function sendTrainingPlanEmail(p: {
         </table>
 
         <a href="${appUrl}/dashboard" style="display:inline-block;padding:12px 28px;background:#ff7a00;color:#fff;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
-          View on Dashboard →
+          View on Dashboard â†’
         </a>
 
         <p style="color:#555;font-size:12px;margin-top:28px;">
@@ -133,11 +133,11 @@ async function sendTrainingPlanEmail(p: {
 
       <!-- Footer -->
       <div style="padding:16px 28px;border-top:1px solid rgba(255,255,255,0.06);">
-        <p style="color:#444;font-size:11px;margin:0;">Connected Steps · <a href="${appUrl}" style="color:#ff7a00;text-decoration:none;">connectedsteps.in</a></p>
+        <p style="color:#444;font-size:11px;margin:0;">Connected Steps Â· <a href="${appUrl}" style="color:#ff7a00;text-decoration:none;">connectedsteps.in</a></p>
       </div>
     </div>
   `;
 
   const { sendSingleEmail } = await import("@/lib/email-service");
-  await sendSingleEmail({ to: p.email, subject: `Your training plan is ready — ${p.title}`, html });
+  await sendSingleEmail({ to: p.email, subject: `Your training plan is ready â€” ${p.title}`, html });
 }

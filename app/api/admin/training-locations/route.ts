@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 
-// GET /api/admin/training-locations — all locations with member counts
+// GET /api/admin/training-locations â€” all locations with member counts
 export async function GET(req: NextRequest) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     .select("*")
     .order("display_order", { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   // Enrich with member counts
   const ids = (locations ?? []).map(l => l.id);
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   });
 }
 
-// POST /api/admin/training-locations — create new location
+// POST /api/admin/training-locations â€” create new location
 export async function POST(req: NextRequest) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -45,6 +45,6 @@ export async function POST(req: NextRequest) {
     .select("*")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ location: data });
 }

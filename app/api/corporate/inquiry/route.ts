@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 
 const ADMIN_EMAIL = process.env.ADMIN_NOTIFY_EMAIL ?? "info@connectedsteps.in";
 
@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     const { sendSingleEmail } = await import("@/lib/email-service");
     await sendSingleEmail({
       to:      ADMIN_EMAIL,
-      subject: `New corporate inquiry — ${company} (${size || "size not specified"})`,
+      subject: `New corporate inquiry â€” ${company} (${size || "size not specified"})`,
       html: `
         <div style="font-family:sans-serif;max-width:520px;margin:0 auto;background:#111;border-radius:10px;overflow:hidden;">
           <div style="background:#0d0d0d;padding:20px 24px;border-bottom:1px solid rgba(255,255,255,0.07);">
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
             </table>
             <div style="margin-top:20px;">
               <a href="https://wa.me/${phone.replace(/\D/g, '')}" style="display:inline-block;padding:10px 20px;background:#25D366;color:#fff;border-radius:6px;text-decoration:none;font-size:0.85rem;font-weight:600;">
-                Reply on WhatsApp →
+                Reply on WhatsApp â†’
               </a>
             </div>
           </div>
@@ -36,6 +36,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

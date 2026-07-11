@@ -44,7 +44,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (paymentF) q = q.eq("payment_status", paymentF) as typeof q;
 
   const { data: rows, error } = await q;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   // Build CSV
   const headers = [

@@ -2,8 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail, sendWhatsApp, runRegistrationEmailHTML, runRegistrationWAParams } from "@/lib/notify";
 import { redeemCoupon } from "@/lib/coupon-redeem";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 export async function POST(req: NextRequest) {
+  // Require a valid user token so anonymous callers cannot trigger coupon
+  // redemption or send WhatsApp/email to arbitrary phone numbers.
+  const userToken  = req.headers.get("x-user-token");
+  const tokenEmail = userToken ? verifyUserToken(userToken) : null;
+  if (!tokenEmail) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
     const {
@@ -16,6 +25,11 @@ export async function POST(req: NextRequest) {
 
     if (!first_name || !last_name || !email || !phone || !blood_group || !distance || !emergency_contact_name || !emergency_contact_phone) {
       return NextResponse.json({ error: "Please fill in all required fields." }, { status: 400 });
+    }
+
+    // Token email must match registration email
+    if (tokenEmail.toLowerCase() !== (email as string).toLowerCase().trim()) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const db = getSupabaseServer();
@@ -46,7 +60,7 @@ export async function POST(req: NextRequest) {
       is_member: is_member ?? false,
     });
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
     // Atomic coupon redemption: single conditional UPDATE guards max_uses.
     if (coupon_id && email) {
@@ -71,7 +85,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

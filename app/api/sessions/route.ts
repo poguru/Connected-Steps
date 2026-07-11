@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { thumbUrl } from "@/lib/thumb-url";
 
@@ -26,7 +26,7 @@ export async function GET() {
     .order("date", { ascending: true })
     .limit(20);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   const GRACE_MINS = 120;
   const filtered = (data ?? []).filter((s) => {
@@ -41,7 +41,7 @@ export async function GET() {
   const sessionIds    = filtered.map(s => s.id as string);
   const noPhotoTitles = [...new Set(filtered.filter(s => !s.photo_url).map(s => s.title as string))];
 
-  // ── Round 2: attendance counts + exact-title photo fallback ───────────────
+  // â”€â”€ Round 2: attendance counts + exact-title photo fallback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [attRes, prevPhotoRes] = await Promise.all([
     db.from("session_attendance").select("session_id").in("session_id", sessionIds),
 
@@ -68,7 +68,7 @@ export async function GET() {
   }
   const prevPhotoMap = prevPhotoByTitle;
 
-  // ── Round 3: keyword fallback for titles still missing a photo ────────────
+  // â”€â”€ Round 3: keyword fallback for titles still missing a photo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const stillMissing = noPhotoTitles.filter(t => !prevPhotoMap[t]);
   if (stillMissing.length > 0) {
     const kwToTitles: Record<string, string[]> = {};

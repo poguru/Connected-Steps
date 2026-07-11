@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 import { createAndSendInvoice } from "@/lib/invoice-service";
 
-// GET /api/admin/invoices — list all invoices with search/filter
+// GET /api/admin/invoices â€” list all invoices with search/filter
 export async function GET(req: NextRequest) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
   if (to)     query = query.lte("created_at", to + "T23:59:59Z");
 
   const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   const invoices = data ?? [];
   const summary = {
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ invoices, summary });
 }
 
-// POST /api/admin/invoices — manually generate invoice for a registration/membership
+// POST /api/admin/invoices â€” manually generate invoice for a registration/membership
 export async function POST(req: NextRequest) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

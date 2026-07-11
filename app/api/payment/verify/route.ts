@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
@@ -22,7 +22,7 @@ const PLAN_LABELS: Record<string, string> = {
 };
 
 export async function POST(req: NextRequest) {
-  // Authenticate the request — email MUST come from the verified token,
+  // Authenticate the request â€” email MUST come from the verified token,
   // not the request body, to prevent a user claiming payment for another account.
   const userToken = req.headers.get("x-user-token");
   const verifiedEmail = userToken ? verifyUserToken(userToken) : null;
@@ -40,13 +40,13 @@ export async function POST(req: NextRequest) {
     coupon_id,
   } = await req.json();
 
-  // Always use the token-verified email — ignore any email in the request body
+  // Always use the token-verified email â€” ignore any email in the request body
   const email = verifiedEmail.toLowerCase();
 
   // Verify Razorpay signature
   const razorpaySecret = process.env.RAZORPAY_KEY_SECRET;
   if (!razorpaySecret) {
-    console.error("RAZORPAY_KEY_SECRET not set — cannot verify payment signature");
+    console.error("RAZORPAY_KEY_SECRET not set â€” cannot verify payment signature");
     return NextResponse.json({ error: "Payment verification unavailable" }, { status: 503 });
   }
 
@@ -92,19 +92,19 @@ export async function POST(req: NextRequest) {
     { onConflict: "user_email" }
   );
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   const displayName = name || "Member";
   const planLabel   = PLAN_LABELS[plan] ?? plan;
   const amountINR   = amount / 100;
   const expiryISO   = expiresAt.toISOString();
 
-  // Enqueue for durability/retry — also fire immediately so users don't wait
+  // Enqueue for durability/retry â€” also fire immediately so users don't wait
   const invoicePayload = {
     productType:     "membership" as const,
     userEmail:       email.toLowerCase(),
     userName:        displayName,
-    productName:     `Membership — ${planLabel}`,
+    productName:     `Membership â€” ${planLabel}`,
     totalPaidRupees: amountINR,
     paymentId:       razorpay_payment_id,
     orderId:         razorpay_order_id,

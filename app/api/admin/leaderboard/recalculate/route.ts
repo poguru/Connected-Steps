@@ -17,6 +17,6 @@ export async function POST(req: NextRequest) {
     const result = await recalculateMonth(month, { force: true });
     return NextResponse.json(result);
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

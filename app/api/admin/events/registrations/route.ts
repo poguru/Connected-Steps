@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 
@@ -14,7 +14,7 @@ import { isAdminOrCoach } from "@/lib/admin-auth";
 //   order           str    asc | desc (default "desc")
 //
 // Response: { registrations[], summary{}, total, page, limit, has_more }
-// Summary uses registration_summary() RPC — one SQL pass, not N+1 counts.
+// Summary uses registration_summary() RPC â€” one SQL pass, not N+1 counts.
 
 const VALID_SORT = new Set(["created_at", "final_price", "payment_status", "status", "user_name", "user_email"]);
 const PAGE_LIMIT  = 50;
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
 
   const db = getSupabaseServer();
 
-  // ── Paginated data query ──────────────────────────────────────────────────
+  // â”€â”€ Paginated data query â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   let query = db
     .from("event_registrations")
     .select(`
@@ -59,13 +59,13 @@ export async function GET(req: NextRequest) {
 
   query = query.range(page * limit, page * limit + limit - 1) as typeof query;
 
-  // ── Summary RPC (single SQL pass, not N+1 counts) ─────────────────────────
+  // â”€â”€ Summary RPC (single SQL pass, not N+1 counts) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [{ data, count, error }, { data: summaryRaw }] = await Promise.all([
     query,
     db.rpc("registration_summary", { p_event_id: eventId ?? null }),
   ]);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   const summary = (summaryRaw as Record<string, number>) ?? {
     total: count ?? 0, paid: 0, free: 0, pending: 0, revenue: 0,
@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
   });
 }
 
-// PATCH /api/admin/events/registrations — cancel or update status
+// PATCH /api/admin/events/registrations â€” cancel or update status
 // Idempotency: if status already matches the requested value, return the current
 // row without touching the DB. Prevents double-submit from network retries.
 export async function PATCH(req: NextRequest) {
@@ -95,7 +95,7 @@ export async function PATCH(req: NextRequest) {
 
   const db = getSupabaseServer();
 
-  // Read current state first — idempotency guard
+  // Read current state first â€” idempotency guard
   const { data: current } = await db
     .from("event_registrations")
     .select("id, status, event_id, user_email, user_name")
@@ -104,7 +104,7 @@ export async function PATCH(req: NextRequest) {
 
   if (!current) return NextResponse.json({ error: "Registration not found" }, { status: 404 });
 
-  // Idempotent: already in the requested state — return without writing
+  // Idempotent: already in the requested state â€” return without writing
   if (current.status === status) {
     return NextResponse.json({ data: current, idempotent: true });
   }
@@ -116,11 +116,11 @@ export async function PATCH(req: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
-  // Audit log — write fire-and-forget so it never blocks the response
-  // Audit log — fire-and-forget; failure must never break the main operation
-  // Audit log — fire-and-forget; failure must never break the main operation
+  // Audit log â€” write fire-and-forget so it never blocks the response
+  // Audit log â€” fire-and-forget; failure must never break the main operation
+  // Audit log â€” fire-and-forget; failure must never break the main operation
   void (async () => {
     try {
       await db.from("audit_logs").insert({

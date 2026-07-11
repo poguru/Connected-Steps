@@ -50,7 +50,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!force) q = q.is("event_registrations.certificate_generated_at", null) as typeof q;
 
   const { data: results, error } = await q;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   const finishers = (results as unknown as Array<{
     id:                string;

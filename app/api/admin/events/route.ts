@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 
@@ -19,7 +19,7 @@ function toSlug(title: string): string {
  *
  * Now: append a base-36 timestamp suffix that is effectively unique at human
  * event-creation rates.  Collisions would require two events created within
- * the same millisecond with identical titles — handled below by the DB
+ * the same millisecond with identical titles â€” handled below by the DB
  * UNIQUE constraint if idx_events_share_slug is enforced.
  */
 function uniqueSlug(base: string): string {
@@ -38,9 +38,9 @@ export async function GET(req: NextRequest) {
   if (limit > 0) q = q.range(page * limit, page * limit + limit - 1);
 
   const { data, error } = await q;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
-  // Backward-compatible: no pagination params → same { data } shape as before.
+  // Backward-compatible: no pagination params â†’ same { data } shape as before.
   // With params: adds page/limit/hasMore for client-side pagination UI.
   return NextResponse.json(
     limit > 0
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ data });
 }
 
@@ -113,7 +113,7 @@ export async function PATCH(req: NextRequest) {
     .eq("id", id)
     .select()
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ data });
 }
 
@@ -123,12 +123,12 @@ export async function DELETE(req: NextRequest) {
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   const db = getSupabaseServer();
 
-  // Delete registrations first — event_registrations has ON DELETE RESTRICT so
+  // Delete registrations first â€” event_registrations has ON DELETE RESTRICT so
   // Supabase would block the event delete if any registrations exist.
   // event_rsvp has ON DELETE CASCADE so it cleans itself up automatically.
   await db.from("event_registrations").delete().eq("event_id", id);
 
   const { error } = await db.from("events").delete().eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ success: true });
 }

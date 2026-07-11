@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireActiveUser } from "@/lib/active-user";
 import { verifyUserToken } from "@/lib/admin-auth";
 
 // POST /api/feed/react
 // Body: { feed_event_id, reaction_type: "like" | "celebrate" }
-// Toggles the reaction: if already set to same type → remove it.
-// If set to different type → switch it.
+// Toggles the reaction: if already set to same type â†’ remove it.
+// If set to different type â†’ switch it.
 // Returns: { action: "added" | "removed" | "switched", reaction_type, counts: {like, celebrate} }
 
 export async function POST(req: NextRequest) {
@@ -39,16 +39,16 @@ export async function POST(req: NextRequest) {
 
     if (existing) {
       if (existing.reaction_type === reaction_type) {
-        // Same type → remove (toggle off)
+        // Same type â†’ remove (toggle off)
         await db.from("feed_reactions").delete().eq("id", existing.id);
         action = "removed";
       } else {
-        // Different type → switch
+        // Different type â†’ switch
         await db.from("feed_reactions").update({ reaction_type }).eq("id", existing.id);
         action = "switched";
       }
     } else {
-      // No existing → add
+      // No existing â†’ add
       await db.from("feed_reactions").insert({
         feed_event_id,
         user_email: user_email.toLowerCase(),
@@ -68,6 +68,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ action, reaction_type, counts });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     .order("approved", { ascending: true })
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ posts: data ?? [] });
 }
 
@@ -30,20 +30,20 @@ export async function PATCH(req: NextRequest) {
 
     if (action === "approve_all") {
       const { error } = await db.from("community_posts").update({ approved: true }).eq("approved", false);
-      if (error) { console.error("[admin/community] approve_all error:", error.message); return NextResponse.json({ error: error.message }, { status: 500 }); }
+      if (error) { console.error("[admin/community] approve_all error:", error.message); return NextResponse.json({ error: "Database error" }, { status: 500 }); }
     } else if (action === "reject") {
       console.log("[admin/community] deleting post id:", id);
       const { error, count } = await db.from("community_posts").delete({ count: "exact" }).eq("id", id);
-      if (error) { console.error("[admin/community] delete error:", error.message); return NextResponse.json({ error: error.message }, { status: 500 }); }
+      if (error) { console.error("[admin/community] delete error:", error.message); return NextResponse.json({ error: "Database error" }, { status: 500 }); }
       console.log("[admin/community] deleted", count, "row(s) for id:", id);
     } else {
       const { error } = await db.from("community_posts").update({ approved: true }).eq("id", id);
-      if (error) { console.error("[admin/community] approve error:", error.message); return NextResponse.json({ error: error.message }, { status: 500 }); }
+      if (error) { console.error("[admin/community] approve error:", error.message); return NextResponse.json({ error: "Database error" }, { status: 500 }); }
     }
 
     return NextResponse.json({ success: true });
   } catch (e: unknown) {
     console.error("[admin/community] PATCH exception:", String(e));
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

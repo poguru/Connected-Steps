@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
 
@@ -21,13 +21,13 @@ async function notifyAdmin(p: { user_name: string; user_email: string; category:
             <div style="font-size:10px;color:#e8620a;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">${p.category}</div>
             <div style="font-size:0.9rem;color:#ddd;line-height:1.6;">${p.question}</div>
           </div>
-          <a href="https://www.connectedsteps.in/admin/coach-questions" style="display:inline-block;padding:10px 24px;background:#e8620a;color:#fff;border-radius:6px;text-decoration:none;font-size:0.85rem;font-weight:600;">Reply in Admin →</a>
+          <a href="https://www.connectedsteps.in/admin/coach-questions" style="display:inline-block;padding:10px 24px;background:#e8620a;color:#fff;border-radius:6px;text-decoration:none;font-size:0.85rem;font-weight:600;">Reply in Admin â†’</a>
         </div>
       </div>`,
   });
 }
 
-// GET /api/coach-questions — requires valid user token
+// GET /api/coach-questions â€” requires valid user token
 export async function GET(req: NextRequest) {
   const token = req.headers.get("x-user-token");
   if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -42,14 +42,14 @@ export async function GET(req: NextRequest) {
       .eq("user_email", email.toLowerCase())
       .order("created_at", { ascending: false });
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
     return NextResponse.json({ questions: data ?? [] });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
 
-// POST /api/coach-questions — requires valid user token + active membership
+// POST /api/coach-questions â€” requires valid user token + active membership
 export async function POST(req: NextRequest) {
   const token = req.headers.get("x-user-token");
   if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -84,13 +84,13 @@ export async function POST(req: NextRequest) {
       .select()
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
-    // Notify admin — fire and forget
+    // Notify admin â€” fire and forget
     notifyAdmin({ user_name, user_email, category: category || "General", question: question.trim() }).catch(() => {});
 
     return NextResponse.json({ question: data });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

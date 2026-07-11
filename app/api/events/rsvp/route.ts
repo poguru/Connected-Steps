@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
-// GET /api/events/rsvp?event_id=...&email=...  — check if already registered
+// GET /api/events/rsvp?event_id=...&email=...  â€” check if already registered
 export async function GET(req: NextRequest) {
   const eventId = req.nextUrl.searchParams.get("event_id");
   const email   = req.nextUrl.searchParams.get("email");
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ registered: !!data });
 }
 
-// POST /api/events/rsvp  — register { event_id, email }
+// POST /api/events/rsvp  â€” register { event_id, email }
 export async function POST(req: NextRequest) {
   const { event_id, email } = await req.json();
   if (!event_id || !email) {
@@ -47,13 +47,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Event not found." }, { status: 404 });
   }
 
-  // Upsert — idempotent
+  // Upsert â€” idempotent
   const { error } = await db.from("event_rsvp").upsert({
     event_id,
     user_email: user.email,
     user_name:  `${user.first_name} ${user.last_name}`.trim(),
   }, { onConflict: "event_id,user_email" });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ success: true, event });
 }

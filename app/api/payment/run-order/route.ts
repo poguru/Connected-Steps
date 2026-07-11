@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import Razorpay from "razorpay";
 import { verifyUserToken } from "@/lib/admin-auth";
 
@@ -9,7 +9,7 @@ function getRazorpay() {
   return new Razorpay({ key_id, key_secret });
 }
 
-const DEFAULT_FEE_PAISE = 19900; // ₹199 — server-side fallback, not caller-supplied
+const DEFAULT_FEE_PAISE = 19900; // â‚¹199 â€” server-side fallback, not caller-supplied
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,6 +35,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ orderId: order.id, amount: fee, currency: "INR" });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

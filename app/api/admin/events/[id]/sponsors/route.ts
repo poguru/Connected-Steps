@@ -13,7 +13,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     .eq("event_id", id)
     .order("display_order")
     .order("created_at");
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ sponsors: data ?? [] });
 }
 
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     display_order: body.display_order ?? 0,
     visible:       true,
   }).select().single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ sponsor: data });
 }
 
@@ -48,7 +48,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const db = getSupabaseServer();
   const { data, error } = await db.from("event_sponsors").update(updates).eq("id", sponsor_id).eq("event_id", id).select().single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ sponsor: data });
 }
 
@@ -61,6 +61,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   const db = getSupabaseServer();
   const { error } = await db.from("event_sponsors").delete().eq("id", sponsor_id).eq("event_id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ success: true });
 }

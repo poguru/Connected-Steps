@@ -29,7 +29,7 @@ export async function DELETE(
   // Delete attendance records first, then the session
   await db.from("session_attendance").delete().eq("session_id", id);
   const { error } = await db.from("sessions").delete().eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ success: true });
 }
 
@@ -53,6 +53,6 @@ export async function PATCH(
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ data });
 }

@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 
-// ── GET /api/admin/media/stats ────────────────────────────────────────────────
+// â”€â”€ GET /api/admin/media/stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Returns current storage statistics and media_settings for the admin panel.
 export async function GET(req: NextRequest) {
   if (!await isAdminOrCoach(req)) {
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ stats, settings, nextCleanupEst });
 }
 
-// ── PATCH /api/admin/media/stats ─────────────────────────────────────────────
+// â”€â”€ PATCH /api/admin/media/stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Update media_settings (admin only).
 // Body: { key: string, value: string }
 export async function PATCH(req: NextRequest) {
@@ -73,6 +73,6 @@ export async function PATCH(req: NextRequest) {
     .from("media_settings")
     .upsert({ key: body.key, value: String(body.value), updated_at: new Date().toISOString() });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ ok: true, key: body.key, value: body.value });
 }

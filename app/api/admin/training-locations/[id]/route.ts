@@ -16,7 +16,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     .eq("id", id)
     .select("*")
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ location: data });
 }
 
@@ -36,6 +36,6 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   }
 
   const { error } = await db.from("training_locations").delete().eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

@@ -13,7 +13,7 @@ export async function GET(
     .select("id, user_name, user_email, rating, comment, created_at")
     .eq("session_id", id)
     .order("created_at", { ascending: false });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   const all = data ?? [];
   const myFeedback = email ? (all.find((f) => f.user_email === email) ?? null) : null;
   // strip emails from public list
@@ -47,6 +47,6 @@ export async function POST(
     { session_id: id, user_email: email.toLowerCase(), user_name: att.user_name, rating, comment: comment?.trim() ?? "" },
     { onConflict: "session_id,user_email" }
   );
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   return NextResponse.json({ success: true });
 }
