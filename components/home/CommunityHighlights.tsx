@@ -276,12 +276,21 @@ function SessionCard({
       }}
       role="button" aria-label={`View ${session.title}`}
     >
-      {/* Media */}
-      <div className="cs-ch-card-media" style={{ position: "relative", aspectRatio: "4/3", overflow: "hidden", flexShrink: 0 }}>
+      {/* ── Mobile: natural-flow image, no fixed height, no cropping ── */}
+      <div className="cs-ch-card-media-mobile">
         {imageUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={imageUrl} alt={session.title} loading="lazy"
-            className="cs-ch-card-img"
+            style={{ width: "100%", height: "auto", display: "block" }}
+          />
+        )}
+      </div>
+
+      {/* ── Desktop: fixed aspect-ratio cover with overlays ── */}
+      <div className="cs-ch-card-media-desktop" style={{ position: "relative", aspectRatio: "4/3", overflow: "hidden", flexShrink: 0 }}>
+        {imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={imageUrl} alt={session.title} loading="lazy"
             style={{
               width: "100%", height: "100%", objectFit: "cover",
               objectPosition: "center 25%", display: "block",

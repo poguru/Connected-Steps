@@ -1525,24 +1525,16 @@ select.auth-input option {
 .cs-ch-hero-mobile  { display: none; }
 .cs-ch-hero-desktop { display: block; }
 
+/* Session card: mobile = natural image flow, desktop = aspect-ratio cover */
+.cs-ch-card-media-mobile  { display: none; }
+.cs-ch-card-media-desktop { display: block; }
+
 @media (max-width: 640px) {
   .cs-ch-hero-mobile  { display: block; }
   .cs-ch-hero-desktop { display: none; }
 
-  /* Session cards: show full image, no cropping */
-  .cs-ch-card-media {
-    aspect-ratio: unset !important;
-    height: auto !important;
-    min-height: unset !important;
-  }
-  .cs-ch-card-img {
-    width: 100% !important;
-    height: auto !important;
-    object-fit: contain !important;
-    object-position: center !important;
-    transform: none !important;
-    filter: none !important;
-  }
+  .cs-ch-card-media-mobile  { display: block; }
+  .cs-ch-card-media-desktop { display: none; }
 }
 
 /* Cards strip: 3-col grid on desktop, horizontal scroll on mobile */
