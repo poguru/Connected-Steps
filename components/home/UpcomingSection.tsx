@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Calendar, MapPin, Users, ChevronLeft, ChevronRight,
@@ -152,18 +152,6 @@ const EVENT_GRADIENTS: Record<string, string> = {
 
 function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (item: Item) => void }) {
   const [hovered, setHovered] = useState(false);
-  // Portrait phone photos have subjects at the bottom (sky/trees at top).
-  // Landscape photos have subjects in the center-upper area.
-  // objectPosition adapts; the 4/3 container stays fixed.
-  const [objPos, setObjPos] = useState("center");
-  function onImgLoad(e: React.SyntheticEvent<HTMLImageElement>) {
-    const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
-    if (!w || !h) return;
-    const r = w / h;
-    if (r < 0.85)     setObjPos("center 70%"); // portrait: show lower portion
-    else if (r > 1.2) setObjPos("center 30%"); // landscape: slight top bias
-    else              setObjPos("center");       // square: dead center
-  }
   const cd = countdown(item.date, item.time, now);
 
   const imageUrl = item.kind === "session" ? item.photo_url : item.cover_image;
@@ -215,22 +203,32 @@ function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (i
         position: "relative", aspectRatio: "4/3", overflow: "hidden", flexShrink: 0, background: bg,
       }}>
         {imageUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={imageUrl}
-            alt={item.title}
-            loading="lazy"
-            onLoad={onImgLoad}
-            style={{
+          <>
+            {/* Blurred fill — covers empty space around the contained image */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={imageUrl} alt="" aria-hidden style={{
               position: "absolute", inset: 0,
               width: "100%", height: "100%",
-              objectFit: "cover",
-              objectPosition: objPos,
-              display: "block",
-              transition: "transform 0.5s ease",
-              transform: hovered ? "scale(1.06)" : "scale(1)",
-            }}
-          />
+              objectFit: "cover", objectPosition: "center",
+              filter: "blur(18px)", transform: "scale(1.12)",
+              opacity: 0.6,
+            }} />
+            {/* Full image — never cropped, never resized */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imageUrl}
+              alt={item.title}
+              loading="lazy"
+              style={{
+                position: "absolute", inset: 0,
+                width: "100%", height: "100%",
+                objectFit: "contain", objectPosition: "center",
+                display: "block",
+                transition: "transform 0.5s ease",
+                transform: hovered ? "scale(1.04)" : "scale(1)",
+              }}
+            />
+          </>
         ) : item.kind === "session" && (
           <div style={{
             position: "absolute", inset: 0,
