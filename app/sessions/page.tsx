@@ -14,6 +14,7 @@ interface Session {
   venue:            string | null;
   location:         string;
   photo_url:        string | null;
+  difficulty:       string | null;
   registered_count: number;
 }
 
@@ -60,6 +61,30 @@ function categoryGradient(title: string): string {
     return "linear-gradient(135deg, #1a110a 0%, #713f12 100%)";
   return "linear-gradient(135deg, #0d1b2a 0%, #1a2744 50%, #0f3460 100%)";
 }
+
+// ── Category emoji + difficulty config ────────────────────────────────────────
+
+function categoryEmoji(title: string): string {
+  const t = title.toLowerCase();
+  if (t.includes("trail"))        return "⛰️";
+  if (t.includes("hill"))         return "🏔️";
+  if (t.includes("speed") || t.includes("interval")) return "⚡";
+  if (t.includes("long run") || t.includes("lsd"))   return "🛣️";
+  if (t.includes("recovery"))     return "💆";
+  if (t.includes("strength") || t.includes("conditioning")) return "💪";
+  if (t.includes("mobility"))     return "🧘";
+  if (t.includes("5k"))           return "🏅";
+  if (t.includes("10k"))          return "🏅";
+  if (t.includes("half") || t.includes("hm")) return "🏆";
+  if (t.includes("full") || t.includes("marathon")) return "🏆";
+  return "🏃";
+}
+
+const DIFFICULTY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  beginner:     { label: "⭐ Beginner",     color: "#4ade80", bg: "rgba(74,222,128,0.15)"  },
+  intermediate: { label: "🔥 Intermediate", color: "#fb923c", bg: "rgba(251,146,60,0.15)"  },
+  advanced:     { label: "💪 Advanced",     color: "#f43f5e", bg: "rgba(244,63,94,0.15)"   },
+};
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -203,7 +228,7 @@ function SessionCard({
     >
       {/* ── Image ── */}
       <div className="cs-scard-img-wrap" style={{ position: "relative", height: 170, flexShrink: 0, background: gradient, overflow: "hidden" }}>
-        {s.photo_url && (
+        {s.photo_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={s.photo_url}
@@ -217,6 +242,14 @@ function SessionCard({
               transform: hovered ? "scale(1.05)" : "scale(1)",
             }}
           />
+        ) : (
+          <div style={{
+            position: "absolute", inset: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "3.5rem", opacity: 0.35, userSelect: "none",
+          }}>
+            {categoryEmoji(s.title)}
+          </div>
         )}
 
         {/* Gradient overlay */}
@@ -257,6 +290,27 @@ function SessionCard({
       <div style={{ padding: "13px 15px 15px", flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={{ fontSize: "0.93rem", fontWeight: 700, color: "var(--foreground)", lineHeight: 1.3 }}>
           {s.title}
+        </div>
+
+        {/* Difficulty + Points badges */}
+        <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+          {s.difficulty && DIFFICULTY_CONFIG[s.difficulty] && (
+            <span style={{
+              fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 999,
+              background: DIFFICULTY_CONFIG[s.difficulty].bg,
+              color: DIFFICULTY_CONFIG[s.difficulty].color,
+              border: `1px solid ${DIFFICULTY_CONFIG[s.difficulty].color}44`,
+            }}>
+              {DIFFICULTY_CONFIG[s.difficulty].label}
+            </span>
+          )}
+          <span style={{
+            fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 999,
+            background: "rgba(234,179,8,0.12)", color: "#eab308",
+            border: "1px solid rgba(234,179,8,0.25)",
+          }}>
+            🏆 Earn 5 pts
+          </span>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 2 }}>

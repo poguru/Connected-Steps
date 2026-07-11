@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { thumbUrl } from "@/lib/thumb-url";
 
 export const revalidate = 300;
 
@@ -20,7 +21,7 @@ export async function GET() {
 
   const { data, error } = await db
     .from("sessions")
-    .select("id, title, date, time, venue, location, photo_url")
+    .select("id, title, date, time, venue, location, photo_url, difficulty")
     .gte("date", today)
     .order("date", { ascending: true })
     .limit(20);
@@ -37,8 +38,8 @@ export async function GET() {
 
   if (filtered.length === 0) return NextResponse.json({ data: [] });
 
-  const sessionIds        = filtered.map(s => s.id as string);
-  const noPhotoTitles     = [...new Set(filtered.filter(s => !s.photo_url).map(s => s.title as string))];
+  const sessionIds    = filtered.map(s => s.id as string);
+  const noPhotoTitles = [...new Set(filtered.filter(s => !s.photo_url).map(s => s.title as string))];
 
   // ── Round 2: attendance counts + exact-title photo fallback ───────────────
   const [attRes, prevPhotoRes] = await Promise.all([
@@ -104,8 +105,9 @@ export async function GET() {
     time:             (s.time ?? null) as string | null,
     venue:            (s.venue ?? null) as string | null,
     location:         s.location as string,
-    photo_url:        (s.photo_url ?? prevPhotoMap[s.title as string] ?? null) as string | null,
+    photo_url:        thumbUrl(s.photo_url ?? prevPhotoMap[s.title as string] ?? null),
     registered_count: attMap[s.id as string] ?? 0,
+    difficulty:       (s.difficulty ?? null) as string | null,
   }));
 
   return NextResponse.json({ data: result });

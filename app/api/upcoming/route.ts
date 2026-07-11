@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
+import { thumbUrl } from "@/lib/thumb-url";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
   // ── Round 1: sessions + events ────────────────────────────────────────────────
   const [sessRes, evtRes] = await Promise.all([
     db.from("sessions")
-      .select("id, title, date, time, venue, location, photo_url")
+      .select("id, title, date, time, venue, location, photo_url, difficulty")
       .gte("date", today)
       .order("date", { ascending: true })
       .limit(8),
@@ -179,7 +180,8 @@ export async function GET(req: NextRequest) {
     time:               (s.time  ?? null) as string | null,
     venue:              (s.venue ?? null) as string | null,
     location:           s.location as string,
-    photo_url:          (s.photo_url ?? prevPhotoMap[s.title as string] ?? null) as string | null,
+    photo_url:          thumbUrl(s.photo_url ?? prevPhotoMap[s.title as string] ?? null),
+    difficulty:         (s.difficulty ?? null) as string | null,
     registered_count:   sessionCountMap[s.id as string] ?? 0,
     registered:         regSessionSet.has(s.id as string),
     user_session_count: userCountByTitle[s.title as string] ?? 0,

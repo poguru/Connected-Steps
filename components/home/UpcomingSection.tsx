@@ -18,6 +18,7 @@ interface SessionItem {
   venue:              string | null;
   location:           string;
   photo_url:          string | null;
+  difficulty:         string | null;
   registered_count:   number;
   registered:         boolean;
   user_session_count: number;
@@ -115,6 +116,28 @@ function slotsLeft(max: number | null, current: number): number | null {
   return Math.max(0, max - current);
 }
 
+function categoryEmoji(title: string): string {
+  const t = title.toLowerCase();
+  if (t.includes("trail"))        return "⛰️";
+  if (t.includes("hill"))         return "🏔️";
+  if (t.includes("speed") || t.includes("interval")) return "⚡";
+  if (t.includes("long run") || t.includes("lsd"))   return "🛣️";
+  if (t.includes("recovery"))     return "💆";
+  if (t.includes("strength") || t.includes("conditioning")) return "💪";
+  if (t.includes("mobility"))     return "🧘";
+  if (t.includes("5k"))           return "🏅";
+  if (t.includes("10k"))          return "🏅";
+  if (t.includes("half") || t.includes("hm")) return "🏆";
+  if (t.includes("full") || t.includes("marathon")) return "🏆";
+  return "🏃";
+}
+
+const DIFFICULTY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  beginner:     { label: "⭐ Beginner",     color: "#4ade80", bg: "rgba(74,222,128,0.15)"  },
+  intermediate: { label: "🔥 Intermediate", color: "#fb923c", bg: "rgba(251,146,60,0.15)"  },
+  advanced:     { label: "💪 Advanced",     color: "#f43f5e", bg: "rgba(244,63,94,0.15)"   },
+};
+
 const SESSION_GRADIENT = "linear-gradient(135deg, #0d1b2a 0%, #1a2744 50%, #0f3460 100%)";
 const EVENT_GRADIENTS: Record<string, string> = {
   running:   "linear-gradient(135deg, #7c2d12 0%, #9a3412 100%)",
@@ -183,7 +206,7 @@ function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (i
         background: bg,
         overflow: "hidden",
       }}>
-        {imageUrl && (
+        {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={imageUrl}
@@ -197,6 +220,14 @@ function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (i
               transform: hovered ? "scale(1.05)" : "scale(1)",
             }}
           />
+        ) : item.kind === "session" && (
+          <div style={{
+            position: "absolute", inset: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "3.5rem", opacity: 0.35, userSelect: "none",
+          }}>
+            {categoryEmoji(item.title)}
+          </div>
         )}
 
         {/* Gradient overlay — dark top + dark bottom for badge readability */}
@@ -308,6 +339,29 @@ function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (i
         }}>
           {item.title}
         </div>
+
+        {/* Difficulty + Points badges */}
+        {item.kind === "session" && (
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+            {item.difficulty && DIFFICULTY_CONFIG[item.difficulty] && (
+              <span style={{
+                fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 999,
+                background: DIFFICULTY_CONFIG[item.difficulty].bg,
+                color: DIFFICULTY_CONFIG[item.difficulty].color,
+                border: `1px solid ${DIFFICULTY_CONFIG[item.difficulty].color}44`,
+              }}>
+                {DIFFICULTY_CONFIG[item.difficulty].label}
+              </span>
+            )}
+            <span style={{
+              fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 999,
+              background: "rgba(234,179,8,0.12)", color: "#eab308",
+              border: "1px solid rgba(234,179,8,0.25)",
+            }}>
+              🏆 Earn 5 pts
+            </span>
+          </div>
+        )}
 
         {/* Meta rows */}
         <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 2 }}>
