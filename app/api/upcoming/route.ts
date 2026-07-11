@@ -4,6 +4,13 @@ import { verifyUserToken } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
+const PHOTO_KEYWORDS = ["recovery", "mobility", "strength", "conditioning", "interval", "speed", "agility", "endurance", "long run", "hill", "trail"];
+function extractKeyword(title: string): string | null {
+  const t = title.toLowerCase();
+  for (const kw of PHOTO_KEYWORDS) if (t.includes(kw)) return kw;
+  return null;
+}
+
 export async function GET(req: NextRequest) {
   const db = getSupabaseServer();
 
@@ -124,6 +131,34 @@ export async function GET(req: NextRequest) {
     if (r.photo_url && !prevPhotoMap[r.title as string]) {
       prevPhotoMap[r.title as string] = r.photo_url as string;
     }
+  }
+
+  // ── Keyword fallback: fill photos for titles that exact-match missed ──────
+  const stillMissingTitles = titlesWithoutPhoto.filter(t => !prevPhotoMap[t]);
+  if (stillMissingTitles.length > 0) {
+    const kwToTitles: Record<string, string[]> = {};
+    for (const title of stillMissingTitles) {
+      const kw = extractKeyword(title);
+      if (kw) (kwToTitles[kw] ??= []).push(title);
+    }
+    await Promise.all(
+      Object.keys(kwToTitles).map(async (kw) => {
+        const { data: kwData } = await db
+          .from("sessions")
+          .select("photo_url")
+          .ilike("title", `%${kw}%`)
+          .lt("date", today)
+          .not("photo_url", "is", null)
+          .order("date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (kwData?.photo_url) {
+          for (const title of kwToTitles[kw]) {
+            prevPhotoMap[title] = kwData.photo_url as string;
+          }
+        }
+      })
+    );
   }
 
   const userCountByTitle: Record<string, number> = {};

@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
-export const revalidate = 300; // refresh every 5 minutes
+export const revalidate = 300;
+
+const PHOTO_KEYWORDS = ["recovery", "mobility", "strength", "conditioning", "interval", "speed", "agility", "endurance", "long run", "hill", "trail"];
+
+function extractKeyword(title: string): string | null {
+  const t = title.toLowerCase();
+  for (const kw of PHOTO_KEYWORDS) if (t.includes(kw)) return kw;
+  return null;
+}
 
 export async function GET() {
   const db = getSupabaseServer();
 
-  // Use IST (UTC+5:30) for date/time comparisons since sessions are in India
   const istNow  = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
   const today   = istNow.toISOString().split("T")[0];
   const nowMins = istNow.getUTCHours() * 60 + istNow.getUTCMinutes();
@@ -20,7 +27,6 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Hide today's sessions that started more than 2 hours ago
   const GRACE_MINS = 120;
   const filtered = (data ?? []).filter((s) => {
     if (s.date !== today) return true;
@@ -29,5 +35,78 @@ export async function GET() {
     return nowMins < sh * 60 + sm + GRACE_MINS;
   });
 
-  return NextResponse.json({ data: filtered });
+  if (filtered.length === 0) return NextResponse.json({ data: [] });
+
+  const sessionIds        = filtered.map(s => s.id as string);
+  const noPhotoTitles     = [...new Set(filtered.filter(s => !s.photo_url).map(s => s.title as string))];
+
+  // ── Round 2: attendance counts + exact-title photo fallback ───────────────
+  const [attRes, prevPhotoRes] = await Promise.all([
+    db.from("session_attendance").select("session_id").in("session_id", sessionIds),
+
+    noPhotoTitles.length
+      ? db.from("sessions")
+          .select("title, photo_url")
+          .in("title", noPhotoTitles)
+          .lt("date", today)
+          .not("photo_url", "is", null)
+          .order("date", { ascending: false })
+          .limit(noPhotoTitles.length * 5)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  // Build exact-title photo map
+  const prevPhotoMap: Record<string, string> = {};
+  for (const r of (prevPhotoRes.data ?? [])) {
+    if (r.photo_url && !prevPhotoMap[r.title as string]) {
+      prevPhotoMap[r.title as string] = r.photo_url as string;
+    }
+  }
+
+  // ── Round 3: keyword fallback for titles still missing a photo ────────────
+  const stillMissing = noPhotoTitles.filter(t => !prevPhotoMap[t]);
+  if (stillMissing.length > 0) {
+    const kwToTitles: Record<string, string[]> = {};
+    for (const title of stillMissing) {
+      const kw = extractKeyword(title);
+      if (kw) (kwToTitles[kw] ??= []).push(title);
+    }
+    await Promise.all(
+      Object.keys(kwToTitles).map(async (kw) => {
+        const { data: kwData } = await db
+          .from("sessions")
+          .select("photo_url")
+          .ilike("title", `%${kw}%`)
+          .lt("date", today)
+          .not("photo_url", "is", null)
+          .order("date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (kwData?.photo_url) {
+          for (const title of kwToTitles[kw]) {
+            prevPhotoMap[title] = kwData.photo_url as string;
+          }
+        }
+      })
+    );
+  }
+
+  // Build attendance map
+  const attMap: Record<string, number> = {};
+  for (const r of (attRes.data ?? [])) {
+    attMap[r.session_id as string] = (attMap[r.session_id as string] ?? 0) + 1;
+  }
+
+  const result = filtered.map(s => ({
+    id:               s.id as string,
+    title:            s.title as string,
+    date:             s.date as string,
+    time:             (s.time ?? null) as string | null,
+    venue:            (s.venue ?? null) as string | null,
+    location:         s.location as string,
+    photo_url:        (s.photo_url ?? prevPhotoMap[s.title as string] ?? null) as string | null,
+    registered_count: attMap[s.id as string] ?? 0,
+  }));
+
+  return NextResponse.json({ data: result });
 }

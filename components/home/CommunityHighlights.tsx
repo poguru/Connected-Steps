@@ -577,21 +577,25 @@ export default function CommunityHighlights() {
           )}
 
           {/* ── CTA ── */}
-          <motion.a
-            href="/auth?tab=register"
+          <motion.button
+            onClick={() => {
+              const user = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
+              window.location.href = user ? "/sessions" : "/auth?tab=register";
+            }}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
             whileHover={{ scale: 1.02 }}
             style={{
               display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
-              padding: "11px 14px", borderRadius: 10,
+              padding: "11px 14px", borderRadius: 10, width: "100%",
               background: "linear-gradient(135deg, oklch(0.72 0.19 49), oklch(0.66 0.22 30))",
-              color: "#fff", fontWeight: 700, fontSize: "0.8rem", textDecoration: "none",
+              color: "#fff", fontWeight: 700, fontSize: "0.8rem",
               boxShadow: "0 4px 20px oklch(0.72 0.19 49 / 30%)",
-              minHeight: 44, /* iOS tap target */
+              minHeight: 44, border: "none", cursor: "pointer",
+              fontFamily: "var(--font-body)",
             }}
           >
             Join Next Session <ArrowRight size={13} />
-          </motion.a>
+          </motion.button>
         </div>
       </motion.div>
 
