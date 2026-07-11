@@ -116,12 +116,16 @@ export async function isAdminOrCoach(req: NextRequest): Promise<boolean> {
   const adminSession = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
   if (adminSession && verifyAdminSession(adminSession)) return true;
 
-  // 2. Raw admin password header — legacy fallback, kept for Playwright tests and scripts.
-  //    Log every use so remaining callers can be identified and migrated to session cookies.
-  const pw      = req.headers.get("x-admin-password");
-  const adminPw = process.env.ADMIN_PASSWORD;
-  if (pw && adminPw && pw.length === adminPw.length &&
-    crypto.timingSafeEqual(Buffer.from(pw), Buffer.from(adminPw))) {
+  // 2. Raw admin password header — legacy fallback for Playwright tests / server-side scripts.
+  //    When PLAYWRIGHT_SECRET is set, the header must match that value (not ADMIN_PASSWORD),
+  //    which keeps the real admin credential separate from the test credential.
+  //    Without PLAYWRIGHT_SECRET: falls back to ADMIN_PASSWORD (backward compatible).
+  const pw            = req.headers.get("x-admin-password");
+  const playwrightPw  = process.env.PLAYWRIGHT_SECRET;
+  const adminPw       = process.env.ADMIN_PASSWORD;
+  const expectedPw    = playwrightPw ?? adminPw;
+  if (pw && expectedPw && pw.length === expectedPw.length &&
+    crypto.timingSafeEqual(Buffer.from(pw), Buffer.from(expectedPw))) {
     console.warn(`[admin-auth] legacy x-admin-password used — route: ${req.nextUrl?.pathname ?? req.url}`);
     return true;
   }

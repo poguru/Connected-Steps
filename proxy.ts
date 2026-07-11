@@ -116,7 +116,8 @@ export async function proxy(request: NextRequest) {
         );
       }
 
-      if (pw !== process.env.ADMIN_PASSWORD) {
+      const expectedPw = process.env.PLAYWRIGHT_SECRET ?? process.env.ADMIN_PASSWORD;
+      if (!expectedPw || pw !== expectedPw) {
         const count = await recordFailure(key);
         console.warn(`[rate-limit] FAILED admin-password IP=${ip} path=${pathname} attempt=${count}/${MAX_FAILURES}`);
       }
