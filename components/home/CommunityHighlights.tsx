@@ -231,8 +231,8 @@ function HeroMedia({ session, onClick }: { session: Session; onClick: () => void
 // ── Session card ──────────────────────────────────────────────────────────────
 
 function SessionCard({
-  session, count, onClick,
-}: { session: Session; count: number; onClick: () => void }) {
+  session, count, onClick, isTouch,
+}: { session: Session; count: number; onClick: () => void; isTouch: boolean }) {
   const videoUrl = getVideoUrl(session);
   const imageUrl = getImageUrl(session);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -547,6 +547,7 @@ export default function CommunityHighlights() {
                       session={s}
                       count={counts[s.id] ?? 0}
                       onClick={() => openGallery(s)}
+                      isTouch={isTouch}
                     />
                   </motion.div>
                 ))}
