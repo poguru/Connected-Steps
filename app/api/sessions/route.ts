@@ -13,10 +13,10 @@ export async function GET() {
 
   const { data, error } = await db
     .from("sessions")
-    .select("id, title, date, time, venue, location")
+    .select("id, title, date, time, venue, location, photo_url")
     .gte("date", today)
     .order("date", { ascending: true })
-    .limit(10);
+    .limit(20);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -29,5 +29,5 @@ export async function GET() {
     return nowMins < sh * 60 + sm + GRACE_MINS;
   });
 
-  return NextResponse.json({ data: filtered.slice(0, 6) });
+  return NextResponse.json({ data: filtered });
 }
