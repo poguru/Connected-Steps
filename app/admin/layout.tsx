@@ -70,6 +70,14 @@ const NAV_GROUPS = [
     ],
   },
   {
+    key:   "support",
+    label: "Support",
+    icon:  "🐛",
+    links: [
+      { label: "Bug Reports", href: "/admin/bug-reports", exact: false, icon: "🐛" },
+    ],
+  },
+  {
     key:   "settings",
     label: "Settings",
     icon:  "⚙️",

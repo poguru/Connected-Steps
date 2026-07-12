@@ -194,7 +194,8 @@ export async function GET(req: NextRequest) {
             .single();
 
           const locationId   = locationRow?.location_id ?? null;
-          const locationName = (locationRow?.training_locations as { name: string } | null)?.name ?? (user.location as string | null) ?? "Connected Steps";
+          const locData = locationRow?.training_locations as { name: string }[] | undefined;
+          const locationName = locData?.[0]?.name ?? (user.location as string | null) ?? "Connected Steps";
 
           const bodyLines: string[] = [
             `🎂 Happy Birthday, ${firstName}!`,

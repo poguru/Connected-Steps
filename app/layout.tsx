@@ -3,6 +3,7 @@ import { Cormorant_Garamond, DM_Sans } from "next/font/google";
 import "./globals.css";
 import CookieBanner from "@/components/ui/CookieBanner";
 import NativeShell from "@/components/mobile/NativeShell";
+import BugReportFab from "@/components/ui/BugReportFab";
 import { ToastProvider } from "@/components/ui/ds";
 
 const cormorant = Cormorant_Garamond({
@@ -70,6 +71,7 @@ export default function RootLayout({
             {children}
           </NativeShell>
           <CookieBanner />
+          <BugReportFab />
         </ToastProvider>
       </body>
     </html>

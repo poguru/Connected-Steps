@@ -258,7 +258,7 @@ export default function PostCard({ post, currentUserEmail, onDeleted }: Props) {
               if (!stored) return;
               const me = JSON.parse(stored) as { firstName?: string; email?: string };
               const name = me.firstName ?? me.email?.split("@")[0] ?? "Someone";
-              await fetch(`/api/posts/${post.id}/comment`, {
+              await fetch(`/api/posts/${post.id}/comments`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ author_name: name, author_email: me.email ?? "", body: `Happy Birthday! 🎂🎉🏃` }),
