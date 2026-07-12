@@ -43,42 +43,7 @@ function countdown(dateStr: string, timeStr: string | null, now: Date): Cd {
   return { label: hours > 0 ? `Starts in ${days}d ${hours}h` : `Starts in ${days}d`, color: "#3b82f6", bg: "rgba(59,130,246,0.2)", isLive: false };
 }
 
-// ── Category gradient ──────────────────────────────────────────────────────────
-
-function categoryGradient(title: string): string {
-  const t = title.toLowerCase();
-  if (t.includes("recovery") || t.includes("mobility") || t.includes("yoga"))
-    return "linear-gradient(135deg, #0f2a1e 0%, #14532d 100%)";
-  if (t.includes("strength") || t.includes("conditioning"))
-    return "linear-gradient(135deg, #1e0a3a 0%, #4c1d95 100%)";
-  if (t.includes("interval") || t.includes("speed"))
-    return "linear-gradient(135deg, #2a0a0a 0%, #991b1b 100%)";
-  if (t.includes("agility") || t.includes("drill"))
-    return "linear-gradient(135deg, #141f0a 0%, #3f6212 100%)";
-  if (t.includes("endurance") || t.includes("long run"))
-    return "linear-gradient(135deg, #0d1b2a 0%, #1e3a5f 100%)";
-  if (t.includes("hill") || t.includes("trail"))
-    return "linear-gradient(135deg, #1a110a 0%, #713f12 100%)";
-  return "linear-gradient(135deg, #0d1b2a 0%, #1a2744 50%, #0f3460 100%)";
-}
-
-// ── Category emoji + difficulty config ────────────────────────────────────────
-
-function categoryEmoji(title: string): string {
-  const t = title.toLowerCase();
-  if (t.includes("trail"))        return "⛰️";
-  if (t.includes("hill"))         return "🏔️";
-  if (t.includes("speed") || t.includes("interval")) return "⚡";
-  if (t.includes("long run") || t.includes("lsd"))   return "🛣️";
-  if (t.includes("recovery"))     return "💆";
-  if (t.includes("strength") || t.includes("conditioning")) return "💪";
-  if (t.includes("mobility"))     return "🧘";
-  if (t.includes("5k"))           return "🏅";
-  if (t.includes("10k"))          return "🏅";
-  if (t.includes("half") || t.includes("hm")) return "🏆";
-  if (t.includes("full") || t.includes("marathon")) return "🏆";
-  return "🏃";
-}
+// ── Difficulty config ──────────────────────────────────────────────────────────
 
 const DIFFICULTY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   beginner:     { label: "⭐ Beginner",     color: "#4ade80", bg: "rgba(74,222,128,0.15)"  },
@@ -199,7 +164,6 @@ function SessionCard({
 }: { session: Session; onJoin: (id: string) => void; now: Date }) {
   const [hovered, setHovered] = useState(false);
   const cd = countdown(s.date, s.time, now);
-  const gradient = categoryGradient(s.title);
 
   return (
     <div
@@ -226,90 +190,30 @@ function SessionCard({
         flexDirection: "column",
       }}
     >
-      {/* ── Image ── */}
-      <div className="cs-scard-img-wrap" style={{
-        position: "relative", aspectRatio: "4/3", overflow: "hidden", flexShrink: 0, background: gradient,
-      }}>
-        {s.photo_url ? (
-          <>
-            {/* Blurred background fill for non-cover areas */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={s.photo_url}
-              alt=""
-              aria-hidden
-              loading="lazy"
-              style={{
-                position: "absolute", inset: 0,
-                width: "100%", height: "100%",
-                objectFit: "cover",
-                filter: "blur(18px)",
-                transform: "scale(1.15)",
-                opacity: 0.55,
-              }}
-            />
-            {/* Full image — no cropping */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={s.photo_url}
-              alt={s.title}
-              loading="lazy"
-              style={{
-                position: "absolute", inset: 0,
-                width: "100%", height: "100%",
-                objectFit: "contain",
-                display: "block",
-                transition: "transform 0.5s ease",
-                transform: hovered ? "scale(1.06)" : "scale(1)",
-              }}
-            />
-          </>
-        ) : (
-          <div style={{
-            position: "absolute", inset: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "3.5rem", opacity: 0.35, userSelect: "none",
-          }}>
-            {categoryEmoji(s.title)}
-          </div>
-        )}
-
-        {/* Gradient overlay */}
-        <div style={{
-          position: "absolute", inset: 0, pointerEvents: "none",
-          background: "linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 45%, rgba(0,0,0,0.7) 100%)",
-        }} />
-
-        {/* Top badge row */}
-        <div style={{ position: "absolute", top: 9, left: 9, right: 9, display: "flex", alignItems: "center", gap: 5 }}>
-          <span style={{
-            fontSize: 9, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase",
-            padding: "3px 8px", borderRadius: 999,
-            background: "rgba(232,98,10,0.22)", color: "#e8620a",
-            backdropFilter: "blur(8px)", border: "1px solid rgba(232,98,10,0.44)",
-          }}>
-            Session
-          </span>
-          <span style={{ flex: 1 }} />
-          {/* Countdown */}
-          <span style={{
-            fontSize: 9, fontWeight: 700, padding: "3px 9px", borderRadius: 999,
-            background: cd.isLive ? cd.bg : "rgba(0,0,0,0.6)",
-            color: cd.color,
-            backdropFilter: "blur(8px)",
-            border: `1px solid ${cd.color}55`,
-            display: "flex", alignItems: "center", gap: 3,
-          }}>
-            {cd.isLive && (
-              <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#4ade80", display: "inline-block", flexShrink: 0, animation: "pulse-ring 2s infinite" }} />
-            )}
-            {cd.label}
-          </span>
-        </div>
+      {/* ── Badge row ── */}
+      <div style={{ padding: "11px 13px 0", display: "flex", alignItems: "center", gap: 5 }}>
+        <span style={{
+          fontSize: 9, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase",
+          padding: "3px 8px", borderRadius: 999,
+          background: "rgba(232,98,10,0.22)", color: "#e8620a",
+          border: "1px solid rgba(232,98,10,0.44)",
+        }}>
+          Session
+        </span>
+        <span style={{ flex: 1 }} />
+        <span style={{
+          fontSize: 9, fontWeight: 700, padding: "3px 9px", borderRadius: 999,
+          background: cd.isLive ? cd.bg : "rgba(255,255,255,0.08)",
+          color: cd.color, border: `1px solid ${cd.color}55`,
+          display: "flex", alignItems: "center", gap: 3,
+        }}>
+          {cd.isLive && <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#4ade80", display: "inline-block", flexShrink: 0, animation: "pulse-ring 2s infinite" }} />}
+          {cd.label}
+        </span>
       </div>
 
       {/* ── Content ── */}
-      <div style={{ padding: "13px 15px 15px", flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ padding: "9px 13px 13px", flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={{ fontSize: "0.93rem", fontWeight: 700, color: "var(--foreground)", lineHeight: 1.3 }}>
           {s.title}
         </div>

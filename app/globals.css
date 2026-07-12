@@ -509,19 +509,6 @@ select.auth-input option {
   .us-view-links     { display: none; }
 }
 
-/* ─── Session card images: blur-fill + contain ──────── */
-/* Background layer: cover+blur fills empty space.
-   Foreground layer: contain shows full image uncropped. */
-@media (max-width: 860px) {
-  .cs-scard-img-wrap {
-    height: auto !important;
-    aspect-ratio: 4 / 3;
-  }
-  .cs-scard-img {
-    transform: none !important;
-  }
-}
-
 /* ─── Training Plans carousel ───────────────────────── */
 .tp-desktop-grid {
   display: grid;
@@ -1737,35 +1724,28 @@ select.auth-input option {
 }
 
 /* Cards strip: 3-col grid on desktop, snap-slide carousel on mobile */
+/* Always a horizontal sliding carousel */
 .cs-ch-cards-strip {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 4px;
 }
-@media (max-width: 640px) {
-  .cs-ch-cards-strip {
-    display: flex;
-    gap: 10px;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding-bottom: 4px;
-    /* No negative margins — strip stays within container bounds,
-       preventing page-level horizontal overflow on iOS Safari */
-  }
-  .cs-ch-cards-strip::-webkit-scrollbar { display: none; }
-}
+.cs-ch-cards-strip::-webkit-scrollbar { display: none; }
 
 /* Each card wrapper */
 .cs-ch-card-item {
-  min-width: 0; /* prevent grid blowout */
+  flex-shrink: 0;
+  width: 260px;
+  scroll-snap-align: start;
 }
 @media (max-width: 640px) {
   .cs-ch-card-item {
-    flex-shrink: 0;
-    width: 100%;          /* one full card per slide */
-    scroll-snap-align: start;
+    width: 85vw;
+    max-width: 320px;
   }
 }
 

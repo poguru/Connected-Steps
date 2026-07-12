@@ -116,36 +116,10 @@ function slotsLeft(max: number | null, current: number): number | null {
   return Math.max(0, max - current);
 }
 
-function categoryEmoji(title: string): string {
-  const t = title.toLowerCase();
-  if (t.includes("trail"))        return "⛰️";
-  if (t.includes("hill"))         return "🏔️";
-  if (t.includes("speed") || t.includes("interval")) return "⚡";
-  if (t.includes("long run") || t.includes("lsd"))   return "🛣️";
-  if (t.includes("recovery"))     return "💆";
-  if (t.includes("strength") || t.includes("conditioning")) return "💪";
-  if (t.includes("mobility"))     return "🧘";
-  if (t.includes("5k"))           return "🏅";
-  if (t.includes("10k"))          return "🏅";
-  if (t.includes("half") || t.includes("hm")) return "🏆";
-  if (t.includes("full") || t.includes("marathon")) return "🏆";
-  return "🏃";
-}
-
 const DIFFICULTY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   beginner:     { label: "⭐ Beginner",     color: "#4ade80", bg: "rgba(74,222,128,0.15)"  },
   intermediate: { label: "🔥 Intermediate", color: "#fb923c", bg: "rgba(251,146,60,0.15)"  },
   advanced:     { label: "💪 Advanced",     color: "#f43f5e", bg: "rgba(244,63,94,0.15)"   },
-};
-
-const SESSION_GRADIENT = "linear-gradient(135deg, #0d1b2a 0%, #1a2744 50%, #0f3460 100%)";
-const EVENT_GRADIENTS: Record<string, string> = {
-  running:   "linear-gradient(135deg, #7c2d12 0%, #9a3412 100%)",
-  race:      "linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%)",
-  training:  "linear-gradient(135deg, #3b0764 0%, #4c1d95 100%)",
-  workshop:  "linear-gradient(135deg, #422006 0%, #713f12 100%)",
-  community: "linear-gradient(135deg, #14532d 0%, #166534 100%)",
-  cycling:   "linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%)",
 };
 
 // ── Card ──────────────────────────────────────────────────────────────────────
@@ -153,11 +127,6 @@ const EVENT_GRADIENTS: Record<string, string> = {
 function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (item: Item) => void }) {
   const [hovered, setHovered] = useState(false);
   const cd = countdown(item.date, item.time, now);
-
-  const imageUrl = item.kind === "session" ? item.photo_url : item.cover_image;
-  const bg       = imageUrl ? undefined
-    : item.kind === "session" ? SESSION_GRADIENT
-    : (EVENT_GRADIENTS[item.event_type] ?? EVENT_GRADIENTS.running);
 
   const slots  = item.kind === "event" ? slotsLeft(item.max_participants, item.participant_count) : null;
   const isFull = slots !== null && slots === 0;
@@ -198,154 +167,59 @@ function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (i
         minWidth: 0,
       }}
     >
-      {/* ── Image ──────────────────────────────────────────────────────────── */}
-      <div className="cs-scard-img-wrap" style={{
-        position: "relative", aspectRatio: "4/3", overflow: "hidden", flexShrink: 0, background: bg,
-      }}>
-        {imageUrl ? (
-          <>
-            {/* Blurred background fill for non-cover areas */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={imageUrl}
-              alt=""
-              aria-hidden
-              loading="lazy"
-              style={{
-                position: "absolute", inset: 0,
-                width: "100%", height: "100%",
-                objectFit: "cover",
-                filter: "blur(18px)",
-                transform: "scale(1.15)",
-                opacity: 0.55,
-              }}
-            />
-            {/* Full image — no cropping */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={imageUrl}
-              alt={item.title}
-              loading="lazy"
-              style={{
-                position: "absolute", inset: 0,
-                width: "100%", height: "100%",
-                objectFit: "contain",
-                display: "block",
-                transition: "transform 0.5s ease",
-                transform: hovered ? "scale(1.06)" : "scale(1)",
-              }}
-            />
-          </>
-        ) : item.kind === "session" && (
-          <div style={{
-            position: "absolute", inset: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "3.5rem", opacity: 0.35, userSelect: "none",
-          }}>
-            {categoryEmoji(item.title)}
-          </div>
-        )}
-
-        {/* Gradient overlay — dark top + dark bottom for badge readability */}
-        <div style={{
-          position: "absolute", inset: 0, pointerEvents: "none",
-          background: "linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 40%, rgba(0,0,0,0.72) 100%)",
-        }} />
-
-        {/* ── Top badges row ── */}
-        <div style={{
-          position: "absolute", top: 9, left: 9, right: 9,
-          display: "flex", alignItems: "center", gap: 5,
+      {/* ── Badge row ── */}
+      <div style={{ padding: "11px 13px 0", display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+        <span style={{
+          fontSize: 9, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase",
+          padding: "3px 8px", borderRadius: 999, background: typeBg, color: typeColor,
+          border: `1px solid ${typeColor}44`,
         }}>
-          {/* Type */}
+          {typeLabel}
+        </span>
+        {item.kind === "event" && (
           <span style={{
-            fontSize: 9, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase",
-            padding: "3px 8px", borderRadius: 999,
-            background: typeBg, color: typeColor,
-            backdropFilter: "blur(8px)", border: `1px solid ${typeColor}44`,
+            fontSize: 9, fontWeight: 800, padding: "3px 8px", borderRadius: 999,
+            background: isFree ? "rgba(34,197,94,0.18)" : "rgba(255,255,255,0.1)",
+            color: isFree ? "#22c55e" : "rgba(255,255,255,0.8)",
           }}>
-            {typeLabel}
+            {isFree ? "Free" : `₹${item.price}`}
           </span>
-
-          {/* Free / Price (events only) */}
-          {item.kind === "event" && (
-            <span style={{
-              fontSize: 9, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase",
-              padding: "3px 8px", borderRadius: 999,
-              background: isFree ? "rgba(34,197,94,0.18)" : "rgba(255,255,255,0.1)",
-              color: isFree ? "#22c55e" : "rgba(255,255,255,0.8)",
-              backdropFilter: "blur(8px)",
-            }}>
-              {isFree ? "Free" : `₹${item.price}`}
-            </span>
-          )}
-
-          {/* Spacer */}
-          <span style={{ flex: 1 }} />
-
-          {/* Countdown badge */}
-          <span style={{
-            fontSize: 9, fontWeight: 700, padding: "3px 9px", borderRadius: 999,
-            background: cd.isLive ? cd.bg : "rgba(0,0,0,0.6)",
-            color: cd.color,
-            backdropFilter: "blur(8px)",
-            border: `1px solid ${cd.color}55`,
-            display: "flex", alignItems: "center", gap: 3,
-            animation: cd.isLive ? "pulse-ring 2s infinite" : "none",
-          }}>
-            {cd.isLive && (
-              <span style={{
-                width: 5, height: 5, borderRadius: "50%",
-                background: "#4ade80", display: "inline-block", flexShrink: 0,
-              }} />
-            )}
-            {cd.label}
-          </span>
-        </div>
-
-        {/* ── Registered badge (bottom-left of image) ── */}
+        )}
         {item.registered && (
-          <div style={{
-            position: "absolute", bottom: 9, left: 9,
-            display: "flex", alignItems: "center", gap: 4,
+          <span style={{
             fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 999,
             background: "rgba(34,197,94,0.22)", color: "#4ade80",
-            backdropFilter: "blur(8px)", border: "1px solid rgba(34,197,94,0.3)",
+            border: "1px solid rgba(34,197,94,0.3)",
+            display: "flex", alignItems: "center", gap: 3,
           }}>
-            <CheckCircle2 size={9} /> Registered
-          </div>
+            <CheckCircle2 size={9} /> Reg&apos;d
+          </span>
         )}
-
-        {/* ── Slots low ── */}
         {isLow && !isFull && !item.registered && (
-          <div style={{
-            position: "absolute", bottom: 9, left: 9,
-            fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 999,
-            background: "rgba(239,68,68,0.85)", color: "#fff",
-          }}>
-            {slots} slots left
-          </div>
+          <span style={{ fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 999, background: "rgba(239,68,68,0.85)", color: "#fff" }}>
+            {slots} left
+          </span>
         )}
-
-        {/* ── Sold out overlay ── */}
         {isFull && (
-          <div style={{
-            position: "absolute", inset: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            background: "rgba(0,0,0,0.55)", backdropFilter: "blur(2px)",
-          }}>
-            <span style={{
-              fontSize: 13, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase",
-              padding: "6px 16px", borderRadius: 999, background: "rgba(239,68,68,0.9)", color: "#fff",
-            }}>
-              Full
-            </span>
-          </div>
+          <span style={{ fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 999, background: "rgba(239,68,68,0.9)", color: "#fff" }}>
+            Full
+          </span>
         )}
+        <span style={{ flex: 1 }} />
+        <span style={{
+          fontSize: 9, fontWeight: 700, padding: "3px 9px", borderRadius: 999,
+          background: cd.isLive ? cd.bg : "rgba(255,255,255,0.08)",
+          color: cd.color, border: `1px solid ${cd.color}55`,
+          display: "flex", alignItems: "center", gap: 3,
+          animation: cd.isLive ? "pulse-ring 2s infinite" : "none",
+        }}>
+          {cd.isLive && <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#4ade80", display: "inline-block", flexShrink: 0 }} />}
+          {cd.label}
+        </span>
       </div>
 
       {/* ── Content ────────────────────────────────────────────────────────── */}
-      <div style={{ padding: "12px 14px 14px", flex: 1, display: "flex", flexDirection: "column", gap: 7 }}>
+      <div style={{ padding: "9px 13px 13px", flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
 
         {/* Title */}
         <div style={{
