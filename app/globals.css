@@ -509,10 +509,9 @@ select.auth-input option {
   .us-view-links     { display: none; }
 }
 
-/* ─── Session card images: blurred-bg technique ─────── */
-/* Both layers are position:absolute inset:0.
-   Mobile gets an aspect-ratio wrapper so portrait photos
-   don't make cards excessively tall. */
+/* ─── Session card images: blur-fill + contain ──────── */
+/* Background layer: cover+blur fills empty space.
+   Foreground layer: contain shows full image uncropped. */
 @media (max-width: 860px) {
   .cs-scard-img-wrap {
     height: auto !important;
