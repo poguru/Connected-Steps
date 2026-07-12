@@ -46,6 +46,7 @@ jest.mock("@/lib/job-queue", () => ({ enqueueJob: jest.fn().mockResolvedValue("j
 import { NextRequest }       from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { enqueueJob }        from "@/lib/job-queue";
+import { makeAdminHeaders, adminCookieHeader } from "@/__tests__/helpers/admin-auth";
 
 const mockGetSupabaseServer = getSupabaseServer as jest.Mock;
 const mockEnqueueJob        = enqueueJob        as jest.Mock;
@@ -127,7 +128,7 @@ function makeAdminDb(opts: {
 }
 
 function makeReq(url: string): NextRequest {
-  return new NextRequest(url, { headers: { "x-admin-password": "test-admin" } });
+  return new NextRequest(url, { headers: makeAdminHeaders() });
 }
 
 beforeEach(() => { jest.clearAllMocks(); });
@@ -301,7 +302,7 @@ describe("POST /api/admin/export", () => {
 
     const req = new NextRequest("http://localhost/api/admin/export", {
       method:  "POST",
-      headers: { "Content-Type": "application/json", "x-admin-password": "test-admin" },
+      headers: { "Content-Type": "application/json", ...makeAdminHeaders() },
       body:    JSON.stringify({ dataset: "memberships", format: "csv" }),
     });
     const res  = await POST(req);
@@ -324,7 +325,7 @@ describe("POST /api/admin/export", () => {
 
     const req = new NextRequest("http://localhost/api/admin/export", {
       method:  "POST",
-      headers: { "Content-Type": "application/json", "x-admin-password": "test-admin" },
+      headers: { "Content-Type": "application/json", ...makeAdminHeaders() },
       body:    JSON.stringify({ dataset: "hacker_table", format: "csv" }),
     });
     const res = await POST(req);

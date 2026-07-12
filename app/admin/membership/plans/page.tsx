@@ -14,6 +14,7 @@ interface Plan {
   currency:        string;
   billing_label:   string | null;
   razorpay_plan:   string | null;
+  duration_months: number | null;
   features:        string[];
   cta_label:       string;
   cta_href:        string | null;
@@ -28,7 +29,7 @@ interface Plan {
 const BLANK: Omit<Plan, "id"> = {
   name: "", slug: "", tagline: "", description: "",
   price: null, currency: "INR", billing_label: "per month",
-  razorpay_plan: null,
+  razorpay_plan: null, duration_months: null,
   features: [],
   cta_label: "Get Started", cta_href: null,
   is_active: true, is_featured: false, is_contact_only: false,
@@ -235,10 +236,10 @@ export default function MembershipPlansAdminPage() {
                 <textarea rows={3} style={{ ...inp, resize: "vertical" as const }} value={form.description ?? ""} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Short paragraph shown on the pricing card…" />
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12 }}>
                 <div>
                   <Label>Price (₹)</Label>
-                  <input type="number" style={inp} value={form.price ?? ""} onChange={e => setForm(f => ({ ...f, price: e.target.value === "" ? null : Number(e.target.value) }))} placeholder="1499 (leave blank for Contact Us)" />
+                  <input type="number" style={inp} value={form.price ?? ""} onChange={e => setForm(f => ({ ...f, price: e.target.value === "" ? null : Number(e.target.value) }))} placeholder="1200" />
                 </div>
                 <div>
                   <Label>Billing Label</Label>
@@ -247,6 +248,10 @@ export default function MembershipPlansAdminPage() {
                 <div>
                   <Label>Razorpay Plan Key</Label>
                   <input style={inp} value={form.razorpay_plan ?? ""} onChange={e => setForm(f => ({ ...f, razorpay_plan: e.target.value || null }))} placeholder="monthly" />
+                </div>
+                <div>
+                  <Label>Duration (months)</Label>
+                  <input type="number" min={1} style={inp} value={form.duration_months ?? ""} onChange={e => setForm(f => ({ ...f, duration_months: e.target.value === "" ? null : Number(e.target.value) }))} placeholder="1" />
                 </div>
               </div>
 

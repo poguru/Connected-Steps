@@ -94,12 +94,13 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
       phone_verified: rest.phone_verified ?? false,
     };
     localStorage.setItem("cs_user", JSON.stringify(userData));
+    // Keep cs_user_token in localStorage during Phase 1 transition (90 days).
+    // NativeShell uses it for fast offline session checks on Capacitor.
+    // The server now sets cs_user_session as an httpOnly cookie (the real auth).
+    // cs_auth (non-httpOnly, JS-readable) is intentionally NOT set — the server
+    // sets the httpOnly cookie instead.
     if (userToken)  localStorage.setItem("cs_user_token",  userToken  as string);
     if (coachToken) localStorage.setItem("cs_coach_token", coachToken as string);
-    if (userToken) {
-      const secure = window.location.protocol === "https:" ? "; Secure" : "";
-      document.cookie = `cs_auth=${userToken as string}; path=/; max-age=7776000; SameSite=Lax${secure}`;
-    }
     // Set flag for PhoneVerifyBanner if phone is unverified
     if (requiresPhoneVerification) {
       localStorage.setItem("cs_requires_phone_verification", "true");

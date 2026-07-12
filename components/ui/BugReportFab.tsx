@@ -94,7 +94,7 @@ function DarkSelect({ value, onChange, options }: {
 // Flag icon SVG
 function FlagIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
       <line x1="4" y1="22" x2="4" y2="15" />
     </svg>
@@ -165,41 +165,51 @@ export default function BugReportFab() {
   return (
     <>
       {/* ── Floating trigger button ─────────────────────────────────────────── */}
+      {/* Positioned bottom-left to avoid overlapping the WhatsApp/Instagram
+          cluster (FloatingContact) which lives at bottom-right. */}
       <button
         onClick={() => setOpen(true)}
-        aria-label="Report a bug or issue"
+        aria-label="Report an issue"
         className="cs-bug-fab"
         style={{
           position: "fixed",
-          bottom: 24,
-          right: 24,
+          bottom: "calc(env(safe-area-inset-bottom) + 20px)",
+          left: 16,
           zIndex: 9990,
-          width: 44,
-          height: 44,
-          borderRadius: "50%",
-          background: "rgba(15,15,15,0.92)",
-          border: "1px solid rgba(255,255,255,0.12)",
-          backdropFilter: "blur(12px)",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+          height: 38,
+          paddingLeft: 12,
+          paddingRight: 16,
+          borderRadius: 999,
+          background: "rgba(15,15,15,0.9)",
+          border: "1px solid rgba(255,255,255,0.14)",
+          backdropFilter: "blur(14px)",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.45)",
           cursor: "pointer",
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
+          gap: 7,
           color: "#aaa",
-          transition: "transform 0.2s, box-shadow 0.2s, color 0.2s",
+          fontSize: "0.78rem",
+          fontWeight: 500,
+          fontFamily: "inherit",
+          whiteSpace: "nowrap",
+          transition: "transform 0.18s, color 0.18s, box-shadow 0.18s",
         }}
         onMouseEnter={e => {
           const b = e.currentTarget as HTMLButtonElement;
-          b.style.transform = "scale(1.08)";
+          b.style.transform = "scale(1.05)";
           b.style.color = "#fff";
+          b.style.boxShadow = "0 6px 22px rgba(0,0,0,0.55)";
         }}
         onMouseLeave={e => {
           const b = e.currentTarget as HTMLButtonElement;
           b.style.transform = "scale(1)";
           b.style.color = "#aaa";
+          b.style.boxShadow = "0 4px 16px rgba(0,0,0,0.45)";
         }}
       >
         <FlagIcon />
+        Report an issue
       </button>
 
       {/* ── Modal ──────────────────────────────────────────────────────────── */}

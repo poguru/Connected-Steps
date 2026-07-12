@@ -10,6 +10,7 @@ import { POST } from "@/app/api/admin/sessions/[id]/sync/route";
 import { NextRequest } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { recalculateMonth } from "@/lib/recalculate-leaderboard";
+import { makeAdminHeaders } from "@/__tests__/helpers/admin-auth";
 
 const mockGetSupabaseServer = getSupabaseServer as jest.Mock;
 const mockRecalculateMonth  = recalculateMonth  as jest.Mock;
@@ -20,7 +21,7 @@ const SESSION_MONTH = "2026-06";
 function makeRequest(): NextRequest {
   return new NextRequest(
     new URL(`http://localhost/api/admin/sessions/${SESSION_ID}/sync`),
-    { method: "POST", headers: { "x-admin-password": "test-admin-password" } }
+    { method: "POST", headers: makeAdminHeaders() }
   );
 }
 

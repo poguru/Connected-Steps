@@ -20,13 +20,15 @@ export function getStoredToken(): string {
 }
 
 /**
- * Call when any protected API returns 401.
- * Clears the stale token, saves the return path, and redirects to login.
+ * Clears all client-side auth storage and server cookie, then redirects to login.
+ * Call when any protected API returns 401 or when the session must be invalidated.
  */
 export function handleAuthExpiry(returnPath: string): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem("cs_user_token");
   // Keep cs_user so form fields can be pre-filled after re-login
   sessionStorage.setItem("cs_post_login_redirect", returnPath);
+  // Clear the httpOnly session cookie server-side (fire-and-forget)
+  fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
   window.location.href = "/auth?tab=login";
 }

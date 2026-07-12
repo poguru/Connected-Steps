@@ -59,12 +59,35 @@ setup("authenticate as standard user", async ({ page }) => {
 });
 
 // ── Admin auth state ──────────────────────────────────────────────────────────
-// Admin routes use x-admin-password header (via playwright.config.ts extraHTTPHeaders).
-// Only an empty storage state file is needed here.
-setup("create admin auth state", async ({}) => {
+// Authenticates via /api/admin/auth to obtain the httpOnly cs_admin_session
+// cookie, then saves the browser storage state so admin Playwright specs
+// run with a valid session (no raw-password header).
+setup("create admin auth state", async ({ page }) => {
   if (!ENV.ADMIN_PASSWORD) {
     console.warn("⚠️  ADMIN_PASSWORD not set — admin tests will return 401");
+    fs.writeFileSync(ADMIN_AUTH_FILE, JSON.stringify({ cookies: [], origins: [] }));
+    return;
   }
-  fs.writeFileSync(ADMIN_AUTH_FILE, JSON.stringify({ cookies: [], origins: [] }));
-  console.log("✅ Admin auth state written (header-based auth)");
+
+  await page.goto(ENV.BASE_URL + "/admin/login");
+  await page.waitForLoadState("domcontentloaded");
+
+  // Call the admin auth API from the browser context so the httpOnly cookie
+  // is stored in the page's cookie jar and captured by storageState().
+  const status = await page.evaluate(async ({ baseUrl, password }: { baseUrl: string; password: string }) => {
+    const res = await fetch(`${baseUrl}/api/admin/auth`, {
+      method:      "POST",
+      headers:     { "Content-Type": "application/json" },
+      credentials: "include",
+      body:        JSON.stringify({ password }),
+    });
+    return res.status;
+  }, { baseUrl: ENV.BASE_URL, password: ENV.ADMIN_PASSWORD });
+
+  if (status !== 200) {
+    throw new Error(`Admin login failed (status ${status}) — check ADMIN_PASSWORD in .env.test`);
+  }
+
+  await page.context().storageState({ path: ADMIN_AUTH_FILE });
+  console.log("✅ Admin auth state written (session cookie)");
 });

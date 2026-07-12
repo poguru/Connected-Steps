@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { signCoachToken, signUserToken } from "@/lib/admin-auth";
+import { signCoachToken, signUserToken, USER_SESSION_COOKIE, USER_TOKEN_TTL } from "@/lib/admin-auth";
 import { isRateLimited, recordFailure, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
   // We do NOT block login — existing users must not be locked out.
   const requiresPhoneVerification = !phoneVerified;
 
-  return NextResponse.json({
+  const res = NextResponse.json({
     success: true,
     requiresPhoneVerification,
     user: {
@@ -85,4 +85,17 @@ export async function POST(req: NextRequest) {
       userToken,
     },
   });
+
+  // Set httpOnly session cookie — this is the secure token going forward.
+  // The client still receives userToken in the body for the 90-day transition
+  // period while NativeShell / old fetch calls migrate to cookie-based auth.
+  res.cookies.set(USER_SESSION_COOKIE, userToken, {
+    httpOnly: true,
+    secure:   process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path:     "/",
+    maxAge:   USER_TOKEN_TTL,
+  });
+
+  return res;
 }

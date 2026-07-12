@@ -29,6 +29,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail }          from "@/lib/notify";
 import { handleEventQrEmail } from "@/lib/job-handlers";
 import { NextRequest }        from "next/server";
+import { makeAdminHeaders }   from "@/__tests__/helpers/admin-auth";
 
 const mockGetSupabaseServer  = getSupabaseServer  as jest.Mock;
 const mockSendEmail          = sendEmail          as jest.Mock;
@@ -82,7 +83,7 @@ function makeAuditDb(rows1: unknown[], rows2: unknown[], rows3: unknown[]) {
 function makeAdminReq(body: unknown): NextRequest {
   return new NextRequest("http://localhost/x", {
     method:  "POST",
-    headers: { "Content-Type": "application/json", "x-admin-password": "test-admin" },
+    headers: { "Content-Type": "application/json", ...makeAdminHeaders() },
     body:    JSON.stringify(body),
   });
 }

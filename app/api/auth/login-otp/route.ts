@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { signCoachToken, signUserToken } from "@/lib/admin-auth";
+import { signCoachToken, signUserToken, USER_SESSION_COOKIE, USER_TOKEN_TTL } from "@/lib/admin-auth";
 
 // POST /api/auth/login-otp
 // Body: { identifier: string, code: string }
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     const coachToken = role === "coach" ? signCoachToken(user.email) : undefined;
     const userToken  = signUserToken(user.email);
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       success: true,
       user: {
         firstName:  user.first_name,
@@ -69,6 +69,16 @@ export async function POST(req: NextRequest) {
         userToken,
       },
     });
+
+    res.cookies.set(USER_SESSION_COOKIE, userToken, {
+      httpOnly: true,
+      secure:   process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path:     "/",
+      maxAge:   USER_TOKEN_TTL,
+    });
+
+    return res;
   } catch (e: unknown) {
     console.error("[login-otp] unhandled error:", e);
     return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 });

@@ -48,16 +48,13 @@ export default defineConfig({
       dependencies: ["setup"],
     },
 
-    // ── 2. Admin tests — x-admin-password header on every request ──────────
+    // ── 2. Admin tests — session cookie set by global.setup.ts ───────────────
     {
       name: "admin",
       testMatch: /admin\/.+\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
         storageState: "playwright/.auth/admin.json",
-        extraHTTPHeaders: {
-          "x-admin-password": process.env.ADMIN_PASSWORD ?? "",
-        },
       },
       dependencies: ["setup"],
     },

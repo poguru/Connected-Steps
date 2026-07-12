@@ -11,6 +11,7 @@ import { deletePostWithCleanup } from "@/lib/delete-post";
 import { DELETE } from "@/app/api/admin/posts/[id]/route";
 import { NextRequest } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { makeAdminHeaders } from "@/__tests__/helpers/admin-auth";
 
 const mockGetSupabaseServer = getSupabaseServer as jest.Mock;
 
@@ -21,7 +22,7 @@ const PHOTO_URL = `https://project.supabase.co/storage/v1/object/public/user-pos
 function makeAdminRequest(): NextRequest {
   return new NextRequest(
     new URL(`http://localhost/api/admin/posts/${POST_ID}`),
-    { headers: { "x-admin-password": "test-admin-password" } }
+    { headers: makeAdminHeaders() }
   );
 }
 

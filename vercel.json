@@ -1,6 +1,6 @@
 {
   "functions": {
-    "app/api/cron/*.ts":                                                    { "maxDuration": 300 },
+    "app/api/cron/**/route.ts":                                              { "maxDuration": 300 },
     "app/api/cron/slot-expiry/route.ts":                                    { "maxDuration": 30  },
     "app/api/admin/events/[id]/communicate/send-next/route.ts":             { "maxDuration": 15  },
     "app/api/admin/events/[id]/communicate/status/route.ts":                { "maxDuration": 10  },

@@ -105,7 +105,8 @@ export default function NativeShell({ children }: { children: React.ReactNode })
       localStorage.removeItem("cs_user");
       localStorage.removeItem("cs_user_token");
       localStorage.removeItem("cs_strava");
-      document.cookie = "cs_auth=; path=/; max-age=0; SameSite=Lax";
+      // Clear the httpOnly session cookie server-side (fire-and-forget)
+      fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
       if (path !== "/auth") router.replace("/auth");
     }
 
@@ -125,16 +126,30 @@ export default function NativeShell({ children }: { children: React.ReactNode })
       }
       // No cookie re-stamp needed — the server sets cs_coach_session.
     } else if (user && isTokenValid(token)) {
-      // ── Regular user session ───────────────────────────────────────────────
-      // Valid JWT in localStorage — re-stamp the cookie in case the WebView
-      // cleared it under memory pressure.
-      const secure = location.protocol === "https:" ? "; Secure" : "";
-      document.cookie = `cs_auth=${token}; path=/; max-age=7776000; SameSite=Lax${secure}`;
+      // ── Regular user session (Phase 1 transition: token still in localStorage) ──
+      // Valid token in localStorage means this is an existing session.
+      // cs_auth (non-httpOnly) is no longer stamped here — the server sets
+      // cs_user_session (httpOnly) at login time instead.
       if (path === "/" || path === "/auth" || path === "") {
         router.replace(getHomeForRole());
       }
+    } else if (user && !token) {
+      // ── New-style session (Phase 2 and beyond: token only in httpOnly cookie) ──
+      // Can't read the httpOnly cookie directly, so ask the server.
+      void (async () => {
+        try {
+          const r = await fetch("/api/auth/me");
+          if (r.ok) {
+            if (path === "/" || path === "/auth" || path === "") {
+              router.replace(getHomeForRole());
+            }
+            return;
+          }
+        } catch { /* network error — let next API call handle redirect */ }
+        clearAuthAndRedirect();
+      })();
     } else if (user) {
-      // User data present but token expired or missing → real expired session
+      // User profile present but token expired → real expired session
       clearAuthAndRedirect();
     } else {
       // Unauthenticated → only allow public routes
@@ -142,7 +157,7 @@ export default function NativeShell({ children }: { children: React.ReactNode })
       if (!isPublic) router.replace("/auth");
     }
 
-    // ── Resume listener: re-check token when app comes back to foreground ──
+    // ── Resume listener: re-check session when app comes back to foreground ──
     const resumePromise = App.addListener("resume", () => {
       const storedUser = localStorage.getItem("cs_user");
       let resumeRole: string | null = null;
@@ -154,12 +169,26 @@ export default function NativeShell({ children }: { children: React.ReactNode })
       const t   = localStorage.getItem("cs_user_token");
       const p   = window.location.pathname;
       const pub = PUBLIC_PREFIX.some(pre => p === pre || p.startsWith(pre + "/"));
-      if (!pub && !isTokenValid(t)) {
-        localStorage.removeItem("cs_user");
-        localStorage.removeItem("cs_user_token");
-        localStorage.removeItem("cs_strava");
-        document.cookie = "cs_auth=; path=/; max-age=0; SameSite=Lax";
-        routerRef.current.replace("/auth");
+
+      if (t) {
+        // Phase 1: legacy localStorage token — fast offline check
+        if (!pub && !isTokenValid(t)) {
+          localStorage.removeItem("cs_user");
+          localStorage.removeItem("cs_user_token");
+          localStorage.removeItem("cs_strava");
+          fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+          routerRef.current.replace("/auth");
+        }
+      } else if (!pub && storedUser) {
+        // Phase 2+: no localStorage token — validate via cookie (network check)
+        void fetch("/api/auth/me").then(r => {
+          if (!r.ok) {
+            localStorage.removeItem("cs_user");
+            localStorage.removeItem("cs_strava");
+            fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+            routerRef.current.replace("/auth");
+          }
+        }).catch(() => { /* network error — next API call will handle 401 */ });
       }
     });
 

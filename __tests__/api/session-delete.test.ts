@@ -10,6 +10,7 @@ jest.mock("@/lib/supabase-server", () => ({
 import { DELETE } from "@/app/api/admin/sessions/[id]/route";
 import { NextRequest } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { makeAdminHeaders } from "@/__tests__/helpers/admin-auth";
 
 const mockGetSupabaseServer = getSupabaseServer as jest.Mock;
 
@@ -18,7 +19,7 @@ const SESSION_ID = "session-abc-123";
 function makeRequest(): NextRequest {
   return new NextRequest(
     new URL(`http://localhost/api/admin/sessions/${SESSION_ID}`),
-    { headers: { "x-admin-password": "test-admin-password" } }
+    { headers: makeAdminHeaders() }
   );
 }
 

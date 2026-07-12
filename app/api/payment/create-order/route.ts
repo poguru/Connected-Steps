@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import Razorpay from "razorpay";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { redeemCoupon } from "@/lib/coupon-redeem";
@@ -11,14 +11,6 @@ function getRazorpay() {
   return new Razorpay({ key_id, key_secret });
 }
 
-// Amount in paise (INR Ã— 100)
-const PLAN_AMOUNTS: Record<string, number> = {
-  monthly:   120000,
-  quarterly: 300000,
-  biannual:  600000,
-  annual:   1080000,
-};
-
 function applyDiscount(amount: number, type: string, value: number): number {
   if (type === "percent") return Math.max(100, Math.round(amount * (1 - value / 100)));
   if (type === "fixed")   return Math.max(100, amount - value * 100);
@@ -30,17 +22,27 @@ export async function POST(req: NextRequest) {
   if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { plan, coupon_id } = await req.json();
+  if (!plan) return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
 
-  if (!plan || !PLAN_AMOUNTS[plan]) {
+  // Resolve plan amount from DB — source of truth for pricing.
+  // price is stored in rupees; convert to paise for Razorpay.
+  const db = getSupabaseServer();
+  const { data: planRow } = await db
+    .from("membership_plans")
+    .select("price")
+    .eq("razorpay_plan", plan)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (!planRow?.price) {
     return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
   }
 
-  const originalAmount = PLAN_AMOUNTS[plan];
+  const originalAmount = Math.round(Number(planRow.price) * 100); // rupees → paise
   let amount           = originalAmount;
   let discountApplied  = 0;
 
   if (coupon_id) {
-    const db = getSupabaseServer();
     const { data: coupon } = await db
       .from("coupons")
       .select("id, discount_type, discount_value, expires_at, use_count, max_uses")
@@ -52,7 +54,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if this user already has a coupon_use entry for this coupon
-    // (e.g. they refreshed during checkout â€” avoid double-claiming).
+    // (e.g. they refreshed during checkout — avoid double-claiming).
     const { data: existingUse } = await db
       .from("coupon_uses")
       .select("id")
@@ -61,7 +63,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (existingUse) {
-      // Already claimed in a prior order â€” re-apply the discount without re-claiming.
+      // Already claimed in a prior order — re-apply the discount without re-claiming.
       amount          = applyDiscount(originalAmount, coupon.discount_type, coupon.discount_value);
       discountApplied = originalAmount - amount;
     } else {
@@ -85,7 +87,7 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ orderId: order.id, amount, originalAmount, discountApplied, currency: "INR" });
-  } catch (e: unknown) {
+  } catch {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

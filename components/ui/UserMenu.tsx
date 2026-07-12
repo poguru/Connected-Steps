@@ -46,8 +46,10 @@ export default function UserMenu({ user }: Props) {
     localStorage.removeItem("cs_user_token");
     localStorage.removeItem("cs_strava");
     localStorage.removeItem(`cs_member_${email}`);
-    document.cookie = "cs_auth=; path=/; max-age=0; SameSite=Lax";
-    router.push("/auth?tab=signin");
+    // Clear httpOnly session cookie server-side, then redirect
+    fetch("/api/auth/logout", { method: "POST" })
+      .catch(() => {})
+      .finally(() => router.push("/auth?tab=signin"));
   };
 
   const first    = user.firstName ?? "";

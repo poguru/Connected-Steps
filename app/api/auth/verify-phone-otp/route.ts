@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { signCoachToken, signUserToken, verifyUserToken } from "@/lib/admin-auth";
+import { signCoachToken, signUserToken, verifyUserToken, USER_SESSION_COOKIE, USER_TOKEN_TTL } from "@/lib/admin-auth";
 import { isRateLimited, recordFailure, getClientIp } from "@/lib/rate-limit";
 
 /**
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
       const userToken  = signUserToken(user.email as string);
 
       console.log(`[verify-phone-otp] login verified phone=${phone} user=${user.email}`);
-      return NextResponse.json({
+      const res = NextResponse.json({
         success: true,
         requiresPhoneVerification: !(user.phone_verified as boolean),
         user: {
@@ -168,6 +168,16 @@ export async function POST(req: NextRequest) {
           userToken,
         },
       });
+
+      res.cookies.set(USER_SESSION_COOKIE, userToken, {
+        httpOnly: true,
+        secure:   process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path:     "/",
+        maxAge:   USER_TOKEN_TTL,
+      });
+
+      return res;
     }
 
     // ════════════════════════════════════════════════════════════════════

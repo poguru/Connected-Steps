@@ -29,6 +29,7 @@ jest.mock("@/lib/admin-auth",      () => ({ isAdminOrCoach: jest.fn().mockResolv
 
 import { NextRequest }       from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { makeAdminHeaders }  from "@/__tests__/helpers/admin-auth";
 
 const mockGetSupabaseServer = getSupabaseServer as jest.Mock;
 
@@ -72,7 +73,7 @@ function makeDeadLetterDb(jobs: unknown[] = []) {
 function makeAdminReq(url: string, method = "GET", body?: unknown): NextRequest {
   return new NextRequest(url, {
     method,
-    headers: { "x-admin-password": "test-admin", "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...makeAdminHeaders() },
     body:    body ? JSON.stringify(body) : undefined,
   });
 }

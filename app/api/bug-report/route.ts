@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail } from "@/lib/notify";
+import { isRateLimited, recordFailure, getClientIp } from "@/lib/rate-limit";
 
 const ADMIN_EMAIL = "info@connectedsteps.in";
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "rc1";
@@ -45,6 +46,14 @@ function bugReportEmailHTML(r: {
 }
 
 export async function POST(req: NextRequest) {
+  // 5 submissions per 15 minutes per IP — prevents DB spam and admin email floods
+  const ip  = getClientIp(req);
+  const key = `bug-report:${ip}`;
+  if (await isRateLimited(key, 5)) {
+    return NextResponse.json({ error: "Too many reports. Please wait before submitting again." }, { status: 429 });
+  }
+  await recordFailure(key); // each submission counts as one "failure" towards the limit
+
   try {
     const body = await req.json();
 

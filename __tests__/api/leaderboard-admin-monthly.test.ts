@@ -27,6 +27,7 @@ jest.mock("@/lib/supabase-server", () => ({ getSupabaseServer: jest.fn() }));
 import { GET, POST } from "@/app/api/admin/leaderboard/archive/route";
 import { NextRequest }     from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { makeAdminHeaders } from "@/__tests__/helpers/admin-auth";
 
 const mockDb = getSupabaseServer as jest.Mock;
 
@@ -162,14 +163,14 @@ function makeGetRequest(month?: string): NextRequest {
     ? `http://localhost/api/admin/leaderboard/archive?month=${month}`
     : "http://localhost/api/admin/leaderboard/archive";
   return new NextRequest(url, {
-    headers: { "x-admin-password": "test-password" },
+    headers: makeAdminHeaders(),
   });
 }
 
 function makePostRequest(month?: string): NextRequest {
   return new NextRequest("http://localhost/api/admin/leaderboard/archive", {
     method:  "POST",
-    headers: { "Content-Type": "application/json", "x-admin-password": "test-password" },
+    headers: { "Content-Type": "application/json", ...makeAdminHeaders() },
     body:    JSON.stringify(month ? { month } : {}),
   });
 }

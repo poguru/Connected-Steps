@@ -33,11 +33,12 @@ export function verifyCoachToken(token: string): string | null {
   }
 }
 
-export const COOKIE_NAME = "cs_coach_session";
+export const COOKIE_NAME         = "cs_coach_session";
+export const USER_SESSION_COOKIE = "cs_user_session";
 
 // ── User token ────────────────────────────────────────────────────────────────
 
-const USER_TOKEN_TTL = 90 * 24 * 60 * 60; // 90 days in seconds
+export const USER_TOKEN_TTL = 90 * 24 * 60 * 60; // 90 days in seconds
 
 export function signUserToken(email: string): string {
   const exp     = Math.floor(Date.now() / 1000) + USER_TOKEN_TTL;
@@ -107,30 +108,15 @@ export function isAdmin(req: NextRequest): boolean {
 
 // ── Unified admin / coach auth ────────────────────────────────────────────────
 // Returns true for:
-//   1. cs_admin_session cookie — short-lived signed admin session (preferred)
-//   2. x-admin-password header — raw password fallback (kept for server-to-server scripts)
-//   3. x-coach-token header or cs_coach_session cookie — signed coach token
+//   1. cs_admin_session cookie — short-lived signed admin session
+//   2. x-coach-token header or cs_coach_session cookie — signed coach token
 
 export async function isAdminOrCoach(req: NextRequest): Promise<boolean> {
   // 1. Admin session cookie (httpOnly — never readable by client JS)
   const adminSession = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
   if (adminSession && verifyAdminSession(adminSession)) return true;
 
-  // 2. Raw admin password header — legacy fallback for Playwright tests / server-side scripts.
-  //    When PLAYWRIGHT_SECRET is set, the header must match that value (not ADMIN_PASSWORD),
-  //    which keeps the real admin credential separate from the test credential.
-  //    Without PLAYWRIGHT_SECRET: falls back to ADMIN_PASSWORD (backward compatible).
-  const pw            = req.headers.get("x-admin-password");
-  const playwrightPw  = process.env.PLAYWRIGHT_SECRET;
-  const adminPw       = process.env.ADMIN_PASSWORD;
-  const expectedPw    = playwrightPw ?? adminPw;
-  if (pw && expectedPw && pw.length === expectedPw.length &&
-    crypto.timingSafeEqual(Buffer.from(pw), Buffer.from(expectedPw))) {
-    console.warn(`[admin-auth] legacy x-admin-password used — route: ${req.nextUrl?.pathname ?? req.url}`);
-    return true;
-  }
-
-  // 3. Coach token (mobile header or web cookie)
+  // 2. Coach token (mobile header or web cookie)
   const token = req.headers.get("x-coach-token") ?? req.cookies.get(COOKIE_NAME)?.value;
   if (!token) return false;
 
@@ -145,8 +131,6 @@ export async function isAdminOrCoach(req: NextRequest): Promise<boolean> {
 /** Returns the authenticated admin's identity string for audit logging.
  *  Returns null if the request is from a coach (no email on header). */
 export function getAdminEmail(req: NextRequest): string | null {
-  const pw = req.headers.get("x-admin-password");
-  if (pw) return "admin";
   const adminSession = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
   if (adminSession) return "admin";
   const token = req.headers.get("x-coach-token") ?? req.cookies.get(COOKIE_NAME)?.value;

@@ -343,9 +343,10 @@ export default function ProfilePage() {
     localStorage.removeItem("cs_strava");
     localStorage.removeItem("cs_coach_token");
     if (email) localStorage.removeItem(`cs_member_${email}`);
-    document.cookie = "cs_auth=; path=/; max-age=0; SameSite=Lax";
-    document.cookie = "cs_coach_session=; path=/; max-age=0; SameSite=Lax";
-    router.replace("/auth");
+    // Clear httpOnly session cookie server-side, then navigate
+    fetch("/api/auth/logout", { method: "POST" })
+      .catch(() => {})
+      .finally(() => router.replace("/auth"));
   }
 
   if (!user) return null;
