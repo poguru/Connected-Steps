@@ -1834,3 +1834,10 @@ select.auth-input option {
   }
   @keyframes cs-distance-line { from { width: 0; } to { width: 0; } }
 }
+
+/* Bug report FAB — lift above the 64px mobile bottom nav on small screens */
+@media (max-width: 767px) {
+  .cs-bug-fab {
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 16px) !important;
+  }
+}

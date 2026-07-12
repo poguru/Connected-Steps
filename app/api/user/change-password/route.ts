@@ -1,10 +1,22 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { verifyUserToken } from "@/lib/admin-auth";
 import bcrypt from "bcryptjs";
 
 export async function POST(req: NextRequest) {
+  // Require a valid user session matching the target email
+  const userToken  = req.headers.get("x-user-token");
+  const tokenEmail = userToken ? verifyUserToken(userToken) : null;
+  if (!tokenEmail) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { email, currentPassword, newPassword } = await req.json();
+    // Token email must match the account being changed
+    if (tokenEmail.toLowerCase() !== email?.toLowerCase()) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     if (!email || !currentPassword || !newPassword)
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     if (newPassword.length < 6)

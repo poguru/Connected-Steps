@@ -2,8 +2,17 @@
 import crypto from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { redeemCoupon } from "@/lib/coupon-redeem";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 export async function POST(req: NextRequest) {
+  // Require a valid user session — prevents anonymous coupon redemption
+  // and registration under arbitrary email addresses.
+  const userToken  = req.headers.get("x-user-token");
+  const tokenEmail = userToken ? verifyUserToken(userToken) : null;
+  if (!tokenEmail) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
     const {

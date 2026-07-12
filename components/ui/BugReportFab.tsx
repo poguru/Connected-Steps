@@ -168,6 +168,7 @@ export default function BugReportFab() {
       <button
         onClick={() => setOpen(true)}
         aria-label="Report a bug or issue"
+        className="cs-bug-fab"
         style={{
           position: "fixed",
           bottom: 24,
