@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 // â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -22,11 +22,11 @@ export interface FeedEvent {
 
 // Session milestone badges (matches Achievements.tsx)
 const SESSION_BADGES: Record<number, { label: string; icon: string }> = {
-  1:  { label: "First Session",   icon: "ðŸŽ¯" },
-  5:  { label: "5 Sessions",      icon: "ðŸŒŸ" },
-  10: { label: "10 Sessions",     icon: "ðŸ’ª" },
-  25: { label: "25 Sessions",     icon: "ðŸ”‘" },
-  50: { label: "50 Sessions",     icon: "ðŸ…" },
+  1:  { label: "First Session",   icon: "🎯" },
+  5:  { label: "5 Sessions",      icon: "🌟" },
+  10: { label: "10 Sessions",     icon: "💪" },
+  25: { label: "25 Sessions",     icon: "🔑" },
+  50: { label: "50 Sessions",     icon: "🏅" },
 };
 const MILESTONE_COUNTS = [1, 5, 10, 25, 50];
 
