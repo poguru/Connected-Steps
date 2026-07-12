@@ -64,6 +64,18 @@ export async function GET(req: NextRequest) {
       if (emailPool.length === 0) return NextResponse.json({ events: [], next_cursor: null, has_more: false });
     }
 
+    // Look up the current user's primary training location for birthday post filtering
+    let userLocationId: string | null = null;
+    if (email) {
+      const { data: locRow } = await db
+        .from("user_location_assignments")
+        .select("location_id")
+        .eq("user_email", email)
+        .eq("is_primary", true)
+        .single();
+      userLocationId = locRow?.location_id ?? null;
+    }
+
     // â”€â”€ Fetch raw event sources in parallel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     const fetchSize = limit * 3; // over-fetch to allow for deduplication and sorting
@@ -92,7 +104,7 @@ export async function GET(req: NextRequest) {
 
     const postsQ = db
       .from("user_posts")
-      .select("id, author_email, author_name, post_type, body, photo_url, created_at")
+      .select("id, author_email, author_name, post_type, body, photo_url, location_id, created_at")
       .eq("approved", true)
       .lt("created_at", before)
       .order("created_at", { ascending: false })
@@ -167,6 +179,10 @@ export async function GET(req: NextRequest) {
 
     // User-generated posts
     for (const p of userPostsRes.data ?? []) {
+      // Birthday posts are location-scoped: only show to users at the same location
+      if (p.post_type === "birthday") {
+        if (!p.location_id || p.location_id !== userLocationId) continue;
+      }
       events.push({
         id:          `post_${p.id}`,
         actor_email: p.author_email,

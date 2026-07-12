@@ -16,6 +16,7 @@ import TrainingPlan from "@/components/dashboard/TrainingPlan";
 import DashboardHero from "@/components/dashboard/DashboardHero";
 import SessionPhotos from "@/components/dashboard/SessionPhotos";
 import FollowerFeed from "@/components/dashboard/FollowerFeed";
+import ActivityFeed from "@/components/feed/ActivityFeed";
 import CoachChatCard from "@/components/dashboard/CoachChatCard";
 import ProgressCard from "@/components/dashboard/ProgressCard";
 import SessionPopup from "@/components/dashboard/SessionPopup";
@@ -823,8 +824,27 @@ export default function Dashboard() {
             fallback={<UpgradeBanner userEmail={user.email} />}
           />
 
-          {/* ── Community activity ── */}
+          {/* ── Follower activity ── */}
           <FollowerFeed userEmail={user.email} />
+
+          {/* ── Community feed (global) ── */}
+          <div style={{ marginBottom: "1rem" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+              <span style={{ fontSize: "10px", color: "var(--muted-foreground)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600 }}>
+                Community Feed
+              </span>
+              <a href="/feed" style={{ fontSize: "10px", color: "var(--cs-orange)", textDecoration: "none", fontWeight: 600 }}>
+                Full feed →
+              </a>
+            </div>
+            <ActivityFeed
+              currentUserEmail={user.email}
+              scope="global"
+              compact={false}
+              maxItems={8}
+              showViewAll={true}
+            />
+          </div>
         </main>
 
         {/* ── Right sidebar ── */}

@@ -3,7 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireActiveUser } from "@/lib/active-user";
 import { verifyUserToken } from "@/lib/admin-auth";
 
-export type PostType = "general" | "run" | "achievement" | "race" | "question";
+export type PostType = "general" | "run" | "achievement" | "race" | "question" | "birthday";
 
 export interface UserPost {
   id:           string;

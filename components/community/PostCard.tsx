@@ -26,6 +26,7 @@ const TYPE_LABEL: Record<string, string> = {
   achievement: "🏅 Achievement",
   race:        "🏁 Race Update",
   question:    "❓ Question",
+  birthday:    "🎂 Birthday",
   general:     "",
 };
 
@@ -34,6 +35,7 @@ const TYPE_COLOR: Record<string, string> = {
   achievement: "#fbbf24",
   race:        "#4ade80",
   question:    "#60a5fa",
+  birthday:    "#f472b6",
   general:     "",
 };
 
@@ -165,7 +167,11 @@ export default function PostCard({ post, currentUserEmail, onDeleted }: Props) {
   const typeColor = TYPE_COLOR[post.post_type];
 
   return (
-    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
+    <div style={{
+      background: post.post_type === "birthday" ? "linear-gradient(135deg, rgba(244,63,94,0.06) 0%, rgba(236,72,153,0.04) 100%)" : "var(--surface)",
+      border: `1px solid ${post.post_type === "birthday" ? "rgba(244,63,94,0.3)" : "var(--border)"}`,
+      borderRadius: 14, overflow: "hidden",
+    }}>
 
       {/* ── Header ── */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: "0.65rem", padding: "0.875rem 0.875rem 0" }}>
@@ -241,6 +247,36 @@ export default function PostCard({ post, currentUserEmail, onDeleted }: Props) {
             />
           </div>
         </button>
+      )}
+
+      {/* ── Birthday wish CTA ── */}
+      {post.post_type === "birthday" && (
+        <div style={{ padding: "0.5rem 0.875rem 0" }}>
+          <button
+            onClick={async () => {
+              const stored = typeof localStorage !== "undefined" ? localStorage.getItem("cs_user") : null;
+              if (!stored) return;
+              const me = JSON.parse(stored) as { firstName?: string; email?: string };
+              const name = me.firstName ?? me.email?.split("@")[0] ?? "Someone";
+              await fetch(`/api/posts/${post.id}/comment`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ author_name: name, author_email: me.email ?? "", body: `Happy Birthday! 🎂🎉🏃` }),
+              });
+              setCommentCount(c => c + 1);
+              await loadComments();
+            }}
+            style={{
+              width: "100%", padding: "9px", borderRadius: 10,
+              background: "linear-gradient(135deg, #ec4899 0%, #f43f5e 100%)",
+              color: "#fff", border: "none", cursor: "pointer",
+              fontSize: "0.82rem", fontWeight: 700, fontFamily: "inherit",
+              letterSpacing: "0.02em",
+            }}
+          >
+            Wish Happy Birthday 🎂
+          </button>
+        </div>
       )}
 
       {/* ── Reactions bar ── */}
