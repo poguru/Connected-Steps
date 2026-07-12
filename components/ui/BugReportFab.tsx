@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 const CATEGORIES = [
   { value: "bug",         label: "🐛 Bug" },
@@ -28,6 +28,79 @@ function getDeviceInfo() {
   };
 }
 
+// Custom dark dropdown — avoids browser-native white popup
+function DarkSelect({ value, onChange, options }: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = options.find(o => o.value === value);
+
+  useEffect(() => {
+    if (!open) return;
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: "100%", padding: "9px 12px", display: "flex", alignItems: "center", justifyContent: "space-between",
+          background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8,
+          color: "#fff", fontSize: "0.85rem", fontFamily: "inherit", cursor: "pointer", textAlign: "left",
+        }}
+      >
+        <span>{selected?.label ?? "Select…"}</span>
+        <span style={{ fontSize: 10, color: "#666", marginLeft: 8 }}>▾</span>
+      </button>
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 10010,
+          background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8,
+          overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+        }}>
+          {options.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => { onChange(opt.value); setOpen(false); }}
+              style={{
+                width: "100%", padding: "9px 12px", display: "block", textAlign: "left",
+                background: opt.value === value ? "rgba(232,98,10,0.15)" : "transparent",
+                border: "none", color: opt.value === value ? "#e8620a" : "#ccc",
+                fontSize: "0.85rem", fontFamily: "inherit", cursor: "pointer",
+                borderBottom: "1px solid rgba(255,255,255,0.05)",
+              }}
+              onMouseEnter={e => { if (opt.value !== value) (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.06)"; }}
+              onMouseLeave={e => { if (opt.value !== value) (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Flag icon SVG
+function FlagIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+      <line x1="4" y1="22" x2="4" y2="15" />
+    </svg>
+  );
+}
+
 export default function BugReportFab() {
   const [open,        setOpen]        = useState(false);
   const [category,    setCategory]    = useState("bug");
@@ -45,7 +118,7 @@ export default function BugReportFab() {
     const user   = stored ? JSON.parse(stored) as { email?: string; firstName?: string; phone?: string } : null;
     const { browser, device, screenSize } = getDeviceInfo();
 
-    let screenshotUrl = "";
+    let screenshotPath = "";
     if (screenshot) {
       const fd = new FormData();
       fd.append("file", screenshot);
@@ -53,7 +126,7 @@ export default function BugReportFab() {
       const up = await fetch("/api/upload", { method: "POST", body: fd }).catch(() => null);
       if (up?.ok) {
         const j = await up.json().catch(() => ({}));
-        screenshotUrl = j.path ?? "";
+        screenshotPath = j.path ?? "";
       }
     }
 
@@ -63,7 +136,7 @@ export default function BugReportFab() {
       body: JSON.stringify({
         category,
         description: description.trim(),
-        screenshot_url: screenshotUrl,
+        screenshot_url: screenshotPath,
         browser, device, screen_size: screenSize,
         current_url:  typeof window !== "undefined" ? window.location.href : "",
         user_email:   user?.email   ?? "",
@@ -100,8 +173,8 @@ export default function BugReportFab() {
           bottom: 24,
           right: 24,
           zIndex: 9990,
-          width: 48,
-          height: 48,
+          width: 44,
+          height: 44,
           borderRadius: "50%",
           background: "rgba(15,15,15,0.92)",
           border: "1px solid rgba(255,255,255,0.12)",
@@ -111,14 +184,21 @@ export default function BugReportFab() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 20,
-          color: "#fff",
-          transition: "transform 0.2s, box-shadow 0.2s",
+          color: "#aaa",
+          transition: "transform 0.2s, box-shadow 0.2s, color 0.2s",
         }}
-        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.08)"; }}
-        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)"; }}
+        onMouseEnter={e => {
+          const b = e.currentTarget as HTMLButtonElement;
+          b.style.transform = "scale(1.08)";
+          b.style.color = "#fff";
+        }}
+        onMouseLeave={e => {
+          const b = e.currentTarget as HTMLButtonElement;
+          b.style.transform = "scale(1)";
+          b.style.color = "#aaa";
+        }}
       >
-        🐛
+        <FlagIcon />
       </button>
 
       {/* ── Modal ──────────────────────────────────────────────────────────── */}
@@ -129,7 +209,6 @@ export default function BugReportFab() {
             position: "fixed", inset: 0, zIndex: 9999,
             background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)",
             display: "flex", alignItems: "flex-end", justifyContent: "center",
-            padding: "0 0 0 0",
           }}
         >
           <div style={{
@@ -142,7 +221,7 @@ export default function BugReportFab() {
           }}>
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <div style={{ fontSize: "1rem", fontWeight: 700, color: "#fff" }}>🐛 Report an Issue</div>
+              <div style={{ fontSize: "1rem", fontWeight: 700, color: "#fff" }}>Report an Issue</div>
               <button onClick={() => setOpen(false)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 20, lineHeight: 1 }}>×</button>
             </div>
 
@@ -157,13 +236,7 @@ export default function BugReportFab() {
                 {/* Category */}
                 <div style={{ marginBottom: 14 }}>
                   <label style={{ display: "block", fontSize: "0.75rem", color: "rgba(255,255,255,0.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.08em" }}>Category</label>
-                  <select
-                    value={category}
-                    onChange={e => setCategory(e.target.value)}
-                    style={{ width: "100%", padding: "9px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: "0.85rem", fontFamily: "inherit" }}
-                  >
-                    {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                  </select>
+                  <DarkSelect value={category} onChange={setCategory} options={CATEGORIES} />
                 </div>
 
                 {/* Description */}
