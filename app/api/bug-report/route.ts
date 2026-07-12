@@ -126,14 +126,16 @@ export async function POST(req: NextRequest) {
       false, true,
     ).catch(err => console.error("[bug-report] admin email failed:", err));
 
-    // Create admin in-app notification
-    db.from("notifications").insert({
-      user_email: ADMIN_EMAIL,
-      type:       "bug_report",
-      title:      `🐛 New ${categoryLabel[category] ?? "Issue"} Report`,
-      body:       description.trim().slice(0, 120),
-      action_url: `/admin/bug-reports?id=${report?.id ?? ""}`,
-    }).then(() => {}).catch(() => {});
+    // Create admin in-app notification (fire-and-forget)
+    void (async () => {
+      await db.from("notifications").insert({
+        user_email: ADMIN_EMAIL,
+        type:       "bug_report",
+        title:      `🐛 New ${categoryLabel[category] ?? "Issue"} Report`,
+        body:       description.trim().slice(0, 120),
+        action_url: `/admin/bug-reports?id=${report?.id ?? ""}`,
+      });
+    })();
 
     return NextResponse.json({ ok: true, id: report?.id });
   } catch (err) {

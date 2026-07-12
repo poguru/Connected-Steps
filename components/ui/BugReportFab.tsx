@@ -53,7 +53,7 @@ export default function BugReportFab() {
       const up = await fetch("/api/upload", { method: "POST", body: fd }).catch(() => null);
       if (up?.ok) {
         const j = await up.json().catch(() => ({}));
-        screenshotUrl = j.url ?? "";
+        screenshotUrl = j.path ?? "";
       }
     }
 

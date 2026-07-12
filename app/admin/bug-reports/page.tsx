@@ -61,6 +61,39 @@ function Badge({ label, colors }: { label: string; colors: { bg: string; color: 
   );
 }
 
+function ScreenshotLink({ path }: { path: string }) {
+  const [url,     setUrl]     = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState("");
+
+  async function open() {
+    // If it's already a full URL (legacy), open directly
+    if (path.startsWith("http")) { window.open(path, "_blank"); return; }
+    setLoading(true); setError("");
+    const res = await fetch(`/api/admin/bug-reports/screenshot?path=${encodeURIComponent(path)}`).catch(() => null);
+    setLoading(false);
+    if (!res?.ok) { setError("Could not load screenshot"); return; }
+    const { signedUrl } = await res.json();
+    setUrl(signedUrl);
+    window.open(signedUrl, "_blank");
+  }
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: "0.75rem", color: "#666", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.08em" }}>Screenshot</div>
+      {url ? (
+        <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: "#e8620a", fontSize: "0.82rem" }}>View screenshot →</a>
+      ) : (
+        <button onClick={open} disabled={loading}
+          style={{ background: "none", border: "none", color: loading ? "#555" : "#e8620a", cursor: loading ? "not-allowed" : "pointer", fontSize: "0.82rem", padding: 0, fontFamily: "inherit" }}>
+          {loading ? "Loading…" : "View screenshot →"}
+        </button>
+      )}
+      {error && <div style={{ fontSize: "0.72rem", color: "#f87171", marginTop: 4 }}>{error}</div>}
+    </div>
+  );
+}
+
 function DetailModal({ report, onClose, onUpdate }: {
   report: BugReport;
   onClose: () => void;
@@ -139,13 +172,7 @@ function DetailModal({ report, onClose, onUpdate }: {
 
         {/* Screenshot */}
         {report.screenshot_url && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: "0.75rem", color: "#666", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.08em" }}>Screenshot</div>
-            <a href={report.screenshot_url} target="_blank" rel="noopener noreferrer"
-              style={{ color: "#e8620a", fontSize: "0.82rem" }}>
-              View screenshot →
-            </a>
-          </div>
+          <ScreenshotLink path={report.screenshot_url} />
         )}
 
         {/* Console Errors */}
