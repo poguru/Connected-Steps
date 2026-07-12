@@ -15,6 +15,8 @@ const PLAN_LABELS: Record<string, string> = {
 
 type MemberFilter = "all" | "active" | "inactive" | "deactivated";
 
+interface TrainingLocation { id: string; name: string; city: string | null; }
+
 interface AppUser {
   email:          string;
   first_name:     string;
@@ -54,6 +56,11 @@ export default function AdminUsersPage() {
   const [filter,    setFilter]    = useState<MemberFilter>("all");
   const [goalFilter, setGoalFilter] = useState("all");
   const [toggling,  setToggling]  = useState<Record<string, boolean>>({});
+  const [locations,    setLocations]    = useState<TrainingLocation[]>([]);
+  const [locModal,     setLocModal]     = useState<AppUser | null>(null);
+  const [locChanging,  setLocChanging]  = useState(false);
+  const [locError,     setLocError]     = useState("");
+  const [locSelected,  setLocSelected]  = useState("");
 
   async function login(password: string) {
     setLoading(true); setError("");
@@ -84,6 +91,32 @@ export default function AdminUsersPage() {
     fetch("/api/admin/auth").then(r => { if (r.ok) setAuthed(true); }).catch(() => {});
   }, []);
   useEffect(() => { if (authed) load(); }, [authed, load]);
+
+  // Fetch training locations once
+  useEffect(() => {
+    fetch("/api/training-locations")
+      .then(r => r.json())
+      .then(d => setLocations((d.locations ?? d) as TrainingLocation[]))
+      .catch(() => {});
+  }, []);
+
+  async function changeLocation(email: string, locationId: string) {
+    setLocChanging(true); setLocError("");
+    try {
+      const res = await fetch("/api/admin/users/location", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, location_id: locationId }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setLocError(data.error ?? "Failed"); return; }
+      // Update local state
+      const loc = locations.find(l => l.id === locationId);
+      setUsers(prev => prev.map(u => u.email === email ? { ...u, location: loc?.name ?? u.location } : u));
+      setLocModal(null);
+    } catch { setLocError("Network error"); }
+    finally { setLocChanging(false); }
+  }
 
   async function toggleActive(email: string, newState: boolean) {
     setToggling((t) => ({ ...t, [email]: true }));
@@ -148,6 +181,37 @@ export default function AdminUsersPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff" }}>
+
+      {/* ── Change Location Modal ── */}
+      {locModal && (
+        <div onClick={() => setLocModal(null)} style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: 24, width: "100%", maxWidth: 380 }}>
+            <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#fff", marginBottom: 4 }}>Change Training Location</div>
+            <div style={{ fontSize: "0.78rem", color: "#666", marginBottom: 16 }}>{locModal.first_name} {locModal.last_name} · {locModal.email}</div>
+            <div style={{ fontSize: "0.72rem", color: "#666", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.08em" }}>Current: <span style={{ color: "#aaa" }}>{locModal.location || "—"}</span></div>
+            <select
+              value={locSelected}
+              onChange={e => setLocSelected(e.target.value)}
+              style={{ width: "100%", padding: "9px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, color: "#fff", fontSize: "0.85rem", fontFamily: "inherit", marginBottom: 12, colorScheme: "dark" }}
+            >
+              <option value="">Select location…</option>
+              {locations.map(l => <option key={l.id} value={l.id}>{l.name}{l.city ? ` — ${l.city}` : ""}</option>)}
+            </select>
+            {locError && <div style={{ fontSize: "0.78rem", color: "#f87171", marginBottom: 10 }}>{locError}</div>}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setLocModal(null)} style={{ flex: 1, padding: "9px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#888", cursor: "pointer", fontSize: "0.82rem", fontFamily: "inherit" }}>Cancel</button>
+              <button
+                onClick={() => locSelected && changeLocation(locModal.email, locSelected)}
+                disabled={!locSelected || locChanging}
+                style={{ flex: 1, padding: "9px", background: locSelected && !locChanging ? "#e8620a" : "rgba(232,98,10,0.3)", border: "none", borderRadius: 8, color: "#fff", cursor: locSelected && !locChanging ? "pointer" : "not-allowed", fontSize: "0.82rem", fontWeight: 700, fontFamily: "inherit" }}
+              >
+                {locChanging ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header style={{ background: "#0a0a0a", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0 2rem", height: "60px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <Link href="/admin"><Image src="/logo.png" alt="" width={28} height={28} className="rounded-full" /></Link>
@@ -219,7 +283,14 @@ export default function AdminUsersPage() {
                 </div>
                 <div style={{ color: "#888", wordBreak: "break-all", fontSize: "0.78rem" }}>{u.email}</div>
                 <div style={{ color: "#888" }}>{GOAL_LABELS[u.goal] ?? (u.goal || "—")}</div>
-                <div style={{ color: "#888", fontSize: "0.78rem" }}>📍 {u.location || "—"}</div>
+                <button
+                  onClick={() => { setLocModal(u); setLocSelected(""); setLocError(""); }}
+                  title="Change training location"
+                  style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}
+                >
+                  <span style={{ fontSize: "0.78rem", color: "#888" }}>📍 {u.location || "—"}</span>
+                  <span style={{ fontSize: "9px", color: "#e8620a", marginLeft: 4 }}>✎</span>
+                </button>
                 <div style={{ color: "#e8620a", fontWeight: 600 }}>{u.session_count}</div>
                 <div style={{ color: "#888" }}>{u.total_runs}</div>
                 <div style={{ color: "#888" }}>{u.total_km.toFixed(0)}</div>

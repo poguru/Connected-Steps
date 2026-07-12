@@ -64,6 +64,7 @@ export default function Leaderboard() {
   const [followBusy,   setFollowBusy]   = useState<Set<string>>(new Set());
   const [preview,      setPreview]      = useState<Entry | null>(null);
   const [visibleCount, setVisibleCount] = useState(47); // 3 podium + 47 = 50 total visible
+  const [viewMode,     setViewMode]     = useState<"overall" | "location">("overall");
 
   const tabRef     = useRef(tab);
   const liveRef    = useRef(false);
@@ -236,6 +237,23 @@ export default function Leaderboard() {
   const locations = ["All", ...Array.from(new Set(entries.map(e => e.location).filter(l => l && !l.includes("@")))).sort()];
   const goals     = ["All", ...Array.from(new Set(entries.map(e => e.goal).filter(Boolean))).sort()];
 
+  // By-location grouping (uses all entries, ignores locFilter when in location view)
+  const locationGroups = (() => {
+    const map = new Map<string, Entry[]>();
+    for (const e of entries) {
+      const loc = (e.location || "Unknown").trim();
+      if (!map.has(loc)) map.set(loc, []);
+      map.get(loc)!.push(e);
+    }
+    return [...map.entries()]
+      .map(([loc, members]) => ({
+        loc,
+        members: members.sort((a, b) => (b[key] ?? 0) - (a[key] ?? 0)),
+        total:   members.reduce((s, m) => s + (m[key] ?? 0), 0),
+      }))
+      .sort((a, b) => b.total - a.total);
+  })();
+
   let filtered = entries;
   if (locFilter  !== "All") filtered = filtered.filter(e => e.location === locFilter);
   if (goalFilter !== "All") filtered = filtered.filter(e => e.goal === goalFilter);
@@ -314,8 +332,18 @@ export default function Leaderboard() {
           active={tab} onChange={v => setTab(v as TimeTab)} variant="pill"
           style={{ marginBottom: "1rem" }} />
 
-        {/* ── Training location scope: My Location vs All ── */}
-        {myLocationId && (
+        {/* ── View mode: Overall vs By Location ── */}
+        <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.04)", borderRadius: 8, padding: 3, marginBottom: "1rem", width: "fit-content" }}>
+          {(["overall", "location"] as const).map(v => (
+            <button key={v} type="button" onClick={() => setViewMode(v)}
+              style={{ padding: "6px 16px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: "0.78rem", fontWeight: 600, background: viewMode === v ? "var(--cs-orange)" : "transparent", color: viewMode === v ? "#fff" : "var(--muted-foreground)", fontFamily: "var(--font-body)", transition: "all 0.15s" }}>
+              {v === "overall" ? "Overall" : "By Location"}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Training location scope: My Location vs All (overall only) ── */}
+        {myLocationId && viewMode === "overall" && (
           <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.04)", borderRadius: 8, padding: 3, marginBottom: "1rem", width: "fit-content" }}>
             {(["all","my"] as const).map(s => (
               <button key={s} type="button" onClick={() => { setLocationScope(s); if (s==="all") fetchWithScope("all"); else if (myLocationId) fetchWithScope("my"); }}
@@ -326,8 +354,8 @@ export default function Leaderboard() {
           </div>
         )}
 
-        {/* ── Goal + location filters ── */}
-        {(goals.length > 2 || locations.length > 2) && (
+        {/* ── Goal + location filters (overall only) ── */}
+        {viewMode === "overall" && (goals.length > 2 || locations.length > 2) && (
           <div style={{ display: "flex", gap: 8, marginBottom: "1.5rem", flexWrap: "wrap" as const }}>
             {goals.length > 2 && (
               <Select value={goalFilter} onChange={e => setGoalFilter(e.target.value)} style={{ flex: 1, minWidth: 120 }}>
@@ -351,7 +379,57 @@ export default function Leaderboard() {
           </div>
         )}
 
-        {!loading && (
+        {!loading && viewMode === "location" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginBottom: "1rem" }}>
+            {locationGroups.length === 0 && (
+              <EmptyState icon="📍" title="No location data" body="Runners without a training location won't appear here." style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12 }} />
+            )}
+            {locationGroups.map((group, gi) => {
+              const myGroup = group.members.some(m => m.user_email === user?.email);
+              return (
+                <div key={group.loc} style={{ background: "var(--surface)", border: `1px solid ${myGroup ? "oklch(0.72 0.19 49 / 35%)" : "var(--border)"}`, borderRadius: 14, overflow: "hidden" }}>
+                  {/* Group header */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.875rem 1rem", background: gi === 0 ? "oklch(0.72 0.19 49 / 6%)" : "transparent", borderBottom: "1px solid var(--border)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: "1rem" }}>{gi === 0 ? "🥇" : gi === 1 ? "🥈" : gi === 2 ? "🥉" : "📍"}</span>
+                      <div>
+                        <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--foreground)" }}>{group.loc}</div>
+                        <div style={{ fontSize: "0.72rem", color: "var(--muted-foreground)", marginTop: 1 }}>{group.members.length} runner{group.members.length !== 1 ? "s" : ""}</div>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--cs-orange)" }}>{group.total}</div>
+                      <div style={{ fontSize: 9, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.06em" }}>GROUP PTS</div>
+                    </div>
+                  </div>
+                  {/* Members */}
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    {group.members.map((m, mi) => {
+                      const isMe = m.user_email === user?.email;
+                      return (
+                        <div key={m.id} onClick={() => setPreview(m)}
+                          style={{ display: "flex", alignItems: "center", gap: "0.65rem", padding: "0.65rem 1rem", borderTop: mi === 0 ? "none" : "1px solid var(--border)", cursor: "pointer", background: isMe ? "oklch(0.72 0.19 49 / 4%)" : "transparent" }}>
+                          <div style={{ width: 24, textAlign: "center", fontFamily: "monospace", fontSize: "0.78rem", fontWeight: 700, color: mi < 3 ? "var(--cs-orange)" : "var(--muted-foreground)", flexShrink: 0 }}>
+                            {mi === 0 ? "🥇" : mi === 1 ? "🥈" : mi === 2 ? "🥉" : `#${mi + 1}`}
+                          </div>
+                          <Avatar src={m.photo} name={m.user_name} size={34} style={{ border: isMe ? "2px solid var(--cs-orange)" : "2px solid transparent", flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: "0.82rem", fontWeight: 600, color: isMe ? "var(--cs-orange)" : "var(--foreground)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {m.user_name}{isMe ? " (you)" : ""}
+                            </div>
+                          </div>
+                          <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--cs-orange)", flexShrink: 0 }}>{m[key] ?? 0} <span style={{ fontSize: 9, color: "var(--muted-foreground)", fontWeight: 400 }}>pts</span></div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {!loading && viewMode === "overall" && (
           <>
             {/* ── Podium (top 3) ── */}
             {podium.length >= 3 && (
