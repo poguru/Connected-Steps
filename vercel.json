@@ -1,6 +1,7 @@
 {
   "functions": {
     "app/api/cron/**/route.ts":                                              { "maxDuration": 300 },
+    "app/api/cron/daily-attendance-report/route.ts":                        { "maxDuration": 60  },
     "app/api/cron/slot-expiry/route.ts":                                    { "maxDuration": 30  },
     "app/api/admin/events/[id]/communicate/send-next/route.ts":             { "maxDuration": 15  },
     "app/api/admin/events/[id]/communicate/status/route.ts":                { "maxDuration": 10  },
@@ -8,7 +9,7 @@
     "app/api/admin/leaderboard/recalculate.ts":                             { "maxDuration": 60  },
     "app/api/admin/events/registrations/resend-missing/route.ts":           { "maxDuration": 300 },
     "app/api/admin/events/registrations/reconcile/route.ts":                { "maxDuration": 300 },
-    "app/api/attendance/scan/route.ts":                                     { "maxDuration": 30  },
+    "app/api/attendance/scan/route.ts":                                     { "maxDuration": 60  },
     "app/api/events/register/route.ts":                                     { "maxDuration": 30  },
     "app/api/events/verify-payment/route.ts":                               { "maxDuration": 30  }
   },
@@ -56,6 +57,10 @@
     {
       "path": "/api/cron/media-cleanup",
       "schedule": "30 20 * * *"
+    },
+    {
+      "path": "/api/cron/daily-attendance-report",
+      "schedule": "45 1 * * *"
     }
   ]
 }
