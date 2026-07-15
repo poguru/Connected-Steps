@@ -78,16 +78,31 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  let order: { id: string };
   try {
-    const order = await getRazorpay().orders.create({
+    order = await getRazorpay().orders.create({
       amount,
       currency: "INR",
       receipt:  `cs_${plan}_${Date.now()}`,
       notes:    { email, plan, coupon_id: coupon_id ?? "" },
     });
-
-    return NextResponse.json({ orderId: order.id, amount, originalAmount, discountApplied, currency: "INR" });
   } catch {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
+
+  // Log the order so the daily membership reconcile can detect any payments
+  // that were captured by Razorpay but never reflected in our memberships
+  // table (network loss, client crash, etc.). Non-blocking: a log failure must
+  // never prevent the user from reaching checkout.
+  db.from("payment_order_log").insert({
+    razorpay_order_id: order.id,
+    user_email:        email.toLowerCase(),
+    plan,
+    amount_paise:      amount,
+    coupon_id:         coupon_id ?? null,
+  }).then(({ error: logErr }) => {
+    if (logErr) console.warn("[create-order] payment_order_log write failed:", logErr.message);
+  });
+
+  return NextResponse.json({ orderId: order.id, amount, originalAmount, discountApplied, currency: "INR" });
 }

@@ -3,7 +3,7 @@ import crypto from "crypto";
 import Razorpay from "razorpay";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
-import { sendWhatsApp, membershipWAParams } from "@/lib/notify";
+import { sendEmail, sendWhatsApp, membershipWAParams } from "@/lib/notify";
 import { autoFeedMembershipActivated } from "@/lib/auto-feed";
 import { enqueueJob } from "@/lib/job-queue";
 import { handleInvoiceGenerate, handleMembershipEmail } from "@/lib/job-handlers";
@@ -191,6 +191,14 @@ export async function POST(req: NextRequest) {
   const amountINR   = verifiedAmount / 100;   // ← always from Razorpay
   const expiryISO   = expiresAt.toISOString();
 
+  // Mark the payment_order_log row as resolved so the daily reconcile cron
+  // does not attempt to re-activate what was just successfully processed.
+  // Non-critical: if this fails, the reconcile will see already_active and
+  // clean up the row itself.
+  void db.from("payment_order_log")
+    .update({ status: "paid", resolved_at: new Date().toISOString() })
+    .eq("razorpay_order_id", razorpay_order_id);
+
   // ── Step 6: Post-payment side effects (invoice, email, WhatsApp, feed) ────
   const invoicePayload = {
     productType:     "membership" as const,
@@ -228,6 +236,29 @@ export async function POST(req: NextRequest) {
       "membership_confirmation"
     ).catch(console.error);
   }
+
+  // Admin notification — non-blocking, fire-and-forget
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  sendEmail(
+    "info@connectedsteps.in",
+    "Connected Steps Admin",
+    `New Membership [verify] — ${planLabel} — ${displayName}`,
+    `<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
+      <h2 style="margin:0 0 16px;color:#1a1a1a">New Membership Activated</h2>
+      <table style="width:100%;font-size:14px;border-collapse:collapse">
+        <tr><td style="padding:6px 0;color:#6b7280;width:140px">User</td><td style="padding:6px 0;font-weight:600">${displayName}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280">Email</td><td style="padding:6px 0">${email}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280">Plan</td><td style="padding:6px 0;font-weight:600">${planLabel}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280">Amount</td><td style="padding:6px 0">₹${amountINR}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280">Expires</td><td style="padding:6px 0">${new Date(expiryISO).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280">Payment ID</td><td style="padding:6px 0;font-family:monospace;font-size:12px">${razorpay_payment_id}</td></tr>
+      </table>
+      <div style="margin-top:20px">
+        <a href="${appUrl}/admin/memberships" style="display:inline-block;padding:10px 20px;background:#e8620a;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px">View in Admin →</a>
+      </div>
+    </body></html>`,
+    false, true,
+  ).catch(() => {});
 
   return NextResponse.json({ success: true, expiresAt: expiryISO });
 }

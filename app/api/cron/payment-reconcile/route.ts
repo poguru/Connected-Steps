@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { runReconciliation } from "@/lib/payment-reconcile";
+import { NextRequest, NextResponse }      from "next/server";
+import { runReconciliation }             from "@/lib/payment-reconcile";
+import { runMembershipReconciliation }   from "@/lib/membership-reconcile";
 
 // GET /api/cron/payment-reconcile
 // Automatic payment reconciliation — runs on the Vercel Cron schedule.
@@ -30,20 +31,21 @@ export async function GET(req: NextRequest) {
   console.log("[cron/payment-reconcile] starting daily sweep");
 
   try {
-    const result = await runReconciliation({
+    // ── Event registration reconciliation ──────────────────────────────────
+    const evResult = await runReconciliation({
       dryRun:      false,
       maxBatch:    5,    // 5 concurrent Razorpay API calls max
       callerLabel: "cron",
     });
 
-    const { checked, recovered, still_pending, api_errors, summary, duration_ms } = result;
+    const { checked, recovered, still_pending, api_errors, summary, duration_ms } = evResult;
 
     // Log structured summary for monitoring
     console.log(JSON.stringify({
       ts:            new Date().toISOString(),
       level:         "info",
       service:       "cron/payment-reconcile",
-      msg:           "Daily payment reconciliation complete",
+      msg:           "Daily event payment reconciliation complete",
       checked,
       still_pending,
       api_errors,
@@ -55,21 +57,56 @@ export async function GET(req: NextRequest) {
     }));
 
     if (recovered > 0) {
-      console.log(`[cron/payment-reconcile] ✅ RECOVERED ${recovered} registrations — users will receive QR emails`);
+      console.log(`[cron/payment-reconcile] ✅ RECOVERED ${recovered} event registrations — users will receive QR emails`);
+    }
+    if (api_errors > 0) {
+      console.error(`[cron/payment-reconcile] ⚠️  ${api_errors} event Razorpay API errors — will retry tomorrow`);
     }
 
-    if (api_errors > 0) {
-      console.error(`[cron/payment-reconcile] ⚠️  ${api_errors} Razorpay API errors — will retry tomorrow`);
+    // ── Membership reconciliation ───────────────────────────────────────────
+    const mbResult = await runMembershipReconciliation({
+      maxBatch:    5,
+      callerLabel: "cron",
+    });
+
+    console.log(JSON.stringify({
+      ts:            new Date().toISOString(),
+      level:         "info",
+      service:       "cron/payment-reconcile",
+      msg:           "Daily membership reconciliation complete",
+      checked:       mbResult.checked,
+      recovered:     mbResult.recovered,
+      still_pending: mbResult.still_pending,
+      api_errors:    mbResult.api_errors,
+      duration_ms:   mbResult.duration_ms,
+    }));
+
+    if (mbResult.recovered > 0) {
+      console.log(`[cron/payment-reconcile] ✅ RECOVERED ${mbResult.recovered} memberships — users have been activated`);
+    }
+    if (mbResult.api_errors > 0) {
+      console.error(`[cron/payment-reconcile] ⚠️  ${mbResult.api_errors} membership reconcile errors — will retry tomorrow`);
     }
 
     return NextResponse.json({
-      ok:            true,
-      checked,
-      recovered,
-      still_pending,
-      api_errors,
-      summary,
-      duration_ms:   Date.now() - startMs,
+      ok:                        true,
+      events: {
+        checked,
+        recovered,
+        still_pending,
+        api_errors,
+        summary,
+        duration_ms,
+      },
+      memberships: {
+        checked:       mbResult.checked,
+        recovered:     mbResult.recovered,
+        still_pending: mbResult.still_pending,
+        api_errors:    mbResult.api_errors,
+        duration_ms:   mbResult.duration_ms,
+      },
+      total_recovered: recovered + mbResult.recovered,
+      duration_ms:     Date.now() - startMs,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);

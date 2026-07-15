@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { getSupabaseServer } from "@/lib/supabase-server";
-import { handleEventQrEmail, handleInvoiceGenerate } from "@/lib/job-handlers";
-import { enqueueJob } from "@/lib/job-queue";
+import { getSupabaseServer }    from "@/lib/supabase-server";
+import { handleEventQrEmail,
+         handleInvoiceGenerate } from "@/lib/job-handlers";
+import { enqueueJob }           from "@/lib/job-queue";
+import { activateMembership }   from "@/lib/membership-activate";
 
 // POST /api/webhooks/razorpay
 //
@@ -179,8 +181,31 @@ async function handlePaymentCaptured(payment: RzpPaymentEntity): Promise<void> {
       }
     }
 
-    // Could be a membership payment (different table) — not an error, just log it
-    console.log(`[razorpay-webhook] No event registration found for order_id=${orderId} email=${emailFromNotes || "unknown"} — may be membership payment`);
+    // No event registration → check if this is a membership payment.
+    // notes.plan is set by /api/payment/create-order for all membership orders.
+    const membershipPlan  = payment.notes?.plan;
+    const membershipEmail = (payment.notes?.email ?? payment.email ?? emailFromNotes ?? "").toLowerCase();
+
+    if (membershipPlan && membershipEmail) {
+      console.log(
+        `[razorpay-webhook] No event registration — attempting membership activation` +
+        ` plan=${membershipPlan} email=${membershipEmail} payment=${payment.id}`
+      );
+      const result = await activateMembership({
+        paymentId:   payment.id,
+        orderId:     orderId ?? "",
+        email:       membershipEmail,
+        planKey:     membershipPlan,
+        amountPaise: payment.amount,
+        logLabel:    "razorpay-webhook",
+      });
+      console.log(`[razorpay-webhook] membership activation result=${result} payment=${payment.id}`);
+    } else {
+      console.log(
+        `[razorpay-webhook] Unrecognised payment — no event registration and no membership notes` +
+        ` order=${orderId} email=${emailFromNotes || "unknown"}`
+      );
+    }
     return;
   }
 
