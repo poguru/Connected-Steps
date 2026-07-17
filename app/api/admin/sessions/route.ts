@@ -1,11 +1,11 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import webpush from "web-push";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendWhatsApp, sessionWAParams } from "@/lib/notify";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 import { createNotifications } from "@/lib/notify-inapp";
 
-// Lazy VAPID init â€” only called when push is actually needed,
+// Lazy VAPID init â€" only called when push is actually needed,
 // so missing env vars don't crash the module at build time.
 function initWebPush(): boolean {
   const pub  = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await q;
   if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
-  // Backward-compatible: no pagination params â†’ same { data } shape as before.
+  // Backward-compatible: no pagination params â†' same { data } shape as before.
   return NextResponse.json(
     limit > 0
       ? { data, page, limit, hasMore: (data?.length ?? 0) >= limit }
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
-  // Fire-and-forget â€” send email to all registered users, don't block the response
+  // Fire-and-forget â€" send email to all registered users, don't block the response
   sendSessionAnnouncementEmails(db, {
     id:       data.id,
     title,
@@ -66,13 +66,13 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ data });
 }
 
-// â”€â”€ Session announcement emails (Resend) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€ Session announcement emails (Resend) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 async function sendSessionAnnouncementEmails(
   db: ReturnType<typeof getSupabaseServer>,
   session: { id: string; title: string; date: string; time: string | null; venue: string | null; location: string }
 ) {
-  // Fetch all registered users â€” needed for both in-app notifications and emails
+  // Fetch all registered users â€" needed for both in-app notifications and emails
   const { data: users, error } = await db
     .from("users")
     .select("email, first_name, last_name")
@@ -105,7 +105,7 @@ async function sendSessionAnnouncementEmails(
   });
   const displayVenue = session.venue || session.location;
 
-  // Resend batch API â€” up to 100 emails per request, avoids per-call rate limits
+  // Resend batch API â€" up to 100 emails per request, avoids per-call rate limits
   const BATCH_SIZE = 100;
   let sent = 0, failed = 0;
 
@@ -114,9 +114,9 @@ async function sendSessionAnnouncementEmails(
     const batch = chunk.map(u => {
       const name = `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() || "there";
       return {
-        from:    `${process.env.ZEPTOMAIL_FROM_NAME ?? “Connected Steps”} <${process.env.ZEPTOMAIL_FROM_EMAIL ?? “info@connectedsteps.in”}>`,
+        from:    `${process.env.ZEPTOMAIL_FROM_NAME ?? "Connected Steps"} <${process.env.ZEPTOMAIL_FROM_EMAIL ?? "info@connectedsteps.in"}>`,
         to:      [u.email],
-        subject: `New Session: ${session.title} – Connected Steps`,
+        subject: `New Session: ${session.title} - Connected Steps`,
         html:    buildAnnouncementEmail(name, session.title, dateStr, session.time, displayVenue, joinUrl),
       };
     });
@@ -143,7 +143,7 @@ function buildAnnouncementEmail(
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>New Session â€” Connected Steps</title>
+  <title>New Session â€" Connected Steps</title>
 </head>
 <body style="margin:0;padding:0;background:#f4f4f5;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
@@ -180,12 +180,12 @@ function buildAnnouncementEmail(
                 <table width="100%" cellpadding="0" cellspacing="0">
                   <tr>
                     <td style="padding:16px 24px;border-right:1px solid #e5e5e5;width:50%;vertical-align:top;">
-                      <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">ðŸ“… Date</div>
+                      <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">ðŸ"… Date</div>
                       <div style="font-size:14px;font-weight:600;color:#0a0a0a;">${dateStr}</div>
                       ${time ? `<div style="font-size:12px;color:#666;margin-top:2px;">ðŸ• ${time}</div>` : ""}
                     </td>
                     <td style="padding:16px 24px;width:50%;vertical-align:top;">
-                      <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">ðŸ“ Venue</div>
+                      <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">ðŸ" Venue</div>
                       <div style="font-size:14px;font-weight:600;color:#0a0a0a;">${venue}</div>
                     </td>
                   </tr>
@@ -200,7 +200,7 @@ function buildAnnouncementEmail(
               <td style="background:#e8620a;border-radius:6px;">
                 <a href="${joinUrl}"
                    style="display:block;padding:14px 40px;font-size:15px;font-weight:700;color:#fff;text-decoration:none;">
-                  Register for this session â†’
+                  Register for this session â†'
                 </a>
               </td>
             </tr>
@@ -230,7 +230,7 @@ function buildAnnouncementEmail(
 </html>`;
 }
 
-// â”€â”€ WhatsApp + push â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€ WhatsApp + push â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 async function notifyUsers(
   db: ReturnType<typeof import("@/lib/supabase-server").getSupabaseServer>,
@@ -268,7 +268,7 @@ async function notifyUsers(
 
     if (subs && subs.length > 0 && initWebPush()) {
       const payload = JSON.stringify({
-        title: "New Session â€“ Connected Steps",
+        title: "New Session â€" Connected Steps",
         body:  `${title} at ${displayLocation}. Tap to register.`,
         icon:  "/logo.png",
         url:   `/join/${sessionId}`,
