@@ -38,7 +38,7 @@ export default function FloatingContact() {
         {/* WhatsApp */}
         <div className="fab-wa">
           <a href="https://wa.me/9703620570" target="_blank" rel="noopener noreferrer"
-            title="Chat on WhatsApp" className="fab-btn"
+            aria-label="Chat on WhatsApp" title="Chat on WhatsApp" className="fab-btn"
             style={{ width:44, height:44, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center",
               background:"oklch(0.20 0.006 250)", border:"1px solid rgba(37,211,102,0.28)", boxShadow:"0 4px 16px rgba(0,0,0,0.5)", flexShrink:0 }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="#25D366">
