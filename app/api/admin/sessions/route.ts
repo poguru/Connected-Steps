@@ -114,9 +114,9 @@ async function sendSessionAnnouncementEmails(
     const batch = chunk.map(u => {
       const name = `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() || "there";
       return {
-        from:    "",
+        from:    `${process.env.ZEPTOMAIL_FROM_NAME ?? “Connected Steps”} <${process.env.ZEPTOMAIL_FROM_EMAIL ?? “info@connectedsteps.in”}>`,
         to:      [u.email],
-        subject: `New Session: ${session.title} â€” Connected Steps`,
+        subject: `New Session: ${session.title} – Connected Steps`,
         html:    buildAnnouncementEmail(name, session.title, dateStr, session.time, displayVenue, joinUrl),
       };
     });

@@ -62,6 +62,7 @@ const NAV_GROUPS = [
     label: "Reports",
     icon:  "📊",
     links: [
+      { label: "Analytics",            href: "/admin/analytics",            exact: false, icon: "📈" },
       { label: "Finance",              href: "/admin/finance",              exact: false, icon: "💰" },
       { label: "Payment Investigate",  href: "/admin/payment-reconcile",    exact: false, icon: "🔍" },
       { label: "Leaderboard",          href: "/admin/leaderboard",          exact: false, icon: "🏆" },

@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     for (let i = 0; i < recipients.length; i += BATCH) {
       const chunk = recipients.slice(i, i + BATCH);
       const jobs  = chunk.map(r => ({
-        from:    "",
+        from:    `${process.env.ZEPTOMAIL_FROM_NAME ?? "Connected Steps"} <${process.env.ZEPTOMAIL_FROM_EMAIL ?? "info@connectedsteps.in"}>`,
         to:      [r.email],
         subject: subject?.trim() || "Message from Connected Steps",
         html:    emailHtml(personalise(message, r.name)),

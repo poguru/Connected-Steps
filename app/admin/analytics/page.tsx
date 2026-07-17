@@ -155,7 +155,7 @@ export default function AnalyticsPage() {
           {/* Revenue section */}
           <div>
             <Label style={{ marginBottom: "12px" }}>Revenue</Label>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 12 }}>
               <KPI label="Total Revenue"        value={fmt(data.summary.total_revenue)}        color="#e8620a" trend={data.growth.revenue}       sparkline={data.trends.revenue}       sparkColor="#e8620a" />
               <KPI label="Event Revenue"        value={fmt(data.summary.event_revenue)}        color="#fbbf24" sparkline={data.trends.revenue.map((_, i) => data.trends.revenue[i])} sparkColor="#fbbf24" />
               <KPI label="Membership Revenue"   value={fmt(data.summary.membership_revenue)}   color="#60a5fa" sparkline={data.trends.memberships} sparkColor="#60a5fa" />
@@ -169,7 +169,7 @@ export default function AnalyticsPage() {
           {/* Members section */}
           <div>
             <Label style={{ marginBottom: "12px" }}>Members &amp; Growth</Label>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 12 }}>
               <KPI label="Active Members"    value={String(data.summary.active_memberships)} color="#4ade80" />
               <KPI label="New Users"         value={String(data.summary.total_new_users)}    color="#60a5fa" trend={data.growth.users} sparkline={data.trends.new_users} sparkColor="#60a5fa" />
               <KPI label="New Memberships"   value={String(data.trends.memberships.reduce((a, b) => a + b, 0))} color="#a78bfa" sparkline={data.trends.memberships} sparkColor="#a78bfa" />
@@ -184,7 +184,7 @@ export default function AnalyticsPage() {
           {/* Events section */}
           <div>
             <Label style={{ marginBottom: "12px" }}>Event Registrations</Label>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 12 }}>
               <KPI label="Total Registrations" value={String(data.summary.total_registrations)}  trend={data.growth.registrations} sparkline={data.trends.registrations} />
               <KPI label="Paid"                value={String(data.summary.paid_registrations)}   color="#4ade80" />
               <KPI label="Free / Comps"        value={String(data.summary.free_registrations)}   color="#a3e635" />
@@ -197,7 +197,7 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Quick links */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
             {[
               { label: "↗ Export Full Report (CSV)", href: "/api/admin/export", note: "Use Admin › Export" },
               { label: "📊 Finance & Settlement",    href: "/admin/finance",    note: "Revenue & Razorpay fees" },

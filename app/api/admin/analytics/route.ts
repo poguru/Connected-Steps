@@ -103,7 +103,8 @@ export async function GET(req: NextRequest) {
   const now_iso  = now.toISOString();
   const allMems  = membershipsRes.data ?? [];
   const activeMemberships   = allMems.filter(m => m.status === "active" && m.expires_at > now_iso).length;
-  const membershipRevenue   = allMems.reduce((s, m) => s + (m.amount_paid ?? 0), 0);
+  // amount_paid is stored in paise → divide by 100 to get rupees (same as dashboard route)
+  const membershipRevenue   = Math.round(allMems.reduce((s, m) => s + (m.amount_paid ?? 0), 0) / 100);
 
   // New memberships per month (from started_at in window)
   const memsByMonth: Record<string, number> = {};
