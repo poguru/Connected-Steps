@@ -292,7 +292,7 @@ export default function PostCard({ post, currentUserEmail, onDeleted }: Props) {
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 0.875rem 0.6rem", borderTop: "1px solid var(--border)", marginTop: "0.6rem" }}>
         <ReactionBtn emoji={reactions.my === "like" ? "❤️" : "🤍"} count={reactions.like} active={reactions.my === "like"} label="Like" onClick={() => react("like")} disabled={reactBusy} />
         <ReactionBtn emoji="🎉" count={reactions.celebrate} active={reactions.my === "celebrate"} label="Celebrate" onClick={() => react("celebrate")} disabled={reactBusy} />
-        <button onClick={loadComments}
+        <button onClick={() => loadComments()}
           style={{ display: "flex", alignItems: "center", gap: "0.3rem", padding: "5px 12px", borderRadius: 20, border: `1px solid ${showComments ? "oklch(0.72 0.19 49 / 40%)" : "var(--border)"}`, background: showComments ? "oklch(0.72 0.19 49 / 10%)" : "transparent", cursor: "pointer", fontSize: "0.78rem", color: showComments ? "var(--cs-orange)" : "var(--muted-foreground)", fontFamily: "inherit", transition: "all 0.15s" }}>
           <span style={{ fontSize: "1rem" }}>💬</span>
           {commentCount > 0 && <span>{commentCount}</span>}
