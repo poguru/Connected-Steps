@@ -27,7 +27,7 @@ function AdminLoginForm() {
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Login failed"); return; }
       const redirect = searchParams.get("redirect") ?? "/admin";
-      router.push(redirect);
+      router.replace(redirect);
     } catch {
       setError("Network error. Please try again.");
     } finally {

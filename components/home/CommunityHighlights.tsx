@@ -77,6 +77,7 @@ function HeroMedia({ session, onClick }: { session: Session; onClick: () => void
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [loaded,    setLoaded]    = useState(false);
+  const [imgError,  setImgError]  = useState(false);
 
   useVideoAutoplay(videoRef as React.RefObject<HTMLVideoElement>);
 
@@ -111,10 +112,11 @@ function HeroMedia({ session, onClick }: { session: Session; onClick: () => void
           border: "1px solid rgba(255,255,255,0.07)",
         }}
       >
-        {imageUrl && (
+        {imageUrl && !imgError && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={imageUrl} alt={session.title} loading="lazy"
+            onError={() => setImgError(true)}
             style={{ width: "100%", height: "auto", display: "block" }}
           />
         )}
@@ -147,11 +149,12 @@ function HeroMedia({ session, onClick }: { session: Session; onClick: () => void
         aria-label={`View gallery for ${session.title}`}
       >
         {/* Background image / poster */}
-        {imageUrl && (
+        {imageUrl && !imgError && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={imageUrl} alt={session.title} loading="lazy"
             onLoad={() => setLoaded(true)}
+            onError={() => setImgError(true)}
             style={{
               position: "absolute", inset: 0, width: "100%", height: "100%",
               objectFit: "cover", objectPosition: "center 25%", display: "block",
@@ -236,7 +239,8 @@ function SessionCard({
   const videoUrl = getVideoUrl(session);
   const imageUrl = getImageUrl(session);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [hovered, setHovered] = useState(false);
+  const [hovered,  setHovered]  = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   const handleMouseEnter = useCallback(() => {
     setHovered(true);
@@ -278,9 +282,10 @@ function SessionCard({
     >
       {/* ── Mobile: natural-flow image, no fixed height, no cropping ── */}
       <div className="cs-ch-card-media-mobile">
-        {imageUrl && (
+        {imageUrl && !imgError && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={imageUrl} alt={session.title} loading="lazy"
+            onError={() => setImgError(true)}
             style={{ width: "100%", height: "auto", display: "block" }}
           />
         )}
@@ -288,9 +293,10 @@ function SessionCard({
 
       {/* ── Desktop: fixed aspect-ratio cover with overlays ── */}
       <div className="cs-ch-card-media-desktop" style={{ position: "relative", aspectRatio: "4/3", overflow: "hidden", flexShrink: 0 }}>
-        {imageUrl && (
+        {imageUrl && !imgError && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={imageUrl} alt={session.title} loading="lazy"
+            onError={() => setImgError(true)}
             style={{
               width: "100%", height: "100%", objectFit: "cover",
               objectPosition: "center 25%", display: "block",

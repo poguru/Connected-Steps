@@ -64,11 +64,11 @@ function UnauthorizedContent() {
           gap:            "0.75rem",
         }}>
           {isAdminPath ? (
-            <Link href="/admin/login" style={btnStyle("primary")}>
+            <Link href={`/admin/login${from ? `?redirect=${encodeURIComponent(from)}` : ""}`} style={btnStyle("primary")}>
               Log in as admin
             </Link>
           ) : isCoachPath ? (
-            <Link href="/coach/login" style={btnStyle("primary")}>
+            <Link href={`/coach/login${from ? `?redirect=${encodeURIComponent(from)}` : ""}`} style={btnStyle("primary")}>
               Log in as coach
             </Link>
           ) : (

@@ -1,21 +1,24 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
-export const revalidate = 120;
+export const revalidate = 60;
 
 export async function GET() {
   const db = getSupabaseServer();
 
-  // Last 10 sessions that have a photo
+  // Fetch recent sessions — no photo_url filter here; session_media covers
+  // are checked below and sessions without any image are dropped at the end.
   const { data: sessions } = await db
     .from("sessions")
     .select("id, title, date, time, venue, location, photo_url")
-    .not("photo_url", "is", null)
     .order("date", { ascending: false })
-    .limit(10);
+    .limit(20);
 
   if (!sessions || sessions.length === 0) return NextResponse.json({ sessions: [] });
 
+  // Narrow to sessions that have at least some visual: either photo_url on the
+  // session row itself OR a cover entry in session_media (checked below).
+  // We fetch 20 above so we have headroom after filtering down to 10.
   const sessionIds = sessions.map(s => s.id);
 
   // ── Fetch cover media from the session_media table ──────────────────────────
@@ -72,5 +75,10 @@ export async function GET() {
     })
   );
 
-  return NextResponse.json({ sessions: results });
+  // Drop sessions that have no displayable image at all, then cap at 10
+  const withMedia = results
+    .filter(s => s.photo_url || s.cover_media_url || s.cover_thumbnail_url)
+    .slice(0, 10);
+
+  return NextResponse.json({ sessions: withMedia });
 }

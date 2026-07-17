@@ -255,11 +255,9 @@ export async function proxy(request: NextRequest) {
   response.headers.set("Permissions-Policy",      "camera=(self), microphone=(), geolocation=(), payment=(self)");
   // Mirror of ENFORCED_CSP in next.config.ts — keep the two in sync.
   // next.config.ts covers public/unmatched routes; middleware covers matched routes.
-  // Both enforcement and report-only use identical policies so monitoring stays
-  // consistent across all routes, authenticated or public.
   const cspValue = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://cdn.razorpay.com https://checkout-static-next.razorpay.com",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in https://lh3.googleusercontent.com https://cdn.razorpay.com",
     "font-src 'self' data:",
@@ -272,8 +270,7 @@ export async function proxy(request: NextRequest) {
     "form-action 'self'",
     "upgrade-insecure-requests",
   ].join("; ");
-  response.headers.set("Content-Security-Policy",             cspValue);
-  response.headers.set("Content-Security-Policy-Report-Only", cspValue);
+  response.headers.set("Content-Security-Policy", cspValue);
 
   return response;
 }

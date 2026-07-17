@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 
-export default function CoachLoginPage() {
-  const router = useRouter();
+function CoachLoginForm() {
+  const router       = useRouter();
+  const searchParams = useSearchParams();
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [error,    setError]    = useState("");
@@ -30,7 +31,8 @@ export default function CoachLoginPage() {
       // but NativeShell reads localStorage — both must be set.
       localStorage.setItem("cs_user", JSON.stringify({ email: data.email, role: "coach" }));
 
-      router.push("/coach");
+      const redirect = searchParams.get("redirect") ?? "/coach";
+      router.replace(redirect);
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -95,5 +97,13 @@ export default function CoachLoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CoachLoginPage() {
+  return (
+    <Suspense>
+      <CoachLoginForm />
+    </Suspense>
   );
 }

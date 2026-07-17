@@ -38,7 +38,11 @@ export async function POST(req: NextRequest, { params }: Params) {
       action = "switched";
     }
   } else {
-    await db.from("user_post_likes").insert({ post_id: id, user_email: user_email.toLowerCase(), reaction_type });
+    const { error: insertErr } = await db.from("user_post_likes").insert({ post_id: id, user_email: user_email.toLowerCase(), reaction_type });
+    if (insertErr) {
+      console.error("[posts/react] insert failed:", insertErr.message);
+      return NextResponse.json({ error: "Could not save reaction" }, { status: 500 });
+    }
     action = "added";
   }
 

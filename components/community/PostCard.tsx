@@ -89,13 +89,20 @@ export default function PostCard({ post, currentUserEmail, onDeleted }: Props) {
         method: "POST", headers: userAuthHeaders(),
         body: JSON.stringify({ reaction_type: type }),
       });
-      if (!res.ok) setReactions(prev);
+      if (res.ok) {
+        const data = await res.json() as { action: string; counts: { like: number; celebrate: number } };
+        if (data.counts) {
+          setReactions({ like: data.counts.like, celebrate: data.counts.celebrate, my: data.action === "removed" ? null : type });
+        }
+      } else {
+        setReactions(prev);
+      }
     } catch { setReactions(prev); }
     finally   { setReactBusy(false); }
   }
 
-  async function loadComments() {
-    if (loadingCom || comments.length > 0) { setShowComments(s => !s); return; }
+  async function loadComments(force = false) {
+    if (!force && (loadingCom || comments.length > 0)) { setShowComments(s => !s); return; }
     setShowComments(true);
     setLoadingCom(true);
     const res  = await fetch(`/api/posts/${post.id}/comments`);
@@ -258,13 +265,15 @@ export default function PostCard({ post, currentUserEmail, onDeleted }: Props) {
               if (!stored) return;
               const me = JSON.parse(stored) as { firstName?: string; email?: string };
               const name = me.firstName ?? me.email?.split("@")[0] ?? "Someone";
-              await fetch(`/api/posts/${post.id}/comments`, {
+              const res = await fetch(`/api/posts/${post.id}/comments`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ author_name: name, author_email: me.email ?? "", body: `Happy Birthday! 🎂🎉🏃` }),
+                headers: userAuthHeaders(),
+                body: JSON.stringify({ author_name: name, body: `Happy Birthday! 🎂🎉🏃` }),
               });
-              setCommentCount(c => c + 1);
-              await loadComments();
+              if (res.ok) {
+                setCommentCount(c => c + 1);
+                await loadComments(true);
+              }
             }}
             style={{
               width: "100%", padding: "9px", borderRadius: 10,

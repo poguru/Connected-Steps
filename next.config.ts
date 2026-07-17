@@ -12,7 +12,7 @@ import type { NextConfig } from "next";
 //   upgrade-insecure-requests — auto-upgrade any stray HTTP sub-resource to HTTPS.
 const ENFORCED_CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://cdn.razorpay.com https://checkout-static-next.razorpay.com",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in https://lh3.googleusercontent.com https://cdn.razorpay.com",
   "font-src 'self' data:",
@@ -40,12 +40,6 @@ const securityHeaders = [
   // Applied globally by next.config.ts so that public routes (/pricing,
   // /events, etc.) are also protected, not just middleware-matched routes.
   { key: "Content-Security-Policy", value: ENFORCED_CSP },
-
-  // ── Content-Security-Policy-Report-Only (monitoring) ─────────────────────
-  // Same policy as enforcement. Browsers report violations to the console
-  // even for already-blocked requests, so this surfaces any gaps introduced
-  // by future feature work without needing a separate report-uri endpoint.
-  { key: "Content-Security-Policy-Report-Only", value: ENFORCED_CSP },
 ];
 
 const nextConfig: NextConfig = {
@@ -64,6 +58,11 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     optimizePackageImports: ["lucide-react", "framer-motion"],
+  },
+  async redirects() {
+    return [
+      { source: "/privacy-policy", destination: "/privacy", permanent: true },
+    ];
   },
   async headers() {
     return [

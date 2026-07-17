@@ -59,7 +59,7 @@ export default function FeedItem({ event, currentUserEmail, compact = false }: P
       created_at:   event.created_at,
       likes:        event.reactions.like,
       celebrates:   event.reactions.celebrate,
-      comments:     0,
+      comments:     (event.payload.comments_count as number) ?? 0,
       my_reaction:  event.reactions.my_reaction,
     };
     return <PostCard post={post} currentUserEmail={currentUserEmail} />;
@@ -96,7 +96,14 @@ export default function FeedItem({ event, currentUserEmail, compact = false }: P
         headers: { "Content-Type": "application/json", "x-user-token": token },
         body: JSON.stringify({ feed_event_id: event.id, reaction_type: type }),
       });
-      if (!res.ok) setReactions(prev);
+      if (res.ok) {
+        const data = await res.json() as { action: string; counts: { like: number; celebrate: number } };
+        if (data.counts) {
+          setReactions({ like: data.counts.like, celebrate: data.counts.celebrate, my_reaction: data.action === "removed" ? null : type });
+        }
+      } else {
+        setReactions(prev);
+      }
     } catch {
       setReactions(prev);
     } finally {

@@ -212,23 +212,53 @@ export async function GET(req: NextRequest) {
 
     // â”€â”€ Attach reaction counts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-    const eventIds = page.map(e => e.id);
-    const reactionsRes = await db
-      .from("feed_reactions")
-      .select("feed_event_id, reaction_type, user_email")
-      .in("feed_event_id", eventIds);
+    // user_post events store reactions in user_post_likes (via /api/posts/[id]/react).
+    // All other event types use feed_reactions. Query both in parallel.
+    const userPostEvents = page.filter(e => e.event_type === "user_post");
+    const otherEvents    = page.filter(e => e.event_type !== "user_post");
+    const otherEventIds  = otherEvents.map(e => e.id);
+    const userPostIds    = userPostEvents.map(e => e.payload.post_id as string).filter(Boolean);
+
+    const [reactionsRes, postLikesRes, postCommentsRes] = await Promise.all([
+      otherEventIds.length
+        ? db.from("feed_reactions").select("feed_event_id, reaction_type, user_email").in("feed_event_id", otherEventIds)
+        : Promise.resolve({ data: [] as { feed_event_id: string; reaction_type: string; user_email: string }[], error: null }),
+      userPostIds.length
+        ? db.from("user_post_likes").select("post_id, reaction_type, user_email").in("post_id", userPostIds)
+        : Promise.resolve({ data: [] as { post_id: string; reaction_type: string; user_email: string }[], error: null }),
+      userPostIds.length
+        ? db.from("user_post_comments").select("post_id").in("post_id", userPostIds)
+        : Promise.resolve({ data: [] as { post_id: string }[], error: null }),
+    ]);
 
     const reactionMap: Record<string, { like: number; celebrate: number; my_reaction: "like" | "celebrate" | null }> = {};
+
     for (const r of reactionsRes.data ?? []) {
       if (!reactionMap[r.feed_event_id]) reactionMap[r.feed_event_id] = { like: 0, celebrate: 0, my_reaction: null };
       reactionMap[r.feed_event_id][r.reaction_type as "like" | "celebrate"]++;
       if (r.user_email === email) reactionMap[r.feed_event_id].my_reaction = r.reaction_type as "like" | "celebrate";
     }
 
-    const result: FeedEvent[] = page.map(e => ({
-      ...e,
-      reactions: reactionMap[e.id] ?? { like: 0, celebrate: 0, my_reaction: null },
-    }));
+    // user_post reactions keyed by "post_" + post_id to match event.id
+    for (const r of postLikesRes.data ?? []) {
+      const eventId = `post_${r.post_id}`;
+      if (!reactionMap[eventId]) reactionMap[eventId] = { like: 0, celebrate: 0, my_reaction: null };
+      reactionMap[eventId][r.reaction_type as "like" | "celebrate"]++;
+      if (r.user_email === email) reactionMap[eventId].my_reaction = r.reaction_type as "like" | "celebrate";
+    }
+
+    const commentCountMap: Record<string, number> = {};
+    for (const c of postCommentsRes.data ?? []) {
+      commentCountMap[c.post_id] = (commentCountMap[c.post_id] ?? 0) + 1;
+    }
+
+    const result: FeedEvent[] = page.map(e => {
+      const reactions = reactionMap[e.id] ?? { like: 0, celebrate: 0, my_reaction: null };
+      if (e.event_type === "user_post" && e.payload.post_id) {
+        return { ...e, reactions, payload: { ...e.payload, comments_count: commentCountMap[e.payload.post_id as string] ?? 0 } };
+      }
+      return { ...e, reactions };
+    });
 
     return NextResponse.json({ events: result, next_cursor, has_more });
   } catch (e: unknown) {
