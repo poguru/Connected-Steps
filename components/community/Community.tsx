@@ -99,7 +99,7 @@ export default function Community() {
   useEffect(() => {
     if (tab !== "posts" || !user || posts.length > 0) return;
     setPostsLoading(true);
-    fetch(`/api/posts?scope=global&limit=20`)
+    fetch(`/api/posts?scope=global&limit=20&email=${encodeURIComponent(user.email)}`)
       .then(r => r.json())
       .then(d => setPosts(d.posts ?? []))
       .catch(() => {})
