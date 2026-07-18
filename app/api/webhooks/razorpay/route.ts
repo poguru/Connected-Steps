@@ -5,6 +5,7 @@ import { handleEventQrEmail,
          handleInvoiceGenerate } from "@/lib/job-handlers";
 import { enqueueJob }           from "@/lib/job-queue";
 import { activateMembership }   from "@/lib/membership-activate";
+import { sendItRunConfirmationEmail } from "@/lib/it-run-email";
 
 // POST /api/webhooks/razorpay
 //
@@ -131,6 +132,12 @@ async function handlePaymentCaptured(payment: RzpPaymentEntity): Promise<void> {
   const { id: paymentId, order_id: orderId, amount } = payment;
   const db = getSupabaseServer();
 
+  // ── IT Run Sprint-2 payment (notes.type === "it_run") ─────────────────────
+  if (payment.notes?.type === "it_run" || payment.notes?.it_run_reg_id) {
+    await handleItRunPaymentCaptured(db, payment, paymentId, orderId ?? "");
+    return;
+  }
+
   // ── Find the pending event registration by order_id ───────────────────────
   const { data: reg } = await db
     .from("event_registrations")
@@ -213,6 +220,54 @@ async function handlePaymentCaptured(payment: RzpPaymentEntity): Promise<void> {
 
   // Process the found registration (shared between primary and fallback paths)
   return handlePaymentCapturedForReg(db, reg, paymentId, orderId);
+}
+
+async function handleItRunPaymentCaptured(
+  db:        ReturnType<typeof getSupabaseServer>,
+  payment:   RzpPaymentEntity,
+  paymentId: string,
+  orderId:   string,
+): Promise<void> {
+  const regId   = payment.notes?.it_run_reg_id   ?? "";
+  const regCode = payment.notes?.it_run_reg_code ?? "";
+  const label   = `[razorpay-webhook/it-run] reg=${regCode || regId}`;
+
+  const { data: reg } = await db
+    .from("it_run_registrations")
+    .select("id, registration_code, lead_email, final_price, payment_status, razorpay_payment_id, qr_token")
+    .eq("razorpay_order_id", orderId)
+    .maybeSingle<{ id: string; registration_code: string; lead_email: string; final_price: number; payment_status: string; razorpay_payment_id: string | null; qr_token: string | null }>();
+
+  if (!reg) {
+    console.warn(`${label} Order not found by order_id=${orderId} — skipping`);
+    return;
+  }
+
+  if (reg.payment_status === "paid") {
+    console.log(`${label} Already paid — skipping`);
+    return;
+  }
+  if (reg.razorpay_payment_id === paymentId) {
+    console.log(`${label} Payment ${paymentId} already processed — skipping`);
+    return;
+  }
+
+  const { error } = await db
+    .from("it_run_registrations")
+    .update({ payment_status: "paid", razorpay_payment_id: paymentId, razorpay_order_id: orderId })
+    .eq("id", reg.id)
+    .in("payment_status", ["pending", "failed"]);
+
+  if (error) {
+    if (error.code === "23505") { console.log(`${label} Duplicate payment_id — already handled`); return; }
+    console.error(`${label} DB update failed:`, error.message);
+    return;
+  }
+
+  console.log(`${label} Payment confirmed via webhook — payment ${paymentId}`);
+
+  sendItRunConfirmationEmail(reg.id, reg.registration_code, reg.lead_email, reg.qr_token ?? "")
+    .catch(e => console.error(`${label} Confirmation email failed:`, e));
 }
 
 type RegRow = {
