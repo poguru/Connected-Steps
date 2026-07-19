@@ -16,7 +16,9 @@ export async function POST(
   if (!file) return NextResponse.json({ error: "No file uploaded." }, { status: 400 });
 
   const ext      = file.name.split(".").pop()?.toLowerCase() || "jpg";
-  const fileName = `${id}/group.${ext}`;
+  // Use a timestamp suffix so every upload gets a new URL and Supabase Storage's
+  // CDN never serves a stale cached version of the previous group photo.
+  const fileName = `${id}/group_${Date.now()}.${ext}`;
   const buffer   = Buffer.from(await file.arrayBuffer());
 
   const db = getSupabaseServer();
@@ -50,8 +52,10 @@ export async function POST(
     uploader_email: "admin",
   });
 
+  // revalidatePath("/") invalidates the Next.js page cache for the homepage.
+  // Note: revalidatePath on an API path has no effect — the API route uses
+  // force-dynamic + explicit no-store headers to prevent all caching.
   revalidatePath("/");
-  revalidatePath("/api/sessions/recent");
 
   return NextResponse.json({ success: true, photo_url: cover_image_url, cover_image_url });
 }

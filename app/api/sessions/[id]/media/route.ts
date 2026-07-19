@@ -122,7 +122,6 @@ export async function POST(req: NextRequest, { params }: Params) {
       await db.from("sessions").update({ photo_url: thumbOrUrl }).eq("id", id);
     }
     revalidatePath("/");
-    revalidatePath("/api/sessions/recent");
   }
 
   return NextResponse.json({ media: inserted }, { status: 201 });

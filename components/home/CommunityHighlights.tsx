@@ -388,7 +388,7 @@ export default function CommunityHighlights() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/sessions/recent").then(r => r.json()),
+      fetch("/api/sessions/recent", { cache: "no-store" }).then(r => r.json()),
       fetch("/api/stats").then(r => r.json()),
     ])
       .then(([sessData, statsData]) => {

@@ -86,5 +86,9 @@ export async function GET() {
     .filter(s => s.photo_url || s.cover_media_url || s.cover_thumbnail_url)
     .slice(0, 10);
 
-  return NextResponse.json({ sessions: withMedia });
+  // Explicit no-store so Vercel's Edge CDN and the browser never cache this response.
+  // force-dynamic prevents Next.js ISR caching; these headers cover the CDN/browser layers.
+  return NextResponse.json({ sessions: withMedia }, {
+    headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+  });
 }
