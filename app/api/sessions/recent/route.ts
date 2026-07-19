@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const db = getSupabaseServer();
@@ -12,6 +12,7 @@ export async function GET() {
     .from("sessions")
     .select("id, title, date, time, venue, location, photo_url")
     .order("date", { ascending: false })
+    .order("created_at", { ascending: false })
     .limit(20);
 
   if (!sessions || sessions.length === 0) return NextResponse.json({ sessions: [] });
@@ -30,8 +31,13 @@ export async function GET() {
       .from("session_media")
       .select("session_id, media_type, url, thumbnail_url, duration_secs")
       .in("session_id", sessionIds)
-      .eq("is_cover", true);
-    for (const row of covers ?? []) coverMap[row.session_id] = row;
+      .eq("is_cover", true)
+      .order("created_at", { ascending: false });
+    // If a session has multiple is_cover=true rows (e.g. after group photo upsert),
+    // keep only the most recent one per session (first in DESC order wins).
+    for (const row of covers ?? []) {
+      if (!coverMap[row.session_id]) coverMap[row.session_id] = row;
+    }
   } catch { /* session_media may not exist yet */ }
 
   // ── Fetch feedback for each session ─────────────────────────────────────────

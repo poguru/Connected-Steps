@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 
@@ -29,9 +30,28 @@ export async function POST(
   const { data: urlData } = db.storage.from("session-photos").getPublicUrl(fileName);
   const cover_image_url = urlData.publicUrl;
 
-  // Save to cover_image_url (card cover) — separate from photo_url (gallery photos)
-  const { error: dbErr } = await db.from("sessions").update({ cover_image_url }).eq("id", id);
+  // Update both cover_image_url and photo_url so the recent-sessions API can display it.
+  // cover_image_url: used by admin UI; photo_url: used by the public recent API as fallback.
+  const { error: dbErr } = await db
+    .from("sessions")
+    .update({ cover_image_url, photo_url: cover_image_url })
+    .eq("id", id);
   if (dbErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
+
+  // Upsert a cover entry in session_media so the cover map in the recent API is populated.
+  await db.from("session_media").update({ is_cover: false }).eq("session_id", id).eq("is_cover", true);
+  await db.from("session_media").insert({
+    session_id:    id,
+    media_type:    "image",
+    url:           cover_image_url,
+    thumbnail_url: cover_image_url,
+    is_cover:      true,
+    display_order: 0,
+    uploader_email: "admin",
+  });
+
+  revalidatePath("/");
+  revalidatePath("/api/sessions/recent");
 
   return NextResponse.json({ success: true, photo_url: cover_image_url, cover_image_url });
 }

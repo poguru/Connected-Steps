@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 
@@ -112,5 +113,17 @@ export async function POST(req: NextRequest, { params }: Params) {
     .single();
 
   if (dbErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
+
+  // When a new cover is set, also update sessions.photo_url so the recent-sessions
+  // API can surface the new image without waiting for session_media to be re-queried.
+  if (setAsCover) {
+    const thumbOrUrl = thumbnailUrl ?? (isImage ? publicUrl : null);
+    if (thumbOrUrl) {
+      await db.from("sessions").update({ photo_url: thumbOrUrl }).eq("id", id);
+    }
+    revalidatePath("/");
+    revalidatePath("/api/sessions/recent");
+  }
+
   return NextResponse.json({ media: inserted }, { status: 201 });
 }
