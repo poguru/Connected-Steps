@@ -85,10 +85,10 @@ export default function MediaManager({ sessionId, uploaderEmail, onChange }: Pro
       const form = new FormData();
       form.append("file",           file);
       form.append("uploader_email", uploaderEmail);
-      // Set as cover when there is currently no cover in the session AND this is
-      // the first file in this upload batch.  Applies to both images and videos.
-      const hasCover      = items.some(item => item.is_cover);
-      const shouldBeCover = !hasCover && i === 0;
+      // Set as cover only when the session has no media at all yet (items.length === 0
+      // means the DB is definitely empty, so no unique-cover-index conflict is possible).
+      // When items already exist, the admin uses the star button to change the cover.
+      const shouldBeCover = items.length === 0 && i === 0;
       if (shouldBeCover) form.append("set_as_cover", "true");
 
       try {
