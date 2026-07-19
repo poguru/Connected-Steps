@@ -5,43 +5,42 @@ import { Card, Button, Alert, Badge } from "@/components/ui/ds";
 
 interface Setting { key: string; value: string; updated_at: string; }
 interface ReminderLog {
-  id:         string;
-  user_email: string;
-  session_id: string;
-  channel:    string;
-  status:     string;
-  error_msg:  string | null;
-  sent_at:    string;
-  sessions:   { title: string; date: string } | null;
+  id:             string;
+  user_email:     string;
+  reminder_date:  string;
+  sessions_count: number;
+  channel:        string;
+  status:         string;
+  error_msg:      string | null;
+  sent_at:        string;
 }
 interface Session { id: string; title: string; date: string; }
 
 const CHANNEL_LABELS: Record<string, string> = {
-  email:     "Email",
-  whatsapp:  "WhatsApp",
-  inapp:     "In-App",
+  email:    "Email",
+  whatsapp: "WhatsApp",
 };
 
 const TOGGLE_KEYS = [
-  { key: "session_reminder_email_enabled",  label: "Email Reminders",    desc: "Send a personalised email to each registered member the evening before their session." },
+  { key: "session_reminder_email_enabled",  label: "Email Reminders",    desc: "Send a personalised email to every active member the evening before each session, listing all sessions for that day." },
   { key: "session_reminder_wa_enabled",     label: "WhatsApp Reminders", desc: "Send a WhatsApp message via Meta Cloud API to members who have a verified phone number." },
-  { key: "session_reminder_inapp_enabled",  label: "In-App Reminders",   desc: "Push an in-app notification and web push to members when they next open the app." },
 ] as const;
 
 export default function RemindersSettingsPage() {
-  const [settings,   setSettings]   = useState<Setting[]>([]);
-  const [logs,       setLogs]       = useState<ReminderLog[]>([]);
-  const [sessions,   setSessions]   = useState<Session[]>([]);
-  const [saving,     setSaving]     = useState<Record<string, boolean>>({});
-  const [saved,      setSaved]      = useState<Record<string, boolean>>({});
-  const [loadErr,    setLoadErr]    = useState("");
+  const [settings,    setSettings]    = useState<Setting[]>([]);
+  const [logs,        setLogs]        = useState<ReminderLog[]>([]);
+  const [sessions,    setSessions]    = useState<Session[]>([]);
+  const [saving,      setSaving]      = useState<Record<string, boolean>>({});
+  const [saved,       setSaved]       = useState<Record<string, boolean>>({});
+  const [loadErr,     setLoadErr]     = useState("");
   const [logsLoading, setLogsLoading] = useState(false);
+
   const [testSessionId, setTestSessionId] = useState("");
-  const [testEmail,    setTestEmail]    = useState("");
-  const [testPhone,    setTestPhone]    = useState("");
-  const [testChannels, setTestChannels] = useState<string[]>(["email", "whatsapp", "inapp"]);
-  const [testResult,   setTestResult]   = useState<{ ok: boolean; report?: Record<string, { ok: boolean; error?: string }> } | null>(null);
-  const [testLoading,  setTestLoading]  = useState(false);
+  const [testEmail,     setTestEmail]     = useState("");
+  const [testPhone,     setTestPhone]     = useState("");
+  const [testChannels,  setTestChannels]  = useState<string[]>(["email", "whatsapp"]);
+  const [testResult,    setTestResult]    = useState<{ ok: boolean; report?: Record<string, { ok: boolean; error?: string }> } | null>(null);
+  const [testLoading,   setTestLoading]   = useState(false);
 
   const loadSettings = useCallback(async () => {
     const res = await fetch("/api/admin/settings");
@@ -145,8 +144,8 @@ export default function RemindersSettingsPage() {
         Session Reminder Settings
       </h1>
       <p style={{ margin: "0 0 2rem", fontSize: 13, color: "#555" }}>
-        Members receive a reminder at 6:00 PM IST the evening before each session they have registered for.
-        No reminders are sent at session creation.
+        Every evening at 6:00 PM IST, all active members receive a single reminder listing
+        every session scheduled for the next day. No pre-registration required.
       </p>
 
       {loadErr && <Alert variant="error" style={{ marginBottom: "1rem" }}>{loadErr}</Alert>}
@@ -191,10 +190,10 @@ export default function RemindersSettingsPage() {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {[
-            ["Fires at",   "6:00 PM IST every day"],
-            ["UTC time",   "12:30 UTC"],
-            ["Targets",    "Registered users for tomorrow's sessions"],
-            ["Dedup",      "One reminder per user per session per channel"],
+            ["Fires at",    "6:00 PM IST every day"],
+            ["UTC time",    "12:30 UTC"],
+            ["Recipients",  "All active Connected Steps members"],
+            ["Dedup",       "One email + one WhatsApp per user per day"],
           ].map(([label, value]) => (
             <div key={label}>
               <div style={{ fontSize: 11, color: "#555", marginBottom: 2 }}>{label}</div>
@@ -252,7 +251,7 @@ export default function RemindersSettingsPage() {
           <div>
             <div style={{ fontSize: 11, color: "#888", marginBottom: 8 }}>Channels</div>
             <div style={{ display: "flex", gap: 8 }}>
-              {["email", "whatsapp", "inapp"].map(ch => (
+              {["email", "whatsapp"].map(ch => (
                 <button
                   key={ch}
                   onClick={() => toggleChannel(ch)}
@@ -324,7 +323,7 @@ export default function RemindersSettingsPage() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-                  {["Session", "Email", "Channel", "Status", "Sent At"].map(h => (
+                  {["Email", "Date", "Sessions", "Channel", "Status", "Sent At"].map(h => (
                     <th key={h} style={{ padding: "6px 10px", textAlign: "left", color: "#555", fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
@@ -332,14 +331,17 @@ export default function RemindersSettingsPage() {
               <tbody>
                 {logs.map(log => (
                   <tr key={log.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                    <td style={{ padding: "7px 10px", color: "#ccc", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {log.sessions?.title ?? log.session_id.slice(0, 8)}
-                    </td>
                     <td style={{ padding: "7px 10px", color: "#888", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {log.user_email}
                     </td>
+                    <td style={{ padding: "7px 10px", color: "#ccc", whiteSpace: "nowrap" }}>
+                      {new Date(log.reminder_date + "T12:00:00Z").toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                    </td>
+                    <td style={{ padding: "7px 10px", color: "#888", textAlign: "center" }}>
+                      {log.sessions_count}
+                    </td>
                     <td style={{ padding: "7px 10px", color: "#aaa" }}>
-                      <Badge color={log.channel === "email" ? "blue" : log.channel === "whatsapp" ? "green" : "purple"} size="sm">
+                      <Badge color={log.channel === "email" ? "blue" : "green"} size="sm">
                         {CHANNEL_LABELS[log.channel] ?? log.channel}
                       </Badge>
                     </td>

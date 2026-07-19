@@ -85,6 +85,7 @@ const NAV_GROUPS = [
     links: [
       { label: "Notifications",    href: "/admin/settings/notifications", exact: false, icon: "🔔" },
       { label: "Platform Settings",href: "/admin/settings",              exact: true,  icon: "⚙️" },
+      { label: "Session Reminders",href: "/admin/settings/reminders",   exact: false, icon: "⏰" },
       { label: "Birthday",         href: "/admin/birthday-settings",     exact: false, icon: "🎂" },
     ],
   },

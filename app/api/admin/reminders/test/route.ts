@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession, ADMIN_SESSION_COOKIE } from "@/lib/admin-auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail, sendWhatsApp, sessionWAParams } from "@/lib/notify";
-import { createNotification } from "@/lib/notify-inapp";
-import { sessionReminderEmailHTML } from "@/lib/session-reminder-email";
+import { sessionReminderEmailHTML, type SessionForEmail } from "@/lib/session-reminder-email";
 
 function requireAdmin(req: NextRequest): boolean {
   const token = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
@@ -12,7 +11,8 @@ function requireAdmin(req: NextRequest): boolean {
 
 // POST /api/admin/reminders/test
 // Body: { session_id, test_email, test_phone?, channels: string[] }
-// Sends a live test reminder to the provided email/phone. Does NOT log to session_reminder_log.
+// Sends a live test reminder using the multi-session email template.
+// Does NOT log to session_reminder_log.
 export async function POST(req: NextRequest) {
   if (!requireAdmin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -39,26 +39,31 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
   const appUrl  = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
-  const venue   = session.venue || session.location;
-  const timeStr = session.time  || "6:00 AM";
-  const joinUrl = `${appUrl}/join/${session.id}`;
-  const dateStr = new Date(session.date + "T12:00:00Z").toLocaleDateString("en-IN", {
-    weekday: "long", day: "numeric", month: "long", year: "numeric",
-  });
-  const name = test_email.split("@")[0] || "Admin";
+  const venue   = session.venue || session.location || "Hyderabad";
+  const name    = test_email.split("@")[0] || "Admin";
+
+  // Use tomorrow's date for display (since this is a preview of a reminder)
+  const nowIST      = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+  const tomorrowIST = new Date(nowIST);
+  tomorrowIST.setDate(tomorrowIST.getDate() + 1);
+  const tomorrowStr = tomorrowIST.toISOString().slice(0, 10);
+
+  const sessionsForEmail: SessionForEmail[] = [
+    { id: session.id, title: session.title, date: session.date, time: session.time, venue: session.venue, location: session.location },
+  ];
 
   const report: Record<string, { ok: boolean; error?: string }> = {};
 
   if (channels.includes("email")) {
     try {
-      const html   = sessionReminderEmailHTML(name, session.title, dateStr, timeStr, venue, joinUrl);
+      const html   = sessionReminderEmailHTML(name, sessionsForEmail, tomorrowStr, `${appUrl}/sessions`);
       const result = await sendEmail(
         test_email,
         name,
-        `[TEST] Tomorrow's Training Session - ${session.title} | Connected Steps`,
+        `[TEST] Tomorrow: ${session.title} | Connected Steps`,
         html,
         false,
-        true,  // isTransactional = true so NON_OTP_EMAILS_DISABLED doesn't block test sends
+        true,  // isTransactional = true bypasses NON_OTP_EMAILS_DISABLED for test sends
       );
       report.email = { ok: result.ok, error: result.error };
     } catch (e) {
@@ -78,21 +83,6 @@ export async function POST(req: NextRequest) {
       }
     } else {
       report.whatsapp = { ok: false, error: "No phone number provided for WhatsApp test" };
-    }
-  }
-
-  if (channels.includes("inapp")) {
-    try {
-      await createNotification({
-        user_email: test_email,
-        type:       "session_reminder",
-        title:      `[TEST] ${session.title} is tomorrow`,
-        body:       `See you at ${venue} at ${timeStr}. Get good sleep tonight!`,
-        action_url: `/join/${session.id}`,
-      });
-      report.inapp = { ok: true };
-    } catch (e) {
-      report.inapp = { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
   }
 

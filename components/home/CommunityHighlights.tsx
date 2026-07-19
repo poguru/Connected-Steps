@@ -44,7 +44,10 @@ function getVideoUrl(s: Session): string | null {
 }
 
 function getImageUrl(s: Session): string | null {
-  return s.cover_thumbnail_url ?? s.photo_url ?? null;
+  if (s.cover_thumbnail_url) return s.cover_thumbnail_url;
+  if (s.photo_url) return s.photo_url;
+  if (s.cover_media_type !== "video" && s.cover_media_url) return s.cover_media_url;
+  return null;
 }
 
 // ── Viewport-aware video autoplay ─────────────────────────────────────────────
