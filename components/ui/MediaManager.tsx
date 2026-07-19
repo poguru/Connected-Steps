@@ -85,8 +85,10 @@ export default function MediaManager({ sessionId, uploaderEmail, onChange }: Pro
       const form = new FormData();
       form.append("file",           file);
       form.append("uploader_email", uploaderEmail);
-      // First upload of a video → set as cover
-      const shouldBeCover = items.length === 0 && i === 0 && file.type.startsWith("video/");
+      // Set as cover when there is currently no cover in the session AND this is
+      // the first file in this upload batch.  Applies to both images and videos.
+      const hasCover      = items.some(item => item.is_cover);
+      const shouldBeCover = !hasCover && i === 0;
       if (shouldBeCover) form.append("set_as_cover", "true");
 
       try {

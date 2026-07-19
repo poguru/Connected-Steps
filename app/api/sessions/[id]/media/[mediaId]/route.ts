@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 
@@ -48,6 +49,18 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     .single();
 
   if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
+
+  // When marking this item as the cover, sync sessions.photo_url and bust the
+  // homepage cache so the Community Highlights module reflects the change immediately.
+  if (body.is_cover === true && data) {
+    const photoUrl = (data as { thumbnail_url?: string | null; url?: string }).thumbnail_url
+      ?? (data as { url?: string }).url;
+    if (photoUrl) {
+      await db.from("sessions").update({ photo_url: photoUrl }).eq("id", id);
+    }
+    revalidatePath("/");
+  }
+
   return NextResponse.json({ media: data });
 }
 
