@@ -67,6 +67,53 @@ function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 
+// ── Types for weekly bonus audit ──────────────────────────────────────────────
+interface WBAUser {
+  email:            string;
+  name:             string;
+  sessions_in_week: number;
+  attendance_dates: string[];
+  session_titles:   string[];
+  attendance_pts:   number;
+  bonus_eligible:   boolean;
+  bonus_awarded:    boolean | null;
+  reason:           string | null;
+}
+interface WBAWeek {
+  week_start:               string;
+  week_end:                 string;
+  week_label:               string;
+  total_users_attending:    number;
+  users_eligible_for_bonus: number;
+  users_awarded_bonus:      number;
+  users:                    WBAUser[];
+}
+interface WBADiscrepancy {
+  email:          string;
+  name:           string;
+  week_start:     string;
+  week_label:     string;
+  sessions_count: number;
+  root_cause:     string;
+  fix:            string;
+}
+interface WBAData {
+  month:                      string;
+  generated_at:               string;
+  week_key_column_exists:     boolean;
+  note:                       string | null;
+  weeks:                      WBAWeek[];
+  summary: {
+    total_sessions_in_month:       number;
+    total_users_with_attendance:   number;
+    total_users_eligible:          number;
+    total_bonuses_expected:        number;
+    total_bonuses_awarded:         number;
+    discrepancies:                 number;
+  };
+  discrepancies: WBADiscrepancy[];
+}
+
 // ── Types for recalculate ─────────────────────────────────────────────────────
 interface PerUserAudit {
   email:                string;
@@ -112,6 +159,13 @@ interface RecalcResult {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function AdminPointsPage() {
+  // ── Weekly bonus audit ──
+  const [wbaData,        setWbaData]        = useState<WBAData | null>(null);
+  const [wbaLoading,     setWbaLoading]     = useState(false);
+  const [wbaMsg,         setWbaMsg]         = useState<string | null>(null);
+  const [expandedWeeks,  setExpandedWeeks]  = useState<Set<string>>(new Set());
+  const [wbaShowAll,     setWbaShowAll]     = useState(false);
+
   // ── Recalculate ──
   const [auditData,      setAuditData]      = useState<AuditData | null>(null);
   const [recalcResult,   setRecalcResult]   = useState<RecalcResult | null>(null);
@@ -141,6 +195,38 @@ export default function AdminPointsPage() {
   const [adjNotes,   setAdjNotes]   = useState("");
   const [adjLoading, setAdjLoading] = useState(false);
   const [adjMsg,     setAdjMsg]     = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // ── Weekly bonus audit fetch ──
+  async function runWBA() {
+    setWbaLoading(true);
+    setWbaMsg(null);
+    try {
+      const res  = await fetch(`/api/admin/points/weekly-bonus-audit?month=${currentMonth()}`);
+      const json = await res.json() as WBAData & { error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Audit failed");
+      setWbaData(json);
+      // Auto-expand weeks that have discrepancies
+      const toExpand = new Set<string>();
+      for (const w of json.weeks) {
+        if (w.users.some(u => u.bonus_eligible && u.bonus_awarded === false)) {
+          toExpand.add(w.week_start);
+        }
+      }
+      setExpandedWeeks(toExpand);
+    } catch (e) {
+      setWbaMsg(e instanceof Error ? e.message : "Audit failed");
+    } finally {
+      setWbaLoading(false);
+    }
+  }
+
+  function toggleWeek(wk: string) {
+    setExpandedWeeks(prev => {
+      const next = new Set(prev);
+      if (next.has(wk)) next.delete(wk); else next.add(wk);
+      return next;
+    });
+  }
 
   // ── Audit ──
   async function runAudit() {
@@ -644,6 +730,195 @@ export default function AdminPointsPage() {
           )}
         </CardBody>
       </Card>
+      {/* ── Weekly Bonus Audit ── */}
+      <Card style={{ marginTop: 28 }}>
+        <CardBody style={{ padding: "18px 20px" }}>
+
+          {/* Header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 3 }}>
+                Weekly Bonus Audit — {currentMonth()}
+              </div>
+              <div style={{ fontSize: 12, color: "#666" }}>
+                Per-week, per-user breakdown. Read-only — no data is modified.
+              </div>
+            </div>
+            <Button variant="ghost" onClick={runWBA} loading={wbaLoading} disabled={wbaLoading}>
+              Run Weekly Bonus Audit
+            </Button>
+          </div>
+
+          {wbaMsg && (
+            <Alert variant="error" style={{ marginBottom: 14 }}>{wbaMsg}</Alert>
+          )}
+
+          {wbaData && (
+            <>
+              {/* Warning if week_key column missing */}
+              {!wbaData.week_key_column_exists && (
+                <Alert variant="error" style={{ marginBottom: 14 }}>
+                  {wbaData.note}
+                </Alert>
+              )}
+
+              {/* Summary stats */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 20 }}>
+                {[
+                  { label: "Sessions",          value: wbaData.summary.total_sessions_in_month,     color: "#60a5fa" },
+                  { label: "Members Active",    value: wbaData.summary.total_users_with_attendance, color: "#4ade80" },
+                  { label: "Eligible Users",    value: wbaData.summary.total_users_eligible,        color: "#fbbf24" },
+                  { label: "Bonuses Expected",  value: wbaData.summary.total_bonuses_expected,      color: "#fbbf24" },
+                  { label: "Bonuses Awarded",   value: wbaData.summary.total_bonuses_awarded,       color: wbaData.summary.total_bonuses_awarded === wbaData.summary.total_bonuses_expected ? "#4ade80" : "#f87171" },
+                  { label: "Discrepancies",     value: wbaData.summary.discrepancies,               color: wbaData.summary.discrepancies === 0 ? "#4ade80" : "#f87171" },
+                ].map(s => (
+                  <div key={s.label} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 8, padding: "10px 12px", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.value}</div>
+                    <div style={{ fontSize: 10, color: "#555", marginTop: 2, textTransform: "uppercase", letterSpacing: "0.06em" }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Per-week breakdown */}
+              {wbaData.weeks.map(week => {
+                const hasIssues = week.users.some(u => u.bonus_eligible && u.bonus_awarded === false);
+                const isOpen    = expandedWeeks.has(week.week_start);
+                const eligible  = week.users.filter(u => u.bonus_eligible);
+
+                return (
+                  <div key={week.week_start} style={{ marginBottom: 8, border: `1px solid ${hasIssues ? "rgba(248,113,113,0.3)" : "rgba(255,255,255,0.07)"}`, borderRadius: 10, overflow: "hidden" }}>
+
+                    {/* Week header row */}
+                    <button
+                      onClick={() => toggleWeek(week.week_start)}
+                      style={{ width: "100%", background: hasIssues ? "rgba(248,113,113,0.06)" : "rgba(255,255,255,0.02)", border: "none", cursor: "pointer", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontFamily: "inherit" }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{week.week_label}</span>
+                        <span style={{ fontSize: 11, color: "#555" }}>{week.total_users_attending} attending</span>
+                        {eligible.length > 0 && (
+                          <span style={{ fontSize: 11, fontWeight: 600, color: hasIssues ? "#f87171" : "#4ade80" }}>
+                            {week.users_awarded_bonus}/{eligible.length} bonuses awarded
+                          </span>
+                        )}
+                        {eligible.length === 0 && (
+                          <span style={{ fontSize: 11, color: "#555" }}>No one eligible</span>
+                        )}
+                      </div>
+                      <span style={{ fontSize: 12, color: "#555" }}>{isOpen ? "▲" : "▼"}</span>
+                    </button>
+
+                    {/* Expanded user table */}
+                    {isOpen && (
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                          <thead>
+                            <tr style={{ background: "rgba(255,255,255,0.03)" }}>
+                              {["Member", "Sessions", "Dates", "Att. Pts", "Eligible", "Bonus Awarded", "Notes"].map(h => (
+                                <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: "#555", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid rgba(255,255,255,0.06)", whiteSpace: "nowrap" }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {week.users
+                              .filter(u => wbaShowAll || u.bonus_eligible || u.sessions_in_week >= 2)
+                              .sort((a, b) => b.sessions_in_week - a.sessions_in_week)
+                              .map(u => (
+                                <tr key={u.email} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", background: u.bonus_eligible && u.bonus_awarded === false ? "rgba(248,113,113,0.04)" : "transparent" }}>
+                                  <td style={{ padding: "9px 12px" }}>
+                                    <div style={{ fontWeight: 600, color: "#fff" }}>{u.name}</div>
+                                    <div style={{ color: "#555", fontSize: 10 }}>{u.email}</div>
+                                  </td>
+                                  <td style={{ padding: "9px 12px", fontWeight: 700, color: u.sessions_in_week >= 4 ? "#fbbf24" : "#aaa" }}>
+                                    {u.sessions_in_week}
+                                  </td>
+                                  <td style={{ padding: "9px 12px", color: "#888", maxWidth: 200 }}>
+                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+                                      {u.attendance_dates.map((d, i) => (
+                                        <span key={d} title={u.session_titles[i]} style={{ background: "rgba(255,255,255,0.06)", borderRadius: 4, padding: "2px 6px", fontSize: 10, whiteSpace: "nowrap" }}>
+                                          {new Date(d + "T12:00:00Z").toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </td>
+                                  <td style={{ padding: "9px 12px", color: "#4ade80", fontWeight: 600 }}>+{u.attendance_pts}</td>
+                                  <td style={{ padding: "9px 12px" }}>
+                                    {u.bonus_eligible
+                                      ? <span style={{ color: "#fbbf24", fontWeight: 700 }}>Yes</span>
+                                      : <span style={{ color: "#555" }}>No</span>}
+                                  </td>
+                                  <td style={{ padding: "9px 12px" }}>
+                                    {u.bonus_awarded === null && <span style={{ color: "#555" }}>N/A</span>}
+                                    {u.bonus_awarded === true  && <span style={{ color: "#4ade80", fontWeight: 700 }}>✓ Yes</span>}
+                                    {u.bonus_awarded === false && <span style={{ color: "#f87171", fontWeight: 700 }}>✗ Missing</span>}
+                                  </td>
+                                  <td style={{ padding: "9px 12px", color: "#666", fontSize: 10 }}>
+                                    {u.reason ?? "—"}
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                        {week.users.some(u => !u.bonus_eligible && u.sessions_in_week < 2) && (
+                          <button
+                            onClick={() => setWbaShowAll(p => !p)}
+                            style={{ fontSize: 11, color: "#555", background: "none", border: "none", cursor: "pointer", padding: "8px 12px" }}
+                          >
+                            {wbaShowAll ? "Show fewer rows" : `Show all ${week.total_users_attending} members`}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Discrepancies list */}
+              {wbaData.discrepancies.length > 0 && (
+                <div style={{ marginTop: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#f87171", marginBottom: 10 }}>
+                    {wbaData.discrepancies.length} Discrepanc{wbaData.discrepancies.length !== 1 ? "ies" : "y"} Found
+                  </div>
+                  {wbaData.discrepancies.map((d, i) => (
+                    <div key={i} style={{ background: "rgba(248,113,113,0.06)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 8, padding: "12px 14px", marginBottom: 8 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 6 }}>
+                        <div>
+                          <span style={{ fontWeight: 700, color: "#fff" }}>{d.name}</span>
+                          <span style={{ color: "#555", fontSize: 11, marginLeft: 8 }}>{d.email}</span>
+                        </div>
+                        <span style={{ fontSize: 11, color: "#fbbf24" }}>{d.week_label} · {d.sessions_count} sessions</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: "#f87171", marginBottom: 6 }}>
+                        Root cause: {d.root_cause}
+                      </div>
+                      <div style={{ fontSize: 10, color: "#555", fontFamily: "monospace", background: "rgba(0,0,0,0.3)", borderRadius: 6, padding: "8px 10px", wordBreak: "break-all" }}>
+                        Fix: {d.fix}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {wbaData.discrepancies.length === 0 && wbaData.summary.total_bonuses_expected > 0 && (
+                <div style={{ marginTop: 12, fontSize: 12, color: "#4ade80" }}>
+                  ✓ All eligible bonuses have been awarded correctly.
+                </div>
+              )}
+
+              {wbaData.summary.total_bonuses_expected === 0 && (
+                <div style={{ marginTop: 12, fontSize: 12, color: "#666" }}>
+                  No user has attended 4+ sessions in a single week this month yet.
+                </div>
+              )}
+
+              <div style={{ marginTop: 10, fontSize: 10, color: "#444" }}>
+                Generated at {new Date(wbaData.generated_at).toLocaleString("en-IN")} · Showing sessions within {wbaData.month} only
+              </div>
+            </>
+          )}
+        </CardBody>
+      </Card>
+
     </div>
   );
 }
