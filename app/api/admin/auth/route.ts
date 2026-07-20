@@ -8,14 +8,20 @@ const COOKIE_OPTS = {
   secure:    process.env.NODE_ENV === "production",
   sameSite:  "lax" as const,
   path:      "/",
-  maxAge:    8 * 60 * 60, // 8 hours
+  maxAge:    30 * 24 * 60 * 60, // 30 days — prevents silent expiry mid-session
 };
 
-// GET — check whether a valid admin session cookie exists
+// GET — check whether a valid admin session cookie exists.
+// Also re-issues a fresh cookie on each valid call (sliding session window)
+// so the 30-day TTL is reset every time the admin loads an admin page,
+// preventing silent expiry during normal daily use.
 export async function GET(req: NextRequest) {
   const token = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
   if (token && verifyAdminSession(token)) {
-    return NextResponse.json({ ok: true });
+    const res = NextResponse.json({ ok: true });
+    // Sliding window: re-issue a fresh 30-day token on every valid auth check
+    res.cookies.set(ADMIN_SESSION_COOKIE, signAdminSession(), COOKIE_OPTS);
+    return res;
   }
   return NextResponse.json({ ok: false }, { status: 401 });
 }

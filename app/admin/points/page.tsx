@@ -418,7 +418,7 @@ export default function AdminPointsPage() {
               <Pagination
                 page={histPage}
                 totalPages={history!.total_pages}
-                onPageChange={pg => { setHistPage(pg); loadHistory(pg); }}
+                onChange={pg => { setHistPage(pg); loadHistory(pg); }}
               />
             </div>
           )}

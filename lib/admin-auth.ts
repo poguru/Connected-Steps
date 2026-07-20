@@ -68,7 +68,7 @@ export function verifyUserToken(token: string): string | null {
 // Signed short-lived token so the raw admin password is never stored client-side.
 
 export const ADMIN_SESSION_COOKIE = "cs_admin_session";
-const ADMIN_SESSION_TTL = 8 * 60 * 60; // 8 hours in seconds
+const ADMIN_SESSION_TTL = 30 * 24 * 60 * 60; // 30 days in seconds
 
 export function signAdminSession(): string {
   const expires = Math.floor(Date.now() / 1000) + ADMIN_SESSION_TTL;

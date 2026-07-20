@@ -345,7 +345,7 @@ export default function MyPoints() {
                 <Pagination
                   page={page}
                   totalPages={data!.total_pages}
-                  onPageChange={changePage}
+                  onChange={changePage}
                 />
               </div>
             )}
