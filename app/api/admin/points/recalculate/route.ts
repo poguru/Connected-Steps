@@ -392,13 +392,25 @@ export async function POST(req: NextRequest) {
     }
 
     if (bonusToInsert.length > 0) {
-      const { error: bInsErr } = await db
-        .from("points_ledger")
-        .upsert(bonusToInsert, { onConflict: "user_email,week_key", ignoreDuplicates: true });
-      if (bInsErr) {
-        console.error("[recalculate] weekly_bonus insert error", bInsErr.message);
-      } else {
-        bonusRowsAdded = bonusToInsert.length;
+      // Use INSERT not UPSERT: PostgREST cannot resolve conflicts against partial
+      // unique indexes (points_ledger_weekly_bonus_dedup has WHERE category='weekly_bonus').
+      // Duplicates are already filtered out above via existingBonusSet, so plain
+      // INSERT is safe. Chunk to stay under PostgREST's 1000-row limit.
+      const BCHUNK = 500;
+      const insertErrors: string[] = [];
+      for (let i = 0; i < bonusToInsert.length; i += BCHUNK) {
+        const { error: bInsErr } = await db
+          .from("points_ledger")
+          .insert(bonusToInsert.slice(i, i + BCHUNK));
+        if (bInsErr) {
+          console.error("[recalculate] weekly_bonus insert error", bInsErr.message, bInsErr.code);
+          insertErrors.push(bInsErr.message);
+        } else {
+          bonusRowsAdded += Math.min(BCHUNK, bonusToInsert.length - i);
+        }
+      }
+      if (insertErrors.length > 0) {
+        console.error("[recalculate] weekly_bonus insert had errors:", insertErrors);
       }
     }
   }
