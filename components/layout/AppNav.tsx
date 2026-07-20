@@ -11,6 +11,7 @@ const NAV_LINKS = [
   { label: "Dashboard",    href: "/dashboard"    },
   { label: "Sessions",     href: "/weekend-run"  },
   { label: "Leaderboard",  href: "/leaderboard"  },
+  { label: "My Points",    href: "/points"       },
   { label: "Feed",         href: "/feed"         },
   { label: "Community",    href: "/community"    },
   { label: "Achievements", href: "/achievements" },

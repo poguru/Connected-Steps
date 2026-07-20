@@ -7,6 +7,13 @@ import { cacheDel, CK } from "@/lib/cache";
 import { autoFeedSessionCompleted } from "@/lib/auto-feed";
 import { createNotification } from "@/lib/notify-inapp";
 
+function isoMondayKey(dateStr: string): string {
+  const d = new Date(dateStr.slice(0, 10) + "T12:00:00Z");
+  const dow = d.getUTCDay();
+  d.setUTCDate(d.getUTCDate() - (dow === 0 ? 6 : dow - 1));
+  return d.toISOString().slice(0, 10);
+}
+
 // POST /api/attendance/scan
 // Header: x-user-token
 // Body: { token: string }
@@ -139,6 +146,67 @@ export async function POST(req: NextRequest) {
         category:   "attendance",
         awarded_by: null,
       });
+
+      // ── Weekly bonus ledger row ─────────────────────────────────────────────
+      // When this attendance is the 4th (or more) in the same ISO week, write a
+      // weekly_bonus ledger row so it appears in the user's points history.
+      // The leaderboard already calculates weekly bonus independently from
+      // session_attendance records, so this row is purely for history/transparency.
+      if (capturedSessionDate) {
+        const weekStart = isoMondayKey(capturedSessionDate);
+        const weekEndDate = new Date(weekStart + "T00:00:00Z");
+        weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 6);
+        const weekEnd = weekEndDate.toISOString().slice(0, 10);
+
+        // Check if bonus already recorded for this user+week (partial unique index dedup)
+        const { data: existingBonus } = await bgDb
+          .from("points_ledger")
+          .select("id")
+          .eq("user_email", capturedEmail)
+          .eq("category", "weekly_bonus")
+          .eq("week_key", weekStart)
+          .maybeSingle();
+
+        if (!existingBonus) {
+          // Count attended sessions in this ISO week
+          const { data: weekSessionRows } = await bgDb
+            .from("sessions")
+            .select("id")
+            .gte("date", weekStart)
+            .lte("date", weekEnd);
+
+          const weekSessionIds = (weekSessionRows ?? []).map(s => s.id);
+
+          if (weekSessionIds.length > 0) {
+            const { count: weekCount } = await bgDb
+              .from("session_attendance")
+              .select("id", { count: "exact", head: true })
+              .eq("user_email", capturedEmail)
+              .eq("attended", true)
+              .in("session_id", weekSessionIds);
+
+            if ((weekCount ?? 0) >= 4) {
+              await bgDb.from("points_ledger").insert({
+                user_email: capturedEmail,
+                session_id: capturedSessionId,
+                points:     5,
+                reason:     "Weekly Attendance Bonus (4+ sessions this week)",
+                category:   "weekly_bonus",
+                awarded_by: "system",
+                week_key:   weekStart,
+              });
+
+              await createNotification({
+                user_email: capturedEmail,
+                type:       "achievement",
+                title:      "Weekly Bonus Unlocked!",
+                body:       "You attended 4+ sessions this week and earned an extra 5 points!",
+                action_url: "/points",
+              });
+            }
+          }
+        }
+      }
 
       // Invalidate per-user caches so the next request reads fresh data.
       await cacheDel(
