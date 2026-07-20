@@ -234,11 +234,23 @@ export async function recalculateMonth(
   // The public /api/leaderboard route stores its response in Redis (30s TTL)
   // and behind HTTP CDN (stale-while-revalidate 60s).  Without explicit
   // invalidation users would see a stale snapshot for up to ~90 s after sync.
-  // We delete the base cache key (no-location, no-friends) which is the most
-  // frequently served variant.  Location-specific and friends-scoped keys carry
-  // their own 30s TTL and will self-expire; explicit deletion is not needed for
-  // correctness (just convenience for admin-facing tools).
-  await cacheDel(CK.leaderboard(null, null));
+  //
+  // For admin-triggered (force=true) recalculations we also clear every
+  // location-specific cache variant so users on the location-filtered tab see
+  // the updated points immediately rather than waiting up to 90 s.
+  // For regular QR-scan recalculations only the base key is cleared — the
+  // extra DB round-trip for location IDs isn't worth it on the hot path.
+  if (force) {
+    const { data: locations } = await db
+      .from("training_locations")
+      .select("id");
+    const locationKeys = (locations ?? []).map((l) =>
+      CK.leaderboard(l.id as string, null),
+    );
+    await cacheDel(CK.leaderboard(null, null), ...locationKeys);
+  } else {
+    await cacheDel(CK.leaderboard(null, null));
+  }
 
   return { message: `Recalculated points for ${upsertRows.length} user(s) — ${month}.`, updated: upsertRows.length };
 }

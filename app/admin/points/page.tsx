@@ -260,7 +260,7 @@ export default function AdminPointsPage() {
       setAuditData(json.audit);
       setRecalcMsg({
         type: "success",
-        text: `Recalculation complete — ${json.summary.users_recalculated} users, ${json.summary.attendance_points_added} attendance pts added, ${json.summary.weekly_bonuses_added} weekly bonuses added, ${json.summary.leaderboard_updated} leaderboard rows updated.`,
+        text: `Recalculation complete — ${json.summary.users_recalculated} users, ${json.summary.attendance_points_added} attendance pts added, ${json.summary.weekly_bonuses_added} weekly bonuses added, ${json.summary.leaderboard_updated} leaderboard rows updated. All leaderboard caches cleared — changes visible within 30 seconds.`,
       });
       // Refresh summary stats
       setSummaryLoad(true);
