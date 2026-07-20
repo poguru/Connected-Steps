@@ -182,9 +182,9 @@ export default function MyPoints() {
                 </div>
               </div>
               {week?.bonus_earned ? (
-                <Badge color="success" style={{ flexShrink: 0 }}>Bonus Earned! 🎉</Badge>
+                <Badge color="green" style={{ flexShrink: 0 }}>Bonus Earned! 🎉</Badge>
               ) : (
-                <Badge color="default" style={{ flexShrink: 0, background: "rgba(255,255,255,0.06)" }}>
+                <Badge color="gray" style={{ flexShrink: 0, background: "rgba(255,255,255,0.06)" }}>
                   {week?.sessions_count ?? 0} / 4 sessions
                 </Badge>
               )}
