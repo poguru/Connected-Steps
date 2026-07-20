@@ -273,7 +273,7 @@ export default function MyPoints() {
                 <EmptyState
                   icon="🏃"
                   title="No transactions yet"
-                  description="Attend sessions to start earning points!"
+                  body="Attend sessions to start earning points!"
                 />
               </div>
             ) : (
