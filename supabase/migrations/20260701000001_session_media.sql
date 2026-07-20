@@ -15,7 +15,7 @@
 
 create table if not exists session_media (
   id              uuid        primary key default gen_random_uuid(),
-  session_id      text        not null,
+  session_id      uuid        not null references sessions(id) on delete cascade,
   media_type      text        not null check (media_type in ('image', 'video')),
   url             text        not null,
   thumbnail_url   text,                     -- generated thumb for videos; null = use url
