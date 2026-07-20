@@ -17,7 +17,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
     .eq("session_id", id)
     .order("display_order", { ascending: true });
 
-  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
+  if (error) {
+    console.error("[media/GET] session_media select failed", { message: error.message, code: error.code });
+    return NextResponse.json({ error: `DB error (${error.code ?? "?"}): ${error.message}` }, { status: 500 });
+  }
   return NextResponse.json({ media: data ?? [] });
 }
 
@@ -76,7 +79,17 @@ export async function POST(req: NextRequest, { params }: Params) {
     .from(bucket)
     .upload(key, buf, { contentType: file.type, upsert: false });
 
-  if (upErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
+  if (upErr) {
+    console.error("[media/POST] storage upload failed", {
+      bucket, key,
+      message: upErr.message,
+      cause:   (upErr as { cause?: unknown }).cause,
+    });
+    return NextResponse.json(
+      { error: `Storage error: ${upErr.message}` },
+      { status: 500 },
+    );
+  }
 
   const { data: urlData } = db.storage.from(bucket).getPublicUrl(key);
   const publicUrl = urlData.publicUrl;
@@ -112,7 +125,18 @@ export async function POST(req: NextRequest, { params }: Params) {
     .select()
     .single();
 
-  if (dbErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
+  if (dbErr) {
+    console.error("[media/POST] session_media insert failed", {
+      message: dbErr.message,
+      code:    dbErr.code,
+      details: dbErr.details,
+      hint:    dbErr.hint,
+    });
+    return NextResponse.json(
+      { error: `DB error (${dbErr.code ?? "?"}): ${dbErr.message}` },
+      { status: 500 },
+    );
+  }
 
   // When a new cover is set, also update sessions.photo_url so the recent-sessions
   // API can surface the new image without waiting for session_media to be re-queried.
