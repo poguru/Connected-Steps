@@ -67,8 +67,59 @@ function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 
+// ── Types for recalculate ─────────────────────────────────────────────────────
+interface PerUserAudit {
+  email:                string;
+  name:                 string;
+  attendance_count:     number;
+  expected_month_pts:   number;
+  current_lb_month_pts: number;
+  lb_drift:             number;
+  missing_att_ledger:   number;
+  missing_bonus_ledger: number;
+  bonus_weeks:          string[];
+}
+interface AuditData {
+  month:                       string;
+  sessions_count:              number;
+  users_affected:              number;
+  attendance_records:          number;
+  missing_attendance_ledger:   number;
+  missing_weekly_bonus_ledger: number;
+  duplicate_attendance_rows:   number;
+  leaderboard_drift_count:     number;
+  week_key_column_exists:      boolean;
+  per_user:                    PerUserAudit[];
+}
+interface RecalcResult {
+  month:   string;
+  audit:   AuditData;
+  actions: {
+    attendance_ledger_rows_added:   number;
+    weekly_bonus_ledger_rows_added: number;
+    leaderboard_users_updated:      number;
+    leaderboard_message:            string;
+  };
+  summary: {
+    users_recalculated:     number;
+    attendance_points_added: number;
+    weekly_bonuses_added:   number;
+    duplicates_removed:     number;
+    leaderboard_updated:    number;
+    inconsistencies:        number;
+  };
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function AdminPointsPage() {
+  // ── Recalculate ──
+  const [auditData,      setAuditData]      = useState<AuditData | null>(null);
+  const [recalcResult,   setRecalcResult]   = useState<RecalcResult | null>(null);
+  const [auditLoading,   setAuditLoading]   = useState(false);
+  const [recalcLoading,  setRecalcLoading]  = useState(false);
+  const [recalcMsg,      setRecalcMsg]      = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [showPerUser,    setShowPerUser]    = useState(false);
+
   // ── Summary ──
   const [summary,       setSummary]       = useState<SummaryData | null>(null);
   const [summaryLoad,   setSummaryLoad]   = useState(true);
@@ -90,6 +141,54 @@ export default function AdminPointsPage() {
   const [adjNotes,   setAdjNotes]   = useState("");
   const [adjLoading, setAdjLoading] = useState(false);
   const [adjMsg,     setAdjMsg]     = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // ── Audit ──
+  async function runAudit() {
+    setAuditLoading(true);
+    setRecalcMsg(null);
+    setRecalcResult(null);
+    try {
+      const res  = await fetch(`/api/admin/points/recalculate?month=${currentMonth()}`);
+      const json = await res.json() as { audit?: AuditData; error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Audit failed");
+      setAuditData(json.audit ?? null);
+    } catch (e) {
+      setRecalcMsg({ type: "error", text: e instanceof Error ? e.message : "Audit failed" });
+    } finally {
+      setAuditLoading(false);
+    }
+  }
+
+  async function runRecalculate() {
+    setRecalcLoading(true);
+    setRecalcMsg(null);
+    try {
+      const res  = await fetch("/api/admin/points/recalculate", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ month: currentMonth() }),
+      });
+      const json = await res.json() as RecalcResult & { error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Recalculation failed");
+      setRecalcResult(json);
+      setAuditData(json.audit);
+      setRecalcMsg({
+        type: "success",
+        text: `Recalculation complete — ${json.summary.users_recalculated} users, ${json.summary.attendance_points_added} attendance pts added, ${json.summary.weekly_bonuses_added} weekly bonuses added, ${json.summary.leaderboard_updated} leaderboard rows updated.`,
+      });
+      // Refresh summary stats
+      setSummaryLoad(true);
+      fetch(`/api/admin/points/summary?month=${currentMonth()}`)
+        .then(r => r.json() as Promise<SummaryData>)
+        .then(d => setSummary(d))
+        .catch(() => {})
+        .finally(() => setSummaryLoad(false));
+    } catch (e) {
+      setRecalcMsg({ type: "error", text: e instanceof Error ? e.message : "Recalculation failed" });
+    } finally {
+      setRecalcLoading(false);
+    }
+  }
 
   // ── Load summary ──
   useEffect(() => {
@@ -178,6 +277,122 @@ export default function AdminPointsPage() {
           Award, deduct, and audit all points transactions across the community.
         </p>
       </div>
+
+      {/* ── Audit & Recalculate ── */}
+      <Card style={{ marginBottom: 28, border: "1px solid rgba(232,98,10,0.2)" }}>
+        <CardBody style={{ padding: "18px 20px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 3 }}>
+                Points Audit &amp; Recalculation
+              </div>
+              <div style={{ fontSize: 12, color: "#666" }}>
+                Recalculates all points for <strong style={{ color: "#e8620a" }}>{currentMonth()}</strong> from attendance records.
+                Safe to run multiple times — idempotent.
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <Button
+                variant="ghost"
+                onClick={runAudit}
+                loading={auditLoading}
+                disabled={auditLoading || recalcLoading}
+              >
+                Run Audit Only
+              </Button>
+              <Button
+                variant="primary"
+                onClick={runRecalculate}
+                loading={recalcLoading}
+                disabled={auditLoading || recalcLoading}
+              >
+                Audit &amp; Recalculate
+              </Button>
+            </div>
+          </div>
+
+          {recalcMsg && (
+            <Alert variant={recalcMsg.type === "success" ? "success" : "error"} style={{ marginBottom: 14 }}>
+              {recalcMsg.text}
+            </Alert>
+          )}
+
+          {/* Audit results */}
+          {auditData && (
+            <div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 14 }}>
+                {[
+                  { label: "Sessions",          value: auditData.sessions_count,              color: "#60a5fa" },
+                  { label: "Users w/ Attendance", value: auditData.users_affected,            color: "#4ade80" },
+                  { label: "Attendance Records", value: auditData.attendance_records,          color: "#4ade80" },
+                  { label: "Missing Att. Ledger", value: auditData.missing_attendance_ledger, color: auditData.missing_attendance_ledger > 0 ? "#f87171" : "#4ade80" },
+                  { label: "Missing Bonus Ledger", value: auditData.missing_weekly_bonus_ledger, color: auditData.missing_weekly_bonus_ledger > 0 ? "#fbbf24" : "#4ade80" },
+                  { label: "LB Drift (users)",  value: auditData.leaderboard_drift_count,    color: auditData.leaderboard_drift_count > 0 ? "#f87171" : "#4ade80" },
+                  { label: "Duplicate Rows",    value: auditData.duplicate_attendance_rows,   color: auditData.duplicate_attendance_rows > 0 ? "#f87171" : "#4ade80" },
+                ].map(s => (
+                  <div key={s.label} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 8, padding: "10px 12px", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: s.color }}>{s.value}</div>
+                    <div style={{ fontSize: 10, color: "#555", marginTop: 2, textTransform: "uppercase", letterSpacing: "0.06em" }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Per-user drift table — only users with issues */}
+              {auditData.per_user.filter(u => u.lb_drift !== 0 || u.missing_att_ledger > 0 || u.missing_bonus_ledger > 0).length > 0 && (
+                <div>
+                  <button
+                    onClick={() => setShowPerUser(p => !p)}
+                    style={{ fontSize: 12, color: "#e8620a", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 8 }}
+                  >
+                    {showPerUser ? "▲ Hide" : "▼ Show"} per-user details ({auditData.per_user.filter(u => u.lb_drift !== 0 || u.missing_att_ledger > 0 || u.missing_bonus_ledger > 0).length} users with issues)
+                  </button>
+
+                  {showPerUser && (
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                        <thead>
+                          <tr style={{ color: "#555", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                            {["Member","Sessions","Expected Pts","LB Pts","Drift","Missing Att","Missing Bonus"].map(h => (
+                              <th key={h} style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid rgba(255,255,255,0.06)", fontWeight: 700 }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {auditData.per_user
+                            .filter(u => u.lb_drift !== 0 || u.missing_att_ledger > 0 || u.missing_bonus_ledger > 0)
+                            .sort((a, b) => Math.abs(b.lb_drift) - Math.abs(a.lb_drift))
+                            .map(u => (
+                              <tr key={u.email} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                                <td style={{ padding: "7px 8px" }}>
+                                  <div style={{ fontWeight: 600, color: "#fff" }}>{u.name}</div>
+                                  <div style={{ color: "#555" }}>{u.email}</div>
+                                </td>
+                                <td style={{ padding: "7px 8px", color: "#4ade80" }}>{u.attendance_count}</td>
+                                <td style={{ padding: "7px 8px", color: "#fbbf24", fontWeight: 700 }}>{u.expected_month_pts}</td>
+                                <td style={{ padding: "7px 8px", color: "#60a5fa" }}>{u.current_lb_month_pts}</td>
+                                <td style={{ padding: "7px 8px", fontWeight: 700, color: u.lb_drift > 0 ? "#f87171" : u.lb_drift < 0 ? "#fbbf24" : "#4ade80" }}>
+                                  {u.lb_drift > 0 ? `+${u.lb_drift}` : u.lb_drift}
+                                </td>
+                                <td style={{ padding: "7px 8px", color: u.missing_att_ledger > 0 ? "#f87171" : "#4ade80" }}>{u.missing_att_ledger}</td>
+                                <td style={{ padding: "7px 8px", color: u.missing_bonus_ledger > 0 ? "#fbbf24" : "#4ade80" }}>{u.missing_bonus_ledger}</td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {auditData.per_user.filter(u => u.lb_drift !== 0 || u.missing_att_ledger > 0 || u.missing_bonus_ledger > 0).length === 0 && (
+                <div style={{ fontSize: 12, color: "#4ade80", padding: "8px 0" }}>
+                  ✓ All users are in sync. No action needed.
+                </div>
+              )}
+            </div>
+          )}
+        </CardBody>
+      </Card>
 
       {/* ── Summary stat cards ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 28 }}>
