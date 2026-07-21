@@ -5,7 +5,7 @@ import { autoFeedMemberJoined } from "@/lib/auto-feed";
 import { getOrCreateCode, processReferral } from "@/lib/referrals";
 import { enqueueJob } from "@/lib/job-queue";
 import { sendEmail, welcomeEmailHTML, adminNewUserEmailHTML } from "@/lib/notify";
-import { isRateLimited, recordFailure, getClientIp } from "@/lib/rate-limit";
+import { isRateLimited, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   // Rate limit registrations per IP to prevent bulk account creation / enumeration
@@ -19,13 +19,13 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // phoneVerified: true signals that the client completed the WhatsApp OTP step.
-    // The server re-checks otp_verifications to prevent spoofing.
+    // phoneVerified: legacy field kept for backward compatibility (feature-flagged WA OTP path).
+    // emailVerified: new primary verification mechanism.
     const { firstName, lastName, email, phone, goal, location, password, phoneVerified, referralCode, dob } = await req.json();
 
-    // phone is required; email is optional (users log in via phone)
-    if (!password || !firstName || !lastName || !phone) {
-      return NextResponse.json({ error: "Full name, mobile number, and password are required." }, { status: 400 });
+    // email is now required; phone is optional contact information
+    if (!password || !firstName || !lastName || !email) {
+      return NextResponse.json({ error: "Full name, email address, and password are required." }, { status: 400 });
     }
 
     // DOB validation
@@ -44,14 +44,14 @@ export async function POST(req: NextRequest) {
     const birthDay   = dobDate.getDate();
     const birthMonth = dobDate.getMonth() + 1;
 
-    // Normalise phone to 10 digits
-    const phoneDigits = (phone as string).replace(/\D/g, "");
+    // Normalise phone to 10 digits (optional — only validate if provided)
+    const phoneDigits = phone ? (phone as string).replace(/\D/g, "") : "";
     const phone10 = phoneDigits.length === 12 && phoneDigits.startsWith("91")
       ? phoneDigits.slice(2)
       : phoneDigits.length === 13 && phoneDigits.startsWith("091")
         ? phoneDigits.slice(3)
         : phoneDigits;
-    if (phone10.length !== 10 || !/^[6-9]\d{9}$/.test(phone10)) {
+    if (phone10 && (phone10.length !== 10 || !/^[6-9]\d{9}$/.test(phone10))) {
       return NextResponse.json({ error: "Please enter a valid 10-digit Indian mobile number." }, { status: 400 });
     }
 
@@ -68,11 +68,28 @@ export async function POST(req: NextRequest) {
 
     const supabaseServer = getSupabaseServer();
 
-    // ── Server-side phone OTP verification check ──────────────────────────────
-    // When phoneVerified=true, confirm the OTP was actually verified in the DB.
-    // This prevents the client from bypassing the OTP step by sending phoneVerified:true.
+    const emailNorm = (email as string).trim().toLowerCase();
+
+    // ── Email verification check (primary verification) ───────────────────────
+    // Confirm the email was verified via the link sent before step 3.
+    const { data: verifiedToken } = await supabaseServer
+      .from("email_verification_tokens")
+      .select("id, expires_at")
+      .eq("email", emailNorm)
+      .eq("verified", true)
+      .maybeSingle();
+
+    if (!verifiedToken) {
+      return NextResponse.json({ error: "Please verify your email address before creating your account." }, { status: 400 });
+    }
+    if (new Date(verifiedToken.expires_at) < new Date()) {
+      return NextResponse.json({ error: "Your email verification has expired. Please restart the sign-up process." }, { status: 400 });
+    }
+
+    // ── Legacy WhatsApp OTP check (feature-flagged) ───────────────────────────
+    // WA_OTP_ENABLED env var re-enables this path when WhatsApp OTP is turned back on.
     let confirmedPhoneVerified = false;
-    if (phoneVerified === true) {
+    if (process.env.WA_OTP_ENABLED === "true" && phoneVerified === true && phone10) {
       const { data: otpRecord } = await supabaseServer
         .from("otp_verifications")
         .select("verified, expires_at")
@@ -82,39 +99,37 @@ export async function POST(req: NextRequest) {
 
       if (otpRecord?.verified) {
         confirmedPhoneVerified = true;
-        // Clean up the OTP record now that the account is being created
         await supabaseServer
           .from("otp_verifications")
           .delete()
           .eq("identifier", phone10)
           .eq("type", "phone");
       }
-      // If OTP record not found or not verified, proceed but mark phone_verified=false
     }
 
     // ── Duplicate checks ──────────────────────────────────────────────────────
-    const { data: existingPhone } = await supabaseServer
-      .from("users")
-      .select("id")
-      .eq("phone", phone10)
-      .maybeSingle();
-    if (existingPhone) {
-      return NextResponse.json({ error: "An account with this mobile number already exists." }, { status: 409 });
-    }
-
-    if (email) {
-      const { data: existingEmail, error: checkError } = await supabaseServer
+    if (phone10) {
+      const { data: existingPhone } = await supabaseServer
         .from("users")
         .select("id")
-        .eq("email", (email as string).toLowerCase())
-        .single();
-      if (checkError && checkError.code !== "PGRST116") {
-        console.error("[register] email check error:", checkError.message);
-        return NextResponse.json({ error: "Registration failed. Please try again." }, { status: 500 });
+        .eq("phone", phone10)
+        .maybeSingle();
+      if (existingPhone) {
+        return NextResponse.json({ error: "An account with this mobile number already exists." }, { status: 409 });
       }
-      if (existingEmail) {
-        return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
-      }
+    }
+
+    const { data: existingEmail, error: checkError } = await supabaseServer
+      .from("users")
+      .select("id")
+      .eq("email", emailNorm)
+      .single();
+    if (checkError && checkError.code !== "PGRST116") {
+      console.error("[register] email check error:", checkError.message);
+      return NextResponse.json({ error: "Registration failed. Please try again." }, { status: 500 });
+    }
+    if (existingEmail) {
+      return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
     }
 
     const hashed = await bcrypt.hash(password, 12);
@@ -124,11 +139,12 @@ export async function POST(req: NextRequest) {
     const { error } = await supabaseServer.from("users").insert({
       first_name:         firstName,
       last_name:          lastName,
-      email:              email ? (email as string).toLowerCase() : null,
-      phone:              phone10,
+      email:              emailNorm,
+      phone:              phone10 || null,
       goal,
       location,
       password:           hashed,
+      email_verified:     true,
       phone_verified:     confirmedPhoneVerified,
       phone_verified_at:  confirmedPhoneVerified ? new Date().toISOString() : null,
       date_of_birth:      dob,
@@ -141,12 +157,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Registration failed. Please try again." }, { status: 500 });
     }
 
-    const userEmail = email ? (email as string).toLowerCase() : null;
+    // Clean up the used verification token
+    await supabaseServer.from("email_verification_tokens").delete().eq("email", emailNorm);
 
-    if (userEmail) {
-      autoFeedMemberJoined(userEmail, firstName, lastName, location ?? null).catch(() => {});
-      getOrCreateCode(userEmail).catch(() => {});
-    }
+    const userEmail = emailNorm;
+
+    autoFeedMemberJoined(userEmail, firstName, lastName, location ?? null).catch(() => {});
+    getOrCreateCode(userEmail).catch(() => {});
 
     if (referralCode && typeof referralCode === "string" && userEmail) {
       const referralPayload = {
@@ -158,14 +175,12 @@ export async function POST(req: NextRequest) {
       void processReferral(referralPayload.referralCode, referralPayload.referredEmail, referralPayload.referredFirstName).catch(console.error);
     }
 
-    // Welcome email (only if email provided)
-    if (userEmail) {
-      sendEmail(
-        userEmail, firstName,
-        "Welcome to Connected Steps! 🎉",
-        welcomeEmailHTML(firstName),
-      ).catch(() => {});
-    }
+    // Welcome email
+    sendEmail(
+      userEmail, firstName,
+      "Welcome to Connected Steps! 🎉",
+      welcomeEmailHTML(firstName),
+    ).catch(() => {});
 
     // Admin notification
     sendEmail(
@@ -173,8 +188,8 @@ export async function POST(req: NextRequest) {
       `New Registration: ${firstName} ${lastName}`,
       adminNewUserEmailHTML({
         firstName, lastName,
-        email:        userEmail ?? "(no email)",
-        phone:        phone10,
+        email:        userEmail,
+        phone:        phone10 || "(no phone)",
         dob:          dob ?? null,
         location:     location ?? null,
         referralCode: referralCode ?? null,

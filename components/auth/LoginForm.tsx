@@ -6,6 +6,8 @@ import Link from "next/link";
 import OtpInput from "./OtpInput";
 import { Alert, Input, PasswordInput } from "@/components/ui/ds";
 
+const WA_OTP_ENABLED = process.env.NEXT_PUBLIC_WA_OTP_ENABLED === "true";
+
 type Mode    = "password" | "otp";
 type OtpStep = "identifier" | "code";
 
@@ -133,11 +135,18 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
   async function sendOtp() {
     const val = identifier.trim();
     if (!val) { setOtpError("Please enter your mobile number or email."); return; }
+
+    // When WA OTP is disabled, block phone OTP and redirect to email
+    if (!WA_OTP_ENABLED && isPhone) {
+      setOtpError("Phone OTP is temporarily unavailable. Please sign in with your email address using password login, or enter your email to receive an OTP.");
+      return;
+    }
+
     setSending(true); setOtpError("");
     try {
       let res: Response;
       if (isPhone) {
-        // Phone OTP — use the new Meta WhatsApp endpoint
+        // Phone OTP — use the new Meta WhatsApp endpoint (WA_OTP_ENABLED=true path)
         const digits = val.replace(/\D/g, "");
         const phone10 = digits.length === 12 && digits.startsWith("91") ? digits.slice(2)
           : digits.length === 13 && digits.startsWith("091") ? digits.slice(3)

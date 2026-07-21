@@ -4,9 +4,14 @@ import { useState, useEffect, useRef, useCallback, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Camera, CheckCircle2 } from "lucide-react";
+import { Camera, CheckCircle2, Mail } from "lucide-react";
 import OtpInput from "./OtpInput";
 import { Alert, Input, PasswordInput, Select } from "@/components/ui/ds";
+
+// ── Feature flag ──────────────────────────────────────────────────────────────
+// Set NEXT_PUBLIC_WA_OTP_ENABLED=true to re-enable the WhatsApp OTP signup flow.
+// When false (default), the email verification flow is used instead.
+const WA_OTP_ENABLED = process.env.NEXT_PUBLIC_WA_OTP_ENABLED === "true";
 
 const GOALS = [
   { id: "5k",       label: "First 5K"            },
@@ -20,12 +25,23 @@ const GOALS = [
   { id: "strength", label: "Strength & Endurance" },
 ];
 
-const RESEND_COOLDOWN = 30; // seconds
+const RESEND_COOLDOWN = 30;
 
-// Step order: basic info → phone OTP → additional details → account created
-type Step = "basic" | "phone-otp" | "details";
+// Step order: Basic Info → Verify Email → Additional Details
+type Step = "basic" | "email-verify" | "details";
+
+// Legacy WA-OTP step — preserved for feature-flag re-enablement
+type LegacyStep = "phone-otp";
+type AnyStep = Step | LegacyStep;
 
 interface Props { onSwitchToLogin: () => void; }
+
+function maskEmail(email: string): string {
+  const [user, domain] = email.split("@");
+  if (!domain) return email;
+  const visible = user.length > 3 ? user.slice(0, 2) + "***" : user[0] + "***";
+  return `${visible}@${domain}`;
+}
 
 function maskPhone(phone: string): string {
   const digits = phone.replace(/\D/g, "");
@@ -38,24 +54,28 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   // ── State ─────────────────────────────────────────────────────────────────
-  const [step, setStep] = useState<Step>("basic");
+  const [step, setStep] = useState<AnyStep>("basic");
 
   // Basic step fields
   const [firstName, setFirstName] = useState("");
   const [lastName,  setLastName]  = useState("");
-  const [phone,     setPhone]     = useState("");
+  const [email,     setEmail]     = useState("");   // required
+  const [phone,     setPhone]     = useState("");   // optional contact info
   const [password,  setPassword]  = useState("");
   const [confirm,   setConfirm]   = useState("");
-  const [email,     setEmail]     = useState("");  // optional
 
-  // Phone OTP step
-  const [phoneOtp,    setPhoneOtp]    = useState("");
-  const [phoneVerified, setPhoneVerified] = useState(false);
-  const [sending,     setSending]     = useState(false);
-  const [verifying,   setVerifying]   = useState(false);
-  const [otpError,    setOtpError]    = useState("");
-  const [otpSendFailed, setOtpSendFailed] = useState(false);
+  // Email verification step
+  const [sending,        setSending]        = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [emailVerified,  setEmailVerified]  = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Legacy WA OTP step (behind WA_OTP_ENABLED flag)
+  const [phoneOtp,      setPhoneOtp]      = useState("");
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [verifying,     setVerifying]     = useState(false);
+  const [otpError,      setOtpError]      = useState("");
+  const [otpSendFailed, setOtpSendFailed] = useState(false);
 
   // Details step fields
   const [dob,               setDob]               = useState("");
@@ -79,12 +99,31 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
       .catch(() => {});
   }, []);
 
-  // Countdown timer for resend button
   useEffect(() => {
     if (resendCooldown <= 0) return;
     const t = setTimeout(() => setResendCooldown(c => c - 1), 1000);
     return () => clearTimeout(t);
   }, [resendCooldown]);
+
+  // Poll for email verification while on the email-verify step
+  useEffect(() => {
+    if (step !== "email-verify" || emailVerified) return;
+
+    pollRef.current = setInterval(async () => {
+      try {
+        const res  = await fetch(`/api/auth/check-email-verified?email=${encodeURIComponent(email)}`);
+        const data = await res.json();
+        if (data.verified) {
+          setEmailVerified(true);
+          clearInterval(pollRef.current!);
+          setTimeout(() => setStep("details"), 800);
+        }
+      } catch { /* ignore polling errors */ }
+    }, 3000);
+
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, email]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const phone10 = phone.replace(/\D/g, "").slice(0, 10);
@@ -96,9 +135,9 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
     reader.readAsDataURL(file);
   };
 
-  // ── Progress bar (3 steps) ────────────────────────────────────────────────
-  const stepLabels = ["Basic Info", "Verify Phone", "Details"];
-  const stepIndex  = step === "basic" ? 0 : step === "phone-otp" ? 1 : 2;
+  // ── Progress bar ──────────────────────────────────────────────────────────
+  const stepLabels = ["Basic Info", "Verify Email", "Details"];
+  const stepIndex  = step === "basic" ? 0 : step === "email-verify" || step === "phone-otp" ? 1 : 2;
   const progress   = Math.round(((stepIndex + 1) / stepLabels.length) * 100);
 
   const ProgressBar = () => (
@@ -129,16 +168,42 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
   // ── Validate basic step ───────────────────────────────────────────────────
   function validateBasic(): string | null {
     if (!firstName.trim() || !lastName.trim()) return "Please enter your full name.";
-    if (phone10.length !== 10 || !/^[6-9]\d{9}$/.test(phone10)) return "Please enter a valid 10-digit Indian mobile number.";
+    if (!email.trim() || !email.includes("@")) return "Please enter a valid email address.";
+    if (phone && (phone10.length !== 10 || !/^[6-9]\d{9}$/.test(phone10)))
+      return "Please enter a valid 10-digit Indian mobile number (or leave it blank).";
     if (password.length < 8)         return "Password must be at least 8 characters.";
     if (!/[A-Z]/.test(password))     return "Password must contain at least one uppercase letter.";
     if (!/[0-9]/.test(password))     return "Password must contain at least one number.";
     if (password !== confirm)        return "Passwords do not match.";
-    if (email && !email.includes("@")) return "Please enter a valid email address.";
     return null;
   }
 
-  // ── Send phone OTP ────────────────────────────────────────────────────────
+  // ── Send email verification ───────────────────────────────────────────────
+  async function sendEmailVerification(isResend = false) {
+    setSending(true); if (!isResend) setFormError("");
+    try {
+      const res  = await fetch("/api/auth/send-email-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), name: firstName }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setFormError(data.error ?? "Failed to send verification email. Please try again.");
+        return false;
+      }
+      if (!isResend) setStep("email-verify");
+      setResendCooldown(RESEND_COOLDOWN);
+      return true;
+    } catch {
+      setFormError("Network error. Please try again.");
+      return false;
+    } finally {
+      setSending(false);
+    }
+  }
+
+  // ── Legacy WA OTP functions (preserved behind feature flag) ───────────────
   async function sendOtp(isResend = false) {
     setSending(true); setOtpError(""); setOtpSendFailed(false);
     try {
@@ -162,18 +227,15 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
       setOtpError(msg);
       if (!isResend) { setFormError(msg); setOtpSendFailed(true); }
       return false;
-    }
-    finally { setSending(false); }
+    } finally { setSending(false); }
   }
 
-  // ── Skip phone verification ───────────────────────────────────────────────
   function skipPhoneVerification() {
     setPhoneVerified(false);
     setOtpError("");
     setStep("details");
   }
 
-  // ── Verify phone OTP ──────────────────────────────────────────────────────
   const verifyOtp = useCallback(async (code: string) => {
     if (code.length !== 6 || verifying) return;
     setVerifying(true); setOtpError("");
@@ -215,13 +277,13 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           firstName, lastName,
-          email:         email.trim() || undefined,
-          phone:         phone10,
+          email:         email.trim(),
+          phone:         phone10 || undefined,
           password,
           goal,
           location:      finalLocation,
           dob,
-          phoneVerified: phoneVerified,
+          phoneVerified: WA_OTP_ENABLED ? phoneVerified : false,
           referralCode,
         }),
       });
@@ -252,10 +314,21 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
         <Input placeholder="Last name"  value={lastName}  onChange={e => { setLastName(e.target.value);  setFormError(""); }} autoComplete="family-name" />
       </div>
 
-      {/* Phone (primary identity) */}
+      {/* Email — required */}
       <div>
         <label style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5 }}>
-          WhatsApp / Mobile number <span style={{ color: "var(--primary)", fontWeight: 600 }}>*</span>
+          Email address <span style={{ color: "var(--primary)", fontWeight: 600 }}>*</span>
+        </label>
+        <Input type="email" placeholder="you@example.com" value={email} onChange={e => { setEmail(e.target.value); setFormError(""); }} autoComplete="email" />
+        <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--muted-foreground)" }}>
+          You&apos;ll receive a verification link at this address.
+        </p>
+      </div>
+
+      {/* Phone — optional contact info */}
+      <div>
+        <label style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5 }}>
+          Mobile number <span style={{ color: "var(--muted-foreground)", fontWeight: 400 }}>(optional)</span>
         </label>
         <div style={{ display: "flex", alignItems: "center", gap: 0, border: "1.5px solid var(--border)", borderRadius: 10, overflow: "hidden", background: "var(--surface)" }}>
           <span style={{ padding: "10px 10px 10px 14px", fontSize: 14, color: "var(--muted-foreground)", fontWeight: 600, background: "var(--surface)", borderRight: "1px solid var(--border)", whiteSpace: "nowrap" }}>+91</span>
@@ -271,7 +344,7 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
           />
         </div>
         <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--muted-foreground)" }}>
-          You'll receive a WhatsApp OTP to verify this number.
+          Used as contact information only.
         </p>
       </div>
 
@@ -281,17 +354,6 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
       <PasswordInput placeholder="Confirm password"
         value={confirm}  onChange={e => { setConfirm(e.target.value);  setFormError(""); }} autoComplete="new-password" />
 
-      {/* Email — optional */}
-      <div>
-        <label style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5 }}>
-          Email address <span style={{ color: "var(--muted-foreground)", fontWeight: 400 }}>(optional)</span>
-        </label>
-        <Input type="email" placeholder="you@example.com" value={email} onChange={e => { setEmail(e.target.value); setFormError(""); }} autoComplete="email" />
-        <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--muted-foreground)" }}>
-          Used for weekly digests and membership invoices.
-        </p>
-      </div>
-
       {formError && <ErrorBlock msg={formError} />}
 
       <button
@@ -300,15 +362,20 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
           setFormError(""); setOtpSendFailed(false);
           const err = validateBasic();
           if (err) { setFormError(err); return; }
-          await sendOtp();
+          if (WA_OTP_ENABLED) {
+            await sendOtp();
+          } else {
+            await sendEmailVerification();
+          }
         }}
         disabled={sending}
         style={{ width: "100%", padding: "13px", borderRadius: 999, background: "var(--gradient-accent)", color: "var(--accent-foreground)", border: "none", cursor: sending ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem", boxShadow: "var(--shadow-orange)" }}
       >
-        {sending ? "Sending OTP…" : "Verify WhatsApp Number →"}
+        {sending ? "Sending…" : "Verify Email Address →"}
       </button>
 
-      {otpSendFailed && (
+      {/* Legacy WA fallback — only shown when WA_OTP_ENABLED */}
+      {WA_OTP_ENABLED && otpSendFailed && (
         <p style={{ fontSize: 11, textAlign: "center", color: "var(--muted-foreground)", margin: 0 }}>
           WhatsApp OTP unavailable.{" "}
           <button type="button" onClick={skipPhoneVerification}
@@ -327,7 +394,68 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
     </div>
   );
 
-  // ══ STEP: phone-otp ═══════════════════════════════════════════════════════
+  // ══ STEP: email-verify ════════════════════════════════════════════════════
+  if (step === "email-verify") return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <ProgressBar />
+
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontSize: 40, marginBottom: 8, display: "flex", justifyContent: "center" }}>
+          {emailVerified
+            ? <CheckCircle2 size={40} color="var(--primary)" />
+            : <Mail size={40} color="var(--primary)" />
+          }
+        </div>
+        <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 700, color: "var(--foreground)" }}>
+          {emailVerified ? "Email Verified!" : "Check your inbox"}
+        </p>
+        <p style={{ margin: 0, fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.6 }}>
+          {emailVerified
+            ? "Email verified. Continuing to next step…"
+            : (
+              <>
+                We sent a verification link to{" "}
+                <strong style={{ color: "var(--foreground)" }}>{maskEmail(email)}</strong>.
+                {" "}Click the button in the email to verify.
+              </>
+            )
+          }
+        </p>
+      </div>
+
+      {!emailVerified && (
+        <>
+          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 16px", fontSize: 12, color: "var(--muted-foreground)", lineHeight: 1.7 }}>
+            <strong style={{ color: "var(--foreground)" }}>Didn&apos;t receive it?</strong> Check your spam folder.
+            The link expires in 24 hours.
+          </div>
+
+          {formError && <ErrorBlock msg={formError} />}
+
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+            <button type="button" onClick={() => { setStep("basic"); setFormError(""); }}
+              style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "var(--muted-foreground)", fontFamily: "var(--font-body)" }}>
+              ← Change email
+            </button>
+            <button
+              type="button"
+              onClick={() => sendEmailVerification(true)}
+              disabled={sending || resendCooldown > 0}
+              style={{ background: "none", border: "none", cursor: resendCooldown > 0 || sending ? "not-allowed" : "pointer", fontSize: 12, color: resendCooldown > 0 ? "var(--muted-foreground)" : "var(--primary)", fontFamily: "var(--font-body)", textDecoration: resendCooldown > 0 ? "none" : "underline" }}
+            >
+              {sending ? "Sending…" : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend email"}
+            </button>
+          </div>
+
+          <p style={{ margin: 0, fontSize: 11, color: "var(--muted-foreground)", textAlign: "center" }}>
+            Waiting for you to click the verification link…
+          </p>
+        </>
+      )}
+    </div>
+  );
+
+  // ══ STEP: phone-otp (legacy — only reached when WA_OTP_ENABLED=true) ══════
   if (step === "phone-otp") return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <ProgressBar />
@@ -400,7 +528,7 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
 
       <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--primary)", marginBottom: 4 }}>
         <CheckCircle2 size={12} />
-        <span style={{ fontFamily: "monospace" }}>{maskPhone(phone10)}</span>
+        <span>{email}</span>
         <span style={{ color: "var(--muted-foreground)" }}>verified</span>
       </div>
 

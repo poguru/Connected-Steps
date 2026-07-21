@@ -58,14 +58,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Your account has been deactivated. Please contact support." }, { status: 403 });
   }
 
+  // email_verified may be null/false on accounts created before the email-verification migration.
+  // Existing users are grandfathered in (migration sets email_verified=true for all existing rows).
+  // Only new sign-ups with email_verified=false should be blocked.
+  if (user.email_verified === false) {
+    return NextResponse.json(
+      { error: "Please verify your email address before signing in. Check your inbox for the verification link." },
+      { status: 403 },
+    );
+  }
+
   const role       = user.role ?? "user";
   const coachToken = role === "coach" ? signCoachToken(user.email) : undefined;
   const userToken  = signUserToken(user.email);
 
   // phone_verified may be null on old rows before the migration runs.
   const phoneVerified = user.phone_verified ?? false;
-  // Prompt the user to verify their phone if they don't have one verified yet.
-  // We do NOT block login — existing users must not be locked out.
+  // Legacy: prompt to verify phone if unverified. We do NOT block login on this.
   const requiresPhoneVerification = !phoneVerified;
 
   const res = NextResponse.json({
