@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
+import { processEmailBatch } from "@/lib/process-email-batch";
 
 type RecipientFilter = "all" | "paid" | "free" | "pending" | "checked_in" | "not_checked_in";
 
@@ -112,6 +113,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     channel:          "email",
     batch_id:         batchId,
   });
+
+  // Process the batch server-side after the response is sent.
+  // This means email delivery continues even if the admin closes the tab.
+  after(() => processEmailBatch(batchId));
 
   return NextResponse.json({ batch_id: batchId, queued: recipients.length });
 }

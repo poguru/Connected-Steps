@@ -226,7 +226,7 @@ export default function CommunicatePage() {
 
   // Async send state machine
   const [send, setSend] = useState<SendState>(INITIAL_SEND);
-  const loopActive      = useRef(false);
+  const pollRef         = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Push state
   const [pushFilter,   setPushFilter]   = useState<RecipientFilter>("all");
@@ -247,6 +247,7 @@ export default function CommunicatePage() {
   const [detailLoading,  setDetailLoading]  = useState(false);
   const [detailFilter,   setDetailFilter]   = useState<string>("all");
   const [detailSearch,   setDetailSearch]   = useState("");
+  const [resumingBatch,  setResumingBatch]  = useState<string | null>(null);
 
   const [toast, setToast] = useState("");
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(""), 3500); };
@@ -259,78 +260,57 @@ export default function CommunicatePage() {
     setHistory(data.history ?? []);
   }
 
-  // ── Sending loop ─────────────────────────────────────────────────────────────
-  // Runs when phase transitions to 'sending'. Calls /send-next once per 1100ms
-  // to stay under the SES sandbox rate limit of 1 email/second.
+  // ── Status polling ────────────────────────────────────────────────────────────
+  // Polls /status every 3s while sending. Emails are processed server-side via
+  // after() — the browser just reads progress from the DB. Closing the tab is safe.
 
   useEffect(() => {
     if (send.phase !== "sending" || !send.batchId) return;
-
-    loopActive.current = true;
     const batchId = send.batchId;
 
-    void (async () => {
-      while (loopActive.current) {
-        try {
-          const res  = await fetch(`/api/admin/events/${eventId}/communicate/send-next`, {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ batch_id: batchId }),
-          });
-          const data = await res.json() as {
-            done?:          boolean;
-            delivered?:     number;
-            failed?:        number;
-            total?:         number;
-            email?:         string;
-            status?:        string;
-            error?:         string | null;
-            error_code?:    string | null;
-            is_permanent?:  boolean | null;
-            attempts?:      number;
-            retrying?:      boolean;
-          };
+    const poll = async () => {
+      try {
+        const res  = await fetch(`/api/admin/events/${eventId}/communicate/status?batch_id=${batchId}`);
+        const data = await res.json() as { total: number; queued: number; sending: number; delivered: number; failed: number; retryable: number };
 
-          if (!loopActive.current) break;
+        setSend(s => ({
+          ...s,
+          total:     data.total,
+          queued:    data.queued + data.sending,
+          delivered: data.delivered,
+          failed:    data.failed,
+          retryable: data.retryable,
+        }));
 
-          if (data.done) {
-            setSend(s => ({ ...s, phase: "done", queued: 0 }));
-            void loadHistory();
-            break;
-          }
-
-          setSend(s => {
-            const detail: EmailDetail = {
-              email:        data.email ?? "",
-              status:       (data.status ?? "failed") as EmailDetail["status"],
-              error:        data.error,
-              code:         data.error_code,
-              is_permanent: data.is_permanent,
-              attempts:     data.attempts ?? 1,
-            };
-            return {
-              ...s,
-              queued:    data.retrying ? s.queued : Math.max(0, s.queued - 1),
-              delivered: data.status === "delivered" ? s.delivered + 1 : s.delivered,
-              failed:    data.status === "failed"    ? s.failed    + 1 : s.failed,
-              retryable: data.status === "failed" && !data.is_permanent ? s.retryable + 1 : s.retryable,
-              details:   [...s.details, detail],
-            };
-          });
-        } catch {
-          // Network error — wait 3s before retry
-          await new Promise<void>(r => setTimeout(r, 3000));
-          if (!loopActive.current) break;
-          continue;
+        if (data.queued === 0 && data.sending === 0) {
+          // All done — load per-email detail list and finalize
+          clearInterval(pollRef.current!);
+          const detailRes  = await fetch(`/api/admin/events/${eventId}/communicate/status?batch_id=${batchId}&include_all=true`);
+          const detailData = await detailRes.json() as { emails?: DeliveryEmail[] };
+          setSend(s => ({
+            ...s,
+            phase:  "done",
+            queued: 0,
+            details: (detailData.emails ?? []).map(d => ({
+              email:        d.email,
+              status:       d.status as EmailDetail["status"],
+              error:        d.error,
+              code:         d.code,
+              is_permanent: d.is_permanent,
+              attempts:     d.attempts,
+            })),
+          }));
+          void loadHistory();
         }
-
-        // 1100ms between sends to stay safely under SES 1/sec sandbox limit
-        if (loopActive.current) {
-          await new Promise<void>(r => setTimeout(r, 1100));
-        }
+      } catch {
+        // Network error — continue polling
       }
-    })();
+    };
 
-    return () => { loopActive.current = false; };
+    void poll();
+    pollRef.current = setInterval(poll, 3000);
+
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [send.phase, send.batchId]);
 
@@ -345,7 +325,7 @@ export default function CommunicatePage() {
   async function enqueueEmail() {
     if (!emailSubject.trim() || !emailBody.trim()) { showToast("Subject and body are required"); return; }
     const filterLabel = FILTERS.find(f => f.value === emailFilter)?.label ?? emailFilter;
-    if (!confirm(`Queue email to ${filterLabel}?\n\nEmails will be sent one per second. Keep this tab open until sending completes.`)) return;
+    if (!confirm(`Queue email to ${filterLabel}?\n\nEmails will be sent in the background — you can safely close this tab.`)) return;
 
     setSend({ ...INITIAL_SEND, phase: "queuing" });
 
@@ -368,12 +348,18 @@ export default function CommunicatePage() {
 
   async function retryFailed() {
     if (!send.batchId) return;
+    const batchId = send.batchId;
     const res  = await fetch(`/api/admin/events/${eventId}/communicate/status`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ batch_id: send.batchId }),
+      body: JSON.stringify({ batch_id: batchId }),
     });
     const data = await res.json() as { requeued?: number };
     if ((data.requeued ?? 0) > 0) {
+      // Re-trigger server-side processing for the re-queued emails
+      void fetch(`/api/admin/events/${eventId}/communicate/resume`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batch_id: batchId }),
+      });
       setSend(s => ({ ...s, phase: "sending", queued: data.requeued!, details: [], retryable: 0 }));
     } else {
       showToast("No transient failures to retry");
@@ -420,6 +406,21 @@ export default function CommunicatePage() {
     } else {
       showToast("No transient failures to retry");
     }
+  }
+
+  async function resumeBatch(batchId: string) {
+    setResumingBatch(batchId);
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/communicate/resume`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batch_id: batchId }),
+      });
+      const data = await res.json() as { resumed?: number; error?: string };
+      if (!res.ok) { showToast(`❌ ${data.error ?? "Resume failed"}`); return; }
+      showToast(`▶ Resuming delivery for ${data.resumed} queued email${data.resumed !== 1 ? "s" : ""}`);
+      void loadHistory();
+    } catch { showToast("❌ Network error"); }
+    finally { setResumingBatch(null); }
   }
 
   function downloadBatchCSV(batchId: string) {
@@ -525,12 +526,11 @@ export default function CommunicatePage() {
                 ))}
               </div>
 
-              {/* SES limit info */}
+              {/* Provider info */}
               <div style={{ marginTop: 20, padding: "10px 12px", background: "rgba(96,165,250,0.05)", border: "1px solid rgba(96,165,250,0.15)", borderRadius: 8, fontSize: 11, color: "#60a5fa", lineHeight: 1.6 }}>
-                <strong>SES Sandbox</strong><br />
-                Rate: 1 email / second<br />
-                Quota: 200 emails / day<br /><br />
-                Emails queue instantly and send 1/sec in the background. Keep this tab open.
+                <strong>ZeptoMail</strong><br />
+                Emails are sent server-side in the background.<br /><br />
+                You can close this tab — delivery will continue automatically.
               </div>
             </div>
 
@@ -573,7 +573,7 @@ export default function CommunicatePage() {
                   {/* Status header */}
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
                     {send.phase === "sending" ? (
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#60a5fa" }}>📤 Sending… (keep this tab open)</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#60a5fa" }}>📤 Sending… (server-side — safe to close tab)</span>
                     ) : (
                       <span style={{ fontSize: 13, fontWeight: 700, color: send.failed === 0 ? "#4ade80" : "#fbbf24" }}>
                         {send.failed === 0 ? "✅ All emails delivered" : `⚠️ Completed with ${send.failed} failure${send.failed !== 1 ? "s" : ""}`}
@@ -792,6 +792,14 @@ export default function CommunicatePage() {
                       }}>
                         {h.status ?? "sent"}
                       </span>
+                      {h.status === "queued" && h.batch_id && (
+                        <button
+                          onClick={() => resumeBatch(h.batch_id!)}
+                          disabled={resumingBatch === h.batch_id}
+                          style={{ padding: "5px 12px", background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.25)", borderRadius: 6, color: "#60a5fa", fontSize: 11, fontWeight: 700, cursor: resumingBatch === h.batch_id ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: resumingBatch === h.batch_id ? 0.6 : 1 }}>
+                          {resumingBatch === h.batch_id ? "Starting…" : "▶ Resume"}
+                        </button>
+                      )}
                       {canExpand && (
                         <button onClick={() => toggleBatchDetail(h.batch_id)} style={{ padding: "5px 12px", background: isExpanded ? "rgba(232,98,10,0.15)" : "rgba(255,255,255,0.05)", border: `1px solid ${isExpanded ? "rgba(232,98,10,0.3)" : "rgba(255,255,255,0.1)"}`, borderRadius: 6, color: isExpanded ? "#e8620a" : "#888", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
                           {isExpanded ? "▲ Hide" : "▼ Details"}
