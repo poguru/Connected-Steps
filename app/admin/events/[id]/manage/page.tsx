@@ -63,6 +63,7 @@ const NAV_ITEMS = [
   { key: "registrations", icon: "👥", label: "Registrations",  inline: false, href: "registrations" },
   { key: "races",         icon: "🏁", label: "Races",          inline: true  },
   { key: "communicate",   icon: "📢", label: "Communicate",    inline: false, href: "communicate"   },
+  { key: "announce",     icon: "📣", label: "Announce",        inline: true  },
   { key: "race-day",      icon: "🏃", label: "Race Day",       inline: false, href: "race-day"      },
   { key: "bib",           icon: "📦", label: "BIB Collection", inline: false, href: "bib"           },
   { key: "results",       icon: "🏅", label: "Results",        inline: false, href: "results"       },
@@ -193,6 +194,90 @@ export default function EventManagePage() {
     if (res.ok && d.status) setData(o => o?.event ? { ...o, event: { ...o.event, status: d.status! } } : o);
     else alert(`❌ ${d.error}`);
   }
+
+  // ── Announce tab state ───────────────────────────────────────────────────────
+
+  const [annPreview,   setAnnPreview]   = useState<{ member_count: number; email_count: number; wa_count: number } | null>(null);
+  const [annLoading,   setAnnLoading]   = useState(false);
+  const [annChannels,  setAnnChannels]  = useState(["email", "whatsapp"]);
+  const [annSubject,   setAnnSubject]   = useState("");
+  const [annBody,      setAnnBody]      = useState("");
+  const [annSending,   setAnnSending]   = useState(false);
+  const [annResult,    setAnnResult]    = useState<{ email_queued: number; wa_total: number; batch_id: string } | null>(null);
+  const [annError,     setAnnError]     = useState("");
+  const [annDelivered, setAnnDelivered] = useState(0);
+  const [annPolling,   setAnnPolling]   = useState(false);
+  const [annPollTotal, setAnnPollTotal] = useState(0);
+
+  function defaultBody(_evTitle: string, _dateStr: string, timeStr: string, _location: string) {
+    return `We're excited to announce an upcoming event!\n\n🏃 {event}\n📅 {date}${timeStr ? " at {time}" : ""}\n📍 {location}\n\nRegister now to secure your spot:\n{register_link}\n\nSee you there!\n\nTeam Connected Steps`;
+  }
+
+  async function loadAnnouncePreview() {
+    setAnnLoading(true); setAnnError("");
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/announce`);
+      const data = await res.json();
+      if (!res.ok) { setAnnError(data.error ?? "Failed"); return; }
+      setAnnPreview(data);
+      if (!annSubject && data.event) {
+        const d = data.event.start_date
+          ? new Date(data.event.start_date + "T12:00:00Z").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+          : "";
+        const t = data.event.start_time
+          ? (() => { const [h, m] = data.event.start_time.split(":").map(Number); return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`; })()
+          : "";
+        setAnnSubject(`Upcoming Event: ${data.event.title}${d ? ` — ${d}` : ""}`);
+        setAnnBody(defaultBody(data.event.title, d, t, data.event.location));
+      }
+    } catch { setAnnError("Network error."); }
+    finally { setAnnLoading(false); }
+  }
+
+  async function sendAnnouncement(e: React.FormEvent) {
+    e.preventDefault();
+    if (!annChannels.length) { setAnnError("Select at least one channel."); return; }
+    if (annChannels.includes("email") && (!annSubject.trim() || !annBody.trim())) {
+      setAnnError("Subject and body are required."); return;
+    }
+    if (!confirm(`Send to ${annPreview?.member_count ?? "all"} active members via ${annChannels.join(" + ")}?`)) return;
+    setAnnSending(true); setAnnError(""); setAnnResult(null); setAnnDelivered(0);
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/announce`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channels: annChannels, subject: annSubject, email_body: annBody }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setAnnError(data.error ?? "Send failed."); return; }
+      setAnnResult(data);
+      if (data.email_queued > 0) {
+        setAnnPollTotal(data.email_queued);
+        setAnnPolling(true);
+      }
+    } catch { setAnnError("Network error."); }
+    finally { setAnnSending(false); }
+  }
+
+  useEffect(() => {
+    if (!annPolling || !annResult?.batch_id) return;
+    const interval = setInterval(async () => {
+      try {
+        const res  = await fetch(`/api/admin/events/${eventId}/communicate/send-next`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ batch_id: annResult.batch_id }),
+        });
+        const data = await res.json();
+        if (data.done) {
+          setAnnPolling(false);
+          setAnnDelivered(data.delivered ?? 0);
+        } else if (data.status === "delivered") {
+          setAnnDelivered(p => p + 1);
+        }
+      } catch { /* non-critical */ }
+    }, 1100);
+    return () => clearInterval(interval);
+  }, [annPolling, annResult?.batch_id, eventId]);
 
   // ── Loading ──────────────────────────────────────────────────────────────────
 
@@ -496,6 +581,131 @@ export default function EventManagePage() {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            </SectionBoundary>
+          )}
+
+          {/* ── ANNOUNCE ─────────────────────────────────────────────────── */}
+          {tab === "announce" && (
+            <SectionBoundary title="Announce">
+              <div style={{ maxWidth: 640 }}>
+                <SecHead title="Announce to All Active Members" />
+
+                {/* Step 1 — recipient preview */}
+                {!annPreview ? (
+                  <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "1.25rem", marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, color: "#888", marginBottom: 12 }}>
+                      Sends an event announcement to <strong style={{ color: "#fff" }}>all active members</strong> — not just registrants — via Email and/or WhatsApp.
+                    </div>
+                    <Button onClick={loadAnnouncePreview} loading={annLoading}>Check Recipients</Button>
+                    {annError && <Alert variant="error" style={{ marginTop: 10 }}>{annError}</Alert>}
+                  </div>
+                ) : (
+                  <>
+                    {/* Recipient count */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
+                      {[
+                        { label: "Active Members", value: annPreview.member_count, color: "#fff" },
+                        { label: "Email",          value: annPreview.email_count,  color: "#60a5fa" },
+                        { label: "WhatsApp",       value: annPreview.wa_count,     color: "#4ade80" },
+                      ].map(s => <EventStatCard key={s.label} label={s.label} value={s.value} color={s.color} />)}
+                    </div>
+
+                    {/* Result banner */}
+                    {annResult && (
+                      <div style={{ background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.25)", borderRadius: 10, padding: "12px 16px", marginBottom: 16 }}>
+                        <div style={{ fontWeight: 700, color: "#4ade80", marginBottom: 6 }}>
+                          ✅ Announcement sent!
+                        </div>
+                        {annResult.wa_total > 0 && (
+                          <div style={{ fontSize: 13, color: "#aaa" }}>
+                            WhatsApp: <strong style={{ color: "#4ade80" }}>{annResult.wa_total}</strong> messages queued
+                          </div>
+                        )}
+                        {annResult.email_queued > 0 && (
+                          <div style={{ fontSize: 13, color: "#aaa", marginTop: 4 }}>
+                            Email:{" "}
+                            {annPolling ? (
+                              <span style={{ color: "#eab308" }}>Delivering… {annDelivered}/{annPollTotal}</span>
+                            ) : (
+                              <strong style={{ color: "#4ade80" }}>{annDelivered} delivered</strong>
+                            )}
+                          </div>
+                        )}
+                        <button onClick={() => { setAnnResult(null); setAnnPreview(null); setAnnDelivered(0); setAnnSubject(""); setAnnBody(""); }}
+                          style={{ marginTop: 10, fontSize: 12, color: "#555", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: 0 }}>
+                          Send another →
+                        </button>
+                      </div>
+                    )}
+
+                    {!annResult && (
+                      <form onSubmit={sendAnnouncement} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+                        {/* Channel toggles */}
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 8 }}>Channels</div>
+                          <div style={{ display: "flex", gap: 10 }}>
+                            {(["email", "whatsapp"] as const).map(ch => {
+                              const on = annChannels.includes(ch);
+                              return (
+                                <button key={ch} type="button"
+                                  onClick={() => setAnnChannels(prev => on ? prev.filter(c => c !== ch) : [...prev, ch])}
+                                  style={{ padding: "7px 16px", borderRadius: 7, border: `1px solid ${on ? (ch === "email" ? "rgba(96,165,250,0.5)" : "rgba(74,222,128,0.5)") : "rgba(255,255,255,0.1)"}`, background: on ? (ch === "email" ? "rgba(96,165,250,0.1)" : "rgba(74,222,128,0.1)") : "transparent", color: on ? (ch === "email" ? "#60a5fa" : "#4ade80") : "#555", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                                  {ch === "email" ? "📧 Email" : "💬 WhatsApp"}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* WhatsApp preview */}
+                        {annChannels.includes("whatsapp") && (
+                          <div style={{ background: "rgba(37,211,102,0.05)", border: "1px solid rgba(37,211,102,0.15)", borderRadius: 10, padding: "12px 14px" }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 8 }}>WhatsApp Preview (session_alert_v3 template)</div>
+                            <div style={{ fontSize: 12, color: "#aaa", lineHeight: 1.7 }}>
+                              <span style={{ color: "#4ade80" }}>Hi [Name],</span><br />
+                              <em style={{ color: "#666" }}>[Template intro text]</em><br />
+                              📌 <strong style={{ color: "#fff" }}>{ev.title}</strong><br />
+                              📅 {ev.start_date ? new Date(ev.start_date + "T12:00:00Z").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}
+                              {ev.start_time && (() => { const [h, m] = ev.start_time!.split(":").map(Number); return `, ${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`; })()}<br />
+                              📍 {ev.location}
+                            </div>
+                            <div style={{ fontSize: 11, color: "#555", marginTop: 8 }}>
+                              Sent to {annPreview.wa_count} members with a saved phone number.
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Email compose */}
+                        {annChannels.includes("email") && (
+                          <>
+                            <div>
+                              <label style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", display: "block", marginBottom: 6 }}>Subject</label>
+                              <input value={annSubject} onChange={e => setAnnSubject(e.target.value)} required
+                                style={{ width: "100%", padding: "9px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" as const }} />
+                            </div>
+
+                            <div>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                                <label style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em" }}>Body</label>
+                                <div style={{ fontSize: 10, color: "#444" }}>vars: {"{name} {event} {date} {time} {location} {register_link}"}</div>
+                              </div>
+                              <textarea value={annBody} onChange={e => setAnnBody(e.target.value)} required rows={10}
+                                style={{ width: "100%", padding: "9px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#fff", fontSize: 13, fontFamily: "monospace", outline: "none", resize: "vertical" as const, boxSizing: "border-box" as const }} />
+                            </div>
+                          </>
+                        )}
+
+                        {annError && <Alert variant="error">{annError}</Alert>}
+
+                        <Button type="submit" loading={annSending} disabled={!annChannels.length}>
+                          📣 Send Announcement ({annPreview.member_count} members)
+                        </Button>
+                      </form>
+                    )}
+                  </>
+                )}
               </div>
             </SectionBoundary>
           )}
