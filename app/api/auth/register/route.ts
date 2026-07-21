@@ -23,9 +23,9 @@ export async function POST(req: NextRequest) {
     // emailVerified: new primary verification mechanism.
     const { firstName, lastName, email, phone, goal, location, password, phoneVerified, referralCode, dob } = await req.json();
 
-    // email is now required; phone is optional contact information
-    if (!password || !firstName || !lastName || !email) {
-      return NextResponse.json({ error: "Full name, email address, and password are required." }, { status: 400 });
+    // email and phone are both required; phone is contact-only (not verified)
+    if (!password || !firstName || !lastName || !email || !phone) {
+      return NextResponse.json({ error: "All fields are required." }, { status: 400 });
     }
 
     // DOB validation
@@ -44,14 +44,14 @@ export async function POST(req: NextRequest) {
     const birthDay   = dobDate.getDate();
     const birthMonth = dobDate.getMonth() + 1;
 
-    // Normalise phone to 10 digits (optional — only validate if provided)
-    const phoneDigits = phone ? (phone as string).replace(/\D/g, "") : "";
+    // Normalise phone to 10 digits (required)
+    const phoneDigits = (phone as string).replace(/\D/g, "");
     const phone10 = phoneDigits.length === 12 && phoneDigits.startsWith("91")
       ? phoneDigits.slice(2)
       : phoneDigits.length === 13 && phoneDigits.startsWith("091")
         ? phoneDigits.slice(3)
         : phoneDigits;
-    if (phone10 && (phone10.length !== 10 || !/^[6-9]\d{9}$/.test(phone10))) {
+    if (phone10.length !== 10 || !/^[6-9]\d{9}$/.test(phone10)) {
       return NextResponse.json({ error: "Please enter a valid 10-digit Indian mobile number." }, { status: 400 });
     }
 
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
       first_name:         firstName,
       last_name:          lastName,
       email:              emailNorm,
-      phone:              phone10 || null,
+      phone:              phone10,
       goal,
       location,
       password:           hashed,

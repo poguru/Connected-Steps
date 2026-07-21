@@ -167,14 +167,22 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
 
   // ── Validate basic step ───────────────────────────────────────────────────
   function validateBasic(): string | null {
-    if (!firstName.trim() || !lastName.trim()) return "Please enter your full name.";
-    if (!email.trim() || !email.includes("@")) return "Please enter a valid email address.";
-    if (phone && (phone10.length !== 10 || !/^[6-9]\d{9}$/.test(phone10)))
-      return "Please enter a valid 10-digit Indian mobile number (or leave it blank).";
-    if (password.length < 8)         return "Password must be at least 8 characters.";
-    if (!/[A-Z]/.test(password))     return "Password must contain at least one uppercase letter.";
-    if (!/[0-9]/.test(password))     return "Password must contain at least one number.";
-    if (password !== confirm)        return "Passwords do not match.";
+    if (!firstName.trim()) return "First name is required.";
+    if (firstName.trim().length < 2) return "First name must be at least 2 characters.";
+    if (firstName.trim().length > 50) return "First name must be 50 characters or fewer.";
+    if (!/^[A-Za-z\s'\-]+$/.test(firstName.trim())) return "First name may only contain letters, spaces, hyphens and apostrophes.";
+    if (!lastName.trim()) return "Last name is required.";
+    if (lastName.trim().length > 50) return "Last name must be 50 characters or fewer.";
+    if (!email.trim()) return "Email address is required.";
+    if (!email.includes("@") || !email.includes(".")) return "Please enter a valid email address.";
+    if (!phone10) return "Mobile number is required.";
+    if (phone10.length !== 10 || !/^[6-9]\d{9}$/.test(phone10)) return "Please enter a valid 10-digit Indian mobile number.";
+    if (password.length < 8)                return "Password must be at least 8 characters.";
+    if (!/[A-Z]/.test(password))            return "Password must contain at least one uppercase letter.";
+    if (!/[a-z]/.test(password))            return "Password must contain at least one lowercase letter.";
+    if (!/[0-9]/.test(password))            return "Password must contain at least one number.";
+    if (!/[^A-Za-z0-9]/.test(password))    return "Password must contain at least one special character.";
+    if (password !== confirm)               return "Passwords do not match.";
     return null;
   }
 
@@ -278,7 +286,7 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
         body: JSON.stringify({
           firstName, lastName,
           email:         email.trim(),
-          phone:         phone10 || undefined,
+          phone:         phone10,
           password,
           goal,
           location:      finalLocation,
@@ -325,10 +333,10 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
         </p>
       </div>
 
-      {/* Phone — optional contact info */}
+      {/* Phone — required contact info */}
       <div>
         <label style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5 }}>
-          Mobile number <span style={{ color: "var(--muted-foreground)", fontWeight: 400 }}>(optional)</span>
+          Mobile number <span style={{ color: "var(--primary)", fontWeight: 600 }}>*</span>
         </label>
         <div style={{ display: "flex", alignItems: "center", gap: 0, border: "1.5px solid var(--border)", borderRadius: 10, overflow: "hidden", background: "var(--surface)" }}>
           <span style={{ padding: "10px 10px 10px 14px", fontSize: 14, color: "var(--muted-foreground)", fontWeight: 600, background: "var(--surface)", borderRight: "1px solid var(--border)", whiteSpace: "nowrap" }}>+91</span>
@@ -344,7 +352,7 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
           />
         </div>
         <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--muted-foreground)" }}>
-          Used as contact information only.
+          Used for event updates, emergency communication, and future WhatsApp notifications. Verification will be enabled once WhatsApp integration is available.
         </p>
       </div>
 
