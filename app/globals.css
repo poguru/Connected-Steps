@@ -2,6 +2,8 @@
 
 /* ─── Design Tokens ─────────────────────────────────── */
 :root {
+  color-scheme: dark;   /* tells the browser to use dark system UI for all form controls */
+
   --radius: 0.875rem;
 
   /* App nav */
@@ -430,6 +432,13 @@ h1, h2, h3 {
 }
 
 .auth-input::placeholder { color: var(--cs-muted); }
+
+/* All native selects — dark popup for every browser */
+select option,
+select option:checked {
+  background: var(--surface);
+  color: var(--foreground);
+}
 
 select.auth-input option {
   background: var(--cs-charcoal);
