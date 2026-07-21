@@ -34,6 +34,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       distance_category, coupon_code, coupon_discount,
       original_price, final_price, payment_status, status,
       created_at, checked_in_at, breakfast_availed,
+      tshirt_size, tshirt_issued, tshirt_issued_at, tshirt_issued_by,
       confirmation_email_sent_at, email_status
     `)
     .eq("event_id", eventId)
@@ -53,6 +54,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     "Category/Race", "Coupon", "Discount (₹)", "Original Price (₹)", "Final Price (₹)",
     "Payment Status", "Registration Status",
     "Registered At", "Checked In At", "Breakfast Availed",
+    "T-Shirt Size", "T-Shirt Issued", "T-Shirt Issued At", "T-Shirt Issued By",
     "Email Status",
   ];
 
@@ -85,6 +87,10 @@ export async function GET(req: NextRequest, { params }: Params) {
       escape(fmtDate(r.created_at)),
       escape(fmtDate(r.checked_in_at)),
       escape(r.breakfast_availed ? "Yes" : "No"),
+      escape(r.tshirt_size ?? ""),
+      escape(r.tshirt_issued ? "Yes" : "No"),
+      escape(fmtDate(r.tshirt_issued_at)),
+      escape(r.tshirt_issued_by ?? ""),
       escape(r.email_status ?? "not sent"),
     ].join(",")),
   ].join("\n");

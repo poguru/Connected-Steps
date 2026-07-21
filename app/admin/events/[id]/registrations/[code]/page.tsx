@@ -37,6 +37,10 @@ interface Registration {
   breakfast_availed:          boolean;
   breakfast_availed_at:       string | null;
   breakfast_verified_by:      string | null;
+  tshirt_size:                string | null;
+  tshirt_issued:              boolean;
+  tshirt_issued_at:           string | null;
+  tshirt_issued_by:           string | null;
   events: {
     id:              string;
     title:           string;
@@ -198,6 +202,8 @@ export default function ParticipantDetailPage() {
             {emailBadge(reg.email_status)}
             {reg.checked_in_at && <DSBadge color="blue">Checked In</DSBadge>}
             {reg.breakfast_availed && <DSBadge color="green">Breakfast ✓</DSBadge>}
+            {reg.tshirt_size && <DSBadge color="blue">👕 {reg.tshirt_size}</DSBadge>}
+            {reg.tshirt_issued && <DSBadge color="green">T-Shirt Issued ✓</DSBadge>}
           </div>
         </div>
 
@@ -342,7 +348,7 @@ export default function ParticipantDetailPage() {
               {reg.email_ses_message_id && <Row label="SES ID" value={reg.email_ses_message_id} mono />}
             </Section>
 
-            {/* Check-in & Breakfast */}
+            {/* Check-in, Breakfast & T-Shirt */}
             <Section title="Race Day">
               <Row label="Check-In"
                    value={reg.checked_in_at ? `✅ ${fmtDate(reg.checked_in_at, true)}` : "Not checked in"}
@@ -353,6 +359,14 @@ export default function ParticipantDetailPage() {
                    color={reg.breakfast_availed ? "#4ade80" : "#555"}
               />
               {reg.breakfast_verified_by && <Row label="Issued by" value={reg.breakfast_verified_by} />}
+              {reg.tshirt_size && <>
+                <Row label="T-Shirt Size" value={reg.tshirt_size} highlight />
+                <Row label="T-Shirt"
+                     value={reg.tshirt_issued ? `✅ Issued ${fmtDate(reg.tshirt_issued_at, true)}` : "Not issued"}
+                     color={reg.tshirt_issued ? "#4ade80" : "#555"}
+                />
+                {reg.tshirt_issued_by && <Row label="Issued by" value={reg.tshirt_issued_by} />}
+              </>}
             </Section>
 
             {/* Invoice */}

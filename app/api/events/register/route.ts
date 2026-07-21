@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     const {
       event_id, email, name, phone, gender, date_of_birth,
       blood_group, emergency_contact, special_notes, coupon_code,
-      distance_category,
+      distance_category, tshirt_size,
     } = await req.json();
 
     // â”€â”€ Release expired slots (compensates for Hobby-plan daily-only cron) â”€â”€â”€â”€â”€â”€â”€
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
     // â”€â”€ Verify event â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const { data: ev } = await db
       .from("events")
-      .select("id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories")
+      .select("id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories, collect_tshirt")
       .eq("id", event_id)
       .single();
     if (!ev || ev.status !== "published") {
@@ -123,6 +123,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid distance category for this event." }, { status: 400 });
     }
     const chosenCategory: string | null = cats.length > 0 ? (distance_category || cats[0]) : null;
+
+    // T-shirt size validation
+    const VALID_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
+    if ((ev as { collect_tshirt?: boolean }).collect_tshirt) {
+      if (!tshirt_size) return NextResponse.json({ error: "Please select your T-shirt size." }, { status: 400 });
+      if (!VALID_SIZES.includes(tshirt_size)) return NextResponse.json({ error: "Invalid T-shirt size." }, { status: 400 });
+    }
+    const chosenTshirtSize: string | null = tshirt_size && VALID_SIZES.includes(tshirt_size) ? tshirt_size : null;
 
     // â”€â”€ Atomic slot check â€” uses participant_count maintained by DB trigger â”€â”€â”€â”€
     // participant_count is incremented by the trigger on INSERT/UPDATE status='confirmed'.
@@ -220,6 +228,7 @@ export async function POST(req: NextRequest) {
           payment_status:    "free",
           status:            "confirmed",
           distance_category: chosenCategory,
+          tshirt_size:       chosenTshirtSize,
           qr_token:          qrToken,
         }, { onConflict: "event_id,user_email", ignoreDuplicates: false })
         .select("registration_code, qr_token")
@@ -319,6 +328,7 @@ export async function POST(req: NextRequest) {
         payment_status:    "pending",
         status:            "pending_payment",
         distance_category: chosenCategory,
+        tshirt_size:       chosenTshirtSize,
       }, { onConflict: "event_id,user_email", ignoreDuplicates: false });
 
     if (regErr2) return NextResponse.json({ error: "Database error" }, { status: 500 });

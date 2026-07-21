@@ -17,9 +17,10 @@ interface Reg {
   checked_in_at: string | null; created_at: string; distance_category: string | null;
   qr_token: string | null;
   breakfast_availed?: boolean; breakfast_availed_at?: string | null;
+  tshirt_size?: string | null; tshirt_issued?: boolean;
 }
 
-interface Summary { total: number; paid: number; free: number; pending: number; revenue: number; checkedIn: number; breakfastIssued?: number; }
+interface Summary { total: number; paid: number; free: number; pending: number; revenue: number; checkedIn: number; breakfastIssued?: number; tshirtCollected?: number; tshirtIssued?: number; }
 
 interface BreakfastResult {
   valid: boolean; already_availed?: boolean; message: string;
@@ -89,6 +90,13 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
   const [breakfastToken,      setBreakfastToken]      = useState("");
   const [breakfastLoading,    setBreakfastLoading]    = useState(false);
   const [breakfastResult,     setBreakfastResult]     = useState<BreakfastResult | null>(null);
+
+  // T-shirt distribution state
+  const [tshirtCameraOpen,  setTshirtCameraOpen]  = useState(false);
+  const [tshirtToken,       setTshirtToken]        = useState("");
+  const [tshirtLoading,     setTshirtLoading]      = useState(false);
+  const [tshirtResult,      setTshirtResult]       = useState<{ valid: boolean; already_issued?: boolean; message: string; registration?: { code: string; name: string; tshirt_size: string; event: string } } | null>(null);
+  const [tshirtReport,      setTshirtReport]       = useState<{ total: number; issued: number; pending: number; by_size: Record<string, { total: number; issued: number; pending: number }>; sizes: string[] } | null>(null);
   const [scanToken,  setScanToken]  = useState("");
   const [scanLoading, setScanLoading] = useState(false);
   const [scanResult,  setScanResult] = useState<CheckInResult | null>(null);
@@ -136,8 +144,10 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
         free:           all.filter((r: Reg) => r.payment_status === "free").length,
         pending:        all.filter((r: Reg) => r.payment_status === "pending").length,
         revenue:        all.filter((r: Reg) => r.payment_status === "paid").reduce((s: number, r: Reg) => s + (r.final_price ?? 0), 0),
-        checkedIn:      all.filter((r: Reg) => r.checked_in_at).length,
+        checkedIn:       all.filter((r: Reg) => r.checked_in_at).length,
         breakfastIssued: all.filter((r: Reg) => r.breakfast_availed).length,
+        tshirtCollected: all.filter((r: Reg) => r.tshirt_size).length,
+        tshirtIssued:    all.filter((r: Reg) => r.tshirt_issued).length,
       });
       if (all[0]?.events?.title) setEventTitle(all[0].events.title);
 
@@ -249,6 +259,27 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
       else        setBulkResult({ sent: 0, failed: 0, skipped: 0, total: 0, details: [{ email: "", name: "", status: "failed", reason: data.error }] });
     } catch { setBulkResult({ sent: 0, failed: 0, skipped: 0, total: 0, details: [{ email: "", name: "", status: "failed", reason: "Network error" }] }); }
     finally { setBulkSending(false); }
+  }
+
+  async function handleTshirtDistribute(tok: string) {
+    if (!tok.trim()) return;
+    setTshirtLoading(true); setTshirtResult(null);
+    try {
+      const res  = await fetch("/api/events/tshirt-distribute", { method: "POST", headers, body: JSON.stringify({ token: tok.trim() }) });
+      const data = await res.json();
+      setTshirtResult(data);
+      if (res.ok && data.valid && !data.already_issued) {
+        setRegs(prev => prev.map(r => r.registration_code === data.registration?.code ? { ...r, tshirt_issued: true } : r));
+        setTshirtToken("");
+        loadTshirtReport();
+      }
+    } catch { setTshirtResult({ valid: false, message: "Network error." }); }
+    finally { setTshirtLoading(false); }
+  }
+
+  async function loadTshirtReport() {
+    const res = await fetch(`/api/admin/events/${eventId}/tshirt-report`).catch(() => null);
+    if (res?.ok) { const d = await res.json(); setTshirtReport(d); }
   }
 
   async function generateMissingQR() {
@@ -443,6 +474,10 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
               { label: "Pending",          value: summary.pending,                                       color: "#eab308"  },
               { label: "Checked In",       value: summary.checkedIn,                                     color: "#a78bfa"  },
               { label: "Breakfast Issued", value: summary.breakfastIssued ?? 0,                          color: "#34d399"  },
+              ...(summary.tshirtCollected ? [
+                { label: "T-Shirt Sizes",  value: summary.tshirtCollected,                               color: "#60a5fa"  },
+                { label: "T-Shirt Issued", value: summary.tshirtIssued ?? 0,                             color: "#4ade80"  },
+              ] : []),
               { label: "Revenue",          value: `₹${summary.revenue.toLocaleString("en-IN")}`,        color: "#e8620a"  },
             ].map(({ label, value, color }) => (
               <StatCard key={label} label={label} value={value} color={color} />
@@ -513,6 +548,58 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
               )}
             </Card>
 
+            {/* ── T-Shirt Distribution Scanner ── */}
+            {summary && (summary.tshirtCollected ?? 0) > 0 && (
+              <Card style={{ marginBottom: "1.5rem", borderColor: "rgba(96,165,250,0.2)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem", flexWrap: "wrap" as const, gap: 8 }}>
+                  <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#fff" }}>👕 T-Shirt Distribution</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <Button size="sm" variant="ghost" onClick={loadTshirtReport}>📊 Size Report</Button>
+                    <Button size="sm" onClick={() => { setTshirtResult(null); setTshirtCameraOpen(true); }}>📷 Open Camera</Button>
+                  </div>
+                </div>
+                <form onSubmit={e => { e.preventDefault(); handleTshirtDistribute(tshirtToken); }} style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" as const }}>
+                  <input value={tshirtToken} onChange={e => { setTshirtToken(e.target.value); setTshirtResult(null); }}
+                    placeholder="Paste QR token manually…"
+                    style={{ ...S.input, flex: "1 1 260px", fontFamily: "monospace", fontSize: "0.78rem" }} />
+                  <Button type="submit" loading={tshirtLoading} disabled={!tshirtToken.trim()}>Issue T-Shirt</Button>
+                </form>
+                {tshirtResult && (
+                  <div style={{ marginTop: "0.75rem", padding: "12px 16px", borderRadius: 8,
+                    background: tshirtResult.valid ? (tshirtResult.already_issued ? "rgba(234,179,8,0.1)" : "rgba(96,165,250,0.1)") : "rgba(239,68,68,0.1)",
+                    border: `1px solid ${tshirtResult.valid ? (tshirtResult.already_issued ? "rgba(234,179,8,0.3)" : "rgba(96,165,250,0.3)") : "rgba(239,68,68,0.3)"}` }}>
+                    <div style={{ fontWeight: 700, color: tshirtResult.valid ? (tshirtResult.already_issued ? "#eab308" : "#60a5fa") : "#f87171", marginBottom: 4 }}>
+                      {tshirtResult.message}
+                    </div>
+                    {tshirtResult.registration && (
+                      <div style={{ fontSize: "0.78rem", color: "#aaa" }}>
+                        {tshirtResult.registration.name} · 👕 {tshirtResult.registration.tshirt_size} · <span style={{ fontFamily: "monospace" }}>{tshirtResult.registration.code}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {tshirtReport && (
+                  <div style={{ marginTop: "1rem", padding: "12px 14px", background: "rgba(255,255,255,0.03)", borderRadius: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".06em", marginBottom: 10 }}>
+                      Size Distribution — {tshirtReport.issued}/{tshirtReport.total} issued
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 8 }}>
+                      {tshirtReport.sizes.filter(s => (tshirtReport.by_size[s]?.total ?? 0) > 0).map(size => {
+                        const d = tshirtReport.by_size[size];
+                        return (
+                          <div key={size} style={{ textAlign: "center", minWidth: 56, padding: "8px 12px", background: "rgba(96,165,250,0.08)", border: "1px solid rgba(96,165,250,0.2)", borderRadius: 8 }}>
+                            <div style={{ fontSize: 13, fontWeight: 900, color: "#60a5fa" }}>{size}</div>
+                            <div style={{ fontSize: 11, color: "#fff" }}>{d.total}</div>
+                            <div style={{ fontSize: 10, color: "#4ade80" }}>✓{d.issued}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </Card>
+            )}
+
             {/* Filters */}
             <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.5rem", flexWrap: "wrap", alignItems: "center" }}>
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, email, code…" style={{ ...S.input, flex: "1 1 240px" }} />
@@ -532,16 +619,16 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
                   <thead>
                     <tr style={{ background: "rgba(255,255,255,0.04)" }}>
-                      {["Code","Participant","Category","Price","Payment","Status","QR","Check-In","Actions"].map(h => (
+                      {["Code","Participant","Category","T-Shirt","Price","Payment","Status","QR","Check-In","Actions"].map(h => (
                         <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: "10px", color: "#666", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, whiteSpace: "nowrap" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {loading ? (
-                      <tr><td colSpan={8} style={{ padding: "2rem", textAlign: "center", color: "#555" }}>Loading…</td></tr>
+                      <tr><td colSpan={10} style={{ padding: "2rem", textAlign: "center", color: "#555" }}>Loading…</td></tr>
                     ) : filtered.length === 0 ? (
-                      <tr><td colSpan={9} style={{ padding: "2rem", textAlign: "center", color: "#555" }}>No registrations found.</td></tr>
+                      <tr><td colSpan={10} style={{ padding: "2rem", textAlign: "center", color: "#555" }}>No registrations found.</td></tr>
                     ) : filtered.map(r => (
                       <tr key={r.id} style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
                         <td style={{ padding: "10px 14px" }}><span style={{ fontFamily: "monospace", color: "#e8620a", fontSize: "0.78rem" }}>{r.registration_code}</span></td>
@@ -551,6 +638,13 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
                           {r.phone && <div style={{ color: "#555", fontSize: "0.72rem" }}>{r.phone}</div>}
                         </td>
                         <td style={{ padding: "10px 14px", color: "#aaa" }}>{r.distance_category || "—"}</td>
+                        <td style={{ padding: "10px 14px", whiteSpace: "nowrap" }}>
+                          {r.tshirt_size ? (
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: "10px", fontWeight: 700, color: r.tshirt_issued ? "#4ade80" : "#60a5fa", background: r.tshirt_issued ? "rgba(74,222,128,0.1)" : "rgba(96,165,250,0.1)", border: `1px solid ${r.tshirt_issued ? "rgba(74,222,128,0.3)" : "rgba(96,165,250,0.3)"}`, padding: "2px 8px", borderRadius: 999 }}>
+                              👕 {r.tshirt_size}{r.tshirt_issued ? " ✓" : ""}
+                            </span>
+                          ) : <span style={{ fontSize: "10px", color: "#555" }}>—</span>}
+                        </td>
                         <td style={{ padding: "10px 14px" }}>
                           <div style={{ color: "#fff" }}>₹{r.final_price}</div>
                           {r.coupon_discount > 0 && <div style={{ color: "#4ade80", fontSize: "0.72rem" }}>−₹{r.coupon_discount}</div>}
@@ -827,6 +921,19 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
             handleBreakfastCheckIn(tok);
           }}
           onClose={() => setBreakfastCameraOpen(false)}
+        />
+      )}
+
+      {tshirtCameraOpen && (
+        <QRScannerModal
+          title="Scan QR — T-Shirt Distribution"
+          onScan={raw => {
+            setTshirtCameraOpen(false);
+            let tok = raw;
+            try { const u = new URL(raw); tok = u.searchParams.get("t") ?? raw; } catch { /* raw */ }
+            handleTshirtDistribute(tok);
+          }}
+          onClose={() => setTshirtCameraOpen(false)}
         />
       )}
 

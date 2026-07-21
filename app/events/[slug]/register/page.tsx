@@ -13,7 +13,10 @@ interface EventInfo {
   start_time: string | null; location: string; price: number;
   max_participants: number | null; share_slug: string | null;
   distance_categories: string[] | null;
+  collect_tshirt: boolean;
 }
+
+const TSHIRT_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"] as const;
 
 interface StoredUser {
   firstName?: string; lastName?: string; email?: string; phone?: string;
@@ -92,6 +95,7 @@ export default function RegisterPage() {
   const [couponErr,        setCouponErr]        = useState("");
   const [couponLoading,    setCouponLoading]    = useState(false);
   const [distanceCategory, setDistanceCategory] = useState("");
+  const [tshirtSize,       setTshirtSize]       = useState("");
   const [submitting,    setSubmitting]    = useState(false);
   const [submitErr,     setSubmitErr]     = useState("");
   const [alreadyReg,    setAlreadyReg]    = useState<string | null>(null);
@@ -214,6 +218,13 @@ export default function RegisterPage() {
       if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
+    // Require t-shirt size when event collects it
+    if (ev.collect_tshirt && !tshirtSize) {
+      setSubmitErr("Please select your T-shirt size.");
+      const el = document.getElementById("field-tshirt_size");
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     setErrors(errs);
     if (Object.keys(errs).length > 0) {
       const firstKey = Object.keys(errs)[0];
@@ -239,6 +250,7 @@ export default function RegisterPage() {
           special_notes:     form.special_notes,
           coupon_code:       couponApplied ? coupon : undefined,
           distance_category: distanceCategory || undefined,
+          tshirt_size:       tshirtSize || undefined,
         }),
       });
       const data = await res.json();
@@ -386,6 +398,39 @@ export default function RegisterPage() {
             {(ev.distance_categories ?? []).length === 1 && !distanceCategory && (
               <div style={{ fontSize: "11px", color: "#555", marginTop: "6px" }}>
                 Tap to confirm your category
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── T-Shirt Size selector ───────────────────────────────────── */}
+        {ev.collect_tshirt && (
+          <div id="field-tshirt_size" style={{ marginBottom: "1.75rem" }}>
+            <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.875rem" }}>
+              T-Shirt Size *
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+              {TSHIRT_SIZES.map(size => {
+                const sel = tshirtSize === size;
+                return (
+                  <button key={size} type="button"
+                    onClick={() => { setTshirtSize(size); setSubmitErr(""); }}
+                    style={{
+                      padding: "9px 18px", borderRadius: "8px", cursor: "pointer",
+                      fontFamily: "inherit", fontWeight: sel ? 800 : 500, fontSize: "0.9rem",
+                      border: `2px solid ${sel ? "#e8620a" : "rgba(255,255,255,0.12)"}`,
+                      background: sel ? "rgba(232,98,10,0.15)" : "transparent",
+                      color: sel ? "#e8620a" : "rgba(255,255,255,0.55)",
+                      transition: "all 0.15s",
+                    }}>
+                    {size}
+                  </button>
+                );
+              })}
+            </div>
+            {!tshirtSize && (
+              <div style={{ fontSize: "11px", color: "#555", marginTop: "6px" }}>
+                Select a size — T-shirt is included with your registration
               </div>
             )}
           </div>

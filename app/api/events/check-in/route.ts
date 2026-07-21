@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   // 2. Look up the registration
   const { data: reg, error: regErr } = await db
     .from("event_registrations")
-    .select("id, registration_code, user_name, user_email, status, payment_status, distance_category, checked_in_at, events(title, start_date, location)")
+    .select("id, registration_code, user_name, user_email, status, payment_status, distance_category, tshirt_size, checked_in_at, events(title, start_date, location)")
     .eq("registration_code", registrationCode)
     .eq("event_id", eventId)
     .single<{
@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
       status: string;
       payment_status: string;
       distance_category: string | null;
+      tshirt_size: string | null;
       checked_in_at: string | null;
       events: { title: string; start_date: string; location: string } | null;
     }>();
@@ -70,10 +71,11 @@ export async function POST(req: NextRequest) {
       already_checked_in: true,
       message:            `${reg.user_name} is already checked in.`,
       registration:       {
-        code:     reg.registration_code,
-        name:     reg.user_name,
-        category: reg.distance_category,
-        event:    reg.events?.title ?? "",
+        code:        reg.registration_code,
+        name:        reg.user_name,
+        category:    reg.distance_category,
+        tshirt_size: reg.tshirt_size,
+        event:       reg.events?.title ?? "",
         checked_in_at: reg.checked_in_at,
       },
     });
@@ -96,11 +98,12 @@ export async function POST(req: NextRequest) {
     already_checked_in: false,
     message:            `✅ ${reg.user_name} checked in successfully!`,
     registration:       {
-      code:     reg.registration_code,
-      name:     reg.user_name,
-      email:    reg.user_email,
-      category: reg.distance_category,
-      event:    reg.events?.title ?? "",
+      code:        reg.registration_code,
+      name:        reg.user_name,
+      email:       reg.user_email,
+      category:    reg.distance_category,
+      tshirt_size: reg.tshirt_size,
+      event:       reg.events?.title ?? "",
       checked_in_at: now,
     },
   });

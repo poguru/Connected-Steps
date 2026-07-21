@@ -43,6 +43,8 @@ export async function GET(req: NextRequest) {
       emergency_contact, coupon_code, coupon_discount, original_price, final_price,
       payment_status, razorpay_payment_id, status, created_at,
       distance_category, qr_token, checked_in_at,
+      breakfast_availed, breakfast_availed_at,
+      tshirt_size, tshirt_issued,
       events ( id, title, start_date, location )
     `, { count: "exact" })
     .order(sort, { ascending: asc });

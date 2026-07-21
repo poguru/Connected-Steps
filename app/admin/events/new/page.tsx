@@ -48,6 +48,7 @@ interface WizardState {
   waiting_list_enabled:    boolean;
   require_login:           boolean;
   approval_required:       boolean;
+  collect_tshirt:          boolean;
   refund_policy:           string;
   cancellation_policy:     string;
   visibility:              string;
@@ -62,6 +63,7 @@ const BLANK: WizardState = {
   cover_image: "", website: "",
   registration_closes_at: "", early_bird_ends_at: "", max_participants: "",
   waiting_list_enabled: false, require_login: true, approval_required: false,
+  collect_tshirt: false,
   refund_policy: "", cancellation_policy: "", visibility: "public",
 };
 
@@ -272,6 +274,7 @@ export default function NewEventWizard() {
         waiting_list_enabled:    form.waiting_list_enabled,
         require_login:           form.require_login,
         approval_required:       form.approval_required,
+        collect_tshirt:          form.collect_tshirt,
         refund_policy:           form.refund_policy || null,
         cancellation_policy:     form.cancellation_policy || null,
         visibility:              form.visibility,
@@ -751,6 +754,7 @@ function StepRegistration({ form, set, errors }: { form: WizardState; set: (k: k
             { key: "require_login",        label: "Require Login",        hint: "Users must be logged in to register" },
             { key: "waiting_list_enabled", label: "Enable Waiting List",  hint: "Accept registrations after capacity is full" },
             { key: "approval_required",    label: "Manual Approval",      hint: "Admin approves each registration manually" },
+            { key: "collect_tshirt",       label: "Collect T-Shirt Size", hint: "Participants must choose a size (XS–XXXL) during registration" },
           ].map(({ key, label, hint }) => (
             <label key={key} style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
               <input type="checkbox" className="wiz-checkbox" style={{ marginTop: 2 }} checked={Boolean(form[key as keyof WizardState])} onChange={e => set(key as keyof WizardState, e.target.checked)} />

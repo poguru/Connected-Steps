@@ -27,6 +27,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       checked_in_at,
       confirmation_email_sent_at, email_status, email_ses_message_id,
       breakfast_availed, breakfast_availed_at, breakfast_verified_by,
+      tshirt_size, tshirt_issued, tshirt_issued_at, tshirt_issued_by,
       slot_reserved_at, slot_expires_at,
       events (
         id, title, start_date, start_time, end_date, location,
@@ -74,7 +75,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   // Only allow safe admin updates
   const allowed: Record<string, unknown> = {};
-  const safeKeys = ["status", "special_notes", "blood_group", "emergency_contact"];
+  const safeKeys = ["status", "special_notes", "blood_group", "emergency_contact", "tshirt_size"];
   for (const k of safeKeys) {
     if (k in body) allowed[k] = body[k];
   }
