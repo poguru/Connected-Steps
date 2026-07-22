@@ -2,22 +2,35 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 
-export interface ScanResult {
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type Phase = "idle" | "looking_up" | "preview" | "confirming" | "done" | "scan_error";
+type CamState = "starting" | "active" | "needs-gesture" | "denied" | "no-device";
+
+interface ParticipantInfo {
+  id: string;
+  name: string;
+  registration_code?: string | null;
+  distance_category: string | null;
+  tshirt_size: string | null;
+  bib_number: string | null;
+  wave: string | null;
+  gender?: string | null;
+  payment_status?: string | null;
+}
+
+interface ApiResponse {
   valid: boolean;
   already_done?: boolean;
   message: string;
   done_at?: string | null;
   done_by?: string | null;
-  participant?: {
-    id: string;
-    name: string;
-    distance_category: string | null;
-    tshirt_size: string | null;
-    bib_number: string | null;
-    wave: string | null;
-  };
+  participant?: ParticipantInfo;
   error?: string;
 }
+
+// Keep legacy ScanResult export so existing imports don't break
+export interface ScanResult extends ApiResponse {}
 
 interface Props {
   eventId: string;
@@ -27,204 +40,468 @@ interface Props {
   onScanCount?: (count: number) => void;
 }
 
-const GREEN  = "#10b981";
-const ORANGE = "#e8620a";
-const PURPLE = "#818cf8";
+// ── Constants ─────────────────────────────────────────────────────────────────
 
-function fmt(iso: string) {
+const CONFIRM_LABELS: Record<string, string> = {
+  checkin:   "Check In",
+  tshirt:    "Issue T-Shirt",
+  breakfast: "Issue Breakfast",
+  medal:     "Issue Medal",
+  bib:       "Confirm BIB Collected",
+};
+
+const DISPLAY_SECS = 10;
+
+function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
+function extractToken(raw: string): string {
+  try { const u = new URL(raw); return u.searchParams.get("t") ?? raw; } catch { return raw; }
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function ScannerModule({
-  eventId,
-  service,
-  serviceLabel,
-  accentColor = GREEN,
-  onScanCount,
+  eventId, service, serviceLabel, accentColor = "#10b981", onScanCount,
 }: Props) {
-  const [query,   setQuery]   = useState("");
-  const [result,  setResult]  = useState<ScanResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [count,   setCount]   = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [phase,        setPhase]        = useState<Phase>("idle");
+  const [camState,     setCamState]     = useState<CamState>("starting");
+  const [manualInput,  setManualInput]  = useState("");
+  const [scannedToken, setScannedToken] = useState("");
+  const [lookupData,   setLookupData]   = useState<ApiResponse | null>(null);
+  const [actionData,   setActionData]   = useState<ApiResponse | null>(null);
+  const [countdown,    setCountdown]    = useState(DISPLAY_SECS);
+  const [sessionCount, setSessionCount] = useState(0);
 
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  const videoRef    = useRef<HTMLVideoElement>(null);
+  const canvasRef   = useRef<HTMLCanvasElement>(null);
+  const streamRef   = useRef<MediaStream | null>(null);
+  const rafRef      = useRef<number>(0);
+  const jsQRRef     = useRef<((d: Uint8ClampedArray, w: number, h: number) => { data: string } | null) | null>(null);
+  const manualRef   = useRef<HTMLInputElement>(null);
+  const busyRef     = useRef(false);  // prevents double-processing
+  const countRef    = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const scan = useCallback(async (token: string) => {
-    if (!token.trim()) return;
-    setLoading(true);
-    setResult(null);
+  // ── Camera lifecycle ───────────────────────────────────────────────────────
+
+  const stopCamera = useCallback(() => {
+    cancelAnimationFrame(rafRef.current);
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+  }, []);
+
+  const startCamera = useCallback(async () => {
+    setCamState("starting");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      if (!jsQRRef.current) {
+        const mod = await import("jsqr");
+        jsQRRef.current = mod.default;
+      }
+      setCamState("active");
+
+      const tick = () => {
+        if (!streamRef.current) return; // camera stopped
+        const video  = videoRef.current;
+        const canvas = canvasRef.current;
+        if (!video || !canvas || video.readyState < 2) { rafRef.current = requestAnimationFrame(tick); return; }
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { rafRef.current = requestAnimationFrame(tick); return; }
+        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const res = jsQRRef.current?.(img.data, img.width, img.height);
+        if (res?.data) { void handleScan(extractToken(res.data)); return; }
+        rafRef.current = requestAnimationFrame(tick);
+      };
+      rafRef.current = requestAnimationFrame(tick);
+    } catch (err: unknown) {
+      const name = (err as { name?: string }).name ?? "";
+      if (name === "NotFoundError") setCamState("no-device");
+      else if (name === "NotAllowedError" || name === "SecurityError") setCamState("needs-gesture");
+      else setCamState("denied");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Start/stop camera based on phase
+  useEffect(() => {
+    if (phase === "idle") {
+      busyRef.current = false;
+      void startCamera();
+      setTimeout(() => manualRef.current?.focus(), 120);
+      return () => { stopCamera(); };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  // Countdown in done state
+  useEffect(() => {
+    if (phase !== "done") return;
+    setCountdown(DISPLAY_SECS);
+    let remaining = DISPLAY_SECS;
+    countRef.current = setInterval(() => {
+      remaining--;
+      setCountdown(remaining);
+      if (remaining <= 0) { clearInterval(countRef.current!); setPhase("idle"); }
+    }, 1000);
+    return () => { clearInterval(countRef.current!); };
+  }, [phase]);
+
+  // ── Scan / lookup / action ─────────────────────────────────────────────────
+
+  async function handleScan(token: string) {
+    if (!token.trim() || busyRef.current) return;
+    busyRef.current = true;
+    stopCamera();
+    setManualInput("");
+    setScannedToken(token.trim());
+    setPhase("looking_up");
+
     try {
       const res  = await fetch(`/api/ops/events/${eventId}/scan`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ service, qr_token: token.trim() }),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ service, qr_token: token.trim(), dry_run: true }),
       });
-      const data = await res.json() as ScanResult;
-      setResult(data);
-      if (res.ok && data.valid && !data.already_done) {
-        setCount(c => {
+      const data = await res.json() as ApiResponse;
+
+      if (!res.ok || !data.valid) {
+        setActionData(data);
+        setPhase("scan_error");
+        return;
+      }
+      if (data.already_done) {
+        setActionData(data);
+        setPhase("done");
+        return;
+      }
+      setLookupData(data);
+      setPhase("preview");
+    } catch {
+      setActionData({ valid: false, message: "Network error. Please try again." });
+      setPhase("scan_error");
+    }
+  }
+
+  async function handleConfirm() {
+    setPhase("confirming");
+    try {
+      const res  = await fetch(`/api/ops/events/${eventId}/scan`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ service, qr_token: scannedToken }),
+      });
+      const data = await res.json() as ApiResponse;
+      setActionData(data);
+      if (!res.ok || !data.valid) { setPhase("scan_error"); return; }
+      if (!data.already_done) {
+        setSessionCount(c => {
           const next = c + 1;
           onScanCount?.(next);
           return next;
         });
       }
+      setPhase("done");
     } catch {
-      setResult({ valid: false, message: "Network error. Please try again.", error: "network" });
-    } finally {
-      setLoading(false);
-      setQuery("");
-      setTimeout(() => inputRef.current?.focus(), 80);
+      setActionData({ valid: false, message: "Network error. Please try again." });
+      setPhase("scan_error");
     }
-  }, [eventId, service, onScanCount]);
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    void scan(query);
   }
 
-  function reset() {
-    setResult(null);
-    setQuery("");
-    setTimeout(() => inputRef.current?.focus(), 50);
+  function goIdle() {
+    clearInterval(countRef.current!);
+    setActionData(null);
+    setLookupData(null);
+    setScannedToken("");
+    setPhase("idle");
   }
 
-  // Determine message colour based on result type
-  const msgColor =
-    !result           ? ORANGE
-    : result.already_done ? PURPLE
-    : result.valid        ? accentColor
-    :                       "#f87171";
+  // ── UI ─────────────────────────────────────────────────────────────────────
 
-  const msgBg =
-    !result           ? "transparent"
-    : result.already_done ? "rgba(99,102,241,0.07)"
-    : result.valid        ? `${accentColor}12`
-    :                       "rgba(239,68,68,0.07)";
-
-  const msgBorder =
-    !result           ? "transparent"
-    : result.already_done ? "rgba(99,102,241,0.25)"
-    : result.valid        ? `${accentColor}40`
-    :                       "rgba(239,68,68,0.25)";
+  const confirmLabel = CONFIRM_LABELS[service] ?? "Confirm";
+  const isDone       = phase === "done";
+  const isSuccess    = isDone && actionData?.valid && !actionData.already_done;
+  const isAlready    = isDone && actionData?.already_done;
 
   return (
-    <div style={{ maxWidth: 520, margin: "0 auto", padding: "clamp(1rem,4vw,1.5rem) 16px 80px" }}>
+    <div style={{ maxWidth: 560, margin: "0 auto", padding: "clamp(0.75rem,3vw,1.25rem) 14px 80px", fontFamily: "'Inter',system-ui,sans-serif" }}>
 
-      {/* Scan count chip */}
-      {count > 0 && (
-        <div style={{ textAlign: "center", marginBottom: 16 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: accentColor,
-            background: `${accentColor}15`, padding: "5px 16px", borderRadius: 999 }}>
-            {count} {serviceLabel.toLowerCase()} this session
+      {/* Session count chip */}
+      {sessionCount > 0 && (
+        <div style={{ textAlign: "center", marginBottom: 14 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: accentColor, background: `${accentColor}18`, padding: "4px 16px", borderRadius: 999 }}>
+            {sessionCount} {serviceLabel.toLowerCase()} this session
           </span>
         </div>
       )}
 
-      {/* Input */}
-      <form onSubmit={handleSubmit} style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder={`Scan QR code or enter BIB number…`}
-            style={{
-              flex: 1, padding: "13px 16px",
-              background: "rgba(255,255,255,0.05)",
-              border: "1px solid rgba(255,255,255,0.15)",
-              borderRadius: 12, color: "#fff", fontSize: 15,
-              fontFamily: "inherit", outline: "none",
-              caretColor: accentColor,
-            }}
-          />
-          <button
-            type="submit"
-            disabled={loading || !query.trim()}
-            style={{
-              padding: "13px 20px",
-              background: loading || !query.trim() ? "rgba(255,255,255,0.08)" : accentColor,
-              border: "none", borderRadius: 12, color: "#fff",
-              fontSize: 15, fontWeight: 700, cursor: loading || !query.trim() ? "not-allowed" : "pointer",
-              fontFamily: "inherit", flexShrink: 0, minWidth: 64,
-              transition: "background 0.15s",
-            }}
-          >
-            {loading ? "…" : "Go"}
-          </button>
+      {/* ── IDLE / LOOKING-UP — camera + manual input ── */}
+      {(phase === "idle" || phase === "looking_up") && (
+        <div>
+          {/* Camera viewfinder */}
+          <div style={{
+            position: "relative", width: "100%", aspectRatio: "4/3", maxHeight: 300,
+            borderRadius: 16, overflow: "hidden", background: "#111",
+            border: `2px solid ${camState === "active" ? accentColor + "60" : "rgba(255,255,255,0.08)"}`,
+            marginBottom: 16,
+          }}>
+            <video ref={videoRef} muted playsInline
+              style={{ width: "100%", height: "100%", objectFit: "cover",
+                display: camState === "active" ? "block" : "none" }} />
+            <canvas ref={canvasRef} style={{ display: "none" }} />
+
+            {/* Scanning overlay with corner guides */}
+            {camState === "active" && phase === "idle" && (
+              <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+                {/* dim edges */}
+                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, transparent 25%, transparent 75%, rgba(0,0,0,0.35) 100%)" }} />
+                {/* corners */}
+                {([["top","left"],["top","right"],["bottom","left"],["bottom","right"]] as const).map(([v,h], i) => (
+                  <div key={i} style={{
+                    position: "absolute", [v]: 18, [h]: 18, width: 32, height: 32,
+                    borderTop:    (v === "top")    ? `3px solid ${accentColor}` : "none",
+                    borderBottom: (v === "bottom") ? `3px solid ${accentColor}` : "none",
+                    borderLeft:   (h === "left")   ? `3px solid ${accentColor}` : "none",
+                    borderRight:  (h === "right")  ? `3px solid ${accentColor}` : "none",
+                    borderRadius: i === 0 ? "4px 0 0 0" : i === 1 ? "0 4px 0 0" : i === 2 ? "0 0 0 4px" : "0 0 4px 0",
+                  }} />
+                ))}
+                <p style={{ position: "absolute", bottom: 12, left: 0, right: 0, textAlign: "center",
+                  fontSize: 12, color: "rgba(255,255,255,0.5)", margin: 0 }}>
+                  Point at participant&apos;s QR code
+                </p>
+              </div>
+            )}
+
+            {/* Looking-up overlay */}
+            {phase === "looking_up" && (
+              <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "center", gap: 10, background: "rgba(0,0,0,0.75)" }}>
+                <div style={{ width: 36, height: 36, borderRadius: "50%", border: "3px solid #333", borderTopColor: accentColor, animation: "spin .7s linear infinite" }} />
+                <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+                <span style={{ fontSize: 13, color: "#aaa" }}>Looking up…</span>
+              </div>
+            )}
+
+            {/* Starting spinner */}
+            {camState === "starting" && phase === "idle" && (
+              <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "center", gap: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: "50%", border: "3px solid #222", borderTopColor: accentColor, animation: "spin .7s linear infinite" }} />
+                <span style={{ fontSize: 13, color: "#555" }}>Starting camera…</span>
+              </div>
+            )}
+
+            {/* Needs gesture */}
+            {camState === "needs-gesture" && phase === "idle" && (
+              <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "center", gap: 14, padding: 24 }}>
+                <div style={{ fontSize: "2.5rem" }}>📷</div>
+                <button
+                  onClick={() => void startCamera()}
+                  style={{ padding: "14px 32px", background: accentColor, border: "none", borderRadius: 12,
+                    color: "#fff", fontSize: 16, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                  Enable Camera
+                </button>
+                <span style={{ fontSize: 12, color: "#555", textAlign: "center" }}>
+                  Camera access needed for QR scanning
+                </span>
+              </div>
+            )}
+
+            {/* Denied / no device */}
+            {(camState === "denied" || camState === "no-device") && phase === "idle" && (
+              <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "center", gap: 10, padding: 24, textAlign: "center" }}>
+                <div style={{ fontSize: "2rem" }}>{camState === "no-device" ? "📷" : "🚫"}</div>
+                <div style={{ fontSize: 13, color: "#f87171", fontWeight: 600 }}>
+                  {camState === "no-device" ? "No camera found" : "Camera access denied"}
+                </div>
+                <div style={{ fontSize: 12, color: "#555", lineHeight: 1.6 }}>
+                  Use manual entry below
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.07)" }} />
+            <span style={{ fontSize: 11, color: "#444", textTransform: "uppercase", letterSpacing: ".06em" }}>or enter manually</span>
+            <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.07)" }} />
+          </div>
+
+          {/* Manual / USB input */}
+          <form onSubmit={e => { e.preventDefault(); void handleScan(manualInput); }}>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                ref={manualRef}
+                value={manualInput}
+                onChange={e => setManualInput(e.target.value)}
+                placeholder="BIB number or registration code…"
+                disabled={phase === "looking_up"}
+                style={{
+                  flex: 1, padding: "14px 16px",
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  borderRadius: 12, color: "#fff", fontSize: 16,
+                  fontFamily: "monospace", outline: "none", caretColor: accentColor,
+                }}
+              />
+              <button
+                type="submit"
+                disabled={phase === "looking_up" || !manualInput.trim()}
+                style={{
+                  padding: "14px 22px", borderRadius: 12, border: "none",
+                  background: manualInput.trim() ? accentColor : "rgba(255,255,255,0.08)",
+                  color: "#fff", fontSize: 16, fontWeight: 800, cursor: manualInput.trim() ? "pointer" : "not-allowed",
+                  fontFamily: "inherit", flexShrink: 0, transition: "background 0.15s",
+                }}>
+                Go
+              </button>
+            </div>
+          </form>
         </div>
-      </form>
+      )}
 
-      {/* Result card */}
-      {result && (
+      {/* ── PREVIEW — participant details + confirm button ── */}
+      {(phase === "preview" || phase === "confirming") && lookupData?.participant && (
+        <ParticipantCard
+          participant={lookupData.participant}
+          service={service}
+          accentColor={accentColor}
+          confirmLabel={confirmLabel}
+          confirming={phase === "confirming"}
+          onConfirm={() => void handleConfirm()}
+          onBack={goIdle}
+        />
+      )}
+
+      {/* ── DONE — success or already-done with countdown ── */}
+      {isDone && (
         <div style={{
-          background: msgBg,
-          border: `1px solid ${msgBorder}`,
-          borderRadius: 16, overflow: "hidden",
-          animation: "fadeIn 0.15s ease",
+          borderRadius: 20, overflow: "hidden",
+          border: `1px solid ${isSuccess ? accentColor + "50" : isAlready ? "rgba(168,85,247,0.35)" : "rgba(239,68,68,0.3)"}`,
+          background: isSuccess ? `${accentColor}0c` : isAlready ? "rgba(168,85,247,0.07)" : "rgba(239,68,68,0.07)",
+          animation: "fadeUp .2s ease",
         }}>
-          <style>{`@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}`}</style>
+          <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}`}</style>
 
-          {/* Colour bar at top */}
-          <div style={{ height: 4, background: msgColor }} />
+          {/* Colour bar */}
+          <div style={{ height: 5, background: isSuccess ? accentColor : isAlready ? "#a855f7" : "#ef4444" }} />
 
-          <div style={{ padding: "20px 20px 24px" }}>
-            {/* Status icon + message */}
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 16 }}>
-              <span style={{ fontSize: 28, lineHeight: 1, flexShrink: 0 }}>
-                {result.already_done ? "ℹ️" : result.valid ? "✅" : "❌"}
+          <div style={{ padding: "22px 20px 24px" }}>
+            {/* Status header */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+              <span style={{ fontSize: 36, lineHeight: 1 }}>
+                {isSuccess ? "✅" : isAlready ? "ℹ️" : "❌"}
               </span>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: msgColor, lineHeight: 1.3 }}>
-                  {result.message}
+                <div style={{ fontSize: 18, fontWeight: 800, color: isSuccess ? accentColor : isAlready ? "#a855f7" : "#f87171", lineHeight: 1.2 }}>
+                  {isSuccess ? "Success!"
+                   : isAlready ? "Already Issued"
+                   : "Error"}
                 </div>
-                {result.already_done && result.done_at && (
-                  <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
-                    at {fmt(result.done_at)}
-                    {result.done_by ? ` · by ${result.done_by}` : ""}
-                  </div>
-                )}
+                <div style={{ fontSize: 13, color: "#aaa", marginTop: 3 }}>
+                  {actionData?.message}
+                </div>
               </div>
             </div>
 
-            {/* Participant details */}
-            {result.participant && (
+            {/* Participant summary */}
+            {actionData?.participant && (
               <div style={{
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: 10, padding: "12px 14px",
-                display: "grid", gridTemplateColumns: "1fr 1fr",
-                gap: "6px 16px", marginBottom: 16, fontSize: 13,
+                background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 12, padding: "14px 16px", marginBottom: 16,
               }}>
-                <Field label="Name"     value={result.participant.name} span />
-                {result.participant.distance_category && (
-                  <Field label="Category" value={result.participant.distance_category} />
-                )}
-                {result.participant.tshirt_size && (
-                  <Field label="T-Shirt"  value={result.participant.tshirt_size} />
-                )}
-                {result.participant.bib_number && (
-                  <Field label="BIB"      value={`#${result.participant.bib_number}`} />
-                )}
-                {result.participant.wave && (
-                  <Field label="Wave"     value={`Wave ${result.participant.wave}`} />
+                <div style={{ fontSize: 20, fontWeight: 800, color: "#fff", marginBottom: 6 }}>
+                  {actionData.participant.name}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {actionData.participant.tshirt_size && service === "tshirt" && (
+                    <SizeChip size={actionData.participant.tshirt_size} color={accentColor} />
+                  )}
+                  {actionData.participant.distance_category && (
+                    <Chip label={actionData.participant.distance_category} color="#60a5fa" />
+                  )}
+                  {actionData.participant.bib_number && (
+                    <Chip label={`BIB #${actionData.participant.bib_number}`} color="#818cf8" />
+                  )}
+                </div>
+                {isAlready && actionData.done_at && (
+                  <div style={{ fontSize: 12, color: "#666", marginTop: 10 }}>
+                    Issued at {fmtTime(actionData.done_at)}
+                    {actionData.done_by ? ` · by ${actionData.done_by}` : ""}
+                  </div>
                 )}
               </div>
             )}
 
-            {/* Actions */}
+            {/* Countdown bar */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                <span style={{ fontSize: 11, color: "#555" }}>Next scan in</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#666" }}>{countdown}s</span>
+              </div>
+              <div style={{ height: 4, background: "rgba(255,255,255,0.08)", borderRadius: 2 }}>
+                <div style={{
+                  height: "100%", borderRadius: 2,
+                  background: isSuccess ? accentColor : isAlready ? "#a855f7" : "#ef4444",
+                  width: `${(countdown / DISPLAY_SECS) * 100}%`,
+                  transition: "width 0.9s linear",
+                }} />
+              </div>
+            </div>
+
+            {/* Next scan button */}
             <button
-              onClick={reset}
+              onClick={goIdle}
               style={{
-                width: "100%", padding: "12px",
-                background: "rgba(255,255,255,0.07)",
-                border: "1px solid rgba(255,255,255,0.12)",
-                borderRadius: 10, color: "#ccc",
-                fontSize: 14, fontWeight: 600,
-                cursor: "pointer", fontFamily: "inherit",
-              }}
-            >
-              Next →
+                width: "100%", padding: "14px", borderRadius: 12,
+                background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)",
+                color: "#ccc", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+              }}>
+              Next Scan →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── SCAN ERROR ── */}
+      {phase === "scan_error" && (
+        <div style={{
+          borderRadius: 20, overflow: "hidden",
+          border: "1px solid rgba(239,68,68,0.3)",
+          background: "rgba(239,68,68,0.07)",
+          animation: "fadeUp .2s ease",
+        }}>
+          <div style={{ height: 5, background: "#ef4444" }} />
+          <div style={{ padding: "22px 20px 24px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+              <span style={{ fontSize: 36, lineHeight: 1 }}>❌</span>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#f87171" }}>Invalid QR Code</div>
+                <div style={{ fontSize: 13, color: "#aaa", marginTop: 3 }}>
+                  {actionData?.error ?? actionData?.message ?? "This QR code could not be verified."}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={goIdle}
+              style={{
+                width: "100%", padding: "14px", borderRadius: 12,
+                background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)",
+                color: "#ccc", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+              }}>
+              Try Again →
             </button>
           </div>
         </div>
@@ -233,13 +510,167 @@ export default function ScannerModule({
   );
 }
 
-function Field({ label, value, span }: { label: string; value: string; span?: boolean }) {
+// ── Sub-components ─────────────────────────────────────────────────────────────
+
+function ParticipantCard({
+  participant, service, accentColor, confirmLabel, confirming, onConfirm, onBack,
+}: {
+  participant: ParticipantInfo;
+  service: string;
+  accentColor: string;
+  confirmLabel: string;
+  confirming: boolean;
+  onConfirm: () => void;
+  onBack: () => void;
+}) {
+  const paymentOk = !participant.payment_status
+    || participant.payment_status === "paid"
+    || participant.payment_status === "confirmed"
+    || participant.payment_status === "free";
+
   return (
-    <div style={span ? { gridColumn: "1/-1" } : undefined}>
-      <div style={{ fontSize: 10, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>
-        {label}
+    <div style={{
+      borderRadius: 20, overflow: "hidden",
+      border: `1px solid ${accentColor}40`,
+      background: `${accentColor}08`,
+      animation: "fadeUp .2s ease",
+    }}>
+      <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}`}</style>
+      <div style={{ height: 4, background: accentColor }} />
+
+      <div style={{ padding: "20px 18px 22px" }}>
+
+        {/* Name */}
+        <div style={{ fontSize: 28, fontWeight: 900, color: "#fff", lineHeight: 1.1, marginBottom: 6 }}>
+          {participant.name}
+        </div>
+
+        {/* Registration code */}
+        {participant.registration_code && (
+          <div style={{ fontSize: 12, color: "#666", fontFamily: "monospace", marginBottom: 14 }}>
+            {participant.registration_code}
+          </div>
+        )}
+
+        {/* T-Shirt size — super prominent for tshirt service */}
+        {participant.tshirt_size && service === "tshirt" && (
+          <div style={{
+            background: `${accentColor}20`, border: `2px solid ${accentColor}60`,
+            borderRadius: 14, padding: "14px 18px", marginBottom: 14,
+            display: "flex", alignItems: "center", gap: 12,
+          }}>
+            <span style={{ fontSize: 22 }}>👕</span>
+            <div>
+              <div style={{ fontSize: 10, color: accentColor, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase" }}>T-Shirt Size</div>
+              <div style={{ fontSize: 36, fontWeight: 900, color: accentColor, lineHeight: 1 }}>
+                {participant.tshirt_size}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Detail grid */}
+        <div style={{
+          display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 14px",
+          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)",
+          borderRadius: 12, padding: "14px 16px", marginBottom: 16,
+        }}>
+          {participant.distance_category && (
+            <DetailField label="Category" value={participant.distance_category} />
+          )}
+          {participant.gender && (
+            <DetailField label="Gender" value={participant.gender} />
+          )}
+          {participant.bib_number && (
+            <DetailField label="BIB Number" value={`#${participant.bib_number}`} />
+          )}
+          {participant.wave && (
+            <DetailField label="Wave" value={`Wave ${participant.wave}`} />
+          )}
+          <div>
+            <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 3 }}>Payment</div>
+            <span style={{
+              fontSize: 12, fontWeight: 700, padding: "2px 10px", borderRadius: 999,
+              background: paymentOk ? "rgba(74,222,128,0.12)" : "rgba(248,113,113,0.12)",
+              color: paymentOk ? "#4ade80" : "#f87171",
+              border: `1px solid ${paymentOk ? "rgba(74,222,128,0.3)" : "rgba(248,113,113,0.3)"}`,
+            }}>
+              {participant.payment_status
+                ? participant.payment_status.charAt(0).toUpperCase() + participant.payment_status.slice(1)
+                : "Confirmed"}
+            </span>
+          </div>
+          {/* T-shirt size compact when not tshirt service */}
+          {participant.tshirt_size && service !== "tshirt" && (
+            <DetailField label="T-Shirt" value={participant.tshirt_size} />
+          )}
+        </div>
+
+        {/* Confirm button */}
+        <button
+          onClick={onConfirm}
+          disabled={confirming}
+          style={{
+            width: "100%", padding: "17px", borderRadius: 14, border: "none",
+            background: confirming ? "rgba(255,255,255,0.08)" : accentColor,
+            color: "#fff", fontSize: 17, fontWeight: 800, cursor: confirming ? "not-allowed" : "pointer",
+            fontFamily: "inherit", marginBottom: 10, letterSpacing: ".01em",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+          }}>
+          {confirming ? (
+            <>
+              <span style={{ width: 18, height: 18, borderRadius: "50%", border: "3px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin .7s linear infinite", display: "inline-block" }} />
+              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+              Processing…
+            </>
+          ) : confirmLabel}
+        </button>
+
+        {/* Back link */}
+        <button
+          onClick={onBack}
+          disabled={confirming}
+          style={{
+            width: "100%", padding: "10px", borderRadius: 10, border: "none",
+            background: "transparent", color: "#555", fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+          }}>
+          ← Scan a different QR
+        </button>
       </div>
-      <div style={{ fontWeight: 600, color: "#eee" }}>{value}</div>
+    </div>
+  );
+}
+
+function DetailField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 3 }}>{label}</div>
+      <div style={{ fontSize: 15, fontWeight: 700, color: "#eee" }}>{value}</div>
+    </div>
+  );
+}
+
+function SizeChip({ size, color }: { size: string; color: string }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 5,
+      background: `${color}18`, border: `1px solid ${color}50`,
+      padding: "4px 12px", borderRadius: 999,
+    }}>
+      <span style={{ fontSize: 13 }}>👕</span>
+      <span style={{ fontSize: 14, fontWeight: 800, color }}>{size}</span>
+    </div>
+  );
+}
+
+function Chip({ label, color }: { label: string; color: string }) {
+  return (
+    <div style={{
+      fontSize: 12, fontWeight: 700, color,
+      background: `${color}18`, border: `1px solid ${color}40`,
+      padding: "3px 10px", borderRadius: 999,
+    }}>
+      {label}
     </div>
   );
 }
