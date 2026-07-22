@@ -78,9 +78,14 @@ export default function MyEventRegistrations() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
         <div style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--foreground)" }}>My Event Registrations</div>
-        <Link href="/events" style={{ fontSize: "0.75rem", color: "var(--cs-orange)", textDecoration: "none", fontWeight: 600 }}>
-          Browse Events →
-        </Link>
+        <div style={{ display: "flex", gap: 10 }}>
+          <Link href="/dashboard/events" style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", textDecoration: "none", fontWeight: 600 }}>
+            View All →
+          </Link>
+          <Link href="/events" style={{ fontSize: "0.75rem", color: "var(--cs-orange)", textDecoration: "none", fontWeight: 600 }}>
+            Browse →
+          </Link>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -113,25 +118,34 @@ export default function MyEventRegistrations() {
             const ev = r.events;
             const href = ev?.share_slug ? `/events/${ev.share_slug}` : "#";
             return (
-              <Link key={r.registration_code} href={href} style={{ textDecoration: "none" }}>
-                <div style={{ padding: "0.75rem 0.875rem", borderRadius: "10px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", display: "flex", alignItems: "center", gap: "0.75rem", transition: "border-color 0.2s" }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = "rgba(232,98,10,0.35)")}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)")}>
-                  <div style={{ fontSize: "1.4rem", flexShrink: 0 }}>{TYPE_ICON[ev?.event_type ?? ""] ?? "🏃"}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--foreground)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev?.title ?? "Event"}</div>
-                    <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
-                      {ev ? `${fmtDate(ev.start_date)} · ${ev.location}` : "Details loading…"}
+              <div key={r.registration_code}
+                style={{ borderRadius: "10px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", overflow: "hidden" }}>
+                <Link href={href} style={{ textDecoration: "none" }}>
+                  <div style={{ padding: "0.75rem 0.875rem", display: "flex", alignItems: "center", gap: "0.75rem", transition: "border-color 0.2s" }}>
+                    <div style={{ fontSize: "1.4rem", flexShrink: 0 }}>{TYPE_ICON[ev?.event_type ?? ""] ?? "🏃"}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--foreground)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev?.title ?? "Event"}</div>
+                      <div style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
+                        {ev ? `${fmtDate(ev.start_date)} · ${ev.location}` : "Details loading…"}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <StatusBadge status={r.status} payment={r.payment_status} />
+                      <div style={{ fontSize: "10px", color: "var(--muted-foreground)", marginTop: "3px", fontFamily: "monospace" }}>
+                        {r.registration_code}
+                      </div>
                     </div>
                   </div>
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <StatusBadge status={r.status} payment={r.payment_status} />
-                    <div style={{ fontSize: "10px", color: "var(--muted-foreground)", marginTop: "3px", fontFamily: "monospace" }}>
-                      {r.registration_code}
-                    </div>
+                </Link>
+                {(r.payment_status === "paid" || r.payment_status === "free") && (
+                  <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", padding: "6px 12px", display: "flex", justifyContent: "flex-end" }}>
+                    <Link href="/dashboard/events"
+                      style={{ fontSize: "10px", color: "var(--cs-orange)", textDecoration: "none", fontWeight: 700 }}>
+                      QR Codes & Details →
+                    </Link>
                   </div>
-                </div>
-              </Link>
+                )}
+              </div>
             );
           })}
         </div>
