@@ -35,6 +35,7 @@ export default function VolunteersPage({ params }: { params: Promise<{ id: strin
 
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading,     setLoading]     = useState(true);
+  const [shareSlug,   setShareSlug]   = useState<string | null>(null);
   const [form,        setForm]        = useState({ email: "", name: "", password: "", role: "checkin" });
   const [isExisting,  setIsExisting]  = useState(false);
   const [saving,      setSaving]      = useState(false);
@@ -47,9 +48,13 @@ export default function VolunteersPage({ params }: { params: Promise<{ id: strin
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(`/api/admin/events/${eventId}/portal-users`);
-      if (r.status === 401) { router.replace("/admin/login"); return; }
-      if (r.ok) { const d = await r.json() as { assignments: Assignment[] }; setAssignments(d.assignments ?? []); }
+      const [usersRes, evRes] = await Promise.all([
+        fetch(`/api/admin/events/${eventId}/portal-users`),
+        fetch(`/api/admin/events/${eventId}/overview`),
+      ]);
+      if (usersRes.status === 401) { router.replace("/admin/login"); return; }
+      if (usersRes.ok) { const d = await usersRes.json() as { assignments: Assignment[] }; setAssignments(d.assignments ?? []); }
+      if (evRes.ok) { const d = await evRes.json() as { event?: { share_slug?: string | null } }; setShareSlug(d.event?.share_slug ?? null); }
     } finally { setLoading(false); }
   }, [eventId, router]);
 
@@ -92,11 +97,11 @@ export default function VolunteersPage({ params }: { params: Promise<{ id: strin
     setResetting(false);
   }
 
-  const portalUrl = typeof window !== "undefined"
-    ? `${window.location.origin}/portal/login?event=${eventId}`
-    : `/portal/login?event=${eventId}`;
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const portalUrl = shareSlug ? `${origin}/ops/${shareSlug}/login` : null;
 
   function copyPortalUrl() {
+    if (!portalUrl) return;
     void navigator.clipboard.writeText(portalUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -115,10 +120,18 @@ export default function VolunteersPage({ params }: { params: Promise<{ id: strin
         {/* Portal login URL */}
         <div style={{ background: "rgba(232,98,10,0.06)", border: "1px solid rgba(232,98,10,0.2)", borderRadius: 12, padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span style={{ fontSize: 11, color: "#e8620a", fontWeight: 700, flexShrink: 0 }}>Portal Login URL</span>
-          <code style={{ flex: 1, fontSize: 11, color: "#888", wordBreak: "break-all" }}>{portalUrl}</code>
-          <button style={{ ...S.btn, flexShrink: 0, color: copied ? "#4ade80" : "#ccc" }} onClick={copyPortalUrl}>
-            {copied ? "✓ Copied" : "Copy"}
-          </button>
+          {portalUrl ? (
+            <>
+              <code style={{ flex: 1, fontSize: 11, color: "#888", wordBreak: "break-all" }}>{portalUrl}</code>
+              <button style={{ ...S.btn, flexShrink: 0, color: copied ? "#4ade80" : "#ccc" }} onClick={copyPortalUrl}>
+                {copied ? "✓ Copied" : "Copy"}
+              </button>
+            </>
+          ) : (
+            <span style={{ flex: 1, fontSize: 11, color: "#666", fontStyle: "italic" }}>
+              {loading ? "Loading…" : "No share slug set — set one in Event Hub → Overview to generate a login URL"}
+            </span>
+          )}
         </div>
 
         {/* Add volunteer form */}
