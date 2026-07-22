@@ -72,13 +72,17 @@ export async function POST(req: NextRequest) {
 
     // ── Email verification check (primary verification) ───────────────────────
     // Confirm the email was verified via the link sent before step 3.
-    const { data: verifiedToken } = await supabaseServer
+    const { data: verifiedToken, error: tokenErr } = await supabaseServer
       .from("email_verification_tokens")
       .select("id, expires_at")
       .eq("email", emailNorm)
       .eq("verified", true)
       .maybeSingle();
 
+    if (tokenErr) {
+      console.error("[register] email_verification_tokens lookup error:", tokenErr.message, tokenErr.code);
+      return NextResponse.json({ error: "Registration service is temporarily unavailable. Please try again in a few minutes." }, { status: 500 });
+    }
     if (!verifiedToken) {
       return NextResponse.json({ error: "Please verify your email address before creating your account." }, { status: 400 });
     }

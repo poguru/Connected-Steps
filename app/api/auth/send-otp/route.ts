@@ -100,15 +100,34 @@ export async function POST(req: NextRequest) {
     // â”€â”€ Existence check (skipped for verify_phone â€” caller is already logged in) â”€â”€
     if (purpose !== "verify_phone") {
       if (type === "email") {
-        const { data: existing } = await db.from("users").select("id").eq("email", identifier).single();
+        const { data: existing, error: lookupErr } = await db
+          .from("users")
+          .select("id, email_verified")
+          .eq("email", identifier)
+          .maybeSingle();
+        if (lookupErr) {
+          console.error("[send-otp] users email lookup error:", lookupErr.message, lookupErr.code);
+          return NextResponse.json({ error: "Unable to process your request. Please try again." }, { status: 500 });
+        }
         if ((purpose === "register" || purpose === "change_email") && existing) {
           return NextResponse.json({ error: "This email is already in use by another account." }, { status: 400 });
         }
         if (purpose === "login" && !existing) {
           return NextResponse.json({ error: "No account found with this email." }, { status: 404 });
         }
+        if (purpose === "login" && existing?.email_verified === false) {
+          return NextResponse.json({ error: "Please verify your email address before signing in." }, { status: 403 });
+        }
       } else {
-        const { data: existing } = await db.from("users").select("id").eq("phone", identifier).single();
+        const { data: existing, error: lookupErr } = await db
+          .from("users")
+          .select("id")
+          .eq("phone", identifier)
+          .maybeSingle();
+        if (lookupErr) {
+          console.error("[send-otp] users phone lookup error:", lookupErr.message, lookupErr.code);
+          return NextResponse.json({ error: "Unable to process your request. Please try again." }, { status: 500 });
+        }
         if (purpose === "register" && existing) {
           return NextResponse.json({ error: "An account with this phone number already exists." }, { status: 409 });
         }

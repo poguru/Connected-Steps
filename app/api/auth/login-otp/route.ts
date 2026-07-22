@@ -45,6 +45,10 @@ export async function POST(req: NextRequest) {
     const user = rows?.[0] ?? null;
     if (!user) return NextResponse.json({ error: "Account not found." }, { status: 404 });
 
+    if (user.email_verified === false) {
+      return NextResponse.json({ error: "Please verify your email address before signing in." }, { status: 403 });
+    }
+
     // Consistent with password login — deactivated accounts cannot log in via any method
     if (user.is_active === false) {
       return NextResponse.json({ error: "Your account has been deactivated. Please contact support." }, { status: 403 });
