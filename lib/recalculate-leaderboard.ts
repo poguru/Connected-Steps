@@ -1,5 +1,5 @@
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { cacheDel, CK } from "@/lib/cache";
+import { cacheDel, cacheFlushPattern, CK } from "@/lib/cache";
 
 function lastDay(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
@@ -240,27 +240,12 @@ export async function recalculateMonth(
       .in("id", allAttIds);
   }
 
-  // ── Invalidate public leaderboard cache ───────────────────────────────────
-  // The public /api/leaderboard route stores its response in Redis (30s TTL)
-  // and behind HTTP CDN (stale-while-revalidate 60s).  Without explicit
-  // invalidation users would see a stale snapshot for up to ~90 s after sync.
-  //
-  // For admin-triggered (force=true) recalculations we also clear every
-  // location-specific cache variant so users on the location-filtered tab see
-  // the updated points immediately rather than waiting up to 90 s.
-  // For regular QR-scan recalculations only the base key is cleared — the
-  // extra DB round-trip for location IDs isn't worth it on the hot path.
-  if (force) {
-    const { data: locations } = await db
-      .from("training_locations")
-      .select("id");
-    const locationKeys = (locations ?? []).map((l) =>
-      CK.leaderboard(l.id as string, null),
-    );
-    await cacheDel(CK.leaderboard(null, null), ...locationKeys);
-  } else {
-    await cacheDel(CK.leaderboard(null, null));
-  }
+  // ── Invalidate ALL leaderboard cache variants ─────────────────────────────
+  // Flush every lb:v1:* key (base, location-filtered, friends-filtered) so no
+  // variant can serve stale data.  Using a pattern flush instead of manually
+  // enumerating location IDs means friends-tab variants are also cleared,
+  // eliminating the previous 30-second stale window for those tabs.
+  await cacheFlushPattern("lb:v1:*");
 
   return { message: `Recalculated points for ${upsertRows.length} user(s) — ${month}.`, updated: upsertRows.length };
 }

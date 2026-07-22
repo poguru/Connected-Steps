@@ -106,6 +106,18 @@ export default function MyPoints() {
     void fetchHistory(token, "all", 1);
   }, [router, fetchHistory]);
 
+  // Re-fetch summary when user returns to this tab so points never appear stale
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState !== "visible") return;
+      const token = localStorage.getItem("cs_user_token") ?? "";
+      if (!token) return;
+      void fetchHistory(token, category, page);
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [category, page, fetchHistory]);
+
   function changeCategory(cat: string) {
     setCategory(cat);
     setPage(1);

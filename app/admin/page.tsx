@@ -49,12 +49,22 @@ export default function AdminDashboard() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const loadMetrics = () =>
     fetch("/api/admin/dashboard")
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setMetrics(d); })
       .finally(() => setLoading(false));
-  }, []);
+
+  useEffect(() => { void loadMetrics(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-fetch when admin returns to this tab so stats never appear stale
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible") void loadMetrics();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pending = (metrics?.pendingStories ?? 0) + (metrics?.pendingPosts ?? 0);
   const v = (n: number | undefined, formatter: (n: number) => string) =>

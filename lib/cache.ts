@@ -92,6 +92,31 @@ export async function cacheDel(...keys: string[]): Promise<void> {
   }
 }
 
+/**
+ * Delete all keys matching a glob pattern using SCAN + DEL.
+ * Used to flush all leaderboard cache variants (location, friends) at once
+ * so no variant can serve stale data after a recalculation.
+ */
+export async function cacheFlushPattern(pattern: string): Promise<void> {
+  const url   = redisUrl();
+  const token = redisToken();
+  if (!url || !token) return;
+  try {
+    // SCAN 0 MATCH <pattern> COUNT 200 — enough for all leaderboard variants
+    const scanRes = await fetch(`${url}/scan/0/match/${encodeURIComponent(pattern)}/count/200`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache:   "no-store",
+    });
+    const scanJson = await scanRes.json() as { result: [string, string[]] };
+    const keys = scanJson?.result?.[1] ?? [];
+    if (keys.length > 0) {
+      await pipeline(keys.map(k => ["DEL", k]));
+    }
+  } catch {
+    // Non-fatal — worst case: stale cache expires naturally within its TTL
+  }
+}
+
 // ── Cache key constructors ────────────────────────────────────────────────────
 
 export const CK = {

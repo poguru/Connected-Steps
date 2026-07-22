@@ -582,12 +582,35 @@ export default function Dashboard() {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "leaderboard", filter: `user_email=eq.${user.email}` },
         (payload) => {
-          const row = payload.new as { month_points?: number; total_points?: number } | null;
-          if (row) setPoints({ month_points: row.month_points ?? 0, total_points: row.total_points ?? 0 });
+          const row = payload.new as { month_points?: number; total_points?: number; points_month?: string } | null;
+          if (!row) return;
+          // Guard: only apply month_points if the leaderboard row is for the current IST month.
+          // Without this, recalculating a past month would incorrectly overwrite current month's display.
+          const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+          const currentMonth  = new Date(Date.now() + IST_OFFSET_MS).toISOString().slice(0, 7);
+          setPoints({
+            month_points: row.points_month === currentMonth ? (row.month_points ?? 0) : 0,
+            total_points: row.total_points ?? 0,
+          });
         }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
+  // ── Re-fetch points when user returns to this tab (Realtime may have missed events) ──
+  useEffect(() => {
+    if (!user) return;
+    const userToken = localStorage.getItem("cs_user_token") ?? "";
+    function onVisible() {
+      if (document.visibilityState !== "visible") return;
+      fetch("/api/leaderboard/user", { headers: { "x-user-token": userToken } })
+        .then(r => r.json())
+        .then(d => { if (d.month_points !== undefined) setPoints(d); })
+        .catch(() => {});
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, [user]);
 
   async function handleLeaveSession(sessionId: string, userEmail: string) {

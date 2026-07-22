@@ -119,12 +119,15 @@ export async function POST(req: NextRequest) {
   // recalculation, feed posts, and notifications always run (fixes the previous
   // fire-and-forget pattern that Vercel killed immediately after response).
   after(async () => {
-    try {
-      const bgDb = getSupabaseServer();
+    // Each step is isolated so a failure in one NEVER prevents the others from running.
+    // recalculateMonth (step 4) is the most critical — it must always execute.
 
-      // Resolve display name — already known for the "insert" path; fetch for "update".
-      let displayName = capturedName;
-      if (!displayName) {
+    const bgDb = getSupabaseServer();
+
+    // Step 1 — resolve display name
+    let displayName = capturedName;
+    if (!displayName) {
+      try {
         const { data: userProfile } = await bgDb
           .from("users")
           .select("first_name, last_name")
@@ -133,11 +136,14 @@ export async function POST(req: NextRequest) {
         displayName = userProfile
           ? `${userProfile.first_name} ${userProfile.last_name}`.trim()
           : capturedEmail.split("@")[0];
+      } catch (err) {
+        console.error("[scan/after] display name fetch failed:", err);
+        displayName = capturedEmail.split("@")[0];
       }
+    }
 
-      // Audit trail: attendance category is excluded from recalculateMonth
-      // (base points come from session_attendance.attended count), but kept
-      // for per-user transaction history views.
+    // Step 2 — attendance ledger row (audit trail for points history)
+    try {
       await bgDb.from("points_ledger").insert({
         user_email: capturedEmail,
         session_id: capturedSessionId,
@@ -146,19 +152,18 @@ export async function POST(req: NextRequest) {
         category:   "attendance",
         awarded_by: null,
       });
+    } catch (err) {
+      console.error("[scan/after] attendance ledger insert failed:", err);
+    }
 
-      // ── Weekly bonus ledger row ─────────────────────────────────────────────
-      // When this attendance is the 4th (or more) in the same ISO week, write a
-      // weekly_bonus ledger row so it appears in the user's points history.
-      // The leaderboard already calculates weekly bonus independently from
-      // session_attendance records, so this row is purely for history/transparency.
-      if (capturedSessionDate) {
+    // Step 3 — weekly bonus ledger row (purely for history; leaderboard derives bonus independently)
+    if (capturedSessionDate) {
+      try {
         const weekStart = isoMondayKey(capturedSessionDate);
         const weekEndDate = new Date(weekStart + "T00:00:00Z");
         weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 6);
         const weekEnd = weekEndDate.toISOString().slice(0, 10);
 
-        // Check if bonus already recorded for this user+week (partial unique index dedup)
         const { data: existingBonus } = await bgDb
           .from("points_ledger")
           .select("id")
@@ -168,7 +173,6 @@ export async function POST(req: NextRequest) {
           .maybeSingle();
 
         if (!existingBonus) {
-          // Count attended sessions in this ISO week
           const { data: weekSessionRows } = await bgDb
             .from("sessions")
             .select("id")
@@ -196,35 +200,50 @@ export async function POST(req: NextRequest) {
                 week_key:   weekStart,
               });
 
-              await createNotification({
+              createNotification({
                 user_email: capturedEmail,
                 type:       "achievement",
                 title:      "Weekly Bonus Unlocked!",
                 body:       "You attended 4+ sessions this week and earned an extra 5 points!",
                 action_url: "/points",
-              });
+              }).catch(() => {});
             }
           }
         }
+      } catch (err) {
+        console.error("[scan/after] weekly bonus failed:", err);
       }
+    }
 
-      // Invalidate per-user caches so the next request reads fresh data.
+    // Step 4 — cache invalidation
+    try {
       await cacheDel(
         CK.userAchievements(capturedEmail),
         CK.userJoinedSessions(capturedEmail),
       );
+    } catch (err) {
+      console.error("[scan/after] cache del failed:", err);
+    }
 
-      // Recalculate leaderboard for this month. force=true bypasses the 60s
-      // debounce so QR check-ins appear on the leaderboard immediately.
-      if (capturedSessionDate) {
+    // Step 5 — leaderboard recalculation (CRITICAL — isolated so nothing above can skip it)
+    if (capturedSessionDate) {
+      try {
         const month = capturedSessionDate.slice(0, 7);
         await recalculateMonth(month, { force: true });
+      } catch (err) {
+        console.error("[scan/after] recalculateMonth failed:", err);
       }
+    }
 
-      // Generate "session completed" feed post and milestone achievements.
+    // Step 6 — feed post + achievements (non-critical)
+    try {
       await autoFeedSessionCompleted(capturedSessionId, [{ email: capturedEmail, name: displayName }]);
+    } catch (err) {
+      console.error("[scan/after] autoFeed failed:", err);
+    }
 
-      // In-app notification confirming the attendance and points award.
+    // Step 7 — attendance confirmation notification (non-critical)
+    try {
       await createNotification({
         user_email: capturedEmail,
         type:       "achievement",
@@ -233,7 +252,7 @@ export async function POST(req: NextRequest) {
         action_url: "/leaderboard",
       });
     } catch (err) {
-      console.error("[scan/after] Background processing failed:", err);
+      console.error("[scan/after] notification failed:", err);
     }
   });
 
