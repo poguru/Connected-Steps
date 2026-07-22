@@ -65,7 +65,10 @@ export async function POST(req: NextRequest) {
   const expiresAt  = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24h
 
   // Delete any existing tokens for this email before inserting a new one
-  await db.from("email_verification_tokens").delete().eq("email", email);
+  const { error: deleteErr } = await db.from("email_verification_tokens").delete().eq("email", email);
+  if (deleteErr) {
+    console.error("[send-email-verification] delete error:", deleteErr.message, deleteErr.code);
+  }
 
   const { error: insertErr } = await db.from("email_verification_tokens").insert({
     email,
@@ -74,7 +77,7 @@ export async function POST(req: NextRequest) {
   });
 
   if (insertErr) {
-    console.error("[send-email-verification] insert error:", insertErr.message);
+    console.error("[send-email-verification] insert error:", insertErr.message, insertErr.code);
     return NextResponse.json({ error: "Failed to send verification email. Please try again." }, { status: 500 });
   }
 

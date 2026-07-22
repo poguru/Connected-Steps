@@ -20,18 +20,32 @@ export async function POST(req: NextRequest) {
   const tokenHash = createHash("sha256").update(plainToken).digest("hex");
   const db = getSupabaseServer();
 
-  const { data: record } = await db
+  const { data: record, error: dbError } = await db
     .from("email_verification_tokens")
     .select("id, email, verified, expires_at")
     .eq("token_hash", tokenHash)
     .maybeSingle();
 
+  if (dbError) {
+    console.error("[verify-email] DB error:", dbError.message, dbError.code);
+    return NextResponse.json(
+      { error: "Verification service is temporarily unavailable. Please try again in a moment.", code: "db_error" },
+      { status: 500 },
+    );
+  }
+
   if (!record) {
-    return NextResponse.json({ error: "Invalid or expired verification link." }, { status: 400 });
+    return NextResponse.json(
+      { error: "This verification link is invalid or has already been used. Please request a new one.", code: "not_found" },
+      { status: 400 },
+    );
   }
 
   if (new Date(record.expires_at) < new Date()) {
-    return NextResponse.json({ error: "This verification link has expired. Please request a new one." }, { status: 400 });
+    return NextResponse.json(
+      { error: "This verification link has expired (links are valid for 24 hours). Please request a new one.", code: "expired" },
+      { status: 400 },
+    );
   }
 
   if (!record.verified) {
@@ -40,7 +54,7 @@ export async function POST(req: NextRequest) {
       .update({ verified: true, verified_at: new Date().toISOString() })
       .eq("id", record.id);
 
-    // If the user already exists (e.g. registered but never verified), mark them verified too
+    // If the user already exists (registered but email not yet marked verified), fix that too
     await db
       .from("users")
       .update({ email_verified: true })
