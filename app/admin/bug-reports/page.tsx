@@ -2,14 +2,19 @@
 
 import { useState, useEffect, useCallback } from "react";
 
+interface Attachment { path: string; type: string; name: string; size: number; }
+
 interface BugReport {
   id: string;
   user_email: string | null;
   user_name:  string | null;
   user_phone: string | null;
+  title:      string | null;
   category:   string;
+  severity:   string | null;
   description: string;
   screenshot_url: string | null;
+  attachments:    Attachment[] | null;
   browser:     string | null;
   device:      string | null;
   screen_size: string | null;
@@ -61,38 +66,142 @@ function Badge({ label, colors }: { label: string; colors: { bg: string; color: 
   );
 }
 
-function ScreenshotLink({ path }: { path: string }) {
-  const [url,     setUrl]     = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState("");
+function AttachmentGallery({ report }: { report: BugReport }) {
+  // Normalise: new reports have attachments[], old reports have screenshot_url
+  const paths: string[] = report.attachments?.length
+    ? report.attachments.map(a => a.path)
+    : report.screenshot_url ? [report.screenshot_url] : [];
 
-  async function open() {
-    // If it's already a full URL (legacy), open directly
-    if (path.startsWith("http")) { window.open(path, "_blank"); return; }
-    setLoading(true); setError("");
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+  const [loading,    setLoading]    = useState<Record<string, boolean>>({});
+  const [loadError,  setLoadError]  = useState<Record<string, boolean>>({});
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+
+  if (paths.length === 0) return null;
+
+  async function resolve(path: string): Promise<string | null> {
+    if (path.startsWith("http")) return path;
+    if (signedUrls[path]) return signedUrls[path];
+    setLoading(l => ({ ...l, [path]: true }));
     const res = await fetch(`/api/admin/bug-reports/screenshot?path=${encodeURIComponent(path)}`).catch(() => null);
-    setLoading(false);
-    if (!res?.ok) { setError("Could not load screenshot"); return; }
-    const { signedUrl } = await res.json();
-    setUrl(signedUrl);
-    window.open(signedUrl, "_blank");
+    setLoading(l => ({ ...l, [path]: false }));
+    if (!res?.ok) { setLoadError(e => ({ ...e, [path]: true })); return null; }
+    const { signedUrl } = await res.json() as { signedUrl: string };
+    setSignedUrls(u => ({ ...u, [path]: signedUrl }));
+    return signedUrl;
   }
+
+  async function openLightbox(idx: number) {
+    const url = await resolve(paths[idx]);
+    if (url) setLightboxIdx(idx);
+  }
+
+  async function download(path: string, idx: number) {
+    const url = await resolve(path);
+    if (!url) return;
+    const a = document.createElement("a");
+    a.href = url;
+    const name = report.attachments?.[idx]?.name ?? path.split("/").pop() ?? `screenshot-${idx + 1}.png`;
+    a.download = name;
+    a.click();
+  }
+
+  const lightboxUrl = lightboxIdx !== null ? signedUrls[paths[lightboxIdx]] : null;
 
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: "0.75rem", color: "#666", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.08em" }}>Screenshot</div>
-      {url ? (
-        <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: "#e8620a", fontSize: "0.82rem" }}>View screenshot →</a>
-      ) : (
-        <button onClick={open} disabled={loading}
-          style={{ background: "none", border: "none", color: loading ? "#555" : "#e8620a", cursor: loading ? "not-allowed" : "pointer", fontSize: "0.82rem", padding: 0, fontFamily: "inherit" }}>
-          {loading ? "Loading…" : "View screenshot →"}
-        </button>
+      <div style={{ fontSize: "0.75rem", color: "#666", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+        Screenshots ({paths.length})
+      </div>
+
+      {/* Thumbnail grid */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {paths.map((path, idx) => (
+          <div key={path} style={{ position: "relative", width: 80, height: 80, flexShrink: 0 }}>
+            {signedUrls[path] ? (
+              <img
+                src={signedUrls[path]}
+                alt={`Screenshot ${idx + 1}`}
+                onClick={() => setLightboxIdx(idx)}
+                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8, cursor: "pointer", border: "1px solid rgba(255,255,255,0.1)" }}
+              />
+            ) : (
+              <button
+                onClick={() => openLightbox(idx)}
+                disabled={!!loading[path] || !!loadError[path]}
+                style={{
+                  width: "100%", height: "100%", background: "rgba(255,255,255,0.04)",
+                  border: `1px solid ${loadError[path] ? "rgba(239,68,68,0.3)" : "rgba(255,255,255,0.1)"}`,
+                  borderRadius: 8, cursor: loadError[path] ? "default" : "pointer",
+                  color: loadError[path] ? "#f87171" : "#555", fontSize: "1.4rem",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+              >
+                {loading[path] ? "⏳" : loadError[path] ? "✕" : "🖼"}
+              </button>
+            )}
+            {/* Download badge */}
+            {signedUrls[path] && (
+              <button
+                onClick={e => { e.stopPropagation(); void download(path, idx); }}
+                title="Download"
+                style={{
+                  position: "absolute", bottom: -1, right: -1,
+                  width: 22, height: 22, borderRadius: "50%",
+                  background: "rgba(30,30,30,0.9)", border: "1px solid rgba(255,255,255,0.15)",
+                  color: "#aaa", cursor: "pointer", fontSize: 11,
+                  display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                }}
+              >⬇</button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Lightbox */}
+      {lightboxIdx !== null && (
+        <div
+          onClick={() => setLightboxIdx(null)}
+          style={{ position: "fixed", inset: 0, zIndex: 10000, background: "rgba(0,0,0,0.93)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}
+        >
+          {lightboxUrl ? (
+            <img
+              src={lightboxUrl}
+              alt=""
+              onClick={e => e.stopPropagation()}
+              style={{ maxWidth: "90vw", maxHeight: "78vh", objectFit: "contain", borderRadius: 8 }}
+            />
+          ) : (
+            <div style={{ color: "#555" }}>Loading…</div>
+          )}
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }} onClick={e => e.stopPropagation()}>
+            {lightboxIdx > 0 && (
+              <button onClick={() => openLightbox(lightboxIdx - 1)} style={navBtn}>← Prev</button>
+            )}
+            {lightboxUrl && (
+              <button onClick={() => download(paths[lightboxIdx], lightboxIdx)} style={navBtn}>⬇ Download</button>
+            )}
+            {lightboxIdx < paths.length - 1 && (
+              <button onClick={() => openLightbox(lightboxIdx + 1)} style={navBtn}>Next →</button>
+            )}
+            <button onClick={() => setLightboxIdx(null)} style={{ ...navBtn, background: "rgba(255,255,255,0.06)" }}>✕ Close</button>
+          </div>
+
+          {paths.length > 1 && (
+            <div style={{ fontSize: "0.75rem", color: "#555" }}>{lightboxIdx + 1} / {paths.length}</div>
+          )}
+        </div>
       )}
-      {error && <div style={{ fontSize: "0.72rem", color: "#f87171", marginTop: 4 }}>{error}</div>}
     </div>
   );
 }
+
+const navBtn: React.CSSProperties = {
+  padding: "8px 16px", background: "rgba(232,98,10,0.2)",
+  border: "1px solid rgba(232,98,10,0.35)", borderRadius: 8,
+  color: "#e8620a", cursor: "pointer", fontSize: "0.8rem", fontFamily: "inherit",
+};
 
 function DetailModal({ report, onClose, onUpdate }: {
   report: BugReport;
@@ -129,13 +238,23 @@ function DetailModal({ report, onClose, onUpdate }: {
       <div style={{ width: "100%", maxWidth: 620, maxHeight: "90vh", overflowY: "auto", background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: 24 }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
-          <div>
-            <div style={{ fontSize: "1rem", fontWeight: 700, color: "#fff", marginBottom: 4 }}>
-              {CATEGORY_LABELS[report.category] ?? report.category}
+          <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
+            {report.title && (
+              <div style={{ fontSize: "1rem", fontWeight: 700, color: "#fff", marginBottom: 4, wordBreak: "break-word" }}>
+                {report.title}
+              </div>
+            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: "0.8rem", color: "#ccc" }}>{CATEGORY_LABELS[report.category] ?? report.category}</span>
+              {report.severity && (
+                <span style={{ fontSize: "0.72rem", fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: "rgba(232,98,10,0.15)", color: "#e8620a", textTransform: "capitalize" }}>
+                  {report.severity}
+                </span>
+              )}
             </div>
-            <div style={{ fontSize: "0.72rem", color: "#555" }}>{fmtDate(report.created_at)}</div>
+            <div style={{ fontSize: "0.72rem", color: "#555", marginTop: 3 }}>{fmtDate(report.created_at)}</div>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 22, lineHeight: 1 }}>×</button>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 22, lineHeight: 1, flexShrink: 0 }}>×</button>
         </div>
 
         {/* Reporter */}
@@ -170,10 +289,8 @@ function DetailModal({ report, onClose, onUpdate }: {
           ))}
         </div>
 
-        {/* Screenshot */}
-        {report.screenshot_url && (
-          <ScreenshotLink path={report.screenshot_url} />
-        )}
+        {/* Attachments */}
+        <AttachmentGallery report={report} />
 
         {/* Console Errors */}
         {report.console_errors && (
@@ -344,7 +461,7 @@ export default function BugReportsPage() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-                  {["Category", "Description", "User", "Priority", "Status", "Date", ""].map(h => (
+                  {["Category", "Issue", "User", "Priority", "Status", "Imgs", "Date", ""].map(h => (
                     <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontSize: "0.68rem", fontWeight: 600, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
@@ -361,8 +478,13 @@ export default function BugReportsPage() {
                     <td style={{ padding: "10px" }}>
                       <span style={{ fontSize: "0.78rem", color: "#ddd" }}>{CATEGORY_LABELS[r.category] ?? r.category}</span>
                     </td>
-                    <td style={{ padding: "10px", maxWidth: 280 }}>
-                      <div style={{ color: "#ccc", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <td style={{ padding: "10px", maxWidth: 260 }}>
+                      {r.title && (
+                        <div style={{ color: "#ddd", fontWeight: 600, fontSize: "0.8rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 2 }}>
+                          {r.title}
+                        </div>
+                      )}
+                      <div style={{ color: r.title ? "#666" : "#ccc", fontSize: "0.75rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {r.description}
                       </div>
                     </td>
@@ -375,6 +497,14 @@ export default function BugReportsPage() {
                     </td>
                     <td style={{ padding: "10px" }}>
                       <Badge label={r.status} colors={STATUS_COLORS[r.status] ?? { bg: "#111", color: "#888" }} />
+                    </td>
+                    <td style={{ padding: "10px", textAlign: "center" }}>
+                      {(r.attachments?.length ?? 0) > 0
+                        ? <span style={{ fontSize: "0.72rem", color: "#e8620a", fontWeight: 600 }}>{r.attachments!.length}🖼</span>
+                        : r.screenshot_url
+                          ? <span style={{ fontSize: "0.72rem", color: "#666" }}>1🖼</span>
+                          : <span style={{ fontSize: "0.72rem", color: "#333" }}>—</span>
+                      }
                     </td>
                     <td style={{ padding: "10px", color: "#555", whiteSpace: "nowrap", fontSize: "0.72rem" }}>
                       {fmtDate(r.created_at)}
