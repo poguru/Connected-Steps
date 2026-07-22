@@ -187,6 +187,75 @@ export class ApiHelper {
     return this.request.get("/api/admin/memberships");
   }
 
+  // ── Events ───────────────────────────────────────────────────────────────
+
+  async getPublishedEvents() {
+    return this.request.get("/api/events");
+  }
+
+  async getEvent(slug: string) {
+    return this.request.get(`/api/events/${slug}`);
+  }
+
+  async registerForEvent(data: {
+    event_id: string; email: string; name: string; phone: string;
+    gender: string; date_of_birth: string; blood_group: string;
+    emergency_contact: string; special_notes: string;
+    distance_category?: string; tshirt_size?: string;
+    coupon_code?: string;
+  }, userToken: string) {
+    return this.request.post("/api/events/register", {
+      data,
+      headers: { "x-user-token": userToken },
+    });
+  }
+
+  async getMyEventRegistrations(userToken: string) {
+    return this.request.get("/api/events/my-registrations", {
+      headers: { "x-user-token": userToken },
+    });
+  }
+
+  async getEventQr(token: string) {
+    return this.request.get(`/api/events/qr/${encodeURIComponent(token)}`);
+  }
+
+  // Admin event endpoints
+  async adminGetParticipants(eventId: string, adminToken: string) {
+    return this.request.get(`/api/admin/events/${eventId}/participants`, {
+      headers: { "x-admin-token": adminToken },
+    });
+  }
+
+  async adminExportCsv(eventId: string, adminToken: string) {
+    return this.request.get(`/api/admin/events/${eventId}/export`, {
+      headers: { "x-admin-token": adminToken },
+    });
+  }
+
+  async adminGetServiceConfig(eventId: string, adminToken: string) {
+    return this.request.get(`/api/admin/events/${eventId}/service-config`, {
+      headers: { "x-admin-token": adminToken },
+    });
+  }
+
+  async adminPutServiceConfig(
+    eventId: string,
+    services: Array<{ service_name: string; enabled: boolean }>,
+    adminToken: string,
+  ) {
+    return this.request.put(`/api/admin/events/${eventId}/service-config`, {
+      data: { services },
+      headers: { "x-admin-token": adminToken },
+    });
+  }
+
+  async adminGetPortalUsers(eventId: string, adminToken: string) {
+    return this.request.get(`/api/admin/events/${eventId}/portal-users`, {
+      headers: { "x-admin-token": adminToken },
+    });
+  }
+
   // ── Cron ─────────────────────────────────────────────────────────────────
 
   async triggerCron(path: string) {

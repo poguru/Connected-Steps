@@ -180,4 +180,60 @@ export const DbHelper = {
       .maybeSingle();
     return data;
   },
+
+  // ── Events ────────────────────────────────────────────────────────────────
+  async getPublishedEvent() {
+    const { data } = await db()
+      .from("events")
+      .select("id, title, price, start_date, location, share_slug, registration_closes_at, distance_categories")
+      .eq("status", "published")
+      .order("start_date", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    return data;
+  },
+
+  async getFreePublishedEvent() {
+    const { data } = await db()
+      .from("events")
+      .select("id, title, price, start_date, location, share_slug, registration_closes_at, distance_categories")
+      .eq("status", "published")
+      .eq("price", 0)
+      .order("start_date", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    return data;
+  },
+
+  async getEventRegistration(eventId: string, userEmail: string) {
+    const { data } = await db()
+      .from("event_registrations")
+      .select("id, registration_code, payment_status, status, qr_token, participant_count")
+      .eq("event_id", eventId)
+      .eq("user_email", userEmail)
+      .maybeSingle();
+    return data;
+  },
+
+  async deleteEventRegistration(eventId: string, userEmail: string) {
+    // Delete participants first (FK constraint)
+    const { data: reg } = await db()
+      .from("event_registrations")
+      .select("id")
+      .eq("event_id", eventId)
+      .eq("user_email", userEmail)
+      .maybeSingle();
+    if (reg?.id) {
+      await db().from("event_participants").delete().eq("registration_id", reg.id);
+    }
+    await db().from("event_registrations").delete().eq("event_id", eventId).eq("user_email", userEmail);
+  },
+
+  async getEventParticipants(registrationId: string) {
+    const { data } = await db()
+      .from("event_participants")
+      .select("id, first_name, qr_token, bib_number, status, checked_in_at")
+      .eq("registration_id", registrationId);
+    return data ?? [];
+  },
 };
