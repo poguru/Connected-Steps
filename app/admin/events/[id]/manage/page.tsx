@@ -61,14 +61,17 @@ interface EventOverview {
 const NAV_ITEMS = [
   { key: "overview",      icon: "⚡", label: "Overview",       inline: true  },
   { key: "registrations", icon: "👥", label: "Registrations",  inline: false, href: "registrations" },
+  { key: "participants",  icon: "🪪", label: "Participants",   inline: false, href: "participants"  },
   { key: "races",         icon: "🏁", label: "Races",          inline: true  },
   { key: "communicate",   icon: "📢", label: "Communicate",    inline: false, href: "communicate"   },
-  { key: "announce",     icon: "📣", label: "Announce",        inline: true  },
+  { key: "announce",      icon: "📣", label: "Announce",       inline: true  },
   { key: "race-day",      icon: "🏃", label: "Race Day",       inline: false, href: "race-day"      },
   { key: "bib",           icon: "📦", label: "BIB Collection", inline: false, href: "bib"           },
   { key: "results",       icon: "🏅", label: "Results",        inline: false, href: "results"       },
   { key: "analytics",     icon: "📈", label: "Analytics",      inline: false, href: "analytics"     },
   { key: "sponsors",      icon: "🤝", label: "Sponsors",       inline: false, href: "sponsors"      },
+  { key: "volunteers",    icon: "🙋", label: "Volunteers",     inline: false, href: "volunteers"    },
+  { key: "services",      icon: "🔧", label: "Services",       inline: false, href: "services"      },
   { key: "finance",       icon: "💰", label: "Finance",        inline: true  },
   { key: "settings",      icon: "⚙️", label: "Settings",       inline: true  },
 ] as const;
@@ -498,6 +501,9 @@ export default function EventManagePage() {
                       { label: "Results",          icon: "🏅", href: `/admin/events/${eventId}/results`       },
                       { label: "Analytics",        icon: "📈", href: `/admin/events/${eventId}/analytics`     },
                       { label: "Register Walk-in", icon: "➕", href: `/admin/events/${eventId}/registrations?action=register` },
+                      { label: "Participants",     icon: "🪪", href: `/admin/events/${eventId}/participants`  },
+                      { label: "Volunteers",       icon: "🙋", href: `/admin/events/${eventId}/volunteers`    },
+                      { label: "Services",         icon: "🔧", href: `/admin/events/${eventId}/services`      },
                       { label: "Edit Event",       icon: "✏️", href: `/admin/events/new?edit=${eventId}`      },
                     ].map(a => (
                       <Link key={a.label} href={a.href} style={{ textDecoration: "none" }}>
