@@ -17,6 +17,7 @@ interface CheckInResult {
     email?:        string;
     category:      string | null;
     tshirt_size:   string | null;
+    bib_number?:   string | null;
     event:         string;
     checked_in_at: string;
   };
@@ -135,6 +136,11 @@ function CheckInContent() {
                   {result.registration.tshirt_size && (
                     <div style={{ fontSize: 11, fontWeight: 700, color: "#60a5fa", background: "rgba(96,165,250,0.12)", border: "1px solid rgba(96,165,250,0.3)", padding: "2px 10px", borderRadius: 999 }}>
                       👕 {result.registration.tshirt_size}
+                    </div>
+                  )}
+                  {result.registration.bib_number && (
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#a78bfa", background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.3)", padding: "2px 10px", borderRadius: 999 }}>
+                      🏷️ BIB {result.registration.bib_number}
                     </div>
                   )}
                 </div>
