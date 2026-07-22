@@ -649,3 +649,85 @@ export function eventRegistrationEmailHTML(opts: {
     ${emailFooter()}
   `);
 }
+
+// ── Bug report status update email (sent to reporter on every status change) ──
+
+const BUG_STATUS_META: Record<string, { icon: string; heading: string; accent: string }> = {
+  new:          { icon: "📬", heading: "We've received your report",          accent: "#e8620a" },
+  acknowledged: { icon: "👀", heading: "Your report is being reviewed",        accent: "#f59e0b" },
+  in_progress:  { icon: "🔧", heading: "We're working on it",                  accent: "#3b82f6" },
+  testing:      { icon: "🧪", heading: "Fix is being tested",                  accent: "#8b5cf6" },
+  resolved:     { icon: "✅", heading: "Issue resolved",                        accent: "#22c55e" },
+  closed:       { icon: "🔒", heading: "Issue closed",                          accent: "#64748b" },
+};
+
+export function bugStatusUpdateEmailHTML(opts: {
+  firstName:         string;
+  bugTitle:          string;
+  status:            string;
+  statusMessage:     string;
+  resolutionSummary?: string;
+  versionFixed?:     string;
+  confirmUrl?:       string;
+}): string {
+  const meta   = BUG_STATUS_META[opts.status] ?? { icon: "📋", heading: "Update on your report", accent: "#e8620a" };
+  const base   = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const isResolved = opts.status === "resolved";
+
+  return emailWrapper(`
+    ${emailHeader("Bug Report Update")}
+    <tr><td style="padding:36px 40px 28px;">
+      <div style="text-align:center;margin-bottom:24px;">
+        <div style="font-size:3rem;line-height:1;margin-bottom:12px;">${meta.icon}</div>
+        <h2 style="margin:0 0 6px;font-size:20px;font-weight:700;color:#111;">${meta.heading}</h2>
+        <p style="margin:0;font-size:13px;color:#888;">Re: <em>${opts.bugTitle}</em></p>
+      </div>
+
+      <p style="margin:0 0 20px;font-size:15px;color:#444;line-height:1.7;">
+        Hi <strong>${opts.firstName}</strong>,
+      </p>
+      <p style="margin:0 0 24px;font-size:15px;color:#444;line-height:1.7;">
+        ${opts.statusMessage}
+      </p>
+
+      ${opts.resolutionSummary ? `
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px 20px;margin-bottom:24px;">
+        <div style="font-size:11px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Resolution</div>
+        <p style="margin:0;font-size:14px;color:#15803d;line-height:1.6;">${opts.resolutionSummary}</p>
+        ${opts.versionFixed ? `<p style="margin:8px 0 0;font-size:12px;color:#166534;">Fixed in: <strong>${opts.versionFixed}</strong></p>` : ""}
+      </div>` : ""}
+
+      ${isResolved && opts.confirmUrl ? `
+      <p style="margin:0 0 14px;font-size:14px;color:#555;text-align:center;">
+        Is this issue fixed for you?
+      </p>
+      <table cellpadding="0" cellspacing="0" style="margin:0 auto 24px;">
+        <tr>
+          <td style="background:#22c55e;border-radius:8px;margin-right:8px;">
+            <a href="${opts.confirmUrl}&confirmed=true" style="display:block;padding:11px 24px;font-size:13px;font-weight:700;color:#fff;text-decoration:none;">
+              ✓ Yes, it's fixed
+            </a>
+          </td>
+          <td style="width:8px;"></td>
+          <td style="background:#ef4444;border-radius:8px;">
+            <a href="${opts.confirmUrl}&confirmed=false" style="display:block;padding:11px 24px;font-size:13px;font-weight:700;color:#fff;text-decoration:none;">
+              ✗ No, still broken
+            </a>
+          </td>
+        </tr>
+      </table>` : `
+      <table cellpadding="0" cellspacing="0" style="margin:0 auto 24px;">
+        <tr><td style="background:${meta.accent};border-radius:8px;">
+          <a href="${base}/my-bugs" style="display:block;padding:12px 32px;font-size:14px;font-weight:700;color:#fff;text-decoration:none;">
+            View My Bug Reports →
+          </a>
+        </td></tr>
+      </table>`}
+
+      <p style="margin:0;font-size:12px;color:#aaa;text-align:center;">
+        Thank you for helping us improve Connected Steps.
+      </p>
+    </td></tr>
+    ${emailFooter()}
+  `);
+}

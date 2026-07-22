@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, ChangeEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Camera, CheckCircle2, Mail } from "lucide-react";
@@ -50,7 +50,8 @@ function maskPhone(phone: string): string {
 }
 
 export default function SignUpForm({ onSwitchToLogin }: Props) {
-  const router  = useRouter();
+  const router       = useRouter();
+  const searchParams = useSearchParams();
   const fileRef = useRef<HTMLInputElement>(null);
 
   // ── State ─────────────────────────────────────────────────────────────────
@@ -104,6 +105,30 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
     const t = setTimeout(() => setResendCooldown(c => c - 1), 1000);
     return () => clearTimeout(t);
   }, [resendCooldown]);
+
+  // Restore draft when returning from email verification link (tab was lost/closed)
+  useEffect(() => {
+    const urlEmail    = (searchParams.get("email") ?? "").toLowerCase().trim();
+    const urlVerified = searchParams.get("verified") === "true";
+    if (!urlEmail || !urlVerified) return;
+    try {
+      const raw = localStorage.getItem(`cs_signup_draft_${urlEmail}`);
+      if (!raw) return;
+      const draft = JSON.parse(raw) as {
+        firstName: string; lastName: string; email: string;
+        phone: string; password: string; confirm: string;
+      };
+      setFirstName(draft.firstName ?? "");
+      setLastName(draft.lastName   ?? "");
+      setEmail(draft.email         ?? urlEmail);
+      setPhone(draft.phone         ?? "");
+      setPassword(draft.password   ?? "");
+      setConfirm(draft.confirm     ?? "");
+      setEmailVerified(true);
+      setStep("details");
+    } catch { /* ignore corrupt draft */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run once on mount
 
   // Poll for email verification while on the email-verify step
   useEffect(() => {
@@ -199,6 +224,21 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
       if (!res.ok) {
         setFormError(data.error ?? "Failed to send verification email. Please try again.");
         return false;
+      }
+      // Save draft so the user can recover form state if this tab is closed before they finish
+      if (!isResend) {
+        try {
+          localStorage.setItem(
+            `cs_signup_draft_${email.trim().toLowerCase()}`,
+            JSON.stringify({ firstName, lastName, email: email.trim().toLowerCase(), phone: phone10, password, confirm }),
+          );
+        } catch { /* ignore if localStorage unavailable */ }
+      }
+      // Email was already verified (user re-entered it) — skip straight to details
+      if (data.already_verified) {
+        setEmailVerified(true);
+        if (!isResend) setStep("details");
+        return true;
       }
       if (!isResend) setStep("email-verify");
       setResendCooldown(RESEND_COOLDOWN);
@@ -297,6 +337,7 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
       });
       const data = await res.json();
       if (!res.ok) { setFormError(data.error ?? "Registration failed."); return; }
+      localStorage.removeItem(`cs_signup_draft_${email.trim().toLowerCase()}`);
       localStorage.removeItem("cs_pending_referral");
       localStorage.setItem("cs_pending_photo", photo ?? "");
       if (preferredLocation) {

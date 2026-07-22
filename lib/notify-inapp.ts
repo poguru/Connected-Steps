@@ -22,7 +22,9 @@ export type NotificationType =
   | "new_session"
   | "streak_at_risk"
   | "upgrade_prompt"
-  | "weekly_digest";
+  | "weekly_digest"
+  | "bug_report"
+  | "bug_update";
 
 export interface InAppNotification {
   user_email: string;

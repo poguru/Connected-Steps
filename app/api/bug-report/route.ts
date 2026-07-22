@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { sendEmail } from "@/lib/notify";
+import { sendEmail, bugStatusUpdateEmailHTML } from "@/lib/notify";
+import { createNotification } from "@/lib/notify-inapp";
 import { isRateLimited, recordFailure, getClientIp } from "@/lib/rate-limit";
 
 const ADMIN_EMAIL = "info@connectedsteps.in";
@@ -9,10 +10,10 @@ const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "rc1";
 interface Attachment { path: string; type: string; name: string; size: number; }
 
 function bugReportEmailHTML(r: {
-  userName: string; userEmail: string; userPhone: string;
+  userName: string; userEmail: string; userPhone: string; membershipType: string;
   title: string; category: string; severity: string; description: string;
   attachments: Attachment[];
-  browser: string; device: string; screenSize: string;
+  browser: string; device: string; os: string; screenSize: string;
   currentUrl: string; timestamp: string; consoleErrors: string;
 }): string {
   const categoryLabel: Record<string, string> = {
@@ -20,7 +21,7 @@ function bugReportEmailHTML(r: {
     session: "📅 Session Issue", event: "🏁 Event Issue",
     feature: "✨ Feature Request", performance: "⚡ Performance Issue",
   };
-  const label = categoryLabel[r.category] ?? r.category;
+  const label  = categoryLabel[r.category] ?? r.category;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
 
   const attachmentRows = r.attachments.map((a, i) =>
@@ -35,11 +36,13 @@ function bugReportEmailHTML(r: {
     <tr><td style="padding:6px 0;color:#6b7280;width:160px">User Name</td><td style="padding:6px 0;font-weight:600">${r.userName || "—"}</td></tr>
     <tr><td style="padding:6px 0;color:#6b7280">User Email</td><td style="padding:6px 0">${r.userEmail || "—"}</td></tr>
     <tr><td style="padding:6px 0;color:#6b7280">User Phone</td><td style="padding:6px 0">${r.userPhone || "—"}</td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280">Membership</td><td style="padding:6px 0">${r.membershipType || "—"}</td></tr>
     <tr><td style="padding:6px 0;color:#6b7280">Category</td><td style="padding:6px 0;font-weight:600">${label}</td></tr>
     <tr><td style="padding:6px 0;color:#6b7280">Severity</td><td style="padding:6px 0;font-weight:600;text-transform:capitalize">${r.severity || "—"}</td></tr>
     <tr style="background:#fef3c7"><td style="padding:8px 6px;color:#6b7280;vertical-align:top">Description</td><td style="padding:8px 6px;white-space:pre-wrap">${r.description}</td></tr>
     <tr><td style="padding:6px 0;color:#6b7280">Current URL</td><td style="padding:6px 0;word-break:break-all">${r.currentUrl || "—"}</td></tr>
     <tr><td style="padding:6px 0;color:#6b7280">Browser</td><td style="padding:6px 0">${r.browser || "—"}</td></tr>
+    <tr><td style="padding:6px 0;color:#6b7280">OS</td><td style="padding:6px 0">${r.os || "—"}</td></tr>
     <tr><td style="padding:6px 0;color:#6b7280">Device</td><td style="padding:6px 0">${r.device || "—"}</td></tr>
     <tr><td style="padding:6px 0;color:#6b7280">Screen Size</td><td style="padding:6px 0">${r.screenSize || "—"}</td></tr>
     <tr><td style="padding:6px 0;color:#6b7280">Screenshots</td><td style="padding:6px 0">${r.attachments.length}</td></tr>
@@ -57,30 +60,30 @@ function bugReportEmailHTML(r: {
 }
 
 export async function POST(req: NextRequest) {
-  // 5 submissions per 15 minutes per IP — prevents DB spam and admin email floods
   const ip  = getClientIp(req);
   const key = `bug-report:${ip}`;
   if (await isRateLimited(key, 5)) {
     return NextResponse.json({ error: "Too many reports. Please wait before submitting again." }, { status: 429 });
   }
-  await recordFailure(key); // each submission counts as one "failure" towards the limit
+  await recordFailure(key);
 
   try {
     const body = await req.json() as Record<string, unknown>;
 
-    const title         = String(body.title         ?? "").trim();
-    const category      = String(body.category      ?? "");
-    const severity      = String(body.severity      ?? "");
-    const description   = String(body.description   ?? "").trim();
-    const screenshot_url= String(body.screenshot_url ?? "");
-    const browser       = String(body.browser       ?? "");
-    const device        = String(body.device        ?? "");
-    const screen_size   = String(body.screen_size   ?? "");
-    const current_url   = String(body.current_url   ?? "");
-    const console_errors= String(body.console_errors ?? "");
-    const user_email    = String(body.user_email    ?? "");
-    const user_name     = String(body.user_name     ?? "");
-    const user_phone    = String(body.user_phone    ?? "");
+    const title          = String(body.title          ?? "").trim();
+    const category       = String(body.category       ?? "");
+    const severity       = String(body.severity       ?? "");
+    const description    = String(body.description    ?? "").trim();
+    const screenshot_url = String(body.screenshot_url ?? "");
+    const browser        = String(body.browser        ?? "");
+    const device         = String(body.device         ?? "");
+    const os             = String(body.os             ?? "");
+    const screen_size    = String(body.screen_size    ?? "");
+    const current_url    = String(body.current_url    ?? "");
+    const console_errors = String(body.console_errors ?? "");
+    const user_email     = String(body.user_email     ?? "");
+    const user_name      = String(body.user_name      ?? "");
+    const user_phone     = String(body.user_phone     ?? "");
 
     const attachments: Attachment[] = Array.isArray(body.attachments)
       ? (body.attachments as Attachment[]).filter(a => a?.path)
@@ -96,25 +99,40 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const db = getSupabaseServer();
+    const db        = getSupabaseServer();
     const timestamp = new Date().toISOString();
 
-    // Enrich with user profile if email provided
-    let enrichedName  = user_name;
-    let enrichedPhone = user_phone;
-    if (user_email && (!enrichedName || !enrichedPhone)) {
+    // Enrich with user profile (name, phone, user_id, membership)
+    let enrichedName       = user_name;
+    let enrichedPhone      = user_phone;
+    let userId: string | null = null;
+    let membershipType: string | null = null;
+
+    if (user_email) {
       const { data: userRow } = await db
         .from("users")
-        .select("first_name, last_name, phone")
+        .select("id, first_name, last_name, phone")
         .eq("email", user_email)
         .single();
+
       if (userRow) {
         enrichedName  = enrichedName  || `${userRow.first_name ?? ""} ${userRow.last_name ?? ""}`.trim();
         enrichedPhone = enrichedPhone || (userRow.phone ?? "");
+        userId        = userRow.id ?? null;
       }
+
+      // Fetch active membership plan
+      const { data: membershipRow } = await db
+        .from("memberships")
+        .select("plan")
+        .eq("user_email", user_email)
+        .eq("status", "active")
+        .order("expires_at", { ascending: false })
+        .limit(1)
+        .single();
+      membershipType = membershipRow?.plan ?? null;
     }
 
-    // Priority: user-selected severity wins; fall back to category-based auto-assign
     const priority =
       severity === "critical" ? "critical" :
       severity === "high"     ? "high"     :
@@ -125,11 +143,12 @@ export async function POST(req: NextRequest) {
       category === "session"  ? "high"     :
       category === "event"    ? "high"     : "medium";
 
-    // Save to DB
     const { data: report, error: dbError } = await db.from("bug_reports").insert({
+      user_id:        userId         || null,
       user_email:     user_email     || null,
       user_name:      enrichedName   || null,
       user_phone:     enrichedPhone  || null,
+      membership_type: membershipType || null,
       title:          title          || null,
       category,
       severity:       severity       || null,
@@ -138,11 +157,13 @@ export async function POST(req: NextRequest) {
       attachments,
       browser:        browser        || null,
       device:         device         || null,
+      os:             os             || null,
       screen_size:    screen_size    || null,
       app_version:    APP_VERSION,
       current_url:    current_url    || null,
       console_errors: console_errors || null,
       priority,
+      status:         "new",
     }).select("id").single();
 
     if (dbError) {
@@ -150,7 +171,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to save report" }, { status: 500 });
     }
 
-    // Send admin email (non-blocking)
+    const reportId = report?.id ?? "";
+
+    // Insert initial history entry
+    void db.from("bug_report_history").insert({
+      bug_report_id: reportId,
+      status:        "new",
+      changed_by:    "system",
+      comment:       "Bug report received",
+    });
+
     const categoryLabel: Record<string, string> = {
       bug: "Bug", ui: "UI Issue", payment: "Payment Issue",
       session: "Session Issue", event: "Event Issue",
@@ -158,30 +188,55 @@ export async function POST(req: NextRequest) {
     };
     const subject = `[BUG REPORT] ${categoryLabel[category] ?? category} — ${enrichedName || user_email || "Anonymous"}`;
 
+    // Admin email (non-blocking)
     sendEmail(
       ADMIN_EMAIL, "Connected Steps Admin",
       subject,
       bugReportEmailHTML({
         userName: enrichedName, userEmail: user_email, userPhone: enrichedPhone,
+        membershipType: membershipType ?? "",
         title, category, severity, description, attachments,
-        browser, device, screenSize: screen_size,
+        browser, device, os, screenSize: screen_size,
         currentUrl: current_url, timestamp, consoleErrors: console_errors,
       }),
       false, true,
     ).catch(err => console.error("[bug-report] admin email failed:", err));
 
-    // Create admin in-app notification (fire-and-forget)
-    void (async () => {
-      await db.from("notifications").insert({
-        user_email: ADMIN_EMAIL,
-        type:       "bug_report",
-        title:      `🐛 New ${categoryLabel[category] ?? "Issue"} Report`,
-        body:       description.slice(0, 120),
-        action_url: `/admin/bug-reports?id=${report?.id ?? ""}`,
-      });
-    })();
+    // Admin in-app notification (uses helper so push is also sent)
+    createNotification({
+      user_email: ADMIN_EMAIL,
+      type:       "bug_report",
+      title:      `🐛 New ${categoryLabel[category] ?? "Issue"} Report`,
+      body:       (title || description).slice(0, 120),
+      action_url: `/admin/bug-reports?id=${reportId}`,
+    }).catch(err => console.error("[bug-report] admin notify failed:", err));
 
-    return NextResponse.json({ ok: true, id: report?.id });
+    // Reporter acknowledgement email (non-blocking)
+    if (user_email) {
+      const firstName = enrichedName?.split(" ")[0] || "there";
+      sendEmail(
+        user_email, enrichedName || firstName,
+        "We received your bug report — Connected Steps",
+        bugStatusUpdateEmailHTML({
+          firstName,
+          bugTitle:      title || description.slice(0, 80),
+          status:        "new",
+          statusMessage: "We've received your bug report and our team will review it shortly. We'll keep you updated at every step.",
+        }),
+        false, true,
+      ).catch(err => console.error("[bug-report] reporter ack email failed:", err));
+
+      // Reporter in-app notification
+      createNotification({
+        user_email,
+        type:       "bug_update",
+        title:      "Bug report received",
+        body:       "We've received your report and our team is reviewing it.",
+        action_url: `/my-bugs`,
+      }).catch(err => console.error("[bug-report] reporter notify failed:", err));
+    }
+
+    return NextResponse.json({ ok: true, id: reportId });
   } catch (err) {
     console.error("[bug-report] unexpected error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Dashboard from "@/components/dashboard/Dashboard";
-import ErrorBoundary from "@/components/ui/ErrorBoundary";
+import { DashboardErrorBoundary } from "@/components/dashboard/DashboardErrorBoundary";
 
 export const dynamic = "force-dynamic";
 
@@ -11,10 +11,10 @@ export const metadata = {
 
 export default function DashboardPage() {
   return (
-    <ErrorBoundary>
-      <Suspense>
+    <DashboardErrorBoundary>
+      <Suspense fallback={null}>
         <Dashboard />
       </Suspense>
-    </ErrorBoundary>
+    </DashboardErrorBoundary>
   );
 }

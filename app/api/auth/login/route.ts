@@ -45,13 +45,19 @@ export async function POST(req: NextRequest) {
 
   if (!user) {
     await recordFailure(key);
-    return NextResponse.json({ error: "Invalid credentials. Please check and try again." }, { status: 401 });
+    return NextResponse.json(
+      { error: "No account found with these details. Please check your email or phone, or create a new account.", code: "not_found" },
+      { status: 401 },
+    );
   }
 
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) {
     await recordFailure(key);
-    return NextResponse.json({ error: "Invalid credentials. Please check and try again." }, { status: 401 });
+    return NextResponse.json(
+      { error: "Incorrect password. Please try again, or use Sign in with OTP to access your account.", code: "wrong_password" },
+      { status: 401 },
+    );
   }
 
   if (user.is_active === false) {
@@ -63,7 +69,7 @@ export async function POST(req: NextRequest) {
   // Only new sign-ups with email_verified=false should be blocked.
   if (user.email_verified === false) {
     return NextResponse.json(
-      { error: "Please verify your email address before signing in. Check your inbox for the verification link." },
+      { error: "Please verify your email address before signing in. Check your inbox for the verification link.", code: "email_unverified" },
       { status: 403 },
     );
   }

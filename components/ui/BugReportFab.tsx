@@ -30,17 +30,25 @@ interface FilePreview {
 }
 
 function getDeviceInfo() {
-  if (typeof window === "undefined") return { browser: "", device: "", screenSize: "" };
-  const ua = navigator.userAgent;
+  if (typeof window === "undefined") return { browser: "", device: "", os: "", screenSize: "" };
+  const ua       = navigator.userAgent;
   const isMobile = /Mobile|Android|iPhone|iPad/i.test(ua);
-  const browser =
+  const browser  =
     ua.includes("Edg/")    ? "Edge"    :
     ua.includes("Chrome/")  ? "Chrome"  :
     ua.includes("Firefox/") ? "Firefox" :
     ua.includes("Safari/")  ? "Safari"  : "Unknown";
+  const os =
+    /Windows NT 10/.test(ua) ? "Windows 10/11" :
+    /Windows NT/.test(ua)    ? "Windows"        :
+    /Mac OS X/.test(ua)      ? "macOS"           :
+    /Android/.test(ua)       ? "Android"         :
+    /iPhone|iPad/.test(ua)   ? "iOS"             :
+    /Linux/.test(ua)         ? "Linux"           : "Unknown";
   return {
     browser:    `${browser} — ${ua.slice(0, 120)}`,
     device:     isMobile ? "Mobile" : "Desktop",
+    os,
     screenSize: `${window.screen.width}×${window.screen.height} (viewport ${window.innerWidth}×${window.innerHeight})`,
   };
 }
@@ -243,8 +251,8 @@ export default function BugReportFab() {
     }
 
     const stored = typeof localStorage !== "undefined" ? localStorage.getItem("cs_user") : null;
-    const user   = stored ? JSON.parse(stored) as { email?: string; firstName?: string; phone?: string } : null;
-    const { browser, device, screenSize } = getDeviceInfo();
+    const user   = stored ? JSON.parse(stored) as { email?: string; firstName?: string; phone?: string; id?: string } : null;
+    const { browser, device, os, screenSize } = getDeviceInfo();
 
     const res = await fetch("/api/bug-report", {
       method:  "POST",
@@ -255,7 +263,7 @@ export default function BugReportFab() {
         severity,
         description: description.trim(),
         attachments,
-        browser, device, screen_size: screenSize,
+        browser, device, os, screen_size: screenSize,
         current_url: typeof window !== "undefined" ? window.location.href : "",
         user_email:  user?.email     ?? "",
         user_name:   user?.firstName ?? "",

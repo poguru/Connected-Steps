@@ -59,6 +59,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
   }
 
+  // If a verified, unexpired token already exists, don't destroy it — the user just needs to
+  // complete the registration form. Returning already_verified lets the form skip re-verification.
+  const { data: existingVerified } = await db
+    .from("email_verification_tokens")
+    .select("id")
+    .eq("email", email)
+    .eq("verified", true)
+    .gt("expires_at", new Date().toISOString())
+    .maybeSingle();
+
+  if (existingVerified) {
+    return NextResponse.json({ sent: true, already_verified: true });
+  }
+
   // Generate a token: store SHA-256 hash in DB, send plain UUID in the link
   const plainToken = randomUUID();
   const tokenHash  = createHash("sha256").update(plainToken).digest("hex");

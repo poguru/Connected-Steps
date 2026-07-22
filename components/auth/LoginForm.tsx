@@ -35,14 +35,16 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
 
   // ── Password mode ──────────────────────────────────────────────────────────
   const [form, setForm]           = useState({ identifier: "", password: "" });
-  const [showPw, setShowPw]       = useState(false);
-  const [pwLoading, setPwLoading] = useState(false);
-  const [pwError,   setPwError]   = useState("");
-  const submittingRef             = useRef(false);
+  const [showPw, setShowPw]         = useState(false);
+  const [pwLoading, setPwLoading]   = useState(false);
+  const [pwError,   setPwError]     = useState("");
+  const [pwErrorCode, setPwErrorCode] = useState("");
+  const submittingRef               = useRef(false);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     setForm(p => ({ ...p, [e.target.name]: e.target.value }));
     setPwError("");
+    setPwErrorCode("");
   };
 
   const submitLogin = async () => {
@@ -61,7 +63,11 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
         body: JSON.stringify({ identifier: form.identifier, password: form.password }),
       });
       const data = await res.json();
-      if (!res.ok) { setPwError(data.error); return; }
+      if (!res.ok) {
+        setPwError(data.error);
+        setPwErrorCode(data.code ?? "");
+        return;
+      }
       saveAndRedirect(data.user, data.requiresPhoneVerification);
     } catch { setPwError("Something went wrong. Please try again."); }
     finally   { setPwLoading(false); submittingRef.current = false; }
@@ -77,6 +83,7 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
   const [sending,    setSending]    = useState(false);
   const [verifying,  setVerifying]  = useState(false);
   const [otpError,   setOtpError]   = useState("");
+  const [otpErrorCode, setOtpErrorCode] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
 
   useEffect(() => {
@@ -165,7 +172,11 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
         });
       }
       const data = await res.json();
-      if (!res.ok) { setOtpError(data.error ?? "Failed to send OTP."); return; }
+      if (!res.ok) {
+        setOtpError(data.error ?? "Failed to send OTP.");
+        setOtpErrorCode(data.code ?? (res.status === 404 ? "not_found" : ""));
+        return;
+      }
       setOtpStep("code");
       setResendCooldown(RESEND_COOLDOWN);
     } catch { setOtpError("Network error. Please try again."); }
@@ -205,7 +216,8 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
 
   function switchMode(m: Mode) {
     setMode(m); setOtpStep("identifier");
-    setOtpCode(""); setOtpError(""); setPwError(""); setResendCooldown(0);
+    setOtpCode(""); setOtpError(""); setOtpErrorCode("");
+    setPwError(""); setPwErrorCode(""); setResendCooldown(0);
   }
 
   // ── Mode toggle ─────────────────────────────────────────────────────────────
@@ -244,6 +256,18 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
       </div>
 
       {pwError && <Alert variant="error">{pwError}</Alert>}
+      {pwErrorCode === "not_found" && (
+        <button type="button" onClick={onSwitchToSignUp}
+          style={{ width: "100%", padding: "11px", borderRadius: 999, background: "transparent", color: "var(--primary)", border: "1.5px solid var(--primary)", cursor: "pointer", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.9rem" }}>
+          Create a new account →
+        </button>
+      )}
+      {pwErrorCode === "email_unverified" && (
+        <button type="button" onClick={onSwitchToSignUp}
+          style={{ width: "100%", padding: "11px", borderRadius: 999, background: "transparent", color: "var(--primary)", border: "1.5px solid var(--primary)", cursor: "pointer", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.9rem" }}>
+          Register again to resend verification →
+        </button>
+      )}
 
       <button
         type="button" onClick={submitLogin} onTouchEnd={submitLogin} disabled={pwLoading}
@@ -263,9 +287,15 @@ export default function LoginForm({ onSwitchToSignUp }: Props) {
       </p>
       <Input type="text"
         placeholder="Mobile number or email"
-        value={identifier} onChange={e => { setIdentifier(e.target.value); setOtpError(""); }}
+        value={identifier} onChange={e => { setIdentifier(e.target.value); setOtpError(""); setOtpErrorCode(""); }}
         autoComplete="username" />
       {otpError && <Alert variant="error">{otpError}</Alert>}
+      {otpErrorCode === "not_found" && (
+        <button type="button" onClick={onSwitchToSignUp}
+          style={{ width: "100%", padding: "11px", borderRadius: 999, background: "transparent", color: "var(--primary)", border: "1.5px solid var(--primary)", cursor: "pointer", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.9rem" }}>
+          Create a new account →
+        </button>
+      )}
       <button
         type="button" onClick={sendOtp} disabled={sending || !identifier.trim()}
         style={{ width: "100%", padding: "13px", borderRadius: 999, background: identifier.trim() ? "var(--gradient-accent)" : "oklch(0.72 0.19 49 / 30%)", color: "var(--accent-foreground)", border: "none", cursor: identifier.trim() ? "pointer" : "not-allowed", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "0.95rem", boxShadow: identifier.trim() ? "var(--shadow-orange)" : "none" }}

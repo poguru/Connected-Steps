@@ -132,7 +132,7 @@ function VerifyEmailContent() {
             Your email has been verified. You can close this tab and return to the signup form to continue.
           </p>
           <Link
-            href="/auth?tab=signup"
+            href={`/auth?tab=signup${email ? `&email=${encodeURIComponent(email)}&verified=true` : ""}`}
             style={{ display: "inline-block", padding: "11px 28px", background: "linear-gradient(135deg,#e8620a,#ff8c42)", color: "#fff", borderRadius: 999, textDecoration: "none", fontWeight: 700, fontSize: 14 }}
           >
             Continue Sign Up →
