@@ -14,9 +14,25 @@ interface EventInfo {
   max_participants: number | null; share_slug: string | null;
   distance_categories: string[] | null;
   collect_tshirt: boolean;
+  allow_multi_participant: boolean;
+  max_per_registration: number;
 }
 
+interface ParticipantData {
+  first_name: string; last_name: string;
+  gender: string; date_of_birth: string;
+  blood_group: string; mobile: string;
+  email: string;
+  distance_category: string; tshirt_size: string;
+}
+
+const EMPTY_PARTICIPANT: ParticipantData = {
+  first_name: "", last_name: "", gender: "", date_of_birth: "",
+  blood_group: "", mobile: "", email: "", distance_category: "", tshirt_size: "",
+};
+
 const TSHIRT_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"] as const;
+const BLOOD_GROUPS = ["A+","A-","B+","B-","AB+","AB-","O+","O-"];
 
 interface StoredUser {
   firstName?: string; lastName?: string; email?: string; phone?: string;
@@ -34,12 +50,12 @@ const LABEL: React.CSSProperties = {
 };
 
 const TYPE: Record<string, { label: string; icon: string; color: string }> = {
-  running: { label: "Running", icon: "🏃", color: "#e8620a" },
-  cycling: { label: "Cycling", icon: "🚴", color: "#3b82f6" },
-  training: { label: "Training", icon: "💪", color: "#a855f7" },
-  race: { label: "Race", icon: "🏆", color: "#ef4444" },
+  running:   { label: "Running",   icon: "🏃", color: "#e8620a" },
+  cycling:   { label: "Cycling",   icon: "🚴", color: "#3b82f6" },
+  training:  { label: "Training",  icon: "💪", color: "#a855f7" },
+  race:      { label: "Race",      icon: "🏆", color: "#ef4444" },
   community: { label: "Community", icon: "🤝", color: "#22c55e" },
-  workshop: { label: "Workshop", icon: "📚", color: "#eab308" },
+  workshop:  { label: "Workshop",  icon: "📚", color: "#eab308" },
 };
 
 function fmtDate(d: string) {
@@ -76,11 +92,11 @@ export default function RegisterPage() {
   const router = useRouter();
   const slug   = params.slug;
 
-  const [ev,     setEv]     = useState<EventInfo | null>(null);
-  const [evErr,  setEvErr]  = useState(false);
+  const [ev,      setEv]      = useState<EventInfo | null>(null);
+  const [evErr,   setEvErr]   = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Form state
+  // ── Single-participant form state (legacy / non-multi) ──────────────────────
   const [form, setForm] = useState({
     name: "", email: "", phone: "",
     gender: "", date_of_birth: "",
@@ -88,22 +104,31 @@ export default function RegisterPage() {
     emergency_contact_name: "", emergency_contact_phone: "",
     special_notes: "",
   });
-  const [errors,        setErrors]        = useState<Record<string, string>>({});
-  const [submitted,     setSubmitted]     = useState(false);
-  const [coupon,           setCoupon]           = useState("");
-  const [couponApplied,    setCouponApplied]    = useState<{ id: string; discount: number; label: string } | null>(null);
-  const [couponErr,        setCouponErr]        = useState("");
-  const [couponLoading,    setCouponLoading]    = useState(false);
+  const [errors,    setErrors]    = useState<Record<string, string>>({});
+  const [submitted, setSubmitted] = useState(false);
+
+  // ── Multi-participant form state ──────────────────────────────────────────
+  const [participantCount, setParticipantCount] = useState(1);
+  const [participants,     setParticipants]     = useState<ParticipantData[]>([{ ...EMPTY_PARTICIPANT }]);
+  const [multiErrors,      setMultiErrors]      = useState<Array<Record<string, string>>>([{}]);
+  const [multiSubmitted,   setMultiSubmitted]   = useState(false);
+  const [sharedEmergency,  setSharedEmergency]  = useState({ name: "", phone: "" });
+  const [sharedNotes,      setSharedNotes]      = useState("");
+
+  // ── Shared state ──────────────────────────────────────────────────────────
+  const [coupon,        setCoupon]        = useState("");
+  const [couponApplied, setCouponApplied] = useState<{ id: string; discount: number; label: string } | null>(null);
+  const [couponErr,     setCouponErr]     = useState("");
+  const [couponLoading, setCouponLoading] = useState(false);
   const [distanceCategory, setDistanceCategory] = useState("");
   const [tshirtSize,       setTshirtSize]       = useState("");
-  const [submitting,    setSubmitting]    = useState(false);
-  const [submitErr,     setSubmitErr]     = useState("");
-  const [alreadyReg,    setAlreadyReg]    = useState<string | null>(null);
+  const [submitting,  setSubmitting]  = useState(false);
+  const [submitErr,   setSubmitErr]   = useState("");
+  const [alreadyReg,  setAlreadyReg]  = useState<string | null>(null);
+  const [userEmail,   setUserEmail]   = useState("");
+  const [userToken,   setUserToken]   = useState("");
 
-  // Guard: must be logged in
-  const [userEmail, setUserEmail] = useState("");
-  const [userToken, setUserToken] = useState("");
-
+  // Auth guard + pre-fill
   useEffect(() => {
     const raw = localStorage.getItem("cs_user");
     if (!raw) {
@@ -115,22 +140,23 @@ export default function RegisterPage() {
       const u: StoredUser = JSON.parse(raw);
       if (!u.email) { router.replace("/auth?tab=login"); return; }
       const storedToken = localStorage.getItem("cs_user_token") ?? "";
-      if (!isTokenValid(storedToken)) {
-        handleAuthExpiry(`/events/${slug}/register`);
-        return;
-      }
+      if (!isTokenValid(storedToken)) { handleAuthExpiry(`/events/${slug}/register`); return; }
       setUserEmail(u.email);
       setUserToken(storedToken);
-      setForm(f => ({
-        ...f,
-        name:  `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim(),
-        email: u.email ?? "",
-        phone: u.phone ?? "",
-      }));
+      const fullName = `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim();
+      setForm(f => ({ ...f, name: fullName, email: u.email ?? "", phone: u.phone ?? "" }));
+      // Pre-fill first participant with account info
+      setParticipants([{
+        ...EMPTY_PARTICIPANT,
+        first_name: u.firstName ?? "",
+        last_name:  u.lastName  ?? "",
+        mobile:     u.phone     ?? "",
+        email:      u.email     ?? "",
+      }]);
     } catch { router.replace("/auth?tab=login"); }
   }, [slug, router]);
 
-  // Fetch event details via by-slug (returns all columns including price)
+  // Fetch event
   useEffect(() => {
     if (!slug) return;
     fetch(`/api/events/by-slug?slug=${slug}`)
@@ -142,7 +168,7 @@ export default function RegisterPage() {
       .catch(() => { setEvErr(true); setLoading(false); });
   }, [slug]);
 
-  // Check if already registered for this event
+  // Already-registered check
   useEffect(() => {
     if (!ev || !userToken) return;
     fetch("/api/events/my-registrations", { headers: { "x-user-token": userToken } })
@@ -158,6 +184,38 @@ export default function RegisterPage() {
       .catch(() => {});
   }, [ev, userToken]);
 
+  // Sync participant count with the participants array
+  function changeCount(n: number) {
+    setParticipantCount(n);
+    setParticipants(prev => {
+      if (n > prev.length) {
+        return [...prev, ...Array(n - prev.length).fill(null).map(() => ({ ...EMPTY_PARTICIPANT }))];
+      }
+      return prev.slice(0, n);
+    });
+    setMultiErrors(prev => {
+      if (n > prev.length) return [...prev, ...Array(n - prev.length).fill({})];
+      return prev.slice(0, n);
+    });
+  }
+
+  function setParticipant(idx: number, field: keyof ParticipantData, value: string) {
+    setParticipants(prev => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], [field]: value };
+      return next;
+    });
+    if (multiSubmitted) {
+      setMultiErrors(prev => {
+        const next = [...prev];
+        next[idx] = validateParticipant({ ...participants[idx], [field]: value }, ev!);
+        return next;
+      });
+    }
+  }
+
+  // ── Validation ─────────────────────────────────────────────────────────────
+
   function validate(f: typeof form) {
     const e: Record<string, string> = {};
     if (!f.name.trim() || f.name.trim().length < 3)   e.name = "Full name must be at least 3 characters.";
@@ -172,6 +230,20 @@ export default function RegisterPage() {
     return e;
   }
 
+  function validateParticipant(p: ParticipantData, event: EventInfo): Record<string, string> {
+    const e: Record<string, string> = {};
+    if (!p.first_name.trim())  e.first_name = "First name is required.";
+    if (!p.gender)             e.gender = "Please select gender.";
+    if (!p.date_of_birth)      e.date_of_birth = "Date of birth is required.";
+    else if (new Date(p.date_of_birth) >= new Date()) e.date_of_birth = "Must be in the past.";
+    if (!p.blood_group)        e.blood_group = "Please select blood group.";
+    if (!p.mobile || !/^\d{10}$/.test(p.mobile.replace(/\s/g, ""))) e.mobile = "Phone must be exactly 10 digits.";
+    const cats = event.distance_categories ?? [];
+    if (cats.length > 1 && !p.distance_category) e.distance_category = "Please select a distance category.";
+    if (event.collect_tshirt && !p.tshirt_size) e.tshirt_size = "Please select a T-shirt size.";
+    return e;
+  }
+
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm(f => {
       const next = { ...f, [k]: e.target.value };
@@ -181,6 +253,8 @@ export default function RegisterPage() {
   };
 
   // ── Coupon validation ──────────────────────────────────────────────────────
+
+  const isMulti = ev?.allow_multi_participant ?? false;
 
   const applyCoupon = useCallback(async () => {
     if (!coupon.trim()) return;
@@ -193,42 +267,78 @@ export default function RegisterPage() {
       });
       const data = await res.json();
       if (!res.ok) { setCouponErr(data.error ?? "Invalid coupon."); return; }
-
-      const price    = ev?.price ?? 0;
-      const disc     = data.discount_type === "percentage"
-        ? Math.min(price, Math.round(price * data.discount_value / 100))
-        : Math.min(price, data.discount_value);
+      const perPersonPrice = ev?.price ?? 0;
+      const totalPrice     = isMulti ? perPersonPrice * participantCount : perPersonPrice;
+      const disc = data.discount_type === "percentage"
+        ? Math.min(totalPrice, Math.round(totalPrice * data.discount_value / 100))
+        : Math.min(totalPrice, data.discount_value);
       setCouponApplied({ id: data.coupon_id, discount: disc, label: data.description ?? coupon.toUpperCase() });
     } catch { setCouponErr("Could not validate coupon. Please try again."); }
     finally   { setCouponLoading(false); }
-  }, [coupon, userEmail, ev?.id, ev?.price]);
+  }, [coupon, userEmail, ev?.id, ev?.price, isMulti, participantCount]);
 
-  // ── Submit ─────────────────────────────────────────────────────────────────
+  // ── Payment helper ─────────────────────────────────────────────────────────
+
+  async function openRazorpay(registrationCode: string, leadName: string, finalPrice: number) {
+    if (!ev) return;
+    await loadRazorpay();
+    const orderRes = await fetch("/api/events/create-payment-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-user-token": userToken },
+      body: JSON.stringify({ event_id: ev.id, email: userEmail, registration_code: registrationCode }),
+    });
+    const orderData = await orderRes.json();
+    if (!orderRes.ok) { setSubmitErr(orderData.error ?? "Could not create payment order."); setSubmitting(false); return; }
+
+    const rzp = new window.Razorpay({
+      key:         orderData.key,
+      amount:      orderData.amount,
+      currency:    "INR",
+      name:        "Connected Steps",
+      description: ev.title,
+      order_id:    orderData.orderId,
+      prefill:     { name: leadName, email: userEmail, contact: isMulti ? participants[0]?.mobile : form.phone },
+      theme:       { color: "#e8620a" },
+      handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
+        const vRes  = await fetch("/api/events/verify-payment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...response, registration_code: registrationCode }),
+        });
+        const vData = await vRes.json();
+        if (vData.success) {
+          router.push(`/events/${slug}/register/success?code=${registrationCode}&paid=1`);
+        } else {
+          setSubmitErr("Payment verification failed. Please contact support.");
+          setSubmitting(false);
+        }
+      },
+      modal: { ondismiss: () => setSubmitting(false) },
+    });
+    rzp.open();
+  }
+
+  // ── Submit: single participant (legacy) ────────────────────────────────────
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!ev) return;
     setSubmitted(true);
     const errs = validate(form);
-    // Require category selection when event has multiple categories
     const cats = ev.distance_categories ?? [];
     if (cats.length > 1 && !distanceCategory) {
       setSubmitErr("Please select a distance category.");
-      const el = document.getElementById("field-distance_category");
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      document.getElementById("field-distance_category")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
-    // Require t-shirt size when event collects it
     if (ev.collect_tshirt && !tshirtSize) {
       setSubmitErr("Please select your T-shirt size.");
-      const el = document.getElementById("field-tshirt_size");
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      document.getElementById("field-tshirt_size")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     setErrors(errs);
     if (Object.keys(errs).length > 0) {
-      const firstKey = Object.keys(errs)[0];
-      const el = document.getElementById(`field-${firstKey}`);
+      const el = document.getElementById(`field-${Object.keys(errs)[0]}`);
       if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
@@ -254,74 +364,88 @@ export default function RegisterPage() {
         }),
       });
       const data = await res.json();
-
       if (res.status === 401) { handleAuthExpiry(`/events/${slug}/register`); return; }
-      if (!res.ok) { setSubmitErr(data.error ?? "Registration failed."); return; }
-
-      // Already registered
-      if (data.already) {
+      if (!res.ok) { setSubmitErr(data.error ?? "Registration failed."); setSubmitting(false); return; }
+      if (data.already || data.free) {
         router.push(`/events/${slug}/register/success?code=${data.registration_code}`);
         return;
       }
+      await openRazorpay(data.registration_code, form.name, data.final_price ?? 0);
+    } catch (err: unknown) {
+      setSubmitErr(String(err)); setSubmitting(false);
+    }
+  }
 
-      // Free event
-      if (data.free) {
-        router.push(`/events/${slug}/register/success?code=${data.registration_code}`);
-        return;
-      }
+  // ── Submit: multi-participant ──────────────────────────────────────────────
 
-      // Paid event — open Razorpay
-      await loadRazorpay();
-      const orderRes  = await fetch("/api/events/create-payment-order", {
+  async function handleMultiSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!ev) return;
+    setMultiSubmitted(true);
+
+    // Validate all participants
+    const allErrs = participants.map(p => validateParticipant(p, ev));
+    setMultiErrors(allErrs);
+
+    const hasErrors = allErrs.some(e => Object.keys(e).length > 0);
+    if (hasErrors) {
+      document.getElementById("multi-participant-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    if (!sharedEmergency.name.trim()) { setSubmitErr("Emergency contact name is required."); return; }
+    if (!sharedEmergency.phone.trim() || !/^\d{10}$/.test(sharedEmergency.phone.replace(/\s/g, ""))) {
+      setSubmitErr("Emergency contact number must be 10 digits.");
+      return;
+    }
+    if (!sharedNotes.trim()) { setSubmitErr("Special notes are required (enter NA if none)."); return; }
+
+    setSubmitting(true); setSubmitErr("");
+
+    try {
+      const res = await fetch("/api/events/register", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-user-token": userToken },
-        body: JSON.stringify({ event_id: ev.id, email: form.email, registration_code: data.registration_code }),
+        body: JSON.stringify({
+          event_id:          ev.id,
+          email:             userEmail,
+          emergency_contact: `${sharedEmergency.name} / ${sharedEmergency.phone}`,
+          special_notes:     sharedNotes,
+          coupon_code:       couponApplied ? coupon : undefined,
+          participants:      participants.map(p => ({
+            first_name:        p.first_name.trim(),
+            last_name:         p.last_name.trim() || undefined,
+            gender:            p.gender,
+            date_of_birth:     p.date_of_birth,
+            blood_group:       p.blood_group,
+            mobile:            p.mobile,
+            email:             p.email || userEmail,
+            distance_category: p.distance_category || undefined,
+            tshirt_size:       p.tshirt_size || undefined,
+          })),
+        }),
       });
-      const orderData = await orderRes.json();
-      if (!orderRes.ok) { setSubmitErr(orderData.error ?? "Could not create payment order."); return; }
-
-      const rzp = new window.Razorpay({
-        key:         orderData.key,
-        amount:      orderData.amount,
-        currency:    "INR",
-        name:        "Connected Steps",
-        description: ev.title,
-        order_id:    orderData.orderId,
-        prefill:     { name: form.name, email: form.email, contact: form.phone },
-        theme:       { color: "#e8620a" },
-        handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
-          const vRes  = await fetch("/api/events/verify-payment", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...response, registration_code: data.registration_code }),
-          });
-          const vData = await vRes.json();
-          if (vData.success) {
-            router.push(`/events/${slug}/register/success?code=${data.registration_code}&paid=1`);
-          } else {
-            setSubmitErr("Payment verification failed. Please contact support.");
-            setSubmitting(false);
-          }
-        },
-        modal: {
-          ondismiss: () => setSubmitting(false),
-        },
-      });
-      rzp.open();
-
+      const data = await res.json();
+      if (res.status === 401) { handleAuthExpiry(`/events/${slug}/register`); return; }
+      if (!res.ok) { setSubmitErr(data.error ?? "Registration failed."); setSubmitting(false); return; }
+      if (data.already || data.free) {
+        router.push(`/events/${slug}/register/success?code=${data.registration_code}`);
+        return;
+      }
+      const leadName = [participants[0]?.first_name, participants[0]?.last_name].filter(Boolean).join(" ");
+      await openRazorpay(data.registration_code, leadName, data.final_price ?? 0);
     } catch (err: unknown) {
-      setSubmitErr(String(err));
-      setSubmitting(false);
+      setSubmitErr(String(err)); setSubmitting(false);
     }
   }
 
   // ── Price display ──────────────────────────────────────────────────────────
 
-  const price    = ev?.price ?? 0;
-  const discount = couponApplied?.discount ?? 0;
-  const final    = Math.max(0, price - discount);
+  const pricePerPerson  = ev?.price ?? 0;
+  const totalBeforeDisc = isMulti ? pricePerPerson * participantCount : pricePerPerson;
+  const discount        = couponApplied?.discount ?? 0;
+  const final           = Math.max(0, totalBeforeDisc - discount);
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Loading / error states ─────────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -330,7 +454,6 @@ export default function RegisterPage() {
       </div>
     );
   }
-
   if (evErr || !ev) {
     return (
       <div style={{ minHeight: "100vh", background: "#0d0d10", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "1rem", color: "rgba(255,255,255,0.4)" }}>
@@ -343,6 +466,303 @@ export default function RegisterPage() {
 
   const conf = TYPE[ev.event_type] ?? TYPE.running;
 
+  // ── Shared top section ────────────────────────────────────────────────────
+
+  const EventHeader = (
+    <div style={{ padding: "1rem 1.25rem", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "12px", marginBottom: "1.75rem", display: "flex", gap: "0.875rem", alignItems: "flex-start" }}>
+      <div style={{ fontSize: "1.75rem", flexShrink: 0 }}>{conf.icon}</div>
+      <div>
+        <div style={{ fontSize: "0.75rem", fontWeight: 700, color: conf.color, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "2px" }}>{conf.label}</div>
+        <div style={{ fontSize: "1rem", fontWeight: 700, color: "#fff", marginBottom: "4px" }}>{ev.title}</div>
+        <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.5)" }}>
+          📅 {fmtDate(ev.start_date)}{ev.start_time ? ` · ${fmtTime(ev.start_time)}` : ""}  · 📍 {ev.location}
+        </div>
+      </div>
+    </div>
+  );
+
+  const AlreadyBanner = alreadyReg && (
+    <div style={{ padding: "1.25rem 1.5rem", borderRadius: "12px", background: "rgba(74,222,128,0.07)", border: "1px solid rgba(74,222,128,0.3)", marginBottom: "1.5rem", textAlign: "center" }}>
+      <div style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>✅</div>
+      <div style={{ fontWeight: 700, color: "#4ade80", marginBottom: "0.25rem" }}>You&apos;re already registered!</div>
+      <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)", marginBottom: "1rem", fontFamily: "monospace" }}>{alreadyReg}</div>
+      <Link href={`/events/${slug}/register/success?code=${alreadyReg}`}
+        style={{ display: "inline-block", padding: "10px 24px", borderRadius: "8px", background: "linear-gradient(135deg,#e8620a,#f07c2a)", color: "#fff", fontWeight: 700, fontSize: "0.875rem", textDecoration: "none" }}>
+        View Registration Details →
+      </Link>
+    </div>
+  );
+
+  const CouponSection = pricePerPerson > 0 && (
+    <section style={{ marginBottom: "1.5rem" }}>
+      <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>Coupon Code</div>
+      <div style={{ display: "flex", gap: "0.5rem" }}>
+        <input
+          style={{ ...INPUT, flex: 1, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "monospace" }}
+          value={coupon}
+          onChange={e => { setCoupon(e.target.value.toUpperCase()); setCouponErr(""); setCouponApplied(null); }}
+          placeholder="ENTER CODE"
+          disabled={!!couponApplied}
+        />
+        <button
+          type="button"
+          onClick={couponApplied ? () => { setCouponApplied(null); setCoupon(""); } : applyCoupon}
+          disabled={couponLoading || (!couponApplied && !coupon.trim())}
+          style={{ padding: "0 1.25rem", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.15)", background: couponApplied ? "rgba(239,68,68,0.1)" : "rgba(255,255,255,0.06)", color: couponApplied ? "#f87171" : "#fff", cursor: "pointer", fontSize: "0.8rem", fontWeight: 700, fontFamily: "inherit", whiteSpace: "nowrap" }}>
+          {couponLoading ? "…" : couponApplied ? "Remove" : "Apply"}
+        </button>
+      </div>
+      {couponErr && <div style={{ fontSize: "0.78rem", color: "#f87171", marginTop: "0.5rem" }}>{couponErr}</div>}
+      {couponApplied && <div style={{ fontSize: "0.78rem", color: "#4ade80", marginTop: "0.5rem" }}>✓ {couponApplied.label} — saves ₹{couponApplied.discount}</div>}
+    </section>
+  );
+
+  // ── Multi-participant form ─────────────────────────────────────────────────
+
+  if (isMulti) {
+    const maxSlots = Math.min(ev.max_per_registration || 10, 10);
+    const cats     = ev.distance_categories ?? [];
+
+    return (
+      <div style={{ minHeight: "100vh", background: "#0d0d10", color: "#fff" }}>
+        <nav style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(13,13,16,0.97)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 1.5rem", height: "56px", display: "flex", alignItems: "center" }}>
+          <Link href={`/events/${slug}`} style={{ fontSize: "0.875rem", color: "rgba(255,255,255,0.6)", textDecoration: "none" }}>← Event Details</Link>
+        </nav>
+
+        <div style={{ maxWidth: "640px", margin: "0 auto", padding: "2rem 1.5rem 5rem" }}>
+          {EventHeader}
+          {AlreadyBanner}
+
+          {/* Participant count selector */}
+          <section style={{ marginBottom: "1.75rem" }}>
+            <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.875rem" }}>
+              Number of Participants *
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+              {Array.from({ length: maxSlots }, (_, i) => i + 1).map(n => (
+                <button key={n} type="button" onClick={() => changeCount(n)}
+                  style={{
+                    width: "44px", height: "44px", borderRadius: "10px", fontFamily: "inherit",
+                    fontWeight: n === participantCount ? 800 : 500, fontSize: "1rem",
+                    border: `2px solid ${n === participantCount ? "#e8620a" : "rgba(255,255,255,0.12)"}`,
+                    background: n === participantCount ? "rgba(232,98,10,0.15)" : "transparent",
+                    color: n === participantCount ? "#e8620a" : "rgba(255,255,255,0.55)",
+                    cursor: "pointer", transition: "all 0.15s",
+                  }}>
+                  {n}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: "11px", color: "#555", marginTop: "6px" }}>
+              Each participant gets their own QR code · ₹{pricePerPerson} per person
+            </div>
+          </section>
+
+          <form id="multi-participant-form" onSubmit={handleMultiSubmit} noValidate
+            style={{ opacity: alreadyReg ? 0.4 : 1, pointerEvents: alreadyReg ? "none" : "auto" }}>
+
+            {/* Per-participant sections */}
+            {participants.map((p, idx) => (
+              <div key={idx} style={{
+                marginBottom: "1.5rem",
+                background: "rgba(255,255,255,0.02)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: "14px", padding: "1.25rem",
+              }}>
+                <div style={{ fontSize: "0.78rem", fontWeight: 800, color: "#e8620a", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>
+                  Participant {idx + 1}{idx === 0 ? " (You)" : ""}
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                  <div>
+                    <label style={LABEL}>First Name *</label>
+                    <input style={{ ...INPUT, borderColor: multiErrors[idx]?.first_name ? "rgba(239,68,68,0.6)" : undefined }}
+                      value={p.first_name} onChange={e => setParticipant(idx, "first_name", e.target.value)}
+                      placeholder="First name" />
+                    {multiErrors[idx]?.first_name && <Err>{multiErrors[idx].first_name}</Err>}
+                  </div>
+
+                  <div>
+                    <label style={LABEL}>Last Name</label>
+                    <input style={INPUT} value={p.last_name}
+                      onChange={e => setParticipant(idx, "last_name", e.target.value)}
+                      placeholder="Last name" />
+                  </div>
+
+                  <div>
+                    <label style={LABEL}>Gender *</label>
+                    <select style={{ ...INPUT, cursor: "pointer", colorScheme: "dark", borderColor: multiErrors[idx]?.gender ? "rgba(239,68,68,0.6)" : undefined }}
+                      value={p.gender} onChange={e => setParticipant(idx, "gender", e.target.value)}>
+                      <option value="" style={{ background: "#1a1a1a" }}>Select gender</option>
+                      <option value="male"   style={{ background: "#1a1a1a" }}>Male</option>
+                      <option value="female" style={{ background: "#1a1a1a" }}>Female</option>
+                      <option value="other"  style={{ background: "#1a1a1a" }}>Other</option>
+                    </select>
+                    {multiErrors[idx]?.gender && <Err>{multiErrors[idx].gender}</Err>}
+                  </div>
+
+                  <div>
+                    <label style={LABEL}>Date of Birth *</label>
+                    <input style={{ ...INPUT, colorScheme: "dark", borderColor: multiErrors[idx]?.date_of_birth ? "rgba(239,68,68,0.6)" : undefined }}
+                      type="date" value={p.date_of_birth}
+                      onChange={e => setParticipant(idx, "date_of_birth", e.target.value)}
+                      max={new Date().toISOString().split("T")[0]} />
+                    {multiErrors[idx]?.date_of_birth && <Err>{multiErrors[idx].date_of_birth}</Err>}
+                  </div>
+
+                  <div>
+                    <label style={LABEL}>Blood Group *</label>
+                    <select style={{ ...INPUT, cursor: "pointer", colorScheme: "dark", borderColor: multiErrors[idx]?.blood_group ? "rgba(239,68,68,0.6)" : undefined }}
+                      value={p.blood_group} onChange={e => setParticipant(idx, "blood_group", e.target.value)}>
+                      <option value="" style={{ background: "#1a1a1a" }}>Select blood group</option>
+                      {BLOOD_GROUPS.map(g => <option key={g} value={g} style={{ background: "#1a1a1a" }}>{g}</option>)}
+                    </select>
+                    {multiErrors[idx]?.blood_group && <Err>{multiErrors[idx].blood_group}</Err>}
+                  </div>
+
+                  <div>
+                    <label style={LABEL}>Mobile Number *</label>
+                    <input style={{ ...INPUT, borderColor: multiErrors[idx]?.mobile ? "rgba(239,68,68,0.6)" : undefined }}
+                      type="tel" maxLength={10} value={p.mobile}
+                      onChange={e => setParticipant(idx, "mobile", e.target.value)}
+                      placeholder="10-digit number" />
+                    {multiErrors[idx]?.mobile && <Err>{multiErrors[idx].mobile}</Err>}
+                  </div>
+
+                  {/* Distance category — per participant */}
+                  {cats.length > 1 && (
+                    <div style={{ gridColumn: "1/-1" }}>
+                      <label style={LABEL}>Distance Category *</label>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                        {cats.map(cat => {
+                          const d   = getDistanceOption(cat);
+                          const sel = p.distance_category === cat;
+                          return (
+                            <button key={cat} type="button"
+                              onClick={() => setParticipant(idx, "distance_category", cat)}
+                              style={{
+                                padding: "8px 18px", borderRadius: "8px", cursor: "pointer",
+                                fontFamily: "inherit", transition: "all 0.15s",
+                                border: `2px solid ${sel ? d.color : "rgba(255,255,255,0.12)"}`,
+                                background: sel ? d.bg : "transparent",
+                                color: sel ? d.color : "rgba(255,255,255,0.55)",
+                                fontWeight: sel ? 800 : 500, fontSize: "0.9rem",
+                              }}>
+                              {cat}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {multiErrors[idx]?.distance_category && <Err>{multiErrors[idx].distance_category}</Err>}
+                    </div>
+                  )}
+                  {cats.length === 1 && (
+                    <div style={{ gridColumn: "1/-1", fontSize: "11px", color: "#555" }}>
+                      Category: {cats[0]}
+                    </div>
+                  )}
+
+                  {/* T-shirt size — per participant */}
+                  {ev.collect_tshirt && (
+                    <div style={{ gridColumn: "1/-1" }}>
+                      <label style={LABEL}>T-Shirt Size *</label>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                        {TSHIRT_SIZES.map(size => {
+                          const sel = p.tshirt_size === size;
+                          return (
+                            <button key={size} type="button"
+                              onClick={() => setParticipant(idx, "tshirt_size", size)}
+                              style={{
+                                padding: "8px 16px", borderRadius: "8px", cursor: "pointer",
+                                fontFamily: "inherit", fontWeight: sel ? 800 : 500, fontSize: "0.875rem",
+                                border: `2px solid ${sel ? "#e8620a" : "rgba(255,255,255,0.12)"}`,
+                                background: sel ? "rgba(232,98,10,0.15)" : "transparent",
+                                color: sel ? "#e8620a" : "rgba(255,255,255,0.55)",
+                                transition: "all 0.15s",
+                              }}>
+                              {size}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {multiErrors[idx]?.tshirt_size && <Err>{multiErrors[idx].tshirt_size}</Err>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {/* Shared emergency contact */}
+            <section style={{ marginBottom: "1.5rem" }}>
+              <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>
+                Emergency Contact (for all participants)
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                <div>
+                  <label style={LABEL}>Contact Name *</label>
+                  <input style={INPUT} value={sharedEmergency.name}
+                    onChange={e => setSharedEmergency(v => ({ ...v, name: e.target.value }))}
+                    placeholder="Contact person's name" />
+                </div>
+                <div>
+                  <label style={LABEL}>Contact Number *</label>
+                  <input style={INPUT} type="tel" maxLength={10} value={sharedEmergency.phone}
+                    onChange={e => setSharedEmergency(v => ({ ...v, phone: e.target.value }))}
+                    placeholder="10-digit number" />
+                </div>
+                <div style={{ gridColumn: "1/-1" }}>
+                  <label style={LABEL}>Special Notes *</label>
+                  <textarea
+                    style={{ ...INPUT, minHeight: "70px", resize: "vertical" } as React.CSSProperties}
+                    value={sharedNotes}
+                    onChange={e => setSharedNotes(e.target.value)}
+                    placeholder="Medical conditions, dietary needs, or any questions. Enter NA if none." />
+                </div>
+              </div>
+            </section>
+
+            {CouponSection}
+
+            {/* Price summary */}
+            <div style={{ padding: "1rem 1.25rem", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "12px", marginBottom: "1.5rem" }}>
+              {pricePerPerson > 0 ? (
+                <>
+                  <PriceLine label={`₹${pricePerPerson} × ${participantCount} participant${participantCount > 1 ? "s" : ""}`} value={`₹${totalBeforeDisc}`} />
+                  {discount > 0 && <PriceLine label={`Coupon (${coupon})`} value={`−₹${discount}`} muted />}
+                  <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "0.75rem 0" }} />
+                  <PriceLine label="Total" value={final === 0 ? "Free" : `₹${final}`} bold />
+                </>
+              ) : (
+                <PriceLine label={`Free Entry × ${participantCount}`} value="Free" bold />
+              )}
+            </div>
+
+            {submitErr && (
+              <div style={{ padding: "10px 14px", borderRadius: "8px", marginBottom: "1rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", fontSize: "0.82rem" }}>
+                {submitErr}
+              </div>
+            )}
+
+            <button type="submit" disabled={submitting}
+              style={{ width: "100%", padding: "14px", borderRadius: "10px", background: submitting ? "rgba(232,98,10,0.45)" : "linear-gradient(135deg,#e8620a,#f07c2a)", border: "none", color: "#fff", fontWeight: 700, fontSize: "1rem", cursor: submitting ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: submitting ? "none" : "0 4px 20px rgba(232,98,10,0.35)" }}>
+              {submitting
+                ? "Processing…"
+                : final > 0
+                  ? `Pay ₹${final} & Register ${participantCount} Participant${participantCount > 1 ? "s" : ""}`
+                  : `Register ${participantCount} Participant${participantCount > 1 ? "s" : ""} →`
+              }
+            </button>
+            <p style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.3)", textAlign: "center", marginTop: "0.75rem" }}>
+              By registering you agree to our terms &amp; conditions.
+            </p>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Single-participant form (original, unchanged) ─────────────────────────
+
   return (
     <div style={{ minHeight: "100vh", background: "#0d0d10", color: "#fff" }}>
 
@@ -352,20 +772,9 @@ export default function RegisterPage() {
       </nav>
 
       <div style={{ maxWidth: "600px", margin: "0 auto", padding: "2rem 1.5rem 5rem" }}>
+        {EventHeader}
 
-        {/* Event summary */}
-        <div style={{ padding: "1rem 1.25rem", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "12px", marginBottom: "1.75rem", display: "flex", gap: "0.875rem", alignItems: "flex-start" }}>
-          <div style={{ fontSize: "1.75rem", flexShrink: 0 }}>{conf.icon}</div>
-          <div>
-            <div style={{ fontSize: "0.75rem", fontWeight: 700, color: conf.color, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "2px" }}>{conf.label}</div>
-            <div style={{ fontSize: "1rem", fontWeight: 700, color: "#fff", marginBottom: "4px" }}>{ev.title}</div>
-            <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.5)" }}>
-              📅 {fmtDate(ev.start_date)}{ev.start_time ? ` · ${fmtTime(ev.start_time)}` : ""}  · 📍 {ev.location}
-            </div>
-          </div>
-        </div>
-
-        {/* ── Distance category selector (multi-category events) ─────────── */}
+        {/* Distance category selector */}
         {(ev.distance_categories ?? []).length > 0 && (
           <div id="field-distance_category" style={{ marginBottom: "1.75rem" }}>
             <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.875rem" }}>
@@ -403,7 +812,7 @@ export default function RegisterPage() {
           </div>
         )}
 
-        {/* ── T-Shirt Size selector ───────────────────────────────────── */}
+        {/* T-Shirt Size selector */}
         {ev.collect_tshirt && (
           <div id="field-tshirt_size" style={{ marginBottom: "1.75rem" }}>
             <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.875rem" }}>
@@ -438,22 +847,11 @@ export default function RegisterPage() {
 
         <h1 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1.75rem", color: "#fff" }}>Registration Form</h1>
 
-        {/* Already registered banner */}
-        {alreadyReg && (
-          <div style={{ padding: "1.25rem 1.5rem", borderRadius: "12px", background: "rgba(74,222,128,0.07)", border: "1px solid rgba(74,222,128,0.3)", marginBottom: "1.5rem", textAlign: "center" }}>
-            <div style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>✅</div>
-            <div style={{ fontWeight: 700, color: "#4ade80", marginBottom: "0.25rem" }}>You&apos;re already registered!</div>
-            <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)", marginBottom: "1rem", fontFamily: "monospace" }}>{alreadyReg}</div>
-            <Link href={`/events/${slug}/register/success?code=${alreadyReg}`}
-              style={{ display: "inline-block", padding: "10px 24px", borderRadius: "8px", background: "linear-gradient(135deg,#e8620a,#f07c2a)", color: "#fff", fontWeight: 700, fontSize: "0.875rem", textDecoration: "none" }}>
-              View Registration Details →
-            </Link>
-          </div>
-        )}
+        {AlreadyBanner}
 
         <form onSubmit={handleSubmit} noValidate style={{ opacity: alreadyReg ? 0.4 : 1, pointerEvents: alreadyReg ? "none" : "auto" }}>
 
-          {/* ── Personal details ────────────────────────────────────────────── */}
+          {/* Personal details */}
           <section style={{ marginBottom: "1.5rem" }}>
             <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>Personal Details</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
@@ -495,7 +893,7 @@ export default function RegisterPage() {
             </div>
           </section>
 
-          {/* ── Event-specific ─────────────────────────────────────────────── */}
+          {/* Event information */}
           <section style={{ marginBottom: "1.5rem" }}>
             <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>Event Information</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
@@ -504,12 +902,12 @@ export default function RegisterPage() {
                 <label style={LABEL}>Blood Group *</label>
                 <select style={{ ...INPUT, cursor: "pointer", colorScheme: "dark", borderColor: errors.blood_group ? "rgba(239,68,68,0.6)" : undefined }} value={form.blood_group} onChange={set("blood_group")}>
                   <option value="" style={{ background: "#1a1a1a" }}>Select blood group</option>
-                  {["A+","A-","B+","B-","AB+","AB-","O+","O-"].map(g => <option key={g} value={g} style={{ background: "#1a1a1a" }}>{g}</option>)}
+                  {BLOOD_GROUPS.map(g => <option key={g} value={g} style={{ background: "#1a1a1a" }}>{g}</option>)}
                 </select>
                 {errors.blood_group && <Err>{errors.blood_group}</Err>}
               </div>
 
-              <div /> {/* spacer */}
+              <div />
 
               <div id="field-emergency_contact_name">
                 <label style={LABEL}>Emergency Contact Name *</label>
@@ -532,36 +930,13 @@ export default function RegisterPage() {
             </div>
           </section>
 
-          {/* ── Coupon ─────────────────────────────────────────────────────── */}
-          {price > 0 && (
-            <section style={{ marginBottom: "1.5rem" }}>
-              <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>Coupon Code</div>
-              <div style={{ display: "flex", gap: "0.5rem" }}>
-                <input
-                  style={{ ...INPUT, flex: 1, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "monospace" }}
-                  value={coupon}
-                  onChange={e => { setCoupon(e.target.value.toUpperCase()); setCouponErr(""); setCouponApplied(null); }}
-                  placeholder="ENTER CODE"
-                  disabled={!!couponApplied}
-                />
-                <button
-                  type="button"
-                  onClick={couponApplied ? () => { setCouponApplied(null); setCoupon(""); } : applyCoupon}
-                  disabled={couponLoading || (!couponApplied && !coupon.trim())}
-                  style={{ padding: "0 1.25rem", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.15)", background: couponApplied ? "rgba(239,68,68,0.1)" : "rgba(255,255,255,0.06)", color: couponApplied ? "#f87171" : "#fff", cursor: "pointer", fontSize: "0.8rem", fontWeight: 700, fontFamily: "inherit", whiteSpace: "nowrap" }}>
-                  {couponLoading ? "…" : couponApplied ? "Remove" : "Apply"}
-                </button>
-              </div>
-              {couponErr && <div style={{ fontSize: "0.78rem", color: "#f87171", marginTop: "0.5rem" }}>{couponErr}</div>}
-              {couponApplied && <div style={{ fontSize: "0.78rem", color: "#4ade80", marginTop: "0.5rem" }}>✓ {couponApplied.label} — saves ₹{couponApplied.discount}</div>}
-            </section>
-          )}
+          {CouponSection}
 
-          {/* ── Price summary ───────────────────────────────────────────────── */}
+          {/* Price summary */}
           <div style={{ padding: "1rem 1.25rem", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "12px", marginBottom: "1.5rem" }}>
-            {price > 0 ? (
+            {pricePerPerson > 0 ? (
               <>
-                <PriceLine label="Registration Fee" value={`₹${price}`} />
+                <PriceLine label="Registration Fee" value={`₹${pricePerPerson}`} />
                 {discount > 0 && <PriceLine label={`Coupon Discount (${coupon})`} value={`−₹${discount}`} muted />}
                 <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "0.75rem 0" }} />
                 <PriceLine label="Total" value={final === 0 ? "Free" : `₹${final}`} bold />
@@ -571,19 +946,18 @@ export default function RegisterPage() {
             )}
           </div>
 
-          {/* Error */}
           {submitErr && (
             <div style={{ padding: "10px 14px", borderRadius: "8px", marginBottom: "1rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", fontSize: "0.82rem" }}>
               {submitErr}
             </div>
           )}
 
-          {/* Submit */}
           {submitted && Object.keys(errors).length > 0 && (
             <div style={{ padding: "10px 14px", borderRadius: "8px", marginBottom: "1rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", fontSize: "0.82rem" }}>
               Please fix {Object.keys(errors).length} error{Object.keys(errors).length > 1 ? "s" : ""} above before continuing.
             </div>
           )}
+
           <button
             type="submit"
             disabled={submitting || (submitted && Object.keys(errors).length > 0)}

@@ -248,8 +248,6 @@ INSERT INTO public.event_participants (
   breakfast_availed,
   breakfast_availed_at,
   breakfast_availed_by,
-  certificate_url,
-  certificate_generated_at,
   status,
   created_at
 )
@@ -259,7 +257,7 @@ SELECT
   er.user_email,
   er.user_name,
   er.gender,
-  er.dob,
+  er.date_of_birth,
   er.blood_group,
   er.phone,
   er.user_email,
@@ -275,8 +273,6 @@ SELECT
   COALESCE(er.breakfast_availed, false),
   er.breakfast_availed_at,
   er.breakfast_verified_by,
-  er.certificate_url,
-  er.certificate_generated_at,
   CASE
     WHEN er.status = 'cancelled' THEN 'cancelled'
     ELSE 'active'

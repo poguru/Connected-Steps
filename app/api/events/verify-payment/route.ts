@@ -1,10 +1,12 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import crypto from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { redeemCoupon } from "@/lib/coupon-redeem";
 import { enqueueJob } from "@/lib/job-queue";
 import { handleEventQrEmail, handleInvoiceGenerate } from "@/lib/job-handlers";
+import { signEventQR } from "@/lib/event-qr";
+import { sendEmail, eventRegistrationEmailHTML } from "@/lib/notify";
 
 // POST /api/events/verify-payment
 // Body: { razorpay_order_id, razorpay_payment_id, razorpay_signature, registration_code }
@@ -39,7 +41,7 @@ export async function POST(req: NextRequest) {
     // Idempotency guard
     const { data: reg } = await db
       .from("event_registrations")
-      .select("id, coupon_id, user_email, user_name, payment_status, event_id, distance_category, final_price, events(title, start_date, start_time, location)")
+      .select("id, coupon_id, user_email, user_name, payment_status, event_id, distance_category, final_price, participant_count, events(title, start_date, start_time, location)")
       .eq("registration_code", registration_code)
       .single<{
         id: string;
@@ -50,6 +52,7 @@ export async function POST(req: NextRequest) {
         event_id: string;
         distance_category: string | null;
         final_price: number | null;
+        participant_count: number;
         events: { title: string; start_date: string; start_time: string | null; location: string } | null;
       }>();
 
@@ -67,9 +70,9 @@ export async function POST(req: NextRequest) {
 
     // Update registration to paid.
     // The DB BEFORE trigger (check_event_capacity) enforces the slot limit here
-    // with a FOR UPDATE lock â€” fully atomic against concurrent confirmations.
+    // with a FOR UPDATE lock -- fully atomic against concurrent confirmations.
     // The UNIQUE index on razorpay_payment_id catches concurrent duplicate calls
-    // (code 23505 â†’ treated as idempotent success).
+    // (code 23505 --> treated as idempotent success).
     const { error } = await db
       .from("event_registrations")
       .update({
@@ -98,12 +101,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
-    // Redeem coupon atomically (fire-and-forget â€” fast, non-critical)
+    // Redeem coupon atomically (fire-and-forget -- fast, non-critical)
     if (reg.coupon_id) {
       redeemCoupon(reg.coupon_id, reg.user_email).catch(console.error);
     }
 
     const ev = reg.events;
+    const isMultiParticipant = (reg.participant_count ?? 1) > 1;
 
     const qrPayload = {
       registrationId:   reg.id,
@@ -131,42 +135,96 @@ export async function POST(req: NextRequest) {
       eventVenue:      ev?.location,
     };
 
-    // Enqueue for durability/retry â€” survives function restarts.
-    // Jobs are the fallback: if after() succeeds they no-op (idempotency guard).
-    // If after() fails, the daily cron picks them up.
-    await enqueueJob("event_qr_email",   qrPayload,      { idempotencyKey: `event_qr_email:${reg.id}`, priority: 10 });
+    // Enqueue for durability/retry -- survives function restarts.
+    // For multi-participant, enqueue the invoice but skip the single-participant
+    // QR email job (multi-participant emails are handled in after() below).
+    if (!isMultiParticipant) {
+      await enqueueJob("event_qr_email", qrPayload, { idempotencyKey: `event_qr_email:${reg.id}`, priority: 10 });
+    }
     await enqueueJob("invoice_generate", invoicePayload, { idempotencyKey: `invoice_generate:${razorpay_payment_id}` });
 
-    // â”€â”€ ROOT CAUSE FIX â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // Previously: `void handleEventQrEmail(...).catch()` fired then returned the
-    // response. Vercel freezes the function immediately after the response is
-    // sent, killing the email BEFORE SES is called. This is why users were not
-    // receiving their confirmation emails.
-    //
-    // Fix: next/server `after()` keeps the function alive until the callback
-    // completes, even after the response has been sent to the client. This is
-    // the designed Next.js solution for post-response async work.
     after(async () => {
+      // Sign QR tokens for each pending participant row and update status to active.
+      // For single-participant: one row, QR written to event_participants + event_registrations.
+      // For multi-participant: N rows, each gets their own QR, then N confirmation emails.
       try {
-        await handleEventQrEmail(qrPayload);
-        console.log(`[verify-payment] âœ… QR email sent reg=${reg.id}`);
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.error(`[verify-payment] âŒ QR email failed reg=${reg.id}:`, msg);
-        // Record failure so admin can see and resend
+        const { data: pendingParticipants } = await getSupabaseServer()
+          .from("event_participants")
+          .select("id, first_name, last_name, distance_category, status")
+          .eq("registration_id", reg.id)
+          .is("qr_token", null);
+
+        if (pendingParticipants && pendingParticipants.length > 0) {
+          const db2 = getSupabaseServer();
+          const signed: Array<{ id: string; first_name: string; last_name: string | null; qr_token: string; distance_category: string | null }> = [];
+          for (const p of pendingParticipants) {
+            const qr = signEventQR(p.id, reg.event_id);
+            await db2.from("event_participants").update({ qr_token: qr, status: "active" }).eq("id", p.id);
+            signed.push({ id: p.id, first_name: p.first_name, last_name: p.last_name, qr_token: qr, distance_category: p.distance_category });
+          }
+
+          if (isMultiParticipant) {
+            for (const p of signed) {
+              const pName = [p.first_name, p.last_name].filter(Boolean).join(" ");
+              await sendEmail(
+                reg.user_email, pName,
+                `Event Registration Confirmed - ${ev?.title ?? "Event"}`,
+                eventRegistrationEmailHTML({
+                  name:             pName,
+                  eventTitle:       ev?.title ?? "Connected Steps Event",
+                  startDate:        ev?.start_date ?? "",
+                  startTime:        ev?.start_time ?? null,
+                  location:         ev?.location ?? "",
+                  registrationCode: registration_code,
+                  distanceCategory: p.distance_category ?? null,
+                  qrToken:          p.qr_token,
+                }),
+                false, true,
+              ).catch(console.error);
+            }
+            await db2.from("event_registrations").update({
+              confirmation_email_sent_at: new Date().toISOString(),
+              email_status:               "sent",
+              qr_generated_at:            new Date().toISOString(),
+            }).eq("id", reg.id);
+            console.log(`[verify-payment] multi-participant emails sent reg=${reg.id} count=${signed.length}`);
+            return;
+          }
+
+          // Single-participant: write QR back to event_registrations so the
+          // existing handleEventQrEmail job handler can pick it up.
+          if (signed[0]) {
+            await db2.from("event_registrations")
+              .update({ qr_token: signed[0].qr_token, qr_generated_at: new Date().toISOString() })
+              .eq("id", reg.id);
+          }
+        }
+      } catch (e) {
+        console.error(`[verify-payment] participant QR error reg=${reg.id}:`, e);
+      }
+
+      // Single-participant QR email (via job handler for idempotency + retry)
+      if (!isMultiParticipant) {
         try {
-          await getSupabaseServer()
-            .from("event_registrations")
-            .update({ email_status: "failed" })
-            .eq("id", reg.id);
-        } catch { /* non-critical â€” failure already logged */ }
+          await handleEventQrEmail(qrPayload);
+          console.log(`[verify-payment] QR email sent reg=${reg.id}`);
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.error(`[verify-payment] QR email failed reg=${reg.id}:`, msg);
+          try {
+            await getSupabaseServer()
+              .from("event_registrations")
+              .update({ email_status: "failed" })
+              .eq("id", reg.id);
+          } catch { /* non-critical */ }
+        }
       }
 
       try {
         await handleInvoiceGenerate(invoicePayload);
-        console.log(`[verify-payment] âœ… Invoice generated reg=${reg.id}`);
+        console.log(`[verify-payment] invoice generated reg=${reg.id}`);
       } catch (e: unknown) {
-        console.error(`[verify-payment] âŒ Invoice failed reg=${reg.id}:`, e instanceof Error ? e.message : String(e));
+        console.error(`[verify-payment] invoice failed reg=${reg.id}:`, e instanceof Error ? e.message : String(e));
       }
     });
 

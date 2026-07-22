@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
@@ -18,332 +18,680 @@ function calcDiscount(price: number, type: string, value: number): number {
   return 0;
 }
 
+interface ParticipantInput {
+  first_name:        string;
+  last_name?:        string;
+  gender:            string;
+  date_of_birth:     string;
+  blood_group:       string;
+  mobile:            string;
+  email?:            string;
+  distance_category?: string;
+  tshirt_size?:      string;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    // Require a valid user session token
     const token = req.headers.get("x-user-token");
     if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const tokenEmail = verifyUserToken(token);
     if (!tokenEmail) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const {
-      event_id, email, name, phone, gender, date_of_birth,
-      blood_group, emergency_contact, special_notes, coupon_code,
-      distance_category, tshirt_size,
-    } = await req.json();
+    const body = await req.json();
 
-    // â”€â”€ Release expired slots (compensates for Hobby-plan daily-only cron) â”€â”€â”€â”€â”€â”€â”€
-    // Fire-and-forget: frees pending_payment slots whose TTL has elapsed so the
-    // capacity check below sees an accurate available count.
-    void (async () => { try { await getSupabaseServer().rpc("release_expired_slots"); } catch { /* non-critical */ } })();
+    // Detect multi-participant mode by the presence of a `participants` array
+    const isMulti = Array.isArray(body.participants) && body.participants.length > 0;
 
-    // â”€â”€ Rate limiting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // Prevents spam registrations and capacity exhaustion attacks.
-    // Per-email: max 3 registration attempts per 15 minutes (handles retries without abuse).
-    // Per-IP: max 20 registration attempts per minute (allows family/group registrations).
-    if (email) {
-      const db = getSupabaseServer();
-      const ip  = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-
-      const [emailCount, ipCount] = await Promise.all([
-        db.rpc("record_rate_limit_failure", { p_key: `reg:email:${email.toLowerCase().trim()}`, p_window_ms: 900000 }),
-        db.rpc("record_rate_limit_failure", { p_key: `reg:ip:${ip}`, p_window_ms: 60000 }),
-      ]);
-
-      if ((emailCount.data ?? 0) > 3) {
-        return NextResponse.json({ error: "Too many registration attempts for this email. Please wait 15 minutes." }, { status: 429 });
-      }
-      if ((ipCount.data ?? 0) > 20) {
-        return NextResponse.json({ error: "Too many registration attempts. Please try again in a minute." }, { status: 429 });
-      }
+    if (isMulti) {
+      return handleMultiParticipant(body, tokenEmail, req);
+    } else {
+      return handleSingleParticipant(body, tokenEmail, req);
     }
+  } catch {
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}
 
-    if (!event_id || !email || !name) {
-      return NextResponse.json({ error: "event_id, email, and name are required." }, { status: 400 });
-    }
+// ── Single-participant (legacy path) ──────────────────────────────────────────
+// Unchanged from original — backwards compatible with all existing forms.
+// Also creates an event_participants row so the ops portal can scan old codes.
 
-    // Ensure the caller can only register for their own email
-    if (tokenEmail.toLowerCase() !== email.toLowerCase().trim()) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
+async function handleSingleParticipant(
+  body: Record<string, unknown>,
+  tokenEmail: string,
+  req: NextRequest,
+): Promise<NextResponse> {
+  const {
+    event_id, email, name, phone, gender, date_of_birth,
+    blood_group, emergency_contact, special_notes, coupon_code,
+    distance_category, tshirt_size,
+  } = body as Record<string, string | null | undefined>;
 
-    // Backend field validation
-    const errs: string[] = [];
-    if (!name || name.trim().length < 3)           errs.push("Full name must be at least 3 characters.");
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.push("Valid email is required.");
-    if (!phone || !/^\d{10}$/.test(phone.replace(/\s/g, ""))) errs.push("Phone must be exactly 10 digits.");
-    if (!gender)                                    errs.push("Gender is required.");
-    if (!date_of_birth)                             errs.push("Date of birth is required.");
-    if (date_of_birth && new Date(date_of_birth) >= new Date()) errs.push("Date of birth must be in the past.");
-    if (!blood_group)                               errs.push("Blood group is required.");
-    if (!emergency_contact)                         errs.push("Emergency contact is required.");
-    if (!special_notes || !special_notes.trim())    errs.push("Special notes are required (enter NA if none).");
-    if (errs.length > 0) return NextResponse.json({ error: errs[0] }, { status: 400 });
+  void (async () => {
+    try { await getSupabaseServer().rpc("release_expired_slots"); } catch { /* non-critical */ }
+  })();
 
+  // Rate limiting
+  if (email) {
     const db = getSupabaseServer();
+    const ip  = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+    const [emailCount, ipCount] = await Promise.all([
+      db.rpc("record_rate_limit_failure", { p_key: `reg:email:${(email as string).toLowerCase().trim()}`, p_window_ms: 900000 }),
+      db.rpc("record_rate_limit_failure", { p_key: `reg:ip:${ip}`, p_window_ms: 60000 }),
+    ]);
+    if ((emailCount.data ?? 0) > 3) {
+      return NextResponse.json({ error: "Too many registration attempts for this email. Please wait 15 minutes." }, { status: 429 });
+    }
+    if ((ipCount.data ?? 0) > 20) {
+      return NextResponse.json({ error: "Too many registration attempts. Please try again in a minute." }, { status: 429 });
+    }
+  }
 
-    // â”€â”€ Verify user â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    const { data: user } = await db
-      .from("users")
-      .select("email, first_name, last_name")
-      .eq("email", email.toLowerCase().trim())
+  if (!event_id || !email || !name) {
+    return NextResponse.json({ error: "event_id, email, and name are required." }, { status: 400 });
+  }
+  if (tokenEmail.toLowerCase() !== (email as string).toLowerCase().trim()) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+
+  const errs: string[] = [];
+  if (!name || (name as string).trim().length < 3)           errs.push("Full name must be at least 3 characters.");
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email as string)) errs.push("Valid email is required.");
+  if (!phone || !/^\d{10}$/.test((phone as string).replace(/\s/g, ""))) errs.push("Phone must be exactly 10 digits.");
+  if (!gender)                                    errs.push("Gender is required.");
+  if (!date_of_birth)                             errs.push("Date of birth is required.");
+  if (date_of_birth && new Date(date_of_birth as string) >= new Date()) errs.push("Date of birth must be in the past.");
+  if (!blood_group)                               errs.push("Blood group is required.");
+  if (!emergency_contact)                         errs.push("Emergency contact is required.");
+  if (!special_notes || !(special_notes as string).trim()) errs.push("Special notes are required (enter NA if none).");
+  if (errs.length > 0) return NextResponse.json({ error: errs[0] }, { status: 400 });
+
+  const db = getSupabaseServer();
+
+  const { data: user } = await db
+    .from("users")
+    .select("email, first_name, last_name")
+    .eq("email", (email as string).toLowerCase().trim())
+    .single();
+  if (!user) return NextResponse.json({ error: "Account not found. Please sign up first." }, { status: 404 });
+
+  const { data: ev } = await db
+    .from("events")
+    .select("id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories, collect_tshirt")
+    .eq("id", event_id as string)
+    .single();
+  if (!ev || ev.status !== "published") {
+    return NextResponse.json({ error: "Event not found." }, { status: 404 });
+  }
+
+  if (ev.registration_closes_at && new Date() >= new Date(ev.registration_closes_at)) {
+    return NextResponse.json({ error: "Registration for this event is now closed." }, { status: 403 });
+  }
+  const istNow  = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+  const today   = istNow.toISOString().split("T")[0];
+  const nowTime = istNow.toTimeString().substring(0, 5);
+  const endDate = ev.end_date ?? ev.start_date;
+  const endTime = (ev.end_time ?? "23:59").substring(0, 5);
+  if (endDate < today || (endDate === today && endTime <= nowTime)) {
+    return NextResponse.json({ error: "This event has already ended." }, { status: 403 });
+  }
+
+  const cats = (ev as { distance_categories?: string[] }).distance_categories ?? [];
+  if (cats.length > 1 && !distance_category) {
+    return NextResponse.json({ error: "Please select a distance category." }, { status: 400 });
+  }
+  if (distance_category && cats.length > 0 && !cats.includes(distance_category as string)) {
+    return NextResponse.json({ error: "Invalid distance category for this event." }, { status: 400 });
+  }
+  const chosenCategory: string | null = cats.length > 0 ? ((distance_category as string) || cats[0]) : null;
+
+  const VALID_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
+  if ((ev as { collect_tshirt?: boolean }).collect_tshirt) {
+    if (!tshirt_size) return NextResponse.json({ error: "Please select your T-shirt size." }, { status: 400 });
+    if (!VALID_SIZES.includes(tshirt_size as string)) return NextResponse.json({ error: "Invalid T-shirt size." }, { status: 400 });
+  }
+  const chosenTshirtSize: string | null = tshirt_size && VALID_SIZES.includes(tshirt_size as string) ? (tshirt_size as string) : null;
+
+  if (ev.max_participants && (ev.participant_count ?? 0) >= ev.max_participants) {
+    return NextResponse.json({ error: "This event is fully booked." }, { status: 409 });
+  }
+
+  const { data: existing } = await db
+    .from("event_registrations")
+    .select("id, registration_code, payment_status")
+    .eq("event_id", event_id as string)
+    .eq("user_email", (email as string).toLowerCase().trim())
+    .maybeSingle();
+  if (existing && (existing.payment_status === "free" || existing.payment_status === "paid")) {
+    return NextResponse.json({ already: true, registration_code: existing.registration_code });
+  }
+
+  // Coupon
+  let couponId: string | null = null;
+  let discount = 0, discountType = "", discountValue = 0;
+  if (coupon_code && ev.price > 0) {
+    const { data: coupon, error: cpErr } = await db
+      .from("coupons")
+      .select("id, discount_type, discount_value, expires_at, use_count, max_uses, event_id, assigned_to_email")
+      .eq("code", (coupon_code as string).toUpperCase().trim())
       .single();
-    if (!user) return NextResponse.json({ error: "Account not found. Please sign up first." }, { status: 404 });
+    if (cpErr || !coupon) return NextResponse.json({ error: "Invalid coupon code." }, { status: 400 });
+    if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) return NextResponse.json({ error: "This coupon has expired." }, { status: 400 });
+    if (coupon.use_count >= coupon.max_uses) return NextResponse.json({ error: "This coupon has reached its usage limit." }, { status: 400 });
+    if (coupon.event_id && coupon.event_id !== event_id) return NextResponse.json({ error: "This coupon is not valid for this event." }, { status: 400 });
+    if (coupon.assigned_to_email && coupon.assigned_to_email.toLowerCase() !== (email as string).toLowerCase()) return NextResponse.json({ error: "This coupon is not assigned to your account." }, { status: 400 });
+    const { data: uses } = await db.from("coupon_uses").select("id").eq("coupon_id", coupon.id).eq("used_by_email", (email as string).toLowerCase()).limit(1);
+    if (uses && uses.length > 0) return NextResponse.json({ error: "You have already used this coupon." }, { status: 400 });
+    couponId = coupon.id; discountType = coupon.discount_type; discountValue = coupon.discount_value;
+    discount = calcDiscount(ev.price, discountType, discountValue);
+  }
 
-    // â”€â”€ Verify event â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    const { data: ev } = await db
-      .from("events")
-      .select("id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories, collect_tshirt")
-      .eq("id", event_id)
-      .single();
-    if (!ev || ev.status !== "published") {
-      return NextResponse.json({ error: "Event not found." }, { status: 404 });
-    }
+  const originalPrice = ev.price;
+  const finalPrice    = Math.max(0, originalPrice - discount);
 
-    // â”€â”€ Registration deadline enforcement (IST-aware) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    if (ev.registration_closes_at && new Date() >= new Date(ev.registration_closes_at)) {
-      return NextResponse.json({ error: "Registration for this event is now closed." }, { status: 403 });
-    }
-    // Also block if event has already started or ended
-    const istNow  = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
-    const today   = istNow.toISOString().split("T")[0];
-    const nowTime = istNow.toTimeString().substring(0, 5);
-    const endDate = ev.end_date ?? ev.start_date;
-    const endTime = (ev.end_time ?? "23:59").substring(0, 5);
-    if (endDate < today || (endDate === today && endTime <= nowTime)) {
-      return NextResponse.json({ error: "This event has already ended." }, { status: 403 });
-    }
+  // Free path
+  if (finalPrice === 0) {
+    const code    = genCode();
+    const qrToken = signEventQR(code, event_id as string);
 
-    // â”€â”€ Distance category validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    const cats = (ev as { distance_categories?: string[] }).distance_categories ?? [];
-    if (cats.length > 1 && !distance_category) {
-      return NextResponse.json({ error: "Please select a distance category." }, { status: 400 });
-    }
-    if (distance_category && cats.length > 0 && !cats.includes(distance_category)) {
-      return NextResponse.json({ error: "Invalid distance category for this event." }, { status: 400 });
-    }
-    const chosenCategory: string | null = cats.length > 0 ? (distance_category || cats[0]) : null;
-
-    // T-shirt size validation
-    const VALID_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
-    if ((ev as { collect_tshirt?: boolean }).collect_tshirt) {
-      if (!tshirt_size) return NextResponse.json({ error: "Please select your T-shirt size." }, { status: 400 });
-      if (!VALID_SIZES.includes(tshirt_size)) return NextResponse.json({ error: "Invalid T-shirt size." }, { status: 400 });
-    }
-    const chosenTshirtSize: string | null = tshirt_size && VALID_SIZES.includes(tshirt_size) ? tshirt_size : null;
-
-    // â”€â”€ Atomic slot check â€” uses participant_count maintained by DB trigger â”€â”€â”€â”€
-    // participant_count is incremented by the trigger on INSERT/UPDATE status='confirmed'.
-    // We still gate here as a fast early-exit; the trigger is the ground truth.
-    if (ev.max_participants && (ev.participant_count ?? 0) >= ev.max_participants) {
-      return NextResponse.json({ error: "This event is fully booked." }, { status: 409 });
-    }
-
-    // â”€â”€ Duplicate check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    const { data: existing } = await db
-      .from("event_registrations")
-      .select("id, registration_code, payment_status")
-      .eq("event_id", event_id)
-      .eq("user_email", email.toLowerCase().trim())
-      .maybeSingle();
-    // If already confirmed (free or paid), return existing code
-    if (existing && (existing.payment_status === "free" || existing.payment_status === "paid")) {
-      return NextResponse.json({ already: true, registration_code: existing.registration_code });
-    }
-    // If pending payment, allow them to re-attempt payment (fall through to paid flow below)
-
-    // â”€â”€ Coupon validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    let couponId: string | null = null;
-    let discount   = 0;
-    let discountType = "";
-    let discountValue = 0;
-
-    if (coupon_code && ev.price > 0) {
-      const { data: coupon, error: cpErr } = await db
-        .from("coupons")
-        .select("id, discount_type, discount_value, expires_at, use_count, max_uses, event_id, assigned_to_email")
-        .eq("code", coupon_code.toUpperCase().trim())
-        .single();
-
-      if (cpErr || !coupon) {
-        return NextResponse.json({ error: "Invalid coupon code." }, { status: 400 });
-      }
-      if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
-        return NextResponse.json({ error: "This coupon has expired." }, { status: 400 });
-      }
-      if (coupon.use_count >= coupon.max_uses) {
-        return NextResponse.json({ error: "This coupon has reached its usage limit." }, { status: 400 });
-      }
-      if (coupon.event_id && coupon.event_id !== event_id) {
-        return NextResponse.json({ error: "This coupon is not valid for this event." }, { status: 400 });
-      }
-      if (coupon.assigned_to_email && coupon.assigned_to_email.toLowerCase() !== email.toLowerCase()) {
-        return NextResponse.json({ error: "This coupon is not assigned to your account." }, { status: 400 });
-      }
-      // Check already used
-      const { data: uses } = await db
-        .from("coupon_uses")
-        .select("id")
-        .eq("coupon_id", coupon.id)
-        .eq("used_by_email", email.toLowerCase())
-        .limit(1);
-      if (uses && uses.length > 0) {
-        return NextResponse.json({ error: "You have already used this coupon." }, { status: 400 });
-      }
-
-      couponId     = coupon.id;
-      discountType = coupon.discount_type;
-      discountValue = coupon.discount_value;
-      discount = calcDiscount(ev.price, discountType, discountValue);
-    }
-
-    const originalPrice = ev.price;
-    const finalPrice    = Math.max(0, originalPrice - discount);
-
-    // â”€â”€ Free event: create confirmed registration immediately â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    if (finalPrice === 0) {
-      const code    = genCode();
-      // Generate QR token before insert so it is saved atomically with the registration.
-      // If this throws (bad env secret), the registration is never created â€” no orphaned records.
-      const qrToken = signEventQR(code, event_id);
-
-      const { data: reg, error: regErr } = await db
-        .from("event_registrations")
-        .upsert({
-          registration_code: code,
-          event_id,
-          user_email:        email.toLowerCase().trim(),
-          user_name:         name.trim(),
-          phone:             phone || null,
-          gender:            gender || null,
-          date_of_birth:     date_of_birth || null,
-          blood_group:       blood_group || null,
-          emergency_contact: emergency_contact || null,
-          special_notes:     special_notes || null,
-          coupon_code:       coupon_code?.toUpperCase().trim() || null,
-          coupon_id:         couponId,
-          coupon_discount:   discount,
-          original_price:    originalPrice,
-          final_price:       finalPrice,
-          payment_status:    "free",
-          status:            "confirmed",
-          distance_category: chosenCategory,
-          tshirt_size:       chosenTshirtSize,
-          qr_token:          qrToken,
-        }, { onConflict: "event_id,user_email", ignoreDuplicates: false })
-        .select("registration_code, qr_token")
-        .single();
-
-      if (regErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
-
-      const finalCode  = reg?.registration_code ?? code;
-      const finalQr    = reg?.qr_token          ?? qrToken;
-
-      // Redeem coupon atomically (fire-and-forget)
-      if (couponId) {
-        const { redeemCoupon } = await import("@/lib/coupon-redeem");
-        redeemCoupon(couponId, email.toLowerCase()).catch(console.error);
-      }
-
-      // â”€â”€ ROOT CAUSE FIX â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      // Previously: an unawaited IIFE sent the email after the response returned.
-      // Vercel freezes the function immediately after NextResponse.json(), so SES
-      // was never reached â€” users received no confirmation email.
-      //
-      // Fix: after() keeps the function alive until the callback completes, even
-      // after the response has been sent. This is the Next.js-designed solution.
-      after(async () => {
-        if (!finalQr) {
-          console.error(`[event-register] no QR token for ${finalCode} â€” email not sent`);
-          await db.from("event_registrations")
-            .update({ email_status: "failed", qr_generated_at: null })
-            .eq("registration_code", finalCode);
-          return;
-        }
-        const subject = `Event Registration Confirmed â€“ ${ev.title}`;
-        try {
-          const result = await sendEmail(
-            email.toLowerCase().trim(),
-            name.trim(),
-            subject,
-            eventRegistrationEmailHTML({
-              name:             name.trim(),
-              eventTitle:       ev.title,
-              startDate:        ev.start_date,
-              startTime:        ev.start_time ?? null,
-              location:         ev.location,
-              registrationCode: finalCode,
-              distanceCategory: chosenCategory,
-              qrToken:          finalQr,
-            }),
-            false, true,  // isOtp=false, isTransactional=true â€” never suppressed
-          );
-          if (result.ok) {
-            console.log(`[event-register] âœ… email sent to=${email} msgId=${result.messageId} provider=${result.provider}`);
-            await db.from("event_registrations").update({
-              confirmation_email_sent_at: new Date().toISOString(),
-              email_status:               "sent",
-              email_ses_message_id:       result.messageId ?? null,
-              qr_generated_at:            new Date().toISOString(),
-            }).eq("registration_code", finalCode);
-          } else {
-            console.error(`[event-register] âŒ email FAILED to=${email} error=${result.error} provider=${result.provider}`);
-            await db.from("event_registrations")
-              .update({ email_status: "failed", qr_generated_at: new Date().toISOString() })
-              .eq("registration_code", finalCode);
-          }
-        } catch (e) {
-          console.error("[event-register] email exception (registration intact):", e);
-          await db.from("event_registrations")
-            .update({ email_status: "failed" })
-            .eq("registration_code", finalCode);
-        }
-      });
-
-      return NextResponse.json({ success: true, free: true, registration_code: finalCode });
-    }
-
-    // â”€â”€ Paid event: create pending_payment registration, caller creates Razorpay order â”€
-    // status = "pending_payment" so slot count (which only counts "confirmed") is not affected
-    // until payment succeeds and verify-payment sets status = "confirmed"
-    const code = existing?.registration_code ?? genCode();
-    const { error: regErr2 } = await db
+    const { data: reg, error: regErr } = await db
       .from("event_registrations")
       .upsert({
         registration_code: code,
-        event_id,
-        user_email:        email.toLowerCase().trim(),
-        user_name:         name.trim(),
+        event_id:          event_id as string,
+        user_email:        (email as string).toLowerCase().trim(),
+        user_name:         (name as string).trim(),
         phone:             phone || null,
         gender:            gender || null,
         date_of_birth:     date_of_birth || null,
         blood_group:       blood_group || null,
         emergency_contact: emergency_contact || null,
         special_notes:     special_notes || null,
-        coupon_code:       coupon_code?.toUpperCase().trim() || null,
+        coupon_code:       coupon_code ? (coupon_code as string).toUpperCase().trim() : null,
         coupon_id:         couponId,
         coupon_discount:   discount,
         original_price:    originalPrice,
         final_price:       finalPrice,
-        payment_status:    "pending",
-        status:            "pending_payment",
+        payment_status:    "free",
+        status:            "confirmed",
         distance_category: chosenCategory,
         tshirt_size:       chosenTshirtSize,
-      }, { onConflict: "event_id,user_email", ignoreDuplicates: false });
+        qr_token:          qrToken,
+        participant_count: 1,
+      }, { onConflict: "event_id,user_email", ignoreDuplicates: false })
+      .select("id, registration_code, qr_token")
+      .single();
+    if (regErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
-    if (regErr2) return NextResponse.json({ error: "Database error" }, { status: 500 });
+    const finalCode  = reg?.registration_code ?? code;
+    const finalQr    = reg?.qr_token          ?? qrToken;
+    const regId      = reg?.id                ?? "";
+
+    if (couponId) {
+      const { redeemCoupon } = await import("@/lib/coupon-redeem");
+      redeemCoupon(couponId, (email as string).toLowerCase()).catch(console.error);
+    }
+
+    // Create the participant row so the ops portal can scan this registration
+    if (regId) {
+      const nameParts  = (name as string).trim().split(" ");
+      const firstName  = nameParts[0];
+      const lastName   = nameParts.slice(1).join(" ") || null;
+      const participantQr = signEventQR(`${regId}`, event_id as string);
+      await db.from("event_participants").upsert({
+        event_id:          event_id as string,
+        registration_id:   regId,
+        account_email:     (email as string).toLowerCase().trim(),
+        first_name:        firstName,
+        last_name:         lastName,
+        gender:            gender || null,
+        dob:               date_of_birth || null,
+        blood_group:       blood_group || null,
+        mobile:            phone || null,
+        email:             (email as string).toLowerCase().trim(),
+        distance_category: chosenCategory,
+        tshirt_size:       chosenTshirtSize,
+        qr_token:          finalQr ?? participantQr,
+        status:            "active",
+      }, { onConflict: "qr_token", ignoreDuplicates: true });
+    }
+
+    after(async () => {
+      if (!finalQr) {
+        console.error(`[event-register] no QR token for ${finalCode} — email not sent`);
+        await db.from("event_registrations")
+          .update({ email_status: "failed", qr_generated_at: null })
+          .eq("registration_code", finalCode);
+        return;
+      }
+      const subject = `Event Registration Confirmed – ${ev.title}`;
+      try {
+        const result = await sendEmail(
+          (email as string).toLowerCase().trim(),
+          (name as string).trim(),
+          subject,
+          eventRegistrationEmailHTML({
+            name:             (name as string).trim(),
+            eventTitle:       ev.title,
+            startDate:        ev.start_date,
+            startTime:        ev.start_time ?? null,
+            location:         ev.location,
+            registrationCode: finalCode,
+            distanceCategory: chosenCategory,
+            qrToken:          finalQr,
+          }),
+          false, true,
+        );
+        if (result.ok) {
+          await db.from("event_registrations").update({
+            confirmation_email_sent_at: new Date().toISOString(),
+            email_status:               "sent",
+            email_ses_message_id:       result.messageId ?? null,
+            qr_generated_at:            new Date().toISOString(),
+          }).eq("registration_code", finalCode);
+        } else {
+          await db.from("event_registrations")
+            .update({ email_status: "failed", qr_generated_at: new Date().toISOString() })
+            .eq("registration_code", finalCode);
+        }
+      } catch (e) {
+        console.error("[event-register] email exception (registration intact):", e);
+        await db.from("event_registrations").update({ email_status: "failed" }).eq("registration_code", finalCode);
+      }
+    });
+
+    return NextResponse.json({ success: true, free: true, registration_code: finalCode });
+  }
+
+  // Paid path
+  const code = existing?.registration_code ?? genCode();
+  const { error: regErr2 } = await db
+    .from("event_registrations")
+    .upsert({
+      registration_code: code,
+      event_id:          event_id as string,
+      user_email:        (email as string).toLowerCase().trim(),
+      user_name:         (name as string).trim(),
+      phone:             phone || null,
+      gender:            gender || null,
+      date_of_birth:     date_of_birth || null,
+      blood_group:       blood_group || null,
+      emergency_contact: emergency_contact || null,
+      special_notes:     special_notes || null,
+      coupon_code:       coupon_code ? (coupon_code as string).toUpperCase().trim() : null,
+      coupon_id:         couponId,
+      coupon_discount:   discount,
+      original_price:    originalPrice,
+      final_price:       finalPrice,
+      payment_status:    "pending",
+      status:            "pending_payment",
+      distance_category: chosenCategory,
+      tshirt_size:       chosenTshirtSize,
+      participant_count: 1,
+    }, { onConflict: "event_id,user_email", ignoreDuplicates: false });
+  if (regErr2) return NextResponse.json({ error: "Database error" }, { status: 500 });
+
+  // Create a pending participant row so it exists in the ops portal pre-payment.
+  // Only insert if no participant row exists yet (handles payment re-attempts).
+  const { data: pendingReg } = await db
+    .from("event_registrations")
+    .select("id")
+    .eq("registration_code", code)
+    .single();
+  if (pendingReg?.id) {
+    const { count } = await db
+      .from("event_participants")
+      .select("id", { count: "exact", head: true })
+      .eq("registration_id", pendingReg.id);
+    if (!count || count === 0) {
+      const nameParts = (name as string).trim().split(" ");
+      await db.from("event_participants").insert({
+        event_id:          event_id as string,
+        registration_id:   pendingReg.id,
+        account_email:     (email as string).toLowerCase().trim(),
+        first_name:        nameParts[0],
+        last_name:         nameParts.slice(1).join(" ") || null,
+        gender:            gender || null,
+        dob:               date_of_birth || null,
+        blood_group:       blood_group || null,
+        mobile:            phone || null,
+        email:             (email as string).toLowerCase().trim(),
+        distance_category: chosenCategory,
+        tshirt_size:       chosenTshirtSize,
+        status:            "pending_payment",
+      });
+    }
+  }
+
+  return NextResponse.json({
+    success: true,
+    free: false,
+    requires_payment: true,
+    registration_code: code,
+    original_price: originalPrice,
+    coupon_discount: discount,
+    final_price: finalPrice,
+  });
+}
+
+// ── Multi-participant path ─────────────────────────────────────────────────────
+// Body: { event_id, email (account), emergency_contact, special_notes,
+//         coupon_code?, participants: ParticipantInput[] }
+// Price = participants.length × ev.price - discount (coupon applied once per booking)
+
+async function handleMultiParticipant(
+  body: Record<string, unknown>,
+  tokenEmail: string,
+  _req: NextRequest,
+): Promise<NextResponse> {
+  const {
+    event_id,
+    email: accountEmailRaw,
+    emergency_contact,
+    special_notes,
+    coupon_code,
+  } = body as Record<string, string | null | undefined>;
+
+  const participants = body.participants as ParticipantInput[];
+
+  if (!event_id || !accountEmailRaw) {
+    return NextResponse.json({ error: "event_id and email are required." }, { status: 400 });
+  }
+  const accountEmail = (accountEmailRaw as string).toLowerCase().trim();
+  if (tokenEmail.toLowerCase() !== accountEmail) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+  if (participants.length < 1 || participants.length > 10) {
+    return NextResponse.json({ error: "Between 1 and 10 participants are allowed per booking." }, { status: 400 });
+  }
+
+  // Validate each participant
+  const VALID_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
+  for (let i = 0; i < participants.length; i++) {
+    const p   = participants[i];
+    const idx = i + 1;
+    if (!p.first_name?.trim())  return NextResponse.json({ error: `Participant ${idx}: first name is required.` }, { status: 400 });
+    if (!p.gender)              return NextResponse.json({ error: `Participant ${idx}: gender is required.` }, { status: 400 });
+    if (!p.date_of_birth)       return NextResponse.json({ error: `Participant ${idx}: date of birth is required.` }, { status: 400 });
+    if (new Date(p.date_of_birth) >= new Date()) return NextResponse.json({ error: `Participant ${idx}: date of birth must be in the past.` }, { status: 400 });
+    if (!p.blood_group)         return NextResponse.json({ error: `Participant ${idx}: blood group is required.` }, { status: 400 });
+    if (!p.mobile || !/^\d{10}$/.test(p.mobile.replace(/\s/g, ""))) return NextResponse.json({ error: `Participant ${idx}: phone must be exactly 10 digits.` }, { status: 400 });
+    if (p.tshirt_size && !VALID_SIZES.includes(p.tshirt_size)) return NextResponse.json({ error: `Participant ${idx}: invalid T-shirt size.` }, { status: 400 });
+  }
+
+  if (!emergency_contact) return NextResponse.json({ error: "Emergency contact is required." }, { status: 400 });
+  if (!special_notes?.trim()) return NextResponse.json({ error: "Special notes are required (enter NA if none)." }, { status: 400 });
+
+  const db = getSupabaseServer();
+
+  const { data: ev } = await db
+    .from("events")
+    .select("id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories, collect_tshirt, allow_multi_participant, max_per_registration")
+    .eq("id", event_id as string)
+    .single();
+  if (!ev || ev.status !== "published") {
+    return NextResponse.json({ error: "Event not found." }, { status: 404 });
+  }
+  if (!(ev as { allow_multi_participant?: boolean }).allow_multi_participant) {
+    return NextResponse.json({ error: "This event does not support multi-participant registration." }, { status: 400 });
+  }
+
+  const maxPer = (ev as { max_per_registration?: number }).max_per_registration ?? 0;
+  if (maxPer > 0 && participants.length > maxPer) {
+    return NextResponse.json({ error: `Maximum ${maxPer} participants per booking for this event.` }, { status: 400 });
+  }
+
+  if (ev.registration_closes_at && new Date() >= new Date(ev.registration_closes_at)) {
+    return NextResponse.json({ error: "Registration for this event is now closed." }, { status: 403 });
+  }
+  const istNow = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+  const today  = istNow.toISOString().split("T")[0];
+  const nowTime = istNow.toTimeString().substring(0, 5);
+  const endDate = ev.end_date ?? ev.start_date;
+  const endTime = (ev.end_time ?? "23:59").substring(0, 5);
+  if (endDate < today || (endDate === today && endTime <= nowTime)) {
+    return NextResponse.json({ error: "This event has already ended." }, { status: 403 });
+  }
+
+  // Capacity check
+  if (ev.max_participants && (ev.participant_count ?? 0) + participants.length > ev.max_participants) {
+    return NextResponse.json({ error: "Not enough spots available for your group size." }, { status: 409 });
+  }
+
+  // Validate distance categories per participant
+  const cats = (ev as { distance_categories?: string[] }).distance_categories ?? [];
+  for (let i = 0; i < participants.length; i++) {
+    const p = participants[i];
+    if (cats.length > 1 && !p.distance_category) {
+      return NextResponse.json({ error: `Participant ${i + 1}: please select a distance category.` }, { status: 400 });
+    }
+    if (p.distance_category && cats.length > 0 && !cats.includes(p.distance_category)) {
+      return NextResponse.json({ error: `Participant ${i + 1}: invalid distance category.` }, { status: 400 });
+    }
+    if ((ev as { collect_tshirt?: boolean }).collect_tshirt && !p.tshirt_size) {
+      return NextResponse.json({ error: `Participant ${i + 1}: T-shirt size is required.` }, { status: 400 });
+    }
+    // Resolve single-category events
+    if (cats.length === 1 && !p.distance_category) p.distance_category = cats[0];
+  }
+
+  // Duplicate check
+  const { data: existing } = await db
+    .from("event_registrations")
+    .select("id, registration_code, payment_status, participant_count")
+    .eq("event_id", event_id as string)
+    .eq("user_email", accountEmail)
+    .maybeSingle();
+  if (existing && (existing.payment_status === "free" || existing.payment_status === "paid")) {
+    return NextResponse.json({ already: true, registration_code: existing.registration_code });
+  }
+
+  // Coupon — applied once to the total booking, not N times
+  let couponId: string | null = null;
+  let discount = 0, discountType = "", discountValue = 0;
+  const totalBeforeDiscount = ev.price * participants.length;
+  if (coupon_code && ev.price > 0) {
+    const { data: coupon, error: cpErr } = await db
+      .from("coupons")
+      .select("id, discount_type, discount_value, expires_at, use_count, max_uses, event_id, assigned_to_email")
+      .eq("code", (coupon_code as string).toUpperCase().trim())
+      .single();
+    if (cpErr || !coupon) return NextResponse.json({ error: "Invalid coupon code." }, { status: 400 });
+    if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) return NextResponse.json({ error: "This coupon has expired." }, { status: 400 });
+    if (coupon.use_count >= coupon.max_uses) return NextResponse.json({ error: "This coupon has reached its usage limit." }, { status: 400 });
+    if (coupon.event_id && coupon.event_id !== event_id) return NextResponse.json({ error: "This coupon is not valid for this event." }, { status: 400 });
+    if (coupon.assigned_to_email && coupon.assigned_to_email.toLowerCase() !== accountEmail) return NextResponse.json({ error: "This coupon is not assigned to your account." }, { status: 400 });
+    const { data: uses } = await db.from("coupon_uses").select("id").eq("coupon_id", coupon.id).eq("used_by_email", accountEmail).limit(1);
+    if (uses && uses.length > 0) return NextResponse.json({ error: "You have already used this coupon." }, { status: 400 });
+    couponId = coupon.id; discountType = coupon.discount_type; discountValue = coupon.discount_value;
+    discount = calcDiscount(totalBeforeDiscount, discountType, discountValue);
+  }
+
+  const originalPrice = totalBeforeDiscount;
+  const finalPrice    = Math.max(0, originalPrice - discount);
+  const leadParticipant = participants[0];
+  const leadName = [leadParticipant.first_name, leadParticipant.last_name].filter(Boolean).join(" ");
+
+  // ── Free (or fully-discounted) multi-participant path ────────────────────────
+  if (finalPrice === 0) {
+    const code = genCode();
+
+    const { data: reg, error: regErr } = await db
+      .from("event_registrations")
+      .upsert({
+        registration_code: code,
+        event_id:          event_id as string,
+        user_email:        accountEmail,
+        user_name:         leadName,
+        phone:             leadParticipant.mobile || null,
+        gender:            leadParticipant.gender || null,
+        date_of_birth:     leadParticipant.date_of_birth || null,
+        blood_group:       leadParticipant.blood_group || null,
+        emergency_contact: emergency_contact || null,
+        special_notes:     special_notes || null,
+        coupon_code:       coupon_code ? (coupon_code as string).toUpperCase().trim() : null,
+        coupon_id:         couponId,
+        coupon_discount:   discount,
+        original_price:    originalPrice,
+        final_price:       finalPrice,
+        payment_status:    "free",
+        status:            "confirmed",
+        distance_category: leadParticipant.distance_category ?? null,
+        tshirt_size:       leadParticipant.tshirt_size ?? null,
+        participant_count: participants.length,
+      }, { onConflict: "event_id,user_email", ignoreDuplicates: false })
+      .select("id, registration_code")
+      .single();
+    if (regErr || !reg) return NextResponse.json({ error: "Database error" }, { status: 500 });
+
+    const regId    = reg.id;
+    const finalCode = reg.registration_code;
+
+    // Create participant rows with QR tokens
+    const participantRows = participants.map(p => {
+      const qr = signEventQR(regId + "_" + (participants.indexOf(p)), event_id as string);
+      return {
+        event_id:          event_id as string,
+        registration_id:   regId,
+        account_email:     accountEmail,
+        first_name:        p.first_name.trim(),
+        last_name:         p.last_name?.trim() || null,
+        gender:            p.gender || null,
+        dob:               p.date_of_birth || null,
+        blood_group:       p.blood_group || null,
+        mobile:            p.mobile || null,
+        email:             p.email?.toLowerCase().trim() || accountEmail,
+        distance_category: p.distance_category ?? null,
+        tshirt_size:       p.tshirt_size ?? null,
+        qr_token:          qr,
+        status:            "active",
+      };
+    });
+
+    const { data: createdParticipants, error: pErr } = await db
+      .from("event_participants")
+      .insert(participantRows)
+      .select("id, first_name, last_name, qr_token, distance_category, tshirt_size");
+    if (pErr) console.error("[multi-register] participant insert error:", pErr.message);
+
+    if (couponId) {
+      const { redeemCoupon } = await import("@/lib/coupon-redeem");
+      redeemCoupon(couponId, accountEmail).catch(console.error);
+    }
+
+    after(async () => {
+      if (!createdParticipants?.length) return;
+      const subject = `Event Registration Confirmed – ${ev.title}`;
+      try {
+        // Send one email per participant so each gets their individual QR
+        for (const p of createdParticipants) {
+          const participantName = [p.first_name, p.last_name].filter(Boolean).join(" ");
+          await sendEmail(
+            accountEmail,
+            participantName,
+            subject,
+            eventRegistrationEmailHTML({
+              name:             participantName,
+              eventTitle:       ev.title,
+              startDate:        ev.start_date,
+              startTime:        ev.start_time ?? null,
+              location:         ev.location,
+              registrationCode: finalCode,
+              distanceCategory: p.distance_category ?? null,
+              qrToken:          p.qr_token ?? undefined,
+            }),
+            false, true,
+          );
+        }
+        await db.from("event_registrations").update({
+          confirmation_email_sent_at: new Date().toISOString(),
+          email_status:               "sent",
+          qr_generated_at:            new Date().toISOString(),
+        }).eq("id", regId);
+      } catch (e) {
+        console.error("[multi-register] email exception:", e);
+        await db.from("event_registrations").update({ email_status: "failed" }).eq("id", regId);
+      }
+    });
 
     return NextResponse.json({
       success: true,
-      free: false,
-      requires_payment: true,
-      registration_code: code,
-      original_price: originalPrice,
-      coupon_discount: discount,
-      final_price: finalPrice,
+      free: true,
+      registration_code: finalCode,
+      participant_count: participants.length,
     });
-
-  } catch (e: unknown) {
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
+
+  // ── Paid multi-participant path ───────────────────────────────────────────────
+  const code = existing?.registration_code ?? genCode();
+  const { error: regErr2 } = await db
+    .from("event_registrations")
+    .upsert({
+      registration_code: code,
+      event_id:          event_id as string,
+      user_email:        accountEmail,
+      user_name:         leadName,
+      phone:             leadParticipant.mobile || null,
+      gender:            leadParticipant.gender || null,
+      date_of_birth:     leadParticipant.date_of_birth || null,
+      blood_group:       leadParticipant.blood_group || null,
+      emergency_contact: emergency_contact || null,
+      special_notes:     special_notes || null,
+      coupon_code:       coupon_code ? (coupon_code as string).toUpperCase().trim() : null,
+      coupon_id:         couponId,
+      coupon_discount:   discount,
+      original_price:    originalPrice,
+      final_price:       finalPrice,
+      payment_status:    "pending",
+      status:            "pending_payment",
+      distance_category: leadParticipant.distance_category ?? null,
+      tshirt_size:       leadParticipant.tshirt_size ?? null,
+      participant_count: participants.length,
+    }, { onConflict: "event_id,user_email", ignoreDuplicates: false });
+  if (regErr2) return NextResponse.json({ error: "Database error" }, { status: 500 });
+
+  const { data: pendingReg } = await db
+    .from("event_registrations")
+    .select("id")
+    .eq("registration_code", code)
+    .single();
+
+  // Pre-create participant rows in pending state (QR assigned on payment).
+  // Only insert if no participant rows exist yet for this registration
+  // (handles re-attempts on the same pending registration gracefully).
+  if (pendingReg?.id) {
+    const { count } = await db
+      .from("event_participants")
+      .select("id", { count: "exact", head: true })
+      .eq("registration_id", pendingReg.id);
+    if (!count || count === 0) {
+      const pendingRows = participants.map(p => ({
+        event_id:          event_id as string,
+        registration_id:   pendingReg.id,
+        account_email:     accountEmail,
+        first_name:        p.first_name.trim(),
+        last_name:         p.last_name?.trim() || null,
+        gender:            p.gender || null,
+        dob:               p.date_of_birth || null,
+        blood_group:       p.blood_group || null,
+        mobile:            p.mobile || null,
+        email:             p.email?.toLowerCase().trim() || accountEmail,
+        distance_category: p.distance_category ?? null,
+        tshirt_size:       p.tshirt_size ?? null,
+        status:            "pending_payment",
+      }));
+      await db.from("event_participants").insert(pendingRows);
+    }
+  }
+
+  return NextResponse.json({
+    success: true,
+    free: false,
+    requires_payment: true,
+    registration_code: code,
+    original_price: originalPrice,
+    coupon_discount: discount,
+    final_price: finalPrice,
+    participant_count: participants.length,
+  });
 }
