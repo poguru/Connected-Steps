@@ -3,6 +3,7 @@ import { after } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 import { sendWhatsAppTemplate } from "@/lib/whatsapp";
+import { processEmailBatch } from "@/lib/process-email-batch";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -131,6 +132,8 @@ export async function POST(req: NextRequest, { params }: Params) {
         channel:          "email",
         batch_id:         batchId,
       });
+      // Process email batch server-side after the response is sent
+      after(() => processEmailBatch(batchId));
     }
   }
 

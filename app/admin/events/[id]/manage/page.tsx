@@ -261,21 +261,17 @@ export default function EventManagePage() {
 
   useEffect(() => {
     if (!annPolling || !annResult?.batch_id) return;
+    const batchId = annResult.batch_id;
     const interval = setInterval(async () => {
       try {
-        const res  = await fetch(`/api/admin/events/${eventId}/communicate/send-next`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ batch_id: annResult.batch_id }),
-        });
-        const data = await res.json();
-        if (data.done) {
+        const res  = await fetch(`/api/admin/events/${eventId}/communicate/status?batch_id=${batchId}`);
+        const data = await res.json() as { queued: number; sending: number; delivered: number };
+        setAnnDelivered(data.delivered ?? 0);
+        if (data.queued === 0 && data.sending === 0) {
           setAnnPolling(false);
-          setAnnDelivered(data.delivered ?? 0);
-        } else if (data.status === "delivered") {
-          setAnnDelivered(p => p + 1);
         }
       } catch { /* non-critical */ }
-    }, 1100);
+    }, 3000);
     return () => clearInterval(interval);
   }, [annPolling, annResult?.batch_id, eventId]);
 
