@@ -1,8 +1,6 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AppNav from "@/components/layout/AppNav";
 import type { MenuUser } from "@/components/ui/UserMenu";
@@ -127,7 +125,7 @@ function ConfirmModal({ bugId, bugTitle, onConfirm, onDeny, onClose }: {
   );
 }
 
-export default function MyBugsPage() {
+function MyBugsContent() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const confirmId    = searchParams.get("confirm");
@@ -271,5 +269,13 @@ export default function MyBugsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function MyBugsPage() {
+  return (
+    <Suspense>
+      <MyBugsContent />
+    </Suspense>
   );
 }
