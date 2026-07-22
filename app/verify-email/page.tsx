@@ -128,15 +128,21 @@ function VerifyEmailContent() {
           {email && (
             <p style={{ margin: "0 0 16px", fontSize: 13, color: "#888" }}>{email}</p>
           )}
-          <p style={{ margin: "0 0 24px", fontSize: 13, color: "#aaa", lineHeight: 1.7 }}>
-            Your email has been verified. You can close this tab and return to the signup form to continue.
+          <p style={{ margin: "0 0 8px", fontSize: 13, color: "#aaa", lineHeight: 1.7 }}>
+            Your email address has been confirmed.
+          </p>
+          <p style={{ margin: "0 0 24px", fontSize: 13, color: "#fbbf24", lineHeight: 1.7, fontWeight: 600 }}>
+            One more step — click the button below to complete your registration.
           </p>
           <Link
             href={`/auth?tab=signup${email ? `&email=${encodeURIComponent(email)}&verified=true` : ""}`}
-            style={{ display: "inline-block", padding: "11px 28px", background: "linear-gradient(135deg,#e8620a,#ff8c42)", color: "#fff", borderRadius: 999, textDecoration: "none", fontWeight: 700, fontSize: 14 }}
+            style={{ display: "inline-block", padding: "13px 32px", background: "linear-gradient(135deg,#e8620a,#ff8c42)", color: "#fff", borderRadius: 999, textDecoration: "none", fontWeight: 700, fontSize: 15 }}
           >
-            Continue Sign Up →
+            Complete Registration →
           </Link>
+          <p style={{ margin: "16px 0 0", fontSize: 11, color: "#555" }}>
+            Takes under a minute — don&apos;t close this tab yet.
+          </p>
         </div>
       )}
 

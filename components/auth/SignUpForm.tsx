@@ -88,6 +88,10 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
   const [referralInput,     setReferralInput]     = useState("");
   const [photo,             setPhoto]             = useState<string | null>(null);
 
+  // Set when user arrives from email verification but with no localStorage draft
+  // (e.g. link opened in Gmail webview / on a different device).
+  const [emailAlreadyVerified, setEmailAlreadyVerified] = useState(false);
+
   // Submission
   const [submitting, setSubmitting] = useState(false);
   const [formError,  setFormError]  = useState("");
@@ -113,7 +117,14 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
     if (!urlEmail || !urlVerified) return;
     try {
       const raw = localStorage.getItem(`cs_signup_draft_${urlEmail}`);
-      if (!raw) return;
+      if (!raw) {
+        // No draft (e.g. email opened in a webview / different device).
+        // Pre-fill the email so the user knows which address is verified and
+        // can click "Verify Email Address →" to get the already_verified fast-path.
+        setEmail(urlEmail);
+        setEmailAlreadyVerified(true);
+        return;
+      }
       const draft = JSON.parse(raw) as {
         firstName: string; lastName: string; email: string;
         phone: string; password: string; confirm: string;
@@ -353,6 +364,13 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <ProgressBar />
 
+      {emailAlreadyVerified && (
+        <div style={{ background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.3)", borderRadius: 10, padding: "10px 14px", fontSize: 12, color: "#4ade80", lineHeight: 1.6 }}>
+          <strong style={{ display: "block", marginBottom: 2 }}>✅ Email verified</strong>
+          Your email address is confirmed. Fill in your details below and click the button to continue registration.
+        </div>
+      )}
+
       <p style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>
         Step 1 — Your details
       </p>
@@ -368,7 +386,7 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
         <label style={{ display: "block", fontSize: 11, color: "var(--muted-foreground)", marginBottom: 5 }}>
           Email address <span style={{ color: "var(--primary)", fontWeight: 600 }}>*</span>
         </label>
-        <Input type="email" placeholder="you@example.com" value={email} onChange={e => { setEmail(e.target.value); setFormError(""); }} autoComplete="email" />
+        <Input type="email" placeholder="you@example.com" value={email} onChange={e => { setEmail(e.target.value); setFormError(""); setEmailAlreadyVerified(false); }} autoComplete="email" />
         <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--muted-foreground)" }}>
           You&apos;ll receive a verification link at this address.
         </p>
