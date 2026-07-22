@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 import { autoFeedSessionCompleted } from "@/lib/auto-feed";
 import { createNotification } from "@/lib/notify-inapp";
+import { recalculateMonth } from "@/lib/recalculate-leaderboard";
 
 // GET — session info + users who joined via link + their attendance status
 export async function GET(
@@ -65,6 +67,11 @@ export async function POST(
 
   const db = getSupabaseServer();
 
+  // Fetch session metadata (date needed for leaderboard recalculation month)
+  const { data: session } = await db.from("sessions").select("date, title").eq("id", id).single();
+  const sessionMonth = session?.date?.slice(0, 7) ?? null;
+  const sessionTitle = session?.title ?? "today's session";
+
   // Fetch existing records to preserve points_synced status
   const { data: existing } = await db
     .from("session_attendance")
@@ -124,8 +131,6 @@ export async function POST(
   const bonusUsers = toUpsert.filter(u => u.bonus_points > 0);
   if (bonusUsers.length) {
     const db2 = getSupabaseServer();
-    const { data: sess } = await db2.from("sessions").select("title").eq("id", id).single();
-    const sessionTitle = sess?.title ?? "today's session";
 
     // N+1 fix: was N×(DELETE + INSERT) per user → now 1 batch DELETE + 1 batch INSERT
     // Delete all existing bonus ledger rows for these users in this session at once.
@@ -157,6 +162,13 @@ export async function POST(
         action_url: "/profile#points",
       }).catch(() => {});
     }
+  }
+
+  // Auto-sync leaderboard after attendance save (same as QR scan path)
+  if (sessionMonth) {
+    after(async () => {
+      await recalculateMonth(sessionMonth, { force: true }).catch(console.error);
+    });
   }
 
   return NextResponse.json({

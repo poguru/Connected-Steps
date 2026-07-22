@@ -12,7 +12,7 @@ const ADMIN_EMAIL = "info@connectedsteps.in";
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const token = req.headers.get("x-user-token") ?? "";
   const tokenEmail = verifyUserToken(token);
@@ -23,8 +23,8 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const db  = getSupabaseServer();
-  const id  = params.id;
+  const db      = getSupabaseServer();
+  const { id }  = await params;
 
   // Verify the report belongs to this user and is in resolved state
   const { data: report, error: fetchErr } = await db

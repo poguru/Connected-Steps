@@ -209,6 +209,16 @@ export async function recalculateMonth(
 
   if (upsertRows.length === 0) return { message: "No users to update.", updated: 0 };
 
+  // ── Assign ranks sorted by month_points DESC (ties share the same rank) ──────
+  upsertRows.sort((a, b) => (b.month_points as number) - (a.month_points as number));
+  for (let i = 0; i < upsertRows.length; i++) {
+    if (i === 0 || upsertRows[i].month_points !== upsertRows[i - 1].month_points) {
+      upsertRows[i].rank = i + 1;
+    } else {
+      upsertRows[i].rank = upsertRows[i - 1].rank;
+    }
+  }
+
   // ── Chunked upsert — Supabase PostgREST rejects single batches > 1,000 rows ──
   // Chunks of 500 are safe, keep each round-trip well below the limit.
   // "Last writer wins" remains safe — concurrent calls produce identical scores.

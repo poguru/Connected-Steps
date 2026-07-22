@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       { entries: decorateLb(cached, callerEmail), location_id: locationId ?? null },
       { headers: {
-          "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
+          "Cache-Control": "no-store",
           "X-Cache": "HIT",
         },
       },
@@ -153,7 +153,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(
     { entries: decorateLb(toCache, callerEmail), location_id: locationId ?? null },
     { headers: {
-        "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
+        "Cache-Control": "no-store",
         "X-Cache": "MISS",
       },
     },

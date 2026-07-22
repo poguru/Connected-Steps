@@ -15,6 +15,7 @@ export interface ScoreBreakdown {
   }[];
   session_points: number;
   weekly_bonus:   number;
+  extra_points:   number;
   total_month:    number;
   total_alltime:  number;
   total_xp:       number;
@@ -69,6 +70,19 @@ export async function GET(req: NextRequest) {
     .eq("user_email", email.toLowerCase())
     .single();
 
+  // Extra points from challenge/referral/admin_adjustment in points_ledger this month.
+  // These are included in recalculateMonth's scoring but excluded from session_attendance,
+  // so the breakdown total must add them explicitly to match the leaderboard figure.
+  const { data: ledgerExtra } = await db
+    .from("points_ledger")
+    .select("points")
+    .eq("user_email", email.toLowerCase())
+    .in("category", ["challenge", "referral", "admin_adjustment"])
+    .gte("created_at", rangeStart + "T00:00:00Z")
+    .lte("created_at", rangeEnd + "T23:59:59Z");
+
+  const extra_points = (ledgerExtra ?? []).reduce((sum, r) => sum + (r.points ?? 0), 0);
+
   // Build per-session breakdown
   function mondayKey(dateStr: string): string {
     const d = new Date(dateStr.slice(0, 10) + "T12:00:00Z");
@@ -97,8 +111,8 @@ export async function GET(req: NextRequest) {
     sessions.push({ session_id: sess.id, title: sess.title, date: sess.date, base_pts, bonus_pts, total_pts });
   }
 
-  const weekly_bonus = Object.values(weekCounts).filter(c => c >= 4).length * 5;
-  const total_month  = session_points + weekly_bonus;
+  const weekly_bonus  = Object.values(weekCounts).filter(c => c >= 4).length * 5;
+  const total_month   = session_points + weekly_bonus + extra_points;
   const total_alltime = lb?.total_points ?? total_month;
   const total_xp      = total_alltime * 5;
 
@@ -110,6 +124,7 @@ export async function GET(req: NextRequest) {
     sessions:   sessions.sort((a, b) => a.date.localeCompare(b.date)),
     session_points,
     weekly_bonus,
+    extra_points,
     total_month,
     total_alltime,
     total_xp,
