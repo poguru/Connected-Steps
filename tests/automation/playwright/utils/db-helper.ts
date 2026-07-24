@@ -86,7 +86,7 @@ export const DbHelper = {
   async getAttendanceCount(sessionId: string) {
     const { count } = await db()
       .from("session_attendance")
-      .select("id", { count: "exact", head: true })
+      .select("session_id", { count: "exact", head: true })
       .eq("session_id", sessionId);
     return count ?? 0;
   },

@@ -36,9 +36,10 @@ export async function POST(
   // Early-exit guard: if every record for this session is already synced,
   // skip the recalculation entirely (no-op for re-clicks and concurrent calls
   // that arrive after the first has finished).
+  // session_attendance has no id column — use session_id (part of composite PK).
   const { count } = await db
     .from("session_attendance")
-    .select("id", { count: "exact", head: true })
+    .select("session_id", { count: "exact", head: true })
     .eq("session_id", id)
     .eq("points_synced", false);
 

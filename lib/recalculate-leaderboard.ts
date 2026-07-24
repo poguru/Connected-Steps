@@ -75,9 +75,10 @@ export async function recalculateMonth(
 
   const sessionIds = sessions.map((s) => s.id);
 
+  // session_attendance has a composite PK (session_id, user_email) — no id column.
   const { data: allAtt, error: aErr } = await db
     .from("session_attendance")
-    .select("id, session_id, user_email, attended, bonus_points")
+    .select("session_id, user_email, attended, bonus_points")
     .in("session_id", sessionIds);
 
   if (aErr) throw new Error(aErr.message);
@@ -105,8 +106,7 @@ export async function recalculateMonth(
 
   const sessionDateMap = new Map(sessions.map((s) => [s.id, s.date]));
 
-  const userAttMap  = new Map<string, { session_id: string; attended: boolean; bonus_points: number }[]>();
-  const allAttIds:  number[] = [];
+  const userAttMap = new Map<string, { session_id: string; attended: boolean; bonus_points: number }[]>();
 
   for (const att of allAtt) {
     if (!userAttMap.has(att.user_email)) {
@@ -117,7 +117,6 @@ export async function recalculateMonth(
       attended:     att.attended,
       bonus_points: att.bonus_points ?? 0,
     });
-    allAttIds.push(att.id);
   }
 
   // Fetch challenge/referral/admin_adjustment points from points_ledger for this month.
@@ -231,13 +230,15 @@ export async function recalculateMonth(
     if (upsertErr) throw new Error(`Chunk ${i}–${i + CHUNK}: ${upsertErr.message}`);
   }
 
-  // ── Single batch mark all month attendance as synced ─────────────────────
-  // Covers all sessions in the month, not just the one that triggered the sync.
-  if (allAttIds.length > 0) {
-    await db
-      .from("session_attendance")
-      .update({ points_synced: true })
-      .in("id", allAttIds);
+  // ── Mark all month attendance as synced ──────────────────────────────────
+  // Filter by session_id (part of the composite PK) — the table has no id column.
+  // Covers every session in the month in one round-trip.
+  const { error: syncErr } = await db
+    .from("session_attendance")
+    .update({ points_synced: true })
+    .in("session_id", sessionIds);
+  if (syncErr) {
+    console.error(`[recalculate] points_synced update failed for ${month}:`, syncErr.message);
   }
 
   // ── Invalidate ALL leaderboard cache variants ─────────────────────────────
