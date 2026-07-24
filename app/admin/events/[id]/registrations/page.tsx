@@ -95,7 +95,8 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
   const [tshirtCameraOpen,  setTshirtCameraOpen]  = useState(false);
   const [tshirtToken,       setTshirtToken]        = useState("");
   const [tshirtLoading,     setTshirtLoading]      = useState(false);
-  const [tshirtResult,      setTshirtResult]       = useState<{ valid: boolean; already_issued?: boolean; message: string; registration?: { code: string; name: string; tshirt_size: string; event: string } } | null>(null);
+  const [tshirtResult,      setTshirtResult]       = useState<{ valid: boolean; already_issued?: boolean; message?: string; error?: string; registration?: { code: string; name: string; tshirt_size: string; event: string } } | null>(null);
+  const [tshirtPreview,     setTshirtPreview]      = useState<{ token: string; name: string; size: string; code: string } | null>(null);
   const [tshirtReport,      setTshirtReport]       = useState<{ total: number; issued: number; pending: number; by_size: Record<string, { total: number; issued: number; pending: number }>; sizes: string[] } | null>(null);
   const [scanToken,  setScanToken]  = useState("");
   const [scanLoading, setScanLoading] = useState(false);
@@ -312,19 +313,39 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
     finally { setBulkSending(false); }
   }
 
+  // Step 1: look up QR (dry_run=true) — shows preview card without issuing
+  async function handleTshirtLookup(tok: string) {
+    if (!tok.trim()) return;
+    setTshirtLoading(true); setTshirtResult(null); setTshirtPreview(null);
+    try {
+      const res  = await fetch("/api/events/tshirt-distribute", { method: "POST", headers, body: JSON.stringify({ token: tok.trim(), dry_run: true }) });
+      const data = await res.json() as { valid: boolean; preview?: boolean; already_issued?: boolean; message?: string; error?: string; registration?: { code: string; name: string; tshirt_size: string; event: string } };
+      if (!res.ok || !data.valid) {
+        setTshirtResult({ valid: false, message: data.message ?? data.error ?? "Invalid QR code" });
+      } else if (data.already_issued) {
+        setTshirtResult({ valid: true, already_issued: true, message: data.message, registration: data.registration });
+      } else {
+        setTshirtPreview({ token: tok.trim(), name: data.registration!.name, size: data.registration!.tshirt_size, code: data.registration!.code });
+      }
+    } catch { setTshirtResult({ valid: false, message: "Network error." }); }
+    finally { setTshirtLoading(false); }
+  }
+
+  // Step 2: confirm and issue — called from the preview card's Confirm button
   async function handleTshirtDistribute(tok: string) {
     if (!tok.trim()) return;
     setTshirtLoading(true); setTshirtResult(null);
     try {
       const res  = await fetch("/api/events/tshirt-distribute", { method: "POST", headers, body: JSON.stringify({ token: tok.trim() }) });
-      const data = await res.json();
-      setTshirtResult(data);
+      const data = await res.json() as { valid: boolean; already_issued?: boolean; message?: string; error?: string; registration?: { code: string; name: string; tshirt_size: string; event: string } };
+      setTshirtResult({ valid: data.valid, already_issued: data.already_issued, message: data.message ?? data.error, registration: data.registration });
+      setTshirtPreview(null);
       if (res.ok && data.valid && !data.already_issued) {
         setRegs(prev => prev.map(r => r.registration_code === data.registration?.code ? { ...r, tshirt_issued: true } : r));
         setTshirtToken("");
-        loadTshirtReport();
+        void loadTshirtReport();
       }
-    } catch { setTshirtResult({ valid: false, message: "Network error." }); }
+    } catch { setTshirtResult({ valid: false, message: "Network error." }); setTshirtPreview(null); }
     finally { setTshirtLoading(false); }
   }
 
@@ -562,7 +583,7 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
               </form>
               {scanResult && (
                 <div style={{ marginTop: "0.75rem", padding: "12px 16px", borderRadius: 8, background: scanResult.valid ? (scanResult.already_checked_in ? "rgba(234,179,8,0.1)" : "rgba(74,222,128,0.1)") : "rgba(239,68,68,0.1)", border: `1px solid ${scanResult.valid ? (scanResult.already_checked_in ? "rgba(234,179,8,0.3)" : "rgba(74,222,128,0.3)") : "rgba(239,68,68,0.3)"}` }}>
-                  <div style={{ fontWeight: 700, color: scanResult.valid ? (scanResult.already_checked_in ? "#eab308" : "#4ade80") : "#f87171", marginBottom: 4 }}>{scanResult.message}</div>
+                  <div style={{ fontWeight: 700, color: scanResult.valid ? (scanResult.already_checked_in ? "#eab308" : "#4ade80") : "#f87171", marginBottom: 4 }}>{scanResult.message ?? scanResult.error}</div>
                   {scanResult.registration && (
                     <div style={{ fontSize: "0.78rem", color: "#aaa" }}>{scanResult.registration.name}{scanResult.registration.category ? ` · ${scanResult.registration.category}` : ""} · <span style={{ fontFamily: "monospace" }}>{scanResult.registration.code}</span></div>
                   )}
@@ -606,21 +627,43 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
                   <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#fff" }}>👕 T-Shirt Distribution</div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <Button size="sm" variant="ghost" onClick={loadTshirtReport}>📊 Size Report</Button>
-                    <Button size="sm" onClick={() => { setTshirtResult(null); setTshirtCameraOpen(true); }}>📷 Open Camera</Button>
+                    <Button size="sm" onClick={() => { setTshirtResult(null); setTshirtPreview(null); setTshirtCameraOpen(true); }}>📷 Open Camera</Button>
                   </div>
                 </div>
-                <form onSubmit={e => { e.preventDefault(); handleTshirtDistribute(tshirtToken); }} style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" as const }}>
-                  <input value={tshirtToken} onChange={e => { setTshirtToken(e.target.value); setTshirtResult(null); }}
+                <form onSubmit={e => { e.preventDefault(); handleTshirtLookup(tshirtToken); }} style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" as const }}>
+                  <input value={tshirtToken} onChange={e => { setTshirtToken(e.target.value); setTshirtResult(null); setTshirtPreview(null); }}
                     placeholder="Paste QR token manually…"
                     style={{ ...S.input, flex: "1 1 260px", fontFamily: "monospace", fontSize: "0.78rem" }} />
-                  <Button type="submit" loading={tshirtLoading} disabled={!tshirtToken.trim()}>Issue T-Shirt</Button>
+                  <Button type="submit" loading={tshirtLoading} disabled={!tshirtToken.trim()}>Scan</Button>
                 </form>
+
+                {/* Preview card — confirm before issuing */}
+                {tshirtPreview && !tshirtResult && (
+                  <div style={{ marginTop: "0.75rem", borderRadius: 10, border: "1px solid rgba(96,165,250,0.4)", background: "rgba(96,165,250,0.06)", overflow: "hidden" }}>
+                    <div style={{ height: 4, background: "#60a5fa" }} />
+                    <div style={{ padding: "14px 16px" }}>
+                      <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#60a5fa", textTransform: "uppercase" as const, letterSpacing: ".06em", marginBottom: 8 }}>Confirm T-Shirt Issue</div>
+                      <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#fff", marginBottom: 2 }}>{tshirtPreview.name}</div>
+                      <div style={{ fontSize: "0.75rem", color: "#666", fontFamily: "monospace", marginBottom: 12 }}>{tshirtPreview.code}</div>
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(96,165,250,0.15)", border: "2px solid rgba(96,165,250,0.4)", borderRadius: 8, padding: "8px 18px", marginBottom: 14 }}>
+                        <span style={{ fontSize: 18 }}>👕</span>
+                        <span style={{ fontSize: "1.8rem", fontWeight: 900, color: "#60a5fa", lineHeight: 1 }}>{tshirtPreview.size}</span>
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <Button loading={tshirtLoading} onClick={() => handleTshirtDistribute(tshirtPreview.token)}>Confirm Issue</Button>
+                        <Button variant="ghost" onClick={() => { setTshirtPreview(null); setTshirtToken(""); }}>Cancel</Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Result card */}
                 {tshirtResult && (
                   <div style={{ marginTop: "0.75rem", padding: "12px 16px", borderRadius: 8,
                     background: tshirtResult.valid ? (tshirtResult.already_issued ? "rgba(234,179,8,0.1)" : "rgba(96,165,250,0.1)") : "rgba(239,68,68,0.1)",
                     border: `1px solid ${tshirtResult.valid ? (tshirtResult.already_issued ? "rgba(234,179,8,0.3)" : "rgba(96,165,250,0.3)") : "rgba(239,68,68,0.3)"}` }}>
                     <div style={{ fontWeight: 700, color: tshirtResult.valid ? (tshirtResult.already_issued ? "#eab308" : "#60a5fa") : "#f87171", marginBottom: 4 }}>
-                      {tshirtResult.message}
+                      {tshirtResult.message ?? tshirtResult.error}
                     </div>
                     {tshirtResult.registration && (
                       <div style={{ fontSize: "0.78rem", color: "#aaa" }}>
@@ -982,7 +1025,7 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
             setTshirtCameraOpen(false);
             let tok = raw;
             try { const u = new URL(raw); tok = u.searchParams.get("t") ?? raw; } catch { /* raw */ }
-            handleTshirtDistribute(tok);
+            handleTshirtLookup(tok);
           }}
           onClose={() => setTshirtCameraOpen(false)}
         />

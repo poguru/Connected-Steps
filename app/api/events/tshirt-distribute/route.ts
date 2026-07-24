@@ -15,12 +15,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { token?: string; counter_number?: string; remarks?: string };
+  let body: { token?: string; counter_number?: string; remarks?: string; dry_run?: boolean };
   try { body = await req.json(); } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { token, counter_number, remarks } = body;
+  const { token, counter_number, remarks, dry_run = false } = body;
   if (!token) return NextResponse.json({ error: "token is required" }, { status: 400 });
 
   const decoded = verifyEventQR(token);
@@ -62,6 +62,26 @@ export async function POST(req: NextRequest) {
   }
   if (!reg.tshirt_size) {
     return NextResponse.json({ error: "No T-shirt size recorded for this participant.", valid: false }, { status: 409 });
+  }
+
+  // Dry-run: return participant info without issuing (used for confirmation preview)
+  if (dry_run) {
+    return NextResponse.json({
+      valid:          true,
+      preview:        true,
+      already_issued: reg.tshirt_issued,
+      message:        reg.tshirt_issued
+        ? `T-shirt already issued to ${reg.user_name}.`
+        : `${reg.tshirt_size} ready for ${reg.user_name}`,
+      registration: {
+        code:        reg.registration_code,
+        name:        reg.user_name,
+        tshirt_size: reg.tshirt_size,
+        event:       reg.events?.title ?? "",
+        issued_at:   reg.tshirt_issued_at,
+        issued_by:   reg.tshirt_issued_by,
+      },
+    });
   }
 
   // Idempotent: already issued
