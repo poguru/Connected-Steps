@@ -89,7 +89,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   // ── Send cancellation email ──────────────────────────────────────────────────
   if (sendEmail_) {
-    const event = reg.events as { title: string; start_date: string; location: string } | null;
+    const event = reg.events as unknown as { title: string; start_date: string; location: string } | null;
     const html  = buildCancellationEmail({
       name:      reg.user_name,
       code:      registrationCode,
