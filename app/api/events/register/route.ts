@@ -152,8 +152,21 @@ async function handleSingleParticipant(
   }
   const chosenTshirtSize: string | null = tshirt_size && VALID_SIZES.includes(tshirt_size as string) ? (tshirt_size as string) : null;
 
+  // Approved waitlist members may register even when the event is full.
+  // Check their status before enforcing the capacity gate.
+  let approvedWaitlistId: string | null = null;
   if (ev.max_participants && (ev.participant_count ?? 0) >= ev.max_participants) {
-    return NextResponse.json({ error: "This event is fully booked." }, { status: 409 });
+    const { data: wl } = await db
+      .from("event_waitlist")
+      .select("id")
+      .eq("event_id", event_id as string)
+      .eq("user_email", (email as string).toLowerCase().trim())
+      .eq("status", "approved")
+      .maybeSingle();
+    approvedWaitlistId = wl?.id ?? null;
+    if (!approvedWaitlistId) {
+      return NextResponse.json({ error: "This event is fully booked." }, { status: 409 });
+    }
   }
 
   const { data: existing } = await db
@@ -163,6 +176,10 @@ async function handleSingleParticipant(
     .eq("user_email", (email as string).toLowerCase().trim())
     .maybeSingle();
   if (existing && (existing.payment_status === "free" || existing.payment_status === "paid")) {
+    // Also expire their waitlist entry if it's still pending
+    if (approvedWaitlistId) {
+      await db.from("event_waitlist").update({ status: "expired" }).eq("id", approvedWaitlistId);
+    }
     return NextResponse.json({ already: true, registration_code: existing.registration_code });
   }
 
@@ -299,6 +316,11 @@ async function handleSingleParticipant(
         await db.from("event_registrations").update({ email_status: "failed" }).eq("registration_code", finalCode);
       }
     });
+
+    // Consume the approved waitlist slot now that registration is confirmed.
+    if (approvedWaitlistId) {
+      await db.from("event_waitlist").update({ status: "expired" }).eq("id", approvedWaitlistId);
+    }
 
     return NextResponse.json({ success: true, free: true, registration_code: finalCode });
   }
@@ -453,9 +475,20 @@ async function handleMultiParticipant(
     return NextResponse.json({ error: "This event has already ended." }, { status: 403 });
   }
 
-  // Capacity check
-  if (ev.max_participants && (ev.participant_count ?? 0) + participants.length > ev.max_participants) {
-    return NextResponse.json({ error: "Not enough spots available for your group size." }, { status: 409 });
+  // Capacity check — approved waitlist members bypass this (1 reserved spot).
+  const capacityWouldExceed = ev.max_participants
+    && (ev.participant_count ?? 0) + participants.length > ev.max_participants;
+  if (capacityWouldExceed) {
+    const { data: wl } = await db
+      .from("event_waitlist")
+      .select("id")
+      .eq("event_id", event_id as string)
+      .eq("user_email", accountEmail)
+      .eq("status", "approved")
+      .maybeSingle();
+    if (!wl) {
+      return NextResponse.json({ error: "Not enough spots available for your group size." }, { status: 409 });
+    }
   }
 
   // Validate distance categories per participant

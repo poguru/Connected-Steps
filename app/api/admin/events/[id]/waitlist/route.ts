@@ -33,7 +33,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { data: entry } = await db
     .from("event_waitlist")
-    .select("*, events(title, start_date, location)")
+    .select("*, events(title, start_date, location, share_slug)")
     .eq("id", waitlist_id)
     .eq("event_id", id)
     .single();
@@ -49,7 +49,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   // Email notification
   if (action === "approve") {
-    const ev = entry.events as { title: string; start_date: string; location: string } | null;
+    const ev = entry.events as { title: string; start_date: string; location: string; share_slug: string | null } | null;
+    const registerUrl = ev?.share_slug
+      ? `https://www.connectedsteps.in/events/${ev.share_slug}/register`
+      : `https://www.connectedsteps.in/events`;
     after(async () => {
       await sendSingleEmail({
         to:      entry.user_email,
@@ -63,7 +66,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           <p style="color:#ccc;">Great news! A spot has opened up for <strong style="color:#fff;">${ev?.title ?? "the event"}</strong> and you're next on the waitlist.</p>
           <p style="color:#ccc;">Please register now to secure your spot. Spots are limited and may fill quickly.</p>
           <div style="margin:24px 0;">
-            <a href="https://www.connectedsteps.in/events" style="padding:12px 24px;background:#e8620a;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;font-size:14px;">Register Now →</a>
+            <a href="${registerUrl}" style="padding:12px 24px;background:#e8620a;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;font-size:14px;">Register Now →</a>
           </div>
           <p style="color:#555;font-size:12px;">If you no longer wish to attend, you can ignore this email.</p>
           <div style="margin-top:28px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.1);font-size:11px;color:#555;">
