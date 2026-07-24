@@ -1,12 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
 export default function WaitlistPage() {
   const { slug } = useParams() as { slug: string };
   const [form,     setForm]     = useState({ name: "", email: "", phone: "", distance_category: "", notes: "" });
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("cs_user");
+      if (!raw) return;
+      const u = JSON.parse(raw) as { first_name?: string; last_name?: string; email?: string; phone?: string };
+      const name = [u.first_name, u.last_name].filter(Boolean).join(" ").trim();
+      setForm(f => ({
+        ...f,
+        name:  name  || f.name,
+        email: u.email || f.email,
+        phone: u.phone || f.phone,
+      }));
+    } catch { /* ignore */ }
+  }, []);
   const [loading,  setLoading]  = useState(false);
   const [result,   setResult]   = useState<{ success?: boolean; already?: boolean; position?: number; message?: string; error?: string } | null>(null);
 

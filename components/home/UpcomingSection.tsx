@@ -141,12 +141,12 @@ function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (i
 
   return (
     <div
-      onClick={() => !isFull && onAction(item)}
+      onClick={() => onAction(item)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => e.key === "Enter" && !isFull && onAction(item)}
+      onKeyDown={(e) => e.key === "Enter" && onAction(item)}
       style={{
         borderRadius: 16,
         overflow: "hidden",
@@ -157,10 +157,10 @@ function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (i
                           "rgba(255,255,255,0.08)"
         }`,
         background: "rgba(255,255,255,0.02)",
-        cursor: isFull ? "default" : "pointer",
+        cursor: "pointer",
         transition: "transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease",
-        transform: hovered && !isFull ? "translateY(-4px)" : "none",
-        boxShadow: hovered && !isFull ? "0 12px 32px rgba(0,0,0,0.4)"
+        transform: hovered ? "translateY(-4px)" : "none",
+        boxShadow: hovered ? "0 12px 32px rgba(0,0,0,0.4)"
           : cd.isLive ? "0 0 20px rgba(74,222,128,0.12)" : "none",
         display: "flex",
         flexDirection: "column",
@@ -415,8 +415,10 @@ export default function UpcomingSection() {
     if (item.kind === "session") {
       router.push(user ? `/join/${item.id}` : `/auth?redirect=/join/${item.id}`);
     } else {
-      const path = item.share_slug ? `/events/${item.share_slug}` : `/events/${item.id}`;
-      router.push(path);
+      const slug = item.share_slug ?? item.id;
+      const slots = slotsLeft(item.max_participants, item.participant_count);
+      const full  = slots !== null && slots === 0;
+      router.push(full ? `/events/${slug}/waitlist` : `/events/${slug}`);
     }
   }
 
