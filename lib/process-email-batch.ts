@@ -16,7 +16,10 @@ export async function processEmailBatch(batchId: string): Promise<void> {
 
   while (true) {
     const { data: claimed, error: claimErr } = await db.rpc("claim_next_email", { p_batch_id: batchId });
-    if (claimErr) break;
+    if (claimErr) {
+      console.error("[processEmailBatch] claim_next_email RPC failed:", claimErr.message, "batch:", batchId);
+      break;
+    }
 
     const email = (claimed as ClaimedRow[] | null)?.[0];
 

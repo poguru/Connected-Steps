@@ -260,13 +260,28 @@ export default function CommunicatePage() {
     setHistory(data.history ?? []);
   }
 
-  // ── Status polling ────────────────────────────────────────────────────────────
-  // Polls /status every 3s while sending. Emails are processed server-side via
-  // after() — the browser just reads progress from the DB. Closing the tab is safe.
+  // ── Status polling + client-driven send ──────────────────────────────────────
+  // Calls /send-next every 1.1s to drive delivery (one email per call).
+  // Also polls /status every 3s to update the progress counters in the UI.
+  // This client-driven approach works reliably regardless of whether server-side
+  // after() is available. Both mechanisms use FOR UPDATE SKIP LOCKED so there
+  // is no double-sending when both run simultaneously.
+
+  const sendNextRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (send.phase !== "sending" || !send.batchId) return;
     const batchId = send.batchId;
+
+    // Drive processing: one email per 1.1s call
+    sendNextRef.current = setInterval(async () => {
+      try {
+        await fetch(`/api/admin/events/${eventId}/communicate/send-next`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ batch_id: batchId }),
+        });
+      } catch { /* ignore — next tick will retry */ }
+    }, 1100);
 
     const poll = async () => {
       try {
@@ -283,7 +298,8 @@ export default function CommunicatePage() {
         }));
 
         if (data.queued === 0 && data.sending === 0) {
-          // All done — load per-email detail list and finalize
+          // All done — stop driving and load per-email detail
+          clearInterval(sendNextRef.current!);
           clearInterval(pollRef.current!);
           const detailRes  = await fetch(`/api/admin/events/${eventId}/communicate/status?batch_id=${batchId}&include_all=true`);
           const detailData = await detailRes.json() as { emails?: DeliveryEmail[] };
@@ -310,7 +326,10 @@ export default function CommunicatePage() {
     void poll();
     pollRef.current = setInterval(poll, 3000);
 
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    return () => {
+      if (pollRef.current)  clearInterval(pollRef.current);
+      if (sendNextRef.current) clearInterval(sendNextRef.current);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [send.phase, send.batchId]);
 
@@ -402,7 +421,8 @@ export default function CommunicatePage() {
     const data = await res.json() as { requeued?: number };
     if ((data.requeued ?? 0) > 0) {
       showToast(`🔄 ${data.requeued} emails re-queued for retry`);
-      void toggleBatchDetail(batchId); // refresh
+      setSend({ ...INITIAL_SEND, phase: "sending", batchId, total: data.requeued!, queued: data.requeued! });
+      setTab("email");
     } else {
       showToast("No transient failures to retry");
     }
@@ -417,7 +437,11 @@ export default function CommunicatePage() {
       });
       const data = await res.json() as { resumed?: number; error?: string };
       if (!res.ok) { showToast(`❌ ${data.error ?? "Resume failed"}`); return; }
-      showToast(`▶ Resuming delivery for ${data.resumed} queued email${data.resumed !== 1 ? "s" : ""}`);
+      const resumed = data.resumed ?? 0;
+      showToast(`▶ Resuming delivery for ${resumed} queued email${resumed !== 1 ? "s" : ""}`);
+      // Activate client-driven processing so delivery continues even if after() is unavailable
+      setSend({ ...INITIAL_SEND, phase: "sending", batchId, total: resumed, queued: resumed });
+      setTab("email");
       void loadHistory();
     } catch { showToast("❌ Network error"); }
     finally { setResumingBatch(null); }
