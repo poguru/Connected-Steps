@@ -553,8 +553,8 @@ export default function CommunicatePage() {
               {/* Provider info */}
               <div style={{ marginTop: 20, padding: "10px 12px", background: "rgba(96,165,250,0.05)", border: "1px solid rgba(96,165,250,0.15)", borderRadius: 8, fontSize: 11, color: "#60a5fa", lineHeight: 1.6 }}>
                 <strong>ZeptoMail</strong><br />
-                Emails are sent server-side in the background.<br /><br />
-                You can close this tab — delivery will continue automatically.
+                Emails are sent 1 per second from this tab.<br /><br />
+                Keep this tab open until delivery completes.
               </div>
             </div>
 

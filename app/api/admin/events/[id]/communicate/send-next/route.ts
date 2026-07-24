@@ -3,13 +3,11 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 import { sendSingleEmail } from "@/lib/email-service";
 
-// Maximum auto-retry attempts for transient failures (ThrottlingException, network errors)
 const MAX_ATTEMPTS = 3;
 
 // Sends exactly ONE email from the batch queue.
-// The admin UI calls this endpoint once per second to throttle sends.
-// Each call is fast (<3s): auth + DB claim + send + DB update.
-// When the queue is empty, returns { done: true } with final counts.
+// Called every 1.1s by the communicate page UI to drive delivery sequentially.
+// Does NOT use claim_next_email RPC — uses direct DB queries to avoid RPC dependency.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -18,20 +16,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const db = getSupabaseServer();
 
-  // Atomically claim the next queued email (FOR UPDATE SKIP LOCKED prevents double-send)
-  const { data: claimed, error: claimErr } = await db.rpc("claim_next_email", { p_batch_id: batch_id });
-  if (claimErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
+  // Pick the oldest queued email in this batch.
+  // Also re-pick emails stuck in "sending" for > 60s (covers Vercel timeouts).
+  const { data: rows, error: selectErr } = await db
+    .from("email_queue")
+    .select("id, recipient_email, recipient_name, subject, html_body, attempts, status")
+    .eq("batch_id", batch_id)
+    .in("status", ["queued", "sending"])
+    .order("created_at")
+    .limit(1);
 
-  type ClaimedRow = {
-    id: string; recipient_email: string; recipient_name: string | null;
-    subject: string; html_body: string; attempts: number;
-  };
-  const email = (claimed as ClaimedRow[] | null)?.[0];
+  if (selectErr) {
+    console.error("[send-next] select failed:", selectErr.message, "batch:", batch_id);
+    return NextResponse.json({ error: "Database error", detail: selectErr.message }, { status: 500 });
+  }
+
+  const email = rows?.[0] ?? null;
 
   if (!email) {
     // Queue exhausted — finalize history record
-    const { data: rows } = await db.from("email_queue").select("status").eq("batch_id", batch_id);
-    const all       = rows ?? [];
+    const { data: allRows } = await db.from("email_queue").select("status").eq("batch_id", batch_id);
+    const all       = allRows ?? [];
     const delivered = all.filter(r => r.status === "delivered").length;
     const failed    = all.filter(r => r.status === "failed").length;
     void db.from("event_comm_history")
@@ -40,16 +45,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ done: true, delivered, failed, total: all.length });
   }
 
+  // Mark as "sending" to prevent double-send if tab reloads mid-flight.
+  // Guard: .eq("status", email.status) skips if already re-claimed by concurrent call.
+  const { error: claimErr } = await db
+    .from("email_queue")
+    .update({ status: "sending", attempts: email.attempts + 1 })
+    .eq("id", email.id)
+    .eq("status", email.status);
+
+  if (claimErr) {
+    console.error("[send-next] claim failed:", claimErr.message, "id:", email.id);
+    return NextResponse.json({ error: "Database error", detail: claimErr.message }, { status: 500 });
+  }
+
   const result = await sendSingleEmail({
     to:      email.recipient_email,
     subject: email.subject,
     html:    email.html_body,
   });
 
-  // Transient failures (network timeout, rate limit) are automatically
-  // re-queued up to MAX_ATTEMPTS times. Permanent failures (invalid address)
-  // are never retried.
-  const willRetry  = !result.ok && result.isTransient === true && email.attempts < MAX_ATTEMPTS;
+  const attempts    = email.attempts + 1;
+  const willRetry   = !result.ok && result.isTransient === true && attempts < MAX_ATTEMPTS;
   const finalStatus = result.ok ? "delivered" : willRetry ? "queued" : "failed";
 
   await db.from("email_queue").update({
@@ -63,15 +79,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     sent_at:        result.ok ? new Date().toISOString() : null,
   }).eq("id", email.id);
 
+  console.log(`[send-next] batch=${batch_id} to=${email.recipient_email} status=${finalStatus} attempt=${attempts}`);
+
   return NextResponse.json({
-    done:           false,
-    email:          email.recipient_email,
-    status:         finalStatus,           // 'delivered' | 'queued' (retrying) | 'failed'
-    aws_message_id: result.messageId      ?? null,
-    error:          result.error          ?? null,
-    error_code:     result.errorCategory  ?? null,
-    is_permanent:   result.ok ? null : (result.isTransient === false ? true : false),
-    attempts:       email.attempts,
-    retrying:       willRetry,            // true = this email was re-queued for automatic retry
+    done:         false,
+    email:        email.recipient_email,
+    status:       finalStatus,
+    error:        result.error          ?? null,
+    error_code:   result.errorCategory  ?? null,
+    is_permanent: result.ok ? null : (result.isTransient === false ? true : false),
+    attempts,
+    retrying:     willRetry,
   });
 }
