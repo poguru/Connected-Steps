@@ -2,8 +2,7 @@
  * Razorpay server-side API client.
  * Uses HTTP Basic Auth (key_id : key_secret).
  *
- * Only reads payment/order data — never creates or mutates anything.
- * Used by the admin reconciliation tool and the webhook handler.
+ * Used by the admin reconciliation tool, webhook handler, and refund flow.
  */
 
 const RZP_BASE = "https://api.razorpay.com/v1";
@@ -133,6 +132,54 @@ export async function searchPayments(opts: {
   const data = await res.json() as { entity: string; count: number; items: RzpPayment[] };
   return data.items ?? [];
 }
+
+// ── Refund ────────────────────────────────────────────────────────────────────
+
+export interface RzpRefund {
+  id:          string;
+  entity:      "refund";
+  amount:      number;       // paise
+  currency:    string;
+  payment_id:  string;
+  status:      "pending" | "processed" | "failed";
+  speed_processed?: string;
+  created_at:  number;
+  notes?:      Record<string, string>;
+}
+
+export interface CreateRefundOptions {
+  amount?:  number;   // paise; omit for full refund
+  speed?:   "normal" | "optimum";
+  notes?:   Record<string, string>;
+}
+
+/** Create a refund for a captured Razorpay payment. */
+export async function createRefund(
+  paymentId: string,
+  opts: CreateRefundOptions = {},
+): Promise<RzpRefund> {
+  const body: Record<string, unknown> = {
+    speed: opts.speed ?? "normal",
+  };
+  if (opts.amount != null) body.amount = opts.amount;
+  if (opts.notes)          body.notes  = opts.notes;
+
+  const res = await fetch(`${RZP_BASE}/payments/${paymentId}/refund`, {
+    method:  "POST",
+    headers: { Authorization: auth(), "Content-Type": "application/json" },
+    body:    JSON.stringify(body),
+    cache:   "no-store",
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Razorpay refund API ${res.status}: ${text}`);
+  }
+
+  return res.json() as Promise<RzpRefund>;
+}
+
+// ── Search ────────────────────────────────────────────────────────────────────
 
 /**
  * Search for a payment by UPI Transaction ID (UTR / RRN).

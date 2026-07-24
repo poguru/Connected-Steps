@@ -206,10 +206,52 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
     finally { setScanLoading(false); }
   }
 
-  async function cancel(id: string) {
-    if (!confirm("Cancel this registration?")) return;
-    const res = await fetch("/api/admin/events/registrations", { method: "PATCH", headers, body: JSON.stringify({ id, status: "cancelled" }) });
-    if (res.ok) setRegs(r => r.map(x => x.id === id ? { ...x, status: "cancelled" } : x));
+  // ── Cancel & Refund modal ──────────────────────────────────────────────────
+  interface CancelTarget { id: string; code: string; name: string; email: string; payment_status: string; final_price: number; razorpay_payment_id: string | null; }
+  const [cancelTarget,   setCancelTarget]   = useState<CancelTarget | null>(null);
+  const [cancelReason,   setCancelReason]   = useState("");
+  const [cancelSendMail, setCancelSendMail] = useState(true);
+  const [cancelLoading,  setCancelLoading]  = useState(false);
+  const [cancelResult,   setCancelResult]   = useState<{ success?: boolean; refund_status?: string; razorpay_payment_id?: string | null; final_price?: number; message?: string; error?: string } | null>(null);
+  const [refundLoading,  setRefundLoading]  = useState(false);
+  const [refundResult,   setRefundResult]   = useState<{ success?: boolean; refund_id?: string; amount_inr?: number; message?: string; error?: string } | null>(null);
+  const [refundAmount,   setRefundAmount]   = useState("");
+
+  function openCancelModal(r: Reg) {
+    setCancelTarget({ id: r.id, code: r.registration_code, name: r.user_name, email: r.user_email, payment_status: r.payment_status, final_price: r.final_price, razorpay_payment_id: r.razorpay_payment_id });
+    setCancelReason(""); setCancelSendMail(true); setCancelResult(null); setRefundResult(null); setRefundAmount("");
+  }
+
+  async function submitCancel() {
+    if (!cancelTarget) return;
+    setCancelLoading(true); setCancelResult(null);
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/registrations/${cancelTarget.code}/cancel`, {
+        method: "POST", headers,
+        body: JSON.stringify({ reason: cancelReason || "Cancelled by admin", send_email: cancelSendMail }),
+      });
+      const data = await res.json();
+      setCancelResult(data);
+      if (res.ok && data.success) {
+        setRegs(r => r.map(x => x.id === cancelTarget.id ? { ...x, status: "cancelled" } : x));
+      }
+    } catch { setCancelResult({ error: "Network error" }); }
+    finally { setCancelLoading(false); }
+  }
+
+  async function submitRefund() {
+    if (!cancelTarget || !cancelResult?.razorpay_payment_id) return;
+    setRefundLoading(true); setRefundResult(null);
+    const amountPaise = refundAmount ? Math.round(parseFloat(refundAmount) * 100) : undefined;
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/registrations/${cancelTarget.code}/refund`, {
+        method: "POST", headers,
+        body: JSON.stringify({ amount: amountPaise, mode: refundAmount ? "partial" : "full" }),
+      });
+      const data = await res.json();
+      setRefundResult(data);
+    } catch { setRefundResult({ error: "Network error" }); }
+    finally { setRefundLoading(false); }
   }
 
   async function resendQR(id: string, name: string) {
@@ -686,7 +728,7 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
                               </button>
                             )}
                             {r.status !== "cancelled" && (
-                              <button onClick={() => cancel(r.id)}
+                              <button onClick={() => openCancelModal(r)}
                                 style={{ padding: "4px 10px", borderRadius: 5, border: "1px solid rgba(239,68,68,0.3)", background: "transparent", color: "#f09595", cursor: "pointer", fontSize: "0.75rem", fontFamily: "inherit" }}>
                                 Cancel
                               </button>
@@ -935,6 +977,148 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
           }}
           onClose={() => setTshirtCameraOpen(false)}
         />
+      )}
+
+      {/* ── Cancel & Refund Modal ───────────────────────────────────────────── */}
+      {cancelTarget && (
+        <div onClick={() => { if (!cancelLoading && !refundLoading) setCancelTarget(null); }}
+          style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ width: "100%", maxWidth: 480, background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: "1.5rem", maxHeight: "90vh", overflowY: "auto" as const }}>
+
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "1.25rem" }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: "1rem", color: "#fff" }}>Cancel Registration</div>
+                <div style={{ fontSize: 11, color: "#555", marginTop: 3 }}>
+                  {cancelTarget.name} · <span style={{ fontFamily: "monospace", color: "#e8620a" }}>{cancelTarget.code}</span>
+                </div>
+              </div>
+              <button onClick={() => setCancelTarget(null)} disabled={cancelLoading || refundLoading}
+                style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: "1.4rem", lineHeight: 1 }}>×</button>
+            </div>
+
+            {/* Participant info */}
+            <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "12px 14px", marginBottom: "1rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 12 }}>
+                <div style={{ color: "#666" }}>Name</div><div style={{ color: "#ccc" }}>{cancelTarget.name}</div>
+                <div style={{ color: "#666" }}>Email</div><div style={{ color: "#ccc", overflow: "hidden", textOverflow: "ellipsis" }}>{cancelTarget.email}</div>
+                <div style={{ color: "#666" }}>Payment</div>
+                <div>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 999,
+                    background: cancelTarget.payment_status === "paid" ? "rgba(74,222,128,0.1)" : "rgba(234,179,8,0.1)",
+                    color: cancelTarget.payment_status === "paid" ? "#4ade80" : "#eab308" }}>
+                    {cancelTarget.payment_status.toUpperCase()}
+                  </span>
+                </div>
+                {cancelTarget.payment_status === "paid" && (
+                  <><div style={{ color: "#666" }}>Amount</div><div style={{ color: "#fff", fontWeight: 700 }}>₹{cancelTarget.final_price.toLocaleString("en-IN")}</div></>
+                )}
+              </div>
+            </div>
+
+            {!cancelResult?.success ? (
+              /* ── Step 1: Confirm cancellation ── */
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: 11, color: "#555", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: ".06em", marginBottom: 6 }}>
+                    Cancellation Reason
+                  </label>
+                  <textarea
+                    value={cancelReason}
+                    onChange={e => setCancelReason(e.target.value)}
+                    placeholder="Optional — e.g. participant request, duplicate registration…"
+                    style={{ width: "100%", minHeight: 72, padding: "8px 10px", resize: "vertical",
+                      background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: 7, color: "#ccc", fontSize: 12, fontFamily: "inherit",
+                      boxSizing: "border-box" as const, outline: "none" }}
+                  />
+                </div>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
+                  <input type="checkbox" checked={cancelSendMail} onChange={e => setCancelSendMail(e.target.checked)} />
+                  Send cancellation email to participant
+                </label>
+                {cancelTarget.payment_status === "paid" && (
+                  <div style={{ padding: "10px 12px", background: "rgba(234,179,8,0.07)", border: "1px solid rgba(234,179,8,0.2)", borderRadius: 8, fontSize: 12, color: "#eab308" }}>
+                    This registration has a paid amount of ₹{cancelTarget.final_price.toLocaleString("en-IN")}.
+                    After cancelling, you can process the refund in the next step.
+                  </div>
+                )}
+                {cancelResult?.error && (
+                  <div style={{ padding: "10px 12px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, fontSize: 12, color: "#f87171" }}>
+                    {cancelResult.error}
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button onClick={submitCancel} disabled={cancelLoading}
+                    style={{ flex: 1, padding: 10, background: "#dc2626", border: "none", borderRadius: 8,
+                      color: "#fff", fontWeight: 700, fontSize: 13, cursor: cancelLoading ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                    {cancelLoading ? "Cancelling…" : "Cancel Registration"}
+                  </button>
+                  <button onClick={() => setCancelTarget(null)} disabled={cancelLoading}
+                    style={{ padding: "10px 18px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#aaa", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                    Back
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* ── Step 2: Refund (if paid) ── */
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ padding: "10px 12px", background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.2)", borderRadius: 8, fontSize: 13, color: "#4ade80" }}>
+                  ✓ {cancelResult.message}
+                </div>
+
+                {cancelResult.refund_status === "pending" && cancelResult.razorpay_payment_id ? (
+                  <>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginTop: 4 }}>Process Refund</div>
+                    <div style={{ fontSize: 12, color: "#888", lineHeight: 1.5 }}>
+                      Full refund: ₹{(cancelResult.final_price ?? 0).toLocaleString("en-IN")} · or enter a custom amount below.
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: 11, color: "#555", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: ".06em", marginBottom: 6 }}>
+                        Refund Amount (₹) — leave blank for full refund
+                      </label>
+                      <input type="number" min="1" max={cancelResult.final_price} step="1"
+                        value={refundAmount} onChange={e => setRefundAmount(e.target.value)}
+                        placeholder={`${cancelResult.final_price ?? ""} (full refund)`}
+                        style={{ width: "100%", padding: "8px 10px", background: "rgba(255,255,255,0.04)",
+                          border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#ccc",
+                          fontSize: 12, fontFamily: "inherit", boxSizing: "border-box" as const, outline: "none" }}
+                      />
+                    </div>
+                    {refundResult?.error && (
+                      <div style={{ padding: "10px 12px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, fontSize: 12, color: "#f87171" }}>
+                        {refundResult.error}
+                      </div>
+                    )}
+                    {refundResult?.success ? (
+                      <div style={{ padding: "10px 12px", background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.2)", borderRadius: 8, fontSize: 12, color: "#4ade80" }}>
+                        ✓ {refundResult.message} · Refund ID: <span style={{ fontFamily: "monospace" }}>{refundResult.refund_id}</span>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", gap: 10 }}>
+                        <button onClick={submitRefund} disabled={refundLoading}
+                          style={{ flex: 1, padding: 10, background: "#16a34a", border: "none", borderRadius: 8,
+                            color: "#fff", fontWeight: 700, fontSize: 13, cursor: refundLoading ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                          {refundLoading ? "Processing…" : `Refund ₹${refundAmount ? parseFloat(refundAmount).toLocaleString("en-IN") : (cancelResult.final_price ?? 0).toLocaleString("en-IN")}`}
+                        </button>
+                        <button onClick={() => setCancelTarget(null)}
+                          style={{ padding: "10px 18px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#aaa", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                          Skip Refund
+                        </button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <button onClick={() => setCancelTarget(null)}
+                    style={{ padding: "10px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#ccc", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                    Close
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* ── Admin Register Participant Modal ──────────────────────────────── */}

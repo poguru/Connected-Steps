@@ -24,6 +24,7 @@ interface Participant {
 
 interface Reg {
   id: string;
+  event_id: string;
   registration_code: string;
   payment_status: string;
   status: string;
@@ -171,10 +172,33 @@ function ParticipantRow({ p }: { p: Participant }) {
   );
 }
 
-function RegistrationCard({ reg, userToken }: { reg: Reg; userToken: string }) {
-  const [expanded, setExpanded] = useState(true);
+function RegistrationCard({ reg, userToken, isUpcoming }: { reg: Reg; userToken: string; isUpcoming: boolean }) {
+  const [expanded,      setExpanded]      = useState(true);
+  const [cancelOpen,    setCancelOpen]    = useState(false);
+  const [cancelReason,  setCancelReason]  = useState("");
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelResult,  setCancelResult]  = useState<{ success?: boolean; message?: string; error?: string } | null>(null);
+
   const ev = reg.events;
   const eventHref = ev?.share_slug ? `/events/${ev.share_slug}` : "#";
+
+  async function submitCancelRequest(e: React.FormEvent) {
+    e.preventDefault();
+    if (!cancelReason.trim() || cancelReason.trim().length < 10) return;
+    setCancelLoading(true); setCancelResult(null);
+    try {
+      const res  = await fetch("/api/events/cancellation-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-user-token": userToken },
+        body: JSON.stringify({ registration_code: reg.registration_code, event_id: reg.event_id, reason: cancelReason }),
+        credentials: "include",
+      });
+      const data = await res.json();
+      setCancelResult(data);
+      if (res.ok) { setCancelReason(""); }
+    } catch { setCancelResult({ error: "Network error. Please try again." }); }
+    finally { setCancelLoading(false); }
+  }
 
   const participants = reg.participants ?? [];
 
@@ -257,7 +281,78 @@ function RegistrationCard({ reg, userToken }: { reg: Reg; userToken: string }) {
           <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>
             Participants & QR Codes
           </div>
+
           {participants.map(p => <ParticipantRow key={p.id} p={p} />)}
+        </div>
+      )}
+
+      {/* Cancellation section — upcoming confirmed events only */}
+      {isUpcoming && reg.status !== "cancelled" && (
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", padding: "12px 16px" }}>
+          {!cancelOpen ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+              <div style={{ fontSize: 11, color: "#444" }}>
+                Need to cancel?{" "}
+                <a href="mailto:info@connectedsteps.in" style={{ color: "#666", textDecoration: "none" }}>info@connectedsteps.in</a>
+                {" · "}
+                <a href="tel:+919876543210" style={{ color: "#666", textDecoration: "none" }}>Contact Support</a>
+              </div>
+              <button onClick={() => { setCancelOpen(true); setCancelResult(null); }}
+                style={{ fontSize: 11, fontWeight: 600, padding: "4px 12px", borderRadius: 6,
+                  background: "transparent", border: "1px solid rgba(239,68,68,0.25)",
+                  color: "#f87171", cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
+                Request Cancellation
+              </button>
+            </div>
+          ) : (
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#f87171", marginBottom: 8 }}>
+                Request Cancellation
+              </div>
+              <div style={{ fontSize: 11, color: "#666", marginBottom: 10, lineHeight: 1.5 }}>
+                Cancellations are processed by our team within 1–2 business days.
+                Refunds for paid registrations are credited within 5–7 business days.
+              </div>
+              {cancelResult?.success ? (
+                <div style={{ padding: "10px 12px", borderRadius: 8, background: "rgba(74,222,128,0.08)",
+                  border: "1px solid rgba(74,222,128,0.2)", fontSize: 12, color: "#4ade80" }}>
+                  {cancelResult.message}
+                </div>
+              ) : (
+                <form onSubmit={submitCancelRequest} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <textarea
+                    value={cancelReason}
+                    onChange={e => setCancelReason(e.target.value)}
+                    placeholder="Please describe your reason for cancellation (required, min 10 characters)…"
+                    required
+                    style={{ width: "100%", minHeight: 70, padding: "8px 10px", resize: "vertical",
+                      background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: 7, color: "#ccc", fontSize: 12, fontFamily: "inherit",
+                      boxSizing: "border-box" as const, outline: "none" }}
+                  />
+                  {cancelResult?.error && (
+                    <div style={{ fontSize: 11, color: "#f87171" }}>{cancelResult.error}</div>
+                  )}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button type="submit" disabled={cancelLoading || cancelReason.trim().length < 10}
+                      style={{ flex: 1, padding: "7px 0", borderRadius: 7,
+                        background: cancelLoading || cancelReason.trim().length < 10 ? "rgba(239,68,68,0.3)" : "rgba(239,68,68,0.8)",
+                        border: "none", color: "#fff", fontSize: 12, fontWeight: 700,
+                        cursor: cancelLoading || cancelReason.trim().length < 10 ? "not-allowed" : "pointer",
+                        fontFamily: "inherit" }}>
+                      {cancelLoading ? "Submitting…" : "Submit Request"}
+                    </button>
+                    <button type="button" onClick={() => { setCancelOpen(false); setCancelResult(null); setCancelReason(""); }}
+                      style={{ padding: "7px 14px", borderRadius: 7, background: "rgba(255,255,255,0.06)",
+                        border: "1px solid rgba(255,255,255,0.08)", color: "#888", fontSize: 12,
+                        cursor: "pointer", fontFamily: "inherit" }}>
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -357,7 +452,7 @@ export default function MyEventsDashboard() {
           </div>
         ) : (
           shown.map(r => (
-            <RegistrationCard key={r.id} reg={r} userToken={userToken} />
+            <RegistrationCard key={r.id} reg={r} userToken={userToken} isUpcoming={tab === "upcoming"} />
           ))
         )}
       </div>

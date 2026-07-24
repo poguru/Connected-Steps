@@ -72,6 +72,7 @@ const NAV_ITEMS = [
   { key: "sponsors",      icon: "🤝", label: "Sponsors",       inline: false, href: "sponsors"      },
   { key: "volunteers",    icon: "🙋", label: "Volunteers",     inline: false, href: "volunteers"    },
   { key: "services",      icon: "🔧", label: "Services",       inline: false, href: "services"      },
+  { key: "cancellations", icon: "↩️", label: "Cancellations",  inline: false, href: "cancellations" },
   { key: "finance",       icon: "💰", label: "Finance",        inline: true  },
   { key: "settings",      icon: "⚙️", label: "Settings",       inline: true  },
 ] as const;
@@ -721,6 +722,7 @@ export default function EventManagePage() {
                   {[
                     { icon: "✏️", label: "Edit Event Details",  desc: "Title, dates, location, media",    href: `/admin/events/new?edit=${eventId}` },
                     { icon: "📢", label: "Communication Hub",   desc: "Emails and push notifications",    href: `/admin/events/${eventId}/communicate` },
+                    { icon: "💸", label: "Refund Policy",       desc: "Set cancellation & refund rules",  href: `/admin/events/${eventId}/refund-policy` },
                     { icon: "📈", label: "Analytics",           desc: "Registration trends",               href: `/admin/events/${eventId}/analytics` },
                     { icon: "🤝", label: "Sponsors",            desc: "Add and manage event sponsors",    href: `/admin/events/${eventId}/sponsors` },
                   ].map((item, i) => (
