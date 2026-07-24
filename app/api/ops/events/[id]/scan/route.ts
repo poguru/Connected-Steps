@@ -90,8 +90,10 @@ export async function POST(
   if (decoded) {
     if (decoded.eventId !== eventId) {
       return NextResponse.json({
+        valid: false,
+        code: "WRONG_EVENT",
         error: "This QR code belongs to a different event",
-        valid: false, code: "WRONG_EVENT",
+        message: "This QR code belongs to a different event. Please check you are at the correct event.",
       }, { status: 400 });
     }
     const { data } = await db
@@ -114,16 +116,40 @@ export async function POST(
       participant = data;
     }
     if (!participant) {
-      return NextResponse.json({ error: "Invalid QR code", valid: false }, { status: 400 });
+      return NextResponse.json({
+        valid: false,
+        code: "INVALID_QR",
+        error: "Invalid QR code",
+        message: "This QR code could not be recognised. Please try scanning again or enter the BIB number manually.",
+      }, { status: 400 });
     }
   }
 
   if (!participant) {
-    return NextResponse.json({ error: "Participant not found for this QR code", valid: false }, { status: 404 });
+    return NextResponse.json({
+      valid: false,
+      code: "NOT_FOUND",
+      error: "Participant not found for this QR code",
+      message: "No participant found for this QR code. The code may be invalid or belong to a different event.",
+    }, { status: 404 });
   }
 
   if (participant.status === "cancelled") {
-    return NextResponse.json({ error: "This registration has been cancelled", valid: false }, { status: 409 });
+    return NextResponse.json({
+      valid: false,
+      code: "CANCELLED",
+      error: "This registration has been cancelled",
+      message: "This registration has been cancelled and is no longer valid.",
+    }, { status: 409 });
+  }
+
+  if (participant.status === "pending_payment") {
+    return NextResponse.json({
+      valid: false,
+      code: "PENDING_PAYMENT",
+      error: "Payment not completed for this registration",
+      message: "Payment has not been completed for this registration. The participant should complete payment before proceeding.",
+    }, { status: 409 });
   }
 
   const now             = new Date().toISOString();
@@ -137,7 +163,9 @@ export async function POST(
     if (service === "tshirt" && !participant.tshirt_size) {
       return NextResponse.json({
         valid: false,
+        code: "NO_TSHIRT_SIZE",
         error: "No T-shirt size recorded for this participant",
+        message: "No T-shirt size was recorded for this participant during registration. Contact the event administrator.",
         participant: participantCard(participant, participantName),
       }, { status: 409 });
     }

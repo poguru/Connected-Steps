@@ -22,11 +22,12 @@ interface ParticipantInfo {
 interface ApiResponse {
   valid: boolean;
   already_done?: boolean;
-  message: string;
+  message?: string;
   done_at?: string | null;
   done_by?: string | null;
   participant?: ParticipantInfo;
   error?: string;
+  code?: string;
 }
 
 // Keep legacy ScanResult export so existing imports don't break
@@ -49,6 +50,17 @@ const CONFIRM_LABELS: Record<string, string> = {
   medal:     "Issue Medal",
   bib:       "Confirm BIB Collected",
 };
+
+const ERROR_TITLES: Record<string, string> = {
+  CANCELLED:       "Registration Cancelled",
+  NOT_FOUND:       "Participant Not Found",
+  WRONG_EVENT:     "Wrong Event",
+  PENDING_PAYMENT: "Payment Incomplete",
+  INVALID_QR:      "Invalid QR Code",
+  NO_TSHIRT_SIZE:  "T-Shirt Not Recorded",
+};
+
+const FALLBACK_ERROR_MSG = "Unable to process this QR code. Please contact an event administrator.";
 
 const DISPLAY_SECS = 10;
 
@@ -175,6 +187,7 @@ export default function ScannerModule({
       const data = await res.json() as ApiResponse;
 
       if (!res.ok || !data.valid) {
+        console.error("[Ops Scanner] QR validation failed — code:", data.code, "error:", data.error);
         setActionData(data);
         setPhase("scan_error");
         return;
@@ -201,7 +214,11 @@ export default function ScannerModule({
       });
       const data = await res.json() as ApiResponse;
       setActionData(data);
-      if (!res.ok || !data.valid) { setPhase("scan_error"); return; }
+      if (!res.ok || !data.valid) {
+        console.error("[Ops Scanner] Confirm failed — code:", data.code, "error:", data.error);
+        setPhase("scan_error");
+        return;
+      }
       if (!data.already_done) {
         setSessionCount(c => {
           const next = c + 1;
@@ -411,7 +428,7 @@ export default function ScannerModule({
                    : "Error"}
                 </div>
                 <div style={{ fontSize: 13, color: "#aaa", marginTop: 3 }}>
-                  {actionData?.message}
+                  {actionData?.message ?? actionData?.error ?? FALLBACK_ERROR_MSG}
                 </div>
               </div>
             </div>
@@ -488,9 +505,11 @@ export default function ScannerModule({
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
               <span style={{ fontSize: 36, lineHeight: 1 }}>❌</span>
               <div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: "#f87171" }}>Invalid QR Code</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#f87171" }}>
+                  {(actionData?.code && ERROR_TITLES[actionData.code]) ?? "Scan Failed"}
+                </div>
                 <div style={{ fontSize: 13, color: "#aaa", marginTop: 3 }}>
-                  {actionData?.error ?? actionData?.message ?? "This QR code could not be verified."}
+                  {actionData?.message ?? actionData?.error ?? FALLBACK_ERROR_MSG}
                 </div>
               </div>
             </div>
