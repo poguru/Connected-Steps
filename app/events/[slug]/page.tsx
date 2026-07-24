@@ -18,7 +18,7 @@ interface Event {
   registration_closes_at: string | null;
   distance_categories:    string[] | null;
   location: string; organizer: string | null;
-  max_participants: number | null; registration_required: boolean;
+  max_participants: number | null; participant_count: number; registration_required: boolean;
   price: number; featured: boolean;
   terms_conditions: string | null; maps_url: string | null;
   status: string; share_slug: string | null;
@@ -71,20 +71,6 @@ async function getSponsors(eventId: string): Promise<Sponsor[]> {
   } catch { return []; }
 }
 
-async function getSlotCount(eventId: string): Promise<number> {
-  try {
-    const db = getSupabaseServer();
-    const { count } = await db
-      .from("event_registrations")
-      .select("id", { count: "exact", head: true })
-      .eq("event_id", eventId)
-      .eq("status", "confirmed");
-    return count ?? 0;
-  } catch {
-    return 0;
-  }
-}
-
 // ── Metadata ──────────────────────────────────────────────────────────────────
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -121,15 +107,17 @@ function fmtTime(t: string | null) {
 
 export default async function EventPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [ev, slotsTaken] = await Promise.all([getEvent(slug), (async () => 0)()]);
+  const ev = await getEvent(slug);
   if (!ev) notFound();
 
-  const [slotsUsed, sponsors] = await Promise.all([
-    ev.max_participants ? getSlotCount(ev.id) : Promise.resolve(0),
-    getSponsors(ev.id),
-  ]);
-  const slotsLeft = ev.max_participants ? ev.max_participants - slotsUsed : null;
-  const isFull    = slotsLeft !== null && slotsLeft <= 0;
+  const sponsors = await getSponsors(ev.id);
+
+  // Use participant_count (same denormalized field the home page card uses) so
+  // the full/available state is always consistent across all pages.
+  const slotsLeft = ev.max_participants !== null
+    ? Math.max(0, ev.max_participants - (ev.participant_count ?? 0))
+    : null;
+  const isFull = slotsLeft !== null && slotsLeft === 0;
 
   const conf      = TYPE[ev.event_type] ?? TYPE.running;
   const time      = fmtTime(ev.start_time);
