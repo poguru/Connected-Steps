@@ -1,7 +1,7 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
-// POST /api/events/waitlist â€” public endpoint to join waitlist for a sold-out event
+// POST /api/events/waitlist -- public endpoint to join waitlist for a sold-out event
 export async function POST(req: NextRequest) {
   try {
     const { event_id, name, email, phone, distance_category, notes } =
@@ -14,6 +14,11 @@ export async function POST(req: NextRequest) {
 
     const db = getSupabaseServer();
 
+    // Release any expired slot reservations before checking capacity
+    void (async () => {
+      try { await db.rpc("release_expired_slots"); } catch { /* non-critical */ }
+    })();
+
     // Verify event is published and at capacity (waitlist only makes sense for full events)
     const { data: ev } = await db
       .from("events")
@@ -25,16 +30,22 @@ export async function POST(req: NextRequest) {
     if (!ev) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
     const isFull = ev.max_participants !== null && (ev.participant_count ?? 0) >= ev.max_participants;
-    if (!isFull) return NextResponse.json({ error: "Event still has spots â€” please register directly" }, { status: 400 });
+    if (!isFull) return NextResponse.json({ error: "Event still has spots -- please register directly" }, { status: 400 });
 
-    // Check already registered
+    // Only block users who have a CONFIRMED registration (paid or free, not cancelled).
+    // Pending/expired rows from abandoned or failed payment flows must NOT block waitlist
+    // enrollment -- those users never received a confirmed slot.
     const { data: existing } = await db
       .from("event_registrations")
-      .select("id")
+      .select("id, payment_status, status")
       .eq("event_id", event_id)
       .eq("user_email", email.toLowerCase().trim())
       .maybeSingle();
-    if (existing) return NextResponse.json({ error: "You are already registered for this event" }, { status: 400 });
+    const isConfirmedReg = existing
+      && existing.status !== "cancelled"
+      && (existing.payment_status === "paid" || existing.payment_status === "free");
+    if (isConfirmedReg)
+      return NextResponse.json({ error: "You are already registered for this event" }, { status: 400 });
 
     // Check already on waitlist
     const { data: onList } = await db

@@ -406,6 +406,10 @@ async function handleMultiParticipant(
   tokenEmail: string,
   _req: NextRequest,
 ): Promise<NextResponse> {
+  void (async () => {
+    try { await getSupabaseServer().rpc("release_expired_slots"); } catch { /* non-critical */ }
+  })();
+
   const {
     event_id,
     email: accountEmailRaw,
