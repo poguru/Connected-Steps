@@ -18,6 +18,36 @@ const EDITABLE_FIELDS = new Set([
   "visibility",
 ]);
 
+// Columns that must be null rather than empty string when blank
+const NULLABLE_FIELDS = new Set([
+  "short_description", "description", "cover_image", "banner_image",
+  "end_date", "start_time", "end_time", "meeting_point", "maps_url",
+  "registration_opens_at", "registration_closes_at", "early_bird_ends_at",
+  "terms_conditions", "refund_policy", "cancellation_policy",
+  "organizer", "organizer_email", "organizer_phone",
+  "support_email", "support_phone", "website",
+]);
+
+// Columns that store a local datetime string from <input type="datetime-local">
+// and must be converted to a proper ISO 8601 string with timezone for Postgres TIMESTAMPTZ
+const TIMESTAMP_FIELDS = new Set([
+  "registration_opens_at", "registration_closes_at", "early_bird_ends_at",
+]);
+
+function sanitizeValue(key: string, val: unknown): unknown {
+  // Convert empty strings to null for nullable fields
+  if (NULLABLE_FIELDS.has(key) && val === "") return null;
+
+  // Convert datetime-local strings ("2026-07-26T01:30") to ISO 8601 with UTC offset
+  // The input is in IST (UTC+5:30) so append the offset so Postgres stores it correctly
+  if (TIMESTAMP_FIELDS.has(key) && typeof val === "string" && val !== "") {
+    // datetime-local format: "YYYY-MM-DDTHH:MM" — treat as IST (UTC+5:30)
+    return `${val}:00+05:30`;
+  }
+
+  return val;
+}
+
 // GET /api/admin/events/[id]/edit — return all editable event fields
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -62,10 +92,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = await req.json() as { fields: Record<string, unknown>; reason?: string };
   const { fields = {}, reason } = body;
 
-  // Filter to only editable fields
+  // Filter to only editable fields and sanitize values
   const updates: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(fields)) {
-    if (EDITABLE_FIELDS.has(key)) updates[key] = val;
+    if (EDITABLE_FIELDS.has(key)) updates[key] = sanitizeValue(key, val);
   }
 
   if (Object.keys(updates).length === 0)
@@ -112,8 +142,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .single();
 
   if (updateErr) {
-    console.error("[event-edit] update error:", updateErr.message);
-    return NextResponse.json({ error: "Database error" }, { status: 500 });
+    console.error("[event-edit] update error:", updateErr.message, "code:", updateErr.code, "details:", updateErr.details);
+    return NextResponse.json({ error: `Save failed: ${updateErr.message}` }, { status: 500 });
   }
 
   // Write audit log entries — one row per changed field
