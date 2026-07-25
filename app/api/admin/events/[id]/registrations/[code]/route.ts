@@ -40,6 +40,25 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   if (error || !data) return NextResponse.json({ error: "Registration not found" }, { status: 404 });
 
+  // Fetch participants for accurate service statuses.
+  // The volunteer scan route writes check-in, t-shirt, breakfast, medal, and BIB
+  // operations to event_participants — not event_registrations — so we must read
+  // service columns from event_participants to get current state.
+  const { data: participants } = await db
+    .from("event_participants")
+    .select(`
+      id, status, first_name, last_name,
+      tshirt_size,
+      checked_in_at, checked_in_by,
+      tshirt_issued, tshirt_issued_at, tshirt_issued_by,
+      breakfast_availed, breakfast_availed_at, breakfast_availed_by,
+      medal_issued, medal_issued_at, medal_issued_by,
+      bib_collected_at, bib_collected_by
+    `)
+    .eq("registration_id", data.id)
+    .neq("status", "cancelled")
+    .order("created_at" as never);
+
   // Fetch invoice if exists
   const { data: invoice } = await db
     .from("invoices")
@@ -56,9 +75,10 @@ export async function GET(req: NextRequest, { params }: Params) {
     .limit(10);
 
   return NextResponse.json({
-    registration: data,
-    invoice:      invoice ?? null,
-    email_logs:   emailLogs ?? [],
+    registration:  data,
+    participants:  participants ?? [],
+    invoice:       invoice ?? null,
+    email_logs:    emailLogs ?? [],
   });
 }
 

@@ -51,6 +51,27 @@ interface Registration {
   } | null;
 }
 
+interface EventParticipant {
+  id:                    string;
+  status:                string;
+  first_name:            string;
+  last_name:             string | null;
+  tshirt_size:           string | null;
+  checked_in_at:         string | null;
+  checked_in_by:         string | null;
+  tshirt_issued:         boolean;
+  tshirt_issued_at:      string | null;
+  tshirt_issued_by:      string | null;
+  breakfast_availed:     boolean;
+  breakfast_availed_at:  string | null;
+  breakfast_availed_by:  string | null;
+  medal_issued:          boolean;
+  medal_issued_at:       string | null;
+  medal_issued_by:       string | null;
+  bib_collected_at:      string | null;
+  bib_collected_by:      string | null;
+}
+
 interface Invoice {
   invoice_number: string;
   invoice_status: string;
@@ -91,12 +112,13 @@ export default function ParticipantDetailPage() {
   const eventId = params.id as string;
   const code    = params.code as string;
 
-  const [reg,     setReg]     = useState<Registration | null>(null);
-  const [invoice, setInvoice] = useState<Invoice | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState("");
-  const [action,  setAction]  = useState("");   // "resending" | "cancelling" | ""
-  const [toast,   setToast]   = useState("");
+  const [reg,          setReg]          = useState<Registration | null>(null);
+  const [participants, setParticipants] = useState<EventParticipant[]>([]);
+  const [invoice,      setInvoice]      = useState<Invoice | null>(null);
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState("");
+  const [action,       setAction]       = useState("");   // "resending" | "cancelling" | ""
+  const [toast,        setToast]        = useState("");
 
   useEffect(() => { loadData(); /* eslint-disable-next-line */ }, []);
 
@@ -107,6 +129,7 @@ export default function ParticipantDetailPage() {
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Not found"); return; }
       setReg(data.registration);
+      setParticipants(data.participants ?? []);
       setInvoice(data.invoice ?? null);
     } catch (e) { setError(String(e)); }
     finally { setLoading(false); }
@@ -158,7 +181,8 @@ export default function ParticipantDetailPage() {
     </div>
   );
 
-  const ev = reg.events;
+  const ev  = reg.events;
+  const svc = participants[0] ?? null;  // primary participant — authoritative source for service statuses
   const isCancelled = reg.status === "cancelled";
 
   return (
@@ -200,10 +224,11 @@ export default function ParticipantDetailPage() {
             {statusBadge(reg.status)}
             {paymentBadge(reg.payment_status)}
             {emailBadge(reg.email_status)}
-            {reg.checked_in_at && <DSBadge color="blue">Checked In</DSBadge>}
-            {reg.breakfast_availed && <DSBadge color="green">Breakfast ✓</DSBadge>}
-            {reg.tshirt_size && <DSBadge color="blue">👕 {reg.tshirt_size}</DSBadge>}
-            {reg.tshirt_issued && <DSBadge color="green">T-Shirt Issued ✓</DSBadge>}
+            {svc?.checked_in_at && <DSBadge color="blue">Checked In</DSBadge>}
+            {svc?.breakfast_availed && <DSBadge color="green">Breakfast ✓</DSBadge>}
+            {(svc?.tshirt_size ?? reg.tshirt_size) && <DSBadge color="blue">👕 {svc?.tshirt_size ?? reg.tshirt_size}</DSBadge>}
+            {svc?.tshirt_issued && <DSBadge color="green">T-Shirt Issued ✓</DSBadge>}
+            {svc?.medal_issued && <DSBadge color="gray">Medal ✓</DSBadge>}
           </div>
         </div>
 
@@ -220,8 +245,11 @@ export default function ParticipantDetailPage() {
               { at: reg.payment_status === "free" ? reg.created_at : null, icon: "🎁", color: "#60a5fa", label: "Free Registration",  detail: reg.coupon_code ? `Coupon: ${reg.coupon_code}` : "Complimentary" },
               { at: reg.qr_generated_at,              icon: "🎫", color: "#a78bfa", label: "QR Code Generated",       detail: reg.qr_token?.slice(0, 20) + "…" },
               { at: reg.confirmation_email_sent_at,   icon: reg.email_status === "sent" ? "✅" : "❌", color: reg.email_status === "sent" ? "#4ade80" : "#f87171", label: "Confirmation Email", detail: reg.email_status === "sent" ? (reg.email_ses_message_id ? `SES: ${reg.email_ses_message_id.slice(0, 24)}…` : "Delivered") : "Failed" },
-              { at: reg.checked_in_at,                icon: "✅", color: "#4ade80", label: "Checked In",              detail: "Race day check-in" },
-              { at: reg.breakfast_availed_at,         icon: "🍽️", color: "#34d399", label: "Breakfast Issued",       detail: reg.breakfast_verified_by ? `By: ${reg.breakfast_verified_by}` : undefined },
+              { at: svc?.bib_collected_at,            icon: "🏷️", color: "#60a5fa", label: "BIB Collected",          detail: svc?.bib_collected_by ? `By: ${svc.bib_collected_by}` : undefined },
+              { at: svc?.checked_in_at,               icon: "✅", color: "#4ade80", label: "Checked In",              detail: svc?.checked_in_by ? `By: ${svc.checked_in_by}` : "Race day check-in" },
+              { at: svc?.breakfast_availed_at,        icon: "🍽️", color: "#34d399", label: "Breakfast Issued",       detail: svc?.breakfast_availed_by ? `By: ${svc.breakfast_availed_by}` : undefined },
+              { at: svc?.tshirt_issued_at,            icon: "👕", color: "#a78bfa", label: "T-Shirt Issued",          detail: svc?.tshirt_issued_by ? `By: ${svc.tshirt_issued_by}` : undefined },
+              { at: svc?.medal_issued_at,             icon: "🥇", color: "#fbbf24", label: "Medal Issued",            detail: svc?.medal_issued_by ? `By: ${svc.medal_issued_by}` : undefined },
             ])()
               .filter(e => e.at)
               .sort((a, b) => new Date(a.at!).getTime() - new Date(b.at!).getTime())
@@ -246,8 +274,10 @@ export default function ParticipantDetailPage() {
 
             {/* Pending items */}
             {((): Array<{ label: string; hint: string }> => [
-              ...(!reg.checked_in_at ? [{ label: "Check-In", hint: "Pending on race day" }] : []),
-              ...(!reg.breakfast_availed && reg.checked_in_at ? [{ label: "Breakfast", hint: "Not availed" }] : []),
+              ...(!svc?.checked_in_at ? [{ label: "Check-In", hint: "Pending on race day" }] : []),
+              ...(!svc?.breakfast_availed && svc?.checked_in_at ? [{ label: "Breakfast", hint: "Not availed" }] : []),
+              ...((svc?.tshirt_size ?? reg.tshirt_size) && !svc?.tshirt_issued ? [{ label: "T-Shirt", hint: "Not yet issued" }] : []),
+              ...(!svc?.medal_issued && svc?.checked_in_at ? [{ label: "Medal", hint: "Not yet issued" }] : []),
             ])().map((e, i) => (
               <div key={`p${i}`} style={{ position: "relative", marginBottom: 14, opacity: 0.35 }}>
                 <div style={{ position: "absolute", left: -22, top: 4, width: 14, height: 14, borderRadius: "50%", background: "#0a0a0a", border: "2px solid rgba(255,255,255,0.15)" }} />
@@ -348,25 +378,38 @@ export default function ParticipantDetailPage() {
               {reg.email_ses_message_id && <Row label="SES ID" value={reg.email_ses_message_id} mono />}
             </Section>
 
-            {/* Check-in, Breakfast & T-Shirt */}
+            {/* Check-in, Breakfast, T-Shirt, BIB & Medal */}
             <Section title="Race Day">
               <Row label="Check-In"
-                   value={reg.checked_in_at ? `✅ ${fmtDate(reg.checked_in_at, true)}` : "Not checked in"}
-                   color={reg.checked_in_at ? "#4ade80" : "#555"}
+                   value={svc?.checked_in_at ? `✅ ${fmtDate(svc.checked_in_at, true)}` : "Not checked in"}
+                   color={svc?.checked_in_at ? "#4ade80" : "#555"}
               />
+              {svc?.checked_in_by && <Row label="Checked in by" value={svc.checked_in_by} />}
               <Row label="Breakfast"
-                   value={reg.breakfast_availed ? `✅ ${fmtDate(reg.breakfast_availed_at, true)}` : "Not availed"}
-                   color={reg.breakfast_availed ? "#4ade80" : "#555"}
+                   value={svc?.breakfast_availed ? `✅ ${fmtDate(svc.breakfast_availed_at, true)}` : "Not availed"}
+                   color={svc?.breakfast_availed ? "#4ade80" : "#555"}
               />
-              {reg.breakfast_verified_by && <Row label="Issued by" value={reg.breakfast_verified_by} />}
-              {reg.tshirt_size && <>
-                <Row label="T-Shirt Size" value={reg.tshirt_size} highlight />
+              {svc?.breakfast_availed_by && <Row label="Issued by" value={svc.breakfast_availed_by} />}
+              {(svc?.tshirt_size ?? reg.tshirt_size) && <>
+                <Row label="T-Shirt Size" value={(svc?.tshirt_size ?? reg.tshirt_size)!} highlight />
                 <Row label="T-Shirt"
-                     value={reg.tshirt_issued ? `✅ Issued ${fmtDate(reg.tshirt_issued_at, true)}` : "Not issued"}
-                     color={reg.tshirt_issued ? "#4ade80" : "#555"}
+                     value={svc?.tshirt_issued ? `✅ Issued ${fmtDate(svc.tshirt_issued_at, true)}` : "Not issued"}
+                     color={svc?.tshirt_issued ? "#4ade80" : "#555"}
                 />
-                {reg.tshirt_issued_by && <Row label="Issued by" value={reg.tshirt_issued_by} />}
+                {svc?.tshirt_issued_by && <Row label="Issued by" value={svc.tshirt_issued_by} />}
               </>}
+              {svc?.bib_collected_at && <>
+                <Row label="BIB"
+                     value={`✅ Collected ${fmtDate(svc.bib_collected_at, true)}`}
+                     color="#4ade80"
+                />
+                {svc?.bib_collected_by && <Row label="Collected by" value={svc.bib_collected_by} />}
+              </>}
+              {svc && <Row label="Medal"
+                   value={svc.medal_issued ? `✅ Issued ${fmtDate(svc.medal_issued_at, true)}` : "Not issued"}
+                   color={svc.medal_issued ? "#4ade80" : "#555"}
+              />}
+              {svc?.medal_issued_by && <Row label="Issued by" value={svc.medal_issued_by} />}
             </Section>
 
             {/* Invoice */}
