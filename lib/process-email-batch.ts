@@ -1,5 +1,6 @@
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendSingleEmail } from "@/lib/email-service";
+import { loadAttachmentsAsBase64, type AttachmentMeta } from "@/lib/email-attachments";
 
 const MAX_ATTEMPTS = 3;
 
@@ -13,6 +14,17 @@ export async function processEmailBatch(batchId: string): Promise<void> {
     id: string; recipient_email: string; recipient_name: string | null;
     subject: string; html_body: string; attempts: number;
   };
+
+  // Load attachment metadata once for the batch (same files for every recipient).
+  // Older batches have attachments=[] by default so this is a no-op for them.
+  const { data: histRow } = await db
+    .from("event_comm_history")
+    .select("attachments")
+    .eq("batch_id", batchId)
+    .single();
+
+  const attachmentMetas = ((histRow?.attachments ?? []) as AttachmentMeta[]);
+  const emailAttachments = await loadAttachmentsAsBase64(attachmentMetas);
 
   while (true) {
     const { data: claimed, error: claimErr } = await db.rpc("claim_next_email", { p_batch_id: batchId });
@@ -37,9 +49,10 @@ export async function processEmailBatch(batchId: string): Promise<void> {
     }
 
     const result = await sendSingleEmail({
-      to:      email.recipient_email,
-      subject: email.subject,
-      html:    email.html_body,
+      to:          email.recipient_email,
+      subject:     email.subject,
+      html:        email.html_body,
+      attachments: emailAttachments.length > 0 ? emailAttachments : undefined,
     });
 
     const willRetry  = !result.ok && result.isTransient === true && email.attempts < MAX_ATTEMPTS;

@@ -3,6 +3,7 @@ import sanitizeHtml from "sanitize-html";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 import { sendSingleEmail } from "@/lib/email-service";
+import { loadAttachmentsAsBase64, type AttachmentMeta } from "@/lib/email-attachments";
 
 const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   allowedTags: [
@@ -26,11 +27,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
 
-  const raw = await req.json() as { to: string; subject: string; body?: string; body_html?: string };
+  const raw = await req.json() as {
+    to:           string;
+    subject:      string;
+    body?:        string;
+    body_html?:   string;
+    attachments?: AttachmentMeta[];
+  };
   const { to, subject } = raw;
-  const bodyHtml  = raw.body_html?.trim() ?? "";
-  const bodyPlain = raw.body?.trim()      ?? "";
-  const isHtml    = bodyHtml.length > 0;
+  const bodyHtml    = raw.body_html?.trim() ?? "";
+  const bodyPlain   = raw.body?.trim()      ?? "";
+  const isHtml      = bodyHtml.length > 0;
+  const attachments = raw.attachments ?? [];
 
   if (!to || !subject || (!bodyHtml && !bodyPlain))
     return NextResponse.json({ error: "to, subject, and body are required" }, { status: 400 });
@@ -38,7 +46,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
 
   const db = getSupabaseServer();
-  const { data: ev } = await db.from("events").select("title, start_date, start_time, location").eq("id", id).single();
+  const [{ data: ev }, emailAttachments] = await Promise.all([
+    db.from("events").select("title, start_date, start_time, location").eq("id", id).single(),
+    loadAttachmentsAsBase64(attachments),
+  ]);
 
   const eventTitle = ev?.title ?? "Event";
   const eventVenue = ev?.location ?? "";
@@ -111,7 +122,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 </body>
 </html>`;
 
-  const result = await sendSingleEmail({ to, subject: `[TEST] ${subject}`, html });
+  const result = await sendSingleEmail({
+    to,
+    subject: `[TEST] ${subject}`,
+    html,
+    attachments: emailAttachments.length > 0 ? emailAttachments : undefined,
+  });
 
   return NextResponse.json({ ok: result.ok, error: result.error ?? null, aws_message_id: result.messageId ?? null });
 }

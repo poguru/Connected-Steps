@@ -3,6 +3,7 @@ import sanitizeHtml from "sanitize-html";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 import { processEmailBatch } from "@/lib/process-email-batch";
+import type { AttachmentMeta } from "@/lib/email-attachments";
 
 type RecipientFilter = "all" | "paid" | "free" | "pending" | "checked_in" | "not_checked_in";
 
@@ -107,7 +108,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const db = getSupabaseServer();
   const { data } = await db
     .from("event_comm_history")
-    .select("id, sent_at, subject, recipients, sent, failed, status, channel, recipient_filter, batch_id")
+    .select("id, sent_at, subject, recipients, sent, failed, status, channel, recipient_filter, batch_id, attachments")
     .eq("event_id", id)
     .order("sent_at", { ascending: false })
     .limit(20);
@@ -122,14 +123,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
 
-  const raw = await req.json() as { recipient_filter: RecipientFilter; subject: string; body?: string; body_html?: string };
+  const raw = await req.json() as {
+    recipient_filter: RecipientFilter;
+    subject:          string;
+    body?:            string;
+    body_html?:       string;
+    attachments?:     AttachmentMeta[];
+  };
   const { recipient_filter, subject } = raw;
-  const bodyHtml  = raw.body_html?.trim() ?? "";
-  const bodyPlain = raw.body?.trim()      ?? "";
-  const isHtml    = bodyHtml.length > 0;
+  const bodyHtml    = raw.body_html?.trim() ?? "";
+  const bodyPlain   = raw.body?.trim()      ?? "";
+  const isHtml      = bodyHtml.length > 0;
+  const attachments = raw.attachments ?? [];
 
   if (!subject?.trim() || (!bodyHtml && !bodyPlain))
     return NextResponse.json({ error: "subject and body are required" }, { status: 400 });
+
+  const totalAttachmentBytes = attachments.reduce((s, a) => s + (a.size ?? 0), 0);
+  if (totalAttachmentBytes > 10 * 1024 * 1024)
+    return NextResponse.json({ error: "Total attachment size exceeds the 10 MB limit" }, { status: 400 });
 
   const db = getSupabaseServer();
 
@@ -189,6 +201,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       recipient_name:  r.user_name ?? null,
       subject,
       html_body,
+      attachments,
     };
   });
 
@@ -206,6 +219,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     recipient_filter,
     channel:          "email",
     batch_id:         batchId,
+    attachments,
   });
   if (histErr) console.error("[communicate] history insert failed:", histErr.message, "batch:", batchId, "code:", histErr.code);
 

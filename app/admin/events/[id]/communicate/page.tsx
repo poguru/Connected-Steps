@@ -15,6 +15,13 @@ type RecipientFilter = "all" | "paid" | "free" | "pending" | "checked_in" | "not
 type Channel = "email" | "push";
 type PreviewMode = "desktop" | "mobile" | "html";
 
+interface AttachmentMeta {
+  name:      string;
+  mime_type: string;
+  size:      number;
+  path:      string;
+}
+
 interface CommHistory {
   id:               string;
   sent_at:          string;
@@ -26,6 +33,7 @@ interface CommHistory {
   recipient_filter: string;
   channel?:         string;
   batch_id?:        string | null;
+  attachments?:     AttachmentMeta[];
 }
 
 interface DeliveryEmail {
@@ -331,6 +339,11 @@ export default function CommunicatePage() {
   const [testSending,    setTestSending]    = useState(false);
   const [testResult,     setTestResult]     = useState<string>("");
 
+  // Attachment state
+  const [attachments,    setAttachments]    = useState<AttachmentMeta[]>([]);
+  const [attachUploading, setAttachUploading] = useState(false);
+  const attachInputRef = useRef<HTMLInputElement>(null);
+
   // Delivery tracking
   const [expandedBatch,  setExpandedBatch]  = useState<string | null>(null);
   const [batchDetail,    setBatchDetail]    = useState<BatchDetail | null>(null);
@@ -437,7 +450,7 @@ export default function CommunicatePage() {
     try {
       const res  = await fetch(`/api/admin/events/${eventId}/communicate`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject: emailSubject, body_html: emailHtml, recipient_filter: emailFilter }),
+        body: JSON.stringify({ subject: emailSubject, body_html: emailHtml, recipient_filter: emailFilter, attachments }),
       });
       const data = await res.json() as { batch_id?: string; queued?: number; message?: string; error?: string };
 
@@ -557,12 +570,70 @@ export default function CommunicatePage() {
     try {
       const res  = await fetch(`/api/admin/events/${eventId}/communicate/test`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to, subject: emailSubject, body_html: emailHtml }),
+        body: JSON.stringify({ to, subject: emailSubject, body_html: emailHtml, attachments }),
       });
       const data = await res.json() as { ok?: boolean; error?: string };
       setTestResult(data.ok ? `✅ Test sent to ${to}` : `❌ ${data.error ?? "Failed"}`);
     } catch { setTestResult("❌ Network error"); }
     finally { setTestSending(false); }
+  }
+
+  // ── Attachments ───────────────────────────────────────────────────────────────
+
+  const ALLOWED_ATTACH = new Set([
+    "image/png","image/jpeg","image/jpg","image/webp","image/svg+xml","application/pdf",
+  ]);
+  const MAX_FILE_BYTES  = 5 * 1024 * 1024;   // 5 MB per file
+  const MAX_TOTAL_BYTES = 10 * 1024 * 1024;  // 10 MB total
+
+  async function handleAttachFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (!files.length) return;
+
+    for (const file of files) {
+      if (!ALLOWED_ATTACH.has(file.type)) {
+        showToast(`❌ ${file.name}: unsupported type. Use PNG, JPG, WEBP, PDF`);
+        continue;
+      }
+      if (file.size > MAX_FILE_BYTES) {
+        showToast(`❌ ${file.name}: exceeds 5 MB limit`);
+        continue;
+      }
+      const currentTotal = attachments.reduce((s, a) => s + a.size, 0);
+      if (currentTotal + file.size > MAX_TOTAL_BYTES) {
+        showToast("❌ Adding this file would exceed the 10 MB total limit");
+        break;
+      }
+      setAttachUploading(true);
+      try {
+        const form = new FormData();
+        form.append("file", file);
+        const res  = await fetch(`/api/admin/events/${eventId}/communicate/attachments`, {
+          method: "POST", body: form,
+        });
+        const data = await res.json() as { attachment?: AttachmentMeta; error?: string };
+        if (!res.ok || !data.attachment) {
+          showToast(`❌ ${data.error ?? "Upload failed"}`);
+        } else {
+          setAttachments(prev => [...prev, data.attachment!]);
+        }
+      } catch {
+        showToast("❌ Upload error — please try again");
+      } finally {
+        setAttachUploading(false);
+      }
+    }
+  }
+
+  async function removeAttachment(index: number) {
+    const att = attachments[index];
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+    try {
+      await fetch(`/api/admin/events/${eventId}/communicate/attachments?path=${encodeURIComponent(att.path)}`, {
+        method: "DELETE",
+      });
+    } catch { /* ignore — orphaned storage file is not critical */ }
   }
 
   // ── Push send ─────────────────────────────────────────────────────────────────
@@ -678,6 +749,64 @@ export default function CommunicatePage() {
                   disabled={send.phase === "sending"}
                   minHeight={300}
                 />
+              </div>
+
+              {/* Attachments */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <Label>
+                    Attachments{" "}
+                    <span style={{ fontSize: 10, color: "#555", fontWeight: 400 }}>
+                      PNG · JPG · WEBP · PDF &nbsp;·&nbsp; 5 MB max per file &nbsp;·&nbsp; 10 MB total
+                    </span>
+                  </Label>
+                  <button
+                    onClick={() => attachInputRef.current?.click()}
+                    disabled={attachUploading || send.phase === "sending"}
+                    style={{ fontSize: 11, color: "#e8620a", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 600, display: "flex", alignItems: "center", gap: 4, opacity: (attachUploading || send.phase === "sending") ? 0.5 : 1 }}>
+                    {attachUploading ? <Spinner size={12} /> : null}
+                    📎 Add File
+                  </button>
+                </div>
+                <input
+                  ref={attachInputRef}
+                  type="file"
+                  accept=".png,.jpg,.jpeg,.webp,.pdf,image/png,image/jpeg,image/webp,application/pdf"
+                  multiple
+                  style={{ display: "none" }}
+                  onChange={handleAttachFiles}
+                />
+                {attachments.length === 0 ? (
+                  <div style={{ padding: "10px 12px", background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 12, color: "#444", textAlign: "center" as const }}>
+                    Optional — attach route maps, guides, PDFs, or other documents
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {attachments.map((a, i) => (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8 }}>
+                        <span style={{ fontSize: 18, flexShrink: 0 }}>
+                          {a.mime_type === "application/pdf" ? "📄" : "🖼"}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, color: "#fff", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{a.name}</div>
+                          <div style={{ fontSize: 10, color: "#555" }}>
+                            {a.mime_type} &nbsp;·&nbsp; {(a.size / 1024).toFixed(0)} KB
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => removeAttachment(i)}
+                          disabled={send.phase === "sending"}
+                          style={{ background: "none", border: "none", color: "#555", cursor: "pointer", padding: "2px 6px", fontSize: 18, lineHeight: 1, opacity: send.phase === "sending" ? 0.4 : 1 }}>
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    <div style={{ fontSize: 10, color: "#555" }}>
+                      {attachments.length} file{attachments.length !== 1 ? "s" : ""} &nbsp;·&nbsp;
+                      {(attachments.reduce((s, a) => s + a.size, 0) / 1024).toFixed(0)} KB total
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Test email row */}
@@ -868,10 +997,18 @@ export default function CommunicatePage() {
                   <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", flexWrap: "wrap" as const }}>
                     <div style={{ flex: 1, minWidth: 180 }}>
                       <div style={{ fontWeight: 600, fontSize: 13, color: "#fff", marginBottom: 2 }}>{h.subject}</div>
-                      <div style={{ fontSize: 11, color: "#555" }}>
-                        {new Date(h.sent_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                        {" · "}{h.recipient_filter ?? "all"}
-                        {" · "}<span style={{ color: (h.channel ?? "email") === "push" ? "#a78bfa" : "#e8620a" }}>{(h.channel ?? "email").toUpperCase()}</span>
+                      <div style={{ fontSize: 11, color: "#555", display: "flex", flexWrap: "wrap" as const, gap: "0 6px" }}>
+                        <span>{new Date(h.sent_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                        <span>·</span>
+                        <span>{h.recipient_filter ?? "all"}</span>
+                        <span>·</span>
+                        <span style={{ color: (h.channel ?? "email") === "push" ? "#a78bfa" : "#e8620a" }}>{(h.channel ?? "email").toUpperCase()}</span>
+                        {(h.attachments?.length ?? 0) > 0 && (
+                          <>
+                            <span>·</span>
+                            <span style={{ color: "#60a5fa" }}>📎 {h.attachments!.length} file{h.attachments!.length !== 1 ? "s" : ""}</span>
+                          </>
+                        )}
                       </div>
                     </div>
 

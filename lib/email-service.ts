@@ -18,6 +18,12 @@
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+export interface EmailAttachment {
+  content:   string;   // base64-encoded file content
+  mime_type: string;
+  name:      string;   // filename shown to recipient
+}
+
 export interface EmailMessage {
   to:       string;
   subject:  string;
@@ -30,6 +36,8 @@ export interface EmailMessage {
    * Never set for OTP, QR codes, or payment receipts.
    */
   listUnsubscribeUrl?: string;
+  /** Files to attach inline. Content must be base64-encoded. */
+  attachments?: EmailAttachment[];
 }
 
 export interface BatchEmailJob {
@@ -141,6 +149,14 @@ export async function sendSingleEmail(msg: EmailMessage): Promise<SendResult> {
       "List-Unsubscribe":      `<${msg.listUnsubscribeUrl}>, <mailto:unsubscribe@connectedsteps.in?subject=Unsubscribe>`,
       "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
     };
+  }
+
+  if (msg.attachments && msg.attachments.length > 0) {
+    payload.attachments = msg.attachments.map(a => ({
+      content:   a.content,
+      mime_type: a.mime_type,
+      name:      a.name,
+    }));
   }
 
   try {
