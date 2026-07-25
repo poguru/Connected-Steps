@@ -120,7 +120,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { error: insertErr } = await db.from("email_queue").insert(rows);
     if (!insertErr) {
       emailQueued = rows.length;
-      void db.from("event_comm_history").insert({
+      const { error: emailHistErr } = await db.from("event_comm_history").insert({
         event_id:         id,
         subject,
         recipients:       emailQueued,
@@ -132,6 +132,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         channel:          "email",
         batch_id:         batchId,
       });
+      if (emailHistErr) console.error("[announce] email history insert failed:", emailHistErr.message, "batch:", batchId);
       // Process email batch server-side after the response is sent
       after(() => processEmailBatch(batchId));
     }
@@ -143,7 +144,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     waTotal         = withPhone.length;
     const waBatchId = `${batchId}-wa`;
 
-    void db.from("event_comm_history").insert({
+    const { error: waHistErr } = await db.from("event_comm_history").insert({
       event_id:         id,
       subject:          `WA: ${ev.title}`,
       recipients:       waTotal,
@@ -155,6 +156,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       channel:          "whatsapp",
       batch_id:         waBatchId,
     });
+    if (waHistErr) console.error("[announce] WA history insert failed:", waHistErr.message, "batch:", waBatchId);
 
     after(async () => {
       const templateName = process.env.WHATSAPP_SESSION_TEMPLATE ?? "session_alert_v3";

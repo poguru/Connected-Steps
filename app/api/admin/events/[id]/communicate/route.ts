@@ -101,7 +101,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (insertErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   // Create history entry in 'queued' state; updated to 'sent'/'failed' when processing completes
-  void db.from("event_comm_history").insert({
+  const { error: histErr } = await db.from("event_comm_history").insert({
     event_id:         id,
     subject,
     recipients:       recipients.length,
@@ -113,6 +113,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     channel:          "email",
     batch_id:         batchId,
   });
+  if (histErr) console.error("[communicate] history insert failed:", histErr.message, "batch:", batchId, "code:", histErr.code);
 
   // Process the batch server-side after the response is sent.
   // This means email delivery continues even if the admin closes the tab.

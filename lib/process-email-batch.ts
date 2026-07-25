@@ -29,9 +29,10 @@ export async function processEmailBatch(batchId: string): Promise<void> {
       const all       = rows ?? [];
       const delivered = all.filter(r => r.status === "delivered").length;
       const failed    = all.filter(r => r.status === "failed").length;
-      void db.from("event_comm_history")
+      const { error: histErr } = await db.from("event_comm_history")
         .update({ sent: delivered, failed, status: delivered === 0 ? "failed" : "sent" })
         .eq("batch_id", batchId);
+      if (histErr) console.error("[processEmailBatch] history update failed:", histErr.message, "batch:", batchId);
       break;
     }
 

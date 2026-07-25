@@ -39,9 +39,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const all       = allRows ?? [];
     const delivered = all.filter(r => r.status === "delivered").length;
     const failed    = all.filter(r => r.status === "failed").length;
-    void db.from("event_comm_history")
+    const { error: histErr } = await db.from("event_comm_history")
       .update({ sent: delivered, failed, status: delivered === 0 ? "failed" : "sent" })
       .eq("batch_id", batch_id);
+    if (histErr) console.error("[send-next] history update failed:", histErr.message, "batch:", batch_id);
     return NextResponse.json({ done: true, delivered, failed, total: all.length });
   }
 
