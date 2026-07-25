@@ -44,6 +44,9 @@ export default function VolunteersPage({ params }: { params: Promise<{ id: strin
   const [resetPwd,    setResetPwd]    = useState("");
   const [resetting,   setResetting]   = useState(false);
   const [copied,      setCopied]      = useState(false);
+  const [editId,      setEditId]      = useState<string | null>(null);
+  const [editRole,    setEditRole]    = useState("");
+  const [editSaving,  setEditSaving]  = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,6 +98,22 @@ export default function VolunteersPage({ params }: { params: Promise<{ id: strin
     if (r.ok) { setMsg("Password reset."); setResetId(null); setResetPwd(""); }
     else setMsg(d.error ?? "Error");
     setResetting(false);
+  }
+
+  async function saveRoleEdit(assignmentId: string) {
+    if (!editRole) return;
+    setEditSaving(true); setMsg("");
+    const r = await fetch(`/api/admin/events/${eventId}/portal-users`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assignment_id: assignmentId, new_role: editRole }),
+    });
+    const d = await r.json() as { ok?: boolean; error?: string; message?: string };
+    if (r.ok) {
+      setMsg(d.message === "No change" ? "No change — role is already the same." : "Role updated.");
+      setEditId(null); setEditRole("");
+      void load();
+    } else { setMsg(d.error ?? "Error updating role"); }
+    setEditSaving(false);
   }
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -192,10 +211,11 @@ export default function VolunteersPage({ params }: { params: Promise<{ id: strin
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {assignments.map(a => {
-              const u = a.event_portal_users;
+              const u          = a.event_portal_users;
               const isResetting = resetId === a.id;
+              const isEditing   = editId  === a.id;
               return (
-                <div key={a.id} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "12px 14px" }}>
+                <div key={a.id} style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${isEditing ? "rgba(232,98,10,0.3)" : "rgba(255,255,255,0.07)"}`, borderRadius: 10, padding: "12px 14px" }}>
                   <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
                     {/* Avatar */}
                     <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "#e8620a", flexShrink: 0 }}>
@@ -211,13 +231,51 @@ export default function VolunteersPage({ params }: { params: Promise<{ id: strin
                       {OPS_ROLE_LABELS[a.role] ?? a.role}
                     </span>
                     {/* Actions */}
-                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                      <button style={S.btn} onClick={() => { setResetId(isResetting ? null : a.id); setResetPwd(""); setMsg(""); }}>
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap" }}>
+                      <button style={{ ...S.btn, color: isEditing ? "#e8620a" : "#ccc" }} onClick={() => {
+                        if (isEditing) { setEditId(null); setEditRole(""); }
+                        else { setEditId(a.id); setEditRole(a.role); setResetId(null); setMsg(""); }
+                      }}>
+                        {isEditing ? "Cancel" : "Edit Role"}
+                      </button>
+                      <button style={S.btn} onClick={() => { setResetId(isResetting ? null : a.id); setResetPwd(""); setEditId(null); setMsg(""); }}>
                         {isResetting ? "Cancel" : "Reset PWD"}
                       </button>
                       <button style={S.btnDanger} onClick={() => void removeAssignment(a.id)}>Remove</button>
                     </div>
                   </div>
+
+                  {/* Edit Role inline panel */}
+                  {isEditing && (
+                    <div style={{ marginTop: 12, padding: "12px", background: "rgba(232,98,10,0.04)", border: "1px solid rgba(232,98,10,0.15)", borderRadius: 8 }}>
+                      <div style={{ fontSize: 10, color: "#e8620a", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 10 }}>
+                        Edit Role — {u.name}
+                      </div>
+                      <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+                        <div style={{ flex: "1 1 200px" }}>
+                          <label style={S.label}>New Role</label>
+                          <select
+                            style={{ ...S.input, cursor: "pointer", colorScheme: "dark" }}
+                            value={editRole}
+                            onChange={e => setEditRole(e.target.value)}>
+                            {Object.entries(OPS_ROLE_LABELS).map(([k, v]) => (
+                              <option key={k} value={k}>{v}{k === a.role ? " (current)" : ""}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <button
+                          style={{ ...S.btnPrimary, padding: "8px 16px", fontSize: 12, opacity: editSaving ? 0.6 : 1 }}
+                          onClick={() => void saveRoleEdit(a.id)}
+                          disabled={editSaving || editRole === a.role}>
+                          {editSaving ? "Saving…" : "Save Role"}
+                        </button>
+                      </div>
+                      <div style={{ marginTop: 8, fontSize: 10, color: "#555" }}>
+                        The volunteer must log out and back in for the new role to take effect.
+                      </div>
+                    </div>
+                  )}
+
                   {/* Reset password inline */}
                   {isResetting && (
                     <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>

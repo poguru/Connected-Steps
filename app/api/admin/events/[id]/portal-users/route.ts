@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { isAdminOrCoach } from "@/lib/admin-auth";
+import { isAdminOrCoach, getAdminEmail } from "@/lib/admin-auth";
 import bcrypt from "bcryptjs";
 import type { OpsRole } from "@/lib/ops-auth";
 import { OPS_ROLE_LABELS } from "@/lib/ops-auth";
@@ -118,6 +118,80 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     .eq("event_id", eventId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
+
+// PUT /api/admin/events/[id]/portal-users
+// Body: { assignment_id, new_role } — change the role on an existing assignment
+export async function PUT(req: NextRequest, { params }: Params) {
+  if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id: eventId } = await params;
+  const adminEmail = getAdminEmail(req) ?? "admin";
+  const body = await req.json().catch(() => ({})) as { assignment_id?: string; new_role?: string };
+  const { assignment_id, new_role } = body;
+
+  if (!assignment_id || !new_role)
+    return NextResponse.json({ error: "assignment_id and new_role are required" }, { status: 400 });
+  if (!Object.keys(OPS_ROLE_LABELS).includes(new_role))
+    return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+
+  const db = getSupabaseServer();
+
+  // Fetch current assignment to compare and audit
+  const { data: current, error: fetchErr } = await db
+    .from("event_portal_assignments")
+    .select("id, role, portal_user_id, event_portal_users(email, name)")
+    .eq("id", assignment_id)
+    .eq("event_id", eventId)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (fetchErr || !current)
+    return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
+
+  const oldRole   = current.role as string;
+  const userEmail = (current.event_portal_users as unknown as { email: string } | null)?.email ?? "unknown";
+
+  if (oldRole === new_role)
+    return NextResponse.json({ ok: true, message: "No change" });
+
+  // Prevent duplicate role on the same user+event
+  const { data: dup } = await db
+    .from("event_portal_assignments")
+    .select("id")
+    .eq("portal_user_id", current.portal_user_id as string)
+    .eq("event_id", eventId)
+    .eq("role", new_role)
+    .eq("is_active", true)
+    .neq("id", assignment_id)
+    .maybeSingle();
+
+  if (dup)
+    return NextResponse.json({ error: "This user already has that role for this event" }, { status: 409 });
+
+  const { error: updateErr } = await db
+    .from("event_portal_assignments")
+    .update({ role: new_role })
+    .eq("id", assignment_id)
+    .eq("event_id", eventId);
+
+  if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
+
+  // Audit trail
+  await db.from("audit_logs").insert({
+    action:      "portal_role_change",
+    actor_email: adminEmail,
+    target:      userEmail,
+    detail: {
+      assignment_id,
+      event_id:   eventId,
+      old_role:   oldRole,
+      new_role,
+      user_email: userEmail,
+    },
+  });
+
   return NextResponse.json({ ok: true });
 }
 
