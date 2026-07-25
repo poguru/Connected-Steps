@@ -391,7 +391,7 @@ export default function EventManagePage() {
                 <Button size="xs" variant="ghost">Preview ↗</Button>
               </Link>
             )}
-            <Link href={`/admin/events/new?edit=${eventId}`}>
+            <Link href={`/admin/events/${eventId}/edit`}>
               <Button size="xs" variant="secondary">Edit</Button>
             </Link>
             <Button size="xs" variant={isPub ? "danger" : "primary"} onClick={togglePublish}>
@@ -505,7 +505,7 @@ export default function EventManagePage() {
                       { label: "Participants",     icon: "🪪", href: `/admin/events/${eventId}/participants`  },
                       { label: "Volunteers",       icon: "🙋", href: `/admin/events/${eventId}/volunteers`    },
                       { label: "Services",         icon: "🔧", href: `/admin/events/${eventId}/services`      },
-                      { label: "Edit Event",       icon: "✏️", href: `/admin/events/new?edit=${eventId}`      },
+                      { label: "Edit Event",       icon: "✏️", href: `/admin/events/${eventId}/edit`          },
                     ].map(a => (
                       <Link key={a.label} href={a.href} style={{ textDecoration: "none" }}>
                         <Card hoverable style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, padding: "0.9rem 0.5rem" }}>
@@ -720,7 +720,7 @@ export default function EventManagePage() {
                 <SecHead title="Event Settings" />
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {[
-                    { icon: "✏️", label: "Edit Event Details",  desc: "Title, dates, location, media",    href: `/admin/events/new?edit=${eventId}` },
+                    { icon: "✏️", label: "Edit Event Details",  desc: "Title, dates, location, media",    href: `/admin/events/${eventId}/edit` },
                     { icon: "📢", label: "Communication Hub",   desc: "Emails and push notifications",    href: `/admin/events/${eventId}/communicate` },
                     { icon: "💸", label: "Refund Policy",       desc: "Set cancellation & refund rules",  href: `/admin/events/${eventId}/refund-policy` },
                     { icon: "📈", label: "Analytics",           desc: "Registration trends",               href: `/admin/events/${eventId}/analytics` },

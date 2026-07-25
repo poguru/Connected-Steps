@@ -4,11 +4,16 @@ import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Button, Alert, Badge, Label, Tabs, Spinner } from "@/components/ui/ds";
+import dynamic from "next/dynamic";
+
+// Load the rich editor client-side only (it uses DOM APIs)
+const RichEmailEditor = dynamic(() => import("@/components/admin/RichEmailEditor"), { ssr: false });
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type RecipientFilter = "all" | "paid" | "free" | "pending" | "checked_in" | "not_checked_in";
 type Channel = "email" | "push";
+type PreviewMode = "desktop" | "mobile" | "html";
 
 interface CommHistory {
   id:               string;
@@ -62,7 +67,6 @@ interface SendState {
   delivered: number;
   failed:    number;
   details:   EmailDetail[];
-  // transient failed count (can be retried)
   retryable: number;
 }
 
@@ -71,115 +75,112 @@ const INITIAL_SEND: SendState = {
   delivered: 0, failed: 0, details: [], retryable: 0,
 };
 
-// ── Template library ──────────────────────────────────────────────────────────
+// ── Email templates (HTML) ────────────────────────────────────────────────────
 
 const EMAIL_TEMPLATES = [
   {
     id: "schedule", label: "📅 Event Schedule",
     subject: "Event Schedule — Connected Steps",
-    body: `Hi {name},
-
-Here's what you need to know for race day:
-
-🕐 REPORTING TIME: 5:30 AM
-🏁 FLAG OFF: 6:00 AM
-📍 VENUE: [Venue Name and Address]
-🚗 PARKING: [Parking Details]
-🗺 ROUTE MAP: [Link]
-
-Please arrive 30 minutes before flag off.
-
-For any queries: info@connectedsteps.in
-
-See you at the start line! 🏃`,
+    body_html: `<p>Hi {{firstName}},</p>
+<p>Here's what you need to know for race day:</p>
+<p>🕐 <strong>Reporting Time:</strong> 5:30 AM<br>
+🏁 <strong>Flag Off:</strong> 6:00 AM<br>
+📍 <strong>Venue:</strong> {{eventVenue}}<br>
+🚗 <strong>Parking:</strong> [Parking Details]<br>
+🗺 <strong>Route Map:</strong> <a href="#">Click here</a></p>
+<p>Please arrive 30 minutes before flag off.</p>
+<p>For any queries, reach us at <a href="mailto:{{supportEmail}}">{{supportEmail}}</a></p>
+<p>See you at the start line! 🏃</p>`,
   },
   {
     id: "reminder", label: "⏰ Race Day Reminder",
     subject: "Race Day Tomorrow — You're Ready!",
-    body: `Hi {name},
-
-Your big day is tomorrow! Here's your quick checklist:
-
-✅ Your QR code is in your registration email — keep it handy
-✅ Carry a valid ID proof
-✅ Bring a water bottle
-✅ Wear comfortable running gear
-✅ Get a good night's sleep
-
-We're excited to see you tomorrow!
-
-— Connected Steps Team`,
+    body_html: `<p>Hi {{firstName}},</p>
+<p>Your big day is <strong>tomorrow</strong>! Here's your quick checklist:</p>
+<ul>
+<li>Your QR code is in your registration email — keep it handy</li>
+<li>Carry a valid ID proof</li>
+<li>Bring a water bottle</li>
+<li>Wear comfortable running gear</li>
+<li>Get a good night's sleep</li>
+</ul>
+<p>We're excited to see you tomorrow!</p>
+<p><em>— Connected Steps Team</em></p>`,
   },
   {
-    id: "bib_reminder", label: "📦 BIB Collection Reminder",
+    id: "bib_reminder", label: "📦 BIB Collection",
     subject: "Don't Forget to Collect Your BIB Packet!",
-    body: `Hi {name},
-
-Don't forget to collect your BIB packet before race day!
-
-📦 BIB COLLECTION DETAILS:
-Venue: [Collection Center Name]
-Address: [Address]
-Date & Time: [Date] from [Time] to [Time]
-
-What you'll receive in your packet:
-• Race BIB with your number
-• Timing chip (if applicable)
-• T-shirt (if applicable)
-• Event goodies
-
-Please bring a valid photo ID when collecting.
-
-See you at the collection center!
-— Connected Steps Team`,
+    body_html: `<p>Hi {{firstName}},</p>
+<p>Don't forget to collect your BIB packet before race day!</p>
+<h3>📦 BIB Collection Details</h3>
+<table>
+<thead><tr><th>Detail</th><th>Info</th></tr></thead>
+<tbody>
+<tr><td>Venue</td><td>[Collection Center Name]</td></tr>
+<tr><td>Address</td><td>[Address]</td></tr>
+<tr><td>Date &amp; Time</td><td>[Date] from [Time] to [Time]</td></tr>
+</tbody>
+</table>
+<p>What you'll receive in your packet:</p>
+<ul>
+<li>Race BIB with your number</li>
+<li>Timing chip (if applicable)</li>
+<li>T-shirt (if applicable)</li>
+<li>Event goodies</li>
+</ul>
+<p>Please bring a valid photo ID when collecting.</p>
+<p><em>— Connected Steps Team</em></p>`,
+  },
+  {
+    id: "venue_change", label: "📍 Venue Change",
+    subject: "Important: Venue Change for {{eventName}}",
+    body_html: `<p>Hi {{firstName}},</p>
+<p>We have an important update regarding the venue for <strong>{{eventName}}</strong>.</p>
+<hr>
+<h2>📍 New Venue</h2>
+<p>[New Venue Name and Address]</p>
+<hr>
+<p>We apologise for any inconvenience this may cause. Please update your plans accordingly.</p>
+<p>All other event details (date, time, route) remain unchanged.</p>
+<p>For any questions, contact us at <a href="mailto:{{supportEmail}}">{{supportEmail}}</a> or call <strong>{{supportPhone}}</strong>.</p>
+<p>Thank you for your understanding.</p>
+<p><em>— Connected Steps Team</em></p>`,
   },
   {
     id: "update", label: "📢 Important Update",
     subject: "Important Update — Connected Steps Event",
-    body: `Hi {name},
-
-We have an important update about your upcoming event.
-
-[Add your update here]
-
-Please note this change and update your plans accordingly.
-
-For any questions: info@connectedsteps.in
-
-Thank you for your understanding.
-— Connected Steps Team`,
+    body_html: `<p>Hi {{firstName}},</p>
+<p>We have an important update about <strong>{{eventName}}</strong>.</p>
+<hr>
+<p>[Add your update here]</p>
+<hr>
+<p>Please note this change and update your plans accordingly.</p>
+<p>For any questions: <a href="mailto:{{supportEmail}}">{{supportEmail}}</a></p>
+<p>Thank you for your understanding.</p>
+<p><em>— Connected Steps Team</em></p>`,
   },
   {
     id: "results", label: "🏅 Results Available",
     subject: "Your Results Are Live! 🏁",
-    body: `Hi {name},
-
-Congratulations on completing the event! 🎉
-
-Your results are now live. Check your finish time, position, and timing details on the website.
-
-🏃 You did amazing — every finisher is a winner!
-
-Results: [Results Page Link]
-
-Thank you for being part of Connected Steps.
-— Connected Steps Team`,
+    body_html: `<p>Hi {{firstName}},</p>
+<p>Congratulations on completing the event! 🎉</p>
+<p>Your results are now live. Check your finish time, position, and timing details on the website.</p>
+<p>🏃 <strong>You did amazing — every finisher is a winner!</strong></p>
+<p><a href="#">View Your Results →</a></p>
+<p>Thank you for being part of <strong>{{eventName}}</strong>.</p>
+<p><em>— Connected Steps Team</em></p>`,
   },
   {
     id: "certificate", label: "📜 Certificate Ready",
     subject: "Your Finisher Certificate is Ready! 🏅",
-    body: `Hi {name},
-
-Your official finisher certificate for [Event Name] is ready to download!
-
-🏅 [Certificate Download Link]
-
-Print it, frame it, or share it — you've earned it!
-
-Thank you for running with Connected Steps.
-— Connected Steps Team`,
+    body_html: `<p>Hi {{firstName}},</p>
+<p>Your official finisher certificate for <strong>{{eventName}}</strong> is ready to download!</p>
+<p>🏅 <a href="#">Download Your Certificate</a></p>
+<p>Print it, frame it, or share it — <strong>you've earned it!</strong></p>
+<p>Thank you for running with Connected Steps.</p>
+<p><em>— Connected Steps Team</em></p>`,
   },
-  { id: "custom", label: "✏️ Custom Message", subject: "", body: "" },
+  { id: "custom", label: "✏️ Custom Message", subject: "", body_html: "" },
 ];
 
 const PUSH_TEMPLATES = [
@@ -202,12 +203,100 @@ const FILTERS: { value: RecipientFilter; label: string }[] = [
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const S = {
-  page:    { minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "inherit" } as React.CSSProperties,
-  header:  { position: "sticky" as const, top: 0, zIndex: 40, background: "rgba(10,10,10,0.97)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 2rem", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" } as React.CSSProperties,
-  input:   { width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const } as React.CSSProperties,
-  select:  { width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const, cursor: "pointer" } as React.CSSProperties,
-  textarea:{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const, resize: "vertical" as const } as React.CSSProperties,
+  page:   { minHeight: "100vh", background: "#0a0a0a", color: "#fff", fontFamily: "inherit" } as React.CSSProperties,
+  header: { position: "sticky" as const, top: 0, zIndex: 40, background: "rgba(10,10,10,0.97)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 2rem", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" } as React.CSSProperties,
+  input:  { width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const } as React.CSSProperties,
+  select: { width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const, cursor: "pointer" } as React.CSSProperties,
 };
+
+// ── Preview modal ─────────────────────────────────────────────────────────────
+
+function PreviewModal({ subject, html, onClose }: { subject: string; html: string; onClose: () => void }) {
+  const [mode, setMode] = useState<PreviewMode>("desktop");
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const previewHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>
+body{margin:0;padding:0;background:#0a0a0a;font-family:sans-serif;}
+h1{font-size:22px;font-weight:800;color:#fff;margin:16px 0 8px;}
+h2{font-size:18px;font-weight:700;color:#fff;margin:14px 0 6px;}
+h3{font-size:15px;font-weight:700;color:#fff;margin:12px 0 4px;}
+p{margin:0 0 10px;color:#ccc;line-height:1.8;}
+strong,b{color:#fff;}
+a{color:#e8620a;text-decoration:underline;}
+ul,ol{color:#ccc;padding-left:20px;margin:6px 0 10px;}
+li{margin-bottom:3px;}
+blockquote{border-left:3px solid #e8620a;padding-left:12px;color:#999;margin:10px 0;}
+hr{border:none;border-top:1px solid rgba(255,255,255,0.12);margin:16px 0;}
+img{max-width:100%;height:auto;}
+table{border-collapse:collapse;width:100%;margin:12px 0;}
+td,th{border:1px solid rgba(255,255,255,0.15);padding:8px 12px;text-align:left;color:#ccc;}
+th{background:rgba(255,255,255,0.06);font-weight:700;color:#fff;}
+mark{border-radius:3px;padding:1px 2px;}
+</style></head>
+<body><div style="max-width:600px;margin:0 auto;padding:24px;background:#0a0a0a;color:#f0f0f0;">
+<div style="margin-bottom:20px;">
+<img src="https://www.connectedsteps.in/logo.png" width="40" style="border-radius:50%;vertical-align:middle;" alt="Connected Steps"/>
+<span style="font-size:16px;font-weight:700;color:#fff;margin-left:10px;">Connected Steps</span>
+</div>
+<div style="line-height:1.8;color:#ccc;">${html.replace(/\{\{firstName\}\}/gi,"Sample").replace(/\{\{lastName\}\}/gi,"Participant").replace(/\{\{eventName\}\}/gi,"Event Name").replace(/\{\{eventVenue\}\}/gi,"Venue").replace(/\{\{eventDate\}\}/gi,"1 August 2026").replace(/\{\{reportingTime\}\}/gi,"5:30 AM").replace(/\{\{supportEmail\}\}/gi,"info@connectedsteps.in").replace(/\{\{supportPhone\}\}/gi,"+91-XXXXXXXXXX").replace(/\{name\}/gi,"Sample Participant").replace(/\{event\}/gi,"Event Name")}</div>
+<div style="margin-top:28px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.1);font-size:11px;color:#555;">
+Connected Steps &middot; Hyderabad &middot; <a href="https://www.connectedsteps.in" style="color:#e8620a;text-decoration:none;">connectedsteps.in</a>
+</div></div></body></html>`;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={onClose}>
+      <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, width: "100%", maxWidth: mode === "mobile" ? 440 : 900, maxHeight: "92vh", display: "flex", flexDirection: "column", overflow: "hidden" }} onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,0.07)", flexShrink: 0 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, color: "#555", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em" }}>Preview</div>
+            <div style={{ fontSize: 13, color: "#fff", fontWeight: 600, marginTop: 2 }}>{subject || "(no subject)"}</div>
+          </div>
+          {/* Mode tabs */}
+          <div style={{ display: "flex", background: "rgba(255,255,255,0.05)", borderRadius: 8, padding: 3, gap: 2 }}>
+            {(["desktop","mobile","html"] as const).map(m => (
+              <button key={m} onClick={() => setMode(m)} style={{ padding: "4px 12px", borderRadius: 6, border: "none", background: mode === m ? "#e8620a" : "transparent", color: mode === m ? "#fff" : "#666", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", textTransform: "capitalize" }}>
+                {m === "desktop" ? "🖥 Desktop" : m === "mobile" ? "📱 Mobile" : "🔤 HTML"}
+              </button>
+            ))}
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer", padding: "0 4px", lineHeight: 1 }}>×</button>
+        </div>
+
+        {/* Preview body */}
+        <div style={{ flex: 1, overflow: "auto", padding: mode === "html" ? 16 : 20, background: mode === "html" ? "#0a0a0a" : "#1a1a1a" }}>
+          {mode === "html" ? (
+            <pre style={{ margin: 0, fontSize: 11, color: "#4ade80", fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-all", lineHeight: 1.6 }}>
+              {previewHtml}
+            </pre>
+          ) : (
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <div style={{ width: mode === "mobile" ? "100%" : 600, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, overflow: "hidden" }}>
+                <iframe
+                  srcDoc={previewHtml}
+                  style={{ width: "100%", border: "none", height: mode === "mobile" ? 640 : 500 }}
+                  title="Email Preview"
+                  sandbox="allow-same-origin"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: "10px 16px", borderTop: "1px solid rgba(255,255,255,0.06)", fontSize: 11, color: "#555", flexShrink: 0 }}>
+          Variables shown with sample values. Actual values will be substituted per recipient at send time.
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -221,8 +310,9 @@ export default function CommunicatePage() {
   // Email composer state
   const [emailFilter,   setEmailFilter]   = useState<RecipientFilter>("all");
   const [emailSubject,  setEmailSubject]  = useState("");
-  const [emailBody,     setEmailBody]     = useState("");
+  const [emailHtml,     setEmailHtml]     = useState("");
   const [emailTemplate, setEmailTemplate] = useState("custom");
+  const [showPreview,   setShowPreview]   = useState(false);
 
   // Async send state machine
   const [send, setSend] = useState<SendState>(INITIAL_SEND);
@@ -241,7 +331,7 @@ export default function CommunicatePage() {
   const [testSending,    setTestSending]    = useState(false);
   const [testResult,     setTestResult]     = useState<string>("");
 
-  // Delivery tracking state (history tab drill-down)
+  // Delivery tracking
   const [expandedBatch,  setExpandedBatch]  = useState<string | null>(null);
   const [batchDetail,    setBatchDetail]    = useState<BatchDetail | null>(null);
   const [detailLoading,  setDetailLoading]  = useState(false);
@@ -261,11 +351,6 @@ export default function CommunicatePage() {
   }
 
   // ── Status polling + client-driven send ──────────────────────────────────────
-  // Calls /send-next every 1.1s to drive delivery (one email per call).
-  // Also polls /status every 3s to update the progress counters in the UI.
-  // This client-driven approach works reliably regardless of whether server-side
-  // after() is available. Both mechanisms use FOR UPDATE SKIP LOCKED so there
-  // is no double-sending when both run simultaneously.
 
   const sendNextRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -273,14 +358,13 @@ export default function CommunicatePage() {
     if (send.phase !== "sending" || !send.batchId) return;
     const batchId = send.batchId;
 
-    // Drive processing: one email per 1.1s call
     sendNextRef.current = setInterval(async () => {
       try {
         await fetch(`/api/admin/events/${eventId}/communicate/send-next`, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ batch_id: batchId }),
         });
-      } catch { /* ignore — next tick will retry */ }
+      } catch { /* ignore */ }
     }, 1100);
 
     const poll = async () => {
@@ -298,7 +382,6 @@ export default function CommunicatePage() {
         }));
 
         if (data.queued === 0 && data.sending === 0) {
-          // All done — stop driving and load per-email detail
           clearInterval(sendNextRef.current!);
           clearInterval(pollRef.current!);
           const detailRes  = await fetch(`/api/admin/events/${eventId}/communicate/status?batch_id=${batchId}&include_all=true`);
@@ -318,31 +401,34 @@ export default function CommunicatePage() {
           }));
           void loadHistory();
         }
-      } catch {
-        // Network error — continue polling
-      }
+      } catch { /* continue */ }
     };
 
     void poll();
     pollRef.current = setInterval(poll, 3000);
 
     return () => {
-      if (pollRef.current)  clearInterval(pollRef.current);
+      if (pollRef.current)     clearInterval(pollRef.current);
       if (sendNextRef.current) clearInterval(sendNextRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [send.phase, send.batchId]);
 
-  // ── Email enqueue ─────────────────────────────────────────────────────────────
+  // ── Template selection ────────────────────────────────────────────────────────
 
   function applyEmailTemplate(id: string) {
     setEmailTemplate(id);
     const t = EMAIL_TEMPLATES.find(t => t.id === id);
-    if (t && id !== "custom") { setEmailSubject(t.subject); setEmailBody(t.body); }
+    if (t && id !== "custom") {
+      setEmailSubject(t.subject);
+      setEmailHtml(t.body_html);
+    }
   }
 
+  // ── Email enqueue ─────────────────────────────────────────────────────────────
+
   async function enqueueEmail() {
-    if (!emailSubject.trim() || !emailBody.trim()) { showToast("Subject and body are required"); return; }
+    if (!emailSubject.trim() || !emailHtml.trim()) { showToast("Subject and body are required"); return; }
     const filterLabel = FILTERS.find(f => f.value === emailFilter)?.label ?? emailFilter;
     if (!confirm(`Queue email to ${filterLabel}?\n\nEmails will be sent in the background — you can safely close this tab.`)) return;
 
@@ -351,7 +437,7 @@ export default function CommunicatePage() {
     try {
       const res  = await fetch(`/api/admin/events/${eventId}/communicate`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject: emailSubject, body: emailBody, recipient_filter: emailFilter }),
+        body: JSON.stringify({ subject: emailSubject, body_html: emailHtml, recipient_filter: emailFilter }),
       });
       const data = await res.json() as { batch_id?: string; queued?: number; message?: string; error?: string };
 
@@ -374,7 +460,6 @@ export default function CommunicatePage() {
     });
     const data = await res.json() as { requeued?: number };
     if ((data.requeued ?? 0) > 0) {
-      // Re-trigger server-side processing for the re-queued emails
       void fetch(`/api/admin/events/${eventId}/communicate/resume`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ batch_id: batchId }),
@@ -439,7 +524,6 @@ export default function CommunicatePage() {
       if (!res.ok) { showToast(`❌ ${data.error ?? "Resume failed"}`); return; }
       const resumed = data.resumed ?? 0;
       showToast(`▶ Resuming delivery for ${resumed} queued email${resumed !== 1 ? "s" : ""}`);
-      // Activate client-driven processing so delivery continues even if after() is unavailable
       setSend({ ...INITIAL_SEND, phase: "sending", batchId, total: resumed, queued: resumed });
       setTab("email");
       void loadHistory();
@@ -466,14 +550,14 @@ export default function CommunicatePage() {
   // ── Test email ────────────────────────────────────────────────────────────────
 
   async function sendTestEmail() {
-    if (!emailSubject.trim() || !emailBody.trim()) { showToast("Write a subject and message first"); return; }
+    if (!emailSubject.trim() || !emailHtml.trim()) { showToast("Write a subject and message first"); return; }
     const to = testEmailAddr.trim() || prompt("Send test to which email address?");
     if (!to) return;
     setTestSending(true); setTestResult("");
     try {
       const res  = await fetch(`/api/admin/events/${eventId}/communicate/test`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to, subject: emailSubject, body: emailBody }),
+        body: JSON.stringify({ to, subject: emailSubject, body_html: emailHtml }),
       });
       const data = await res.json() as { ok?: boolean; error?: string };
       setTestResult(data.ok ? `✅ Test sent to ${to}` : `❌ ${data.error ?? "Failed"}`);
@@ -529,16 +613,16 @@ export default function CommunicatePage() {
 
       {/* Tabs */}
       <div style={{ borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 2rem", background: "#0d0d0d" }}>
-        <div style={{ maxWidth: 900, margin: "0 auto" }}>
+        <div style={{ maxWidth: 960, margin: "0 auto" }}>
           <Tabs tabs={TABS.map(t => ({ key: t.key, label: t.label }))} active={tab} onChange={k => setTab(k as typeof tab)} />
         </div>
       </div>
 
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "1.75rem 2rem" }}>
+      <div style={{ maxWidth: 960, margin: "0 auto", padding: "1.75rem 2rem" }}>
 
         {/* ── Email Tab ────────────────────────────────────────────────────── */}
         {tab === "email" && (
-          <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: 20 }}>
             {/* Template sidebar */}
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 10 }}>Templates</div>
@@ -550,11 +634,18 @@ export default function CommunicatePage() {
                 ))}
               </div>
 
-              {/* Provider info */}
               <div style={{ marginTop: 20, padding: "10px 12px", background: "rgba(96,165,250,0.05)", border: "1px solid rgba(96,165,250,0.15)", borderRadius: 8, fontSize: 11, color: "#60a5fa", lineHeight: 1.6 }}>
                 <strong>ZeptoMail</strong><br />
                 Emails are sent 1 per second from this tab.<br /><br />
                 Keep this tab open until delivery completes.
+              </div>
+
+              {/* Personalization cheat sheet */}
+              <div style={{ marginTop: 12, padding: "10px 12px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 8, fontSize: 10, color: "#555", lineHeight: 1.8 }}>
+                <div style={{ fontWeight: 700, color: "#666", marginBottom: 4 }}>Variables</div>
+                {["{{firstName}}","{{eventName}}","{{eventDate}}","{{eventVenue}}","{{reportingTime}}","{{supportEmail}}"].map(v => (
+                  <div key={v}><code style={{ color: "#e8620a" }}>{v}</code></div>
+                ))}
               </div>
             </div>
 
@@ -573,17 +664,39 @@ export default function CommunicatePage() {
               </div>
 
               <div>
-                <Label>Message *</Label>
-                <p style={{ fontSize: 11, color: "#555", marginBottom: 6 }}>Use <code style={{ color: "#e8620a" }}>{"{name}"}</code> for participant name. Plain text — line breaks become paragraphs.</p>
-                <textarea style={{ ...S.textarea, minHeight: 260 }} value={emailBody} onChange={e => setEmailBody(e.target.value)} placeholder="Write your message here…" disabled={send.phase === "sending"} />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <Label>Message *</Label>
+                  {emailHtml && (
+                    <button onClick={() => setShowPreview(true)} style={{ fontSize: 11, color: "#e8620a", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
+                      👁 Preview
+                    </button>
+                  )}
+                </div>
+                <RichEmailEditor
+                  content={emailHtml}
+                  onChange={(html) => setEmailHtml(html)}
+                  disabled={send.phase === "sending"}
+                  minHeight={300}
+                />
+              </div>
+
+              {/* Test email row */}
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" as const }}>
+                <input
+                  style={{ ...S.input, width: 220, flex: "none" }}
+                  value={testEmailAddr}
+                  onChange={e => setTestEmailAddr(e.target.value)}
+                  placeholder="test@example.com"
+                  type="email"
+                />
+                <Button size="sm" variant="secondary" loading={testSending} onClick={sendTestEmail}>📨 Send Test</Button>
+                {testResult && <Badge color={testResult.startsWith("✅") ? "green" : "red"} size="sm">{testResult}</Badge>}
               </div>
 
               {/* ── Send button / progress display ─────────────────────────── */}
               {send.phase === "idle" && (
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const, alignItems: "center" }}>
+                <div>
                   <Button onClick={enqueueEmail}>Queue &amp; Send Email</Button>
-                  <Button size="sm" variant="secondary" loading={testSending} onClick={sendTestEmail}>📨 Send Test</Button>
-                  {testResult && <Badge color={testResult.startsWith("✅") ? "green" : "red"} size="sm">{testResult}</Badge>}
                 </div>
               )}
 
@@ -594,7 +707,6 @@ export default function CommunicatePage() {
               {(send.phase === "sending" || send.phase === "done") && (
                 <div style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "16px 18px" }}>
 
-                  {/* Status header */}
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
                     {send.phase === "sending" ? (
                       <span style={{ fontSize: 13, fontWeight: 700, color: "#60a5fa" }}>📤 Sending… (server-side — safe to close tab)</span>
@@ -605,15 +717,13 @@ export default function CommunicatePage() {
                     )}
                   </div>
 
-                  {/* Progress bar */}
                   <div style={{ height: 6, background: "rgba(255,255,255,0.06)", borderRadius: 3, marginBottom: 12, overflow: "hidden" }}>
-                    <div style={{ display: "flex", height: "100%", borderRadius: 3, overflow: "hidden", transition: "width 0.3s" }}>
+                    <div style={{ display: "flex", height: "100%", borderRadius: 3, overflow: "hidden" }}>
                       <div style={{ width: `${send.total > 0 ? (send.delivered / send.total) * 100 : 0}%`, background: "#4ade80", transition: "width 0.5s" }} />
                       <div style={{ width: `${send.total > 0 ? (send.failed / send.total) * 100 : 0}%`, background: "#f87171", transition: "width 0.5s" }} />
                     </div>
                   </div>
 
-                  {/* Counters */}
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 12 }}>
                     {[
                       { label: "Total",     value: send.total,     color: "#888"    },
@@ -628,14 +738,12 @@ export default function CommunicatePage() {
                     ))}
                   </div>
 
-                  {/* Progress text */}
                   <div style={{ fontSize: 11, color: "#555", marginBottom: 12 }}>
                     {send.phase === "sending"
                       ? `Processing ${send.delivered + send.failed} of ${send.total} — ${pct}% complete`
                       : `${pct}% complete · ${send.total} recipients`}
                   </div>
 
-                  {/* Actions when done */}
                   {send.phase === "done" && (
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
                       {send.retryable > 0 && (
@@ -648,7 +756,6 @@ export default function CommunicatePage() {
                     </div>
                   )}
 
-                  {/* Per-email detail log (scrollable, newest-last) */}
                   {send.details.length > 0 && (
                     <div style={{ marginTop: 12, maxHeight: 180, overflowY: "auto" as const, background: "#0a0a0a", borderRadius: 6, border: "1px solid rgba(255,255,255,0.05)", padding: "8px 10px" }}>
                       <div style={{ fontSize: 10, fontWeight: 700, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 6 }}>
@@ -663,24 +770,6 @@ export default function CommunicatePage() {
                           {d.status !== "delivered" && d.error && (
                             <span style={{ color: "#555", fontSize: 10 }}>{d.error.slice(0, 70)}</span>
                           )}
-                          {d.status === "queued" && (
-                            <span style={{ color: "#60a5fa", fontSize: 10 }}>retrying (attempt {d.attempts})</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Failure details when done */}
-                  {send.phase === "done" && send.failed > 0 && (
-                    <div style={{ marginTop: 10, background: "rgba(248,113,113,0.05)", border: "1px solid rgba(248,113,113,0.15)", borderRadius: 6, padding: "10px 12px" }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "#f87171", marginBottom: 6 }}>Failed Recipients</div>
-                      {send.details.filter(d => d.status === "failed").map((d, i) => (
-                        <div key={i} style={{ fontSize: 11, color: "#888", marginBottom: 3 }}>
-                          <span style={{ color: "#f87171" }}>{d.email}</span>
-                          {d.code && <span style={{ color: "#555", marginLeft: 8, fontFamily: "monospace", fontSize: 10 }}>{d.code.replace(/_/g, " ")}</span>}
-                          {d.is_permanent && <span style={{ color: "#ef4444", marginLeft: 6, fontSize: 10 }}>permanent</span>}
-                          {!d.is_permanent && <span style={{ color: "#60a5fa", marginLeft: 6, fontSize: 10 }}>transient</span>}
                         </div>
                       ))}
                     </div>
@@ -693,7 +782,7 @@ export default function CommunicatePage() {
 
         {/* ── Push Notification Tab ─────────────────────────────────────────── */}
         {tab === "push" && (
-          <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: 20 }}>
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 10 }}>Quick Templates</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -726,7 +815,13 @@ export default function CommunicatePage() {
               </div>
               <div>
                 <Label>Message Body *</Label>
-                <textarea style={{ ...S.textarea, minHeight: 100 }} value={pushBody} onChange={e => setPushBody(e.target.value)} placeholder="Don't forget — your event is tomorrow…" maxLength={178} />
+                <textarea
+                  style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const, resize: "vertical" as const, minHeight: 100 }}
+                  value={pushBody}
+                  onChange={e => setPushBody(e.target.value)}
+                  placeholder="Don't forget — your event is tomorrow…"
+                  maxLength={178}
+                />
                 <div style={{ fontSize: 11, color: "#555", marginTop: 4 }}>{pushBody.length}/178 characters</div>
               </div>
               {(pushTitle || pushBody) && (
@@ -762,7 +857,6 @@ export default function CommunicatePage() {
               const canExpand  = !!h.batch_id && (h.channel ?? "email") === "email";
               const pct        = h.recipients > 0 ? Math.round(((h.sent ?? 0) / h.recipients) * 100) : 0;
 
-              // Filtered + searched emails for the detail panel
               const detailEmails = (batchDetail?.emails ?? []).filter(d => {
                 const matchStatus = detailFilter === "all" || d.status === detailFilter;
                 const matchSearch = !detailSearch || d.email.toLowerCase().includes(detailSearch.toLowerCase()) || (d.name ?? "").toLowerCase().includes(detailSearch.toLowerCase());
@@ -770,8 +864,7 @@ export default function CommunicatePage() {
               });
 
               return (
-                <div key={h.id} style={{ background: "#111", border: `1px solid ${isExpanded ? "rgba(232,98,10,0.3)" : "rgba(255,255,255,0.07)"}`, borderRadius: 12, overflow: "hidden", transition: "border-color 0.2s" }}>
-                  {/* Campaign row */}
+                <div key={h.id} style={{ background: "#111", border: `1px solid ${isExpanded ? "rgba(232,98,10,0.3)" : "rgba(255,255,255,0.07)"}`, borderRadius: 12, overflow: "hidden" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", flexWrap: "wrap" as const }}>
                     <div style={{ flex: 1, minWidth: 180 }}>
                       <div style={{ fontWeight: 600, fontSize: 13, color: "#fff", marginBottom: 2 }}>{h.subject}</div>
@@ -782,7 +875,6 @@ export default function CommunicatePage() {
                       </div>
                     </div>
 
-                    {/* Delivery stats mini-bar */}
                     <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
                       <div style={{ textAlign: "center" as const }}>
                         <div style={{ fontSize: 15, fontWeight: 700, color: "#4ade80" }}>{h.sent ?? 0}</div>
@@ -817,10 +909,8 @@ export default function CommunicatePage() {
                         {h.status ?? "sent"}
                       </span>
                       {h.status === "queued" && h.batch_id && (
-                        <button
-                          onClick={() => resumeBatch(h.batch_id!)}
-                          disabled={resumingBatch === h.batch_id}
-                          style={{ padding: "5px 12px", background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.25)", borderRadius: 6, color: "#60a5fa", fontSize: 11, fontWeight: 700, cursor: resumingBatch === h.batch_id ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: resumingBatch === h.batch_id ? 0.6 : 1 }}>
+                        <button onClick={() => resumeBatch(h.batch_id!)} disabled={resumingBatch === h.batch_id}
+                          style={{ padding: "5px 12px", background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.25)", borderRadius: 6, color: "#60a5fa", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: resumingBatch === h.batch_id ? 0.6 : 1 }}>
                           {resumingBatch === h.batch_id ? "Starting…" : "▶ Resume"}
                         </button>
                       )}
@@ -832,14 +922,12 @@ export default function CommunicatePage() {
                     </div>
                   </div>
 
-                  {/* Delivery detail panel */}
                   {isExpanded && (
                     <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "14px 16px" }}>
                       {detailLoading ? (
                         <div style={{ fontSize: 12, color: "#555", padding: "20px 0", textAlign: "center" as const }}>Loading delivery data…</div>
                       ) : batchDetail ? (
                         <>
-                          {/* Stats row */}
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, marginBottom: 14 }}>
                             {[
                               { label: "Total",     v: batchDetail.total,     c: "#888"    },
@@ -855,7 +943,6 @@ export default function CommunicatePage() {
                             ))}
                           </div>
 
-                          {/* Actions */}
                           <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" as const }}>
                             {batchDetail.retryable > 0 && (
                               <button onClick={() => retryBatchFailed(h.batch_id!)} style={{ padding: "6px 14px", background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.25)", borderRadius: 6, color: "#fbbf24", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
@@ -867,7 +954,6 @@ export default function CommunicatePage() {
                             </button>
                           </div>
 
-                          {/* Filter + search */}
                           <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center", flexWrap: "wrap" as const }}>
                             <div style={{ display: "flex", gap: 2, background: "rgba(255,255,255,0.04)", borderRadius: 6, padding: 2 }}>
                               {["all","delivered","failed","queued"].map(f => (
@@ -879,7 +965,6 @@ export default function CommunicatePage() {
                             <input value={detailSearch} onChange={e => setDetailSearch(e.target.value)} placeholder="Search email or name…" style={{ padding: "5px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#fff", fontSize: 11, outline: "none", fontFamily: "inherit", flex: 1, minWidth: 180 }} />
                           </div>
 
-                          {/* Per-email table */}
                           <div style={{ maxHeight: 320, overflowY: "auto" as const, background: "#0a0a0a", borderRadius: 6, border: "1px solid rgba(255,255,255,0.05)" }}>
                             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
                               <thead style={{ position: "sticky" as const, top: 0, background: "#0a0a0a", zIndex: 1 }}>
@@ -926,6 +1011,15 @@ export default function CommunicatePage() {
           </div>
         )}
       </div>
+
+      {/* Preview modal */}
+      {showPreview && (
+        <PreviewModal
+          subject={emailSubject}
+          html={emailHtml}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
 
       {toast && (
         <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 24, padding: "10px 20px", fontSize: 13, fontWeight: 600, color: "#fff", zIndex: 9999, whiteSpace: "nowrap" }}>

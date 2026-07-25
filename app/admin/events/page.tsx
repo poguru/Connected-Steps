@@ -535,6 +535,9 @@ export default function AdminEventsPage() {
                           <Link href={`/admin/events/${ev.id}/manage`}>
                             <Button size="sm" variant="outline">Event Hub</Button>
                           </Link>
+                          <Link href={`/admin/events/${ev.id}/edit`}>
+                            <Button size="sm" variant="secondary">✏️ Edit</Button>
+                          </Link>
                           <Button size="sm" variant={ev.status === "published" ? "secondary" : "ghost"}
                             onClick={() => togglePublish(ev)}>
                             {ev.status === "published" ? "Unpublish" : "Publish"}
