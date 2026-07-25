@@ -224,9 +224,10 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
 
         {/* Description */}
         {ev.description && (
-          <div style={{ fontSize: "0.95rem", color: "rgba(255,255,255,0.75)", lineHeight: 1.8, marginBottom: "2rem", whiteSpace: "pre-line" }}>
-            {ev.description}
-          </div>
+          <div
+            style={{ fontSize: "0.95rem", color: "rgba(255,255,255,0.75)", lineHeight: 1.8, marginBottom: "2rem" }}
+            dangerouslySetInnerHTML={{ __html: ev.description }}
+          />
         )}
 
         {/* CTA */}
