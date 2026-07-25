@@ -104,24 +104,58 @@ export async function POST(
       .maybeSingle<Participant>();
     participant = data;
   } else {
-    // BIB number fallback — authenticated ops session already trusted
-    const trimmed = qr_token.trim();
-    if (/^[A-Za-z0-9\-]{1,20}$/.test(trimmed)) {
+    // QR signature invalid — try fallback identifiers in order:
+    // 1. Event Registration ID (e.g. CS-EVT-LBAMJB)
+    // 2. BIB number
+    const raw   = qr_token.trim();
+    const upper = raw.toUpperCase();
+
+    // ── 1. Registration code lookup ──────────────────────────────────────────
+    if (upper.length >= 3) {
+      // registration_code has a unique index — O(1) lookup
+      const { data: regRow } = await db
+        .from("event_registrations")
+        .select("id, event_id")
+        .eq("registration_code", upper)
+        .maybeSingle();
+
+      if (regRow) {
+        if (regRow.event_id !== eventId) {
+          return NextResponse.json({
+            valid: false,
+            code: "WRONG_EVENT",
+            error: "This Registration ID belongs to a different event",
+            message: "This Registration ID belongs to a different event. Please check you are at the correct station.",
+          }, { status: 400 });
+        }
+        const { data } = await db
+          .from("event_participants")
+          .select(SELECT)
+          .eq("registration_id", regRow.id)
+          .eq("event_id", eventId)
+          .maybeSingle<Participant>();
+        participant = data;
+      }
+    }
+
+    // ── 2. BIB number lookup ─────────────────────────────────────────────────
+    if (!participant && /^[A-Za-z0-9]{1,20}$/.test(raw)) {
       const { data } = await db
         .from("event_participants")
         .select(SELECT)
-        .eq("bib_number", trimmed)
+        .eq("bib_number", raw)
         .eq("event_id", eventId)
         .maybeSingle<Participant>();
       participant = data;
     }
+
     if (!participant) {
       return NextResponse.json({
         valid: false,
-        code: "INVALID_QR",
-        error: "Invalid QR code",
-        message: "This QR code could not be recognised. Please try scanning again or enter the BIB number manually.",
-      }, { status: 400 });
+        code: "NOT_FOUND",
+        error: "Participant not found",
+        message: "No participant found for this Registration ID, QR Code or BIB Number. Please check and try again.",
+      }, { status: 404 });
     }
   }
 
@@ -129,8 +163,8 @@ export async function POST(
     return NextResponse.json({
       valid: false,
       code: "NOT_FOUND",
-      error: "Participant not found for this QR code",
-      message: "No participant found for this QR code. The code may be invalid or belong to a different event.",
+      error: "Participant not found",
+      message: "No participant found for this Registration ID, QR Code or BIB Number. Please check and try again.",
     }, { status: 404 });
   }
 
@@ -138,7 +172,7 @@ export async function POST(
     return NextResponse.json({
       valid: false,
       code: "CANCELLED",
-      error: "This registration has been cancelled",
+      error: "Registration Cancelled",
       message: "This registration has been cancelled and is no longer valid.",
     }, { status: 409 });
   }
@@ -147,7 +181,7 @@ export async function POST(
     return NextResponse.json({
       valid: false,
       code: "PENDING_PAYMENT",
-      error: "Payment not completed for this registration",
+      error: "Payment Not Completed",
       message: "Payment has not been completed for this registration. The participant should complete payment before proceeding.",
     }, { status: 409 });
   }
