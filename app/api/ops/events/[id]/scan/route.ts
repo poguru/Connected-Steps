@@ -177,7 +177,12 @@ export async function POST(
     }, { status: 409 });
   }
 
-  if (participant.status === "pending_payment") {
+  // Use the authoritative payment_status from event_registrations, not the participant
+  // row status. The Razorpay webhook path confirms payment in event_registrations but
+  // never updates event_participants.status, so checking participant.status here would
+  // incorrectly block participants who paid via the webhook fallback path.
+  const regPaymentStatus = participant.event_registrations?.payment_status;
+  if (regPaymentStatus && regPaymentStatus !== "paid" && regPaymentStatus !== "free") {
     return NextResponse.json({
       valid: false,
       code: "PENDING_PAYMENT",

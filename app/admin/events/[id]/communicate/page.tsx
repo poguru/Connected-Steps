@@ -46,6 +46,11 @@ interface DeliveryEmail {
   attempts:       number;
   aws_message_id?: string | null;
   sent_at?:       string | null;
+  delivered_at?:  string | null;
+  opened_at?:     string | null;
+  clicked_at?:    string | null;
+  bounce_type?:   string | null;
+  bounce_reason?: string | null;
 }
 
 interface BatchDetail {
@@ -55,7 +60,41 @@ interface BatchDetail {
   delivered: number;
   failed:    number;
   retryable: number;
+  opened:    number;
+  clicked:   number;
+  bounced:   number;
   emails:    DeliveryEmail[];
+}
+
+// ── Health check types ─────────────────────────────────────────────────────────
+
+interface HealthItem {
+  label:  string;
+  status: "healthy" | "warning" | "critical";
+  detail: string;
+}
+
+interface HealthSection {
+  label:   string;
+  status:  "healthy" | "warning" | "critical";
+  score:   number;
+  weight:  number;
+  blocker: boolean;
+  items:   HealthItem[];
+}
+
+interface HealthResult {
+  score:    number;
+  status:   "healthy" | "warning" | "critical";
+  checks:   Record<string, HealthSection>;
+  blockers: string[];
+  warnings: string[];
+  delivery_estimate: {
+    recipient_count:   number;
+    batch_count:       number;
+    estimated_seconds: number;
+    completion_time:   string;
+  };
 }
 
 interface EmailDetail {
@@ -306,14 +345,53 @@ Connected Steps &middot; Hyderabad &middot; <a href="https://www.connectedsteps.
   );
 }
 
+// ── Health section card ────────────────────────────────────────────────────────
+
+function HealthSectionCard({ section }: { section: HealthSection }) {
+  const [open, setOpen] = useState(section.status !== "healthy");
+  const color = section.status === "healthy" ? "#4ade80" : section.status === "warning" ? "#fbbf24" : "#f87171";
+  const icon  = section.status === "healthy" ? "🟢" : section.status === "warning" ? "🟡" : "🔴";
+  return (
+    <div style={{ background: "#0d0d0d", border: `1px solid ${section.status === "healthy" ? "rgba(255,255,255,0.07)" : section.status === "warning" ? "rgba(251,191,36,0.18)" : "rgba(248,113,113,0.22)"}`, borderRadius: 8, overflow: "hidden" }}>
+      <button onClick={() => setOpen(o => !o)} style={{ width: "100%", padding: "10px 14px", display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left" as const }}>
+        <span>{icon}</span>
+        <span style={{ flex: 1, fontSize: 12, fontWeight: 700, color: "#fff" }}>{section.label}</span>
+        <span style={{ fontSize: 11, fontWeight: 700, color }}>{section.score}%</span>
+        <span style={{ color: "#444", fontSize: 11 }}>{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", padding: "8px 14px 10px" }}>
+          {section.items.map((item, i) => {
+            const ic = item.status === "healthy" ? "#4ade80" : item.status === "warning" ? "#fbbf24" : "#f87171";
+            const sym = item.status === "healthy" ? "✓" : item.status === "warning" ? "⚠" : "✗";
+            return (
+              <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 5 }}>
+                <span style={{ fontSize: 10, color: ic, fontWeight: 700, flexShrink: 0, marginTop: 2 }}>{sym}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: 11, color: "#bbb" }}>{item.label}</span>
+                  <span style={{ fontSize: 10, color: "#555", marginLeft: 6 }}>{item.detail}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function CommunicatePage() {
   const params  = useParams();
   const eventId = params.id as string;
 
-  const [tab,     setTab]     = useState<"email" | "push" | "history">("email");
+  const [tab,     setTab]     = useState<"email" | "push" | "health" | "history">("email");
   const [history, setHistory] = useState<CommHistory[]>([]);
+
+  // Health check state
+  const [healthResult,  setHealthResult]  = useState<HealthResult | null>(null);
+  const [healthLoading, setHealthLoading] = useState(false);
 
   // Email composer state
   const [emailFilter,   setEmailFilter]   = useState<RecipientFilter>("all");
@@ -361,6 +439,24 @@ export default function CommunicatePage() {
     const res  = await fetch(`/api/admin/events/${eventId}/communicate`);
     const data = await res.json();
     setHistory(data.history ?? []);
+  }
+
+  async function runHealthCheck() {
+    setHealthLoading(true);
+    setHealthResult(null);
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/comm-health`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ subject: emailSubject, body_html: emailHtml, recipient_filter: emailFilter, attachments }),
+      });
+      const data = await res.json() as HealthResult;
+      setHealthResult(data);
+    } catch {
+      showToast("❌ Health check failed — network error");
+    } finally {
+      setHealthLoading(false);
+    }
   }
 
   // ── Status polling + client-driven send ──────────────────────────────────────
@@ -484,10 +580,14 @@ export default function CommunicatePage() {
   }
 
   function downloadCSV() {
-    const rows = ["Email,Status,Error,Code,Permanent,Attempts",
+    const rows = [
+      "Email,Status,Error,Code,Permanent,Attempts",
       ...send.details.map(d =>
-        `${d.email},${d.status},"${(d.error ?? "").replace(/"/g, "'")}",${d.code ?? ""},${d.is_permanent ?? ""},${d.attempts}`
-      )];
+        [d.email, d.status, d.error ?? "", d.code ?? "", d.is_permanent ?? "", d.attempts]
+          .map(v => `"${String(v).replace(/"/g, "'")}"`)
+          .join(",")
+      ),
+    ];
     const a = document.createElement("a");
     a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(rows.join("\n"));
     a.download = `email-report-${send.batchId?.slice(0, 8) ?? "batch"}.csv`;
@@ -547,9 +647,15 @@ export default function CommunicatePage() {
   function downloadBatchCSV(batchId: string) {
     if (!batchDetail) return;
     const rows = [
-      "Email,Name,Status,Error,Code,Permanent,Attempts,AWS Message ID,Sent At",
+      "Email,Name,Status,Opened At,Clicked At,Bounce Type,Error,Code,Permanent,Attempts,Sent At",
       ...batchDetail.emails.map(d =>
-        [d.email, d.name ?? "", d.status, d.error ?? "", d.code ?? "", d.is_permanent ?? "", d.attempts, d.aws_message_id ?? "", d.sent_at ?? ""]
+        [
+          d.email, d.name ?? "", d.status,
+          d.opened_at  ?? "", d.clicked_at  ?? "",
+          d.bounce_type ?? "",
+          d.bounce_type ? (d.bounce_reason ?? "") : (d.error ?? ""),
+          d.code ?? "", d.is_permanent ?? "", d.attempts, d.sent_at ?? "",
+        ]
           .map(v => `"${String(v).replace(/"/g, "'")}"`)
           .join(",")
       ),
@@ -664,6 +770,7 @@ export default function CommunicatePage() {
   const TABS = [
     { key: "email",   label: "📧 Email" },
     { key: "push",    label: "🔔 Push Notification" },
+    { key: "health",  label: healthResult ? `🔍 Health ${healthResult.score}%` : "🔍 Health Check" },
     { key: "history", label: `📋 History (${history.length})` },
   ];
 
@@ -973,6 +1080,147 @@ export default function CommunicatePage() {
           </div>
         )}
 
+        {/* ── Health Check Tab ─────────────────────────────────────────────── */}
+        {tab === "health" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap" as const, gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>Communication Health Check</div>
+                <div style={{ fontSize: 12, color: "#555", marginTop: 4 }}>Diagnose the full pipeline before sending. Uses your current email draft for template validation.</div>
+              </div>
+              <Button onClick={runHealthCheck} loading={healthLoading}>
+                {healthResult ? "↻ Re-run Check" : "Run Health Check"}
+              </Button>
+            </div>
+
+            {/* Loading */}
+            {healthLoading && (
+              <div style={{ textAlign: "center" as const, padding: "3rem 0", color: "#555" }}>
+                <Spinner size={28} />
+                <div style={{ marginTop: 14, fontSize: 13 }}>Running diagnostics…</div>
+                <div style={{ marginTop: 6, fontSize: 11, color: "#444" }}>Checking ZeptoMail, database, queue, storage, template, recipients</div>
+              </div>
+            )}
+
+            {!healthLoading && !healthResult && (
+              <div style={{ padding: "3rem", textAlign: "center" as const, background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12 }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#555", marginBottom: 8 }}>Ready to diagnose</div>
+                <div style={{ fontSize: 12, color: "#444", lineHeight: 1.6 }}>
+                  Run a health check to verify: Email Provider · Database · Queue · Storage · Template · Recipients · Event
+                </div>
+                {!emailSubject && !emailHtml && (
+                  <div style={{ marginTop: 14, padding: "8px 14px", background: "rgba(251,191,36,0.07)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 6, fontSize: 11, color: "#fbbf24", display: "inline-block" }}>
+                    ⚠ Compose your email in the Email tab first for full template validation
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!healthLoading && healthResult && (
+              <>
+                {/* Overall score banner */}
+                <div style={{ display: "flex", alignItems: "center", gap: 20, padding: "18px 22px", background: "#0d0d0d", border: `1px solid ${healthResult.status === "healthy" ? "rgba(74,222,128,0.2)" : healthResult.status === "warning" ? "rgba(251,191,36,0.2)" : "rgba(248,113,113,0.22)"}`, borderRadius: 12, flexWrap: "wrap" as const }}>
+                  {/* Score ring */}
+                  <div style={{ position: "relative" as const, width: 76, height: 76, flexShrink: 0 }}>
+                    <svg viewBox="0 0 36 36" style={{ transform: "rotate(-90deg)", width: "100%", height: "100%" }}>
+                      <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
+                      <circle cx="18" cy="18" r="15.9" fill="none"
+                        stroke={healthResult.status === "healthy" ? "#4ade80" : healthResult.status === "warning" ? "#fbbf24" : "#f87171"}
+                        strokeWidth="3.2"
+                        strokeDasharray={`${healthResult.score} ${100 - healthResult.score}`}
+                        strokeLinecap="round" />
+                    </svg>
+                    <div style={{ position: "absolute" as const, inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <span style={{ fontSize: 14, fontWeight: 800, color: healthResult.status === "healthy" ? "#4ade80" : healthResult.status === "warning" ? "#fbbf24" : "#f87171" }}>{healthResult.score}%</span>
+                    </div>
+                  </div>
+
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>
+                      {healthResult.status === "healthy" ? "🟢 Healthy" : healthResult.status === "warning" ? "🟡 Warning" : "🔴 Critical"}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#555", marginTop: 3 }}>Communication Health Score</div>
+                    {healthResult.blockers.length === 0 && <div style={{ fontSize: 11, color: "#4ade80", marginTop: 5 }}>✓ No blockers — ready to send</div>}
+                    {healthResult.blockers.length > 0  && <div style={{ fontSize: 11, color: "#f87171", marginTop: 5 }}>🚫 {healthResult.blockers.length} blocker(s) must be resolved</div>}
+                  </div>
+
+                  {/* Estimate quick stats */}
+                  <div style={{ display: "flex", gap: 20, flexShrink: 0 }}>
+                    {[
+                      { label: "Will Receive",   value: healthResult.delivery_estimate.recipient_count.toLocaleString() },
+                      { label: "Batches",         value: String(healthResult.delivery_estimate.batch_count) },
+                      { label: "Est. Duration",   value: `~${Math.max(1, Math.ceil(healthResult.delivery_estimate.estimated_seconds / 60))} min` },
+                    ].map(s => (
+                      <div key={s.label} style={{ textAlign: "center" as const }}>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>{s.value}</div>
+                        <div style={{ fontSize: 10, color: "#555" }}>{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Blockers */}
+                {healthResult.blockers.length > 0 && (
+                  <div style={{ padding: "12px 16px", background: "rgba(248,113,113,0.07)", border: "1px solid rgba(248,113,113,0.24)", borderRadius: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#f87171", marginBottom: 8, textTransform: "uppercase" as const, letterSpacing: ".06em" }}>🚫 Blockers — Fix before sending</div>
+                    {healthResult.blockers.map((b, i) => (
+                      <div key={i} style={{ fontSize: 12, color: "#f87171", marginBottom: 4 }}>• {b}</div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Warnings */}
+                {healthResult.warnings.length > 0 && (
+                  <div style={{ padding: "12px 16px", background: "rgba(251,191,36,0.05)", border: "1px solid rgba(251,191,36,0.18)", borderRadius: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#fbbf24", marginBottom: 8, textTransform: "uppercase" as const, letterSpacing: ".06em" }}>⚠ Warnings — Review before sending</div>
+                    {healthResult.warnings.slice(0, 6).map((w, i) => (
+                      <div key={i} style={{ fontSize: 12, color: "#fbbf24", marginBottom: 3 }}>• {w}</div>
+                    ))}
+                    {healthResult.warnings.length > 6 && (
+                      <div style={{ fontSize: 11, color: "#666", marginTop: 4 }}>+{healthResult.warnings.length - 6} more warnings</div>
+                    )}
+                  </div>
+                )}
+
+                {/* Check sections grid */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 10 }}>
+                  {Object.entries(healthResult.checks).map(([key, section]) => (
+                    <HealthSectionCard key={key} section={section} />
+                  ))}
+                </div>
+
+                {/* Delivery estimate box */}
+                <div style={{ padding: "14px 18px", background: "rgba(96,165,250,0.04)", border: "1px solid rgba(96,165,250,0.14)", borderRadius: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#60a5fa", textTransform: "uppercase" as const, letterSpacing: ".06em", marginBottom: 12 }}>📊 Delivery Estimate</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                    {[
+                      { label: "Recipients",   value: healthResult.delivery_estimate.recipient_count.toLocaleString() },
+                      { label: "Batches of 5", value: String(healthResult.delivery_estimate.batch_count) },
+                      { label: "Rate",          value: "~1 email/sec" },
+                      { label: "Completes ~",  value: new Date(healthResult.delivery_estimate.completion_time).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }) },
+                    ].map(e => (
+                      <div key={e.label} style={{ textAlign: "center" as const, padding: "8px 4px", background: "rgba(255,255,255,0.02)", borderRadius: 6 }}>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{e.value}</div>
+                        <div style={{ fontSize: 10, color: "#555" }}>{e.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Webhook info */}
+                <div style={{ padding: "10px 14px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, fontSize: 11, color: "#555", lineHeight: 1.7 }}>
+                  <strong style={{ color: "#666" }}>Delivery Tracking:</strong> ZeptoMail webhooks update open/click/bounce status automatically.
+                  Configure in ZeptoMail Dashboard → Mail Agent → Webhooks → <code style={{ color: "#888" }}>https://www.connectedsteps.in/api/webhooks/zepto-mail</code>.
+                  Set <code style={{ color: "#888" }}>ZEPTOMAIL_WEBHOOK_SECRET</code> in Vercel for authentication.
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         {/* ── History Tab ───────────────────────────────────────────────────── */}
         {tab === "history" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -987,9 +1235,13 @@ export default function CommunicatePage() {
               const pct        = h.recipients > 0 ? Math.round(((h.sent ?? 0) / h.recipients) * 100) : 0;
 
               const detailEmails = (batchDetail?.emails ?? []).filter(d => {
-                const matchStatus = detailFilter === "all" || d.status === detailFilter;
                 const matchSearch = !detailSearch || d.email.toLowerCase().includes(detailSearch.toLowerCase()) || (d.name ?? "").toLowerCase().includes(detailSearch.toLowerCase());
-                return matchStatus && matchSearch;
+                if (!matchSearch) return false;
+                if (detailFilter === "all")     return true;
+                if (detailFilter === "opened")  return !!d.opened_at;
+                if (detailFilter === "clicked") return !!d.clicked_at;
+                if (detailFilter === "bounced") return !!d.bounce_type;
+                return d.status === detailFilter;
               });
 
               return (
@@ -1065,13 +1317,12 @@ export default function CommunicatePage() {
                         <div style={{ fontSize: 12, color: "#555", padding: "20px 0", textAlign: "center" as const }}>Loading delivery data…</div>
                       ) : batchDetail ? (
                         <>
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, marginBottom: 14 }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 10 }}>
                             {[
                               { label: "Total",     v: batchDetail.total,     c: "#888"    },
                               { label: "Delivered", v: batchDetail.delivered, c: "#4ade80" },
                               { label: "Failed",    v: batchDetail.failed,    c: batchDetail.failed > 0 ? "#f87171" : "#555" },
                               { label: "Queued",    v: batchDetail.queued,    c: "#60a5fa" },
-                              { label: "Retryable", v: batchDetail.retryable, c: batchDetail.retryable > 0 ? "#fbbf24" : "#555" },
                             ].map(s => (
                               <div key={s.label} style={{ textAlign: "center" as const, padding: "8px 4px", background: "rgba(255,255,255,0.02)", borderRadius: 6 }}>
                                 <div style={{ fontSize: 20, fontWeight: 700, color: s.c }}>{s.v}</div>
@@ -1079,6 +1330,29 @@ export default function CommunicatePage() {
                               </div>
                             ))}
                           </div>
+                          {/* Webhook-sourced engagement stats (shown only when data exists) */}
+                          {(batchDetail.opened > 0 || batchDetail.clicked > 0 || batchDetail.bounced > 0 || batchDetail.retryable > 0) && (
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 10 }}>
+                              {[
+                                { label: "Opened",    v: batchDetail.opened ?? 0,    c: batchDetail.opened   > 0 ? "#a78bfa" : "#555" },
+                                { label: "Clicked",   v: batchDetail.clicked ?? 0,   c: batchDetail.clicked  > 0 ? "#34d399" : "#555" },
+                                { label: "Bounced",   v: batchDetail.bounced ?? 0,   c: batchDetail.bounced  > 0 ? "#f59e0b" : "#555" },
+                                { label: "Retryable", v: batchDetail.retryable,       c: batchDetail.retryable > 0 ? "#fbbf24" : "#555" },
+                              ].map(s => (
+                                <div key={s.label} style={{ textAlign: "center" as const, padding: "8px 4px", background: "rgba(255,255,255,0.02)", borderRadius: 6 }}>
+                                  <div style={{ fontSize: 16, fontWeight: 700, color: s.c }}>{s.v}</div>
+                                  <div style={{ fontSize: 9, color: "#555", textTransform: "uppercase" as const }}>{s.label}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* High failure rate alert */}
+                          {batchDetail.total > 0 && (batchDetail.failed / batchDetail.total) > 0.05 && (
+                            <div style={{ marginBottom: 12, padding: "10px 14px", background: "rgba(248,113,113,0.07)", border: "1px solid rgba(248,113,113,0.22)", borderRadius: 8, fontSize: 12, color: "#f87171" }}>
+                              ⚠ High failure rate detected ({Math.round((batchDetail.failed / batchDetail.total) * 100)}%). Review failed recipients before sending another campaign.
+                            </div>
+                          )}
 
                           <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" as const }}>
                             {batchDetail.retryable > 0 && (
@@ -1092,28 +1366,36 @@ export default function CommunicatePage() {
                           </div>
 
                           <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center", flexWrap: "wrap" as const }}>
-                            <div style={{ display: "flex", gap: 2, background: "rgba(255,255,255,0.04)", borderRadius: 6, padding: 2 }}>
-                              {["all","delivered","failed","queued"].map(f => (
-                                <button key={f} onClick={() => setDetailFilter(f)} style={{ padding: "4px 10px", borderRadius: 5, border: "none", background: detailFilter === f ? "#e8620a" : "transparent", color: detailFilter === f ? "#fff" : "#666", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                                  {f === "all" ? `All (${batchDetail.total})` : f === "delivered" ? `✓ ${batchDetail.delivered}` : f === "failed" ? `✗ ${batchDetail.failed}` : `⏳ ${batchDetail.queued}`}
+                            <div style={{ display: "flex", gap: 2, background: "rgba(255,255,255,0.04)", borderRadius: 6, padding: 2, flexWrap: "wrap" as const }}>
+                              {[
+                                { key: "all",       label: `All (${batchDetail.total})` },
+                                { key: "delivered", label: `✓ ${batchDetail.delivered}` },
+                                { key: "failed",    label: `✗ ${batchDetail.failed}` },
+                                { key: "queued",    label: `⏳ ${batchDetail.queued}` },
+                                ...(batchDetail.opened  > 0 ? [{ key: "opened",  label: `👁 ${batchDetail.opened}` }]  : []),
+                                ...(batchDetail.clicked > 0 ? [{ key: "clicked", label: `🔗 ${batchDetail.clicked}` }] : []),
+                                ...(batchDetail.bounced > 0 ? [{ key: "bounced", label: `↩ ${batchDetail.bounced}` }]  : []),
+                              ].map(f => (
+                                <button key={f.key} onClick={() => setDetailFilter(f.key)} style={{ padding: "4px 10px", borderRadius: 5, border: "none", background: detailFilter === f.key ? "#e8620a" : "transparent", color: detailFilter === f.key ? "#fff" : "#666", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" as const }}>
+                                  {f.label}
                                 </button>
                               ))}
                             </div>
-                            <input value={detailSearch} onChange={e => setDetailSearch(e.target.value)} placeholder="Search email or name…" style={{ padding: "5px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#fff", fontSize: 11, outline: "none", fontFamily: "inherit", flex: 1, minWidth: 180 }} />
+                            <input value={detailSearch} onChange={e => setDetailSearch(e.target.value)} placeholder="Search email or name…" style={{ padding: "5px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#fff", fontSize: 11, outline: "none", fontFamily: "inherit", flex: 1, minWidth: 160 }} />
                           </div>
 
                           <div style={{ maxHeight: 320, overflowY: "auto" as const, background: "#0a0a0a", borderRadius: 6, border: "1px solid rgba(255,255,255,0.05)" }}>
                             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
                               <thead style={{ position: "sticky" as const, top: 0, background: "#0a0a0a", zIndex: 1 }}>
                                 <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-                                  {["Status","Recipient","AWS Message ID","Error","Attempts","Sent At"].map(col => (
+                                  {["Status","Recipient","Opened","Clicked","Error / Bounce","Att.","Sent At"].map(col => (
                                     <th key={col} style={{ padding: "8px 10px", textAlign: "left" as const, fontSize: 9, color: "#555", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: ".06em", whiteSpace: "nowrap" as const }}>{col}</th>
                                   ))}
                                 </tr>
                               </thead>
                               <tbody>
                                 {detailEmails.length === 0 ? (
-                                  <tr><td colSpan={6} style={{ padding: "20px", textAlign: "center" as const, color: "#555" }}>No results</td></tr>
+                                  <tr><td colSpan={7} style={{ padding: "20px", textAlign: "center" as const, color: "#555" }}>No results</td></tr>
                                 ) : detailEmails.slice(0, 200).map((d, i) => (
                                   <tr key={i} style={{ borderTop: "1px solid rgba(255,255,255,0.03)" }}>
                                     <td style={{ padding: "6px 10px", whiteSpace: "nowrap" as const }}>
@@ -1126,9 +1408,16 @@ export default function CommunicatePage() {
                                       <div style={{ color: "#fff" }}>{d.name || "—"}</div>
                                       <div style={{ color: "#555", fontSize: 10 }}>{d.email}</div>
                                     </td>
-                                    <td style={{ padding: "6px 10px", color: "#555", fontFamily: "monospace", fontSize: 10 }}>{d.aws_message_id ? d.aws_message_id.slice(0, 20) + "…" : "—"}</td>
-                                    <td style={{ padding: "6px 10px", color: "#666", maxWidth: 180, overflow: "hidden" as const, textOverflow: "ellipsis" as const, whiteSpace: "nowrap" as const }}>{d.error ?? "—"}</td>
-                                    <td style={{ padding: "6px 10px", color: "#666", textAlign: "center" as const }}>{d.attempts}</td>
+                                    <td style={{ padding: "6px 10px", color: d.opened_at ? "#a78bfa" : "#444", fontSize: 10, whiteSpace: "nowrap" as const }}>
+                                      {d.opened_at ? new Date(d.opened_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
+                                    </td>
+                                    <td style={{ padding: "6px 10px", color: d.clicked_at ? "#34d399" : "#444", fontSize: 10, whiteSpace: "nowrap" as const }}>
+                                      {d.clicked_at ? new Date(d.clicked_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
+                                    </td>
+                                    <td style={{ padding: "6px 10px", color: d.bounce_type ? "#f59e0b" : "#666", maxWidth: 160, overflow: "hidden" as const, textOverflow: "ellipsis" as const, whiteSpace: "nowrap" as const, fontSize: 10 }}>
+                                      {d.bounce_type ? `↩ ${d.bounce_type}: ${d.bounce_reason ?? ""}` : (d.error ?? "—")}
+                                    </td>
+                                    <td style={{ padding: "6px 10px", color: "#666", textAlign: "center" as const, fontSize: 10 }}>{d.attempts}</td>
                                     <td style={{ padding: "6px 10px", color: "#555", whiteSpace: "nowrap" as const, fontSize: 10 }}>{d.sent_at ? new Date(d.sent_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
                                   </tr>
                                 ))}

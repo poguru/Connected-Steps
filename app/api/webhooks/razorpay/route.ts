@@ -4,6 +4,7 @@ import { getSupabaseServer }    from "@/lib/supabase-server";
 import { handleEventQrEmail,
          handleInvoiceGenerate } from "@/lib/job-handlers";
 import { enqueueJob }           from "@/lib/job-queue";
+import { signEventQR }          from "@/lib/event-qr";
 import { activateMembership }   from "@/lib/membership-activate";
 import { sendItRunConfirmationEmail } from "@/lib/it-run-email";
 
@@ -305,6 +306,27 @@ async function handlePaymentCapturedForReg(
   }
 
   console.log(`[razorpay-webhook] ✅ Registration ${reg.registration_code} confirmed via webhook — payment ${paymentId}`);
+
+  // Activate event_participants rows that are still in pending_payment state.
+  // The client-side verify-payment route does this, but the webhook is the server-side
+  // fallback and must mirror that work so the ops scan route sees them as valid.
+  const { data: pendingParticipants } = await db
+    .from("event_participants")
+    .select("id")
+    .eq("registration_id", reg.id)
+    .eq("status", "pending_payment");
+
+  if (pendingParticipants && pendingParticipants.length > 0) {
+    await Promise.all(
+      pendingParticipants.map(p => {
+        const qr = signEventQR(p.id, reg.event_id);
+        return db.from("event_participants")
+          .update({ status: "active", qr_token: qr })
+          .eq("id", p.id);
+      })
+    );
+    console.log(`[razorpay-webhook] Activated ${pendingParticipants.length} participant(s) for registration ${reg.registration_code}`);
+  }
 
   const ev = reg.events;
   const qrPayload = {

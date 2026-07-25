@@ -19,7 +19,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const db = getSupabaseServer();
   const { data, error } = await db
     .from("email_queue")
-    .select("status, failure_code, failure_reason, is_permanent, recipient_email, recipient_name, attempts, aws_message_id, sent_at, created_at")
+    .select("status, failure_code, failure_reason, is_permanent, recipient_email, recipient_name, attempts, aws_message_id, sent_at, created_at, delivered_at, opened_at, clicked_at, bounce_type, bounce_reason")
     .eq("batch_id", batch_id)
     .order("created_at");
 
@@ -32,6 +32,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const delivered = rows.filter(r => r.status === "delivered").length;
   const failed    = rows.filter(r => r.status === "failed").length;
   const retryable = rows.filter(r => r.status === "failed" && r.is_permanent === false).length;
+  const opened    = rows.filter(r => r.opened_at   != null).length;
+  const clicked   = rows.filter(r => r.clicked_at  != null).length;
+  const bounced   = rows.filter(r => r.bounce_type != null).length;
 
   const failures = rows
     .filter(r => r.status === "failed")
@@ -46,7 +49,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // Full per-email list for the delivery detail view
   const emails = includeAll
     ? rows
-        .filter(r => !statusFilter || r.status === statusFilter)
+        .filter(r => {
+          if (!statusFilter || statusFilter === "all") return true;
+          if (statusFilter === "opened")  return r.opened_at  != null;
+          if (statusFilter === "clicked") return r.clicked_at != null;
+          if (statusFilter === "bounced") return r.bounce_type != null;
+          return r.status === statusFilter;
+        })
         .map(r => ({
           email:          r.recipient_email,
           name:           r.recipient_name,
@@ -57,10 +66,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           attempts:       r.attempts,
           aws_message_id: r.aws_message_id,
           sent_at:        r.sent_at,
+          delivered_at:   r.delivered_at,
+          opened_at:      r.opened_at,
+          clicked_at:     r.clicked_at,
+          bounce_type:    r.bounce_type,
+          bounce_reason:  r.bounce_reason,
         }))
     : undefined;
 
-  return NextResponse.json({ total, queued, sending, delivered, failed, retryable, failures, emails });
+  return NextResponse.json({ total, queued, sending, delivered, failed, retryable, opened, clicked, bounced, failures, emails });
 }
 
 // POST — re-queue transient failed emails for retry
