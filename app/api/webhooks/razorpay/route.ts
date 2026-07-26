@@ -317,14 +317,27 @@ async function handlePaymentCapturedForReg(
     .eq("status", "pending_payment");
 
   if (pendingParticipants && pendingParticipants.length > 0) {
+    const signed = pendingParticipants.map(p => ({
+      id: p.id,
+      qr: signEventQR(p.id, reg.event_id),
+    }));
+
     await Promise.all(
-      pendingParticipants.map(p => {
-        const qr = signEventQR(p.id, reg.event_id);
-        return db.from("event_participants")
+      signed.map(({ id, qr }) =>
+        db.from("event_participants")
           .update({ status: "active", qr_token: qr })
-          .eq("id", p.id);
-      })
+          .eq("id", id)
+      )
     );
+
+    // Sync the first participant's QR token to event_registrations so
+    // handleEventQrEmail below reuses it. Without this, handleEventQrEmail
+    // generates a registration-code-based QR (its fallback) that does not match
+    // the UUID-based QR stored in event_participants, causing scan failures.
+    await db.from("event_registrations")
+      .update({ qr_token: signed[0].qr })
+      .eq("id", reg.id);
+
     console.log(`[razorpay-webhook] Activated ${pendingParticipants.length} participant(s) for registration ${reg.registration_code}`);
   }
 

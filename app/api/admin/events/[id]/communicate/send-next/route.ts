@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 import { sendSingleEmail } from "@/lib/email-service";
+import { loadAttachmentsAsBase64, type AttachmentMeta } from "@/lib/email-attachments";
 
 const MAX_ATTEMPTS = 3;
 
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Also re-pick emails stuck in "sending" for > 60s (covers Vercel timeouts).
   const { data: rows, error: selectErr } = await db
     .from("email_queue")
-    .select("id, recipient_email, recipient_name, subject, html_body, attempts, status")
+    .select("id, recipient_email, recipient_name, subject, html_body, attempts, status, attachments")
     .eq("batch_id", batch_id)
     .in("status", ["queued", "sending"])
     .order("created_at")
@@ -59,10 +60,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Database error", detail: claimErr.message }, { status: 500 });
   }
 
+  const emailAttachments = await loadAttachmentsAsBase64((email.attachments ?? []) as AttachmentMeta[]);
   const result = await sendSingleEmail({
-    to:      email.recipient_email,
-    subject: email.subject,
-    html:    email.html_body,
+    to:          email.recipient_email,
+    subject:     email.subject,
+    html:        email.html_body,
+    attachments: emailAttachments.length > 0 ? emailAttachments : undefined,
   });
 
   const attempts    = email.attempts + 1;

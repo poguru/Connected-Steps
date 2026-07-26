@@ -96,13 +96,40 @@ export async function POST(
         message: "This QR code belongs to a different event. Please check you are at the correct event.",
       }, { status: 400 });
     }
-    const { data } = await db
+
+    // Primary: exact QR token match
+    const { data: byToken } = await db
       .from("event_participants")
       .select(SELECT)
       .eq("qr_token", qr_token)
       .eq("event_id", eventId)
       .maybeSingle<Participant>();
-    participant = data;
+    participant = byToken;
+
+    // Secondary fallback: valid QR signature but no participant has this exact token.
+    // This covers webhook-path registrations where the confirmation email QR is
+    // signed with the registration code (CS-EVT-xxxxx) but event_participants holds
+    // a different UUID-based token assigned during participant activation.
+    if (!participant) {
+      const rc = decoded.registrationCode;
+      if (/^CS-/i.test(rc)) {
+        const { data: regRow } = await db
+          .from("event_registrations")
+          .select("id")
+          .eq("registration_code", rc)
+          .eq("event_id", eventId)
+          .maybeSingle();
+        if (regRow) {
+          const { data: byReg } = await db
+            .from("event_participants")
+            .select(SELECT)
+            .eq("registration_id", regRow.id)
+            .eq("event_id", eventId)
+            .maybeSingle<Participant>();
+          participant = byReg;
+        }
+      }
+    }
   } else {
     // QR signature invalid — try fallback identifiers in order:
     // 1. Event Registration ID (e.g. CS-EVT-LBAMJB)
