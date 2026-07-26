@@ -15,45 +15,47 @@ export async function GET(req: NextRequest, { params }: Params) {
   const { id: eventId } = await params;
   const db = getSupabaseServer();
 
-  // Step 1: Always-safe core query — uses only columns that exist in the base schema.
-  // Deliberately avoids columns added by optional migrations (phase3 BIB, phase5 certs).
-  // This ensures funnel + revenue + email stats always work.
-  const [evRes, coreRegsRes, resultsRes] = await Promise.all([
+  // Step 1: Core queries.
+  // event_participants is the authoritative source for all race-day service columns
+  // (checked_in_at, bib_collected_at, breakfast_availed). The ops scan route writes
+  // these to event_participants only — event_registrations is never updated.
+  const [evRes, coreRegsRes, resultsRes, participantsRes] = await Promise.all([
     db.from("events").select("title, start_date, max_participants, participant_count").eq("id", eventId).single(),
     db.from("event_registrations")
-      .select("payment_status, final_price, status, created_at, distance_category, email_status, checked_in_at")
+      .select("id, payment_status, final_price, status, created_at, distance_category, email_status")
       .eq("event_id", eventId),
     db.from("event_results")
       .select("status, finish_time, overall_position, distance_category")
       .eq("event_id", eventId),
+    db.from("event_participants")
+      .select("registration_id, checked_in_at, bib_collected_at, breakfast_availed")
+      .eq("event_id", eventId)
+      .neq("status", "cancelled"),
   ]);
 
   if (coreRegsRes.error) console.error("[analytics] core regs failed:", coreRegsRes.error.message);
   if (resultsRes.error)  console.error("[analytics] results failed:",   resultsRes.error.message);
 
-  const ev      = evRes.data;
-  const regs    = coreRegsRes.data ?? [];
-  const results = resultsRes.data ?? [];
+  const ev           = evRes.data;
+  const regs         = coreRegsRes.data ?? [];
+  const results      = resultsRes.data ?? [];
+  const participants = participantsRes.data ?? [];
 
-  // Step 2: Optional race-day / certificate columns — added by phase3 & phase5 migrations.
-  // If the migration hasn't run these queries return an error; we fall back to 0.
-  const [raceRegsRes, certRegsRes] = await Promise.all([
-    db.from("event_registrations")
-      .select("bib_collected_at, breakfast_availed")
-      .eq("event_id", eventId),
-    db.from("event_registrations")
-      .select("certificate_generated_at")
-      .eq("event_id", eventId)
-      .not("certificate_generated_at", "is", null),
-  ]);
+  // Step 2: Optional certificate column (phase5 migration). Fall back to 0 on error.
+  const certRegsRes = await db.from("event_registrations")
+    .select("certificate_generated_at")
+    .eq("event_id", eventId)
+    .not("certificate_generated_at", "is", null);
 
-  const raceRegs = raceRegsRes.data  ?? [];
   const certRegs = certRegsRes.error ? [] : (certRegsRes.data ?? []);
 
-  // Build combined view for race-day analytics
-  const bibCollected        = raceRegs.filter(r => r.bib_collected_at).length;
-  const breakfastIssued     = raceRegs.filter(r => r.breakfast_availed).length;
+  // Race-day counts from event_participants (authoritative)
+  const bibCollected          = participants.filter(p => p.bib_collected_at).length;
+  const breakfastIssued       = participants.filter(p => p.breakfast_availed).length;
   const certificatesGenerated = certRegs.length;
+
+  // Set of registration IDs whose participant has checked in — used for by_race breakdown
+  const checkedInRegIds = new Set(participants.filter(p => p.checked_in_at).map(p => p.registration_id));
 
   // ── Registration funnel ───────────────────────────────────────────────────
   const total       = regs.length;
@@ -69,7 +71,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     .reduce((s, r) => s + (r.final_price ?? 0), 0);
 
   // ── Race day progression ──────────────────────────────────────────────────
-  const checkedIn = regs.filter(r => r.checked_in_at).length;
+  const checkedIn = participants.filter(p => p.checked_in_at).length;
   const finishers = results.filter(r => r.status === "finisher").length;
   // bibCollected, breakfastIssued, certificatesGenerated — from step 2 queries above
 
@@ -92,7 +94,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     if (!byRace[cat]) byRace[cat] = { total: 0, paid: 0, revenue: 0, checked_in: 0, finishers: 0 };
     byRace[cat].total++;
     if (r.payment_status === "paid") { byRace[cat].paid++; byRace[cat].revenue += r.final_price ?? 0; }
-    if (r.checked_in_at) byRace[cat].checked_in++;
+    if (checkedInRegIds.has(r.id)) byRace[cat].checked_in++;
   }
   for (const r of results) {
     const cat = r.distance_category ?? "Unspecified";

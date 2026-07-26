@@ -18,25 +18,59 @@ export async function GET(req: NextRequest, { params }: Params) {
   const since = req.nextUrl.searchParams.get("since") ?? null;
   const db    = getSupabaseServer();
 
-  // All confirmed registrations with race-day status
-  const { data: regs, error } = await db
-    .from("event_registrations")
-    .select(`
-      id, registration_code, user_name, user_email, phone,
-      distance_category, bib_number,
-      status, payment_status,
-      checked_in_at, checked_in_by,
-      breakfast_availed, breakfast_availed_at,
-      bib_collected_at
-    `)
-    .eq("event_id", eventId)
-    .in("status", ["confirmed"])
-    .in("payment_status", ["paid", "free"])
-    .order("checked_in_at", { ascending: false, nullsFirst: false });
+  // Registration info + service status (checked_in_at, breakfast_availed, bib_collected_at).
+  // Service columns live in event_participants — the ops scan route never updates
+  // event_registrations for these fields, so reading them from there always returns null/false.
+  const [regsRes, partsRes] = await Promise.all([
+    db.from("event_registrations")
+      .select("id, registration_code, user_name, user_email, phone, distance_category, bib_number")
+      .eq("event_id", eventId)
+      .in("status", ["confirmed"])
+      .in("payment_status", ["paid", "free"]),
+    db.from("event_participants")
+      .select("registration_id, checked_in_at, checked_in_by, breakfast_availed, bib_collected_at")
+      .eq("event_id", eventId)
+      .neq("status", "cancelled"),
+  ]);
 
-  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
+  if (regsRes.error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
-  const all             = regs ?? [];
+  // Build a map from registration_id → aggregated service status.
+  // For group registrations (multiple participants), take the most recent check-in
+  // and OR-aggregate boolean fields so any participant's action counts.
+  type SvcStatus = { checked_in_at: string | null; checked_in_by: string | null; breakfast_availed: boolean; bib_collected_at: string | null };
+  const partMap = new Map<string, SvcStatus>();
+  for (const p of (partsRes.data ?? [])) {
+    const existing = partMap.get(p.registration_id);
+    if (!existing) {
+      partMap.set(p.registration_id, {
+        checked_in_at:     p.checked_in_at,
+        checked_in_by:     p.checked_in_by,
+        breakfast_availed: !!p.breakfast_availed,
+        bib_collected_at:  p.bib_collected_at,
+      });
+    } else {
+      partMap.set(p.registration_id, {
+        checked_in_at:     p.checked_in_at ?? existing.checked_in_at,
+        checked_in_by:     p.checked_in_at ? p.checked_in_by : existing.checked_in_by,
+        breakfast_availed: !!p.breakfast_availed || existing.breakfast_availed,
+        bib_collected_at:  p.bib_collected_at ?? existing.bib_collected_at,
+      });
+    }
+  }
+
+  const empty: SvcStatus = { checked_in_at: null, checked_in_by: null, breakfast_availed: false, bib_collected_at: null };
+
+  // Enrich registration rows with participant service status, then sort by check-in time desc.
+  const all = (regsRes.data ?? [])
+    .map(r => ({ ...r, ...(partMap.get(r.id) ?? empty) }))
+    .sort((a, b) => {
+      if (!a.checked_in_at && !b.checked_in_at) return 0;
+      if (!a.checked_in_at) return 1;
+      if (!b.checked_in_at) return -1;
+      return b.checked_in_at.localeCompare(a.checked_in_at);
+    });
+
   const total           = all.length;
   const checkedIn       = all.filter(r => r.checked_in_at).length;
   const notCheckedIn    = total - checkedIn;
