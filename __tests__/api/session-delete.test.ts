@@ -39,7 +39,7 @@ function makeDbMock(tableResults: Record<string, { error: { message: string } | 
     chain.then   = jest.fn().mockImplementation((resolve: (v: unknown) => unknown) => Promise.resolve(result).then(resolve));
     Object.defineProperty(chain, Symbol.toStringTag, { value: "Promise" });
     // Make the chain itself thenable so `await db.from(...).delete().eq(...)` resolves
-    chain[Symbol.iterator as unknown as string] = undefined;
+    (chain as Record<string, unknown>)[Symbol.iterator as unknown as string] = undefined;
     return chain;
   };
 
@@ -64,7 +64,7 @@ function makeSequentialMock(calls: Array<{ error: { message: string } | null }>)
     chain.delete = jest.fn().mockReturnValue(chain);
     chain.eq     = jest.fn().mockReturnValue(chain);
     // When awaited, return the configured result
-    (chain as unknown as Promise<unknown>)[Symbol.toStringTag as unknown as string] = "MockChain";
+    (chain as Record<string, unknown>)[Symbol.toStringTag as unknown as string] = "MockChain";
     Object.assign(chain, {
       then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
         Promise.resolve(result).then(resolve, reject),

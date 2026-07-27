@@ -6,6 +6,7 @@ import { getOrCreateCode, processReferral } from "@/lib/referrals";
 import { enqueueJob } from "@/lib/job-queue";
 import { sendEmail, welcomeEmailHTML, adminNewUserEmailHTML } from "@/lib/notify";
 import { isRateLimited, getClientIp } from "@/lib/rate-limit";
+import { signUserToken, USER_SESSION_COOKIE, USER_TOKEN_TTL } from "@/lib/admin-auth";
 
 export async function POST(req: NextRequest) {
   // Rate limit registrations per IP to prevent bulk account creation / enumeration
@@ -201,7 +202,30 @@ export async function POST(req: NextRequest) {
       }),
     ).catch(() => {});
 
-    return NextResponse.json({ success: true });
+    const userToken = signUserToken(userEmail);
+    const res = NextResponse.json({
+      success:   true,
+      userToken,
+      user: {
+        firstName: firstName as string,
+        lastName:  lastName  as string,
+        email:     userEmail,
+        phone:     phone10   || null,
+        goal:      goal      ?? null,
+        location:  location  ?? null,
+        photo:     null,
+        role:      "user",
+        phone_verified: confirmedPhoneVerified,
+      },
+    });
+    res.cookies.set(USER_SESSION_COOKIE, userToken, {
+      httpOnly: true,
+      secure:   process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path:     "/",
+      maxAge:   USER_TOKEN_TTL,
+    });
+    return res;
   } catch (e: unknown) {
     console.error("[register] unexpected error:", e);
     return NextResponse.json({ error: "An error occurred, please try again." }, { status: 500 });

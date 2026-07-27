@@ -16,6 +16,8 @@ const EDITABLE_FIELDS = new Set([
   "organizer", "organizer_email", "organizer_phone",
   "support_email", "support_phone", "website",
   "visibility",
+  "tshirt_size_chart_url",
+  "registration_config",
 ]);
 
 // Columns that must be null rather than empty string when blank
@@ -26,6 +28,7 @@ const NULLABLE_FIELDS = new Set([
   "terms_conditions", "refund_policy", "cancellation_policy",
   "organizer", "organizer_email", "organizer_phone",
   "support_email", "support_phone", "website",
+  "tshirt_size_chart_url",
 ]);
 
 // Columns that store a local datetime string from <input type="datetime-local">

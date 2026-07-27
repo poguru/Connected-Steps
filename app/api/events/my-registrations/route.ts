@@ -27,20 +27,25 @@ export async function GET(req: NextRequest) {
   const regIds  = regs.map(r => r.id);
   const eventIds = [...new Set(regs.map(r => r.event_id))];
 
-  // Fetch events, participants, and invoices in parallel
-  const [eventsRes, participantsRes, invoicesRes] = await Promise.all([
+  // Fetch events, participants, invoices, and pending category change requests in parallel
+  const [eventsRes, participantsRes, invoicesRes, catChangesRes] = await Promise.all([
     db.from("events")
-      .select("id, title, event_type, cover_image, start_date, start_time, end_date, end_time, location, share_slug")
+      .select("id, title, event_type, cover_image, banner_image, start_date, start_time, end_date, end_time, location, share_slug, whatsapp_community_url, route_map_url, route_map_type, tshirt_size_chart_url, distance_categories, registration_closes_at")
       .in("id", eventIds),
 
     db.from("event_participants")
-      .select("id, registration_id, first_name, last_name, distance_category, tshirt_size, qr_token, checked_in_at, tshirt_issued, breakfast_availed, medal_issued, bib_collected_at, status")
+      .select("id, registration_id, first_name, last_name, distance_category, tshirt_size, qr_token, checked_in_at, tshirt_issued, breakfast_availed, medal_issued, bib_collected_at, bib_number, certificate_url, status")
       .in("registration_id", regIds)
       .order("created_at", { ascending: true }),
 
     db.from("invoices")
       .select("registration_id, invoice_number")
       .in("registration_id", regIds),
+
+    db.from("category_change_requests")
+      .select("registration_id, status, old_category, new_category, created_at")
+      .in("registration_id", regIds)
+      .eq("status", "pending"),
   ]);
 
   type EvRow = NonNullable<typeof eventsRes.data>[number];
@@ -59,11 +64,17 @@ export async function GET(req: NextRequest) {
     if (inv.registration_id) invoiceByReg[inv.registration_id] = inv.invoice_number;
   }
 
+  const pendingCatChange: Record<string, { old_category: string; new_category: string }> = {};
+  for (const r of catChangesRes.data ?? []) {
+    pendingCatChange[r.registration_id] = { old_category: r.old_category, new_category: r.new_category };
+  }
+
   const registrations = regs.map(r => ({
     ...r,
-    events:          evMap[r.event_id] ?? null,
-    participants:    participantsByReg[r.id] ?? [],
-    invoice_number:  invoiceByReg[r.id] ?? null,
+    events:                 evMap[r.event_id] ?? null,
+    participants:           participantsByReg[r.id] ?? [],
+    invoice_number:         invoiceByReg[r.id] ?? null,
+    pending_category_change: pendingCatChange[r.id] ?? null,
   }));
 
   return NextResponse.json({ registrations });

@@ -346,15 +346,34 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
           referralCode,
         }),
       });
-      const data = await res.json();
+      const data = await res.json() as {
+        success?: boolean; error?: string;
+        userToken?: string;
+        user?: { firstName: string; lastName: string; email: string; phone: string | null; goal: string | null; location: string | null; photo: string | null; role: string; phone_verified: boolean };
+      };
       if (!res.ok) { setFormError(data.error ?? "Registration failed."); return; }
       localStorage.removeItem(`cs_signup_draft_${email.trim().toLowerCase()}`);
       localStorage.removeItem("cs_pending_referral");
-      localStorage.setItem("cs_pending_photo", photo ?? "");
-      if (preferredLocation) {
+      localStorage.removeItem("cs_pending_photo");
+      if (data.userToken) localStorage.setItem("cs_user_token", data.userToken);
+      if (data.user) {
+        const userToStore = { ...data.user, photo: photo || data.user.photo || null };
+        localStorage.setItem("cs_user", JSON.stringify(userToStore));
+      }
+      if (!data.user?.phone_verified) {
+        localStorage.setItem("cs_requires_phone_verification", "true");
+      }
+      if (preferredLocation && data.userToken) {
+        localStorage.removeItem("cs_pending_location");
+        fetch("/api/user/location", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json", "x-user-token": data.userToken },
+          body:    JSON.stringify({ location_id: preferredLocation }),
+        }).catch(() => {});
+      } else if (preferredLocation) {
         localStorage.setItem("cs_pending_location", preferredLocation);
       }
-      router.push("/auth?tab=login&registered=true");
+      router.push("/dashboard");
     } catch { setFormError("Network error. Please try again."); }
     finally { setSubmitting(false); }
   }

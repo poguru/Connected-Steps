@@ -19,7 +19,15 @@ export async function GET(req: NextRequest) {
   // Increment view count (fire-and-forget)
   db.from("events").update({ view_count: (data.view_count ?? 0) + 1 }).eq("share_slug", slug).then(() => {});
 
-  return NextResponse.json({ event: data });
+  // Fetch active custom form fields for this event (public read via RLS)
+  const { data: formFields } = await db
+    .from("event_form_fields")
+    .select("id, field_key, field_type, label, placeholder, help_text, required, options, display_order")
+    .eq("event_id", data.id)
+    .eq("is_active", true)
+    .order("display_order", { ascending: true });
+
+  return NextResponse.json({ event: data, form_fields: formFields ?? [] });
 }
 
 // POST /api/events/by-slug?slug=... — increment share count

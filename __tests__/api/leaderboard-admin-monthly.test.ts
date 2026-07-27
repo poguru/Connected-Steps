@@ -52,7 +52,7 @@ function makeDb(lbRows: LbRow[], archiveRows: unknown[] = []) {
     from: jest.fn().mockImplementation((table: string) => {
       if (table === "leaderboard") {
         // Support chained: .select().eq().gt().order()
-        const chain: Record<string, jest.Mock> = {} as Record<string, jest.Mock>;
+        const chain: Record<string, unknown> = {};
         chain.select = jest.fn().mockReturnValue(chain);
         chain.eq     = jest.fn((col: string, val: string) => {
           // Filter rows that match the eq condition
@@ -64,15 +64,15 @@ function makeDb(lbRows: LbRow[], archiveRows: unknown[] = []) {
           return chain;
         });
         chain.gt     = jest.fn((col: string, val: number) => {
-          const filtered = (chain._filtered ?? lbRows).filter((r: LbRow) => {
+          const filtered = ((chain._filtered as LbRow[] | undefined) ?? lbRows).filter((r: LbRow) => {
             if (col === "month_points") return r.month_points > val;
             return true;
           });
           chain._filteredGt = filtered;
           return chain;
         });
-        chain.order  = jest.fn().mockImplementation(function(this: Record<string, jest.Mock>) {
-          return Promise.resolve({ data: this._filteredGt ?? this._filtered ?? lbRows, error: null });
+        chain.order  = jest.fn().mockImplementation(function(this: Record<string, unknown>) {
+          return Promise.resolve({ data: (this._filteredGt as LbRow[] | undefined) ?? (this._filtered as LbRow[] | undefined) ?? lbRows, error: null });
         }.bind(chain));
         chain.upsert = jest.fn().mockResolvedValue({ error: null });
         chain.insert = insertMock;

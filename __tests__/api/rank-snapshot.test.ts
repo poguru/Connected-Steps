@@ -291,7 +291,7 @@ describe("retry logic", () => {
   beforeEach(() => {
     // Make setTimeout instant so retry delays don't slow tests down
     jest.spyOn(global, "setTimeout").mockImplementation(
-      (fn: (...args: unknown[]) => void) => { fn(); return 0 as unknown as ReturnType<typeof setTimeout>; },
+      ((fn: (...args: unknown[]) => void) => { fn(); return 0 as unknown as ReturnType<typeof setTimeout>; }) as unknown as typeof globalThis.setTimeout,
     );
   });
   afterEach(() => jest.restoreAllMocks());
@@ -457,7 +457,7 @@ describe("response shape", () => {
 
   test("partial failure includes errors array", async () => {
     jest.spyOn(global, "setTimeout").mockImplementation(
-      (fn: (...args: unknown[]) => void) => { fn(); return 0 as unknown as ReturnType<typeof setTimeout>; },
+      ((fn: (...args: unknown[]) => void) => { fn(); return 0 as unknown as ReturnType<typeof setTimeout>; }) as unknown as typeof globalThis.setTimeout,
     );
 
     mockPaginateAll.mockResolvedValue({ rows: makeEntries(10), pages: 1 });

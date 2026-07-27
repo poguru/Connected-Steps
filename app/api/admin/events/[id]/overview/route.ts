@@ -18,7 +18,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     { data: emailQ },
   ] = await Promise.all([
     db.from("events")
-      .select("id, title, status, start_date, start_time, end_date, end_time, location, max_participants, price, cover_image, registration_closes_at, distance_categories, featured, share_slug")
+      .select("id, title, status, start_date, start_time, end_date, end_time, location, max_participants, price, cover_image, registration_closes_at, distance_categories, featured, share_slug, registration_config")
       .eq("id", id)
       .single(),
 

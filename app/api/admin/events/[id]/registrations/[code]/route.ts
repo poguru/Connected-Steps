@@ -19,7 +19,9 @@ export async function GET(req: NextRequest, { params }: Params) {
       id, registration_code, user_email, user_name,
       phone, gender, date_of_birth, blood_group,
       emergency_contact, special_notes,
-      distance_category,
+      distance_category, race_id, is_early_bird,
+      price_differential, category_change_log, category_changed_at, category_changed_by,
+      custom_fields,
       coupon_code, coupon_discount, original_price, final_price,
       payment_status, razorpay_order_id, razorpay_payment_id,
       status, created_at,
@@ -31,7 +33,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       slot_reserved_at, slot_expires_at,
       events (
         id, title, start_date, start_time, end_date, location,
-        organizer, price, max_participants, participant_count
+        organizer, price, max_participants, participant_count, distance_categories
       )
     `)
     .eq("registration_code", registrationCode)

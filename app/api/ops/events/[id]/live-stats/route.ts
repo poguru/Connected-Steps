@@ -23,7 +23,7 @@ export async function GET(
   const { data, error } = await db
     .from("event_participants")
     .select(
-      "status, checked_in_at, tshirt_issued, breakfast_availed, medal_issued, bib_collected_at"
+      "status, checked_in_at, tshirt_issued, breakfast_availed, medal_issued, bib_collected_at, certificate_issued"
     )
     .eq("event_id", eventId)
     .eq("status", "active")
@@ -34,6 +34,7 @@ export async function GET(
       breakfast_availed: boolean;
       medal_issued: boolean;
       bib_collected_at: string | null;
+      certificate_issued: boolean;
     }[]>();
 
   if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
@@ -46,8 +47,9 @@ export async function GET(
     checkin:   { done: rows.filter(r => r.checked_in_at).length,    label: "Checked In" },
     tshirt:    { done: rows.filter(r => r.tshirt_issued).length,     label: "T-Shirts Issued" },
     breakfast: { done: rows.filter(r => r.breakfast_availed).length, label: "Breakfasts Issued" },
-    medal:     { done: rows.filter(r => r.medal_issued).length,      label: "Medals Issued" },
-    bib:       { done: rows.filter(r => r.bib_collected_at).length,  label: "BIBs Collected" },
+    medal:       { done: rows.filter(r => r.medal_issued).length,         label: "Medals Issued" },
+    bib:         { done: rows.filter(r => r.bib_collected_at).length,     label: "BIBs Collected" },
+    certificate: { done: rows.filter(r => r.certificate_issued).length,   label: "Certificates Issued" },
   };
 
   // Also fetch enabled service configs so dashboard only shows relevant panels

@@ -30,7 +30,7 @@ jest.mock("@/lib/cache", () => ({
   CK:        { leaderboard: () => "lb:v1:_:_" },
   TTL:       { leaderboard: 30 },
   decorateLb: jest.fn((rows: unknown[]) =>
-    rows.map((r: Record<string, unknown>) => {
+    rows.map((r: unknown) => {
       const { _raw_email, ...rest } = r as Record<string, unknown>;
       return { ...rest, user_email: _raw_email, is_me: false };
     })

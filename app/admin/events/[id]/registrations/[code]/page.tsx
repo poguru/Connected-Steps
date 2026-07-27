@@ -20,6 +20,13 @@ interface Registration {
   emergency_contact:          string | null;
   special_notes:              string | null;
   distance_category:          string | null;
+  race_id:                    string | null;
+  is_early_bird:              boolean;
+  price_differential:         number;
+  category_change_log:        CategoryChangeEntry[];
+  category_changed_at:        string | null;
+  category_changed_by:        string | null;
+  custom_fields:              Record<string, string>;
   coupon_code:                string | null;
   coupon_discount:            number;
   original_price:             number;
@@ -42,13 +49,24 @@ interface Registration {
   tshirt_issued_at:           string | null;
   tshirt_issued_by:           string | null;
   events: {
-    id:              string;
-    title:           string;
-    start_date:      string;
-    start_time:      string | null;
-    location:        string;
-    organizer:       string | null;
+    id:                   string;
+    title:                string;
+    start_date:           string;
+    start_time:           string | null;
+    location:             string;
+    organizer:            string | null;
+    distance_categories:  string[] | null;
   } | null;
+}
+
+interface CategoryChangeEntry {
+  from:         string | null;
+  to:           string;
+  from_price:   number;
+  to_price:     number;
+  differential: number;
+  changed_at:   string;
+  changed_by:   string;
 }
 
 interface EventParticipant {
@@ -117,8 +135,13 @@ export default function ParticipantDetailPage() {
   const [invoice,      setInvoice]      = useState<Invoice | null>(null);
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState("");
-  const [action,       setAction]       = useState("");   // "resending" | "cancelling" | ""
+  const [action,       setAction]       = useState("");   // "resending" | "cancelling" | "changing_category" | "regenerating_qr" | ""
   const [toast,        setToast]        = useState("");
+
+  // Category change modal
+  const [showCatModal,    setShowCatModal]    = useState(false);
+  const [selectedNewCat,  setSelectedNewCat]  = useState("");
+  const [catChangeResult, setCatChangeResult] = useState<{ differential: number; new_category: string } | null>(null);
 
   useEffect(() => { loadData(); /* eslint-disable-next-line */ }, []);
 
@@ -164,6 +187,38 @@ export default function ParticipantDetailPage() {
     } finally { setAction(""); }
   }
 
+  async function regenerateQR() {
+    if (!reg || !confirm("Regenerate QR code? The old code will stop working immediately.")) return;
+    setAction("regenerating_qr");
+    try {
+      const res = await fetch(`/api/admin/events/${eventId}/registrations/${code}/regenerate-qr`, {
+        method: "POST",
+      });
+      if (res.ok) { showToast("✅ QR code regenerated"); await loadData(); }
+      else { const d = await res.json(); showToast(`❌ ${d.error ?? "Failed"}`); }
+    } finally { setAction(""); }
+  }
+
+  async function changeCategory() {
+    if (!reg || !selectedNewCat) return;
+    setAction("changing_category");
+    try {
+      const res = await fetch(`/api/admin/events/${eventId}/registrations/${code}/category`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ new_category: selectedNewCat, changed_by: "admin" }),
+      });
+      const d = await res.json() as { ok?: boolean; differential?: number; new_category?: string; error?: string };
+      if (res.ok && d.ok) {
+        setCatChangeResult({ differential: d.differential ?? 0, new_category: d.new_category ?? selectedNewCat });
+        setShowCatModal(false);
+        await loadData();
+        showToast(`✅ Category changed to ${d.new_category}`);
+      } else {
+        showToast(`❌ ${d.error ?? "Failed to change category"}`);
+      }
+    } finally { setAction(""); }
+  }
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
 
   if (loading) return (
@@ -205,6 +260,7 @@ export default function ParticipantDetailPage() {
               Download QR ↗
             </a>
           )}
+          <Button size="sm" variant="secondary" loading={action === "regenerating_qr"} disabled={action !== "" || isCancelled} onClick={regenerateQR}>Regenerate QR</Button>
           <Button size="sm" variant="secondary" loading={action === "resending"} disabled={action !== "" || isCancelled} onClick={resendEmail}>Resend Email</Button>
           {!isCancelled && (
             <Button size="sm" variant="danger" loading={action === "cancelling"} disabled={action !== ""} onClick={cancelRegistration}>Cancel Registration</Button>
@@ -316,7 +372,39 @@ export default function ParticipantDetailPage() {
               <Row label="Date"     value={ev?.start_date ? new Date(ev.start_date + "T12:00:00Z").toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : null} />
               {ev?.start_time && <Row label="Time"   value={ev.start_time} />}
               <Row label="Venue"    value={ev?.location} />
-              {reg.distance_category && <Row label="Category" value={reg.distance_category} highlight />}
+              {reg.distance_category && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                  <span style={{ width: 110, flexShrink: 0, fontSize: 11, color: "#555", fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: ".05em" }}>Category</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#e8620a", flex: 1 }}>{reg.distance_category}</span>
+                  {reg.is_early_bird && <span style={{ fontSize: 10, background: "rgba(250,204,21,0.12)", color: "#facc15", border: "1px solid rgba(250,204,21,0.2)", borderRadius: 4, padding: "1px 6px", fontWeight: 700 }}>EARLY BIRD</span>}
+                  {!isCancelled && (ev?.distance_categories?.length ?? 0) > 1 && (
+                    <button
+                      onClick={() => { setSelectedNewCat(""); setCatChangeResult(null); setShowCatModal(true); }}
+                      style={{ fontSize: 11, color: "#e8620a", background: "none", border: "1px solid rgba(232,98,10,0.3)", borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}
+                    >
+                      Change
+                    </button>
+                  )}
+                </div>
+              )}
+              {reg.price_differential !== 0 && (
+                <div style={{ marginTop: 6, padding: "6px 10px", background: reg.price_differential > 0 ? "rgba(251,191,36,0.08)" : "rgba(52,211,153,0.08)", border: `1px solid ${reg.price_differential > 0 ? "rgba(251,191,36,0.2)" : "rgba(52,211,153,0.2)"}`, borderRadius: 8, fontSize: 12, color: reg.price_differential > 0 ? "#fbbf24" : "#34d399" }}>
+                  {reg.price_differential > 0
+                    ? `⚠️ Participant owes ₹${reg.price_differential} more (category upgrade)`
+                    : `ℹ️ ₹${Math.abs(reg.price_differential)} refund due (category downgrade)`
+                  }
+                </div>
+              )}
+              {reg.category_change_log?.length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 10, color: "#555", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: ".06em", marginBottom: 4 }}>Change History</div>
+                  {reg.category_change_log.map((entry, i) => (
+                    <div key={i} style={{ fontSize: 11, color: "#666", padding: "2px 0" }}>
+                      {new Date(entry.changed_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} · {entry.from ?? "—"} → {entry.to} {entry.differential !== 0 && <span style={{ color: entry.differential > 0 ? "#fbbf24" : "#34d399" }}>({entry.differential > 0 ? "+" : ""}₹{entry.differential})</span>} <span style={{ color: "#444" }}>by {entry.changed_by}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Section>
 
             {/* Payment */}
@@ -431,6 +519,15 @@ export default function ParticipantDetailPage() {
                 )}
               </Section>
             )}
+
+            {/* Custom Fields */}
+            {Object.keys(reg.custom_fields ?? {}).length > 0 && (
+              <Section title="Additional Information">
+                {Object.entries(reg.custom_fields).map(([key, value]) => (
+                  <Row key={key} label={key.replace(/_/g, " ")} value={value || "—"} />
+                ))}
+              </Section>
+            )}
           </div>
         </div>
       </div>
@@ -439,6 +536,60 @@ export default function ParticipantDetailPage() {
       {toast && (
         <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 24, padding: "10px 20px", fontSize: 13, fontWeight: 600, color: "#fff", zIndex: 9999, whiteSpace: "nowrap" }}>
           {toast}
+        </div>
+      )}
+
+      {/* Category Change Modal */}
+      {showCatModal && ev && (
+        <div
+          onClick={() => setShowCatModal(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 9998, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, padding: "1.5rem", width: "100%", maxWidth: 420 }}
+          >
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 4 }}>Change Category</div>
+            <div style={{ fontSize: 12, color: "#666", marginBottom: 20 }}>
+              Current: <span style={{ color: "#e8620a", fontWeight: 600 }}>{reg.distance_category ?? "—"}</span>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 11, color: "#777", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: ".06em", display: "block", marginBottom: 6 }}>New Category</label>
+              <select
+                value={selectedNewCat}
+                onChange={e => setSelectedNewCat(e.target.value)}
+                style={{ width: "100%", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, color: "#fff", padding: "8px 12px", fontSize: 14, fontFamily: "inherit" }}
+              >
+                <option value="">— Select —</option>
+                {(ev.distance_categories ?? [])
+                  .filter(cat => cat !== reg.distance_category)
+                  .map(cat => <option key={cat} value={cat}>{cat}</option>)
+                }
+              </select>
+            </div>
+
+            <div style={{ fontSize: 12, color: "#555", marginBottom: 20, padding: "8px 12px", background: "rgba(255,255,255,0.03)", borderRadius: 8 }}>
+              Note: Price differentials are tracked for your records. Additional collection or refunds must be handled manually.
+            </div>
+
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setShowCatModal(false)}
+                style={{ padding: "8px 18px", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#aaa", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                Cancel
+              </button>
+              <Button
+                size="sm"
+                loading={action === "changing_category"}
+                disabled={!selectedNewCat || action !== ""}
+                onClick={changeCategory}
+              >
+                Confirm Change
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

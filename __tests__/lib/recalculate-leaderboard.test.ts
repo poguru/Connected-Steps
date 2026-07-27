@@ -34,15 +34,16 @@ interface UserRow {
   goal:       string;
 }
 interface LbRow {
-  user_email:      string;
-  month_points:    number;
-  total_points:    number;
-  points_month:    string;
-  month_runs?:     number;
-  month_km?:       number;
+  user_email:       string;
+  user_name?:       string;
+  month_points:     number;
+  total_points:     number;
+  points_month:     string;
+  month_runs?:      number;
+  month_km?:        number;
   month_time_secs?: number;
-  total_runs?:     number;
-  total_km?:       number;
+  total_runs?:      number;
+  total_km?:        number;
   total_time_secs?: number;
 }
 

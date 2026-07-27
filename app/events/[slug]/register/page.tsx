@@ -8,14 +8,49 @@ import { getDistanceOption } from "@/lib/event-distances";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+interface EventFormField {
+  id: string; field_key: string; field_type: string; label: string;
+  placeholder: string | null; help_text: string | null; required: boolean;
+  options: string[]; display_order: number;
+}
+
+interface RegConfig {
+  require_gender:            boolean;
+  require_dob:               boolean;
+  require_blood_group:       boolean;
+  require_emergency_contact: boolean;
+  show_notes:                boolean;
+  notes_label:               string;
+  notes_placeholder:         string;
+  multi_step:                boolean;
+}
+
+const REG_DEFAULTS: RegConfig = {
+  require_gender:            true,
+  require_dob:               true,
+  require_blood_group:       true,
+  require_emergency_contact: true,
+  show_notes:                true,
+  notes_label:               "Notes",
+  notes_placeholder:         "Medical conditions, dietary needs, or any questions. Enter NA if none.",
+  multi_step:                false,
+};
+
+function getRegConfig(raw: Partial<RegConfig> | null | undefined): RegConfig {
+  return { ...REG_DEFAULTS, ...raw };
+}
+
 interface EventInfo {
   id: string; title: string; event_type: string; start_date: string;
   start_time: string | null; location: string; price: number;
   max_participants: number | null; share_slug: string | null;
   distance_categories: string[] | null;
   collect_tshirt: boolean;
+  tshirt_size_chart_url?: string | null;
   allow_multi_participant: boolean;
   max_per_registration: number;
+  form_fields?: EventFormField[];
+  registration_config?: Partial<RegConfig> | null;
 }
 
 interface ParticipantData {
@@ -122,11 +157,14 @@ export default function RegisterPage() {
   const [couponLoading, setCouponLoading] = useState(false);
   const [distanceCategory, setDistanceCategory] = useState("");
   const [tshirtSize,       setTshirtSize]       = useState("");
+  const [showSizeGuide,    setShowSizeGuide]    = useState(false);
   const [submitting,  setSubmitting]  = useState(false);
   const [submitErr,   setSubmitErr]   = useState("");
   const [alreadyReg,  setAlreadyReg]  = useState<string | null>(null);
   const [userEmail,   setUserEmail]   = useState("");
   const [userToken,   setUserToken]   = useState("");
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
+  const [customFieldErrors, setCustomFieldErrors] = useState<Record<string, string>>({});
 
   // Auth guard + pre-fill
   useEffect(() => {
@@ -162,7 +200,9 @@ export default function RegisterPage() {
     fetch(`/api/events/by-slug?slug=${slug}`)
       .then(r => r.json())
       .then(d => {
-        if (d.event) { setEv(d.event); } else { setEvErr(true); }
+        if (d.event) {
+          setEv({ ...d.event, form_fields: d.form_fields ?? [] });
+        } else { setEvErr(true); }
         setLoading(false);
       })
       .catch(() => { setEvErr(true); setLoading(false); });
@@ -217,30 +257,42 @@ export default function RegisterPage() {
   // ── Validation ─────────────────────────────────────────────────────────────
 
   function validate(f: typeof form) {
+    const cfg = getRegConfig(ev?.registration_config);
     const e: Record<string, string> = {};
     if (!f.name.trim() || f.name.trim().length < 3)   e.name = "Full name must be at least 3 characters.";
     if (!f.phone.trim() || !/^\d{10}$/.test(f.phone.replace(/\s/g, ""))) e.phone = "Phone must be exactly 10 digits.";
-    if (!f.gender)                                     e.gender = "Please select your gender.";
-    if (!f.date_of_birth)                              e.date_of_birth = "Date of birth is required.";
-    else if (new Date(f.date_of_birth) >= new Date())  e.date_of_birth = "Date of birth must be in the past.";
-    if (!f.blood_group)                                e.blood_group = "Please select your blood group.";
-    if (!f.emergency_contact_name.trim())              e.emergency_contact_name = "Emergency contact name is required.";
-    if (!f.emergency_contact_phone.trim() || !/^\d{10}$/.test(f.emergency_contact_phone.replace(/\s/g, ""))) e.emergency_contact_phone = "Emergency contact number must be 10 digits.";
-    if (!f.special_notes.trim())                       e.special_notes = "Required — enter NA if no medical conditions.";
+    if (cfg.require_gender && !f.gender)                                   e.gender = "Please select your gender.";
+    if (cfg.require_dob && !f.date_of_birth)                               e.date_of_birth = "Date of birth is required.";
+    else if (cfg.require_dob && f.date_of_birth && new Date(f.date_of_birth) >= new Date()) e.date_of_birth = "Date of birth must be in the past.";
+    if (cfg.require_blood_group && !f.blood_group)                         e.blood_group = "Please select your blood group.";
+    if (cfg.require_emergency_contact && !f.emergency_contact_name.trim()) e.emergency_contact_name = "Emergency contact name is required.";
+    if (cfg.require_emergency_contact && (!f.emergency_contact_phone.trim() || !/^\d{10}$/.test(f.emergency_contact_phone.replace(/\s/g, "")))) e.emergency_contact_phone = "Emergency contact number must be 10 digits.";
+    if (cfg.show_notes && !f.special_notes.trim())                         e.special_notes = "Required — enter NA if no medical conditions.";
     return e;
   }
 
   function validateParticipant(p: ParticipantData, event: EventInfo): Record<string, string> {
+    const cfg = getRegConfig(event.registration_config);
     const e: Record<string, string> = {};
-    if (!p.first_name.trim())  e.first_name = "First name is required.";
-    if (!p.gender)             e.gender = "Please select gender.";
-    if (!p.date_of_birth)      e.date_of_birth = "Date of birth is required.";
-    else if (new Date(p.date_of_birth) >= new Date()) e.date_of_birth = "Must be in the past.";
-    if (!p.blood_group)        e.blood_group = "Please select blood group.";
+    if (!p.first_name.trim())                           e.first_name = "First name is required.";
+    if (cfg.require_gender && !p.gender)                e.gender = "Please select gender.";
+    if (cfg.require_dob && !p.date_of_birth)            e.date_of_birth = "Date of birth is required.";
+    else if (cfg.require_dob && p.date_of_birth && new Date(p.date_of_birth) >= new Date()) e.date_of_birth = "Must be in the past.";
+    if (cfg.require_blood_group && !p.blood_group)      e.blood_group = "Please select blood group.";
     if (!p.mobile || !/^\d{10}$/.test(p.mobile.replace(/\s/g, ""))) e.mobile = "Phone must be exactly 10 digits.";
     const cats = event.distance_categories ?? [];
     if (cats.length > 1 && !p.distance_category) e.distance_category = "Please select a distance category.";
     if (event.collect_tshirt && !p.tshirt_size) e.tshirt_size = "Please select a T-shirt size.";
+    return e;
+  }
+
+  function validateCustomFields(vals: Record<string, string>) {
+    const e: Record<string, string> = {};
+    for (const f of (ev?.form_fields ?? [])) {
+      if (f.required && !vals[f.field_key]?.trim()) {
+        e[f.field_key] = `${f.label} is required.`;
+      }
+    }
     return e;
   }
 
@@ -342,6 +394,15 @@ export default function RegisterPage() {
       if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
+    // Validate custom fields
+    const cfErrs = validateCustomFields(customFieldValues);
+    setCustomFieldErrors(cfErrs);
+    if (Object.keys(cfErrs).length > 0) {
+      const firstKey = Object.keys(cfErrs)[0];
+      document.getElementById(`cf-${firstKey}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
     setSubmitting(true); setSubmitErr("");
 
     try {
@@ -361,6 +422,7 @@ export default function RegisterPage() {
           coupon_code:       couponApplied ? coupon : undefined,
           distance_category: distanceCategory || undefined,
           tshirt_size:       tshirtSize || undefined,
+          custom_fields:     customFieldValues,
         }),
       });
       const data = await res.json();
@@ -411,6 +473,7 @@ export default function RegisterPage() {
           emergency_contact: `${sharedEmergency.name} / ${sharedEmergency.phone}`,
           special_notes:     sharedNotes,
           coupon_code:       couponApplied ? coupon : undefined,
+          custom_fields:     customFieldValues,
           participants:      participants.map(p => ({
             first_name:        p.first_name.trim(),
             last_name:         p.last_name.trim() || undefined,
@@ -442,6 +505,7 @@ export default function RegisterPage() {
 
   const pricePerPerson  = ev?.price ?? 0;
   const totalBeforeDisc = isMulti ? pricePerPerson * participantCount : pricePerPerson;
+  const regCfg          = getRegConfig(ev?.registration_config);
   const discount        = couponApplied?.discount ?? 0;
   const final           = Math.max(0, totalBeforeDisc - discount);
 
@@ -589,36 +653,42 @@ export default function RegisterPage() {
                       placeholder="Last name" />
                   </div>
 
-                  <div>
-                    <label style={LABEL}>Gender *</label>
-                    <select style={{ ...INPUT, cursor: "pointer", colorScheme: "dark", borderColor: multiErrors[idx]?.gender ? "rgba(239,68,68,0.6)" : undefined }}
-                      value={p.gender} onChange={e => setParticipant(idx, "gender", e.target.value)}>
-                      <option value="" style={{ background: "#1a1a1a" }}>Select gender</option>
-                      <option value="male"   style={{ background: "#1a1a1a" }}>Male</option>
-                      <option value="female" style={{ background: "#1a1a1a" }}>Female</option>
-                      <option value="other"  style={{ background: "#1a1a1a" }}>Other</option>
-                    </select>
-                    {multiErrors[idx]?.gender && <Err>{multiErrors[idx].gender}</Err>}
-                  </div>
+                  {regCfg.require_gender && (
+                    <div>
+                      <label style={LABEL}>Gender *</label>
+                      <select style={{ ...INPUT, cursor: "pointer", colorScheme: "dark", borderColor: multiErrors[idx]?.gender ? "rgba(239,68,68,0.6)" : undefined }}
+                        value={p.gender} onChange={e => setParticipant(idx, "gender", e.target.value)}>
+                        <option value="" style={{ background: "#1a1a1a" }}>Select gender</option>
+                        <option value="male"   style={{ background: "#1a1a1a" }}>Male</option>
+                        <option value="female" style={{ background: "#1a1a1a" }}>Female</option>
+                        <option value="other"  style={{ background: "#1a1a1a" }}>Other</option>
+                      </select>
+                      {multiErrors[idx]?.gender && <Err>{multiErrors[idx].gender}</Err>}
+                    </div>
+                  )}
 
-                  <div>
-                    <label style={LABEL}>Date of Birth *</label>
-                    <input style={{ ...INPUT, colorScheme: "dark", borderColor: multiErrors[idx]?.date_of_birth ? "rgba(239,68,68,0.6)" : undefined }}
-                      type="date" value={p.date_of_birth}
-                      onChange={e => setParticipant(idx, "date_of_birth", e.target.value)}
-                      max={new Date().toISOString().split("T")[0]} />
-                    {multiErrors[idx]?.date_of_birth && <Err>{multiErrors[idx].date_of_birth}</Err>}
-                  </div>
+                  {regCfg.require_dob && (
+                    <div>
+                      <label style={LABEL}>Date of Birth *</label>
+                      <input style={{ ...INPUT, colorScheme: "dark", borderColor: multiErrors[idx]?.date_of_birth ? "rgba(239,68,68,0.6)" : undefined }}
+                        type="date" value={p.date_of_birth}
+                        onChange={e => setParticipant(idx, "date_of_birth", e.target.value)}
+                        max={new Date().toISOString().split("T")[0]} />
+                      {multiErrors[idx]?.date_of_birth && <Err>{multiErrors[idx].date_of_birth}</Err>}
+                    </div>
+                  )}
 
-                  <div>
-                    <label style={LABEL}>Blood Group *</label>
-                    <select style={{ ...INPUT, cursor: "pointer", colorScheme: "dark", borderColor: multiErrors[idx]?.blood_group ? "rgba(239,68,68,0.6)" : undefined }}
-                      value={p.blood_group} onChange={e => setParticipant(idx, "blood_group", e.target.value)}>
-                      <option value="" style={{ background: "#1a1a1a" }}>Select blood group</option>
-                      {BLOOD_GROUPS.map(g => <option key={g} value={g} style={{ background: "#1a1a1a" }}>{g}</option>)}
-                    </select>
-                    {multiErrors[idx]?.blood_group && <Err>{multiErrors[idx].blood_group}</Err>}
-                  </div>
+                  {regCfg.require_blood_group && (
+                    <div>
+                      <label style={LABEL}>Blood Group *</label>
+                      <select style={{ ...INPUT, cursor: "pointer", colorScheme: "dark", borderColor: multiErrors[idx]?.blood_group ? "rgba(239,68,68,0.6)" : undefined }}
+                        value={p.blood_group} onChange={e => setParticipant(idx, "blood_group", e.target.value)}>
+                        <option value="" style={{ background: "#1a1a1a" }}>Select blood group</option>
+                        {BLOOD_GROUPS.map(g => <option key={g} value={g} style={{ background: "#1a1a1a" }}>{g}</option>)}
+                      </select>
+                      {multiErrors[idx]?.blood_group && <Err>{multiErrors[idx].blood_group}</Err>}
+                    </div>
+                  )}
 
                   <div>
                     <label style={LABEL}>Mobile Number *</label>
@@ -665,7 +735,18 @@ export default function RegisterPage() {
                   {/* T-shirt size — per participant */}
                   {ev.collect_tshirt && (
                     <div style={{ gridColumn: "1/-1" }}>
-                      <label style={LABEL}>T-Shirt Size *</label>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "5px" }}>
+                        <label style={{ ...LABEL, marginBottom: 0 }}>T-Shirt Size *</label>
+                        {ev.tshirt_size_chart_url && (
+                          <button
+                            type="button"
+                            onClick={() => setShowSizeGuide(true)}
+                            style={{ fontSize: "11px", color: "#60a5fa", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 600, padding: 0, textDecoration: "underline" }}
+                          >
+                            View Size Guide ↗
+                          </button>
+                        )}
+                      </div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                         {TSHIRT_SIZES.map(size => {
                           const sel = p.tshirt_size === size;
@@ -693,33 +774,57 @@ export default function RegisterPage() {
             ))}
 
             {/* Shared emergency contact */}
+            {(regCfg.require_emergency_contact || regCfg.show_notes) && (
             <section style={{ marginBottom: "1.5rem" }}>
               <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>
-                Emergency Contact (for all participants)
+                {regCfg.require_emergency_contact ? "Emergency Contact (for all participants)" : "Additional Info"}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-                <div>
-                  <label style={LABEL}>Contact Name *</label>
-                  <input style={INPUT} value={sharedEmergency.name}
-                    onChange={e => setSharedEmergency(v => ({ ...v, name: e.target.value }))}
-                    placeholder="Contact person's name" />
-                </div>
-                <div>
-                  <label style={LABEL}>Contact Number *</label>
-                  <input style={INPUT} type="tel" maxLength={10} value={sharedEmergency.phone}
-                    onChange={e => setSharedEmergency(v => ({ ...v, phone: e.target.value }))}
-                    placeholder="10-digit number" />
-                </div>
-                <div style={{ gridColumn: "1/-1" }}>
-                  <label style={LABEL}>Special Notes *</label>
-                  <textarea
-                    style={{ ...INPUT, minHeight: "70px", resize: "vertical" } as React.CSSProperties}
-                    value={sharedNotes}
-                    onChange={e => setSharedNotes(e.target.value)}
-                    placeholder="Medical conditions, dietary needs, or any questions. Enter NA if none." />
-                </div>
+                {regCfg.require_emergency_contact && (<>
+                  <div>
+                    <label style={LABEL}>Contact Name *</label>
+                    <input style={INPUT} value={sharedEmergency.name}
+                      onChange={e => setSharedEmergency(v => ({ ...v, name: e.target.value }))}
+                      placeholder="Contact person's name" />
+                  </div>
+                  <div>
+                    <label style={LABEL}>Contact Number *</label>
+                    <input style={INPUT} type="tel" maxLength={10} value={sharedEmergency.phone}
+                      onChange={e => setSharedEmergency(v => ({ ...v, phone: e.target.value }))}
+                      placeholder="10-digit number" />
+                  </div>
+                </>)}
+                {regCfg.show_notes && (
+                  <div style={{ gridColumn: "1/-1" }}>
+                    <label style={LABEL}>{regCfg.notes_label} *</label>
+                    <textarea
+                      style={{ ...INPUT, minHeight: "70px", resize: "vertical" } as React.CSSProperties}
+                      value={sharedNotes}
+                      onChange={e => setSharedNotes(e.target.value)}
+                      placeholder={regCfg.notes_placeholder} />
+                  </div>
+                )}
               </div>
             </section>
+            )}
+
+            {/* Custom form fields (shared for the booking) */}
+            {(ev.form_fields ?? []).length > 0 && (
+              <section style={{ marginBottom: "1.5rem" }}>
+                <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: "1rem" }}>Additional Information</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                  {(ev.form_fields ?? []).map(field => (
+                    <CustomFieldInput
+                      key={field.field_key}
+                      field={field}
+                      value={customFieldValues[field.field_key] ?? ""}
+                      error={customFieldErrors[field.field_key]}
+                      onChange={v => setCustomFieldValues(prev => ({ ...prev, [field.field_key]: v }))}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
 
             {CouponSection}
 
@@ -815,8 +920,19 @@ export default function RegisterPage() {
         {/* T-Shirt Size selector */}
         {ev.collect_tshirt && (
           <div id="field-tshirt_size" style={{ marginBottom: "1.75rem" }}>
-            <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.875rem" }}>
-              T-Shirt Size *
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.875rem" }}>
+              <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                T-Shirt Size *
+              </div>
+              {ev.tshirt_size_chart_url && (
+                <button
+                  type="button"
+                  onClick={() => setShowSizeGuide(true)}
+                  style={{ fontSize: "11px", color: "#60a5fa", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 600, padding: 0, textDecoration: "underline" }}
+                >
+                  View Size Guide ↗
+                </button>
+              )}
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
               {TSHIRT_SIZES.map(size => {
@@ -873,62 +989,93 @@ export default function RegisterPage() {
                 {errors.phone && <Err>{errors.phone}</Err>}
               </div>
 
-              <div id="field-gender">
-                <label style={LABEL}>Gender *</label>
-                <select style={{ ...INPUT, cursor: "pointer", colorScheme: "dark", borderColor: errors.gender ? "rgba(239,68,68,0.6)" : undefined }} value={form.gender} onChange={set("gender")}>
-                  <option value="" style={{ background: "#1a1a1a" }}>Select gender</option>
-                  <option value="male"   style={{ background: "#1a1a1a" }}>Male</option>
-                  <option value="female" style={{ background: "#1a1a1a" }}>Female</option>
-                  <option value="other"  style={{ background: "#1a1a1a" }}>Other</option>
-                </select>
-                {errors.gender && <Err>{errors.gender}</Err>}
-              </div>
+              {regCfg.require_gender && (
+                <div id="field-gender">
+                  <label style={LABEL}>Gender *</label>
+                  <select style={{ ...INPUT, cursor: "pointer", colorScheme: "dark", borderColor: errors.gender ? "rgba(239,68,68,0.6)" : undefined }} value={form.gender} onChange={set("gender")}>
+                    <option value="" style={{ background: "#1a1a1a" }}>Select gender</option>
+                    <option value="male"   style={{ background: "#1a1a1a" }}>Male</option>
+                    <option value="female" style={{ background: "#1a1a1a" }}>Female</option>
+                    <option value="other"  style={{ background: "#1a1a1a" }}>Other</option>
+                  </select>
+                  {errors.gender && <Err>{errors.gender}</Err>}
+                </div>
+              )}
 
-              <div id="field-date_of_birth">
-                <label style={LABEL}>Date of Birth *</label>
-                <input style={{ ...INPUT, colorScheme: "dark", borderColor: errors.date_of_birth ? "rgba(239,68,68,0.6)" : undefined }} type="date" value={form.date_of_birth} onChange={set("date_of_birth")} max={new Date().toISOString().split("T")[0]} />
-                {errors.date_of_birth && <Err>{errors.date_of_birth}</Err>}
-              </div>
+              {regCfg.require_dob && (
+                <div id="field-date_of_birth">
+                  <label style={LABEL}>Date of Birth *</label>
+                  <input style={{ ...INPUT, colorScheme: "dark", borderColor: errors.date_of_birth ? "rgba(239,68,68,0.6)" : undefined }} type="date" value={form.date_of_birth} onChange={set("date_of_birth")} max={new Date().toISOString().split("T")[0]} />
+                  {errors.date_of_birth && <Err>{errors.date_of_birth}</Err>}
+                </div>
+              )}
 
             </div>
           </section>
 
           {/* Event information */}
+          {(regCfg.require_blood_group || regCfg.require_emergency_contact || regCfg.show_notes) && (
           <section style={{ marginBottom: "1.5rem" }}>
             <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>Event Information</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
 
-              <div id="field-blood_group">
-                <label style={LABEL}>Blood Group *</label>
-                <select style={{ ...INPUT, cursor: "pointer", colorScheme: "dark", borderColor: errors.blood_group ? "rgba(239,68,68,0.6)" : undefined }} value={form.blood_group} onChange={set("blood_group")}>
-                  <option value="" style={{ background: "#1a1a1a" }}>Select blood group</option>
-                  {BLOOD_GROUPS.map(g => <option key={g} value={g} style={{ background: "#1a1a1a" }}>{g}</option>)}
-                </select>
-                {errors.blood_group && <Err>{errors.blood_group}</Err>}
-              </div>
+              {regCfg.require_blood_group && (
+                <div id="field-blood_group">
+                  <label style={LABEL}>Blood Group *</label>
+                  <select style={{ ...INPUT, cursor: "pointer", colorScheme: "dark", borderColor: errors.blood_group ? "rgba(239,68,68,0.6)" : undefined }} value={form.blood_group} onChange={set("blood_group")}>
+                    <option value="" style={{ background: "#1a1a1a" }}>Select blood group</option>
+                    {BLOOD_GROUPS.map(g => <option key={g} value={g} style={{ background: "#1a1a1a" }}>{g}</option>)}
+                  </select>
+                  {errors.blood_group && <Err>{errors.blood_group}</Err>}
+                </div>
+              )}
 
-              <div />
+              {regCfg.require_emergency_contact && (<>
+                <div id="field-emergency_contact_name">
+                  <label style={LABEL}>Emergency Contact Name *</label>
+                  <input style={{ ...INPUT, borderColor: errors.emergency_contact_name ? "rgba(239,68,68,0.6)" : undefined }} value={form.emergency_contact_name} onChange={set("emergency_contact_name")} placeholder="Contact person's name" />
+                  {errors.emergency_contact_name && <Err>{errors.emergency_contact_name}</Err>}
+                </div>
 
-              <div id="field-emergency_contact_name">
-                <label style={LABEL}>Emergency Contact Name *</label>
-                <input style={{ ...INPUT, borderColor: errors.emergency_contact_name ? "rgba(239,68,68,0.6)" : undefined }} value={form.emergency_contact_name} onChange={set("emergency_contact_name")} placeholder="Contact person's name" />
-                {errors.emergency_contact_name && <Err>{errors.emergency_contact_name}</Err>}
-              </div>
+                <div id="field-emergency_contact_phone">
+                  <label style={LABEL}>Emergency Contact Number *</label>
+                  <input style={{ ...INPUT, borderColor: errors.emergency_contact_phone ? "rgba(239,68,68,0.6)" : undefined }} value={form.emergency_contact_phone} onChange={set("emergency_contact_phone")} placeholder="10-digit number" type="tel" maxLength={10} />
+                  {errors.emergency_contact_phone && <Err>{errors.emergency_contact_phone}</Err>}
+                </div>
+              </>)}
 
-              <div id="field-emergency_contact_phone">
-                <label style={LABEL}>Emergency Contact Number *</label>
-                <input style={{ ...INPUT, borderColor: errors.emergency_contact_phone ? "rgba(239,68,68,0.6)" : undefined }} value={form.emergency_contact_phone} onChange={set("emergency_contact_phone")} placeholder="10-digit number" type="tel" maxLength={10} />
-                {errors.emergency_contact_phone && <Err>{errors.emergency_contact_phone}</Err>}
-              </div>
-
-              <div style={{ gridColumn: "1/-1" }} id="field-special_notes">
-                <label style={LABEL}>Special Notes *</label>
-                <textarea style={{ ...INPUT, minHeight: "70px", resize: "vertical", borderColor: errors.special_notes ? "rgba(239,68,68,0.6)" : undefined } as React.CSSProperties} value={form.special_notes} onChange={set("special_notes")} placeholder="Medical conditions, dietary needs, or questions. Enter NA if none." />
-                {errors.special_notes && <Err>{errors.special_notes}</Err>}
-              </div>
+              {regCfg.show_notes && (
+                <div style={{ gridColumn: "1/-1" }} id="field-special_notes">
+                  <label style={LABEL}>{regCfg.notes_label} *</label>
+                  <textarea style={{ ...INPUT, minHeight: "70px", resize: "vertical", borderColor: errors.special_notes ? "rgba(239,68,68,0.6)" : undefined } as React.CSSProperties} value={form.special_notes} onChange={set("special_notes")} placeholder={regCfg.notes_placeholder} />
+                  {errors.special_notes && <Err>{errors.special_notes}</Err>}
+                </div>
+              )}
 
             </div>
           </section>
+          )}
+
+          {/* Custom form fields */}
+          {(ev.form_fields ?? []).length > 0 && (
+            <section style={{ marginBottom: "1.5rem" }}>
+              <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: "1rem" }}>Additional Information</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                {(ev.form_fields ?? []).map(field => (
+                  <CustomFieldInput
+                    key={field.field_key}
+                    field={field}
+                    value={customFieldValues[field.field_key] ?? ""}
+                    error={customFieldErrors[field.field_key]}
+                    onChange={v => {
+                      setCustomFieldValues(prev => ({ ...prev, [field.field_key]: v }));
+                      if (submitted) setCustomFieldErrors(e => ({ ...e, [field.field_key]: field.required && !v.trim() ? `${field.label} is required.` : "" }));
+                    }}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
 
           {CouponSection}
 
@@ -970,6 +1117,131 @@ export default function RegisterPage() {
           </p>
         </form>
       </div>
+
+      {/* T-Shirt Size Guide Modal */}
+      {showSizeGuide && ev?.tshirt_size_chart_url && (
+        <div
+          onClick={() => setShowSizeGuide(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 9999,
+            background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "1rem",
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: "#111", border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 20, padding: "1.25rem", maxWidth: 540, width: "100%",
+              maxHeight: "90vh", overflowY: "auto",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>T-Shirt Size Guide</div>
+              <button
+                onClick={() => setShowSizeGuide(false)}
+                style={{ fontSize: 18, color: "#555", background: "none", border: "none", cursor: "pointer", lineHeight: 1, padding: "2px 6px" }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ borderRadius: 10, overflow: "hidden", touchAction: "pinch-zoom" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={ev.tshirt_size_chart_url}
+                alt="T-Shirt Size Guide"
+                style={{ width: "100%", height: "auto", display: "block", maxWidth: "100%" }}
+              />
+            </div>
+
+            {tshirtSize && (
+              <div style={{ marginTop: "0.875rem", padding: "8px 12px", borderRadius: 8, background: "rgba(232,98,10,0.1)", border: "1px solid rgba(232,98,10,0.3)", fontSize: 12, color: "#e8620a", textAlign: "center", fontWeight: 700 }}>
+                Your selected size: {tshirtSize}
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowSizeGuide(false)}
+              style={{ marginTop: "1rem", width: "100%", padding: "10px", borderRadius: 8, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#ccc", fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CustomFieldInput({
+  field, value, error, onChange,
+}: {
+  field: EventFormField;
+  value: string;
+  error?: string;
+  onChange: (v: string) => void;
+}) {
+  const borderErr = error ? "rgba(239,68,68,0.6)" : undefined;
+  const baseInput: React.CSSProperties = {
+    width: "100%", padding: "11px 14px",
+    background: "rgba(255,255,255,0.05)", border: `1px solid ${borderErr ?? "rgba(255,255,255,0.1)"}`,
+    borderRadius: "10px", color: "#fff", fontFamily: "inherit",
+    fontSize: "0.875rem", outline: "none", boxSizing: "border-box",
+  };
+  const label: React.CSSProperties = {
+    display: "block", fontSize: "11px", color: "rgba(255,255,255,0.5)",
+    letterSpacing: "0.07em", textTransform: "uppercase" as const, marginBottom: "5px",
+  };
+
+  return (
+    <div id={`cf-${field.field_key}`}>
+      <label style={label}>{field.label}{field.required ? " *" : ""}</label>
+
+      {field.field_type === "textarea" && (
+        <textarea
+          style={{ ...baseInput, minHeight: "70px", resize: "vertical" } as React.CSSProperties}
+          value={value} onChange={e => onChange(e.target.value)}
+          placeholder={field.placeholder ?? ""}
+        />
+      )}
+
+      {field.field_type === "select" && (
+        <select style={{ ...baseInput, cursor: "pointer", colorScheme: "dark" } as React.CSSProperties}
+          value={value} onChange={e => onChange(e.target.value)}>
+          <option value="" style={{ background: "#1a1a1a" }}>Select…</option>
+          {(field.options ?? []).map(opt => (
+            <option key={opt} value={opt} style={{ background: "#1a1a1a" }}>{opt}</option>
+          ))}
+        </select>
+      )}
+
+      {field.field_type === "checkbox" && (
+        <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", paddingTop: "4px" }}>
+          <input
+            type="checkbox"
+            checked={value === "yes"}
+            onChange={e => onChange(e.target.checked ? "yes" : "")}
+            style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#e8620a" }}
+          />
+          <span style={{ fontSize: "0.875rem", color: "rgba(255,255,255,0.7)" }}>{field.placeholder ?? "Yes"}</span>
+        </label>
+      )}
+
+      {(field.field_type === "text" || field.field_type === "number" || field.field_type === "date") && (
+        <input
+          style={{ ...baseInput, colorScheme: field.field_type === "date" ? "dark" : undefined } as React.CSSProperties}
+          type={field.field_type}
+          value={value} onChange={e => onChange(e.target.value)}
+          placeholder={field.placeholder ?? ""}
+        />
+      )}
+
+      {field.help_text && !error && (
+        <div style={{ fontSize: "0.73rem", color: "rgba(255,255,255,0.3)", marginTop: "4px" }}>{field.help_text}</div>
+      )}
+      {error && <div style={{ fontSize: "0.75rem", color: "#f87171", marginTop: "4px" }}>{error}</div>}
     </div>
   );
 }

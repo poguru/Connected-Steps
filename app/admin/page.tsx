@@ -28,6 +28,7 @@ const QUICK_ACTIONS = [
   { label: "Write Training Plans",    href: "/admin/training-plans",       desc: "Weekly plans for members" },
   { label: "Event Registrations",     href: "/admin/events/registrations", desc: "View registrations & revenue" },
   { label: "Coach Operations",        href: "/admin/coach-ops",            desc: "Athlete roster & bulk actions" },
+  { label: "🖼 Asset Library",        href: "/admin/assets",              desc: "Upload & manage shared media assets" },
 ];
 
 function fmt(n: number) { return n.toLocaleString("en-IN"); }

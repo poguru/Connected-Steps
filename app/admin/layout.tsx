@@ -19,9 +19,10 @@ const NAV_GROUPS = [
     label: "Events",
     icon:  "📅",
     links: [
-      { label: "All Events",     href: "/admin/events",               exact: true,  icon: "🗓" },
-      { label: "Registrations",  href: "/admin/events/registrations", exact: false, icon: "📋" },
-      { label: "Create Event",   href: "/admin/events/new",           exact: true,  icon: "➕" },
+      { label: "All Events",        href: "/admin/events",               exact: true,  icon: "🗓" },
+      { label: "Registrations",   href: "/admin/events/registrations", exact: false, icon: "📋" },
+      { label: "Scheduled Emails",href: "/admin/scheduled-emails",     exact: false, icon: "🕐" },
+      { label: "Create Event",    href: "/admin/events/new",           exact: true,  icon: "➕" },
     ],
   },
   {
@@ -77,6 +78,14 @@ const NAV_GROUPS = [
     icon:  "🐛",
     links: [
       { label: "Bug Reports", href: "/admin/bug-reports", exact: false, icon: "🐛" },
+    ],
+  },
+  {
+    key:   "content",
+    label: "Content",
+    icon:  "🖼",
+    links: [
+      { label: "Asset Library", href: "/admin/assets", exact: false, icon: "🖼" },
     ],
   },
   {

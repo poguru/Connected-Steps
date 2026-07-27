@@ -123,7 +123,7 @@ describe("POST /api/events/create-payment-order — slot protection", () => {
     expect(res.status).toBe(409);
     expect(body.error).toMatch(/fully booked/i);
     // Razorpay orders.create must NOT have been called
-    const Razorpay = (await import("razorpay")).default as jest.Mock;
+    const Razorpay = (await import("razorpay")).default as unknown as jest.Mock;
     const razorpayInstance = Razorpay.mock.results[Razorpay.mock.results.length - 1]?.value;
     if (razorpayInstance) {
       expect(razorpayInstance.orders.create).not.toHaveBeenCalled();

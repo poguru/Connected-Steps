@@ -35,6 +35,9 @@ interface Participant {
   medal_issued_by: string | null;
   bib_collected_at: string | null;
   bib_collected_by: string | null;
+  certificate_issued: boolean;
+  certificate_issued_at: string | null;
+  certificate_issued_by: string | null;
   status: string;
   event_registrations: RegInfo | null;
 }
@@ -46,7 +49,8 @@ const SELECT =
   "tshirt_issued, tshirt_issued_at, tshirt_issued_by, " +
   "breakfast_availed, breakfast_availed_at, breakfast_availed_by, " +
   "medal_issued, medal_issued_at, medal_issued_by, " +
-  "bib_collected_at, bib_collected_by, status, " +
+  "bib_collected_at, bib_collected_by, " +
+  "certificate_issued, certificate_issued_at, certificate_issued_by, status, " +
   "event_registrations(registration_code, payment_status, gender)";
 
 // POST /api/ops/events/[id]/scan
@@ -255,7 +259,8 @@ export async function POST(
     case "tshirt":    return handleTshirt(db, participant, participantName, now, volunteerEmail, volunteerRole, eventId);
     case "breakfast": return handleBreakfast(db, participant, participantName, now, volunteerEmail, volunteerRole, eventId);
     case "medal":     return handleMedal(db, participant, participantName, now, volunteerEmail, volunteerRole, eventId);
-    case "bib":       return handleBib(db, participant, participantName, now, volunteerEmail, volunteerRole, eventId);
+    case "bib":         return handleBib(db, participant, participantName, now, volunteerEmail, volunteerRole, eventId);
+    case "certificate": return handleCertificate(db, participant, participantName, now, volunteerEmail, volunteerRole, eventId);
     default:
       return NextResponse.json({ error: `Unknown service: ${service}` }, { status: 400 });
   }
@@ -283,8 +288,9 @@ function serviceStatus(p: Participant, svc: string) {
     case "tshirt":    return { already_done: p.tshirt_issued,       done_at: p.tshirt_issued_at,  done_by: p.tshirt_issued_by };
     case "breakfast": return { already_done: p.breakfast_availed,   done_at: p.breakfast_availed_at, done_by: p.breakfast_availed_by };
     case "medal":     return { already_done: p.medal_issued,        done_at: p.medal_issued_at,   done_by: p.medal_issued_by };
-    case "bib":       return { already_done: !!p.bib_collected_at,  done_at: p.bib_collected_at,  done_by: p.bib_collected_by };
-    default:          return { already_done: false, done_at: null, done_by: null };
+    case "bib":         return { already_done: !!p.bib_collected_at,       done_at: p.bib_collected_at,        done_by: p.bib_collected_by };
+    case "certificate": return { already_done: p.certificate_issued,       done_at: p.certificate_issued_at,   done_by: p.certificate_issued_by };
+    default:            return { already_done: false, done_at: null, done_by: null };
   }
 }
 
@@ -428,6 +434,32 @@ async function handleBib(
   return NextResponse.json({
     valid: true, already_done: false,
     message: `✅ BIB confirmed for ${name}${p.bib_number ? ` — BIB #${p.bib_number}` : ""}!`,
+    done_at: now, participant: participantCard(p, name),
+  });
+}
+
+async function handleCertificate(
+  db: DB, p: Participant, name: string,
+  now: string, vol: string, role: string, eventId: string
+): Promise<NextResponse> {
+  if (p.certificate_issued) {
+    return NextResponse.json({
+      valid: true, already_done: true,
+      message: `Certificate already issued to ${name}.`,
+      done_at: p.certificate_issued_at, done_by: p.certificate_issued_by,
+      participant: participantCard(p, name),
+    });
+  }
+
+  const { error } = await db.from("event_participants").update({
+    certificate_issued: true, certificate_issued_at: now, certificate_issued_by: vol,
+  }).eq("id", p.id).eq("certificate_issued", false);
+  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
+
+  await logAction(db, eventId, p.id, p.registration_id, "certificate", "certificate_issued", vol, role);
+  return NextResponse.json({
+    valid: true, already_done: false,
+    message: `✅ Certificate issued to ${name}!`,
     done_at: now, participant: participantCard(p, name),
   });
 }

@@ -861,6 +861,19 @@ export default function EditEventPage() {
                   />
                 </div>
               </div>
+
+              <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 20 }}>
+                <Field label="T-Shirt Size Chart" hint="Optional. Shown to participants as a popup when selecting their size. Upload a chart image with measurements in cm/inches.">
+                  <ImageUploader
+                    eventId={eventId}
+                    purpose="size-chart"
+                    currentUrl={(ev as unknown as Record<string, string>).tshirt_size_chart_url ?? ""}
+                    height={180}
+                    hint="JPEG, PNG, WEBP or SVG — max 10 MB"
+                    onUploaded={async url => { await saveField("tshirt_size_chart_url", url || null); }}
+                  />
+                </Field>
+              </div>
             </div>
           </div>
         )}

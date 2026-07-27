@@ -54,6 +54,30 @@ interface WizardState {
   visibility:              string;
 }
 
+interface EventTemplate {
+  id:                   string;
+  name:                 string;
+  event_category:       string;
+  event_type:           string;
+  event_description:    string | null;
+  organizer:            string | null;
+  organizer_email:      string | null;
+  organizer_phone:      string | null;
+  support_email:        string | null;
+  website:              string | null;
+  cover_image:          string | null;
+  max_participants:     number | null;
+  waiting_list_enabled: boolean;
+  require_login:        boolean;
+  approval_required:    boolean;
+  collect_tshirt:       boolean;
+  refund_policy:        string | null;
+  cancellation_policy:  string | null;
+  visibility:           string;
+  races:                RaceForm[];
+  created_at:           string;
+}
+
 const BLANK: WizardState = {
   title: "", event_category: "community", event_type: "running",
   description: "", start_date: "", end_date: "", start_time: "", end_time: "",
@@ -176,6 +200,10 @@ export default function NewEventWizard() {
   const autoRef = useRef<ReturnType<typeof setTimeout>>(null);
   const isMounted = useRef(true);
 
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [templates,          setTemplates]          = useState<EventTemplate[]>([]);
+  const [templatesLoading,   setTemplatesLoading]   = useState(false);
+
   // ── CSS injection ───────────────────────────────────────────────────────────
   useEffect(() => {
     const style = document.createElement("style");
@@ -207,6 +235,51 @@ export default function NewEventWizard() {
   }
 
   function discardDraft() { localStorage.removeItem("cs_new_event_draft"); setHasDraft(false); }
+
+  // ── Templates ────────────────────────────────────────────────────────────────
+  async function loadAndShowTemplates() {
+    setShowTemplatePicker(true);
+    if (templates.length > 0) return;
+    setTemplatesLoading(true);
+    try {
+      const res  = await fetch("/api/admin/event-templates");
+      const data = await res.json() as { templates?: EventTemplate[] };
+      if (isMounted.current) setTemplates(data.templates ?? []);
+    } catch { /* non-critical */ }
+    finally { if (isMounted.current) setTemplatesLoading(false); }
+  }
+
+  function applyTemplate(t: EventTemplate) {
+    setForm(prev => ({
+      ...prev,
+      event_category:       t.event_category,
+      event_type:           t.event_type,
+      description:          t.event_description ?? prev.description,
+      organizer:            t.organizer ?? prev.organizer,
+      organizer_email:      t.organizer_email ?? prev.organizer_email,
+      organizer_phone:      t.organizer_phone ?? prev.organizer_phone,
+      support_email:        t.support_email ?? prev.support_email,
+      website:              t.website ?? prev.website,
+      cover_image:          t.cover_image ?? prev.cover_image,
+      max_participants:     t.max_participants != null ? String(t.max_participants) : prev.max_participants,
+      waiting_list_enabled: t.waiting_list_enabled,
+      require_login:        t.require_login,
+      approval_required:    t.approval_required,
+      collect_tshirt:       t.collect_tshirt,
+      refund_policy:        t.refund_policy ?? prev.refund_policy,
+      cancellation_policy:  t.cancellation_policy ?? prev.cancellation_policy,
+      visibility:           t.visibility,
+    }));
+    if (t.races.length > 0) setRaces(t.races.map(r => ({ ...r })));
+    setSkipRaces(t.races.length === 0);
+    setShowTemplatePicker(false);
+    showToast(`Template "${t.name}" applied ✓`);
+  }
+
+  async function deleteTemplate(id: string) {
+    await fetch(`/api/admin/event-templates/${id}`, { method: "DELETE" });
+    setTemplates(prev => prev.filter(t => t.id !== id));
+  }
 
   // ── Auto-save draft to localStorage ────────────────────────────────────────
   const saveDraft = useCallback(() => {
@@ -380,6 +453,7 @@ export default function NewEventWizard() {
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {savedAt && <span style={{ fontSize: 11, color: "#333" }}>Saved {savedAt}</span>}
+          <Button size="sm" variant="ghost" onClick={loadAndShowTemplates}>🗂️ Template</Button>
           <Button size="sm" variant="secondary" loading={saving} onClick={handleSaveDraft}>Save Draft</Button>
           <Link href="/admin/events" style={{ textDecoration: "none" }}>
             <Button size="sm" variant="ghost">Cancel</Button>
@@ -458,6 +532,16 @@ export default function NewEventWizard() {
         <div style={{ position: "fixed", bottom: 80, left: "50%", transform: "translateX(-50%)", background: toast.type === "err" ? "#3b0a0a" : "#0f1a0f", border: `1px solid ${toast.type === "err" ? "rgba(239,68,68,0.3)" : "rgba(74,222,128,0.3)"}`, borderRadius: 24, padding: "10px 22px", fontSize: 13, fontWeight: 600, color: toast.type === "err" ? "#f87171" : "#4ade80", zIndex: 9999, whiteSpace: "nowrap", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}>
           {toast.msg}
         </div>
+      )}
+
+      {showTemplatePicker && (
+        <TemplatePicker
+          templates={templates}
+          loading={templatesLoading}
+          onSelect={applyTemplate}
+          onDelete={deleteTemplate}
+          onClose={() => setShowTemplatePicker(false)}
+        />
       )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -853,6 +937,98 @@ function StepReview({ form, races, skipRaces, onPublish, saving }: { form: Wizar
           </div>
         </div>
         <Button loading={saving} disabled={!isReady} onClick={onPublish}>🚀 Publish Now</Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Template Picker Modal ─────────────────────────────────────────────────────
+
+const CATEGORY_EMOJI: Record<string, string> = {
+  community: "🤝", marathon: "🏆", corporate: "🏢", virtual: "💻",
+  walkathon: "🚶", cycling: "🚴", triathlon: "🔱",
+};
+
+function TemplatePicker({
+  templates, loading, onSelect, onDelete, onClose,
+}: {
+  templates: EventTemplate[];
+  loading: boolean;
+  onSelect: (t: EventTemplate) => void;
+  onDelete: (id: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.82)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, width: "100%", maxWidth: 560, maxHeight: "80vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+        {/* Header */}
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.07)", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexShrink: 0 }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 15, color: "#fff" }}>Start from Template</div>
+            <div style={{ fontSize: 11, color: "#555", marginTop: 3, lineHeight: 1.5 }}>
+              Pre-fills category, races, organizer, and policies.<br />
+              You still fill in: title, dates, venue, and registration window.
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ background: "rgba(255,255,255,0.07)", border: "none", borderRadius: 8, width: 30, height: 30, cursor: "pointer", color: "#888", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0 }}
+          >✕</button>
+        </div>
+
+        {/* Body */}
+        <div style={{ overflowY: "auto", flex: 1, padding: "12px 14px" }}>
+          {loading && (
+            <div style={{ textAlign: "center", padding: "2.5rem", color: "#555", fontSize: 13 }}>Loading templates…</div>
+          )}
+
+          {!loading && templates.length === 0 && (
+            <div style={{ textAlign: "center", padding: "3rem 1.5rem" }}>
+              <div style={{ fontSize: 36, marginBottom: 12 }}>🗂️</div>
+              <div style={{ fontWeight: 700, color: "#555", fontSize: 14, marginBottom: 8 }}>No templates yet</div>
+              <div style={{ fontSize: 12, color: "#333", lineHeight: 1.6 }}>
+                Open any event → <strong style={{ color: "#555" }}>Settings</strong> → <strong style={{ color: "#555" }}>Save as Template</strong><br />
+                to save a reusable configuration.
+              </div>
+            </div>
+          )}
+
+          {!loading && templates.map(t => (
+            <div
+              key={t.id}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, marginBottom: 8, cursor: "pointer", transition: "border-color 0.15s" }}
+              onClick={() => onSelect(t)}
+              onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(232,98,10,0.4)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.07)"; }}
+            >
+              <div style={{ width: 42, height: 42, borderRadius: 10, background: "rgba(232,98,10,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>
+                {CATEGORY_EMOJI[t.event_category] ?? "📋"}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{t.name}</div>
+                <div style={{ display: "flex", gap: 8, marginTop: 3, fontSize: 11, color: "#555", flexWrap: "wrap" as const }}>
+                  <span>{t.event_category}</span>
+                  {t.races.length > 0 && <span>· {t.races.length} race{t.races.length !== 1 ? "s" : ""}</span>}
+                  <span>· {new Date(t.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                <button
+                  onClick={() => onSelect(t)}
+                  style={{ background: "#e8620a", border: "none", borderRadius: 7, padding: "5px 12px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                >Apply</button>
+                <button
+                  onClick={() => { if (confirm(`Delete template "${t.name}"?`)) onDelete(t.id); }}
+                  style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 7, padding: "5px 8px", color: "#f87171", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}
+                >✕</button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

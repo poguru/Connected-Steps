@@ -18,5 +18,5 @@ export function makeAdminHeaders(extra?: Record<string, string>): Record<string,
 export function makeAdminRequest(url: string | URL, init?: RequestInit): NextRequest {
   const headers = new Headers((init?.headers as HeadersInit) ?? {});
   headers.set("cookie", adminCookieHeader());
-  return new NextRequest(url, { ...init, headers });
+  return new NextRequest(url, { ...init, headers } as unknown as ConstructorParameters<typeof NextRequest>[1]);
 }

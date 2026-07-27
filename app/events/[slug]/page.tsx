@@ -7,6 +7,7 @@ import { getEventLifecycleStatus, LIFECYCLE_LABEL, LIFECYCLE_COLOR } from "@/lib
 import { getLifecycle } from "@/lib/event-lifecycle";
 import { getDistanceOption } from "@/lib/event-distances";
 import EventDetailCountdown from "@/components/events/EventDetailCountdown";
+import EventShareButton from "@/components/events/EventShareButton";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -36,6 +37,7 @@ interface Event {
   terms_conditions: string | null;
   whatsapp_community_url: string | null;
   route_map_url: string | null; route_map_type: string | null;
+  tshirt_size_chart_url: string | null; collect_tshirt: boolean;
   status: string; share_slug: string | null;
   view_count: number;
 }
@@ -128,6 +130,34 @@ async function getSponsors(eventId: string): Promise<Sponsor[]> {
   } catch { return []; }
 }
 
+interface RouteMapRow { id: string; name: string; file_url: string; file_type: "image" | "pdf" | "gpx"; display_order: number }
+
+interface CollectionCenter { id: string; name: string; address: string | null; maps_url: string | null; contact_name: string | null; contact_phone: string | null; notes: string | null; display_order: number }
+
+async function getRouteMaps(eventId: string): Promise<RouteMapRow[]> {
+  try {
+    const { data } = await getSupabaseServer()
+      .from("event_route_maps")
+      .select("id, name, file_url, file_type, display_order")
+      .eq("event_id", eventId)
+      .eq("is_active", true)
+      .order("display_order")
+      .order("created_at");
+    return data ?? [];
+  } catch { return []; }
+}
+
+async function getCollectionCenters(eventId: string): Promise<CollectionCenter[]> {
+  try {
+    const { data } = await getSupabaseServer()
+      .from("bib_collection_centers")
+      .select("id, name, address, maps_url, contact_name, contact_phone, notes, display_order")
+      .eq("event_id", eventId)
+      .order("display_order");
+    return data ?? [];
+  } catch { return []; }
+}
+
 // ── Metadata ──────────────────────────────────────────────────────────────────
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -204,9 +234,11 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
   const ev = await getEvent(slug);
   if (!ev) notFound();
 
-  const [racesData, sponsorsData] = await Promise.all([
+  const [racesData, sponsorsData, routeMapsData, centersData] = await Promise.all([
     getRaces(ev.id),
     getSponsors(ev.id),
+    getRouteMaps(ev.id),
+    getCollectionCenters(ev.id),
   ]);
 
   const slotsLeft = ev.max_participants !== null
@@ -222,6 +254,16 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
     ? new Date(ev.registration_closes_at).toLocaleString("en-IN", {
         timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
       })
+    : null;
+
+  // Early bird: show banner when future date is set and races have early-bird prices
+  const hasEarlyBirdRaces = racesData.some(r => r.early_bird_price != null && r.early_bird_price < r.price);
+  const earlyBirdEndsAt   = ev.early_bird_ends_at && hasEarlyBirdRaces && lifecycle.canRegister
+    ? new Date(ev.early_bird_ends_at)
+    : null;
+  const earlyBirdActive   = earlyBirdEndsAt !== null && earlyBirdEndsAt > new Date();
+  const earlyBirdLabel    = earlyBirdActive
+    ? earlyBirdEndsAt!.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
     : null;
 
   const heroImg = ev.banner_image ?? ev.cover_image;
@@ -266,13 +308,17 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
       <style>{css}</style>
 
       {/* Nav */}
-      <nav style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(13,13,16,0.97)", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0 20px", height: "52px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <Link href="/events" style={{ fontSize: "13px", color: "rgba(255,255,255,0.5)", textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}>
+      <nav style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(13,13,16,0.97)", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0 20px", height: "52px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+        <Link href="/events" style={{ fontSize: "13px", color: "rgba(255,255,255,0.5)", textDecoration: "none", display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
           <span style={{ fontSize: 16 }}>←</span> All Events
         </Link>
-        <Link href="/" style={{ fontSize: "11px", fontWeight: 700, letterSpacing: ".06em", color: "rgba(255,255,255,0.25)", textDecoration: "none", textTransform: "uppercase" }}>
+        <Link href="/" style={{ fontSize: "11px", fontWeight: 700, letterSpacing: ".06em", color: "rgba(255,255,255,0.25)", textDecoration: "none", textTransform: "uppercase", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           Connected Steps
         </Link>
+        <EventShareButton
+          title={ev.title}
+          url={`https://www.connectedsteps.in/events/${ev.share_slug ?? ev.id}`}
+        />
       </nav>
 
       {/* Hero */}
@@ -326,6 +372,17 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
           end_time:               ev.end_time,
           registration_closes_at: ev.registration_closes_at,
         }} />
+
+        {/* Early bird banner */}
+        {earlyBirdActive && earlyBirdLabel && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", marginBottom: "20px", background: "rgba(251,191,36,0.07)", border: "1px solid rgba(251,191,36,0.22)", borderRadius: "10px" }}>
+            <span style={{ fontSize: 18, flexShrink: 0 }}>🐦</span>
+            <div>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: "#fbbf24" }}>Early Bird Prices Active</div>
+              <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", marginTop: 2 }}>Ends {earlyBirdLabel} IST</div>
+            </div>
+          </div>
+        )}
 
         {/* Race categories */}
         {racesData.length > 0 && (
@@ -491,23 +548,102 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
           </>
         )}
 
-        {/* Route map */}
-        {ev.route_map_url && (
+        {/* Route maps — prefer new table, fall back to legacy column */}
+        {(routeMapsData.length > 0 || ev.route_map_url) && (
           <>
             <Divider />
             <div style={{ marginBottom: "36px" }}>
-              <SectionHead>Route Map</SectionHead>
-              {ev.route_map_type === "pdf" ? (
-                <a href={ev.route_map_url} target="_blank" rel="noopener noreferrer"
+              <SectionHead>Route Map{routeMapsData.length > 1 ? "s" : ""}</SectionHead>
+              {routeMapsData.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  {routeMapsData.map(map => (
+                    <div key={map.id}>
+                      {map.file_type === "image" ? (
+                        <>
+                          {routeMapsData.length > 1 && (
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.6)", marginBottom: 8 }}>{map.name}</div>
+                          )}
+                          <a href={map.file_url} target="_blank" rel="noopener noreferrer">
+                            <img src={map.file_url} alt={map.name} style={{ width: "100%", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.08)" }} loading="lazy" />
+                          </a>
+                        </>
+                      ) : (
+                        <a href={map.file_url} target="_blank" rel="noopener noreferrer"
+                          style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 18px", background: "rgba(96,165,250,0.08)", border: "1px solid rgba(96,165,250,0.2)", borderRadius: "10px", color: "#60a5fa", fontWeight: 600, fontSize: "13px", textDecoration: "none" }}>
+                          {map.file_type === "pdf"
+                            ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+                            : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="3,6 9,3 15,6 21,3 21,18 15,21 9,18 3,21"/></svg>
+                          }
+                          {map.name}
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : ev.route_map_url && (
+                ev.route_map_type === "pdf" ? (
+                  <a href={ev.route_map_url} target="_blank" rel="noopener noreferrer"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 18px", background: "rgba(96,165,250,0.08)", border: "1px solid rgba(96,165,250,0.2)", borderRadius: "10px", color: "#60a5fa", fontWeight: 600, fontSize: "13px", textDecoration: "none" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+                    Download Route Map (PDF)
+                  </a>
+                ) : (
+                  <a href={ev.route_map_url} target="_blank" rel="noopener noreferrer">
+                    <img src={ev.route_map_url} alt="Route map" style={{ width: "100%", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.08)" }} loading="lazy" />
+                  </a>
+                )
+              )}
+            </div>
+          </>
+        )}
+
+        {/* T-shirt size chart */}
+        {ev.tshirt_size_chart_url && ev.collect_tshirt && (
+          <>
+            <Divider />
+            <div style={{ marginBottom: "36px" }}>
+              <SectionHead>T-Shirt Size Guide</SectionHead>
+              {ev.tshirt_size_chart_url.match(/\.pdf$/i) ? (
+                <a href={ev.tshirt_size_chart_url} target="_blank" rel="noopener noreferrer"
                   style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 18px", background: "rgba(96,165,250,0.08)", border: "1px solid rgba(96,165,250,0.2)", borderRadius: "10px", color: "#60a5fa", fontWeight: 600, fontSize: "13px", textDecoration: "none" }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
-                  Download Route Map (PDF)
+                  View T-Shirt Size Chart (PDF)
                 </a>
               ) : (
-                <a href={ev.route_map_url} target="_blank" rel="noopener noreferrer">
-                  <img src={ev.route_map_url} alt="Route map" style={{ width: "100%", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.08)" }} loading="lazy" />
+                <a href={ev.tshirt_size_chart_url} target="_blank" rel="noopener noreferrer" title="View full size">
+                  <img src={ev.tshirt_size_chart_url} alt="T-Shirt Size Guide" style={{ maxWidth: "100%", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.08)", display: "block" }} loading="lazy" />
                 </a>
               )}
+            </div>
+          </>
+        )}
+
+        {/* BIB collection centers */}
+        {centersData.length > 0 && (
+          <>
+            <Divider />
+            <div style={{ marginBottom: "36px" }}>
+              <SectionHead>BIB &amp; Kit Collection</SectionHead>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {centersData.map(c => (
+                  <div key={c.id} style={{ padding: "14px 16px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "12px" }}>
+                    <div style={{ fontWeight: 700, fontSize: "14px", color: "#fff", marginBottom: 6 }}>{c.name}</div>
+                    {c.address && (
+                      <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.55)", marginBottom: 4, lineHeight: 1.5 }}>
+                        📍 {c.maps_url ? (
+                          <a href={c.maps_url} target="_blank" rel="noopener noreferrer" style={{ color: "#60a5fa", textDecoration: "none" }}>{c.address} ↗</a>
+                        ) : c.address}
+                      </div>
+                    )}
+                    {(c.contact_name || c.contact_phone) && (
+                      <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", marginBottom: c.notes ? 4 : 0 }}>
+                        📞 {c.contact_name}{c.contact_name && c.contact_phone ? " · " : ""}{c.contact_phone ? <a href={`tel:${c.contact_phone}`} style={{ color: "#60a5fa", textDecoration: "none" }}>{c.contact_phone}</a> : null}
+                      </div>
+                    )}
+                    {c.notes && <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)", lineHeight: 1.6 }}>{c.notes}</div>}
+                  </div>
+                ))}
+              </div>
             </div>
           </>
         )}

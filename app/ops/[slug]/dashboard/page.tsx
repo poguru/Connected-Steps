@@ -17,11 +17,12 @@ interface ServiceStat { done: number; label: string; }
 interface LiveStats {
   stats: {
     total: number;
-    checkin:   ServiceStat;
-    tshirt:    ServiceStat;
-    breakfast: ServiceStat;
-    medal:     ServiceStat;
-    bib:       ServiceStat;
+    checkin:      ServiceStat;
+    tshirt:       ServiceStat;
+    breakfast:    ServiceStat;
+    medal:        ServiceStat;
+    bib:          ServiceStat;
+    certificate:  ServiceStat;
   };
   enabled_services: string[];
   recent_activity: { service_name: string; action: string; volunteer_email: string | null; volunteer_role: string | null; created_at: string }[];
@@ -33,7 +34,8 @@ const SERVICE_META: Record<string, { label: string; module: string; color: strin
   tshirt:    { label: "T-Shirts",     module: "tshirt",    color: "#f59e0b", emoji: "👕" },
   breakfast: { label: "Breakfast",    module: "breakfast", color: "#f97316", emoji: "🍽️" },
   bib:       { label: "BIB",          module: "bib",       color: "#60a5fa", emoji: "🏷️" },
-  medal:     { label: "Medals",       module: "medal",     color: "#fbbf24", emoji: "🏅" },
+  medal:       { label: "Medals",       module: "medal",       color: "#fbbf24", emoji: "🏅" },
+  certificate: { label: "Certificates", module: "certificate", color: "#a78bfa", emoji: "📜" },
 };
 
 export default function DashboardPage({ params }: { params: Promise<{ slug: string }> }) {

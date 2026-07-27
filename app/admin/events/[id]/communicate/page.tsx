@@ -15,6 +15,14 @@ type RecipientFilter = "all" | "paid" | "free" | "pending" | "checked_in" | "not
 type Channel = "email" | "push";
 type PreviewMode = "desktop" | "mobile" | "html";
 
+interface CommTemplate {
+  id:         string;
+  name:       string;
+  subject:    string;
+  created_at: string;
+  body_html?: string;
+}
+
 interface AttachmentMeta {
   name:      string;
   mime_type: string;
@@ -34,6 +42,7 @@ interface CommHistory {
   channel?:         string;
   batch_id?:        string | null;
   attachments?:     AttachmentMeta[];
+  scheduled_for?:   string | null;
 }
 
 interface DeliveryEmail {
@@ -386,7 +395,7 @@ export default function CommunicatePage() {
   const params  = useParams();
   const eventId = params.id as string;
 
-  const [tab,     setTab]     = useState<"email" | "push" | "health" | "history">("email");
+  const [tab,     setTab]     = useState<"email" | "whatsapp" | "push" | "health" | "history">("email");
   const [history, setHistory] = useState<CommHistory[]>([]);
 
   // Health check state
@@ -433,7 +442,107 @@ export default function CommunicatePage() {
   const [toast, setToast] = useState("");
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(""), 3500); };
 
-  useEffect(() => { loadHistory(); /* eslint-disable-next-line */ }, []);
+  // Saved email templates
+  const [savedTemplates,        setSavedTemplates]        = useState<CommTemplate[]>([]);
+  const [savedTemplatesLoading, setSavedTemplatesLoading] = useState(false);
+  const [savingTemplate,        setSavingTemplate]        = useState(false);
+
+  // Scheduling state
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduledFor,    setScheduledFor]    = useState("");
+
+  // WhatsApp to registrants
+  const [waFilter,      setWaFilter]      = useState<RecipientFilter>("all");
+  const [waSending,     setWaSending]     = useState(false);
+  const [waResult,      setWaResult]      = useState<{ total: number; batch_id: string } | null>(null);
+  const [waChecked,     setWaChecked]     = useState<{ total: number; with_phone: number } | null>(null);
+  const [waChecking,    setWaChecking]    = useState(false);
+
+  useEffect(() => { loadHistory(); loadSavedTemplates(); /* eslint-disable-next-line */ }, []);
+
+  // ── Saved templates ───────────────────────────────────────────────────────────
+
+  async function loadSavedTemplates() {
+    setSavedTemplatesLoading(true);
+    try {
+      const res  = await fetch("/api/admin/comm-templates");
+      const data = await res.json() as { templates?: CommTemplate[] };
+      setSavedTemplates(data.templates ?? []);
+    } catch { /* non-critical */ }
+    finally { setSavedTemplatesLoading(false); }
+  }
+
+  async function saveCurrentAsTemplate() {
+    if (!emailSubject.trim() || !emailHtml.trim()) { showToast("Write a subject and body first"); return; }
+    const name = prompt("Template name:", emailSubject.slice(0, 60));
+    if (!name) return;
+    setSavingTemplate(true);
+    try {
+      const res  = await fetch("/api/admin/comm-templates", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), subject: emailSubject, body_html: emailHtml }),
+      });
+      const data = await res.json() as { template?: CommTemplate; error?: string };
+      if (res.ok && data.template) {
+        setSavedTemplates(prev => [data.template!, ...prev]);
+        showToast(`✅ Template "${data.template.name}" saved`);
+      } else {
+        showToast(`❌ ${data.error ?? "Save failed"}`);
+      }
+    } catch { showToast("❌ Network error"); }
+    finally { setSavingTemplate(false); }
+  }
+
+  async function loadSavedTemplateById(id: string) {
+    try {
+      const res  = await fetch(`/api/admin/comm-templates/${id}`);
+      const data = await res.json() as { template?: CommTemplate };
+      if (data.template?.body_html) {
+        setEmailSubject(data.template.subject);
+        setEmailHtml(data.template.body_html);
+        setEmailTemplate("custom");
+      }
+    } catch { showToast("❌ Failed to load template"); }
+  }
+
+  async function deleteSavedTemplate(id: string) {
+    await fetch(`/api/admin/comm-templates/${id}`, { method: "DELETE" });
+    setSavedTemplates(prev => prev.filter(t => t.id !== id));
+  }
+
+  // ── WhatsApp to registrants ───────────────────────────────────────────────────
+
+  async function checkWaRecipients() {
+    setWaChecking(true); setWaChecked(null);
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/communicate/whatsapp?filter=${waFilter}`);
+      const data = await res.json() as { total: number; with_phone: number };
+      setWaChecked(data);
+    } catch { showToast("❌ Failed to check recipients"); }
+    finally { setWaChecking(false); }
+  }
+
+  async function sendWhatsAppToRegistrants() {
+    if (!waChecked) { showToast("Check recipients first"); return; }
+    if (!waChecked.with_phone) { showToast("No registrants with phone numbers matched"); return; }
+    if (!confirm(`Send WhatsApp to ${waChecked.with_phone} registrant${waChecked.with_phone !== 1 ? "s" : ""} with a phone number?`)) return;
+    setWaSending(true); setWaResult(null);
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/communicate/whatsapp`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipient_filter: waFilter }),
+      });
+      const data = await res.json() as { total?: number; batch_id?: string; message?: string; error?: string };
+      if (res.ok && data.total) {
+        setWaResult({ total: data.total, batch_id: data.batch_id ?? "" });
+        showToast(`✅ Sending WhatsApp to ${data.total} recipients`);
+        void loadHistory();
+      } else {
+        showToast(`❌ ${data.error ?? data.message ?? "Send failed"}`);
+      }
+    } catch { showToast("❌ Network error"); }
+    finally { setWaSending(false); }
+  }
 
   async function loadHistory() {
     const res  = await fetch(`/api/admin/events/${eventId}/communicate`);
@@ -539,25 +648,51 @@ export default function CommunicatePage() {
   async function enqueueEmail() {
     if (!emailSubject.trim() || !emailHtml.trim()) { showToast("Subject and body are required"); return; }
     const filterLabel = FILTERS.find(f => f.value === emailFilter)?.label ?? emailFilter;
-    if (!confirm(`Queue email to ${filterLabel}?\n\nEmails will be sent in the background — you can safely close this tab.`)) return;
+    const isScheduled = scheduleEnabled && scheduledFor.trim();
+    const confirmMsg  = isScheduled
+      ? `Schedule email to ${filterLabel} for ${new Date(scheduledFor + ":00+05:30").toLocaleString("en-IN")}?`
+      : `Queue email to ${filterLabel}?\n\nEmails will be sent in the background — you can safely close this tab.`;
+    if (!confirm(confirmMsg)) return;
 
     setSend({ ...INITIAL_SEND, phase: "queuing" });
 
     try {
       const res  = await fetch(`/api/admin/events/${eventId}/communicate`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject: emailSubject, body_html: emailHtml, recipient_filter: emailFilter, attachments }),
+        body: JSON.stringify({
+          subject: emailSubject, body_html: emailHtml, recipient_filter: emailFilter, attachments,
+          ...(isScheduled ? { scheduled_for: scheduledFor } : {}),
+        }),
       });
-      const data = await res.json() as { batch_id?: string; queued?: number; message?: string; error?: string };
+      const data = await res.json() as { batch_id?: string; queued?: number; scheduled_for?: string | null; message?: string; error?: string };
 
       if (!res.ok) { setSend(INITIAL_SEND); showToast(`❌ ${data.error ?? "Failed to queue emails"}`); return; }
       if (!data.batch_id || !data.queued) { setSend(INITIAL_SEND); showToast(data.message ?? "No recipients matched"); return; }
 
-      setSend({ ...INITIAL_SEND, phase: "sending", batchId: data.batch_id, total: data.queued, queued: data.queued });
+      if (data.scheduled_for) {
+        // Scheduled — don't enter the send-progress flow; refresh history instead
+        setSend(INITIAL_SEND);
+        showToast(`✅ Scheduled for ${new Date(data.scheduled_for).toLocaleString("en-IN")} · ${data.queued} recipients`);
+        loadHistory();
+        setScheduleEnabled(false); setScheduledFor("");
+      } else {
+        setSend({ ...INITIAL_SEND, phase: "sending", batchId: data.batch_id, total: data.queued, queued: data.queued });
+      }
     } catch {
       setSend(INITIAL_SEND);
       showToast("❌ Network error — please try again");
     }
+  }
+
+  async function cancelScheduled(batchId: string) {
+    if (!confirm("Cancel this scheduled email? The draft will be lost.")) return;
+    const res = await fetch(`/api/admin/events/${eventId}/communicate/cancel-scheduled`, {
+      method: "DELETE", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ batch_id: batchId }),
+    });
+    const data = await res.json() as { ok?: boolean; error?: string };
+    if (res.ok) { showToast("✅ Scheduled email cancelled"); loadHistory(); }
+    else showToast(`❌ ${data.error ?? "Failed to cancel"}`);
   }
 
   async function retryFailed() {
@@ -768,10 +903,11 @@ export default function CommunicatePage() {
   // ── Render ────────────────────────────────────────────────────────────────────
 
   const TABS = [
-    { key: "email",   label: "📧 Email" },
-    { key: "push",    label: "🔔 Push Notification" },
-    { key: "health",  label: healthResult ? `🔍 Health ${healthResult.score}%` : "🔍 Health Check" },
-    { key: "history", label: `📋 History (${history.length})` },
+    { key: "email",     label: "📧 Email" },
+    { key: "whatsapp",  label: "💬 WhatsApp" },
+    { key: "push",      label: "🔔 Push" },
+    { key: "health",    label: healthResult ? `🔍 Health ${healthResult.score}%` : "🔍 Health" },
+    { key: "history",   label: `📋 History (${history.length})` },
   ];
 
   const pct = send.total > 0 ? Math.round(((send.delivered + send.failed) / send.total) * 100) : 0;
@@ -816,6 +952,41 @@ export default function CommunicatePage() {
                 <strong>ZeptoMail</strong><br />
                 Emails are sent 1 per second from this tab.<br /><br />
                 Keep this tab open until delivery completes.
+              </div>
+
+              {/* Saved templates */}
+              <div style={{ marginTop: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em" }}>Saved</div>
+                  {(emailSubject || emailHtml) && (
+                    <button
+                      onClick={saveCurrentAsTemplate}
+                      disabled={savingTemplate}
+                      style={{ fontSize: 10, color: "#e8620a", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 700, opacity: savingTemplate ? 0.6 : 1, padding: 0 }}
+                    >
+                      {savingTemplate ? "Saving…" : "+ Save"}
+                    </button>
+                  )}
+                </div>
+                {savedTemplatesLoading ? (
+                  <div style={{ fontSize: 11, color: "#444", textAlign: "center" as const, padding: "10px 0" }}>Loading…</div>
+                ) : savedTemplates.length === 0 ? (
+                  <div style={{ fontSize: 10, color: "#333", lineHeight: 1.5 }}>Compose an email, then click + Save to build your library.</div>
+                ) : savedTemplates.map(t => (
+                  <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 3, marginBottom: 3 }}>
+                    <button
+                      onClick={() => loadSavedTemplateById(t.id)}
+                      style={{ flex: 1, padding: "7px 9px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 6, color: "#888", fontSize: 11, cursor: "pointer", fontFamily: "inherit", textAlign: "left" as const, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}
+                      title={t.subject}
+                    >
+                      {t.name}
+                    </button>
+                    <button
+                      onClick={() => { if (confirm(`Delete "${t.name}"?`)) deleteSavedTemplate(t.id); }}
+                      style={{ background: "none", border: "none", color: "#444", cursor: "pointer", padding: "4px 5px", fontSize: 15, lineHeight: 1, flexShrink: 0 }}
+                    >×</button>
+                  </div>
+                ))}
               </div>
 
               {/* Personalization cheat sheet */}
@@ -929,10 +1100,35 @@ export default function CommunicatePage() {
                 {testResult && <Badge color={testResult.startsWith("✅") ? "green" : "red"} size="sm">{testResult}</Badge>}
               </div>
 
-              {/* ── Send button / progress display ─────────────────────────── */}
+              {/* ── Schedule toggle + send button ──────────────────────────── */}
               {send.phase === "idle" && (
-                <div>
-                  <Button onClick={enqueueEmail}>Queue &amp; Send Email</Button>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {/* Schedule toggle row */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" as const }}>
+                      <input
+                        type="checkbox"
+                        checked={scheduleEnabled}
+                        onChange={e => { setScheduleEnabled(e.target.checked); if (!e.target.checked) setScheduledFor(""); }}
+                        style={{ width: 15, height: 15, accentColor: "#e8620a", cursor: "pointer" }}
+                      />
+                      <span style={{ fontSize: 12, color: "#888", fontWeight: 500 }}>Schedule for later (IST)</span>
+                    </label>
+                    {scheduleEnabled && (
+                      <input
+                        type="datetime-local"
+                        value={scheduledFor}
+                        onChange={e => setScheduledFor(e.target.value)}
+                        min={new Date(Date.now() + 5 * 60 * 1000).toISOString().slice(0, 16)}
+                        style={{ ...S.input, width: "auto", fontSize: 12 }}
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <Button onClick={enqueueEmail}>
+                      {scheduleEnabled && scheduledFor ? "🗓 Schedule Email" : "Queue & Send Email"}
+                    </Button>
+                  </div>
                 </div>
               )}
 
@@ -1012,6 +1208,109 @@ export default function CommunicatePage() {
                   )}
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ── WhatsApp Tab ──────────────────────────────────────────────────── */}
+        {tab === "whatsapp" && (
+          <div style={{ maxWidth: 580 }}>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#fff", marginBottom: 4 }}>WhatsApp to Registrants</div>
+              <div style={{ fontSize: 12, color: "#555", lineHeight: 1.6 }}>
+                Sends the <strong style={{ color: "#888" }}>session_alert_v3</strong> template to registrants who have a phone number.<br />
+                Template variables: name · event title · date + time · venue. No custom text — uses the Meta-approved template.
+              </div>
+            </div>
+
+            {/* Template preview */}
+            <div style={{ background: "rgba(37,211,102,0.05)", border: "1px solid rgba(37,211,102,0.15)", borderRadius: 10, padding: "14px 16px", marginBottom: 18 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#4ade80", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 10 }}>Template Preview — session_alert_v3</div>
+              <div style={{ fontSize: 12, color: "#aaa", lineHeight: 1.8 }}>
+                Hi <span style={{ color: "#4ade80" }}>[Name]</span>,<br />
+                <em style={{ color: "#666", fontSize: 11 }}>[Template intro line]</em><br />
+                📌 <strong style={{ color: "#fff" }}>[Event Title]</strong><br />
+                📅 <span style={{ color: "#ccc" }}>[Date + Time]</span><br />
+                📍 <span style={{ color: "#ccc" }}>[Venue]</span>
+              </div>
+            </div>
+
+            {/* Recipient filter */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 7 }}>Recipients</div>
+              <select
+                value={waFilter}
+                onChange={e => { setWaFilter(e.target.value as RecipientFilter); setWaChecked(null); }}
+                style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const, cursor: "pointer" }}
+              >
+                <option value="all">All Confirmed Registrants</option>
+                <option value="paid">Paid Only</option>
+                <option value="free">Free / Complementary</option>
+                <option value="checked_in">Checked In</option>
+                <option value="not_checked_in">Not Yet Checked In</option>
+              </select>
+            </div>
+
+            {/* Count check */}
+            {!waChecked ? (
+              <div style={{ marginBottom: 16 }}>
+                <button
+                  onClick={checkWaRecipients}
+                  disabled={waChecking}
+                  style={{ padding: "9px 18px", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#ccc", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: waChecking ? 0.6 : 1 }}
+                >
+                  {waChecking ? "Checking…" : "Check Recipients"}
+                </button>
+              </div>
+            ) : (
+              <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+                  <div style={{ textAlign: "center" as const, padding: "10px 8px", background: "rgba(255,255,255,0.03)", borderRadius: 8 }}>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: "#fff" }}>{waChecked.total}</div>
+                    <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase" as const, marginTop: 3 }}>Matched</div>
+                  </div>
+                  <div style={{ textAlign: "center" as const, padding: "10px 8px", background: waChecked.with_phone > 0 ? "rgba(37,211,102,0.07)" : "rgba(255,255,255,0.02)", borderRadius: 8 }}>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: waChecked.with_phone > 0 ? "#4ade80" : "#555" }}>{waChecked.with_phone}</div>
+                    <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase" as const, marginTop: 3 }}>With Phone</div>
+                  </div>
+                </div>
+                {waChecked.with_phone === 0 && (
+                  <div style={{ fontSize: 12, color: "#f87171", marginBottom: 10 }}>No registrants matched this filter have a phone number on record.</div>
+                )}
+                {waChecked.with_phone > 0 && waChecked.total - waChecked.with_phone > 0 && (
+                  <div style={{ fontSize: 11, color: "#555", marginBottom: 10 }}>
+                    ⚠ {waChecked.total - waChecked.with_phone} registrant{waChecked.total - waChecked.with_phone !== 1 ? "s" : ""} without a phone number will be skipped.
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    onClick={sendWhatsAppToRegistrants}
+                    disabled={waSending || waChecked.with_phone === 0}
+                    style={{ padding: "9px 20px", background: waChecked.with_phone > 0 ? "#25d366" : "rgba(255,255,255,0.04)", border: "none", borderRadius: 8, color: waChecked.with_phone > 0 ? "#000" : "#555", fontSize: 13, fontWeight: 700, cursor: waChecked.with_phone > 0 ? "pointer" : "not-allowed", fontFamily: "inherit", opacity: waSending ? 0.6 : 1 }}
+                  >
+                    {waSending ? "Sending…" : `💬 Send to ${waChecked.with_phone}`}
+                  </button>
+                  <button onClick={() => { setWaChecked(null); setWaResult(null); }} style={{ padding: "9px 14px", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#555", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                    Reset
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Result */}
+            {waResult && (
+              <div style={{ padding: "14px 16px", background: "rgba(37,211,102,0.07)", border: "1px solid rgba(37,211,102,0.2)", borderRadius: 10 }}>
+                <div style={{ fontWeight: 700, color: "#4ade80", marginBottom: 4 }}>✅ WhatsApp sending in background</div>
+                <div style={{ fontSize: 12, color: "#aaa" }}>
+                  Queued {waResult.total} message{waResult.total !== 1 ? "s" : ""}. Check History tab for delivery status once complete.
+                </div>
+              </div>
+            )}
+
+            {/* Info box */}
+            <div style={{ marginTop: 20, padding: "12px 14px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 8, fontSize: 11, color: "#555", lineHeight: 1.7 }}>
+              <strong style={{ color: "#666" }}>Note:</strong> This sends to event registrants only (not all members). To announce to all members use the <strong style={{ color: "#666" }}>Announce</strong> tab in the Event Hub.<br />
+              Template requires a phone number at registration. Numbers not on record are skipped.
             </div>
           </div>
         )}
@@ -1230,9 +1529,11 @@ export default function CommunicatePage() {
                 <div style={{ fontWeight: 700, fontSize: 16, color: "#555" }}>No messages sent yet</div>
               </div>
             ) : history.map(h => {
-              const isExpanded = expandedBatch === h.batch_id;
-              const canExpand  = !!h.batch_id && (h.channel ?? "email") === "email";
-              const pct        = h.recipients > 0 ? Math.round(((h.sent ?? 0) / h.recipients) * 100) : 0;
+              const isExpanded  = expandedBatch === h.batch_id;
+              const canExpand   = !!h.batch_id && (h.channel ?? "email") === "email" && h.status !== "scheduled" && h.status !== "cancelled";
+              const pct         = h.recipients > 0 ? Math.round(((h.sent ?? 0) / h.recipients) * 100) : 0;
+              const isScheduled = h.status === "scheduled";
+              const isCancelled = h.status === "cancelled";
 
               const detailEmails = (batchDetail?.emails ?? []).filter(d => {
                 const matchSearch = !detailSearch || d.email.toLowerCase().includes(detailSearch.toLowerCase()) || (d.name ?? "").toLowerCase().includes(detailSearch.toLowerCase());
@@ -1248,9 +1549,13 @@ export default function CommunicatePage() {
                 <div key={h.id} style={{ background: "#111", border: `1px solid ${isExpanded ? "rgba(232,98,10,0.3)" : "rgba(255,255,255,0.07)"}`, borderRadius: 12, overflow: "hidden" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", flexWrap: "wrap" as const }}>
                     <div style={{ flex: 1, minWidth: 180 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13, color: "#fff", marginBottom: 2 }}>{h.subject}</div>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: isCancelled ? "#555" : "#fff", marginBottom: 2, textDecoration: isCancelled ? "line-through" : "none" }}>{h.subject}</div>
                       <div style={{ fontSize: 11, color: "#555", display: "flex", flexWrap: "wrap" as const, gap: "0 6px" }}>
-                        <span>{new Date(h.sent_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                        {isScheduled && h.scheduled_for ? (
+                          <span style={{ color: "#fbbf24" }}>⏰ Scheduled for {new Date(h.scheduled_for).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                        ) : (
+                          <span>{new Date(h.sent_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                        )}
                         <span>·</span>
                         <span>{h.recipient_filter ?? "all"}</span>
                         <span>·</span>
@@ -1292,15 +1597,29 @@ export default function CommunicatePage() {
                     <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: "center" }}>
                       <span style={{
                         padding: "3px 10px", borderRadius: 999, fontSize: 10, fontWeight: 700,
-                        background: h.status === "queued" ? "rgba(96,165,250,0.12)" : h.status === "failed" ? "rgba(248,113,113,0.12)" : "rgba(74,222,128,0.1)",
-                        color:      h.status === "queued" ? "#60a5fa"              : h.status === "failed" ? "#f87171"              : "#4ade80",
+                        background: h.status === "queued"    ? "rgba(96,165,250,0.12)"
+                                  : h.status === "scheduled" ? "rgba(251,191,36,0.12)"
+                                  : h.status === "cancelled" ? "rgba(255,255,255,0.06)"
+                                  : h.status === "failed"    ? "rgba(248,113,113,0.12)"
+                                  : "rgba(74,222,128,0.1)",
+                        color:      h.status === "queued"    ? "#60a5fa"
+                                  : h.status === "scheduled" ? "#fbbf24"
+                                  : h.status === "cancelled" ? "#555"
+                                  : h.status === "failed"    ? "#f87171"
+                                  : "#4ade80",
                       }}>
-                        {h.status ?? "sent"}
+                        {h.status === "scheduled" ? "🗓 Scheduled" : h.status ?? "sent"}
                       </span>
                       {h.status === "queued" && h.batch_id && (
                         <button onClick={() => resumeBatch(h.batch_id!)} disabled={resumingBatch === h.batch_id}
                           style={{ padding: "5px 12px", background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.25)", borderRadius: 6, color: "#60a5fa", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: resumingBatch === h.batch_id ? 0.6 : 1 }}>
                           {resumingBatch === h.batch_id ? "Starting…" : "▶ Resume"}
+                        </button>
+                      )}
+                      {isScheduled && h.batch_id && (
+                        <button onClick={() => cancelScheduled(h.batch_id!)}
+                          style={{ padding: "5px 12px", background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: 6, color: "#f87171", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                          ✕ Cancel
                         </button>
                       )}
                       {canExpand && (

@@ -108,7 +108,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const db = getSupabaseServer();
   const { data } = await db
     .from("event_comm_history")
-    .select("id, sent_at, subject, recipients, sent, failed, status, channel, recipient_filter, batch_id, attachments")
+    .select("id, sent_at, subject, recipients, sent, failed, status, channel, recipient_filter, batch_id, attachments, scheduled_for")
     .eq("event_id", id)
     .order("sent_at", { ascending: false })
     .limit(20);
@@ -129,12 +129,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     body?:            string;
     body_html?:       string;
     attachments?:     AttachmentMeta[];
+    scheduled_for?:   string | null;   // ISO 8601 string in IST; null = send now
   };
   const { recipient_filter, subject } = raw;
   const bodyHtml    = raw.body_html?.trim() ?? "";
   const bodyPlain   = raw.body?.trim()      ?? "";
   const isHtml      = bodyHtml.length > 0;
   const attachments = raw.attachments ?? [];
+
+  // Parse scheduled_for: convert IST datetime-local input ("YYYY-MM-DDTHH:MM") to UTC
+  let scheduledFor: string | null = null;
+  if (raw.scheduled_for?.trim()) {
+    const raw_sf = raw.scheduled_for.trim();
+    // Input arrives as IST datetime-local; append "+05:30" to interpret correctly
+    const iso = raw_sf.includes("+") || raw_sf.includes("Z") ? raw_sf : `${raw_sf}:00+05:30`;
+    const ts  = new Date(iso);
+    if (isNaN(ts.getTime())) return NextResponse.json({ error: "Invalid scheduled_for date" }, { status: 400 });
+    if (ts <= new Date()) scheduledFor = null; // past → send immediately
+    else scheduledFor = ts.toISOString();
+  }
 
   if (!subject?.trim() || (!bodyHtml && !bodyPlain))
     return NextResponse.json({ error: "subject and body are required" }, { status: 400 });
@@ -202,28 +215,34 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       subject,
       html_body,
       attachments,
+      ...(scheduledFor ? { scheduled_for: scheduledFor } : {}),
     };
   });
 
   const { error: insertErr } = await db.from("email_queue").insert(rows);
   if (insertErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
+  const histStatus = scheduledFor ? "scheduled" : "queued";
   const { error: histErr } = await db.from("event_comm_history").insert({
     event_id:         id,
     subject,
     recipients:       recipients.length,
     sent:             0,
     failed:           0,
-    status:           "queued",
+    status:           histStatus,
     filter:           recipient_filter,
     recipient_filter,
     channel:          "email",
     batch_id:         batchId,
     attachments,
+    ...(scheduledFor ? { scheduled_for: scheduledFor } : {}),
   });
   if (histErr) console.error("[communicate] history insert failed:", histErr.message, "batch:", batchId, "code:", histErr.code);
 
-  after(() => processEmailBatch(batchId));
+  // Only start processing immediately for non-scheduled sends
+  if (!scheduledFor) {
+    after(() => processEmailBatch(batchId));
+  }
 
-  return NextResponse.json({ batch_id: batchId, queued: recipients.length });
+  return NextResponse.json({ batch_id: batchId, queued: recipients.length, scheduled_for: scheduledFor ?? null });
 }

@@ -66,6 +66,7 @@ async function handleSingleParticipant(
     blood_group, emergency_contact, special_notes, coupon_code,
     distance_category, tshirt_size,
   } = body as Record<string, string | null | undefined>;
+  const customFieldsRaw = (body.custom_fields ?? {}) as Record<string, string>;
 
   void (async () => {
     try { await getSupabaseServer().rpc("release_expired_slots"); } catch { /* non-critical */ }
@@ -117,7 +118,7 @@ async function handleSingleParticipant(
 
   const { data: ev } = await db
     .from("events")
-    .select("id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories, collect_tshirt")
+    .select("id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories, collect_tshirt, early_bird_ends_at")
     .eq("id", event_id as string)
     .single();
   if (!ev || ev.status !== "published") {
@@ -144,6 +145,23 @@ async function handleSingleParticipant(
     return NextResponse.json({ error: "Invalid distance category for this event." }, { status: 400 });
   }
   const chosenCategory: string | null = cats.length > 0 ? ((distance_category as string) || cats[0]) : null;
+
+  // Race-based pricing: look up the event_races row matching the chosen category.
+  // Falls back to ev.price for legacy events that don't use event_races.
+  const { data: races } = await db
+    .from("event_races")
+    .select("id, distance, price, early_bird_price")
+    .eq("event_id", event_id as string)
+    .eq("status", "active");
+
+  const matchedRace = races?.find(r => r.distance === chosenCategory) ?? null;
+  const earlyBirdActive =
+    !!(ev as { early_bird_ends_at?: string | null }).early_bird_ends_at &&
+    new Date() < new Date((ev as { early_bird_ends_at: string }).early_bird_ends_at);
+  const isEarlyBird = earlyBirdActive && !!matchedRace?.early_bird_price;
+  const raceBasePrice = matchedRace
+    ? (isEarlyBird ? (matchedRace.early_bird_price as number) : matchedRace.price)
+    : null;
 
   const VALID_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
   if ((ev as { collect_tshirt?: boolean }).collect_tshirt) {
@@ -183,6 +201,25 @@ async function handleSingleParticipant(
     return NextResponse.json({ already: true, registration_code: existing.registration_code });
   }
 
+  // Custom form field validation
+  const { data: formFields } = await db
+    .from("event_form_fields")
+    .select("field_key, label, required")
+    .eq("event_id", event_id as string)
+    .eq("is_active", true);
+
+  for (const f of (formFields ?? [])) {
+    if (f.required && !customFieldsRaw[f.field_key]?.trim()) {
+      return NextResponse.json({ error: `"${f.label}" is required.` }, { status: 400 });
+    }
+  }
+  // Only keep keys that are actual form fields (prevents arbitrary data injection)
+  const validKeys = new Set((formFields ?? []).map(f => f.field_key));
+  const customFields: Record<string, string> = {};
+  for (const [k, v] of Object.entries(customFieldsRaw)) {
+    if (validKeys.has(k)) customFields[k] = String(v).trim();
+  }
+
   // Coupon
   let couponId: string | null = null;
   let discount = 0, discountType = "", discountValue = 0;
@@ -203,7 +240,7 @@ async function handleSingleParticipant(
     discount = calcDiscount(ev.price, discountType, discountValue);
   }
 
-  const originalPrice = ev.price;
+  const originalPrice = raceBasePrice ?? ev.price;
   const finalPrice    = Math.max(0, originalPrice - discount);
 
   // Free path
@@ -233,6 +270,9 @@ async function handleSingleParticipant(
         status:            "confirmed",
         distance_category: chosenCategory,
         tshirt_size:       chosenTshirtSize,
+        race_id:           matchedRace?.id ?? null,
+        is_early_bird:     isEarlyBird,
+        custom_fields:     customFields,
         qr_token:          qrToken,
         participant_count: 1,
       }, { onConflict: "event_id,user_email", ignoreDuplicates: false })
@@ -349,6 +389,9 @@ async function handleSingleParticipant(
       status:            "pending_payment",
       distance_category: chosenCategory,
       tshirt_size:       chosenTshirtSize,
+      race_id:           matchedRace?.id ?? null,
+      is_early_bird:     isEarlyBird,
+      custom_fields:     customFields,
       participant_count: 1,
     }, { onConflict: "event_id,user_email", ignoreDuplicates: false });
   if (regErr2) return NextResponse.json({ error: "Database error" }, { status: 500 });
@@ -417,6 +460,7 @@ async function handleMultiParticipant(
     special_notes,
     coupon_code,
   } = body as Record<string, string | null | undefined>;
+  const multiCustomFieldsRaw = (body.custom_fields ?? {}) as Record<string, string>;
 
   const participants = body.participants as ParticipantInput[];
 
@@ -452,7 +496,7 @@ async function handleMultiParticipant(
 
   const { data: ev } = await db
     .from("events")
-    .select("id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories, collect_tshirt, allow_multi_participant, max_per_registration")
+    .select("id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories, collect_tshirt, allow_multi_participant, max_per_registration, early_bird_ends_at")
     .eq("id", event_id as string)
     .single();
   if (!ev || ev.status !== "published") {
@@ -523,6 +567,24 @@ async function handleMultiParticipant(
     return NextResponse.json({ already: true, registration_code: existing.registration_code });
   }
 
+  // Custom form field validation (multi-participant: one set of custom fields per booking)
+  const { data: multiFormFields } = await db
+    .from("event_form_fields")
+    .select("field_key, label, required")
+    .eq("event_id", event_id as string)
+    .eq("is_active", true);
+
+  for (const f of (multiFormFields ?? [])) {
+    if (f.required && !multiCustomFieldsRaw[f.field_key]?.trim()) {
+      return NextResponse.json({ error: `"${f.label}" is required.` }, { status: 400 });
+    }
+  }
+  const multiValidKeys = new Set((multiFormFields ?? []).map(f => f.field_key));
+  const multiCustomFields: Record<string, string> = {};
+  for (const [k, v] of Object.entries(multiCustomFieldsRaw)) {
+    if (multiValidKeys.has(k)) multiCustomFields[k] = String(v).trim();
+  }
+
   // Coupon — applied once to the total booking, not N times
   let couponId: string | null = null;
   let discount = 0, discountType = "", discountValue = 0;
@@ -575,6 +637,7 @@ async function handleMultiParticipant(
         status:            "confirmed",
         distance_category: leadParticipant.distance_category ?? null,
         tshirt_size:       leadParticipant.tshirt_size ?? null,
+        custom_fields:     multiCustomFields,
         participant_count: participants.length,
       }, { onConflict: "event_id,user_email", ignoreDuplicates: false })
       .select("id, registration_code")
@@ -683,6 +746,7 @@ async function handleMultiParticipant(
       status:            "pending_payment",
       distance_category: leadParticipant.distance_category ?? null,
       tshirt_size:       leadParticipant.tshirt_size ?? null,
+      custom_fields:     multiCustomFields,
       participant_count: participants.length,
     }, { onConflict: "event_id,user_email", ignoreDuplicates: false });
   if (regErr2) return NextResponse.json({ error: "Database error" }, { status: 500 });
