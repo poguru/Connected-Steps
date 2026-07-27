@@ -10,7 +10,10 @@ import {
   handleWeeklyDigestEmail,
   handleCertificateGenerate,
   handleAdminExport,
+  handleDeliverWebhook,
+  handleImportCsv,
 } from "@/lib/job-handlers";
+import { logger } from "@/lib/logger";
 
 // Runs every minute via Vercel Cron.
 // Claims up to MAX_JOBS pending jobs, processes them sequentially, and marks
@@ -43,6 +46,10 @@ async function dispatch(job: JobRow): Promise<void> {
       return handleCertificateGenerate(p as JobPayloads["certificate_generate"]);
     case "admin_export":
       return handleAdminExport(p as JobPayloads["admin_export"]);
+    case "deliver_webhook":
+      return handleDeliverWebhook(p as JobPayloads["deliver_webhook"]);
+    case "import_csv":
+      return handleImportCsv(p as JobPayloads["import_csv"]);
     default:
       throw new Error(`Unknown job type: ${job.job_type}`);
   }
@@ -52,14 +59,17 @@ async function processJob(job: JobRow): Promise<"done" | "failed" | "dead"> {
   try {
     await dispatch(job);
     await completeJob(job.id);
-    console.log(`[job-worker] done type=${job.job_type} id=${job.id} attempts=${job.attempts}`);
+    logger.info("job-worker", "Job completed", { jobId: job.id, type: job.job_type, attempts: job.attempts });
     return "done";
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error(
-      `[job-worker] failed type=${job.job_type} id=${job.id}` +
-      ` attempts=${job.attempts}/${job.max_attempts} error="${msg}"`,
-    );
+    logger.error("job-worker", "Job failed", {
+      jobId:       job.id,
+      type:        job.job_type,
+      attempts:    job.attempts,
+      maxAttempts: job.max_attempts,
+      error:       msg,
+    });
     await failJob(job.id, msg, job.attempts, job.max_attempts);
     return job.attempts >= job.max_attempts ? "dead" : "failed";
   }
@@ -87,10 +97,11 @@ export async function GET(req: NextRequest) {
   }
 
   const durationMs = Date.now() - startMs;
-  console.log(
-    `[job-worker] processed=${jobs.length} done=${done} failed=${failed}` +
-    ` dead=${dead} duration=${durationMs}ms`,
-  );
+  logger.info("job-worker", "Worker run complete", { processed: jobs.length, done, failed, dead, durationMs });
+
+  if (dead > 0) {
+    logger.warn("job-worker", "Dead-letter jobs detected — requires manual review", { dead });
+  }
 
   return NextResponse.json({ ok: true, processed: jobs.length, done, failed, dead, durationMs });
 }

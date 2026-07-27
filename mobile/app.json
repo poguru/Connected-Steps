@@ -2,7 +2,7 @@
   "expo": {
     "name": "Connected Steps",
     "slug": "connected-steps",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "connectedsteps",
@@ -14,17 +14,41 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "in.connectedsteps.app"
+      "bundleIdentifier": "in.connectedsteps.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Camera is used to scan QR codes at events for check-in, T-shirt, breakfast, and BIB collection.",
+        "NSPhotoLibraryUsageDescription": "Not required for this app."
+      }
     },
     "android": {
       "package": "in.connectedsteps.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0a0a0a"
-      }
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
+      ]
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-sqlite",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Camera is used to scan QR codes at Connected Steps events."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#e8620a",
+          "defaultChannel": "default"
+        }
+      ]
     ],
     "extra": {
       "eas": {

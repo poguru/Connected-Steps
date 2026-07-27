@@ -14,6 +14,9 @@ import { sendEmail, eventRegistrationEmailHTML,
 import { processReferral }                            from "@/lib/referrals";
 import { getSupabaseServer }                          from "@/lib/supabase-server";
 import type { JobPayloads }                           from "@/lib/job-queue";
+import { logger }                                     from "@/lib/logger";
+import { executeWebhookDelivery }                     from "@/lib/webhook-dispatch";
+import { parseCsvSimple }                             from "@/lib/csv-utils";
 
 // ── invoice_generate ──────────────────────────────────────────────────────────
 // createAndSendInvoice() is already idempotent: it returns the existing invoice
@@ -53,7 +56,7 @@ export async function handleEventQrEmail(p: JobPayloads["event_qr_email"]): Prom
     .maybeSingle();
 
   if (reg?.confirmation_email_sent_at) {
-    console.log(`[handleEventQrEmail] already sent for reg=${p.registrationId} — skipping`);
+    logger.info("job/qr-email", "Already sent — skipping", { registrationId: p.registrationId });
     return;  // already delivered — idempotency guard
   }
 
@@ -65,7 +68,7 @@ export async function handleEventQrEmail(p: JobPayloads["event_qr_email"]): Prom
       .from("event_registrations")
       .update({ qr_token: qrToken, qr_generated_at: new Date().toISOString() })
       .eq("id", p.registrationId);
-    console.log(`[handleEventQrEmail] QR generated reg=${p.registrationId}`);
+    logger.info("job/qr-email", "QR generated", { registrationId: p.registrationId });
   }
 
   const html = eventRegistrationEmailHTML({
@@ -92,7 +95,7 @@ export async function handleEventQrEmail(p: JobPayloads["event_qr_email"]): Prom
       email_status: "failed",
     }).eq("id", p.registrationId);
 
-    console.error(`[handleEventQrEmail] SES failed reg=${p.registrationId} error="${result.error}" provider=${result.provider}`);
+    logger.error("job/qr-email", "Email delivery failed", { registrationId: p.registrationId, error: result.error, provider: result.provider });
     throw new Error(`SES delivery failed: ${result.error ?? "unknown"}`);
   }
 
@@ -104,7 +107,7 @@ export async function handleEventQrEmail(p: JobPayloads["event_qr_email"]): Prom
     qr_generated_at:            new Date().toISOString(),
   }).eq("id", p.registrationId);
 
-  console.log(`[handleEventQrEmail] ✅ email sent reg=${p.registrationId} to=${p.userEmail} msgId=${result.messageId} provider=${result.provider}`);
+  logger.info("job/qr-email", "Email sent", { registrationId: p.registrationId, email: p.userEmail, messageId: result.messageId, provider: result.provider });
 }
 
 // ── membership_email ──────────────────────────────────────────────────────────
@@ -140,7 +143,7 @@ export async function handleWeeklyDigestEmail(p: JobPayloads["weekly_digest_emai
 
   const data = await fetchWeeklyDigestDataForUser(p.userEmail);
   if (!data) {
-    console.warn(`[weekly_digest_email] user not found or inactive: ${p.userEmail} — skipping`);
+    logger.warn("job/weekly-digest", "User not found or inactive — skipping", { email: p.userEmail });
     return;
   }
 
@@ -158,11 +161,11 @@ export async function handleWeeklyDigestEmail(p: JobPayloads["weekly_digest_emai
   );
 
   if (!result.ok) {
-    console.error(`[weekly_digest_email] failed to=${p.userEmail} error="${result.error ?? "unknown"}"`);
+    logger.error("job/weekly-digest", "Email failed", { email: p.userEmail, error: result.error ?? "unknown" });
     throw new Error(`Weekly digest email failed: ${result.error ?? "unknown"}`);
   }
 
-  console.log(`[weekly_digest_email] sent to=${p.userEmail} msgId=${result.messageId}`);
+  logger.info("job/weekly-digest", "Email sent", { email: p.userEmail, messageId: result.messageId });
 }
 
 // ── bulk_email ────────────────────────────────────────────────────────────────
@@ -212,7 +215,7 @@ export async function handleCertificateGenerate(p: JobPayloads["certificate_gene
     .maybeSingle();
 
   if (!reg?.certificate_url) {
-    console.warn(`[certificate_generate] No certificate URL for ${p.userEmail} event=${p.eventId} — skipping email`);
+    logger.warn("job/certificate", "No certificate URL — skipping email", { email: p.userEmail, eventId: p.eventId });
     return;
   }
 
@@ -245,7 +248,7 @@ export async function handleCertificateGenerate(p: JobPayloads["certificate_gene
 
   if (!result.ok) throw new Error(`Certificate email failed: ${result.error ?? "unknown"}`);
 
-  console.log(`[certificate_generate] ✅ Certificate email sent to=${p.userEmail} msgId=${result.messageId}`);
+  logger.info("job/certificate", "Certificate email sent", { email: p.userEmail, messageId: result.messageId });
 }
 
 // ── admin_export ──────────────────────────────────────────────────────────────
@@ -372,10 +375,100 @@ export async function handleAdminExport(p: JobPayloads["admin_export"]): Promise
       completed_at: new Date().toISOString(),
     }).eq("id", p.exportId);
 
-    console.log(`[admin_export] ${p.format} ready — exportId=${p.exportId} rows=${rowCount}`);
+    logger.info("job/admin-export", "Export ready", { format: p.format, exportId: p.exportId, rows: rowCount });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await db.from("admin_exports").update({ status: "failed", error: msg.slice(0, 500) }).eq("id", p.exportId);
     throw e; // re-throw so job-worker records the failure
   }
 }
+
+// ── deliver_webhook ───────────────────────────────────────────────────────────
+// Delegates to webhook-dispatch.ts which handles signing, HTTP delivery,
+// and updating the delivery log row.
+
+export async function handleDeliverWebhook(p: JobPayloads["deliver_webhook"]): Promise<void> {
+  await executeWebhookDelivery(p.delivery_id);
+}
+
+// ── import_csv ────────────────────────────────────────────────────────────────
+// Executes a committed CSV import — reads the uploaded file from Storage
+// and inserts rows into the appropriate table.
+
+export async function handleImportCsv(p: JobPayloads["import_csv"]): Promise<void> {
+  const db = getSupabaseServer();
+
+  // Idempotency: skip if already done
+  const { data: job } = await db.from("import_jobs").select("status").eq("id", p.import_id).single();
+  if (job?.status === "done") return;
+
+  await db.from("import_jobs").update({ status: "committing" }).eq("id", p.import_id);
+
+  try {
+    // Download the CSV from Storage
+    const { data: fileData, error: dlErr } = await db.storage
+      .from("imports")
+      .download(p.storage_path);
+
+    if (dlErr || !fileData) throw new Error(`Storage download failed: ${dlErr?.message}`);
+
+    const text = await fileData.text();
+    const rows = parseCsvSimple(text);
+    if (!rows.length) throw new Error("Empty CSV after parse");
+
+    let created = 0;
+    const errors: string[] = [];
+
+    if (p.entity_type === "participants" && p.event_id) {
+      for (const row of rows) {
+        try {
+          await db.from("event_participants").upsert({
+            event_id:          p.event_id,
+            name:              row["name"] ?? row["Name"] ?? "",
+            email:             row["email"] ?? row["Email"] ?? "",
+            phone:             row["phone"] ?? row["Phone"] ?? null,
+            distance_category: row["distance_category"] ?? row["Category"] ?? null,
+            tshirt_size:       row["tshirt_size"] ?? row["T-Shirt Size"] ?? null,
+          }, { onConflict: "event_id,email", ignoreDuplicates: false });
+          created++;
+        } catch (e) {
+          errors.push(`Row ${created + errors.length + 1}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+    } else if (p.entity_type === "coupons") {
+      for (const row of rows) {
+        try {
+          await db.from("coupons").upsert({
+            code:          (row["code"] ?? row["Code"] ?? "").toUpperCase(),
+            discount_type: row["discount_type"] ?? "percentage",
+            discount_value: parseFloat(row["discount_value"] ?? "0") || 0,
+            max_uses:      parseInt(row["max_uses"] ?? "0", 10) || null,
+            valid_from:    row["valid_from"] ?? null,
+            valid_until:   row["valid_until"] ?? null,
+            is_active:     (row["is_active"] ?? "true").toLowerCase() === "true",
+          }, { onConflict: "code", ignoreDuplicates: false });
+          created++;
+        } catch (e) {
+          errors.push(`Row ${created + errors.length + 1}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+    }
+    // Other entity types follow the same pattern
+
+    await db.from("import_jobs").update({
+      status:       "done",
+      created_rows: created,
+      error_rows:   errors.length,
+      committed_at: new Date().toISOString(),
+      validation_report: errors.length ? errors.slice(0, 100) : null,
+    }).eq("id", p.import_id);
+
+    logger.info("job/import-csv", "Import complete", { importId: p.import_id, created, errors: errors.length });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await db.from("import_jobs").update({ status: "error", error_message: msg.slice(0, 1000) }).eq("id", p.import_id);
+    throw e;
+  }
+}
+
+

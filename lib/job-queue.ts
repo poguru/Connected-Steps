@@ -12,6 +12,7 @@
  */
 
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { logger } from "@/lib/logger";
 
 // ── Job type registry ─────────────────────────────────────────────────────────
 
@@ -24,7 +25,9 @@ export type JobType =
   | "bulk_email"            // Send one email from an admin bulk-send batch
   | "bulk_invoice"          // Generate one invoice from an admin backfill batch
   | "certificate_generate"  // (stub) Generate participation certificate PDF
-  | "admin_export";         // Generate CSV/ZIP export of admin data
+  | "admin_export"          // Generate CSV/ZIP export of admin data
+  | "deliver_webhook"       // Execute one outbound webhook delivery attempt
+  | "import_csv";           // Process one committed CSV import batch
 
 // Typed payload per job type — worker casts payload to the correct type via switch
 export type JobPayloads = {
@@ -114,6 +117,18 @@ export type JobPayloads = {
     filters:      Record<string, string>; // arbitrary filter params forwarded to queries
     requestedBy:  string;
   };
+
+  deliver_webhook: {
+    delivery_id:     string;   // webhook_delivery_log.id
+    subscription_id: string;   // webhook_subscriptions.id
+  };
+
+  import_csv: {
+    import_id:       string;   // import_jobs.id
+    entity_type:     string;
+    storage_path:    string;
+    event_id?:       string;
+  };
 };
 
 // ── Row shape returned from Supabase ──────────────────────────────────────────
@@ -182,7 +197,7 @@ export async function enqueueJob<T extends JobType>(
 
   if (error) {
     if (error.code === "23505") return null;  // duplicate idempotency key — expected
-    console.error(`[job-queue] enqueue ${type} failed: ${error.message}`);
+    logger.error("job-queue", "Enqueue failed", { type, idempotencyKey: opts.idempotencyKey, code: error.code, error: error.message });
     return null;
   }
 
@@ -243,7 +258,7 @@ export async function claimNextJobs(limit = 15): Promise<JobRow[]> {
   const db = getSupabaseServer();
   const { data, error } = await db.rpc("claim_next_jobs", { p_limit: limit });
   if (error) {
-    console.error("[job-queue] claim_next_jobs RPC error:", error.message);
+    logger.error("job-queue", "claim_next_jobs RPC error", { code: error.code, error: error.message });
     return [];
   }
   return (data as JobRow[]) ?? [];

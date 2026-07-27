@@ -5,7 +5,17 @@
  * Used by the admin reconciliation tool, webhook handler, and refund flow.
  */
 
+import Razorpay from "razorpay";
+
 const RZP_BASE = "https://api.razorpay.com/v1";
+
+/** Shared Razorpay SDK instance factory — use instead of copy-pasting per route. */
+export function getRazorpaySDK(): Razorpay {
+  const key_id     = process.env.RAZORPAY_KEY_ID;
+  const key_secret = process.env.RAZORPAY_KEY_SECRET;
+  if (!key_id || !key_secret) throw new Error("Razorpay keys not configured");
+  return new Razorpay({ key_id, key_secret });
+}
 
 function auth(): string {
   const key    = process.env.RAZORPAY_KEY_ID;

@@ -138,8 +138,9 @@ describe("enqueueJob", () => {
     });
 
     expect(id).toBeNull();
+    // logger.error calls console.error with a JSON string — check it contains the key fields
     expect(spy).toHaveBeenCalledWith(
-      expect.stringContaining("enqueue bulk_email failed"),
+      expect.stringContaining("bulk_email"),
     );
     spy.mockRestore();
   });
@@ -263,9 +264,9 @@ describe("claimNextJobs", () => {
     const jobs = await claimNextJobs();
 
     expect(jobs).toEqual([]);
+    // logger.error calls console.error with a JSON string — check it contains the key fields
     expect(spy).toHaveBeenCalledWith(
       expect.stringContaining("claim_next_jobs RPC error"),
-      "deadlock detected",
     );
     spy.mockRestore();
   });

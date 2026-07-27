@@ -16,7 +16,10 @@ process.env.NEXT_PUBLIC_APP_URL       = "https://www.connectedsteps.in";
 
 // Top-level mocks — hoisted before any imports
 jest.mock("@/lib/supabase-server",  () => ({ getSupabaseServer: jest.fn() }));
-jest.mock("@/lib/admin-auth",       () => ({ isAdminOrCoach: jest.fn().mockResolvedValue(true) }));
+jest.mock("@/lib/admin-auth", () => {
+  const actual = jest.requireActual<typeof import("@/lib/admin-auth")>("@/lib/admin-auth");
+  return { ...actual, isAdminOrCoach: jest.fn().mockResolvedValue(true) };
+});
 jest.mock("@/lib/event-qr",         () => ({ signEventQR: jest.fn().mockReturnValue("mock-qr-token") }));
 jest.mock("@/lib/notify",           () => ({
   sendEmail:                  jest.fn(),

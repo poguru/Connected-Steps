@@ -1,3 +1,14 @@
+/**
+ * OTP SYSTEM A — Verify endpoint for the unified email + phone OTP flow.
+ *
+ * Used by: app/profile/page.tsx (verify email change, verify phone change)
+ *          Reads from the `otp_verifications` table (plaintext comparison).
+ *
+ * DO NOT merge with System B (verify-phone-otp).
+ * System B handles authentication (login/register) and reads from
+ * `users.otp_hash` using bcrypt for its login/verify_phone purposes.
+ * Merging would collapse two distinct security models into one.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isRateLimited, recordFailure, getClientIp } from "@/lib/rate-limit";

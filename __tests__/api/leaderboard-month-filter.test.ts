@@ -24,12 +24,13 @@ process.env.NEXT_PUBLIC_SUPABASE_URL  = "https://test.supabase.co";
 
 jest.mock("@/lib/supabase-server", () => ({ getSupabaseServer: jest.fn() }));
 jest.mock("@/lib/cache", () => ({
-  cacheGet:  jest.fn().mockResolvedValue(null), // always cache miss
-  cacheSet:  jest.fn(),
-  cacheDel:  jest.fn(),
-  CK:        { leaderboard: () => "lb:v1:_:_" },
-  TTL:       { leaderboard: 30 },
-  decorateLb: jest.fn((rows: unknown[]) =>
+  cacheGet:          jest.fn().mockResolvedValue(null), // always cache miss
+  cacheSet:          jest.fn(),
+  cacheDel:          jest.fn(),
+  cacheFlushPattern: jest.fn().mockResolvedValue(0),
+  CK:                { leaderboard: () => "lb:v1:_:_" },
+  TTL:               { leaderboard: 30 },
+  decorateLb:        jest.fn((rows: unknown[]) =>
     rows.map((r: unknown) => {
       const { _raw_email, ...rest } = r as Record<string, unknown>;
       return { ...rest, user_email: _raw_email, is_me: false };

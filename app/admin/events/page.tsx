@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { getEventLifecycleStatus, LIFECYCLE_LABEL, LIFECYCLE_COLOR, type EventLifecycleStatus } from "@/lib/event-status";
-import { DISTANCE_OPTIONS, getDistanceOption } from "@/lib/event-distances";
+import { getDistanceOption } from "@/lib/event-distances";
 import { Card, Button, Input, Label, Alert, Badge, Tabs, EmptyState } from "@/components/ui/ds";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -55,7 +55,6 @@ const S: Record<string, React.CSSProperties> = {
   input: { width: "100%", padding: "10px 13px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "#fff", fontSize: "0.875rem", outline: "none", boxSizing: "border-box" },
 };
 
-const EVENT_TYPES = ["running", "cycling", "training", "race", "community", "workshop"];
 const TYPE_ICON: Record<string, string> = { running: "🏃", cycling: "🚴", training: "💪", race: "🏆", community: "🤝", workshop: "📚" };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -74,11 +73,6 @@ function fmtDatetime(iso: string | null) {
   return new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-// Convert a local IST date + time string into an ISO TIMESTAMPTZ string (UTC)
-function toIST_ISO(date: string, time: string): string {
-  return `${date}T${time}:00+05:30`;
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function AdminEventsPage() {
@@ -92,18 +86,6 @@ export default function AdminEventsPage() {
   const [loading,      setLoading]      = useState(false);
   const [msg,          setMsg]          = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | EventLifecycleStatus>("all");
-
-  // Event form
-  const blankEf = {
-    title: "", description: "", event_type: "running", cover_image: "",
-    start_date: "", start_time: "", end_date: "", end_time: "",
-    registration_close_date: "", registration_close_time: "",
-    location: "", organizer: "", max_participants: "",
-    registration_required: true, price: "0", featured: false,
-    terms_conditions: "", maps_url: "",
-    distance_categories: [] as string[],
-  };
-  const [ef, setEf] = useState(blankEf);
 
   // Coupon form
   const [cf, setCf] = useState({ type: "shared", code: "", prefix: "CS", emails: "", description: "", discount_type: "percentage", discount_value: "", max_uses: "999", event_id: "", expires_at: "" });
@@ -137,43 +119,6 @@ export default function AdminEventsPage() {
     fetch("/api/admin/auth").then(r => { if (r.ok) setAuthed(true); }).catch(() => {});
   }, []); // eslint-disable-line
   useEffect(() => { if (authed) loadEvents(); }, [authed]); // eslint-disable-line
-
-  async function createEvent(e: React.SyntheticEvent) {
-    e.preventDefault(); setLoading(true); setMsg("");
-
-    // Build registration_closes_at from the two separate date+time inputs
-    let registration_closes_at: string | null = null;
-    if (ef.registration_close_date && ef.registration_close_time) {
-      registration_closes_at = toIST_ISO(ef.registration_close_date, ef.registration_close_time);
-    } else if (ef.registration_close_date) {
-      registration_closes_at = toIST_ISO(ef.registration_close_date, "23:59");
-    }
-
-    const body = {
-      title:                  ef.title,
-      description:            ef.description || null,
-      event_type:             ef.event_type,
-      cover_image:            ef.cover_image || null,
-      start_date:             ef.start_date,
-      start_time:             ef.start_time || null,
-      end_date:               ef.end_date || null,
-      end_time:               ef.end_time || null,
-      registration_closes_at,
-      location:               ef.location,
-      organizer:              ef.organizer || null,
-      max_participants:       ef.max_participants ? Number(ef.max_participants) : null,
-      registration_required:  ef.registration_required,
-      price:                  Number(ef.price) || 0,
-      featured:               ef.featured,
-      terms_conditions:       ef.terms_conditions || null,
-      maps_url:               ef.maps_url || null,
-      distance_categories:    ef.distance_categories,
-    };
-    const res  = await fetch("/api/admin/events", { method: "POST", headers, body: JSON.stringify(body) });
-    const json = await res.json();
-    if (!res.ok) { setMsg("❌ " + json.error); } else { setMsg("✅ Event created as draft!"); setEf(blankEf); await loadEvents(); }
-    setLoading(false);
-  }
 
   async function togglePublish(ev: Event) {
     const newStatus = ev.status === "published" ? "draft" : "published";
@@ -292,175 +237,6 @@ export default function AdminEventsPage() {
         {/* ── EVENTS TAB ── */}
         {tab === "events" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
-
-            {/* Create form */}
-            <Card>
-              <Badge color="orange" style={{ marginBottom: "1.25rem" }}>Create New Event</Badge>
-              <form onSubmit={createEvent}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
-
-                  <div style={{ gridColumn: "1/-1" }}>
-                    <Label>Event Title *</Label>
-                    <input style={S.input} value={ef.title} onChange={e => setEf(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Weekend Group Run – Jubilee Hills" required />
-                  </div>
-
-                  <div style={{ gridColumn: "1/-1" }}>
-                    <Label>Description</Label>
-                    <textarea style={{ ...S.input, minHeight: "80px", resize: "vertical" } as React.CSSProperties} value={ef.description} onChange={e => setEf(f => ({ ...f, description: e.target.value }))} placeholder="Tell participants what to expect…" />
-                  </div>
-
-                  <div>
-                    <Label>Event Type *</Label>
-                    <select style={{ ...S.input, cursor: "pointer", colorScheme: "dark" }} value={ef.event_type} onChange={e => setEf(f => ({ ...f, event_type: e.target.value }))}>
-                      {EVENT_TYPES.map(t => <option key={t} value={t} style={{ background: "#1a1a1a" }}>{TYPE_ICON[t]} {t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
-                    </select>
-                  </div>
-
-                  <div>
-                    <Label>Location *</Label>
-                    <input style={S.input} value={ef.location} onChange={e => setEf(f => ({ ...f, location: e.target.value }))} placeholder="e.g. Kondapur, Hyderabad" required />
-                  </div>
-
-                  {/* ── Event Start ── */}
-                  <div>
-                    <Label>Event Start Date *</Label>
-                    <input style={{ ...S.input, colorScheme: "dark" }} type="date" value={ef.start_date} onChange={e => setEf(f => ({ ...f, start_date: e.target.value }))} required />
-                  </div>
-
-                  <div>
-                    <Label>Event Start Time (IST)</Label>
-                    <input style={{ ...S.input, colorScheme: "dark" }} type="time" value={ef.start_time} onChange={e => setEf(f => ({ ...f, start_time: e.target.value }))} />
-                  </div>
-
-                  {/* ── Event End ── */}
-                  <div>
-                    <Label>Event End Date</Label>
-                    <input style={{ ...S.input, colorScheme: "dark" }} type="date" value={ef.end_date} onChange={e => setEf(f => ({ ...f, end_date: e.target.value }))} />
-                  </div>
-
-                  <div>
-                    <Label>Event End Time (IST)</Label>
-                    <input style={{ ...S.input, colorScheme: "dark" }} type="time" value={ef.end_time} onChange={e => setEf(f => ({ ...f, end_time: e.target.value }))} />
-                  </div>
-
-                  {/* ── Registration Close — two fields ── */}
-                  <div style={{ gridColumn: "1/-1" }}>
-                    <Badge color="orange" style={{ marginBottom: "0.75rem" }}>Registration Deadline</Badge>
-                  </div>
-
-                  <div>
-                    <Label>Registration Closes — Date</Label>
-                    <input style={{ ...S.input, colorScheme: "dark" }} type="date" value={ef.registration_close_date} onChange={e => setEf(f => ({ ...f, registration_close_date: e.target.value }))} />
-                  </div>
-
-                  <div>
-                    <Label>Registration Closes — Time (IST)</Label>
-                    <input style={{ ...S.input, colorScheme: "dark" }} type="time" value={ef.registration_close_time} onChange={e => setEf(f => ({ ...f, registration_close_time: e.target.value }))} />
-                    <div style={{ fontSize: "11px", color: "#555", marginTop: "4px" }}>
-                      {ef.registration_close_date && ef.registration_close_time
-                        ? `Closes: ${ef.registration_close_date} at ${fmtTime(ef.registration_close_time)} IST`
-                        : "Leave blank for no deadline"}
-                    </div>
-                  </div>
-
-                  {/* ── Distance Categories ── */}
-                  <div style={{ gridColumn: "1/-1" }}>
-                    <Badge color="orange" style={{ marginBottom: "0.75rem" }}>Distance Categories</Badge>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                      {DISTANCE_OPTIONS.map(opt => {
-                        const selected = ef.distance_categories.includes(opt.code);
-                        return (
-                          <button key={opt.code} type="button"
-                            onClick={() => setEf(f => ({
-                              ...f,
-                              distance_categories: selected
-                                ? f.distance_categories.filter(c => c !== opt.code)
-                                : [...f.distance_categories, opt.code],
-                            }))}
-                            style={{
-                              padding: "5px 14px", borderRadius: "20px", border: "1px solid",
-                              cursor: "pointer", fontSize: "0.78rem", fontWeight: 700, fontFamily: "inherit",
-                              transition: "all 0.15s",
-                              background: selected ? opt.bg : "transparent",
-                              borderColor: selected ? opt.border : "rgba(255,255,255,0.12)",
-                              color: selected ? opt.color : "#666",
-                            }}>
-                            {selected ? "✓ " : ""}{opt.code}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {ef.distance_categories.length > 0 && (
-                      <div style={{ fontSize: "11px", color: "#555", marginTop: "8px" }}>
-                        Selected: {ef.distance_categories.join(", ")}
-                        {ef.distance_categories.length > 1 ? " — users will pick one during registration" : ""}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* ── Rest of fields ── */}
-                  <div>
-                    <Label>Organizer</Label>
-                    <input style={S.input} value={ef.organizer} onChange={e => setEf(f => ({ ...f, organizer: e.target.value }))} placeholder="e.g. Kalyan" />
-                  </div>
-
-                  <div>
-                    <Label>Max Participants</Label>
-                    <input style={S.input} type="number" min="1" value={ef.max_participants} onChange={e => setEf(f => ({ ...f, max_participants: e.target.value }))} placeholder="Leave blank for unlimited" />
-                  </div>
-
-                  <div style={{ gridColumn: "1/-1" }}>
-                    <Label>Cover Image URL</Label>
-                    <input style={S.input} value={ef.cover_image} onChange={e => setEf(f => ({ ...f, cover_image: e.target.value }))} placeholder="https://… (optional)" />
-                    {ef.cover_image && (
-                      <div style={{ marginTop: "8px", borderRadius: "6px", overflow: "hidden", height: "100px" }}>
-                        <img src={ef.cover_image} alt="cover preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => (e.currentTarget.style.display = "none")} />
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label>Registration Price (₹)</Label>
-                    <input style={S.input} type="number" min="0" value={ef.price} onChange={e => setEf(f => ({ ...f, price: e.target.value }))} placeholder="0 for free events" />
-                    {Number(ef.price) === 0 && <div style={{ fontSize: "11px", color: "#555", marginTop: "4px" }}>Free event — no payment required</div>}
-                  </div>
-
-                  <div>
-                    <Label>Google Maps URL</Label>
-                    <input style={S.input} value={ef.maps_url} onChange={e => setEf(f => ({ ...f, maps_url: e.target.value }))} placeholder="https://maps.google.com/…" />
-                  </div>
-
-                  <div style={{ gridColumn: "1/-1" }}>
-                    <Label>Terms &amp; Conditions</Label>
-                    <textarea style={{ ...S.input, minHeight: "80px", resize: "vertical" } as React.CSSProperties} value={ef.terms_conditions} onChange={e => setEf(f => ({ ...f, terms_conditions: e.target.value }))} placeholder="e.g. Participants must carry their own water. No refunds after 48 hours..." />
-                  </div>
-
-                  <div>
-                    <Label>Featured Event</Label>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
-                      <button type="button" onClick={() => setEf(f => ({ ...f, featured: !f.featured }))}
-                        style={{ width: "40px", height: "22px", borderRadius: "11px", border: "none", cursor: "pointer", background: ef.featured ? "#e8620a" : "rgba(255,255,255,0.15)", transition: "background 0.2s", position: "relative" }}>
-                        <span style={{ position: "absolute", top: "3px", width: "16px", height: "16px", borderRadius: "50%", background: "#fff", transition: "left 0.2s", left: ef.featured ? "21px" : "3px" }} />
-                      </button>
-                      <span style={{ fontSize: "0.8rem", color: "#888" }}>{ef.featured ? "Yes — shown prominently" : "No"}</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label>Registration Required</Label>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
-                      <button type="button" onClick={() => setEf(f => ({ ...f, registration_required: !f.registration_required }))}
-                        style={{ width: "40px", height: "22px", borderRadius: "11px", border: "none", cursor: "pointer", background: ef.registration_required ? "#e8620a" : "rgba(255,255,255,0.15)", transition: "background 0.2s", position: "relative" }}>
-                        <span style={{ position: "absolute", top: "3px", width: "16px", height: "16px", borderRadius: "50%", background: "#fff", transition: "left 0.2s", left: ef.registration_required ? "21px" : "3px" }} />
-                      </button>
-                      <span style={{ fontSize: "0.8rem", color: "#888" }}>{ef.registration_required ? "Yes" : "No"}</span>
-                    </div>
-                  </div>
-
-                </div>
-                <Button type="submit" loading={loading}>Create Event (Draft)</Button>
-              </form>
-            </Card>
 
             {/* Status filter */}
             <div>

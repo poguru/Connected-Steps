@@ -46,7 +46,81 @@ function statusFromItems(items: HealthCheckItem[]): CheckStatus {
   return "healthy";
 }
 
-// ── Route ──────────────────────────────────────────────────────────────────────
+// ── GET: live operational health (no template content required) ───────────────
+
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await params;
+  const db = getSupabaseServer();
+
+  const cutoff24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  const [emailQueueRes, waRes, jobsRes, providerCheck, dbCheck] = await Promise.all([
+    db.from("email_queue").select("status, sent_at, bounce_type")
+      .eq("event_id", id),
+    db.from("wa_message_log").select("status, sent_at")
+      .eq("event_id", id)
+      .gte("sent_at", cutoff24h),
+    db.from("job_queue").select("status").in("status", ["pending", "dead"]),
+    runEmailProviderCheck(),
+    runDatabaseCheck(db),
+  ]);
+
+  const emailRows = emailQueueRes.data ?? [];
+  const emailAll  = emailRows.length;
+  const emailQueued   = emailRows.filter(r => r.status === "queued").length;
+  const emailSending  = emailRows.filter(r => r.status === "sending").length;
+  const emailDelivered = emailRows.filter(r => r.status === "delivered").length;
+  const emailFailed   = emailRows.filter(r => r.status === "failed").length;
+  const emailBounced  = emailRows.filter(r => r.bounce_type).length;
+  const emailPct24h   = (() => {
+    const sent24h = emailRows.filter(r => (r.sent_at ?? "") >= cutoff24h);
+    if (!sent24h.length) return null;
+    return Math.round((sent24h.filter(r => r.status === "delivered").length / sent24h.length) * 100);
+  })();
+
+  const waRows = waRes.data ?? [];
+  const waTotal     = waRows.length;
+  const waDelivered = waRows.filter(r => r.status === "delivered" || r.status === "read").length;
+  const waFailed    = waRows.filter(r => r.status === "failed").length;
+
+  const jobs       = jobsRes.data ?? [];
+  const pendingJobs = jobs.filter(j => j.status === "pending").length;
+  const deadJobs    = jobs.filter(j => j.status === "dead").length;
+
+  // Derive overall status
+  const hasIssue = emailFailed > 10 || deadJobs > 0 || providerCheck.status === "critical";
+  const hasWarn  = emailFailed > 0  || pendingJobs > 100 || waFailed > 5 || providerCheck.status === "warning";
+  const overallStatus: CheckStatus = hasIssue ? "critical" : hasWarn ? "warning" : "healthy";
+
+  return NextResponse.json({
+    event_id: id,
+    status:   overallStatus,
+    email: {
+      total:     emailAll,
+      queued:    emailQueued,
+      sending:   emailSending,
+      delivered: emailDelivered,
+      failed:    emailFailed,
+      bounced:   emailBounced,
+      delivery_rate_24h: emailPct24h,
+    },
+    whatsapp: {
+      total_24h:     waTotal,
+      delivered_24h: waDelivered,
+      failed_24h:    waFailed,
+    },
+    system: {
+      pending_jobs: pendingJobs,
+      dead_jobs:    deadJobs,
+      provider:     { status: providerCheck.status, score: providerCheck.score },
+      database:     { status: dbCheck.status,       score: dbCheck.score },
+    },
+    as_of: new Date().toISOString(),
+  });
+}
+
+// ── POST: pre-send validation (existing — unchanged) ─────────────────────────
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

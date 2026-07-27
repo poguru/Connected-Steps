@@ -1,3 +1,20 @@
+/**
+ * OTP SYSTEM B — Phone OTP verify endpoint for authentication flows.
+ *
+ * Used by: components/auth/LoginForm.tsx (phone login)
+ *          components/auth/SignUpForm.tsx (phone registration)
+ *          components/auth/PhoneVerifyBanner.tsx (verify existing phone)
+ *
+ * Verification strategy (purpose-dependent):
+ *   "register"     → reads from `otp_verifications` (plaintext comparison)
+ *   "login"        → bcrypt.compare against `users.otp_hash`; sets session cookie
+ *   "verify_phone" → bcrypt.compare against `users.otp_hash`; sets phone_verified=true
+ *
+ * DO NOT merge with System A (verify-otp).
+ * System A only reads from `otp_verifications` (plaintext) and never touches
+ * `users.otp_hash`. System B handles stateful authentication including session
+ * cookie issuance on successful login — a concern outside System A's scope.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getSupabaseServer } from "@/lib/supabase-server";

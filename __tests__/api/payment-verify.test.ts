@@ -16,10 +16,29 @@ jest.mock("@/lib/notify", () => ({
   paymentEmailHTML:   jest.fn().mockReturnValue(""),
   membershipWAParams: jest.fn().mockReturnValue([]),
 }));
+jest.mock("@/lib/job-queue",    () => ({ enqueueJob: jest.fn().mockResolvedValue("job-1") }));
+jest.mock("@/lib/job-handlers", () => ({
+  handleInvoiceGenerate:  jest.fn().mockResolvedValue(undefined),
+  handleMembershipEmail:  jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock("@/lib/razorpay-client", () => ({
+  getRazorpaySDK: jest.fn().mockReturnValue({
+    orders: {
+      fetch: jest.fn().mockResolvedValue({
+        id:       "order_abc123",
+        amount:   120000,
+        currency: "INR",
+        status:   "paid",
+        notes:    { plan: "monthly", email: "runner@example.com" },
+      }),
+    },
+  }),
+}));
 
-import { POST } from "@/app/api/payment/verify/route";
-import { NextRequest } from "next/server";
+import { POST }             from "@/app/api/payment/verify/route";
+import { NextRequest }      from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { signUserToken }    from "@/lib/admin-auth";
 
 const mockGetSupabaseServer = getSupabaseServer as jest.Mock;
 
@@ -51,7 +70,8 @@ function makeRequest(p: Omit<PaymentPayload, "razorpay_signature">): NextRequest
   return new NextRequest("http://localhost/api/payment/verify", {
     method:  "POST",
     body:    JSON.stringify(body),
-    headers: { "Content-Type": "application/json" },
+    // Route requires a verified user token — sign one for the email in the payload.
+    headers: { "Content-Type": "application/json", "x-user-token": signUserToken(p.email) },
   });
 }
 
@@ -98,8 +118,26 @@ function makeDb(idempotencyResult: { expires_at: string } | null) {
         return chain;
       }
 
-      // coupon_uses, coupons — not reached in these tests
-      return { insert: jest.fn().mockResolvedValue({ error: null }) };
+      if (table === "membership_plans") {
+        const chain: Record<string, jest.Mock> = {} as Record<string, jest.Mock>;
+        chain.select      = jest.fn().mockReturnValue(chain);
+        chain.eq          = jest.fn().mockReturnValue(chain);
+        chain.maybeSingle = jest.fn().mockResolvedValue({
+          data:  { price: 1200, duration_months: 1, name: "Monthly" },
+          error: null,
+        });
+        return chain;
+      }
+
+      // payment_order_log, job_queue, coupons, etc. — return a no-op chain
+      const noopChain: Record<string, jest.Mock> = {} as Record<string, jest.Mock>;
+      noopChain.select      = jest.fn().mockReturnValue(noopChain);
+      noopChain.eq          = jest.fn().mockReturnValue(noopChain);
+      noopChain.update      = jest.fn().mockReturnValue(noopChain);
+      noopChain.insert      = jest.fn().mockReturnValue(noopChain);
+      noopChain.single      = jest.fn().mockResolvedValue({ data: null, error: null });
+      noopChain.maybeSingle = jest.fn().mockResolvedValue({ data: null, error: null });
+      return noopChain;
     }),
     rpc: jest.fn().mockResolvedValue({ error: null }),
     _upsertMock: upsertMock,
@@ -210,7 +248,7 @@ describe("POST /api/payment/verify — idempotency", () => {
     const req = new NextRequest("http://localhost/api/payment/verify", {
       method:  "POST",
       body:    JSON.stringify({ ...BASE_PAYMENT, razorpay_signature: "bad_signature" }),
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-user-token": signUserToken(BASE_PAYMENT.email) },
     });
 
     const res = await POST(req);

@@ -6,14 +6,15 @@ process.env.NEXT_PUBLIC_SUPABASE_URL  = "https://test.supabase.co";
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 jest.mock("@/lib/supabase-server", () => ({ getSupabaseServer: jest.fn() }));
-jest.mock("@/lib/notify",          () => ({ sendEmail: jest.fn().mockResolvedValue(undefined), sendWhatsAppOTP: jest.fn().mockResolvedValue(undefined) }));
-jest.mock("@/lib/admin-auth",      () => ({
-  verifyUserToken: jest.fn(),
-  isAdminOrCoach:  jest.fn().mockResolvedValue(false),
-  signUserToken:   jest.fn().mockReturnValue("mock-user-token"),
-  signCoachToken:  jest.fn(),
-  COOKIE_NAME:     "cs_coach_token",
-}));
+jest.mock("@/lib/notify",          () => ({ sendEmail: jest.fn().mockResolvedValue({ ok: true }), sendWhatsAppOTP: jest.fn().mockResolvedValue({ ok: true }) }));
+jest.mock("@/lib/admin-auth", () => {
+  const actual = jest.requireActual<typeof import("@/lib/admin-auth")>("@/lib/admin-auth");
+  return {
+    ...actual,
+    verifyUserToken: jest.fn(),
+    isAdminOrCoach:  jest.fn().mockResolvedValue(false),
+  };
+});
 
 import { POST as sendOtp   } from "@/app/api/auth/send-otp/route";
 import { POST as verifyOtp } from "@/app/api/auth/verify-otp/route";
@@ -75,6 +76,10 @@ function makeDb(overrides: Partial<{
           then:   (r: (v: unknown) => unknown) => Promise.resolve(cfg.otpUpdate).then(r),
         };
       }
+      // Throw for rate_limit_store so isRateLimited/recordFailure fall through
+      // to the in-process Map fallback (Supabase returns null data otherwise,
+      // which makes isRateLimited always return false even after 5 failures).
+      if (table === "rate_limit_store") throw new Error("rate_limit_store not available in test");
       return chain(null);
     }),
   };

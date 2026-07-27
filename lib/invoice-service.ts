@@ -9,6 +9,7 @@
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { gstFromInclusive, getCurrentGSTRate } from "@/lib/gst";
 import { sendEmail } from "@/lib/notify";
+import { logger } from "@/lib/logger";
 
 // ── Business Constants ────────────────────────────────────────────────────────
 export const CS_BUSINESS = {
@@ -417,11 +418,11 @@ export async function createAndSendInvoice(input: InvoiceInput): Promise<Invoice
   // Idempotency: if an invoice already exists for this payment, return it
   if (input.paymentId) {
     const { data: existing } = await db.from("invoices").select("*").eq("payment_id", input.paymentId).maybeSingle();
-    if (existing) { console.log(`[invoice] already exists for payment ${input.paymentId}: ${existing.invoice_number}`); return existing as Invoice; }
+    if (existing) { logger.info("invoice", "Already exists for payment", { paymentId: input.paymentId, invoiceNumber: existing.invoice_number }); return existing as Invoice; }
   }
   if (input.registrationId) {
     const { data: existing } = await db.from("invoices").select("*").eq("registration_id", input.registrationId).maybeSingle();
-    if (existing) { console.log(`[invoice] already exists for registration ${input.registrationId}: ${existing.invoice_number}`); return existing as Invoice; }
+    if (existing) { logger.info("invoice", "Already exists for registration", { registrationId: input.registrationId, invoiceNumber: existing.invoice_number }); return existing as Invoice; }
   }
 
   try {
@@ -449,9 +450,9 @@ export async function createAndSendInvoice(input: InvoiceInput): Promise<Invoice
       total_amount:   totalAmt,
     }).select("*").single();
 
-    if (error || !inv) { console.error("[invoice] DB insert failed:", error?.message); return null; }
+    if (error || !inv) { logger.error("invoice", "DB insert failed", { error: error?.message }); return null; }
 
-    console.log(`[invoice] Bill of Supply created ${inv.invoice_number} for ${input.userEmail}`);
+    logger.info("invoice", "Bill of Supply created", { invoiceNumber: inv.invoice_number, email: input.userEmail });
 
     // Generate HTML
     const html = generateInvoiceHTML({
@@ -478,11 +479,11 @@ export async function createAndSendInvoice(input: InvoiceInput): Promise<Invoice
     const storagePath = await uploadBillToStorage(db, inv.invoice_number, html);
     if (storagePath) {
       await db.from("invoices").update({ storage_path: storagePath }).eq("id", inv.id);
-      console.log(`[invoice] uploaded to storage: ${storagePath}`);
+      logger.info("invoice", "Uploaded to storage", { storagePath });
     } else {
       // Fallback: store HTML in DB column (legacy path) so existing download flow works
       await db.from("invoices").update({ invoice_html: html }).eq("id", inv.id);
-      console.warn(`[invoice] storage upload failed — stored HTML in DB column for ${inv.invoice_number}`);
+      logger.warn("invoice", "Storage upload failed — stored HTML in DB column", { invoiceNumber: inv.invoice_number });
     }
 
     // Send email with invoice link
@@ -490,7 +491,7 @@ export async function createAndSendInvoice(input: InvoiceInput): Promise<Invoice
 
     return inv as Invoice;
   } catch (e: unknown) {
-    console.error("[invoice] createAndSendInvoice failed:", e);
+    logger.error("invoice", "createAndSendInvoice failed", { error: String(e) });
     return null;
   }
 }
@@ -508,10 +509,10 @@ async function uploadBillToStorage(
         contentType: "text/html; charset=utf-8",
         upsert: true,
       });
-    if (error) { console.error("[invoice] storage upload error:", error.message); return null; }
+    if (error) { logger.error("invoice", "Storage upload error", { error: error.message }); return null; }
     return fileName;
   } catch (e) {
-    console.error("[invoice] storage upload exception:", e);
+    logger.error("invoice", "Storage upload exception", { error: String(e) });
     return null;
   }
 }
@@ -552,12 +553,12 @@ async function sendInvoiceEmail(
         email_sent_at:        new Date().toISOString(),
         email_ses_message_id: result.messageId ?? null,
       }).eq("id", invoiceId);
-      console.log(`[invoice] email sent ${invoiceNumber} → ${input.userEmail} msgId=${result.messageId}`);
+      logger.info("invoice", "Email sent", { invoiceNumber, email: input.userEmail, messageId: result.messageId });
     } else {
       await db.from("invoices").update({ email_error: result.error ?? "unknown", email_retry_count: 1 }).eq("id", invoiceId);
-      console.error(`[invoice] email FAILED ${invoiceNumber} → ${input.userEmail}: ${result.error}`);
+      logger.error("invoice", "Email failed", { invoiceNumber, email: input.userEmail, error: result.error });
     }
   } catch (e) {
-    console.error(`[invoice] email exception for ${invoiceNumber}:`, e);
+    logger.error("invoice", "Email exception", { invoiceNumber, error: String(e) });
   }
 }

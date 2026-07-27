@@ -1,13 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
-import Razorpay from "razorpay";
 import { verifyUserToken } from "@/lib/admin-auth";
-
-function getRazorpay() {
-  const key_id     = process.env.RAZORPAY_KEY_ID;
-  const key_secret = process.env.RAZORPAY_KEY_SECRET;
-  if (!key_id || !key_secret) throw new Error("Razorpay keys not configured");
-  return new Razorpay({ key_id, key_secret });
-}
+import { getRazorpaySDK as getRazorpay } from "@/lib/razorpay-client";
 
 const DEFAULT_FEE_PAISE = 19900; // â‚¹199 â€” server-side fallback, not caller-supplied
 

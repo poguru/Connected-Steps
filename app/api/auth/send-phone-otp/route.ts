@@ -1,3 +1,21 @@
+/**
+ * OTP SYSTEM B — Phone OTP send endpoint for authentication flows.
+ *
+ * Used by: components/auth/LoginForm.tsx (phone login)
+ *          components/auth/SignUpForm.tsx (phone registration)
+ *          components/auth/PhoneVerifyBanner.tsx (verify existing phone)
+ *
+ * Storage strategy (purpose-dependent):
+ *   "register"     → stores in `otp_verifications` table (plaintext + expiry)
+ *   "login"        → stores bcrypt hash in `users.otp_hash` + resend tracking
+ *   "verify_phone" → stores bcrypt hash in `users.otp_hash`
+ *
+ * DO NOT merge with System A (send-otp / verify-otp).
+ * System A handles account-change flows (email/phone updates) for already
+ * authenticated users and always uses `otp_verifications` with plaintext.
+ * System B handles unauthenticated login/registration, requiring the stronger
+ * bcrypt storage for login OTPs to prevent timing attacks on the users table.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getSupabaseServer } from "@/lib/supabase-server";

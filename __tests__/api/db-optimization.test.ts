@@ -21,10 +21,14 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key";
 process.env.NEXT_PUBLIC_SUPABASE_URL  = "https://test.supabase.co";
 
 jest.mock("@/lib/supabase-server",  () => ({ getSupabaseServer: jest.fn() }));
-jest.mock("@/lib/admin-auth",       () => ({
-  isAdminOrCoach:  jest.fn().mockResolvedValue(true),
-  verifyUserToken: jest.fn().mockReturnValue("admin@cs.test"),
-}));
+jest.mock("@/lib/admin-auth", () => {
+  const actual = jest.requireActual<typeof import("@/lib/admin-auth")>("@/lib/admin-auth");
+  return {
+    ...actual,
+    isAdminOrCoach:  jest.fn().mockResolvedValue(true),
+    verifyUserToken: jest.fn().mockReturnValue("admin@cs.test"),
+  };
+});
 jest.mock("@/lib/notify-inapp",     () => ({ createNotification: jest.fn().mockResolvedValue(undefined) }));
 jest.mock("@/lib/auto-feed",        () => ({
   autoFeedSessionCompleted: jest.fn().mockResolvedValue(undefined),
@@ -63,12 +67,18 @@ function makeAttendanceDb(opts: {
         };
       }
       if (table === "session_attendance") {
+        const updateChain: Record<string, jest.Mock> = {} as Record<string, jest.Mock>;
+        updateChain.eq = jest.fn().mockReturnValue(updateChain);
+        updateChain.then = jest.fn().mockImplementation((resolve: (v: { error: null }) => void) =>
+          Promise.resolve({ error: null }).then(resolve)
+        );
         return {
           select: jest.fn().mockReturnThis(),
           eq:     jest.fn().mockResolvedValue({
             data:  opts.existingAttendance ?? [],
             error: null,
           }),
+          update: jest.fn().mockReturnValue(updateChain),
           upsert: upsertMock,
         };
       }
@@ -189,9 +199,12 @@ describe("admin attendance — bonus points batch operations", () => {
     });
     const res = await POST(req, { params: Promise.resolve({ id: "sess-1" }) });
     const body = await res.json();
-    expect(body.skipped).toBe(1);  // synced user is in skippedEmails set
-    expect(body.saved).toBe(0);
-    expect(db._inDeleteMock).not.toHaveBeenCalled();  // no bonus ops on skipped user
+    // Synced users are no longer hard-skipped; their bonus is updated via
+    // session_attendance.update() and the sync flag is reset so the next
+    // recalculate picks up the new bonus.  Points_ledger is still untouched.
+    expect(body.saved).toBe(1);   // 1 synced user had bonus updated
+    expect(body.skipped).toBe(0); // nothing is hard-skipped
+    expect(db._inDeleteMock).not.toHaveBeenCalled();  // points_ledger not touched
   });
 });
 

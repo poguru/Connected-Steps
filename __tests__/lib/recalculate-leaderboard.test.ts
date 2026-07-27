@@ -5,15 +5,17 @@ process.env.NEXT_PUBLIC_SUPABASE_URL  = "https://test.supabase.co";
 jest.mock("@/lib/supabase-server", () => ({ getSupabaseServer: jest.fn() }));
 // Mock cache so tests don't need Redis — also lets us assert cache is invalidated
 jest.mock("@/lib/cache", () => ({
-  cacheDel: jest.fn().mockResolvedValue(undefined),
-  CK:       { leaderboard: (loc: unknown, friends: unknown) => `lb:v1:${loc ?? "_"}:${friends ?? "_"}` },
+  cacheDel:          jest.fn().mockResolvedValue(undefined),
+  cacheFlushPattern: jest.fn().mockResolvedValue(0),
+  CK:                { leaderboard: (loc: unknown, friends: unknown) => `lb:v1:${loc ?? "_"}:${friends ?? "_"}` },
 }));
 
 import { recalculateMonth } from "@/lib/recalculate-leaderboard";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { cacheDel } from "@/lib/cache";
+import { cacheDel, cacheFlushPattern } from "@/lib/cache";
 
-const mockCacheDel = cacheDel as jest.Mock;
+const mockCacheDel         = cacheDel         as jest.Mock;
+const mockCacheFlushPattern = cacheFlushPattern as jest.Mock;
 
 const mockGetSupabaseServer = getSupabaseServer as jest.Mock;
 
@@ -93,6 +95,15 @@ function makeDb(opts: {
         lbChain.limit  = jest.fn().mockResolvedValue({ data: [], error: null }); // debounce: no recent
         lbChain.in     = jest.fn().mockResolvedValue({ data: opts.existingLeaderboard ?? [], error: null });
         return { ...lbChain, upsert: upsertMock };
+      }
+
+      if (table === "points_ledger") {
+        const chain: Record<string, jest.Mock> = {} as Record<string, jest.Mock>;
+        chain.select = jest.fn().mockReturnValue(chain);
+        chain.in     = jest.fn().mockReturnValue(chain);
+        chain.gte    = jest.fn().mockReturnValue(chain);
+        chain.lte    = jest.fn().mockResolvedValue({ data: [], error: null });
+        return chain;
       }
 
       return {};
@@ -217,7 +228,7 @@ describe("recalculateMonth", () => {
 
     // One batch update call (not two per-user calls)
     expect(db._attUpdateInMock).toHaveBeenCalledTimes(1);
-    expect(db._attUpdateInMock).toHaveBeenCalledWith("id", [1, 2]);
+    expect(db._attUpdateInMock).toHaveBeenCalledWith("session_id", ["s1"]);
   });
 
   test("idempotent: same inputs produce the same upsert payload on repeated calls", async () => {
@@ -335,43 +346,43 @@ describe("recalculateMonth", () => {
 
   describe("cache invalidation after upsert", () => {
 
-    test("calls cacheDel with the base leaderboard key after a successful update", async () => {
+    test("calls cacheFlushPattern with the leaderboard glob after a successful update", async () => {
       const db = makeDb({
         sessions:   SESSIONS,
         attendance: [{ id: 1, session_id: "s1", user_email: "a@x.com", attended: true, bonus_points: 0 }],
         users:      [USERS[0]],
       });
       mockGetSupabaseServer.mockReturnValue(db);
-      mockCacheDel.mockClear();
+      mockCacheFlushPattern.mockClear();
 
       await recalculateMonth("2026-06");
 
-      expect(mockCacheDel).toHaveBeenCalledTimes(1);
-      expect(mockCacheDel).toHaveBeenCalledWith("lb:v1:_:_");
+      expect(mockCacheFlushPattern).toHaveBeenCalledTimes(1);
+      expect(mockCacheFlushPattern).toHaveBeenCalledWith("lb:v1:*");
     });
 
-    test("does NOT call cacheDel when there are no sessions (early return)", async () => {
+    test("does NOT call cacheFlushPattern when there are no sessions (early return)", async () => {
       const db = makeDb({ sessions: [], attendance: [], users: [] });
       mockGetSupabaseServer.mockReturnValue(db);
-      mockCacheDel.mockClear();
+      mockCacheFlushPattern.mockClear();
 
       await recalculateMonth("2026-06");
 
-      expect(mockCacheDel).not.toHaveBeenCalled();
+      expect(mockCacheFlushPattern).not.toHaveBeenCalled();
     });
 
-    test("does NOT call cacheDel when no attendance records found (early return)", async () => {
+    test("does NOT call cacheFlushPattern when no attendance records found (early return)", async () => {
       const db = makeDb({
         sessions:   SESSIONS,
         attendance: [],
         users:      [],
       });
       mockGetSupabaseServer.mockReturnValue(db);
-      mockCacheDel.mockClear();
+      mockCacheFlushPattern.mockClear();
 
       await recalculateMonth("2026-06");
 
-      expect(mockCacheDel).not.toHaveBeenCalled();
+      expect(mockCacheFlushPattern).not.toHaveBeenCalled();
     });
   });
 
@@ -488,6 +499,14 @@ describe("force flag bypasses debounce", () => {
           lbChain.limit  = jest.fn().mockResolvedValue({ data: [{ updated_at: new Date().toISOString() }], error: null });
           lbChain.in     = jest.fn().mockResolvedValue({ data: [], error: null });
           return { ...lbChain, upsert: upsertMock };
+        }
+        if (table === "points_ledger") {
+          const c: Record<string, jest.Mock> = {} as Record<string, jest.Mock>;
+          c.select = jest.fn().mockReturnValue(c);
+          c.in     = jest.fn().mockReturnValue(c);
+          c.gte    = jest.fn().mockReturnValue(c);
+          c.lte    = jest.fn().mockResolvedValue({ data: [], error: null });
+          return c;
         }
         return {};
       }),

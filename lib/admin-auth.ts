@@ -2,16 +2,29 @@ import crypto from "crypto";
 import type { NextRequest } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
-// Lazy — avoids crash at import time when env vars are absent during build
-let _secret: string | null = null;
-function SECRET(): string {
-  if (!_secret) {
-    const s = process.env.COACH_TOKEN_SECRET ?? process.env.ADMIN_PASSWORD;
-    if (!s) throw new Error("COACH_TOKEN_SECRET or ADMIN_PASSWORD must be set");
-    _secret = s;
+// ── Secret resolution ─────────────────────────────────────────────────────────
+// Lazy-initialized to avoid crash at import time when env vars are absent
+// during build. Singleton cleared on first call only.
+//
+// Rotation support: set COACH_TOKEN_SECRET_PREV to the old secret during the
+// rotation window. Verify functions accept tokens signed by either secret;
+// sign functions always use the primary (COACH_TOKEN_SECRET) secret only.
+// Once all old tokens have expired (90 days for user tokens, 30 days for admin
+// sessions), remove COACH_TOKEN_SECRET_PREV to complete the rotation.
+
+let _secrets: string[] | null = null;
+
+function SECRETS(): string[] {
+  if (!_secrets) {
+    const primary = process.env.COACH_TOKEN_SECRET ?? process.env.ADMIN_PASSWORD;
+    if (!primary) throw new Error("COACH_TOKEN_SECRET or ADMIN_PASSWORD must be set");
+    const prev = process.env.COACH_TOKEN_SECRET_PREV;
+    _secrets = prev ? [primary, prev] : [primary];
   }
-  return _secret;
+  return _secrets;
 }
+
+function SECRET(): string { return SECRETS()[0]; }
 
 // ── Coach token ───────────────────────────────────────────────────────────────
 
@@ -24,10 +37,14 @@ export function verifyCoachToken(token: string): string | null {
   const [emailB64, hmac] = token.split(".");
   if (!emailB64 || !hmac) return null;
   try {
-    const email    = Buffer.from(emailB64, "base64url").toString("utf8");
-    const expected = crypto.createHmac("sha256", SECRET()).update(email).digest("hex");
-    if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(hmac))) return null;
-    return email;
+    const email = Buffer.from(emailB64, "base64url").toString("utf8");
+    for (const secret of SECRETS()) {
+      const expected = crypto.createHmac("sha256", secret).update(email).digest("hex");
+      if (expected.length === hmac.length && crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(hmac))) {
+        return email;
+      }
+    }
+    return null;
   } catch {
     return null;
   }
@@ -53,12 +70,17 @@ export function verifyUserToken(token: string): string | null {
   if (parts.length !== 3) return null;
   const [emailB64, expStr, hmac] = parts;
   try {
-    const email    = Buffer.from(emailB64, "base64url").toString("utf8");
-    const exp      = parseInt(expStr, 10);
+    const email = Buffer.from(emailB64, "base64url").toString("utf8");
+    const exp   = parseInt(expStr, 10);
     if (!Number.isFinite(exp) || Math.floor(Date.now() / 1000) > exp) return null;
-    const expected = crypto.createHmac("sha256", SECRET()).update(`user:${email.toLowerCase()}:${exp}`).digest("hex");
-    if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(hmac))) return null;
-    return email;
+    const payload = `user:${email.toLowerCase()}:${exp}`;
+    for (const secret of SECRETS()) {
+      const expected = crypto.createHmac("sha256", secret).update(payload).digest("hex");
+      if (expected.length === hmac.length && crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(hmac))) {
+        return email;
+      }
+    }
+    return null;
   } catch {
     return null;
   }
@@ -81,11 +103,15 @@ export function verifyAdminSession(token: string): boolean {
   const [payloadB64, hmac] = token.split(".");
   if (!payloadB64 || !hmac) return false;
   try {
-    const payload  = Buffer.from(payloadB64, "base64url").toString("utf8");
-    const expected = crypto.createHmac("sha256", SECRET()).update(payload).digest("hex");
-    if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(hmac))) return false;
-    const expires = parseInt(payload.split(":")[1], 10);
-    return Number.isFinite(expires) && Math.floor(Date.now() / 1000) < expires;
+    const payload = Buffer.from(payloadB64, "base64url").toString("utf8");
+    for (const secret of SECRETS()) {
+      const expected = crypto.createHmac("sha256", secret).update(payload).digest("hex");
+      if (expected.length === hmac.length && crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(hmac))) {
+        const expires = parseInt(payload.split(":")[1], 10);
+        return Number.isFinite(expires) && Math.floor(Date.now() / 1000) < expires;
+      }
+    }
+    return false;
   } catch {
     return false;
   }

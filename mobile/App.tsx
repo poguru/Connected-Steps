@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { NavigationContainer }        from "@react-navigation/native";
+import React, { useEffect, useRef, useState } from "react";
+import { NavigationContainer, NavigationContainerRef } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar }                  from "expo-status-bar";
 import { View, ActivityIndicator }    from "react-native";
@@ -7,6 +7,7 @@ import AsyncStorage                   from "@react-native-async-storage/async-st
 import { SafeAreaProvider }           from "react-native-safe-area-context";
 
 import { UserProvider, useUser }   from "./src/context/UserContext";
+import { NetworkProvider }         from "./src/context/NetworkContext";
 import LoginScreen                 from "./src/screens/LoginScreen";
 import TabNavigator                from "./src/navigation/TabNavigator";
 import ConversationScreen          from "./src/screens/ConversationScreen";
@@ -17,8 +18,13 @@ import AdminMembersScreen          from "./src/screens/admin/AdminMembersScreen"
 import AdminQuestionsScreen        from "./src/screens/admin/AdminQuestionsScreen";
 import AdminTrainingScreen         from "./src/screens/admin/AdminTrainingScreen";
 import AdminScoringAuditScreen     from "./src/screens/admin/AdminScoringAuditScreen";
+import EventPassScreen             from "./src/screens/EventPassScreen";
+import LiveEventScreen             from "./src/screens/LiveEventScreen";
+import TrackerScreen               from "./src/screens/TrackerScreen";
+import OrganizerScreen             from "./src/screens/OrganizerScreen";
 import { STORAGE_KEY_USER, CS_API_BASE } from "./src/config";
 import { registerPushToken }       from "./src/services/api";
+import { setupNotificationListeners, setNotificationTapHandler } from "./src/services/push";
 import type { CSUser }             from "./src/types";
 
 export type RootStackParamList = {
@@ -31,9 +37,16 @@ export type RootStackParamList = {
   AdminQuestions:  undefined;
   AdminTraining:   undefined;
   AdminScoringAudit: undefined;
+  // Phase 4 & 5 — deep-link targets
+  EventPass:       { registrationCode: string };
+  LiveEvent:       { registrationCode: string };
+  // Phase 6 & 7 — stack screens accessible from Profile / Scan
+  Tracker:         undefined;
+  Organizer:       undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const navRef  = React.createRef<NavigationContainerRef<RootStackParamList>>();
 
 const NAV_THEME = {
   dark: true,
@@ -72,10 +85,26 @@ async function setupPushNotifications(userEmail: string) {
   } catch { /* notifications unavailable in current environment */ }
 }
 
+// Route notification taps to the relevant screen
+setNotificationTapHandler((data) => {
+  const nav = navRef.current;
+  if (!nav) return;
+  if (data.registrationCode) {
+    nav.navigate("EventPass", { registrationCode: data.registrationCode });
+  }
+});
+
 function RootNav() {
   const { user, setUser }               = useUser();
   const [loading,      setLoading]      = useState(true);
   const [initialRoute, setInitialRoute] = useState<"Login" | "MainTabs">("Login");
+  const notifCleanup = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    // Set up push notification listeners once
+    notifCleanup.current = setupNotificationListeners();
+    return () => { notifCleanup.current?.(); };
+  }, []);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY_USER).then(async raw => {
@@ -124,6 +153,11 @@ function RootNav() {
       <Stack.Screen name="AdminQuestions"  component={AdminQuestionsScreen}  options={{ animation: "slide_from_right", gestureEnabled: true }} />
       <Stack.Screen name="AdminTraining"      component={AdminTrainingScreen}      options={{ animation: "slide_from_right", gestureEnabled: true }} />
       <Stack.Screen name="AdminScoringAudit" component={AdminScoringAuditScreen}  options={{ animation: "slide_from_right", gestureEnabled: true }} />
+      {/* Phase 4–7 deep-link screens */}
+      <Stack.Screen name="EventPass"  component={EventPassScreen}    options={{ animation: "slide_from_right", gestureEnabled: true }} />
+      <Stack.Screen name="LiveEvent"  component={LiveEventScreen}    options={{ animation: "slide_from_right", gestureEnabled: true }} />
+      <Stack.Screen name="Tracker"    component={TrackerScreen}      options={{ animation: "slide_from_right", gestureEnabled: true }} />
+      <Stack.Screen name="Organizer"  component={OrganizerScreen}    options={{ animation: "slide_from_right", gestureEnabled: true }} />
     </Stack.Navigator>
   );
 }
@@ -132,11 +166,13 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <StatusBar style="light" backgroundColor="#0a0a0a" />
-      <UserProvider>
-        <NavigationContainer theme={NAV_THEME}>
-          <RootNav />
-        </NavigationContainer>
-      </UserProvider>
+      <NetworkProvider>
+        <UserProvider>
+          <NavigationContainer ref={navRef} theme={NAV_THEME}>
+            <RootNav />
+          </NavigationContainer>
+        </UserProvider>
+      </NetworkProvider>
     </SafeAreaProvider>
   );
 }

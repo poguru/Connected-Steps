@@ -5,6 +5,8 @@ import type {
   CommunityPost, Story,
   Coach, Conversation, Message,
   SessionPhoto, FeedEvent,
+  MyRegistration, ScanResult, OpsSession,
+  AppNotification, TimelineItem,
 } from "../types";
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -354,4 +356,158 @@ export async function adminAssignPlan(coachToken: string, body: {
     method: "POST", headers: coachHeaders(coachToken), body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error("Failed to assign plan");
+}
+
+// ── Participant portal (requires x-user-token) ────────────────────────────────
+
+function participantHeaders(userToken: string) {
+  return { "Content-Type": "application/json", "x-user-token": userToken };
+}
+
+export async function getMyRegistrations(userToken: string): Promise<MyRegistration[]> {
+  const res = await fetch(`${CS_API_BASE}/api/events/my-registrations`, {
+    headers: participantHeaders(userToken),
+  });
+  if (!res.ok) throw new Error("Failed to load registrations");
+  const data = await res.json();
+  return data.registrations as MyRegistration[];
+}
+
+export async function getMyEvent(
+  userToken: string,
+  registrationCode: string,
+): Promise<MyRegistration> {
+  const res = await fetch(`${CS_API_BASE}/api/my-events/${registrationCode}`, {
+    headers: participantHeaders(userToken),
+  });
+  if (!res.ok) throw new Error("Failed to load event details");
+  return res.json() as Promise<MyRegistration>;
+}
+
+export async function getEventTimeline(
+  userToken: string,
+  registrationCode: string,
+): Promise<TimelineItem[]> {
+  const res = await fetch(`${CS_API_BASE}/api/my-events/${registrationCode}/timeline`, {
+    headers: participantHeaders(userToken),
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.timeline as TimelineItem[];
+}
+
+export async function getUserInvoices(userToken: string): Promise<
+  Array<{ invoice_number: string; product_name: string; total_amount: number; created_at: string }>
+> {
+  const res = await fetch(`${CS_API_BASE}/api/user/invoices`, {
+    headers: participantHeaders(userToken),
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.invoices ?? [];
+}
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+export async function getNotifications(
+  userToken: string,
+  before?: string,
+): Promise<{ notifications: AppNotification[]; unread_count: number }> {
+  const params = new URLSearchParams();
+  if (before) params.set("before", before);
+  const res = await fetch(`${CS_API_BASE}/api/notifications?${params}`, {
+    headers: participantHeaders(userToken),
+  });
+  if (!res.ok) return { notifications: [], unread_count: 0 };
+  return res.json();
+}
+
+export async function markNotificationsRead(userToken: string): Promise<void> {
+  await fetch(`${CS_API_BASE}/api/notifications`, {
+    method:  "POST",
+    headers: participantHeaders(userToken),
+  });
+}
+
+export async function markOneNotificationRead(userToken: string, id: string): Promise<void> {
+  await fetch(`${CS_API_BASE}/api/notifications/${id}`, {
+    method:  "PATCH",
+    headers: participantHeaders(userToken),
+  });
+}
+
+// ── Volunteer ops ─────────────────────────────────────────────────────────────
+
+function opsHeaders(opsToken: string) {
+  return {
+    "Content-Type": "application/json",
+    "Cookie":       `ops_session=${opsToken}`,
+  };
+}
+
+export async function opsLogin(params: {
+  email: string; password: string; event_id: string;
+}): Promise<OpsSession> {
+  const res = await fetch(`${CS_API_BASE}/api/ops/auth/mobile`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify(params),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Login failed");
+  return {
+    token:      data.token,
+    expires_at: data.expires_at,
+    role:       data.role,
+    name:       data.name,
+    email:      data.email,
+    event_id:   params.event_id,
+  } as OpsSession;
+}
+
+export async function opsLogout(opsToken: string): Promise<void> {
+  await fetch(`${CS_API_BASE}/api/ops/auth`, {
+    method:  "DELETE",
+    headers: opsHeaders(opsToken),
+  }).catch(() => {});
+}
+
+export async function opsScan(
+  opsToken: string,
+  eventId:  string,
+  params: { service: string; qr_token: string; dry_run?: boolean },
+): Promise<ScanResult> {
+  const res = await fetch(`${CS_API_BASE}/api/ops/events/${eventId}/scan`, {
+    method:  "POST",
+    headers: opsHeaders(opsToken),
+    body:    JSON.stringify(params),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Scan failed");
+  return data as ScanResult;
+}
+
+export async function opsLiveStats(
+  opsToken: string,
+  eventId:  string,
+): Promise<Record<string, unknown>> {
+  const res = await fetch(`${CS_API_BASE}/api/ops/events/${eventId}/live-stats`, {
+    headers: opsHeaders(opsToken),
+  });
+  if (!res.ok) throw new Error("Failed to load stats");
+  return res.json();
+}
+
+export async function opsSearchParticipants(
+  opsToken: string,
+  eventId:  string,
+  query:    string,
+): Promise<unknown[]> {
+  const res = await fetch(
+    `${CS_API_BASE}/api/ops/events/${eventId}/registrations?q=${encodeURIComponent(query)}&limit=20`,
+    { headers: opsHeaders(opsToken) },
+  );
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.participants ?? [];
 }

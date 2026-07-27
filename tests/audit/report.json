@@ -1,0 +1,239 @@
+[
+  {
+    "id": 1,
+    "section": "1-Public",
+    "severity": "medium",
+    "page": "https://www.connectedsteps.in/",
+    "title": "Broken images",
+    "detail": "https://www.connectedsteps.in/_next/image?url=%2Flogo.png&w=96&q=75",
+    "screenshot": "C:\\Users\\conne\\Desktop\\connected-steps\\tests\\audit\\screenshots\\broken_img__.png",
+    "timestamp": "2026-07-17T14:33:50.348Z"
+  },
+  {
+    "id": 2,
+    "section": "1-Public",
+    "severity": "medium",
+    "page": "https://www.connectedsteps.in/feed",
+    "title": "Broken images",
+    "detail": "https://www.connectedsteps.in/_next/image?url=%2Flogo.png&w=64&q=75",
+    "screenshot": "C:\\Users\\conne\\Desktop\\connected-steps\\tests\\audit\\screenshots\\broken_img__feed.png",
+    "timestamp": "2026-07-17T14:34:00.443Z"
+  },
+  {
+    "id": 3,
+    "section": "1-Public",
+    "severity": "medium",
+    "page": "https://www.connectedsteps.in/feed",
+    "title": "No navigation links found",
+    "detail": "Nav/header/bottom-nav has no anchor tags",
+    "timestamp": "2026-07-17T14:34:00.455Z"
+  },
+  {
+    "id": 4,
+    "section": "1-Public",
+    "severity": "medium",
+    "page": "https://www.connectedsteps.in/community",
+    "title": "Broken images",
+    "detail": "https://www.connectedsteps.in/_next/image?url=%2Flogo.png&w=64&q=75",
+    "screenshot": "C:\\Users\\conne\\Desktop\\connected-steps\\tests\\audit\\screenshots\\broken_img__community.png",
+    "timestamp": "2026-07-17T14:34:03.449Z"
+  },
+  {
+    "id": 5,
+    "section": "1-Public",
+    "severity": "medium",
+    "page": "https://www.connectedsteps.in/community",
+    "title": "No navigation links found",
+    "detail": "Nav/header/bottom-nav has no anchor tags",
+    "timestamp": "2026-07-17T14:34:03.464Z"
+  },
+  {
+    "id": 6,
+    "section": "1-Public",
+    "severity": "medium",
+    "page": "https://www.connectedsteps.in/leaderboard",
+    "title": "Broken images",
+    "detail": "https://www.connectedsteps.in/_next/image?url=%2Flogo.png&w=64&q=75",
+    "screenshot": "C:\\Users\\conne\\Desktop\\connected-steps\\tests\\audit\\screenshots\\broken_img__leaderboard.png",
+    "timestamp": "2026-07-17T14:34:06.513Z"
+  },
+  {
+    "id": 7,
+    "section": "1-Public",
+    "severity": "medium",
+    "page": "https://www.connectedsteps.in/leaderboard",
+    "title": "No navigation links found",
+    "detail": "Nav/header/bottom-nav has no anchor tags",
+    "timestamp": "2026-07-17T14:34:06.521Z"
+  },
+  {
+    "id": 8,
+    "section": "1-Public",
+    "severity": "high",
+    "page": "https://www.connectedsteps.in/pricing",
+    "title": "Console error",
+    "detail": "Connecting to 'https://lumberjack.razorpay.com/v2/logz' violates the following Content Security Policy directive: \"connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://api.razorpay.com https://checkout.razorpay.com\". The action has been blocked.",
+    "screenshot": "C:\\Users\\conne\\Desktop\\connected-steps\\tests\\audit\\screenshots\\console_err__pricing.png",
+    "timestamp": "2026-07-17T14:34:10.329Z"
+  },
+  {
+    "id": 9,
+    "section": "1-Public",
+    "severity": "medium",
+    "page": "https://www.connectedsteps.in/achievements",
+    "title": "No navigation links found",
+    "detail": "Nav/header/bottom-nav has no anchor tags",
+    "timestamp": "2026-07-17T14:34:13.169Z"
+  },
+  {
+    "id": 10,
+    "section": "2-Auth",
+    "severity": "medium",
+    "page": "https://www.connectedsteps.in/auth",
+    "title": "Broken images",
+    "detail": "https://www.connectedsteps.in/_next/image?url=%2Flogo.png&w=64&q=75",
+    "screenshot": "C:\\Users\\conne\\Desktop\\connected-steps\\tests\\audit\\screenshots\\broken_img__auth.png",
+    "timestamp": "2026-07-17T14:34:29.938Z"
+  },
+  {
+    "id": 11,
+    "section": "3-Sessions",
+    "severity": "high",
+    "page": "https://www.connectedsteps.in/sessions",
+    "title": "No session cards visible",
+    "detail": "No card/article elements found",
+    "timestamp": "2026-07-17T14:34:39.403Z"
+  },
+  {
+    "id": 12,
+    "section": "6-Leaderboard",
+    "severity": "medium",
+    "page": "https://www.connectedsteps.in/leaderboard",
+    "title": "Broken images",
+    "detail": "https://www.connectedsteps.in/_next/image?url=%2Flogo.png&w=64&q=75",
+    "screenshot": "C:\\Users\\conne\\Desktop\\connected-steps\\tests\\audit\\screenshots\\broken_img__leaderboard.png",
+    "timestamp": "2026-07-17T14:34:47.960Z"
+  },
+  {
+    "id": 13,
+    "section": "6-Leaderboard",
+    "severity": "medium",
+    "page": "https://www.connectedsteps.in/leaderboard",
+    "title": "No leaderboard entries visible",
+    "detail": "No rank/row elements found",
+    "timestamp": "2026-07-17T14:34:47.969Z"
+  },
+  {
+    "id": 14,
+    "section": "3-Sessions",
+    "severity": "medium",
+    "page": "https://www.connectedsteps.in/achievements",
+    "title": "Broken images",
+    "detail": "https://www.connectedsteps.in/_next/image?url=%2Flogo.png&w=64&q=75",
+    "screenshot": "C:\\Users\\conne\\Desktop\\connected-steps\\tests\\audit\\screenshots\\broken_img__achievements.png",
+    "timestamp": "2026-07-17T14:34:52.246Z"
+  },
+  {
+    "id": 15,
+    "section": "7-Feed",
+    "severity": "medium",
+    "page": "https://www.connectedsteps.in/feed",
+    "title": "Broken images",
+    "detail": "https://www.connectedsteps.in/_next/image?url=%2Flogo.png&w=64&q=75",
+    "screenshot": "C:\\Users\\conne\\Desktop\\connected-steps\\tests\\audit\\screenshots\\broken_img__feed.png",
+    "timestamp": "2026-07-17T14:34:57.727Z"
+  },
+  {
+    "id": 16,
+    "section": "7-Feed",
+    "severity": "high",
+    "page": "https://www.connectedsteps.in/feed",
+    "title": "Feed appears empty",
+    "detail": "No feed item elements found after 4s",
+    "timestamp": "2026-07-17T14:34:57.738Z"
+  },
+  {
+    "id": 17,
+    "section": "7-Feed",
+    "severity": "medium",
+    "page": "https://www.connectedsteps.in/community",
+    "title": "Broken images",
+    "detail": "https://www.connectedsteps.in/_next/image?url=%2Flogo.png&w=64&q=75",
+    "screenshot": "C:\\Users\\conne\\Desktop\\connected-steps\\tests\\audit\\screenshots\\broken_img__community.png",
+    "timestamp": "2026-07-17T14:35:04.686Z"
+  },
+  {
+    "id": 18,
+    "section": "8-Pricing",
+    "severity": "high",
+    "page": "https://www.connectedsteps.in/pricing",
+    "title": "Console error",
+    "detail": "Connecting to 'https://lumberjack.razorpay.com/v2/logz' violates the following Content Security Policy directive: \"connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://api.razorpay.com https://checkout.razorpay.com\". The action has been blocked.",
+    "screenshot": "C:\\Users\\conne\\Desktop\\connected-steps\\tests\\audit\\screenshots\\console_err__pricing.png",
+    "timestamp": "2026-07-17T14:35:09.544Z"
+  },
+  {
+    "id": 19,
+    "section": "8-Pricing",
+    "severity": "medium",
+    "page": "https://www.connectedsteps.in/pricing",
+    "title": "Network failure",
+    "detail": "GET https://checkout-static-next.razorpay.com/build/undefined — net::ERR_BLOCKED_BY_ORB",
+    "screenshot": "C:\\Users\\conne\\Desktop\\connected-steps\\tests\\audit\\screenshots\\net_fail__pricing.png",
+    "timestamp": "2026-07-17T14:35:09.876Z"
+  },
+  {
+    "id": 20,
+    "section": "8-Pricing",
+    "severity": "high",
+    "page": "https://www.connectedsteps.in/pricing",
+    "title": "No pricing plan cards visible",
+    "detail": "Pricing cards not rendered",
+    "timestamp": "2026-07-17T14:35:09.888Z"
+  },
+  {
+    "id": 21,
+    "section": "11-Responsive",
+    "severity": "medium",
+    "page": "https://www.connectedsteps.in/",
+    "title": "Zero-height text elements at 320px",
+    "detail": "Some text elements may be hidden/overlapping",
+    "timestamp": "2026-07-17T14:36:24.239Z"
+  },
+  {
+    "id": 22,
+    "section": "11-Responsive",
+    "severity": "medium",
+    "page": "https://www.connectedsteps.in/",
+    "title": "Zero-height text elements at 360px",
+    "detail": "Some text elements may be hidden/overlapping",
+    "timestamp": "2026-07-17T14:37:02.614Z"
+  },
+  {
+    "id": 23,
+    "section": "14-A11y",
+    "severity": "low",
+    "page": "https://www.connectedsteps.in/",
+    "title": "Accessibility issue",
+    "detail": "1 empty link(s)",
+    "timestamp": "2026-07-17T14:38:09.881Z"
+  },
+  {
+    "id": 24,
+    "section": "14-A11y",
+    "severity": "low",
+    "page": "https://www.connectedsteps.in/feed",
+    "title": "Accessibility issue",
+    "detail": "1 empty link(s)",
+    "timestamp": "2026-07-17T14:38:16.241Z"
+  },
+  {
+    "id": 25,
+    "section": "14-A11y",
+    "severity": "low",
+    "page": "https://www.connectedsteps.in/leaderboard",
+    "title": "Accessibility issue",
+    "detail": "1 empty link(s)",
+    "timestamp": "2026-07-17T14:38:18.368Z"
+  }
+]

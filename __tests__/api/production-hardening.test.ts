@@ -25,7 +25,10 @@ process.env.COACH_TOKEN_SECRET        = "test-secret";
 // Leave UPSTASH_REDIS_REST_URL unset for most tests (cache-not-configured path)
 
 jest.mock("@/lib/supabase-server", () => ({ getSupabaseServer: jest.fn() }));
-jest.mock("@/lib/admin-auth",      () => ({ isAdminOrCoach: jest.fn().mockResolvedValue(true) }));
+jest.mock("@/lib/admin-auth", () => {
+  const actual = jest.requireActual<typeof import("@/lib/admin-auth")>("@/lib/admin-auth");
+  return { ...actual, isAdminOrCoach: jest.fn().mockResolvedValue(true) };
+});
 
 import { NextRequest }       from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";

@@ -37,10 +37,14 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key";
 process.env.NEXT_PUBLIC_SUPABASE_URL  = "https://test.supabase.co";
 
 jest.mock("@/lib/supabase-server", () => ({ getSupabaseServer: jest.fn() }));
-jest.mock("@/lib/admin-auth",      () => ({
-  isAdminOrCoach:  jest.fn().mockResolvedValue(true),
-  getAdminEmail:   jest.fn().mockReturnValue("admin"),
-}));
+jest.mock("@/lib/admin-auth", () => {
+  const actual = jest.requireActual<typeof import("@/lib/admin-auth")>("@/lib/admin-auth");
+  return {
+    ...actual,
+    isAdminOrCoach: jest.fn().mockResolvedValue(true),
+    getAdminEmail:  jest.fn().mockReturnValue("admin"),
+  };
+});
 jest.mock("@/lib/job-queue", () => ({ enqueueJob: jest.fn().mockResolvedValue("job-1") }));
 
 import { NextRequest }       from "next/server";

@@ -8,14 +8,14 @@ jest.mock("@/lib/supabase-server", () => ({
   getSupabaseServer: jest.fn(),
 }));
 
-jest.mock("@/lib/admin-auth", () => ({
-  verifyUserToken: jest.fn(),
-  isAdminOrCoach: jest.fn(),
-  signUserToken: jest.fn(),
-  signCoachToken: jest.fn(),
-  verifyCoachToken: jest.fn(),
-  COOKIE_NAME: "cs_coach_session",
-}));
+jest.mock("@/lib/admin-auth", () => {
+  const actual = jest.requireActual<typeof import("@/lib/admin-auth")>("@/lib/admin-auth");
+  return {
+    ...actual,
+    verifyUserToken: jest.fn(),
+    isAdminOrCoach:  jest.fn(),
+  };
+});
 
 import { GET } from "@/app/api/user/training-plan/route";
 import { NextRequest } from "next/server";

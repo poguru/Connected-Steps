@@ -4,6 +4,8 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
 import { signEventQR } from "@/lib/event-qr";
 import { sendEmail, eventRegistrationEmailHTML } from "@/lib/notify";
+import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
+import { evaluateAutomations } from "@/lib/automation-engine";
 
 function genCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -118,7 +120,7 @@ async function handleSingleParticipant(
 
   const { data: ev } = await db
     .from("events")
-    .select("id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories, collect_tshirt, early_bird_ends_at")
+    .select("id, organization_id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories, collect_tshirt, early_bird_ends_at")
     .eq("id", event_id as string)
     .single();
   if (!ev || ev.status !== "published") {
@@ -354,6 +356,12 @@ async function handleSingleParticipant(
       } catch (e) {
         console.error("[event-register] email exception (registration intact):", e);
         await db.from("event_registrations").update({ email_status: "failed" }).eq("registration_code", finalCode);
+      }
+
+      if (ev.organization_id) {
+        const ctx = { registration_id: regId, event_id: event_id as string, user_email: (email as string).toLowerCase().trim(), payment_status: "free" };
+        dispatchWebhookEvent(ev.organization_id as string, "registration.created", ctx).catch(() => {});
+        evaluateAutomations(ev.organization_id as string, "registration.created", ctx).catch(() => {});
       }
     });
 

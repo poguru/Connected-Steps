@@ -61,10 +61,13 @@ interface EventOverview {
 
 const NAV_ITEMS = [
   { key: "overview",      icon: "⚡", label: "Overview",       inline: true  },
+  { key: "ops",           icon: "🎛️", label: "Command Center", inline: false, href: "ops"           },
   { key: "registrations", icon: "👥", label: "Registrations",  inline: false, href: "registrations" },
   { key: "participants",  icon: "🪪", label: "Participants",   inline: false, href: "participants"  },
   { key: "races",         icon: "🏁", label: "Races",          inline: true  },
   { key: "form",          icon: "📋", label: "Form Builder",   inline: true  },
+  { key: "steps",         icon: "🔢", label: "Reg. Steps",     inline: true  },
+  { key: "pricing",       icon: "🏷️", label: "Pricing Rules",  inline: true  },
   { key: "registration",  icon: "🧾", label: "Registration",   inline: true  },
   { key: "cat-changes",   icon: "🔄", label: "Cat. Changes",   inline: true  },
   { key: "route-maps",    icon: "🗺️", label: "Route Maps",     inline: true  },
@@ -79,6 +82,7 @@ const NAV_ITEMS = [
   { key: "services",      icon: "🔧", label: "Services",       inline: false, href: "services"      },
   { key: "cancellations", icon: "↩️", label: "Cancellations",  inline: false, href: "cancellations" },
   { key: "finance",       icon: "💰", label: "Finance",        inline: true  },
+  { key: "versions",      icon: "🕐", label: "Versions",       inline: true  },
   { key: "settings",      icon: "⚙️", label: "Settings",       inline: true  },
 ] as const;
 
@@ -300,10 +304,17 @@ export default function EventManagePage() {
 
   // ── Form Builder state ───────────────────────────────────────────────────────
 
+  interface FieldCondition {
+    field_key: string; operator: "equals" | "not_equals" | "contains" | "is_empty" | "is_not_empty"; value: string;
+  }
+
   interface FormField {
     id: string; field_key: string; field_type: string; label: string;
     placeholder: string | null; help_text: string | null; required: boolean;
     options: string[]; display_order: number; is_active: boolean;
+    conditions: FieldCondition[]; default_value: string | null;
+    max_length: number | null; validation_pattern: string | null;
+    editable_after_reg: boolean; section: string | null;
   }
 
   const [formFields,    setFormFields]    = useState<FormField[]>([]);
@@ -518,6 +529,290 @@ export default function EventManagePage() {
       return;
     }
     await loadCatChanges();
+  }
+
+  // ── Version History state ─────────────────────────────────────────────────
+
+  interface EventVersion {
+    id: string; version_number: number; label: string | null;
+    created_by: string | null; created_at: string;
+    title?: string; status?: string;
+  }
+
+  const [versions,        setVersions]        = useState<EventVersion[]>([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+  const [versionsError,   setVersionsError]   = useState("");
+  const [versionSaving,   setVersionSaving]   = useState(false);
+  const [versionLabel,    setVersionLabel]     = useState("");
+  const [restoring,       setRestoring]        = useState<string | null>(null);
+
+  const loadVersions = useCallback(async () => {
+    setVersionsLoading(true); setVersionsError("");
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/versions`);
+      const data = await res.json();
+      if (!res.ok) { setVersionsError(data.error ?? "Failed"); return; }
+      setVersions(data.versions ?? []);
+    } catch { setVersionsError("Network error"); }
+    finally { setVersionsLoading(false); }
+  }, [eventId]);
+
+  useEffect(() => {
+    if (tab === "versions" && versions.length === 0 && !versionsLoading) {
+      void loadVersions();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  async function saveVersionCheckpoint() {
+    setVersionSaving(true); setVersionsError("");
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/versions`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: versionLabel.trim() || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setVersionsError(data.error ?? "Failed"); return; }
+      setVersionLabel("");
+      setVersions(vs => [data.version as EventVersion, ...vs]);
+    } catch { setVersionsError("Network error"); }
+    finally { setVersionSaving(false); }
+  }
+
+  async function restoreVersion(versionId: string, versionNum: number) {
+    if (!confirm(`Restore event to version ${versionNum}? Current changes will be overwritten. Registrations are never affected.`)) return;
+    setRestoring(versionId); setVersionsError("");
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/versions/${versionId}/restore`, { method: "POST" });
+      const data = await res.json() as { ok?: boolean; error?: string };
+      if (!res.ok) { setVersionsError(data.error ?? "Restore failed"); return; }
+      alert(`✅ Restored to version ${versionNum}. Refresh the page to see the updated event.`);
+      void load();
+    } catch { setVersionsError("Network error"); }
+    finally { setRestoring(null); }
+  }
+
+  // ── Registration Steps state ─────────────────────────────────────────────
+
+  interface RegStep {
+    id: string; step_key: string; label: string; description: string | null;
+    display_order: number; is_visible: boolean; is_required: boolean;
+    step_type: string; icon: string | null; field_scope: string[];
+  }
+
+  const [regSteps,        setRegSteps]        = useState<RegStep[]>([]);
+  const [stepsLoading,    setStepsLoading]    = useState(false);
+  const [stepsError,      setStepsError]      = useState("");
+  const [stepSaving,      setStepSaving]      = useState(false);
+  const [newStepLabel,    setNewStepLabel]    = useState("");
+  const [newStepType,     setNewStepType]     = useState("standard");
+  const [editingStep,     setEditingStep]     = useState<string | null>(null);
+  const [editingStepData, setEditingStepData] = useState<Partial<RegStep> | null>(null);
+
+  const loadRegSteps = useCallback(async () => {
+    setStepsLoading(true); setStepsError("");
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/registration-steps`);
+      const data = await res.json();
+      if (!res.ok) { setStepsError(data.error ?? "Failed"); return; }
+      setRegSteps(data.steps ?? []);
+    } catch { setStepsError("Network error"); }
+    finally { setStepsLoading(false); }
+  }, [eventId]);
+
+  useEffect(() => {
+    if (tab === "steps" && regSteps.length === 0 && !stepsLoading) void loadRegSteps();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  async function addRegStep() {
+    if (!newStepLabel.trim()) return;
+    setStepSaving(true); setStepsError("");
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/registration-steps`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: newStepLabel.trim(), step_type: newStepType }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setStepsError(data.error ?? "Failed"); return; }
+      setRegSteps(s => [...s, data.step as RegStep]);
+      setNewStepLabel("");
+    } catch { setStepsError("Network error"); }
+    finally { setStepSaving(false); }
+  }
+
+  async function saveStepEdit() {
+    if (!editingStep || !editingStepData) return;
+    setStepSaving(true); setStepsError("");
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/registration-steps`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editingStep, ...editingStepData }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setStepsError(data.error ?? "Failed"); return; }
+      setRegSteps(s => s.map(x => x.id === editingStep ? { ...x, ...(data.step as RegStep) } : x));
+      setEditingStep(null); setEditingStepData(null);
+    } catch { setStepsError("Network error"); }
+    finally { setStepSaving(false); }
+  }
+
+  async function deleteRegStep(id: string, label: string) {
+    if (!confirm(`Delete step "${label}"?`)) return;
+    const res  = await fetch(`/api/admin/events/${eventId}/registration-steps`, {
+      method: "DELETE", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    if (res.ok) setRegSteps(s => s.filter(x => x.id !== id));
+    else setStepsError("Delete failed");
+  }
+
+  // ── Pricing Rules state ───────────────────────────────────────────────────
+
+  interface PricingRule {
+    id: string; rule_type: string; label: string; description: string | null;
+    discount_type: string; discount_value: number;
+    min_participants: number | null; max_uses: number | null; uses_count: number;
+    valid_from: string | null; valid_until: string | null;
+    is_active: boolean; created_at: string;
+  }
+
+  const [pricingRules,     setPricingRules]    = useState<PricingRule[]>([]);
+  const [pricingLoading,   setPricingLoading]  = useState(false);
+  const [pricingError,     setPricingError]    = useState("");
+  const [pricingSaving,    setPricingSaving]   = useState(false);
+  const [newRule,          setNewRule]         = useState({ label: "", rule_type: "group", discount_type: "flat", discount_value: "0", min_participants: "", max_uses: "" });
+  type EditingRuleForm = Omit<Partial<PricingRule>, "discount_value"> & { discount_value: string };
+  const [editingRule,      setEditingRule]     = useState<string | null>(null);
+  const [editingRuleData,  setEditingRuleData] = useState<EditingRuleForm>({ label: "", rule_type: "group", discount_type: "flat", discount_value: "0" });
+
+  const loadPricingRules = useCallback(async () => {
+    setPricingLoading(true); setPricingError("");
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/pricing-rules`);
+      const data = await res.json();
+      if (!res.ok) { setPricingError(data.error ?? "Failed"); return; }
+      setPricingRules(data.rules ?? []);
+    } catch { setPricingError("Network error"); }
+    finally { setPricingLoading(false); }
+  }, [eventId]);
+
+  useEffect(() => {
+    if (tab === "pricing" && pricingRules.length === 0 && !pricingLoading) void loadPricingRules();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  async function addPricingRule() {
+    if (!newRule.label.trim()) return;
+    setPricingSaving(true); setPricingError("");
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/pricing-rules`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          label:           newRule.label.trim(),
+          rule_type:       newRule.rule_type,
+          discount_type:   newRule.discount_type,
+          discount_value:  Number(newRule.discount_value) || 0,
+          min_participants:newRule.min_participants ? Number(newRule.min_participants) : null,
+          max_uses:        newRule.max_uses         ? Number(newRule.max_uses)         : null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setPricingError(data.error ?? "Failed"); return; }
+      setPricingRules(r => [...r, data.rule as PricingRule]);
+      setNewRule({ label: "", rule_type: "group", discount_type: "flat", discount_value: "0", min_participants: "", max_uses: "" });
+    } catch { setPricingError("Network error"); }
+    finally { setPricingSaving(false); }
+  }
+
+  async function savePricingEdit() {
+    if (!editingRule) return;
+    setPricingSaving(true); setPricingError("");
+    try {
+      const payload = { id: editingRule, ...editingRuleData, discount_value: Number(editingRuleData.discount_value) || 0 };
+      const res  = await fetch(`/api/admin/events/${eventId}/pricing-rules`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) { setPricingError(data.error ?? "Failed"); return; }
+      setPricingRules(r => r.map(x => x.id === editingRule ? { ...x, ...(data.rule as PricingRule) } : x));
+      setEditingRule(null);
+    } catch { setPricingError("Network error"); }
+    finally { setPricingSaving(false); }
+  }
+
+  async function deletePricingRule(id: string, label: string) {
+    if (!confirm(`Delete pricing rule "${label}"?`)) return;
+    const res  = await fetch(`/api/admin/events/${eventId}/pricing-rules`, {
+      method: "DELETE", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    if (res.ok) setPricingRules(r => r.filter(x => x.id !== id));
+    else setPricingError("Delete failed");
+  }
+
+  // ── Form field inline-edit state ──────────────────────────────────────────
+
+  const [editingFieldData, setEditingFieldData] = useState<{
+    id: string; label: string; field_type: string; placeholder: string;
+    help_text: string; required: boolean; options: string; is_active: boolean;
+    default_value: string; max_length: string; validation_pattern: string;
+    editable_after_reg: boolean; section: string;
+    conditions: FieldCondition[];
+  } | null>(null);
+
+  function startEditField(field: FormField) {
+    setEditingField(field.id);
+    setEditingFieldData({
+      id:                 field.id,
+      label:              field.label,
+      field_type:         field.field_type,
+      placeholder:        field.placeholder        ?? "",
+      help_text:          field.help_text          ?? "",
+      required:           field.required,
+      options:            field.options?.join(", ") ?? "",
+      is_active:          field.is_active,
+      default_value:      field.default_value      ?? "",
+      max_length:         field.max_length          != null ? String(field.max_length) : "",
+      validation_pattern: field.validation_pattern  ?? "",
+      editable_after_reg: field.editable_after_reg  ?? true,
+      section:            field.section             ?? "",
+      conditions:         field.conditions          ?? [],
+    });
+  }
+
+  async function saveFieldEdit() {
+    if (!editingFieldData) return;
+    setFormSaving(true); setFormError("");
+    try {
+      const opts = editingFieldData.options.split(",").map(s => s.trim()).filter(Boolean);
+      const res  = await fetch(`/api/admin/events/${eventId}/form-fields`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id:                 editingFieldData.id,
+          label:              editingFieldData.label,
+          field_type:         editingFieldData.field_type,
+          placeholder:        editingFieldData.placeholder  || null,
+          help_text:          editingFieldData.help_text    || null,
+          required:           editingFieldData.required,
+          is_active:          editingFieldData.is_active,
+          options:            opts,
+          default_value:      editingFieldData.default_value      || null,
+          max_length:         editingFieldData.max_length ? Number(editingFieldData.max_length) : null,
+          validation_pattern: editingFieldData.validation_pattern  || null,
+          editable_after_reg: editingFieldData.editable_after_reg,
+          section:            editingFieldData.section              || null,
+          conditions:         editingFieldData.conditions,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setFormError(data.error ?? "Failed"); return; }
+      setFormFields(fs => fs.map(f => f.id === editingFieldData.id ? (data.field as FormField) : f));
+      setEditingField(null);
+      setEditingFieldData(null);
+    } catch { setFormError("Network error"); }
+    finally { setFormSaving(false); }
   }
 
   async function saveNewField() {
@@ -782,6 +1077,47 @@ export default function EventManagePage() {
                 </div>
               </SectionBoundary>
 
+              <SectionBoundary title="Event Timeline">
+                <div style={{ marginBottom: 18 }}>
+                  <SecHead title="Event Status Timeline" />
+                  {(() => {
+                    const now   = new Date();
+                    const toDate = (d: string | null | undefined) => {
+                      if (!d) return null;
+                      try { return new Date(d.includes("T") ? d : d + "T12:00:00"); } catch { return null; }
+                    };
+                    const regCloses = toDate(ev.registration_closes_at);
+                    const evStart   = toDate(ev.start_date);
+                    const evEnd     = toDate(ev.end_date ?? ev.start_date);
+
+                    const steps = [
+                      { key: "created",   label: "Created",           done: true,                                                                                                          desc: ev.status === "draft" ? "Draft" : "Saved" },
+                      { key: "published", label: "Published",         done: ev.status !== "draft" && ev.status !== "archived",                                                             desc: ev.status === "draft" ? "Not yet" : ev.status === "archived" ? "Archived" : "Live" },
+                      { key: "reg_open",  label: "Registrations",     done: !!(regCloses && now > regCloses) || ev.status === "completed",                                                 desc: regCloses ? (now < regCloses ? regCloses.toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "Closed") : "Open" },
+                      { key: "event",     label: "Event Day",         done: !!(evStart && now > evStart),                                                                                  desc: evStart ? evStart.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }) : "Not set" },
+                      { key: "completed", label: "Completed",         done: ev.status === "completed" || !!(evEnd && now > evEnd && now.getTime() - evEnd.getTime() > 86_400_000),         desc: ev.status === "completed" ? "Done" : "After event" },
+                    ];
+                    const activeIdx = steps.reduce((acc, s, i) => s.done ? i : acc, -1);
+                    return (
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 0, overflowX: "auto", paddingBottom: 4 }}>
+                        {steps.map((step, i) => (
+                          <div key={step.key} style={{ display: "flex", alignItems: "flex-start", flex: 1, minWidth: 70 }}>
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
+                              <div style={{ width: 26, height: 26, borderRadius: "50%", border: `2px solid ${step.done ? "#e8620a" : i === activeIdx + 1 ? "rgba(232,98,10,0.4)" : "rgba(255,255,255,0.1)"}`, background: step.done ? "#e8620a" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: step.done ? "#fff" : "#555", flexShrink: 0, zIndex: 1 }}>
+                                {step.done ? "✓" : i + 1}
+                              </div>
+                              <div style={{ fontSize: 10, fontWeight: step.done ? 700 : 400, color: step.done ? "#e8620a" : i === activeIdx + 1 ? "#ccc" : "#555", textAlign: "center" as const, marginTop: 4, lineHeight: 1.3 }}>{step.label}</div>
+                              <div style={{ fontSize: 9, color: "#444", textAlign: "center" as const, marginTop: 2, lineHeight: 1.3, maxWidth: 72 }}>{step.desc}</div>
+                            </div>
+                            {i < steps.length - 1 && <div style={{ height: 2, flex: 1, background: step.done ? "#e8620a" : "rgba(255,255,255,0.08)", marginTop: 12, minWidth: 12 }} />}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </SectionBoundary>
+
               <SectionBoundary title="Quick Actions">
                 <div style={{ marginBottom: 18 }}>
                   <SecHead title="Quick Actions" />
@@ -1035,10 +1371,17 @@ export default function EventManagePage() {
                           style={{ width: "100%", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", padding: "7px 10px", fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" as const }}>
                           <option value="text">Text (single line)</option>
                           <option value="textarea">Text (multi-line)</option>
-                          <option value="select">Dropdown (select)</option>
+                          <option value="email">Email Address</option>
+                          <option value="phone">Phone Number</option>
                           <option value="number">Number</option>
                           <option value="date">Date</option>
+                          <option value="select">Dropdown (select)</option>
+                          <option value="radio">Radio Buttons</option>
+                          <option value="multi_select">Multi-Select</option>
                           <option value="checkbox">Checkbox (yes/no)</option>
+                          <option value="address">Address</option>
+                          <option value="waiver">Waiver / Consent</option>
+                          <option value="file">File Upload</option>
                         </select>
                       </div>
                       <div>
@@ -1052,7 +1395,7 @@ export default function EventManagePage() {
                           placeholder="Shown below the field" style={{ width: "100%", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", padding: "7px 10px", fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" as const }} />
                       </div>
                     </div>
-                    {(newField.field_type === "select") && (
+                    {(["select", "radio", "multi_select"].includes(newField.field_type)) && (
                       <div style={{ marginBottom: 10 }}>
                         <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4, textTransform: "uppercase" as const, fontWeight: 700 }}>Options (comma-separated) *</label>
                         <input value={newField.options} onChange={e => setNewField(f => ({ ...f, options: e.target.value }))}
@@ -1083,8 +1426,141 @@ export default function EventManagePage() {
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {formFields.map((field, idx) => {
                       const typeIcon: Record<string, string> = { text: "📝", textarea: "📄", select: "📋", number: "#️⃣", date: "📅", checkbox: "☑️" };
+                      const isEditing = editingField === field.id;
                       return (
-                        <div key={field.id} style={{ background: "#111", border: `1px solid ${field.is_active ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.03)"}`, borderRadius: 10, padding: "10px 14px", opacity: field.is_active ? 1 : 0.5 }}>
+                        <div key={field.id} style={{ background: "#111", border: `1px solid ${isEditing ? "rgba(232,98,10,0.3)" : field.is_active ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.03)"}`, borderRadius: 10, padding: "10px 14px", opacity: isEditing ? 1 : field.is_active ? 1 : 0.5 }}>
+                          {/* Inline edit form */}
+                          {isEditing && editingFieldData ? (
+                            <div>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: "#e8620a", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 10 }}>Edit Field</div>
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                                <div>
+                                  <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 3, textTransform: "uppercase" as const, fontWeight: 700 }}>Label *</label>
+                                  <input value={editingFieldData.label} onChange={e => setEditingFieldData(d => d ? { ...d, label: e.target.value } : d)}
+                                    style={{ width: "100%", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#fff", padding: "6px 9px", fontSize: 12, fontFamily: "inherit", boxSizing: "border-box" as const }} />
+                                </div>
+                                <div>
+                                  <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 3, textTransform: "uppercase" as const, fontWeight: 700 }}>Type</label>
+                                  <select value={editingFieldData.field_type} onChange={e => setEditingFieldData(d => d ? { ...d, field_type: e.target.value } : d)}
+                                    style={{ width: "100%", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#fff", padding: "6px 9px", fontSize: 12, fontFamily: "inherit", boxSizing: "border-box" as const }}>
+                                    <option value="text">Text (single line)</option>
+                                    <option value="textarea">Text (multi-line)</option>
+                                    <option value="email">Email Address</option>
+                                    <option value="phone">Phone Number</option>
+                                    <option value="number">Number</option>
+                                    <option value="date">Date</option>
+                                    <option value="select">Dropdown (select)</option>
+                                    <option value="radio">Radio Buttons</option>
+                                    <option value="multi_select">Multi-Select</option>
+                                    <option value="checkbox">Checkbox (yes/no)</option>
+                                    <option value="address">Address</option>
+                                    <option value="waiver">Waiver / Consent</option>
+                                    <option value="file">File Upload</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 3, textTransform: "uppercase" as const, fontWeight: 700 }}>Placeholder</label>
+                                  <input value={editingFieldData.placeholder} onChange={e => setEditingFieldData(d => d ? { ...d, placeholder: e.target.value } : d)}
+                                    style={{ width: "100%", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#fff", padding: "6px 9px", fontSize: 12, fontFamily: "inherit", boxSizing: "border-box" as const }} />
+                                </div>
+                                <div>
+                                  <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 3, textTransform: "uppercase" as const, fontWeight: 700 }}>Help Text</label>
+                                  <input value={editingFieldData.help_text} onChange={e => setEditingFieldData(d => d ? { ...d, help_text: e.target.value } : d)}
+                                    style={{ width: "100%", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#fff", padding: "6px 9px", fontSize: 12, fontFamily: "inherit", boxSizing: "border-box" as const }} />
+                                </div>
+                              </div>
+                              {(["select", "radio", "multi_select"].includes(editingFieldData.field_type)) && (
+                                <div style={{ marginBottom: 8 }}>
+                                  <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 3, textTransform: "uppercase" as const, fontWeight: 700 }}>Options (comma-separated)</label>
+                                  <input value={editingFieldData.options} onChange={e => setEditingFieldData(d => d ? { ...d, options: e.target.value } : d)}
+                                    placeholder="Option A, Option B, Option C"
+                                    style={{ width: "100%", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#fff", padding: "6px 9px", fontSize: 12, fontFamily: "inherit", boxSizing: "border-box" as const }} />
+                                </div>
+                              )}
+
+                              {/* Advanced fields row */}
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+                                <div>
+                                  <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 3, textTransform: "uppercase" as const, fontWeight: 700 }}>Default Value</label>
+                                  <input value={editingFieldData.default_value} onChange={e => setEditingFieldData(d => d ? { ...d, default_value: e.target.value } : d)}
+                                    placeholder="Pre-filled value"
+                                    style={{ width: "100%", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#fff", padding: "6px 9px", fontSize: 12, fontFamily: "inherit", boxSizing: "border-box" as const }} />
+                                </div>
+                                <div>
+                                  <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 3, textTransform: "uppercase" as const, fontWeight: 700 }}>Max Length</label>
+                                  <input type="number" min="1" value={editingFieldData.max_length} onChange={e => setEditingFieldData(d => d ? { ...d, max_length: e.target.value } : d)}
+                                    placeholder="No limit"
+                                    style={{ width: "100%", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#fff", padding: "6px 9px", fontSize: 12, fontFamily: "inherit", boxSizing: "border-box" as const }} />
+                                </div>
+                                <div>
+                                  <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 3, textTransform: "uppercase" as const, fontWeight: 700 }}>Section Label</label>
+                                  <input value={editingFieldData.section} onChange={e => setEditingFieldData(d => d ? { ...d, section: e.target.value } : d)}
+                                    placeholder="e.g. Medical Info"
+                                    style={{ width: "100%", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#fff", padding: "6px 9px", fontSize: 12, fontFamily: "inherit", boxSizing: "border-box" as const }} />
+                                </div>
+                              </div>
+
+                              {/* Conditional Logic builder */}
+                              <div style={{ background: "rgba(232,98,10,0.04)", border: "1px solid rgba(232,98,10,0.12)", borderRadius: 8, padding: "8px 10px", marginBottom: 8 }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                                  <div style={{ fontSize: 10, color: "#e8620a", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: ".07em" }}>Conditional Logic ({editingFieldData.conditions.length} rule{editingFieldData.conditions.length !== 1 ? "s" : ""})</div>
+                                  <button type="button"
+                                    onClick={() => setEditingFieldData(d => d ? { ...d, conditions: [...d.conditions, { field_key: "", operator: "equals", value: "" }] } : d)}
+                                    style={{ fontSize: 11, color: "#e8620a", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 700, padding: 0 }}>
+                                    + Add Rule
+                                  </button>
+                                </div>
+                                {editingFieldData.conditions.length === 0 ? (
+                                  <div style={{ fontSize: 11, color: "#555" }}>Always visible. Add a rule to show this field only when conditions are met.</div>
+                                ) : (
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                    {editingFieldData.conditions.map((cond, ci) => (
+                                      <div key={ci} style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr auto", gap: 5, alignItems: "center" }}>
+                                        <input
+                                          value={cond.field_key}
+                                          onChange={e => setEditingFieldData(d => d ? { ...d, conditions: d.conditions.map((c, i) => i === ci ? { ...c, field_key: e.target.value } : c) } : d)}
+                                          placeholder="field_key"
+                                          style={{ padding: "4px 7px", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#fff", fontSize: 11, fontFamily: "inherit" }}
+                                        />
+                                        <select
+                                          value={cond.operator}
+                                          onChange={e => setEditingFieldData(d => d ? { ...d, conditions: d.conditions.map((c, i) => i === ci ? { ...c, operator: e.target.value as FieldCondition["operator"] } : c) } : d)}
+                                          style={{ padding: "4px 7px", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#fff", fontSize: 11, fontFamily: "inherit" }}>
+                                          <option value="equals">equals</option>
+                                          <option value="not_equals">≠</option>
+                                          <option value="contains">contains</option>
+                                          <option value="is_empty">is empty</option>
+                                          <option value="is_not_empty">not empty</option>
+                                        </select>
+                                        <input
+                                          value={cond.value}
+                                          onChange={e => setEditingFieldData(d => d ? { ...d, conditions: d.conditions.map((c, i) => i === ci ? { ...c, value: e.target.value } : c) } : d)}
+                                          placeholder="value"
+                                          disabled={["is_empty", "is_not_empty"].includes(cond.operator)}
+                                          style={{ padding: "4px 7px", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#fff", fontSize: 11, fontFamily: "inherit", opacity: ["is_empty", "is_not_empty"].includes(cond.operator) ? 0.4 : 1 }}
+                                        />
+                                        <button type="button"
+                                          onClick={() => setEditingFieldData(d => d ? { ...d, conditions: d.conditions.filter((_, i) => i !== ci) } : d)}
+                                          style={{ padding: "3px 6px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 5, color: "#f87171", cursor: "pointer", fontSize: 11 }}>×</button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" as const }}>
+                                <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#aaa", cursor: "pointer" }}>
+                                  <input type="checkbox" checked={editingFieldData.required} onChange={e => setEditingFieldData(d => d ? { ...d, required: e.target.checked } : d)} /> Required
+                                </label>
+                                <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#aaa", cursor: "pointer" }}>
+                                  <input type="checkbox" checked={editingFieldData.editable_after_reg} onChange={e => setEditingFieldData(d => d ? { ...d, editable_after_reg: e.target.checked } : d)} /> Editable after registration
+                                </label>
+                                <div style={{ flex: 1 }} />
+                                <Button size="sm" variant="ghost" onClick={() => { setEditingField(null); setEditingFieldData(null); }}>Cancel</Button>
+                                <Button size="sm" loading={formSaving} onClick={saveFieldEdit}>Save</Button>
+                              </div>
+                            </div>
+                          ) : (
                           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                             <span style={{ fontSize: 16, flexShrink: 0 }}>{typeIcon[field.field_type] ?? "📝"}</span>
                             <div style={{ flex: 1, minWidth: 0 }}>
@@ -1102,10 +1578,12 @@ export default function EventManagePage() {
                             <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                               <button onClick={() => moveField(field.id, "up")}   disabled={idx === 0}                    title="Move up"   style={{ padding: "3px 7px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 5, color: idx === 0 ? "#333" : "#aaa", cursor: idx === 0 ? "default" : "pointer", fontSize: 11 }}>↑</button>
                               <button onClick={() => moveField(field.id, "down")} disabled={idx === formFields.length-1} title="Move down" style={{ padding: "3px 7px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 5, color: idx === formFields.length-1 ? "#333" : "#aaa", cursor: idx === formFields.length-1 ? "default" : "pointer", fontSize: 11 }}>↓</button>
+                              <button onClick={() => startEditField(field)} title="Edit" style={{ padding: "3px 7px", background: "rgba(232,98,10,0.08)", border: "1px solid rgba(232,98,10,0.2)", borderRadius: 5, color: "#e8620a", cursor: "pointer", fontSize: 11 }}>Edit</button>
                               <button onClick={() => toggleFieldActive(field)} title={field.is_active ? "Hide" : "Show"} style={{ padding: "3px 7px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 5, color: "#aaa", cursor: "pointer", fontSize: 11 }}>{field.is_active ? "Hide" : "Show"}</button>
                               <button onClick={() => deleteField(field.id)} title="Delete" style={{ padding: "3px 7px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)", borderRadius: 5, color: "#f87171", cursor: "pointer", fontSize: 11 }}>Del</button>
                             </div>
                           </div>
+                          )}
                         </div>
                       );
                     })}
@@ -1389,6 +1867,259 @@ export default function EventManagePage() {
                     ))}
                   </div>
                 )}
+              </div>
+            </SectionBoundary>
+          )}
+
+          {/* ── REGISTRATION STEPS ───────────────────────────────────────── */}
+          {tab === "steps" && (
+            <SectionBoundary title="Registration Steps">
+              <div style={{ maxWidth: 720 }}>
+                <div style={{ fontSize: 13, color: "#555", marginBottom: 20 }}>
+                  Configure the steps shown during registration. An empty list means a single-page form (default behaviour). Steps are shown in order; hidden steps are skipped.
+                </div>
+                {stepsError && <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#f87171", marginBottom: 16 }}>{stepsError}</div>}
+
+                {/* Existing steps */}
+                {stepsLoading ? <div style={{ fontSize: 13, color: "#555" }}>Loading…</div> : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+                    {regSteps.length === 0 && <div style={{ fontSize: 13, color: "#444", padding: "24px 0", textAlign: "center" }}>No steps configured — using single-page default.</div>}
+                    {regSteps.map((step, idx) => (
+                      <div key={step.id} style={{ background: "#111", border: "1px solid #222", borderRadius: 10, padding: "12px 16px" }}>
+                        {editingStep === step.id && editingStepData ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                              <input value={editingStepData.label ?? ""} onChange={e => setEditingStepData(d => ({ ...d!, label: e.target.value }))} placeholder="Step label" style={{ padding: "7px 10px", background: "#0a0a0a", border: "1px solid #333", borderRadius: 6, color: "#fff", fontFamily: "inherit", fontSize: 13 }} />
+                              <select value={editingStepData.step_type ?? "standard"} onChange={e => setEditingStepData(d => ({ ...d!, step_type: e.target.value }))} style={{ padding: "7px 10px", background: "#0a0a0a", border: "1px solid #333", borderRadius: 6, color: "#fff", fontFamily: "inherit", fontSize: 13, colorScheme: "dark" }}>
+                                <option value="standard">Standard</option>
+                                <option value="custom">Custom</option>
+                                <option value="payment">Payment</option>
+                                <option value="confirmation">Confirmation</option>
+                              </select>
+                            </div>
+                            <input value={editingStepData.description ?? ""} onChange={e => setEditingStepData(d => ({ ...d!, description: e.target.value }))} placeholder="Description (optional)" style={{ padding: "7px 10px", background: "#0a0a0a", border: "1px solid #333", borderRadius: 6, color: "#fff", fontFamily: "inherit", fontSize: 13 }} />
+                            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#888", cursor: "pointer" }}>
+                                <input type="checkbox" checked={editingStepData.is_visible ?? true} onChange={e => setEditingStepData(d => ({ ...d!, is_visible: e.target.checked }))} style={{ accentColor: "#e8620a" }} /> Visible
+                              </label>
+                              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#888", cursor: "pointer" }}>
+                                <input type="checkbox" checked={editingStepData.is_required ?? true} onChange={e => setEditingStepData(d => ({ ...d!, is_required: e.target.checked }))} style={{ accentColor: "#e8620a" }} /> Required
+                              </label>
+                              <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+                                <button onClick={() => { setEditingStep(null); setEditingStepData(null); }} style={{ padding: "5px 12px", background: "transparent", border: "1px solid #333", borderRadius: 6, color: "#888", fontSize: 12, cursor: "pointer" }}>Cancel</button>
+                                <button onClick={saveStepEdit} disabled={stepSaving} style={{ padding: "5px 14px", background: "#e8620a", border: "none", borderRadius: 6, color: "#fff", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>{stepSaving ? "Saving…" : "Save"}</button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <span style={{ fontSize: 18, width: 28, textAlign: "center" }}>{step.icon ?? "📋"}</span>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                                <span style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{idx + 1}. {step.label}</span>
+                                <span style={{ fontSize: 10, padding: "1px 6px", background: "rgba(255,255,255,0.08)", borderRadius: 4, color: "#888" }}>{step.step_type}</span>
+                                {!step.is_visible && <span style={{ fontSize: 10, padding: "1px 6px", background: "rgba(239,68,68,0.1)", borderRadius: 4, color: "#f87171" }}>hidden</span>}
+                              </div>
+                              {step.description && <div style={{ fontSize: 11, color: "#555" }}>{step.description}</div>}
+                            </div>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button onClick={() => { setEditingStep(step.id); setEditingStepData({ ...step }); }} style={{ padding: "4px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid #333", borderRadius: 6, color: "#aaa", fontSize: 11, cursor: "pointer" }}>Edit</button>
+                              <button onClick={() => deleteRegStep(step.id, step.label)} style={{ padding: "4px 10px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 6, color: "#f87171", fontSize: 11, cursor: "pointer" }}>Delete</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add step */}
+                <div style={{ background: "#0d0d0d", border: "1px solid #222", borderRadius: 10, padding: 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#e8620a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Add Step</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 160px auto", gap: 8, alignItems: "flex-end" }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: "#555", marginBottom: 4 }}>Label</div>
+                      <input value={newStepLabel} onChange={e => setNewStepLabel(e.target.value)} onKeyDown={e => e.key === "Enter" && addRegStep()} placeholder="e.g. Personal Info" style={{ width: "100%", padding: "8px 10px", background: "#0a0a0a", border: "1px solid #333", borderRadius: 6, color: "#fff", fontFamily: "inherit", fontSize: 13, boxSizing: "border-box" as const }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: "#555", marginBottom: 4 }}>Type</div>
+                      <select value={newStepType} onChange={e => setNewStepType(e.target.value)} style={{ width: "100%", padding: "8px 10px", background: "#0a0a0a", border: "1px solid #333", borderRadius: 6, color: "#fff", fontFamily: "inherit", fontSize: 13, colorScheme: "dark" }}>
+                        <option value="standard">Standard</option>
+                        <option value="custom">Custom</option>
+                        <option value="payment">Payment</option>
+                        <option value="confirmation">Confirmation</option>
+                      </select>
+                    </div>
+                    <button onClick={addRegStep} disabled={stepSaving || !newStepLabel.trim()} style={{ padding: "8px 18px", background: "#e8620a", border: "none", borderRadius: 6, color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap" as const }}>
+                      {stepSaving ? "Adding…" : "Add Step"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </SectionBoundary>
+          )}
+
+          {/* ── PRICING RULES ────────────────────────────────────────────── */}
+          {tab === "pricing" && (
+            <SectionBoundary title="Pricing Rules">
+              <div style={{ maxWidth: 720 }}>
+                <div style={{ fontSize: 13, color: "#555", marginBottom: 20 }}>
+                  Configure group, corporate, tiered, or referral discount rules. Rules are applied on top of the base category price.
+                </div>
+                {pricingError && <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#f87171", marginBottom: 16 }}>{pricingError}</div>}
+
+                {/* Existing rules */}
+                {pricingLoading ? <div style={{ fontSize: 13, color: "#555" }}>Loading…</div> : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+                    {pricingRules.length === 0 && <div style={{ fontSize: 13, color: "#444", padding: "24px 0", textAlign: "center" }}>No pricing rules configured.</div>}
+                    {pricingRules.map(rule => (
+                      <div key={rule.id} style={{ background: "#111", border: "1px solid #222", borderRadius: 10, padding: "12px 16px" }}>
+                        {editingRule === rule.id ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                              <input value={editingRuleData.label ?? ""} onChange={e => { const v = e.target.value; setEditingRuleData(d => ({ ...d, label: v } as EditingRuleForm)); }} placeholder="Label" style={{ padding: "7px 10px", background: "#0a0a0a", border: "1px solid #333", borderRadius: 6, color: "#fff", fontFamily: "inherit", fontSize: 13 }} />
+                              <select value={editingRuleData.discount_type ?? "flat"} onChange={e => { const v = e.target.value; setEditingRuleData(d => ({ ...d, discount_type: v } as EditingRuleForm)); }} style={{ padding: "7px 10px", background: "#0a0a0a", border: "1px solid #333", borderRadius: 6, color: "#fff", fontFamily: "inherit", fontSize: 13, colorScheme: "dark" }}>
+                                <option value="flat">Flat (₹)</option>
+                                <option value="percent">Percent (%)</option>
+                              </select>
+                              <input type="number" min="0" value={editingRuleData.discount_value ?? "0"} onChange={e => { const v = e.target.value; setEditingRuleData(d => ({ ...d, discount_value: v } as EditingRuleForm)); }} placeholder="Value" style={{ padding: "7px 10px", background: "#0a0a0a", border: "1px solid #333", borderRadius: 6, color: "#fff", fontFamily: "inherit", fontSize: 13 }} />
+                            </div>
+                            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#888", cursor: "pointer" }}>
+                                <input type="checkbox" checked={editingRuleData.is_active ?? true} onChange={e => setEditingRuleData(d => ({ ...d, is_active: e.target.checked }))} style={{ accentColor: "#e8620a" }} /> Active
+                              </label>
+                              <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+                                <button onClick={() => setEditingRule(null)} style={{ padding: "5px 12px", background: "transparent", border: "1px solid #333", borderRadius: 6, color: "#888", fontSize: 12, cursor: "pointer" }}>Cancel</button>
+                                <button onClick={savePricingEdit} disabled={pricingSaving} style={{ padding: "5px 14px", background: "#e8620a", border: "none", borderRadius: 6, color: "#fff", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>{pricingSaving ? "Saving…" : "Save"}</button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                                <span style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{rule.label}</span>
+                                <span style={{ fontSize: 10, padding: "1px 6px", background: "rgba(255,255,255,0.08)", borderRadius: 4, color: "#888" }}>{rule.rule_type}</span>
+                                {!rule.is_active && <span style={{ fontSize: 10, padding: "1px 6px", background: "rgba(239,68,68,0.1)", borderRadius: 4, color: "#f87171" }}>inactive</span>}
+                              </div>
+                              <div style={{ fontSize: 11, color: "#555" }}>
+                                {rule.discount_type === "flat" ? `₹${rule.discount_value} off` : `${rule.discount_value}% off`}
+                                {rule.min_participants ? ` · min ${rule.min_participants} participants` : ""}
+                                {rule.max_uses ? ` · ${rule.uses_count}/${rule.max_uses} uses` : ""}
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button onClick={() => { setEditingRule(rule.id); setEditingRuleData({ ...rule, discount_value: String(rule.discount_value) } as EditingRuleForm); }} style={{ padding: "4px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid #333", borderRadius: 6, color: "#aaa", fontSize: 11, cursor: "pointer" }}>Edit</button>
+                              <button onClick={() => deletePricingRule(rule.id, rule.label)} style={{ padding: "4px 10px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 6, color: "#f87171", fontSize: 11, cursor: "pointer" }}>Delete</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add rule */}
+                <div style={{ background: "#0d0d0d", border: "1px solid #222", borderRadius: 10, padding: 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#e8620a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Add Rule</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 140px 120px 100px auto", gap: 8, alignItems: "flex-end" }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: "#555", marginBottom: 4 }}>Label</div>
+                      <input value={newRule.label} onChange={e => setNewRule(r => ({ ...r, label: e.target.value }))} placeholder="e.g. Group of 5" style={{ width: "100%", padding: "8px 10px", background: "#0a0a0a", border: "1px solid #333", borderRadius: 6, color: "#fff", fontFamily: "inherit", fontSize: 13, boxSizing: "border-box" as const }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: "#555", marginBottom: 4 }}>Type</div>
+                      <select value={newRule.rule_type} onChange={e => setNewRule(r => ({ ...r, rule_type: e.target.value }))} style={{ width: "100%", padding: "8px 10px", background: "#0a0a0a", border: "1px solid #333", borderRadius: 6, color: "#fff", fontFamily: "inherit", fontSize: 13, colorScheme: "dark" }}>
+                        <option value="group">Group</option>
+                        <option value="corporate">Corporate</option>
+                        <option value="tiered">Tiered</option>
+                        <option value="referral">Referral</option>
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: "#555", marginBottom: 4 }}>Discount</div>
+                      <select value={newRule.discount_type} onChange={e => setNewRule(r => ({ ...r, discount_type: e.target.value }))} style={{ width: "100%", padding: "8px 10px", background: "#0a0a0a", border: "1px solid #333", borderRadius: 6, color: "#fff", fontFamily: "inherit", fontSize: 13, colorScheme: "dark" }}>
+                        <option value="flat">Flat (₹)</option>
+                        <option value="percent">Percent (%)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: "#555", marginBottom: 4 }}>Value</div>
+                      <input type="number" min="0" value={newRule.discount_value} onChange={e => setNewRule(r => ({ ...r, discount_value: e.target.value }))} placeholder="0" style={{ width: "100%", padding: "8px 10px", background: "#0a0a0a", border: "1px solid #333", borderRadius: 6, color: "#fff", fontFamily: "inherit", fontSize: 13, boxSizing: "border-box" as const }} />
+                    </div>
+                    <button onClick={addPricingRule} disabled={pricingSaving || !newRule.label.trim()} style={{ padding: "8px 16px", background: "#e8620a", border: "none", borderRadius: 6, color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap" as const }}>
+                      {pricingSaving ? "Adding…" : "Add Rule"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </SectionBoundary>
+          )}
+
+          {/* ── VERSION HISTORY ──────────────────────────────────────────── */}
+          {tab === "versions" && (
+            <SectionBoundary title="Version History">
+              <div style={{ maxWidth: 680 }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20, gap: 12, flexWrap: "wrap" as const }}>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 4 }}>Event Version History</div>
+                    <div style={{ fontSize: 12, color: "#555" }}>Save checkpoints before making changes. Restoring a version overwrites event details — registrations are never affected.</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+                    <input
+                      value={versionLabel}
+                      onChange={e => setVersionLabel(e.target.value)}
+                      placeholder="Checkpoint label (optional)"
+                      style={{ padding: "7px 11px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 12, fontFamily: "inherit", width: 220 }}
+                    />
+                    <Button size="sm" loading={versionSaving} onClick={saveVersionCheckpoint}>📌 Save Checkpoint</Button>
+                  </div>
+                </div>
+
+                {versionsError && <Alert variant="error" style={{ marginBottom: 12 }}>{versionsError}</Alert>}
+
+                {versionsLoading ? (
+                  <div style={{ textAlign: "center", padding: "2rem", color: "#555" }}><Spinner /></div>
+                ) : versions.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "3rem 2rem", background: "#111", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, color: "#555" }}>
+                    <div style={{ fontSize: 28, marginBottom: 8 }}>🕐</div>
+                    <div style={{ fontSize: 13, marginBottom: 4 }}>No checkpoints yet</div>
+                    <div style={{ fontSize: 11 }}>Save a checkpoint before making changes to preserve a restore point.</div>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {versions.map((v, idx) => (
+                      <div key={v.id} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }}>
+                        {/* Version badge */}
+                        <div style={{ flexShrink: 0, width: 36, height: 36, borderRadius: "50%", background: idx === 0 ? "rgba(232,98,10,0.15)" : "rgba(255,255,255,0.05)", border: `1px solid ${idx === 0 ? "rgba(232,98,10,0.3)" : "rgba(255,255,255,0.08)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: idx === 0 ? "#e8620a" : "#555" }}>
+                          v{v.version_number}
+                        </div>
+                        {/* Info */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: "#ccc", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+                            {v.label ?? `Version ${v.version_number}`}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>
+                            {new Date(v.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                            {v.created_by && ` · ${v.created_by}`}
+                            {idx === 0 && <span style={{ marginLeft: 8, color: "#e8620a", fontWeight: 600 }}>Latest</span>}
+                          </div>
+                        </div>
+                        {/* Restore */}
+                        <button
+                          onClick={() => void restoreVersion(v.id, v.version_number)}
+                          disabled={restoring === v.id}
+                          style={{ flexShrink: 0, padding: "6px 14px", borderRadius: 7, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#aaa", fontSize: 12, cursor: restoring === v.id ? "wait" : "pointer", fontFamily: "inherit" }}>
+                          {restoring === v.id ? "Restoring…" : "Restore"}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{ fontSize: 11, color: "#333", marginTop: 14, textAlign: "center" }}>
+                  Up to 50 checkpoints stored · oldest are automatically replaced when limit is reached
+                </div>
               </div>
             </SectionBoundary>
           )}

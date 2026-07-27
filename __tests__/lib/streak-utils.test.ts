@@ -57,6 +57,12 @@ describe("calcDateGapStreak", () => {
 
 // ── calcMissToleranceStreak ───────────────────────────────────────────────────
 
+// Use relative dates so these tests never go stale as time passes.
+function dateStrAt(daysAgo: number): string {
+  const d = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
+  return d.toISOString().split("T")[0];
+}
+
 describe("calcMissToleranceStreak", () => {
   test("empty array returns 0", () => {
     expect(calcMissToleranceStreak([])).toBe(0);
@@ -64,38 +70,38 @@ describe("calcMissToleranceStreak", () => {
 
   test("all attended returns full count", () => {
     const sessions = [
-      { attended: true, date: "2026-06-10" },
-      { attended: true, date: "2026-06-03" },
-      { attended: true, date: "2026-05-27" },
+      { attended: true, date: dateStrAt(0)  },
+      { attended: true, date: dateStrAt(7)  },
+      { attended: true, date: dateStrAt(14) },
     ];
     expect(calcMissToleranceStreak(sessions)).toBe(3);
   });
 
   test("single miss is tolerated — streak continues", () => {
     const sessions = [
-      { attended: true,  date: "2026-06-10" },
-      { attended: false, date: "2026-06-03" }, // 1 miss — tolerated
-      { attended: true,  date: "2026-05-27" },
+      { attended: true,  date: dateStrAt(0)  },
+      { attended: false, date: dateStrAt(7)  }, // 1 miss — tolerated
+      { attended: true,  date: dateStrAt(14) },
     ];
     expect(calcMissToleranceStreak(sessions)).toBe(2);
   });
 
   test("two consecutive misses end the streak", () => {
     const sessions = [
-      { attended: true,  date: "2026-06-10" },
-      { attended: false, date: "2026-06-03" },
-      { attended: false, date: "2026-05-27" }, // 2nd consecutive miss — breaks
-      { attended: true,  date: "2026-05-20" }, // not counted
+      { attended: true,  date: dateStrAt(0)  },
+      { attended: false, date: dateStrAt(7)  },
+      { attended: false, date: dateStrAt(14) }, // 2nd consecutive miss — breaks
+      { attended: true,  date: dateStrAt(21) }, // not counted
     ];
     expect(calcMissToleranceStreak(sessions)).toBe(1);
   });
 
   test("leading misses at the front do not count against initial streak", () => {
-    // Two misses at the front: streak should be 0 right away
+    // Most recent sessions are misses: streak is 0
     const sessions = [
-      { attended: false, date: "2026-06-10" },
-      { attended: false, date: "2026-06-03" },
-      { attended: true,  date: "2026-05-27" },
+      { attended: false, date: dateStrAt(0)  },
+      { attended: false, date: dateStrAt(7)  },
+      { attended: true,  date: dateStrAt(14) },
     ];
     expect(calcMissToleranceStreak(sessions)).toBe(0);
   });
@@ -103,17 +109,17 @@ describe("calcMissToleranceStreak", () => {
   test("sorts by date descending internally", () => {
     // Input in ascending order — must be re-sorted
     const sessions = [
-      { attended: true, date: "2026-05-27" },
-      { attended: true, date: "2026-06-03" },
-      { attended: true, date: "2026-06-10" },
+      { attended: true, date: dateStrAt(14) },
+      { attended: true, date: dateStrAt(7)  },
+      { attended: true, date: dateStrAt(0)  },
     ];
     expect(calcMissToleranceStreak(sessions)).toBe(3);
   });
 
   test("does not mutate the input array", () => {
     const sessions = [
-      { attended: true, date: "2026-06-10" },
-      { attended: true, date: "2026-06-03" },
+      { attended: true, date: dateStrAt(0) },
+      { attended: true, date: dateStrAt(7) },
     ];
     const copy = [...sessions];
     calcMissToleranceStreak(sessions);

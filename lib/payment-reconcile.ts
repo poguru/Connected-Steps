@@ -18,6 +18,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { getCapturedPayment } from "@/lib/razorpay-client";
 import { handleEventQrEmail, handleInvoiceGenerate } from "@/lib/job-handlers";
 import { enqueueJob } from "@/lib/job-queue";
+import { logger } from "@/lib/logger";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -123,7 +124,7 @@ export async function runReconciliation(opts: {
   const report: ReconcileRow[] = [];
   let recovered = 0, stillPending = 0, apiErrors = 0;
 
-  console.log(`[${callerLabel}/reconcile] starting — ${registrations.length} pending, dry_run=${dryRun}`);
+  logger.info(`${callerLabel}/reconcile`, "Starting reconciliation", { count: registrations.length, dryRun });
 
   // Process in parallel batches to stay within Razorpay rate limits
   for (let i = 0; i < registrations.length; i += maxBatch) {
@@ -138,7 +139,7 @@ export async function runReconciliation(opts: {
         return { reg, captured, error: null, skipped: null };
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
-        console.error(`[${callerLabel}/reconcile] Razorpay API error order=${reg.razorpay_order_id}: ${msg}`);
+        logger.error(`${callerLabel}/reconcile`, "Razorpay API error", { orderId: reg.razorpay_order_id, error: msg });
         return { reg, captured: null, error: msg.slice(0, 200), skipped: null };
       }
     }));
@@ -221,14 +222,14 @@ export async function runReconciliation(opts: {
       if (outcome === "recovered") {
         recovered++;
         row.category = "recovered" as unknown as ReconcileCategory;
-        console.log(`[${callerLabel}/reconcile] ✅ recovered=${reg.registration_code} payment=${captured.id}`);
+        logger.info(`${callerLabel}/reconcile`, "Recovered", { code: reg.registration_code, paymentId: captured.id });
       } else if (outcome === "already_paid_in_db") {
         row.category = "already_reconciled";
         row.match    = true;
-        console.log(`[${callerLabel}/reconcile] ℹ️  already_paid=${reg.registration_code}`);
+        logger.info(`${callerLabel}/reconcile`, "Already paid in DB", { code: reg.registration_code });
       } else {
         apiErrors++;
-        console.error(`[${callerLabel}/reconcile] ❌ recovery_failed=${reg.registration_code}`);
+        logger.error(`${callerLabel}/reconcile`, "Recovery failed", { code: reg.registration_code });
       }
       report.push(row);
     }
@@ -243,7 +244,7 @@ export async function runReconciliation(opts: {
     recovered,
   };
 
-  console.log(`[${callerLabel}/reconcile] done in ${durationMs}ms — recovered=${recovered} pending=${stillPending} errors=${apiErrors}`);
+  logger.info(`${callerLabel}/reconcile`, "Done", { durationMs, recovered, stillPending, errors: apiErrors });
 
   return {
     checked:       registrations.length,
@@ -284,7 +285,7 @@ async function recoverSingle(
     .eq("payment_status", "pending");   // optimistic lock
 
   if (updateErr) {
-    console.error(`[${logLabel}/reconcile] DB update failed ${reg.registration_code}:`, updateErr.message);
+    logger.error(`${logLabel}/reconcile`, "DB update failed", { code: reg.registration_code, error: updateErr.message });
     return "recovery_failed";
   }
 
@@ -323,10 +324,10 @@ async function recoverSingle(
 
   // Fire immediately — don't wait for the daily cron
   await handleEventQrEmail(qrPayload).catch(e =>
-    console.error(`[${logLabel}/reconcile] QR email failed ${reg.registration_code}:`, e)
+    logger.error(`${logLabel}/reconcile`, "QR email failed", { code: reg.registration_code, error: String(e) })
   );
   await handleInvoiceGenerate(invoicePayload).catch(e =>
-    console.error(`[${logLabel}/reconcile] Invoice failed ${reg.registration_code}:`, e)
+    logger.error(`${logLabel}/reconcile`, "Invoice failed", { code: reg.registration_code, error: String(e) })
   );
 
   return "recovered";

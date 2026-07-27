@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 // GET /api/health
-// Probes the database and returns component statuses.
+// Probes database, cache, job queue, and critical env vars.
 // Used by monitoring systems, uptime checks, and deployment readiness gates.
 //
 // Response shape is STABLE — do not remove fields; only add optional ones.
@@ -16,6 +16,16 @@ interface ComponentStatus {
   error?:  string;
 }
 
+interface JobQueueStatus extends ComponentStatus {
+  pending?: number;
+  dead?:    number;
+}
+
+interface EnvStatus {
+  ok:        boolean;
+  configured: boolean;
+}
+
 interface HealthResponse {
   ok:        boolean;
   version:   string;
@@ -23,8 +33,11 @@ interface HealthResponse {
   ts:        string;
   uptime_s:  number;
   components: {
-    database: ComponentStatus;
-    cache:    ComponentStatus;
+    database:  ComponentStatus;
+    cache:     ComponentStatus;
+    job_queue: JobQueueStatus;
+    email:     EnvStatus;
+    whatsapp:  EnvStatus;
   };
 }
 
@@ -32,8 +45,11 @@ const startMs = Date.now();
 
 export async function GET(): Promise<NextResponse<HealthResponse>> {
   const components: HealthResponse["components"] = {
-    database: { ok: false, latency: 0 },
-    cache:    { ok: false, latency: 0 },
+    database:  { ok: false, latency: 0 },
+    cache:     { ok: false, latency: 0 },
+    job_queue: { ok: false, latency: 0 },
+    email:     { ok: false, configured: false },
+    whatsapp:  { ok: false, configured: false },
   };
 
   // ── Database probe ────────────────────────────────────────────────────────
@@ -89,7 +105,45 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
     }
   }
 
-  const allOk = components.database.ok && components.cache.ok;
+  // ── Job queue probe ───────────────────────────────────────────────────────
+  // Count pending and dead jobs — dead jobs are an alert signal.
+  // Dead count > 0 marks this component degraded (needs manual review).
+  const jqStart = Date.now();
+  try {
+    const db = getSupabaseServer();
+    const [pendingRes, deadRes] = await Promise.all([
+      db.from("job_queue").select("*", { count: "exact", head: true }).eq("status", "pending"),
+      db.from("job_queue").select("*", { count: "exact", head: true }).eq("status", "dead"),
+    ]);
+
+    const pendingCount = pendingRes.count ?? 0;
+    const deadCount    = deadRes.count    ?? 0;
+
+    components.job_queue = {
+      ok:      !pendingRes.error && !deadRes.error && deadCount === 0,
+      latency: Date.now() - jqStart,
+      pending: pendingCount,
+      dead:    deadCount,
+      error:   pendingRes.error?.message ?? deadRes.error?.message,
+    };
+  } catch (e: unknown) {
+    components.job_queue = {
+      ok:      false,
+      latency: Date.now() - jqStart,
+      error:   e instanceof Error ? e.message : "unknown",
+    };
+  }
+
+  // ── Email service probe ───────────────────────────────────────────────────
+  // ZeptoMail integration — just verify env is configured (pinging would use quota).
+  const emailConfigured = !!(process.env.ZEPTO_MAIL_API_KEY || process.env.ZEPTO_TOKEN);
+  components.email = { ok: emailConfigured, configured: emailConfigured };
+
+  // ── WhatsApp probe ────────────────────────────────────────────────────────
+  const waConfigured = !!(process.env.META_WA_TOKEN && process.env.META_WA_PHONE_ID);
+  components.whatsapp = { ok: waConfigured, configured: waConfigured };
+
+  const allOk = components.database.ok && components.cache.ok;  // hard failures only
 
   const body: HealthResponse = {
     ok:        allOk,

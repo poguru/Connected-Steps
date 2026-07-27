@@ -363,6 +363,11 @@ function RegistrationCard({ reg, userToken, isUpcoming, onShowQR, onRefresh }: {
   const banner    = ev?.banner_image ?? ev?.cover_image ?? null;
   const participants = reg.participants ?? [];
 
+  const daysUntilEvent = ev ? (() => {
+    const d = new Date(ev.start_date + "T00:00:00+05:30");
+    return Math.ceil((d.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  })() : null;
+
   async function submitCancelRequest(e: React.FormEvent) {
     e.preventDefault();
     if (!cancelReason.trim() || cancelReason.trim().length < 10) return;
@@ -427,11 +432,24 @@ function RegistrationCard({ reg, userToken, isUpcoming, onShowQR, onRefresh }: {
               <PayBadge status={reg.status} payment={reg.payment_status} />
               {reg.final_price > 0 && <Chip color="#888">₹{reg.final_price}</Chip>}
               {participants.length > 1 && <Chip color="#a78bfa">{participants.length} participants</Chip>}
+              {isUpcoming && daysUntilEvent !== null && daysUntilEvent >= 0 && (
+                <Chip color={daysUntilEvent === 0 ? "#f87171" : daysUntilEvent <= 7 ? "#fb923c" : "#60a5fa"}>
+                  {daysUntilEvent === 0 ? "Today!" : daysUntilEvent === 1 ? "Tomorrow" : `${daysUntilEvent}d away`}
+                </Chip>
+              )}
             </div>
           </div>
 
           {/* Top-right actions */}
           <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: "flex-start", flexWrap: "wrap" }}>
+            {/* View Hub */}
+            <a href={`/my-events/${reg.registration_code}`}
+              style={{ fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8,
+                background: "rgba(232,98,10,0.1)", border: "1px solid rgba(232,98,10,0.3)",
+                color: "#e8620a", textDecoration: "none", whiteSpace: "nowrap" }}>
+              View Hub →
+            </a>
+
             {/* Invoice */}
             {reg.invoice_number && (
               <button
@@ -671,7 +689,7 @@ export default function MyEventsDashboard() {
   const [regs,      setRegs]      = useState<Reg[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [apiErr,    setApiErr]    = useState<string | null>(null);
-  const [tab,       setTab]       = useState<"upcoming" | "past">("upcoming");
+  const [tab,       setTab]       = useState<"upcoming" | "past" | "waitlisted" | "cancelled">("upcoming");
   const [userToken, setUserToken] = useState("");
   const [qrModal,   setQrModal]   = useState<QRModalState | null>(null);
 
@@ -700,9 +718,14 @@ export default function MyEventsDashboard() {
     loadRegs(token);
   }, [loadRegs]);
 
-  const upcoming = regs.filter(r => r.status !== "cancelled" && !isEventOver(r.events));
-  const past     = regs.filter(r => r.status !== "cancelled" &&  isEventOver(r.events));
-  const shown    = tab === "upcoming" ? upcoming : past;
+  const upcoming   = regs.filter(r => r.status !== "cancelled" && r.status !== "waitlisted" && !isEventOver(r.events));
+  const past       = regs.filter(r => r.status !== "cancelled" && r.status !== "waitlisted" &&  isEventOver(r.events));
+  const waitlisted = regs.filter(r => r.status === "waitlisted");
+  const cancelled  = regs.filter(r => r.status === "cancelled");
+  const shown = tab === "upcoming"   ? upcoming
+              : tab === "past"       ? past
+              : tab === "waitlisted" ? waitlisted
+              : cancelled;
 
   return (
     <div style={{ minHeight: "100vh", background: "#080808", color: "#fff", fontFamily: "'Inter',system-ui,sans-serif" }}>
@@ -723,18 +746,20 @@ export default function MyEventsDashboard() {
       <div style={{ maxWidth: 720, margin: "0 auto", padding: "clamp(1rem,4vw,2rem) 16px 80px" }}>
 
         {/* Tabs */}
-        <div style={{ display: "flex", gap: 4, padding: 3, background: "rgba(255,255,255,0.04)",
-          borderRadius: 10, width: "fit-content", marginBottom: 24 }}>
-          {(["upcoming", "past"] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)}
-              style={{ padding: "7px 18px", borderRadius: 7, border: "none", cursor: "pointer",
-                fontSize: 13, fontWeight: 600, fontFamily: "inherit",
-                background: tab === t ? "#e8620a" : "transparent",
-                color: tab === t ? "#fff" : "rgba(255,255,255,0.5)" }}>
-              {t === "upcoming"
-                ? `Upcoming${!loading ? ` (${upcoming.length})` : ""}`
-                : `Past${!loading ? ` (${past.length})` : ""}`
-              }
+        <div style={{ display: "flex", gap: 4, overflowX: "auto", paddingBottom: 2, marginBottom: 24 }}>
+          {([
+            { key: "upcoming",   label: "Upcoming",   count: upcoming.length },
+            { key: "past",       label: "Past",       count: past.length },
+            { key: "waitlisted", label: "Waitlist",   count: waitlisted.length },
+            { key: "cancelled",  label: "Cancelled",  count: cancelled.length },
+          ] as const).map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              style={{ padding: "7px 16px", borderRadius: 20, border: "1px solid", cursor: "pointer",
+                fontSize: 12, fontWeight: 600, fontFamily: "inherit", whiteSpace: "nowrap" as const,
+                background: tab === t.key ? "rgba(232,98,10,0.12)" : "transparent",
+                borderColor: tab === t.key ? "#e8620a" : "rgba(255,255,255,0.1)",
+                color: tab === t.key ? "#e8620a" : "rgba(255,255,255,0.45)" }}>
+              {t.label}{!loading ? ` (${t.count})` : ""}
             </button>
           ))}
         </div>

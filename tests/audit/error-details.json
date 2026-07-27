@@ -1,0 +1,48 @@
+{
+  "/": {
+    "errors": [
+      "The Content Security Policy directive 'upgrade-insecure-requests' is ignored when delivered in a report-only policy."
+    ],
+    "netFails": [],
+    "brokenImages": [
+      "https://jwhnxsfhkoodjdhbibvn.supabase.co/storage/v1/object/public/session-photos/c40ec5d6-314e-4375-94f2-71ef34310683/group.jpeg",
+      "https://jwhnxsfhkoodjdhbibvn.supabase.co/storage/v1/object/public/session-photos/129552ed-9b0a-46e4-bf06-c064affc43d6/group.jpeg",
+      "https://jwhnxsfhkoodjdhbibvn.supabase.co/storage/v1/object/public/session-photos/40aa6ac2-0203-4e2b-b679-faf67c77d9d1/group.jpeg",
+      "https://jwhnxsfhkoodjdhbibvn.supabase.co/storage/v1/object/public/session-photos/46888dee-7655-49a1-a89b-57665377edee/group.jpeg",
+      "https://www.connectedsteps.in/_next/image?url=%2Flogo.png&w=96&q=75"
+    ]
+  },
+  "/sessions": {
+    "errors": [
+      "The Content Security Policy directive 'upgrade-insecure-requests' is ignored when delivered in a report-only policy."
+    ],
+    "netFails": [],
+    "brokenImages": []
+  },
+  "/events": {
+    "errors": [
+      "The Content Security Policy directive 'upgrade-insecure-requests' is ignored when delivered in a report-only policy."
+    ],
+    "netFails": [],
+    "brokenImages": []
+  },
+  "/pricing": {
+    "errors": [
+      "The Content Security Policy directive 'upgrade-insecure-requests' is ignored when delivered in a report-only policy.",
+      "The Content Security Policy directive 'upgrade-insecure-requests' is ignored when delivered in a report-only policy.",
+      "Loading the script 'https://cdn.razorpay.com/static/cx/razorpay-risk-detection/bundle.js' violates the following Content Security Policy directive: \"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com\". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked."
+    ],
+    "netFails": [
+      "GET https://cdn.razorpay.com/static/cx/razorpay-risk-detection/bundle.js — csp",
+      "GET https://checkout-static-next.razorpay.com/build/undefined — net::ERR_BLOCKED_BY_ORB"
+    ],
+    "brokenImages": []
+  },
+  "/contact": {
+    "errors": [
+      "The Content Security Policy directive 'upgrade-insecure-requests' is ignored when delivered in a report-only policy."
+    ],
+    "netFails": [],
+    "brokenImages": []
+  }
+}

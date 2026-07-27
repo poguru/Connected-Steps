@@ -4,7 +4,10 @@ import { isAdminOrCoach } from "@/lib/admin-auth";
 
 type Params = { params: Promise<{ id: string }> };
 
-const VALID_TYPES = ["text", "textarea", "select", "number", "date", "checkbox"] as const;
+const VALID_TYPES = [
+  "text", "textarea", "select", "number", "date", "checkbox",
+  "email", "phone", "radio", "multi_select", "address", "waiver", "signature", "file",
+] as const;
 type FieldType = typeof VALID_TYPES[number];
 
 function slugify(s: string): string {
@@ -21,7 +24,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   const { data, error } = await db
     .from("event_form_fields")
-    .select("id, field_key, field_type, label, placeholder, help_text, required, options, display_order, is_active, created_at")
+    .select("id, field_key, field_type, label, placeholder, help_text, required, options, display_order, is_active, created_at, conditions, default_value, max_length, validation_pattern, editable_after_reg, section")
     .eq("event_id", id)
     .order("display_order", { ascending: true })
     .order("created_at", { ascending: true });
@@ -106,13 +109,21 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const db = getSupabaseServer();
 
   const allowed: Record<string, unknown> = {};
-  if (body.label       !== undefined) allowed.label       = String(body.label).trim();
-  if (body.field_type  !== undefined && VALID_TYPES.includes(body.field_type as FieldType)) allowed.field_type = body.field_type;
-  if (body.placeholder !== undefined) allowed.placeholder = body.placeholder ? String(body.placeholder).trim() : null;
-  if (body.help_text   !== undefined) allowed.help_text   = body.help_text   ? String(body.help_text).trim()   : null;
-  if (body.required    !== undefined) allowed.required    = body.required === true;
-  if (body.is_active   !== undefined) allowed.is_active   = body.is_active === true;
-  if (body.display_order !== undefined) allowed.display_order = Number(body.display_order);
+  if (body.label              !== undefined) allowed.label              = String(body.label).trim();
+  if (body.field_type         !== undefined && VALID_TYPES.includes(body.field_type as FieldType)) allowed.field_type = body.field_type;
+  if (body.placeholder        !== undefined) allowed.placeholder        = body.placeholder        ? String(body.placeholder).trim()        : null;
+  if (body.help_text          !== undefined) allowed.help_text          = body.help_text          ? String(body.help_text).trim()          : null;
+  if (body.required           !== undefined) allowed.required           = body.required           === true;
+  if (body.is_active          !== undefined) allowed.is_active          = body.is_active          === true;
+  if (body.editable_after_reg !== undefined) allowed.editable_after_reg = body.editable_after_reg !== false;
+  if (body.display_order      !== undefined) allowed.display_order      = Number(body.display_order);
+  if (body.max_length         !== undefined) allowed.max_length         = body.max_length != null ? Number(body.max_length) : null;
+  if (body.default_value      !== undefined) allowed.default_value      = body.default_value      ? String(body.default_value)      : null;
+  if (body.validation_pattern !== undefined) allowed.validation_pattern = body.validation_pattern ? String(body.validation_pattern) : null;
+  if (body.section            !== undefined) allowed.section            = body.section            ? String(body.section).trim()     : null;
+  if (body.conditions !== undefined && Array.isArray(body.conditions)) {
+    allowed.conditions = body.conditions;
+  }
   if (body.options !== undefined && Array.isArray(body.options)) {
     allowed.options = (body.options as unknown[]).filter(o => typeof o === "string").map(o => String(o).trim()).filter(Boolean);
   }

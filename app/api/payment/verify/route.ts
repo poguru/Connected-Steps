@@ -1,20 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import Razorpay from "razorpay";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
 import { sendEmail, sendWhatsApp, membershipWAParams } from "@/lib/notify";
 import { autoFeedMembershipActivated } from "@/lib/auto-feed";
 import { enqueueJob } from "@/lib/job-queue";
 import { handleInvoiceGenerate, handleMembershipEmail } from "@/lib/job-handlers";
-
-
-function getRazorpay() {
-  const key_id     = process.env.RAZORPAY_KEY_ID;
-  const key_secret = process.env.RAZORPAY_KEY_SECRET;
-  if (!key_id || !key_secret) throw new Error("Razorpay keys not configured");
-  return new Razorpay({ key_id, key_secret });
-}
+import { getRazorpaySDK as getRazorpay } from "@/lib/razorpay-client";
+import { logger } from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
   // Authenticate the request — email MUST come from the verified token,
@@ -42,7 +35,7 @@ export async function POST(req: NextRequest) {
   // ── Step 1: Verify Razorpay HMAC signature ────────────────────────────────
   const razorpaySecret = process.env.RAZORPAY_KEY_SECRET;
   if (!razorpaySecret) {
-    console.error("[payment/verify] RAZORPAY_KEY_SECRET not set");
+    logger.error("payment/verify", "RAZORPAY_KEY_SECRET not configured");
     return NextResponse.json({ error: "Payment verification unavailable" }, { status: 503 });
   }
 
@@ -52,7 +45,7 @@ export async function POST(req: NextRequest) {
     .digest("hex");
 
   if (expected !== razorpay_signature) {
-    console.warn(`[payment/verify] Invalid signature for order ${razorpay_order_id} payment ${razorpay_payment_id}`);
+    logger.warn("payment/verify", "Invalid signature — possible tampering", { email, orderId: razorpay_order_id, paymentId: razorpay_payment_id });
     return NextResponse.json({ error: "Invalid payment signature" }, { status: 400 });
   }
 
@@ -85,13 +78,13 @@ export async function POST(req: NextRequest) {
     };
 
     if (!order?.id) {
-      console.error(`[payment/verify] Order ${razorpay_order_id} not found in Razorpay`);
+      logger.error("payment/verify", "Order not found in Razorpay", { email, orderId: razorpay_order_id });
       return NextResponse.json({ error: "Order not found" }, { status: 400 });
     }
 
     // Validate order status — must be "paid" (Razorpay sets this after capture)
     if (order.status !== "paid") {
-      console.warn(`[payment/verify] Order ${razorpay_order_id} status="${order.status}" — expected "paid"`);
+      logger.warn("payment/verify", "Order not yet paid", { email, orderId: razorpay_order_id, status: order.status });
       return NextResponse.json({ error: "Payment not completed" }, { status: 400 });
     }
 
@@ -103,32 +96,30 @@ export async function POST(req: NextRequest) {
     // plan=annual while having paid only for plan=monthly to get 12 months for free.
     canonicalPlan = order.notes?.plan || plan;
     if (order.notes?.plan && order.notes.plan !== plan) {
-      console.warn(
-        `[payment/verify] PLAN MISMATCH: client sent plan=${plan}, order.notes.plan=${order.notes.plan}` +
-        ` — using server value — order=${razorpay_order_id}`
-      );
+      logger.warn("payment/verify", "Plan mismatch — using server value", {
+        email, orderId: razorpay_order_id, clientPlan: plan, serverPlan: order.notes.plan,
+      });
     }
 
     // Cross-check email: order notes must match the authenticated user
     if (order.notes?.email && order.notes.email.toLowerCase() !== email) {
-      console.warn(
-        `[payment/verify] EMAIL MISMATCH: token=${email} order.notes.email=${order.notes.email}` +
-        ` — order=${razorpay_order_id}`
-      );
+      logger.warn("payment/verify", "Email mismatch — token vs order notes", {
+        tokenEmail: email, orderEmail: order.notes.email, orderId: razorpay_order_id,
+      });
       return NextResponse.json({ error: "Payment does not match account" }, { status: 400 });
     }
 
     // Log if client tried to send a different amount (tampering attempt or stale UI)
     if (clientAmount !== undefined && clientAmount !== verifiedAmount) {
-      console.warn(
-        `[payment/verify] AMOUNT MISMATCH: client sent ${clientAmount} paise, Razorpay order has ${verifiedAmount} paise` +
-        ` — email=${email} order=${razorpay_order_id} payment=${razorpay_payment_id}`
-      );
+      logger.warn("payment/verify", "Amount mismatch — client vs Razorpay order", {
+        email, orderId: razorpay_order_id, paymentId: razorpay_payment_id,
+        clientAmount, serverAmount: verifiedAmount,
+      });
     }
   } catch (fetchErr) {
-    // Razorpay API unavailable — log and reject to avoid persisting unverified amounts.
-    // The client can retry; the idempotency guard prevents double-processing.
-    console.error(`[payment/verify] Razorpay orders.fetch failed for ${razorpay_order_id}:`, fetchErr);
+    logger.error("payment/verify", "Razorpay orders.fetch failed", {
+      email, orderId: razorpay_order_id, error: String(fetchErr),
+    });
     return NextResponse.json(
       { error: "Could not verify payment amount — please retry or contact support" },
       { status: 503 }
@@ -147,7 +138,7 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   if (!planRow) {
-    console.error(`[payment/verify] No active plan found for razorpay_plan=${canonicalPlan} order=${razorpay_order_id}`);
+    logger.error("payment/verify", "No active plan found", { email, orderId: razorpay_order_id, canonicalPlan });
     return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
   }
 
@@ -156,7 +147,7 @@ export async function POST(req: NextRequest) {
   // Amounts below the ceiling are valid (discounted via coupon).
   const maxAmount = planRow.price ? Math.round(Number(planRow.price) * 100) : null;
   if (verifiedAmount <= 0 || (maxAmount && verifiedAmount > maxAmount)) {
-    console.error(`[payment/verify] AMOUNT ANOMALY: order=${razorpay_order_id} amount=${verifiedAmount} plan=${canonicalPlan} max=${maxAmount}`);
+    logger.error("payment/verify", "Amount anomaly detected", { email, orderId: razorpay_order_id, verifiedAmount, canonicalPlan, maxAmount });
     return NextResponse.json({ error: "Payment amount invalid" }, { status: 400 });
   }
 
@@ -182,9 +173,11 @@ export async function POST(req: NextRequest) {
   );
 
   if (error) {
-    console.error("[payment/verify] DB upsert error:", error.message);
+    logger.error("payment/verify", "Membership upsert failed", { email, orderId: razorpay_order_id, code: error.code });
     return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
+
+  logger.info("payment/verify", "Membership activated", { email, plan: canonicalPlan, orderId: razorpay_order_id, paymentId: razorpay_payment_id, amountINR: verifiedAmount / 100 });
 
   const displayName = name || "Member";
   const planLabel   = planRow.name ?? plan;
@@ -221,8 +214,8 @@ export async function POST(req: NextRequest) {
   // Enqueue for durability/retry — also fire immediately so users don't wait
   await enqueueJob("invoice_generate",  invoicePayload,         { idempotencyKey: `invoice_generate:${razorpay_payment_id}` });
   await enqueueJob("membership_email",  membershipEmailPayload, { idempotencyKey: `membership_email:${razorpay_payment_id}`, priority: 10 });
-  void handleInvoiceGenerate(invoicePayload).catch(console.error);
-  void handleMembershipEmail(membershipEmailPayload).catch(console.error);
+  void handleInvoiceGenerate(invoicePayload).catch((e: unknown) => logger.error("payment/verify", "Invoice fire-and-forget failed", { email, error: String(e) }));
+  void handleMembershipEmail(membershipEmailPayload).catch((e: unknown) => logger.error("payment/verify", "Membership email fire-and-forget failed", { email, error: String(e) }));
 
   // Coupon was already atomically claimed at create-order time — no second redemption needed.
 

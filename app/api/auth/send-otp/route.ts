@@ -1,4 +1,16 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+﻿/**
+ * OTP SYSTEM A — Unified email + phone OTP for account-change flows.
+ *
+ * Used by: app/profile/page.tsx (email change, phone change)
+ *          Stores OTPs in the `otp_verifications` table (plaintext + expiry).
+ *          Dispatches via ZeptoMail (email) or Meta WhatsApp (phone).
+ *
+ * DO NOT merge with System B (send-phone-otp / verify-phone-otp).
+ * System B handles authentication (login/register) using bcrypt hashes in
+ * the `users.otp_hash` column for its login/verify_phone purposes. The two
+ * systems have different storage mechanisms and security models.
+ */
+import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail, sendWhatsAppOTP } from "@/lib/notify";
 import {

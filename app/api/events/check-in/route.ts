@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach, getCoachEmailFromCookie } from "@/lib/admin-auth";
 import { verifyEventQR } from "@/lib/event-qr";
+import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
+import { evaluateAutomations } from "@/lib/automation-engine";
 
 // POST /api/events/check-in
 // Body: { token: string }   — the signed QR token
@@ -90,6 +92,14 @@ export async function POST(req: NextRequest) {
       .update({ checked_in_at: now, checked_in_by: scannerBy })
       .eq("id", participant.id);
     if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
+
+    // Fire webhooks + automations after successful check-in (fire-and-forget)
+    const { data: eventOrg } = await db.from("events").select("organization_id").eq("id", eventId).single<{ organization_id: string }>();
+    if (eventOrg?.organization_id) {
+      const whCtx = { participant_id: participant.id, event_id: eventId, user_name: name, registration_id: participant.registration_id };
+      dispatchWebhookEvent(eventOrg.organization_id, "participant.checked_in", whCtx).catch(() => {});
+      evaluateAutomations(eventOrg.organization_id, "participant.checked_in", whCtx).catch(() => {});
+    }
 
     return NextResponse.json({
       valid:              true,

@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import Razorpay from "razorpay";
 import { getSupabaseServer } from "@/lib/supabase-server";
-
-function getRazorpay() {
-  const key_id     = process.env.RAZORPAY_KEY_ID;
-  const key_secret = process.env.RAZORPAY_KEY_SECRET;
-  if (!key_id || !key_secret) throw new Error("Razorpay keys not configured");
-  return new Razorpay({ key_id, key_secret });
-}
+import { getRazorpaySDK as getRazorpay } from "@/lib/razorpay-client";
 
 // POST /api/it-run/payment/create-order
 // Body: { registrationId }

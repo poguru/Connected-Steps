@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import Razorpay from "razorpay";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { redeemCoupon } from "@/lib/coupon-redeem";
 import { verifyUserToken } from "@/lib/admin-auth";
-
-function getRazorpay() {
-  const key_id     = process.env.RAZORPAY_KEY_ID;
-  const key_secret = process.env.RAZORPAY_KEY_SECRET;
-  if (!key_id || !key_secret) throw new Error("Razorpay keys not configured");
-  return new Razorpay({ key_id, key_secret });
-}
+import { getRazorpaySDK as getRazorpay } from "@/lib/razorpay-client";
 
 function applyDiscount(amount: number, type: string, value: number): number {
   if (type === "percent") return Math.max(100, Math.round(amount * (1 - value / 100)));

@@ -9,7 +9,8 @@ export interface CSUser {
   location:   string;
   photo:      string | null;
   role?:      "user" | "coach";
-  coachToken?: string;
+  coachToken?:string;
+  userToken?: string;   // 90-day HMAC token for participant APIs (x-user-token)
 }
 
 // ── Leaderboard ───────────────────────────────────────────────────────────────
@@ -28,10 +29,10 @@ export interface LeaderboardEntry {
 }
 
 export interface UserStats {
-  month_points: number;  // leaderboard points this month (5 pts/session)
-  total_points: number;  // leaderboard points all-time  (5 pts/session)
-  month_xp:     number;  // XP this month (25 pts/session — used for levels)
-  total_xp:     number;  // XP all-time   (25 pts/session — used for levels)
+  month_points: number;
+  total_points: number;
+  month_xp:     number;
+  total_xp:     number;
 }
 
 export interface UserAchievements {
@@ -161,4 +162,120 @@ export interface Story {
   achievement: string;
   rating:      number | null;
   created_at:  string;
+}
+
+// ── Event Registration (Participant) ──────────────────────────────────────────
+
+export interface EventParticipant {
+  id:              string;
+  name:            string;
+  registration_code: string;
+  distance_category: string;
+  tshirt_size:     string | null;
+  bib_number:      string | null;
+  wave:            string | null;
+  gender:          string | null;
+  payment_status:  string;
+  qr_token:        string | null;
+  // service completion flags
+  checked_in:      boolean;
+  checked_in_at:   string | null;
+  tshirt_collected:boolean;
+  breakfast_availed:boolean;
+  bib_collected:   boolean;
+  medal_collected: boolean;
+}
+
+export interface MyRegistration {
+  registration_code: string;
+  status:            string;
+  payment_status:    string;
+  final_price:       number;
+  qr_token:          string | null;
+  created_at:        string;
+  event: {
+    id:         string;
+    title:      string;
+    date:       string;
+    venue:      string | null;
+    city:       string | null;
+    start_time: string | null;
+    route_map_url: string | null;
+  };
+  participants: EventParticipant[];
+  invoice_number: string | null;
+}
+
+// ── Volunteer / Ops ───────────────────────────────────────────────────────────
+
+export type OpsRole =
+  | "event_admin" | "registration_desk" | "checkin"
+  | "tshirt" | "breakfast" | "bib" | "medal" | "certificate"
+  | "support" | "medical" | "photography";
+
+export type ScanService =
+  | "checkin" | "tshirt" | "breakfast" | "bib" | "medal" | "certificate";
+
+export interface OpsSession {
+  token:      string;
+  expires_at: number;  // unix timestamp
+  role:       OpsRole;
+  name:       string;
+  email:      string;
+  event_id:   string;
+  event_title?: string;
+}
+
+export interface ScanResult {
+  valid:        boolean;
+  already_done: boolean;
+  done_at:      string | null;
+  done_by:      string | null;
+  message:      string;
+  participant:  {
+    id:                string;
+    name:              string;
+    registration_code: string;
+    distance_category: string;
+    tshirt_size:       string | null;
+    bib_number:        string | null;
+    wave:              string | null;
+    gender:            string | null;
+    payment_status:    string;
+  } | null;
+}
+
+// ── Sync Queue ────────────────────────────────────────────────────────────────
+
+export interface SyncQueueItem {
+  id:              string;
+  endpoint:        string;
+  method:          string;
+  body:            string;
+  created_at:      number;
+  retry_count:     number;
+  last_error:      string | null;
+  idempotency_key: string;
+}
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+export interface AppNotification {
+  id:         string;
+  title:      string;
+  body:       string;
+  data:       Record<string, string> | null;
+  is_read:    boolean;
+  created_at: string;
+}
+
+// ── Live Event ────────────────────────────────────────────────────────────────
+
+export interface TimelineItem {
+  type:       string;
+  label:      string;
+  subtitle:   string | null;
+  timestamp:  string | null;
+  status:     "completed" | "pending" | "upcoming";
+  icon:       string;
 }

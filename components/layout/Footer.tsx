@@ -58,6 +58,7 @@ export default function Footer() {
                 { href: "/#upcoming-sessions",    label: "Upcoming events"   },
                 { href: "/pricing",               label: "Pricing"           },
                 { href: "/quiz",                  label: "Find my plan"      },
+                { href: "/blog",                  label: "Blog"              },
               ].map(({ href, label }) => (
                 <li key={label}>
                   <Link href={href} style={{ fontSize: "0.82rem", color: "var(--muted-foreground)", textDecoration: "none" }}
@@ -121,9 +122,10 @@ export default function Footer() {
         <div style={{ marginTop: "2.5rem", paddingTop: "1.5rem", borderTop: "1px solid var(--border)", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem", fontSize: "0.72rem", color: "var(--muted-foreground)" }}>
           <div>© {new Date().getFullYear()} Connected Steps · Hyderabad, India</div>
           <div style={{ display: "flex", gap: "1.25rem" }}>
-            <Link href="/privacy"       style={{ color: "var(--muted-foreground)", textDecoration: "none" }}>Privacy</Link>
-            <Link href="/terms"         style={{ color: "var(--muted-foreground)", textDecoration: "none" }}>Terms</Link>
-            <Link href="/refund-policy" style={{ color: "var(--muted-foreground)", textDecoration: "none" }}>Refunds</Link>
+            <Link href="/privacy"        style={{ color: "var(--muted-foreground)", textDecoration: "none" }}>Privacy</Link>
+            <Link href="/terms"          style={{ color: "var(--muted-foreground)", textDecoration: "none" }}>Terms</Link>
+            <Link href="/refund-policy"  style={{ color: "var(--muted-foreground)", textDecoration: "none" }}>Refunds</Link>
+            <Link href="/delete-account" style={{ color: "var(--muted-foreground)", textDecoration: "none" }}>Delete Account</Link>
           </div>
         </div>
       </div>

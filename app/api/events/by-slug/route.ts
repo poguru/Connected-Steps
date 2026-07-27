@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   // Fetch active custom form fields for this event (public read via RLS)
   const { data: formFields } = await db
     .from("event_form_fields")
-    .select("id, field_key, field_type, label, placeholder, help_text, required, options, display_order")
+    .select("id, field_key, field_type, label, placeholder, help_text, required, options, display_order, conditions, default_value, max_length, validation_pattern, editable_after_reg, section")
     .eq("event_id", data.id)
     .eq("is_active", true)
     .order("display_order", { ascending: true });

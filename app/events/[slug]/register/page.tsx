@@ -8,10 +8,17 @@ import { getDistanceOption } from "@/lib/event-distances";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+interface FieldCondition {
+  field_key: string; operator: "equals" | "not_equals" | "contains" | "is_empty" | "is_not_empty"; value: string;
+}
+
 interface EventFormField {
   id: string; field_key: string; field_type: string; label: string;
   placeholder: string | null; help_text: string | null; required: boolean;
   options: string[]; display_order: number;
+  conditions: FieldCondition[]; default_value: string | null;
+  max_length: number | null; validation_pattern: string | null;
+  editable_after_reg: boolean; section: string | null;
 }
 
 interface RegConfig {
@@ -201,7 +208,14 @@ export default function RegisterPage() {
       .then(r => r.json())
       .then(d => {
         if (d.event) {
-          setEv({ ...d.event, form_fields: d.form_fields ?? [] });
+          const fields: EventFormField[] = d.form_fields ?? [];
+          setEv({ ...d.event, form_fields: fields });
+          // Pre-fill default values
+          const defaults: Record<string, string> = {};
+          for (const f of fields) {
+            if (f.default_value) defaults[f.field_key] = f.default_value;
+          }
+          if (Object.keys(defaults).length > 0) setCustomFieldValues(defaults);
         } else { setEvErr(true); }
         setLoading(false);
       })
@@ -286,11 +300,47 @@ export default function RegisterPage() {
     return e;
   }
 
+  function evaluateConditions(
+    conditions: FieldCondition[],
+    customVals: Record<string, string>,
+    builtinVals: Record<string, string>,
+  ): boolean {
+    if (!conditions || conditions.length === 0) return true;
+    return conditions.every(c => {
+      const val = customVals[c.field_key] ?? builtinVals[c.field_key] ?? "";
+      switch (c.operator) {
+        case "equals":       return val === c.value;
+        case "not_equals":   return val !== c.value;
+        case "contains":     return val.toLowerCase().includes(c.value.toLowerCase());
+        case "is_empty":     return !val.trim();
+        case "is_not_empty": return !!val.trim();
+        default:             return true;
+      }
+    });
+  }
+
   function validateCustomFields(vals: Record<string, string>) {
     const e: Record<string, string> = {};
+    const builtins: Record<string, string> = {
+      distance_category: distanceCategory,
+      gender:            form.gender,
+      blood_group:       form.blood_group,
+    };
     for (const f of (ev?.form_fields ?? [])) {
+      const visible = evaluateConditions(f.conditions ?? [], vals, builtins);
+      if (!visible) continue;  // skip validation for conditionally hidden fields
       if (f.required && !vals[f.field_key]?.trim()) {
         e[f.field_key] = `${f.label} is required.`;
+      }
+      if (f.max_length && vals[f.field_key] && vals[f.field_key].length > f.max_length) {
+        e[f.field_key] = `${f.label} must be ${f.max_length} characters or fewer.`;
+      }
+      if (f.validation_pattern && vals[f.field_key]?.trim()) {
+        try {
+          if (!new RegExp(f.validation_pattern).test(vals[f.field_key])) {
+            e[f.field_key] = `${f.label} format is invalid.`;
+          }
+        } catch { /* invalid regex — skip */ }
       }
     }
     return e;
@@ -809,22 +859,39 @@ export default function RegisterPage() {
             )}
 
             {/* Custom form fields (shared for the booking) */}
-            {(ev.form_fields ?? []).length > 0 && (
-              <section style={{ marginBottom: "1.5rem" }}>
-                <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: "1rem" }}>Additional Information</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                  {(ev.form_fields ?? []).map(field => (
-                    <CustomFieldInput
-                      key={field.field_key}
-                      field={field}
-                      value={customFieldValues[field.field_key] ?? ""}
-                      error={customFieldErrors[field.field_key]}
-                      onChange={v => setCustomFieldValues(prev => ({ ...prev, [field.field_key]: v }))}
-                    />
+            {(() => {
+              const builtins: Record<string, string> = { distance_category: distanceCategory, gender: form.gender, blood_group: form.blood_group };
+              const visibleFields = (ev.form_fields ?? []).filter(f => evaluateConditions(f.conditions ?? [], customFieldValues, builtins));
+              if (visibleFields.length === 0) return null;
+              // Group by section label
+              const sections: { sectionLabel: string | null; fields: EventFormField[] }[] = [];
+              for (const f of visibleFields) {
+                const last = sections[sections.length - 1];
+                if (last && last.sectionLabel === (f.section ?? null)) { last.fields.push(f); }
+                else { sections.push({ sectionLabel: f.section ?? null, fields: [f] }); }
+              }
+              return (
+                <section style={{ marginBottom: "1.5rem" }}>
+                  {sections.map((sec, si) => (
+                    <div key={si}>
+                      {sec.sectionLabel && <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: "0.75rem", marginTop: si > 0 ? "1.25rem" : 0 }}>{sec.sectionLabel}</div>}
+                      {si === 0 && !sec.sectionLabel && <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: "1rem" }}>Additional Information</div>}
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                        {sec.fields.map(field => (
+                          <CustomFieldInput
+                            key={field.field_key}
+                            field={field}
+                            value={customFieldValues[field.field_key] ?? ""}
+                            error={customFieldErrors[field.field_key]}
+                            onChange={v => setCustomFieldValues(prev => ({ ...prev, [field.field_key]: v }))}
+                          />
+                        ))}
+                      </div>
+                    </div>
                   ))}
-                </div>
-              </section>
-            )}
+                </section>
+              );
+            })()}
 
             {CouponSection}
 
@@ -1057,25 +1124,41 @@ export default function RegisterPage() {
           )}
 
           {/* Custom form fields */}
-          {(ev.form_fields ?? []).length > 0 && (
-            <section style={{ marginBottom: "1.5rem" }}>
-              <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: "1rem" }}>Additional Information</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                {(ev.form_fields ?? []).map(field => (
-                  <CustomFieldInput
-                    key={field.field_key}
-                    field={field}
-                    value={customFieldValues[field.field_key] ?? ""}
-                    error={customFieldErrors[field.field_key]}
-                    onChange={v => {
-                      setCustomFieldValues(prev => ({ ...prev, [field.field_key]: v }));
-                      if (submitted) setCustomFieldErrors(e => ({ ...e, [field.field_key]: field.required && !v.trim() ? `${field.label} is required.` : "" }));
-                    }}
-                  />
+          {(() => {
+            const builtins: Record<string, string> = { distance_category: distanceCategory, gender: form.gender, blood_group: form.blood_group };
+            const visibleFields = (ev.form_fields ?? []).filter(f => evaluateConditions(f.conditions ?? [], customFieldValues, builtins));
+            if (visibleFields.length === 0) return null;
+            const sections: { sectionLabel: string | null; fields: EventFormField[] }[] = [];
+            for (const f of visibleFields) {
+              const last = sections[sections.length - 1];
+              if (last && last.sectionLabel === (f.section ?? null)) { last.fields.push(f); }
+              else { sections.push({ sectionLabel: f.section ?? null, fields: [f] }); }
+            }
+            return (
+              <section style={{ marginBottom: "1.5rem" }}>
+                {sections.map((sec, si) => (
+                  <div key={si}>
+                    {sec.sectionLabel && <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: "0.75rem", marginTop: si > 0 ? "1.25rem" : 0 }}>{sec.sectionLabel}</div>}
+                    {si === 0 && !sec.sectionLabel && <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: "1rem" }}>Additional Information</div>}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                      {sec.fields.map(field => (
+                        <CustomFieldInput
+                          key={field.field_key}
+                          field={field}
+                          value={customFieldValues[field.field_key] ?? ""}
+                          error={customFieldErrors[field.field_key]}
+                          onChange={v => {
+                            setCustomFieldValues(prev => ({ ...prev, [field.field_key]: v }));
+                            if (submitted) setCustomFieldErrors(e => ({ ...e, [field.field_key]: field.required && !v.trim() ? `${field.label} is required.` : "" }));
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 ))}
-              </div>
-            </section>
-          )}
+              </section>
+            );
+          })()}
 
           {CouponSection}
 
@@ -1190,24 +1273,28 @@ function CustomFieldInput({
     borderRadius: "10px", color: "#fff", fontFamily: "inherit",
     fontSize: "0.875rem", outline: "none", boxSizing: "border-box",
   };
-  const label: React.CSSProperties = {
+  const labelStyle: React.CSSProperties = {
     display: "block", fontSize: "11px", color: "rgba(255,255,255,0.5)",
     letterSpacing: "0.07em", textTransform: "uppercase" as const, marginBottom: "5px",
   };
+  const t = field.field_type;
+  // Selected values for multi_select stored as comma-separated
+  const multiSelected = value ? value.split(",").map(s => s.trim()).filter(Boolean) : [];
 
   return (
     <div id={`cf-${field.field_key}`}>
-      <label style={label}>{field.label}{field.required ? " *" : ""}</label>
+      <label style={labelStyle}>{field.label}{field.required ? " *" : ""}</label>
 
-      {field.field_type === "textarea" && (
+      {t === "textarea" && (
         <textarea
           style={{ ...baseInput, minHeight: "70px", resize: "vertical" } as React.CSSProperties}
           value={value} onChange={e => onChange(e.target.value)}
           placeholder={field.placeholder ?? ""}
+          maxLength={field.max_length ?? undefined}
         />
       )}
 
-      {field.field_type === "select" && (
+      {(t === "select") && (
         <select style={{ ...baseInput, cursor: "pointer", colorScheme: "dark" } as React.CSSProperties}
           value={value} onChange={e => onChange(e.target.value)}>
           <option value="" style={{ background: "#1a1a1a" }}>Select…</option>
@@ -1217,7 +1304,50 @@ function CustomFieldInput({
         </select>
       )}
 
-      {field.field_type === "checkbox" && (
+      {t === "radio" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", paddingTop: "4px" }}>
+          {(field.options ?? []).map(opt => (
+            <label key={opt} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+              <input
+                type="radio"
+                name={`cf-${field.field_key}`}
+                value={opt}
+                checked={value === opt}
+                onChange={() => onChange(opt)}
+                style={{ accentColor: "#e8620a", width: 16, height: 16, cursor: "pointer" }}
+              />
+              <span style={{ fontSize: "0.875rem", color: "rgba(255,255,255,0.8)" }}>{opt}</span>
+            </label>
+          ))}
+        </div>
+      )}
+
+      {t === "multi_select" && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", paddingTop: "4px" }}>
+          {(field.options ?? []).map(opt => {
+            const checked = multiSelected.includes(opt);
+            return (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => {
+                  const next = checked ? multiSelected.filter(v => v !== opt) : [...multiSelected, opt];
+                  onChange(next.join(", "));
+                }}
+                style={{
+                  padding: "6px 14px", borderRadius: "20px", fontSize: "0.8125rem", cursor: "pointer",
+                  border: `1px solid ${checked ? "#e8620a" : "rgba(255,255,255,0.15)"}`,
+                  background: checked ? "rgba(232,98,10,0.18)" : "rgba(255,255,255,0.04)",
+                  color: checked ? "#e8620a" : "rgba(255,255,255,0.65)", fontFamily: "inherit",
+                  transition: "all 0.15s",
+                }}
+              >{opt}</button>
+            );
+          })}
+        </div>
+      )}
+
+      {t === "checkbox" && (
         <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", paddingTop: "4px" }}>
           <input
             type="checkbox"
@@ -1229,13 +1359,107 @@ function CustomFieldInput({
         </label>
       )}
 
-      {(field.field_type === "text" || field.field_type === "number" || field.field_type === "date") && (
+      {(t === "text" || t === "number" || t === "date") && (
         <input
-          style={{ ...baseInput, colorScheme: field.field_type === "date" ? "dark" : undefined } as React.CSSProperties}
-          type={field.field_type}
+          style={{ ...baseInput, colorScheme: t === "date" ? "dark" : undefined } as React.CSSProperties}
+          type={t}
           value={value} onChange={e => onChange(e.target.value)}
           placeholder={field.placeholder ?? ""}
+          maxLength={t === "text" && field.max_length ? field.max_length : undefined}
         />
+      )}
+
+      {t === "email" && (
+        <input
+          style={baseInput}
+          type="email"
+          value={value} onChange={e => onChange(e.target.value)}
+          placeholder={field.placeholder ?? "email@example.com"}
+        />
+      )}
+
+      {t === "phone" && (
+        <input
+          style={baseInput}
+          type="tel"
+          value={value} onChange={e => onChange(e.target.value)}
+          placeholder={field.placeholder ?? "10-digit mobile number"}
+          maxLength={field.max_length ?? 10}
+        />
+      )}
+
+      {t === "address" && (
+        <textarea
+          style={{ ...baseInput, minHeight: "80px", resize: "vertical" } as React.CSSProperties}
+          value={value} onChange={e => onChange(e.target.value)}
+          placeholder={field.placeholder ?? "Street, City, State, PIN"}
+        />
+      )}
+
+      {t === "waiver" && (
+        <div style={{ border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", overflow: "hidden" }}>
+          <div style={{
+            padding: "12px 14px", background: "rgba(255,255,255,0.03)",
+            fontSize: "0.8125rem", color: "rgba(255,255,255,0.6)", lineHeight: 1.55,
+            maxHeight: "140px", overflowY: "auto",
+          }}>
+            {field.placeholder ?? field.help_text ?? "Please read and accept the waiver below."}
+          </div>
+          <label style={{
+            display: "flex", alignItems: "center", gap: "10px", cursor: "pointer",
+            padding: "10px 14px", background: value === "accepted" ? "rgba(232,98,10,0.1)" : "rgba(255,255,255,0.02)",
+            borderTop: "1px solid rgba(255,255,255,0.08)",
+          }}>
+            <input
+              type="checkbox"
+              checked={value === "accepted"}
+              onChange={e => onChange(e.target.checked ? "accepted" : "")}
+              style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#e8620a" }}
+            />
+            <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.7)" }}>I have read and agree to the above</span>
+          </label>
+        </div>
+      )}
+
+      {t === "file" && (
+        <label style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          gap: "8px", padding: "20px 14px",
+          border: `2px dashed ${borderErr ?? "rgba(255,255,255,0.15)"}`,
+          borderRadius: "10px", cursor: "pointer",
+          background: "rgba(255,255,255,0.02)", color: "rgba(255,255,255,0.5)",
+          fontSize: "0.875rem",
+        }}>
+          <input
+            type="file"
+            style={{ display: "none" }}
+            onChange={e => { const f = e.target.files?.[0]; if (f) onChange(f.name); }}
+          />
+          <span>{value || (field.placeholder ?? "Click to upload a file")}</span>
+        </label>
+      )}
+
+      {t === "signature" && (
+        <div style={{ border: `1px solid ${borderErr ?? "rgba(255,255,255,0.1)"}`, borderRadius: "10px", overflow: "hidden" }}>
+          <div style={{ padding: "32px 14px", background: "rgba(255,255,255,0.03)", textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: "0.8125rem" }}>
+            {value
+              ? <span style={{ color: "rgba(255,255,255,0.7)" }}>Signed: {value}</span>
+              : <span>{field.placeholder ?? "Type your full name to sign"}</span>
+            }
+          </div>
+          <input
+            style={{ ...baseInput, borderRadius: 0, borderWidth: "1px 0 0 0", background: "rgba(255,255,255,0.02)" } as React.CSSProperties}
+            type="text"
+            value={value} onChange={e => onChange(e.target.value)}
+            placeholder="Type your full legal name"
+          />
+        </div>
+      )}
+
+      {field.max_length && (t === "text" || t === "textarea") && (
+        <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.25)", marginTop: "3px", textAlign: "right" }}>
+          {value.length}/{field.max_length}
+        </div>
       )}
 
       {field.help_text && !error && (

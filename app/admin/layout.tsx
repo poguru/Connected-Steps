@@ -26,6 +26,14 @@ const NAV_GROUPS = [
     ],
   },
   {
+    key:   "comms",
+    label: "Communications",
+    icon:  "📨",
+    links: [
+      { label: "Comm Center",     href: "/admin/communication",        exact: true,  icon: "📨" },
+    ],
+  },
+  {
     key:   "operations",
     label: "Operations",
     icon:  "🏃",
@@ -59,17 +67,38 @@ const NAV_GROUPS = [
     ],
   },
   {
+    key:   "finance",
+    label: "Finance",
+    icon:  "💰",
+    links: [
+      { label: "Finance Dashboard",   href: "/admin/finance/dashboard",       exact: false, icon: "📊" },
+      { label: "Invoices",            href: "/admin/finance",                 exact: true,  icon: "🧾" },
+      { label: "Manual Payments",     href: "/admin/finance/manual-payments", exact: false, icon: "💵" },
+      { label: "Payouts",             href: "/admin/finance/payouts",         exact: false, icon: "💸" },
+      { label: "Reports & Export",    href: "/admin/finance/reports",         exact: false, icon: "📋" },
+      { label: "Payment Investigate", href: "/admin/payment-reconcile",       exact: false, icon: "🔍" },
+    ],
+  },
+  {
+    key:   "commerce",
+    label: "Commerce",
+    icon:  "🛍",
+    links: [
+      { label: "Merchandise",    href: "/admin/merchandise",        exact: false, icon: "👕" },
+      { label: "Donations",      href: "/admin/donations",          exact: false, icon: "🤲" },
+      { label: "Sponsors",       href: "/admin/sponsors/packages",  exact: false, icon: "🤝" },
+    ],
+  },
+  {
     key:   "reports",
     label: "Reports",
     icon:  "📊",
     links: [
-      { label: "Analytics",            href: "/admin/analytics",            exact: false, icon: "📈" },
-      { label: "Finance",              href: "/admin/finance",              exact: false, icon: "💰" },
-      { label: "Payment Investigate",  href: "/admin/payment-reconcile",    exact: false, icon: "🔍" },
-      { label: "Leaderboard",          href: "/admin/leaderboard",          exact: false, icon: "🏆" },
-      { label: "Points",              href: "/admin/points",               exact: false, icon: "⭐" },
-      { label: "Memberships",          href: "/admin/membership",           exact: false, icon: "🎖" },
-      { label: "Referrals",            href: "/admin/referrals",            exact: false, icon: "🔗" },
+      { label: "Analytics",    href: "/admin/analytics",  exact: false, icon: "📈" },
+      { label: "Leaderboard",  href: "/admin/leaderboard",exact: false, icon: "🏆" },
+      { label: "Points",       href: "/admin/points",     exact: false, icon: "⭐" },
+      { label: "Memberships",  href: "/admin/membership", exact: false, icon: "🎖" },
+      { label: "Referrals",    href: "/admin/referrals",  exact: false, icon: "🔗" },
     ],
   },
   {
@@ -86,6 +115,28 @@ const NAV_GROUPS = [
     icon:  "🖼",
     links: [
       { label: "Asset Library", href: "/admin/assets", exact: false, icon: "🖼" },
+    ],
+  },
+  {
+    key:   "organizations",
+    label: "Organizations",
+    icon:  "🏢",
+    links: [
+      { label: "All Organizations", href: "/admin/orgs", exact: true,  icon: "🏢" },
+    ],
+  },
+  {
+    key:   "developer",
+    label: "Developer",
+    icon:  "🔌",
+    links: [
+      { label: "Developer Home",  href: "/admin/developer",             exact: true,  icon: "🔌" },
+      { label: "API Keys",        href: "/admin/developer/api-keys",    exact: false, icon: "🔑" },
+      { label: "Webhooks",        href: "/admin/developer/webhooks",    exact: false, icon: "📡" },
+      { label: "Import / Export", href: "/admin/developer/import",      exact: false, icon: "📥" },
+      { label: "Automations",     href: "/admin/developer/automations", exact: false, icon: "⚡" },
+      { label: "API Docs",        href: "/admin/developer/docs",        exact: false, icon: "📚" },
+      { label: "Monitoring",      href: "/admin/developer/monitoring",  exact: false, icon: "📊" },
     ],
   },
   {

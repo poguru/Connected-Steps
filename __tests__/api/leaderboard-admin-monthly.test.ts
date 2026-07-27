@@ -44,64 +44,6 @@ interface LbRow {
   updated_at?:  string;
 }
 
-function makeDb(lbRows: LbRow[], archiveRows: unknown[] = []) {
-  const insertMock = jest.fn().mockResolvedValue({ error: null });
-  const deleteMock = jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({ error: null }) });
-
-  return {
-    from: jest.fn().mockImplementation((table: string) => {
-      if (table === "leaderboard") {
-        // Support chained: .select().eq().gt().order()
-        const chain: Record<string, unknown> = {};
-        chain.select = jest.fn().mockReturnValue(chain);
-        chain.eq     = jest.fn((col: string, val: string) => {
-          // Filter rows that match the eq condition
-          const filtered = lbRows.filter(r => {
-            if (col === "points_month") return r.points_month === val;
-            return true;
-          });
-          chain._filtered = filtered;
-          return chain;
-        });
-        chain.gt     = jest.fn((col: string, val: number) => {
-          const filtered = ((chain._filtered as LbRow[] | undefined) ?? lbRows).filter((r: LbRow) => {
-            if (col === "month_points") return r.month_points > val;
-            return true;
-          });
-          chain._filteredGt = filtered;
-          return chain;
-        });
-        chain.order  = jest.fn().mockImplementation(function(this: Record<string, unknown>) {
-          return Promise.resolve({ data: (this._filteredGt as LbRow[] | undefined) ?? (this._filtered as LbRow[] | undefined) ?? lbRows, error: null });
-        }.bind(chain));
-        chain.upsert = jest.fn().mockResolvedValue({ error: null });
-        chain.insert = insertMock;
-        chain.delete = deleteMock;
-        return chain;
-      }
-
-      if (table === "monthly_leaderboard_archive") {
-        return {
-          select: jest.fn().mockReturnThis(),
-          order:  jest.fn().mockReturnThis(),
-          then:   jest.fn().mockResolvedValue({ data: archiveRows, error: null }),
-          // For chained .order().order()
-          [Symbol.asyncIterator]: undefined,
-          insert: insertMock,
-          delete: deleteMock,
-          // second .order() returns the resolved value
-          mockResolvedValue: archiveRows,
-        };
-      }
-
-      return {};
-    }),
-    _insertMock: insertMock,
-    _deleteMock: deleteMock,
-  };
-}
-
-// Simpler mock for archive — Supabase chains are a bit complex
 function makeDbSimple(lbRows: LbRow[], archiveRows: unknown[] = []) {
   const insertMock = jest.fn().mockResolvedValue({ error: null });
   const archiveDeleteEq = jest.fn().mockResolvedValue({ error: null });
