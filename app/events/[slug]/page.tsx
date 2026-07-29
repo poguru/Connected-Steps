@@ -42,11 +42,20 @@ interface Event {
   view_count: number;
 }
 
+interface RacePerks {
+  medal: boolean; bib: boolean; tshirt: boolean;
+  breakfast: boolean; certificate: boolean; goodies: boolean;
+}
+
 interface EventRace {
   id: string; name: string; distance: string;
   price: number; early_bird_price: number | null;
+  price_type: string;
+  min_participants: number; max_participants: number;
   max_slots: number | null; slot_reserved: number;
   reporting_time: string | null; gun_time: string | null;
+  timing_chip: boolean;
+  perks: RacePerks | null;
   display_order: number; status: string;
 }
 
@@ -109,7 +118,7 @@ async function getRaces(eventId: string): Promise<EventRace[]> {
   try {
     const { data } = await getSupabaseServer()
       .from("event_races")
-      .select("id, name, distance, price, early_bird_price, max_slots, slot_reserved, reporting_time, gun_time, display_order, status")
+      .select("id, name, distance, price, early_bird_price, price_type, min_participants, max_participants, max_slots, slot_reserved, reporting_time, gun_time, timing_chip, perks, display_order, status")
       .eq("event_id", eventId)
       .eq("status", "active")
       .order("display_order");
@@ -256,6 +265,11 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
       })
     : null;
 
+  // Starting price — the lowest price across all active categories
+  const startingPrice = racesData.length > 0
+    ? Math.min(...racesData.map(r => r.price))
+    : ev.price ?? 0;
+
   // Early bird: show banner when future date is set and races have early-bird prices
   const hasEarlyBirdRaces = racesData.some(r => r.early_bird_price != null && r.early_bird_price < r.price);
   const earlyBirdEndsAt   = ev.early_bird_ends_at && hasEarlyBirdRaces && lifecycle.canRegister
@@ -393,46 +407,79 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
                 const rSlotsLeft = race.max_slots !== null ? Math.max(0, race.max_slots - race.slot_reserved) : null;
                 const rFull = rSlotsLeft !== null && rSlotsLeft === 0;
                 const showEarly = race.early_bird_price != null && race.early_bird_price < race.price && lifecycle.canRegister;
+                const isGroup = (race.max_participants ?? 1) > 1;
+                const perks: RacePerks = race.perks ?? { medal: false, bib: false, tshirt: false, breakfast: false, certificate: false, goodies: false };
+                const perkList = [
+                  perks.medal       && { label: "Medal",       icon: "🏅" },
+                  perks.bib         && { label: "BIB",         icon: "📋" },
+                  perks.tshirt      && { label: "T-Shirt",     icon: "👕" },
+                  perks.breakfast   && { label: "Breakfast",   icon: "🍌" },
+                  perks.certificate && { label: "Certificate", icon: "📜" },
+                  perks.goodies     && { label: "Goodies",     icon: "🎁" },
+                ].filter(Boolean) as { label: string; icon: string }[];
                 return (
-                  <div key={race.id} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "14px 16px" }}>
-                    <div style={{ fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: ".08em", marginBottom: "4px" }}>
-                      {race.distance}
-                    </div>
-                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#fff", marginBottom: "10px", lineHeight: 1.3 }}>
-                      {race.name}
-                    </div>
-                    <div style={{ marginBottom: "8px" }}>
+                  <div key={race.id} style={{ background: rFull ? "rgba(239,68,68,0.04)" : "rgba(255,255,255,0.03)", border: `1px solid ${rFull ? "rgba(239,68,68,0.2)" : "rgba(255,255,255,0.08)"}`, borderRadius: "12px", padding: "14px 16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {/* Distance tag */}
+                    <div style={{ fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: ".08em" }}>{race.distance}</div>
+
+                    {/* Name */}
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: rFull ? "rgba(255,255,255,0.4)" : "#fff", lineHeight: 1.3 }}>{race.name}</div>
+
+                    {/* Price */}
+                    <div>
                       {race.price === 0 ? (
                         <span style={{ fontSize: "16px", fontWeight: 700, color: "#4ade80" }}>Free</span>
                       ) : showEarly ? (
                         <div>
                           <span style={{ fontSize: "16px", fontWeight: 700, color: "#e8620a" }}>₹{race.early_bird_price}</span>
                           <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", marginLeft: 6, textDecoration: "line-through" }}>₹{race.price}</span>
-                          <div style={{ fontSize: "10px", color: "#fbbf24", fontWeight: 600, marginTop: 2 }}>Early Bird</div>
+                          <div style={{ fontSize: "10px", color: "#fbbf24", fontWeight: 600, marginTop: 2 }}>⚡ Early Bird</div>
                         </div>
                       ) : (
-                        <span style={{ fontSize: "16px", fontWeight: 700, color: "#e8620a" }}>
-                          {race.price === 0 ? "Free" : `₹${race.price}`}
-                        </span>
+                        <div>
+                          <span style={{ fontSize: "16px", fontWeight: 700, color: "#e8620a" }}>₹{race.price}</span>
+                          {(race.price_type === "per_registration" || isGroup) && (
+                            <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)", marginLeft: 5 }}>
+                              {race.price_type === "per_registration" ? "/registration" : isGroup ? `/person` : ""}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                      {race.reporting_time && (
-                        <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>
-                          Report: {fmtTime(race.reporting_time)}
-                        </div>
-                      )}
-                      {race.gun_time && (
-                        <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>
-                          Gun: {fmtTime(race.gun_time)}
-                        </div>
-                      )}
+
+                    {/* Group indicator */}
+                    {isGroup && (
+                      <div style={{ fontSize: "10px", color: "#60a5fa", fontWeight: 600, background: "rgba(96,165,250,0.1)", borderRadius: 4, padding: "2px 6px", display: "inline-block", alignSelf: "flex-start" }}>
+                        👥 {(race.min_participants ?? 1) === (race.max_participants ?? 1) ? `${race.min_participants} people` : `${race.min_participants}–${race.max_participants} people`}
+                      </div>
+                    )}
+
+                    {/* Perks */}
+                    {perkList.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginTop: 2 }}>
+                        {perkList.map(p => (
+                          <span key={p.label} style={{ fontSize: "10px", color: "rgba(255,255,255,0.5)", background: "rgba(255,255,255,0.05)", borderRadius: 4, padding: "2px 5px", display: "flex", alignItems: "center", gap: 2 }}>
+                            {p.icon} {p.label}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Timing + slots */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "3px", marginTop: 2 }}>
+                      {race.reporting_time && <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.38)" }}>🕐 Report {fmtTime(race.reporting_time)}</div>}
+                      {race.gun_time      && <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.38)" }}>🏁 Flag-off {fmtTime(race.gun_time)}</div>}
                       {rSlotsLeft !== null && (
-                        <div style={{ fontSize: "11px", fontWeight: 600, color: rFull ? "#f87171" : slotsColor(rSlotsLeft, race.max_slots!) }}>
-                          {rFull ? "Full" : `${rSlotsLeft} slots left`}
+                        <div style={{ fontSize: "11px", fontWeight: 700, color: rFull ? "#f87171" : slotsColor(rSlotsLeft, race.max_slots!), marginTop: 1 }}>
+                          {rFull ? "⛔ Full" : rSlotsLeft <= 20 ? `🔥 ${rSlotsLeft} slots left` : `${rSlotsLeft} slots left`}
                         </div>
                       )}
                     </div>
+
+                    {/* Timing chip badge */}
+                    {race.timing_chip && (
+                      <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.38)", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 6, marginTop: 2 }}>⏱ Timing Chip</div>
+                    )}
                   </div>
                 );
               })}
@@ -493,7 +540,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
             </div>
           ) : (
             <RegisterButton
-              eventId={ev.id} slug={ev.share_slug ?? ev.id} price={ev.price}
+              eventId={ev.id} slug={ev.share_slug ?? ev.id} price={startingPrice}
               startDate={ev.start_date} endDate={ev.end_date} endTime={ev.end_time}
               registrationClosesAt={ev.registration_closes_at}
             />
@@ -770,7 +817,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         ) : lifecycle.canRegister ? (
           <a href={`/events/${ev.share_slug ?? ev.id}/register`}
             style={{ display: "block", textAlign: "center", padding: "14px", borderRadius: "10px", background: "#e8620a", color: "#fff", fontWeight: 700, fontSize: "15px", textDecoration: "none" }}>
-            {ev.price === 0 ? "Register Free" : `Register · ₹${ev.price}`}
+            {startingPrice === 0 ? "Register Free" : racesData.length > 1 ? `Register · from ₹${startingPrice}` : `Register · ₹${startingPrice}`}
           </a>
         ) : null}
       </div>

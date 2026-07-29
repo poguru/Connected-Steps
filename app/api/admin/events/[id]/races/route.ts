@@ -36,11 +36,14 @@ export async function POST(req: NextRequest, { params }: Params) {
   const {
     name, distance, description,
     price = 0, early_bird_price,
+    price_type = "per_participant",
+    min_participants = 1, max_participants = 1,
     max_slots,
     reporting_time, gun_time, cutoff_time,
     timing_chip = false, auto_bib = false, bib_prefix,
     gender_restriction, min_age, max_age,
     qualifying_required = false, qualifying_notes,
+    perks,
     display_order = 0,
   } = body;
 
@@ -63,7 +66,11 @@ export async function POST(req: NextRequest, { params }: Params) {
       description:          description ? String(description) : null,
       price:                Number(price) || 0,
       early_bird_price:     early_bird_price ? Number(early_bird_price) : null,
+      price_type:           ["per_participant","per_registration"].includes(String(price_type)) ? String(price_type) : "per_participant",
+      min_participants:     Math.max(1, Number(min_participants) || 1),
+      max_participants:     Math.max(1, Number(max_participants) || 1),
       max_slots:            max_slots ? Number(max_slots) : null,
+      perks:                perks && typeof perks === "object" ? perks : { medal: false, bib: true, tshirt: false, breakfast: false, certificate: false, goodies: false },
       reporting_time:       reporting_time ? String(reporting_time) : null,
       gun_time:             gun_time ? String(gun_time) : null,
       cutoff_time:          cutoff_time ? String(cutoff_time) : null,
@@ -107,11 +114,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const allowed: Record<string, unknown> = {};
   const allowedKeys = [
     "name", "distance", "description", "price", "early_bird_price",
+    "price_type", "min_participants", "max_participants",
     "max_slots", "reporting_time", "gun_time", "cutoff_time",
     "timing_chip", "auto_bib", "bib_prefix",
     "gender_restriction", "min_age", "max_age",
     "qualifying_required", "qualifying_notes",
-    "display_order", "status",
+    "perks", "display_order", "status",
   ];
   for (const k of allowedKeys) {
     if (k in fields) allowed[k] = fields[k];

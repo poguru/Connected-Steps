@@ -19,6 +19,7 @@ interface EventFormField {
   conditions: FieldCondition[]; default_value: string | null;
   max_length: number | null; validation_pattern: string | null;
   editable_after_reg: boolean; section: string | null;
+  race_ids: string[];
 }
 
 interface RegConfig {
@@ -47,6 +48,19 @@ function getRegConfig(raw: Partial<RegConfig> | null | undefined): RegConfig {
   return { ...REG_DEFAULTS, ...raw };
 }
 
+interface RacePerks { medal: boolean; bib: boolean; tshirt: boolean; breakfast: boolean; certificate: boolean; goodies: boolean; }
+
+interface RaceInfo {
+  id: string; name: string; distance: string;
+  price: number; early_bird_price: number | null;
+  price_type: string;
+  min_participants: number; max_participants: number;
+  max_slots: number | null; slot_reserved: number;
+  reporting_time: string | null; gun_time: string | null;
+  timing_chip: boolean; perks: RacePerks | null;
+  display_order: number; status: string;
+}
+
 interface EventInfo {
   id: string; title: string; event_type: string; start_date: string;
   start_time: string | null; location: string; price: number;
@@ -58,6 +72,7 @@ interface EventInfo {
   max_per_registration: number;
   form_fields?: EventFormField[];
   registration_config?: Partial<RegConfig> | null;
+  races?: RaceInfo[];
 }
 
 interface ParticipantData {
@@ -209,7 +224,8 @@ export default function RegisterPage() {
       .then(d => {
         if (d.event) {
           const fields: EventFormField[] = d.form_fields ?? [];
-          setEv({ ...d.event, form_fields: fields });
+          const races: RaceInfo[] = d.races ?? [];
+          setEv({ ...d.event, form_fields: fields, races });
           // Pre-fill default values
           const defaults: Record<string, string> = {};
           for (const f of fields) {
@@ -327,6 +343,8 @@ export default function RegisterPage() {
       blood_group:       form.blood_group,
     };
     for (const f of (ev?.form_fields ?? [])) {
+      // race_ids: empty array means show for all; non-empty means only for listed races
+      if (f.race_ids?.length > 0 && selectedRace && !f.race_ids.includes(selectedRace.id)) continue;
       const visible = evaluateConditions(f.conditions ?? [], vals, builtins);
       if (!visible) continue;  // skip validation for conditionally hidden fields
       if (f.required && !vals[f.field_key]?.trim()) {
@@ -369,15 +387,18 @@ export default function RegisterPage() {
       });
       const data = await res.json();
       if (!res.ok) { setCouponErr(data.error ?? "Invalid coupon."); return; }
-      const perPersonPrice = ev?.price ?? 0;
-      const totalPrice     = isMulti ? perPersonPrice * participantCount : perPersonPrice;
+      const evRaces = ev?.races ?? [];
+      const selRace = evRaces.find(r => r.distance === distanceCategory) ?? evRaces[0] ?? null;
+      const perPersonPrice = selRace?.price ?? ev?.price ?? 0;
+      const perRegPrice    = selRace?.price_type === "per_registration";
+      const totalPrice     = isMulti ? (perRegPrice ? perPersonPrice : perPersonPrice * participantCount) : perPersonPrice;
       const disc = data.discount_type === "percentage"
         ? Math.min(totalPrice, Math.round(totalPrice * data.discount_value / 100))
         : Math.min(totalPrice, data.discount_value);
       setCouponApplied({ id: data.coupon_id, discount: disc, label: data.description ?? coupon.toUpperCase() });
     } catch { setCouponErr("Could not validate coupon. Please try again."); }
     finally   { setCouponLoading(false); }
-  }, [coupon, userEmail, ev?.id, ev?.price, isMulti, participantCount]);
+  }, [coupon, userEmail, ev?.id, ev?.price, ev?.races, isMulti, participantCount, distanceCategory]);
 
   // ── Payment helper ─────────────────────────────────────────────────────────
 
@@ -553,8 +574,18 @@ export default function RegisterPage() {
 
   // ── Price display ──────────────────────────────────────────────────────────
 
-  const pricePerPerson  = ev?.price ?? 0;
-  const totalBeforeDisc = isMulti ? pricePerPerson * participantCount : pricePerPerson;
+  // Resolve the selected race from the races array so price is reactive to category selection.
+  // Falls back to ev.price if no races data (backward compat with events that have no event_races rows).
+  const races = ev?.races ?? [];
+  const selectedRace = races.find(r => r.distance === distanceCategory) ?? races[0] ?? null;
+  const pricePerPerson = selectedRace?.price ?? ev?.price ?? 0;
+  const selectedRaceMaxParticipants = selectedRace?.max_participants ?? ev?.max_per_registration ?? 10;
+  const selectedRaceMinParticipants = selectedRace?.min_participants ?? 1;
+  const isPricePerReg = selectedRace?.price_type === "per_registration";
+
+  const totalBeforeDisc = isMulti
+    ? (isPricePerReg ? pricePerPerson : pricePerPerson * participantCount)
+    : pricePerPerson;
   const regCfg          = getRegConfig(ev?.registration_config);
   const discount        = couponApplied?.discount ?? 0;
   const final           = Math.max(0, totalBeforeDisc - discount);
@@ -607,7 +638,7 @@ export default function RegisterPage() {
     </div>
   );
 
-  const CouponSection = pricePerPerson > 0 && (
+  const CouponSection = (ev?.price ?? 0) > 0 || (ev?.races ?? []).some(r => r.price > 0) ? (
     <section style={{ marginBottom: "1.5rem" }}>
       <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>Coupon Code</div>
       <div style={{ display: "flex", gap: "0.5rem" }}>
@@ -629,12 +660,12 @@ export default function RegisterPage() {
       {couponErr && <div style={{ fontSize: "0.78rem", color: "#f87171", marginTop: "0.5rem" }}>{couponErr}</div>}
       {couponApplied && <div style={{ fontSize: "0.78rem", color: "#4ade80", marginTop: "0.5rem" }}>✓ {couponApplied.label} — saves ₹{couponApplied.discount}</div>}
     </section>
-  );
+  ) : null;
 
   // ── Multi-participant form ─────────────────────────────────────────────────
 
   if (isMulti) {
-    const maxSlots = Math.min(ev.max_per_registration || 10, 10);
+    const maxSlots = Math.min(selectedRaceMaxParticipants || 10, 20);
     const cats     = ev.distance_categories ?? [];
 
     return (
@@ -668,7 +699,10 @@ export default function RegisterPage() {
               ))}
             </div>
             <div style={{ fontSize: "11px", color: "#555", marginTop: "6px" }}>
-              Each participant gets their own QR code · ₹{pricePerPerson} per person
+              Each participant gets their own QR code ·{" "}
+              {isPricePerReg
+                ? `₹${pricePerPerson} flat per registration (${selectedRaceMinParticipants}–${maxSlots} people)`
+                : `₹${pricePerPerson} per person`}
             </div>
           </section>
 
@@ -861,7 +895,10 @@ export default function RegisterPage() {
             {/* Custom form fields (shared for the booking) */}
             {(() => {
               const builtins: Record<string, string> = { distance_category: distanceCategory, gender: form.gender, blood_group: form.blood_group };
-              const visibleFields = (ev.form_fields ?? []).filter(f => evaluateConditions(f.conditions ?? [], customFieldValues, builtins));
+              const visibleFields = (ev.form_fields ?? []).filter(f => {
+                if (f.race_ids?.length > 0 && selectedRace && !f.race_ids.includes(selectedRace.id)) return false;
+                return evaluateConditions(f.conditions ?? [], customFieldValues, builtins);
+              });
               if (visibleFields.length === 0) return null;
               // Group by section label
               const sections: { sectionLabel: string | null; fields: EventFormField[] }[] = [];
@@ -899,7 +936,12 @@ export default function RegisterPage() {
             <div style={{ padding: "1rem 1.25rem", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "12px", marginBottom: "1.5rem" }}>
               {pricePerPerson > 0 ? (
                 <>
-                  <PriceLine label={`₹${pricePerPerson} × ${participantCount} participant${participantCount > 1 ? "s" : ""}`} value={`₹${totalBeforeDisc}`} />
+                  <PriceLine
+                    label={isPricePerReg
+                      ? `Registration Fee (${participantCount} participants)`
+                      : `₹${pricePerPerson} × ${participantCount} participant${participantCount > 1 ? "s" : ""}`}
+                    value={`₹${totalBeforeDisc}`}
+                  />
                   {discount > 0 && <PriceLine label={`Coupon (${coupon})`} value={`−₹${discount}`} muted />}
                   <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "0.75rem 0" }} />
                   <PriceLine label="Total" value={final === 0 ? "Free" : `₹${final}`} bold />
@@ -1126,7 +1168,10 @@ export default function RegisterPage() {
           {/* Custom form fields */}
           {(() => {
             const builtins: Record<string, string> = { distance_category: distanceCategory, gender: form.gender, blood_group: form.blood_group };
-            const visibleFields = (ev.form_fields ?? []).filter(f => evaluateConditions(f.conditions ?? [], customFieldValues, builtins));
+            const visibleFields = (ev.form_fields ?? []).filter(f => {
+              if (f.race_ids?.length > 0 && selectedRace && !f.race_ids.includes(selectedRace.id)) return false;
+              return evaluateConditions(f.conditions ?? [], customFieldValues, builtins);
+            });
             if (visibleFields.length === 0) return null;
             const sections: { sectionLabel: string | null; fields: EventFormField[] }[] = [];
             for (const f of visibleFields) {

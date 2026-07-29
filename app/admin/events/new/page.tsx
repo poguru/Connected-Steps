@@ -35,20 +35,31 @@ interface RegConfig {
   notes_placeholder:        string;
 }
 
+interface RacePerks {
+  medal: boolean; bib: boolean; tshirt: boolean;
+  breakfast: boolean; certificate: boolean; goodies: boolean;
+}
+
 interface RaceForm {
   id?:                string;
   name:               string;
   distance:           string;
   price:              string;
+  early_bird_price:   string;
+  price_type:         "per_participant" | "per_registration";
+  min_participants:   string;
+  max_participants:   string;
   max_slots:          string;
   reporting_time:     string;
   gun_time:           string;
   timing_chip:        boolean;
   auto_bib:           boolean;
+  bib_prefix:         string;
   gender_restriction: string;
   min_age:            string;
   max_age:            string;
   description:        string;
+  perks:              RacePerks;
 }
 
 interface WizardState {
@@ -131,9 +142,11 @@ const BLANK: WizardState = {
 };
 
 const BLANK_RACE: RaceForm = {
-  name: "", distance: "", price: "", max_slots: "",
-  reporting_time: "", gun_time: "", timing_chip: false, auto_bib: false,
-  gender_restriction: "", min_age: "", max_age: "", description: "",
+  name: "", distance: "", price: "", early_bird_price: "",
+  price_type: "per_participant", min_participants: "1", max_participants: "1",
+  max_slots: "", reporting_time: "", gun_time: "", timing_chip: false, auto_bib: false,
+  bib_prefix: "", gender_restriction: "", min_age: "", max_age: "", description: "",
+  perks: { medal: false, bib: true, tshirt: false, breakfast: false, certificate: false, goodies: false },
 };
 
 const REG_CONFIG_BLANK: RegConfig = {
@@ -655,7 +668,17 @@ export default function NewEventWizard() {
           const race = races[i];
           await fetch(`/api/admin/events/${id}/races`, {
             method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...race, display_order: i, price: Number(race.price) || 0, max_slots: race.max_slots ? Number(race.max_slots) : null, min_age: race.min_age ? Number(race.min_age) : null, max_age: race.max_age ? Number(race.max_age) : null }),
+            body: JSON.stringify({
+              ...race,
+              display_order:    i,
+              price:            Number(race.price) || 0,
+              early_bird_price: race.early_bird_price ? Number(race.early_bird_price) : null,
+              min_participants: Math.max(1, Number(race.min_participants) || 1),
+              max_participants: Math.max(1, Number(race.max_participants) || 1),
+              max_slots:        race.max_slots ? Number(race.max_slots) : null,
+              min_age:          race.min_age ? Number(race.min_age) : null,
+              max_age:          race.max_age ? Number(race.max_age) : null,
+            }),
           });
         }
       }
@@ -1175,6 +1198,36 @@ function StepCategories({
 
           <div style={{ marginBottom: 14 }}>
             <Grid cols="1fr 1fr 1fr" gap={14} mobile="1">
+              <Field label="Early Bird Price (₹)" hint="Blank = no early bird">
+                <input type="number" className="wiz-input" value={raceForm.early_bird_price} onChange={e => setRF("early_bird_price", e.target.value)} placeholder="Same as entry fee" min="0" />
+              </Field>
+              <Field label="Pricing Model">
+                <select className="wiz-select" value={raceForm.price_type} onChange={e => setRF("price_type", e.target.value)}>
+                  <option value="per_participant">Per Participant</option>
+                  <option value="per_registration">Per Registration (flat fee)</option>
+                </select>
+              </Field>
+              <Field label="BIB Prefix" hint="e.g. 5K, HR, CS">
+                <input className="wiz-input" value={raceForm.bib_prefix} onChange={e => setRF("bib_prefix", e.target.value)} placeholder="Optional" maxLength={6} />
+              </Field>
+            </Grid>
+          </div>
+
+          {raceForm.price_type === "per_registration" && (
+            <div style={{ marginBottom: 14 }}>
+              <Grid cols="1fr 1fr" gap={14} mobile="1">
+                <Field label="Min Participants per Booking">
+                  <input type="number" className="wiz-input" value={raceForm.min_participants} onChange={e => setRF("min_participants", e.target.value)} min="1" />
+                </Field>
+                <Field label="Max Participants per Booking">
+                  <input type="number" className="wiz-input" value={raceForm.max_participants} onChange={e => setRF("max_participants", e.target.value)} min="1" />
+                </Field>
+              </Grid>
+            </div>
+          )}
+
+          <div style={{ marginBottom: 14 }}>
+            <Grid cols="1fr 1fr 1fr" gap={14} mobile="1">
               <Field label="Max Slots" hint="Blank = unlimited">
                 <input type="number" className="wiz-input" value={raceForm.max_slots} onChange={e => setRF("max_slots", e.target.value)} placeholder="Unlimited" min="1" />
               </Field>
@@ -1203,6 +1256,18 @@ function StepCategories({
                 <input type="number" className="wiz-input" value={raceForm.max_age} onChange={e => setRF("max_age", e.target.value)} placeholder="No maximum" min="0" />
               </Field>
             </Grid>
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase" as const, letterSpacing: ".08em", marginBottom: 10 }}>What&apos;s Included</div>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" as const }}>
+              {([ ["medal","🏅","Medal"], ["bib","📋","BIB"], ["tshirt","👕","T-Shirt"], ["breakfast","🍌","Breakfast"], ["certificate","📜","Certificate"], ["goodies","🎁","Goodies"] ] as [keyof RacePerks, string, string][]).map(([key, icon, label]) => (
+                <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 13, color: raceForm.perks[key] ? "#e8620a" : "#666" }}>
+                  <input type="checkbox" className="wiz-checkbox" checked={raceForm.perks[key]} onChange={e => setRF("perks", { ...raceForm.perks, [key]: e.target.checked })} />
+                  {icon} {label}
+                </label>
+              ))}
+            </div>
           </div>
 
           <div style={{ display: "flex", gap: 20, marginBottom: 16, flexWrap: "wrap" as const }}>
