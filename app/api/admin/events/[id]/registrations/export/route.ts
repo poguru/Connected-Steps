@@ -29,7 +29,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   let q = db
     .from("event_registrations")
     .select(`
-      registration_code, user_name, user_email, phone, gender,
+      registration_code, bib_number, user_name, user_email, phone, gender,
       date_of_birth, blood_group, emergency_contact,
       distance_category, coupon_code, coupon_discount,
       original_price, final_price, payment_status, status,
@@ -49,7 +49,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   // Build CSV
   const headers = [
-    "Registration Code", "Name", "Email", "Phone", "Gender",
+    "Registration Code", "BIB", "Name", "Email", "Phone", "Gender",
     "Date of Birth", "Blood Group", "Emergency Contact",
     "Category/Race", "Coupon", "Discount (₹)", "Original Price (₹)", "Final Price (₹)",
     "Payment Status", "Registration Status",
@@ -70,6 +70,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     headers.join(","),
     ...(rows ?? []).map(r => [
       escape(r.registration_code),
+      escape((r as { bib_number?: string | null }).bib_number ?? ""),
       escape(r.user_name),
       escape(r.user_email),
       escape(r.phone),
