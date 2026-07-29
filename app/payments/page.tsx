@@ -14,6 +14,18 @@ interface Transaction {
   status:     string;
 }
 
+interface Invoice {
+  id:              string;
+  invoice_number:  string;
+  product_name:    string;
+  product_type:    string;
+  total_amount:    number;
+  gst_amount:      number;
+  invoice_status:  string;
+  email_sent:      boolean;
+  created_at:      string;
+}
+
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
@@ -25,6 +37,7 @@ function fmtAmount(paise: number) {
 export default function PaymentHistoryPage() {
   const router = useRouter();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [invoices,     setInvoices]     = useState<Invoice[]>([]);
   const [loading,      setLoading]      = useState(true);
 
   useEffect(() => {
@@ -37,9 +50,14 @@ export default function PaymentHistoryPage() {
     if (!email) { router.replace("/auth?tab=signin&redirect=/payments"); return; }
 
     const token = localStorage.getItem("cs_user_token") ?? "";
-    fetch("/api/user/payments", { headers: { "x-user-token": token } })
-      .then((r) => r.json())
-      .then((d) => setTransactions(d.transactions ?? []))
+    Promise.all([
+      fetch("/api/user/payments",  { headers: { "x-user-token": token } }).then(r => r.json()),
+      fetch("/api/user/invoices",  { headers: { "x-user-token": token } }).then(r => r.json()),
+    ])
+      .then(([pd, inv]) => {
+        setTransactions(pd.transactions ?? []);
+        setInvoices(inv.invoices ?? []);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [router]);
@@ -98,6 +116,33 @@ export default function PaymentHistoryPage() {
 
               </div>
             ))}
+          </div>
+        )}
+
+        {/* GST Invoices */}
+        {!loading && invoices.length > 0 && (
+          <div style={{ marginTop: "2.5rem" }}>
+            <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--cs-white)", marginBottom: "1rem" }}>GST Invoices</h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              {invoices.map(inv => (
+                <div key={inv.id} style={{ background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "10px", padding: "0.9rem 1.25rem", display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
+                  <div style={{ width: "38px", height: "38px", borderRadius: "8px", background: "rgba(99,102,241,0.10)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem", flexShrink: 0 }}>📄</div>
+                  <div style={{ flex: 1, minWidth: "150px" }}>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--cs-white)", marginBottom: "2px" }}>{inv.product_name}</div>
+                    <div style={{ fontSize: "11px", fontFamily: "monospace", color: "#6366f1" }}>{inv.invoice_number}</div>
+                    <div style={{ fontSize: "0.72rem", color: "var(--cs-muted)", marginTop: "2px" }}>{fmtDate(inv.created_at)}</div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                    <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--cs-white)" }}>{fmtAmount(inv.total_amount)}</div>
+                    <div style={{ fontSize: "10px", color: "#555" }}>GST: {fmtAmount(inv.gst_amount)}</div>
+                    <a href={`/invoices/${encodeURIComponent(inv.invoice_number)}`} target="_blank" rel="noopener noreferrer"
+                      style={{ fontSize: "11px", color: "#6366f1", textDecoration: "none", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 4, padding: "2px 8px" }}>
+                      View PDF →
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
