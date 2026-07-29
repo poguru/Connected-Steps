@@ -23,6 +23,13 @@ interface DeadLetter {
   created_at: string; completed_at: string | null;
 }
 
+interface AuthDiag {
+  summary: { stuck_verified_token_valid: number; stuck_verified_token_expired: number; unverified_accounts: number };
+  stuck_users_active_token:  { email: string; verified_at: string | null; expires_at: string }[];
+  stuck_users_expired_token: { email: string; verified_at: string | null; expires_at: string }[];
+  unverified_accounts:       { email: string; first_name: string | null; last_name: string | null; created_at: string }[];
+}
+
 const S: Record<string, React.CSSProperties> = {
   page:   { padding: "28px 24px", maxWidth: 920, margin: "0 auto" },
   title:  { fontSize: "1.3rem", fontWeight: 700, color: "#fff", margin: "0 0 24px" },
@@ -46,15 +53,16 @@ function StatCard({ num, label, warn }: { num: number | string; label: string; w
 }
 
 export default function MonitoringPage() {
-  const [tab, setTab] = useState<"api" | "webhooks" | "limits" | "dead-letters">("api");
+  const [tab, setTab] = useState<"api" | "webhooks" | "limits" | "dead-letters" | "auth">("api");
   const [apiData,    setApiData]    = useState<ApiUsageData | null>(null);
   const [whData,     setWhData]     = useState<WebhookData  | null>(null);
   const [rlData,     setRlData]     = useState<RateLimitData | null>(null);
   const [dlData,     setDlData]     = useState<DeadLetter[] | null>(null);
+  const [authData,   setAuthData]   = useState<AuthDiag | null>(null);
   const [loading,    setLoading]    = useState(false);
   const [expandedDl, setExpandedDl] = useState<string | null>(null);
 
-  async function load(t: "api" | "webhooks" | "limits" | "dead-letters") {
+  async function load(t: "api" | "webhooks" | "limits" | "dead-letters" | "auth") {
     setLoading(true);
     try {
       if (t === "api") {
@@ -69,6 +77,10 @@ export default function MonitoringPage() {
         const r = await fetch("/api/admin/monitoring/rate-limits");
         const d = await r.json();
         setRlData(d.data ?? null);
+      } else if (t === "auth") {
+        const r = await fetch("/api/admin/auth-diagnostics");
+        const d = await r.json();
+        setAuthData(d);
       } else {
         const r = await fetch("/api/admin/dead-letters?limit=100");
         const d = await r.json();
@@ -85,9 +97,9 @@ export default function MonitoringPage() {
       <h1 style={S.title}>📊 Monitoring</h1>
 
       <div style={S.tabs}>
-        {(["api", "webhooks", "limits", "dead-letters"] as const).map(t => (
+        {(["api", "webhooks", "limits", "dead-letters", "auth"] as const).map(t => (
           <button key={t} style={{ ...S.tabBase, fontWeight: tab === t ? 600 : 400, color: tab === t ? "#fff" : "rgba(255,255,255,0.45)", borderBottom: tab === t ? "2px solid #6366f1" : "2px solid transparent" }} onClick={() => setTab(t)}>
-            {t === "api" ? "API Usage" : t === "webhooks" ? "Webhook Health" : t === "limits" ? "Rate Limits" : "Dead Letters"}
+            {t === "api" ? "API Usage" : t === "webhooks" ? "Webhook Health" : t === "limits" ? "Rate Limits" : t === "dead-letters" ? "Dead Letters" : "Auth Diagnostics"}
           </button>
         ))}
       </div>
@@ -218,6 +230,82 @@ export default function MonitoringPage() {
                 );
               })}
             </>
+          )}
+        </>
+      )}
+
+      {/* Auth Diagnostics tab */}
+      {!loading && tab === "auth" && authData && (
+        <>
+          <div style={{ ...S.row, marginBottom: 20 }}>
+            <StatCard num={authData.summary.stuck_verified_token_valid} label="Stuck (token valid)" warn={authData.summary.stuck_verified_token_valid > 0} />
+            <StatCard num={authData.summary.stuck_verified_token_expired} label="Stuck (token expired)" />
+            <StatCard num={authData.summary.unverified_accounts} label="Unverified Accounts" warn={authData.summary.unverified_accounts > 0} />
+          </div>
+
+          {authData.stuck_users_active_token.length > 0 && (
+            <div style={{ ...S.card, marginBottom: 14 }}>
+              <div style={{ fontWeight: 600, color: "#fbbf24", fontSize: "0.85rem", marginBottom: 10 }}>
+                ⚠ Stuck in Sign-Up — Email Verified, No Account Created ({authData.stuck_users_active_token.length})
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.4)", marginBottom: 10 }}>
+                These users verified their email but did not complete Step 3 (account creation). Token is still valid — they can resume sign-up.
+              </div>
+              {authData.stuck_users_active_token.map(u => (
+                <div key={u.email} style={{ display: "flex", gap: 12, padding: "5px 0", borderBottom: "1px solid rgba(255,255,255,0.04)", fontSize: "0.78rem", flexWrap: "wrap" }}>
+                  <span style={{ ...S.mono, color: "#e8620a", flex: "1 1 200px" }}>{u.email}</span>
+                  {u.verified_at && <span style={{ color: "#555" }}>Verified: {new Date(u.verified_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>}
+                  <span style={{ color: "#555" }}>Expires: {new Date(u.expires_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {authData.stuck_users_expired_token.length > 0 && (
+            <div style={{ ...S.card, marginBottom: 14 }}>
+              <div style={{ fontWeight: 600, color: "#f87171", fontSize: "0.85rem", marginBottom: 10 }}>
+                ✗ Stuck in Sign-Up — Token Expired ({authData.stuck_users_expired_token.length})
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.4)", marginBottom: 10 }}>
+                These users verified their email but the token has expired. They need to restart sign-up.
+              </div>
+              {authData.stuck_users_expired_token.slice(0, 20).map(u => (
+                <div key={u.email} style={{ display: "flex", gap: 12, padding: "5px 0", borderBottom: "1px solid rgba(255,255,255,0.04)", fontSize: "0.78rem", flexWrap: "wrap" }}>
+                  <span style={{ ...S.mono, color: "#888", flex: "1 1 200px" }}>{u.email}</span>
+                  <span style={{ color: "#555" }}>Expired: {new Date(u.expires_at).toLocaleString("en-IN", { day: "numeric", month: "short" })}</span>
+                </div>
+              ))}
+              {authData.stuck_users_expired_token.length > 20 && (
+                <div style={{ fontSize: "0.75rem", color: "#555", marginTop: 6 }}>… and {authData.stuck_users_expired_token.length - 20} more</div>
+              )}
+            </div>
+          )}
+
+          {authData.unverified_accounts.length > 0 && (
+            <div style={S.card}>
+              <div style={{ fontWeight: 600, color: "#f87171", fontSize: "0.85rem", marginBottom: 10 }}>
+                ✗ Accounts with Unverified Email ({authData.unverified_accounts.length})
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.4)", marginBottom: 10 }}>
+                These accounts were created but email_verified=false — should be 0 after all migrations have run.
+              </div>
+              {authData.unverified_accounts.map(u => (
+                <div key={u.email} style={{ display: "flex", gap: 12, padding: "5px 0", borderBottom: "1px solid rgba(255,255,255,0.04)", fontSize: "0.78rem", flexWrap: "wrap" }}>
+                  <span style={{ ...S.mono, color: "#f87171", flex: "1 1 200px" }}>{u.email}</span>
+                  <span style={{ color: "#555" }}>{[u.first_name, u.last_name].filter(Boolean).join(" ") || "—"}</span>
+                  <span style={{ color: "#555" }}>Created: {new Date(u.created_at).toLocaleDateString("en-IN")}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {authData.summary.stuck_verified_token_valid === 0 &&
+           authData.summary.stuck_verified_token_expired === 0 &&
+           authData.summary.unverified_accounts === 0 && (
+            <div style={{ textAlign: "center", padding: "3rem 1rem", color: "rgba(255,255,255,0.3)", fontSize: "0.9rem" }}>
+              <div style={{ fontSize: "2rem", marginBottom: 8 }}>✓</div>
+              Auth funnel is clean — no stuck users
+            </div>
           )}
         </>
       )}

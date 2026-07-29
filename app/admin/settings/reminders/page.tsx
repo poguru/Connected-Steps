@@ -42,6 +42,25 @@ export default function RemindersSettingsPage() {
   const [testResult,    setTestResult]    = useState<{ ok: boolean; report?: Record<string, { ok: boolean; error?: string }> } | null>(null);
   const [testLoading,   setTestLoading]   = useState(false);
 
+  // Email pipeline diagnostic
+  const [diagEmail,    setDiagEmail]    = useState("");
+  const [diagLoading,  setDiagLoading]  = useState(false);
+  const [diagResult,   setDiagResult]   = useState<{ ok: boolean; diagnosis: string; provider: string | null; message_id: string | null; error: string | null; env_check: Record<string, unknown> } | null>(null);
+
+  async function runEmailDiag() {
+    if (!diagEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(diagEmail)) return;
+    setDiagLoading(true); setDiagResult(null);
+    try {
+      const r = await fetch("/api/admin/email-diagnostics", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: diagEmail }),
+      });
+      const d = await r.json();
+      setDiagResult(d);
+    } catch { setDiagResult({ ok: false, diagnosis: "Network error", provider: null, message_id: null, error: "Network error", env_check: {} }); }
+    finally  { setDiagLoading(false); }
+  }
+
   const loadSettings = useCallback(async () => {
     const res = await fetch("/api/admin/settings");
     if (!res.ok) { setLoadErr("Failed to load settings."); return; }
@@ -362,6 +381,46 @@ export default function RemindersSettingsPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </Card>
+
+      {/* ── Email Pipeline Diagnostic ──────────────────────────────────────── */}
+      <Card style={{ marginTop: 24 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 6 }}>📧 Email Delivery Diagnostic</div>
+        <div style={{ fontSize: 12, color: "#555", marginBottom: 16 }}>
+          Send a test email to verify the ZeptoMail delivery pipeline is working. Use your own email address to confirm receipt.
+        </div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div style={{ flex: "1 1 240px" }}>
+            <label style={{ fontSize: 11, color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Recipient Email</label>
+            <input
+              type="email"
+              value={diagEmail}
+              onChange={e => setDiagEmail(e.target.value)}
+              placeholder="you@example.com"
+              style={{ width: "100%", padding: "8px 10px", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#fff", fontFamily: "inherit", fontSize: 13, boxSizing: "border-box" }}
+            />
+          </div>
+          <Button onClick={runEmailDiag} disabled={diagLoading || !diagEmail} style={{ flexShrink: 0 }}>
+            {diagLoading ? "Sending…" : "Send Test Email"}
+          </Button>
+        </div>
+
+        {diagResult && (
+          <div style={{ marginTop: 14, padding: "12px 14px", borderRadius: 8,
+            background: diagResult.ok ? "rgba(74,222,128,0.07)" : "rgba(239,68,68,0.07)",
+            border: `1px solid ${diagResult.ok ? "rgba(74,222,128,0.25)" : "rgba(239,68,68,0.25)"}` }}>
+            <div style={{ fontSize: 13, color: diagResult.ok ? "#4ade80" : "#f87171", fontWeight: 600, marginBottom: 8 }}>
+              {diagResult.diagnosis}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, color: "#555" }}>
+              {diagResult.provider   && <span>Provider: {diagResult.provider}</span>}
+              {diagResult.message_id && <span style={{ fontFamily: "monospace" }}>Message ID: {diagResult.message_id}</span>}
+              {diagResult.env_check && Object.entries(diagResult.env_check).map(([k, v]) => (
+                <span key={k}>{k}: <span style={{ color: v === true ? "#4ade80" : v === false ? "#f87171" : "#888" }}>{String(v)}</span></span>
+              ))}
+            </div>
           </div>
         )}
       </Card>

@@ -112,6 +112,10 @@ export default function OrgDashboardPage() {
             style={{ padding: "8px 16px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, color: "#ccc", textDecoration: "none", fontSize: 12, fontWeight: 600 }}>
             Features
           </Link>
+          <Link href={`/admin/orgs/${id}/connectors`}
+            style={{ padding: "8px 16px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, color: "#ccc", textDecoration: "none", fontSize: 12, fontWeight: 600 }}>
+            Connectors
+          </Link>
         </div>
       </div>
 
