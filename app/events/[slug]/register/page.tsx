@@ -58,6 +58,8 @@ interface RaceInfo {
   max_slots: number | null; slot_reserved: number;
   reporting_time: string | null; gun_time: string | null;
   timing_chip: boolean; perks: RacePerks | null;
+  gender_restriction: string | null;
+  min_age: number | null; max_age: number | null;
   display_order: number; status: string;
 }
 
@@ -286,6 +288,15 @@ export default function RegisterPage() {
 
   // ── Validation ─────────────────────────────────────────────────────────────
 
+  function computeAge(dob: string): number {
+    const birth = new Date(dob);
+    const now = new Date();
+    let age = now.getFullYear() - birth.getFullYear();
+    const m = now.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
+    return age;
+  }
+
   function validate(f: typeof form) {
     const cfg = getRegConfig(ev?.registration_config);
     const e: Record<string, string> = {};
@@ -298,6 +309,26 @@ export default function RegisterPage() {
     if (cfg.require_emergency_contact && !f.emergency_contact_name.trim()) e.emergency_contact_name = "Emergency contact name is required.";
     if (cfg.require_emergency_contact && (!f.emergency_contact_phone.trim() || !/^\d{10}$/.test(f.emergency_contact_phone.replace(/\s/g, "")))) e.emergency_contact_phone = "Emergency contact number must be 10 digits.";
     if (cfg.show_notes && !f.special_notes.trim())                         e.special_notes = "Required — enter NA if no medical conditions.";
+
+    // Race-level age restriction (requires DOB)
+    if (selectedRace && f.date_of_birth && !e.date_of_birth) {
+      const age = computeAge(f.date_of_birth);
+      const catLabel = selectedRace.name ?? selectedRace.distance;
+      if (selectedRace.min_age !== null && age < selectedRace.min_age) {
+        e.date_of_birth = `You must be at least ${selectedRace.min_age} years old for ${catLabel}.`;
+      } else if (selectedRace.max_age !== null && age > selectedRace.max_age) {
+        e.date_of_birth = `You must be ${selectedRace.max_age} years or younger for ${catLabel}.`;
+      }
+    }
+
+    // Race-level gender restriction
+    if (selectedRace?.gender_restriction && !["any", "all", null, ""].includes(selectedRace.gender_restriction) && f.gender) {
+      if (f.gender !== selectedRace.gender_restriction) {
+        const catLabel = selectedRace.name ?? selectedRace.distance;
+        e.gender = `${catLabel} is open to ${selectedRace.gender_restriction === "male" ? "male" : "female"} participants only.`;
+      }
+    }
+
     return e;
   }
 
@@ -313,6 +344,26 @@ export default function RegisterPage() {
     const cats = event.distance_categories ?? [];
     if (cats.length > 1 && !p.distance_category) e.distance_category = "Please select a distance category.";
     if (event.collect_tshirt && !p.tshirt_size) e.tshirt_size = "Please select a T-shirt size.";
+
+    // Race-level age/gender restrictions for this participant's chosen category
+    const pCat = p.distance_category || (cats.length === 1 ? cats[0] : null);
+    const pRace = pCat ? (event.races ?? []).find(r => r.distance === pCat) ?? null : null;
+    if (pRace && p.date_of_birth && !e.date_of_birth) {
+      const age = computeAge(p.date_of_birth);
+      const catLabel = pRace.name ?? pRace.distance;
+      if (pRace.min_age !== null && age < pRace.min_age) {
+        e.date_of_birth = `Must be at least ${pRace.min_age} years for ${catLabel}.`;
+      } else if (pRace.max_age !== null && age > pRace.max_age) {
+        e.date_of_birth = `Must be ${pRace.max_age} years or younger for ${catLabel}.`;
+      }
+    }
+    if (pRace?.gender_restriction && !["any", "all", null, ""].includes(pRace.gender_restriction) && p.gender) {
+      if (p.gender !== pRace.gender_restriction) {
+        const catLabel = pRace.name ?? pRace.distance;
+        e.gender = `${catLabel} is for ${pRace.gender_restriction === "male" ? "male" : "female"} participants only.`;
+      }
+    }
+
     return e;
   }
 
@@ -515,6 +566,12 @@ export default function RegisterPage() {
     e.preventDefault();
     if (!ev) return;
     setMultiSubmitted(true);
+
+    // Enforce min_participants for the selected race
+    if (selectedRace && selectedRace.min_participants > 1 && participantCount < selectedRace.min_participants) {
+      setSubmitErr(`The ${selectedRace.name ?? selectedRace.distance} category requires at least ${selectedRace.min_participants} participants.`);
+      return;
+    }
 
     // Validate all participants
     const allErrs = participants.map(p => validateParticipant(p, ev));
@@ -1021,6 +1078,31 @@ export default function RegisterPage() {
             {(ev.distance_categories ?? []).length === 1 && !distanceCategory && (
               <div style={{ fontSize: "11px", color: "#555", marginTop: "6px" }}>
                 Tap to confirm your category
+              </div>
+            )}
+            {/* Show race-level constraints when a category is selected */}
+            {selectedRace && (selectedRace.min_age || selectedRace.max_age || selectedRace.gender_restriction) && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                {selectedRace.min_age && selectedRace.max_age && (
+                  <span style={{ fontSize: "11px", color: "#fbbf24", background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 5, padding: "2px 8px" }}>
+                    Age {selectedRace.min_age}–{selectedRace.max_age} yrs
+                  </span>
+                )}
+                {selectedRace.min_age && !selectedRace.max_age && (
+                  <span style={{ fontSize: "11px", color: "#fbbf24", background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 5, padding: "2px 8px" }}>
+                    Age {selectedRace.min_age}+ yrs
+                  </span>
+                )}
+                {!selectedRace.min_age && selectedRace.max_age && (
+                  <span style={{ fontSize: "11px", color: "#fbbf24", background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 5, padding: "2px 8px" }}>
+                    Up to {selectedRace.max_age} yrs
+                  </span>
+                )}
+                {selectedRace.gender_restriction && !["any", "all"].includes(selectedRace.gender_restriction) && (
+                  <span style={{ fontSize: "11px", color: "#a78bfa", background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.2)", borderRadius: 5, padding: "2px 8px" }}>
+                    {selectedRace.gender_restriction === "male" ? "♂ Male only" : "♀ Female only"}
+                  </span>
+                )}
               </div>
             )}
           </div>

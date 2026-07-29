@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
       .order("display_order", { ascending: true }),
     db
       .from("event_races")
-      .select("id, name, distance, price, early_bird_price, price_type, min_participants, max_participants, max_slots, slot_reserved, reporting_time, gun_time, timing_chip, perks, display_order, status")
+      .select("id, name, distance, price, early_bird_price, price_type, min_participants, max_participants, max_slots, slot_reserved, reporting_time, gun_time, timing_chip, perks, gender_restriction, min_age, max_age, display_order, status")
       .eq("event_id", data.id)
       .eq("status", "active")
       .order("display_order", { ascending: true }),

@@ -152,7 +152,7 @@ async function handleSingleParticipant(
   // Falls back to ev.price for legacy events that don't use event_races.
   const { data: races } = await db
     .from("event_races")
-    .select("id, distance, price, early_bird_price")
+    .select("id, distance, price, early_bird_price, gender_restriction, min_age, max_age")
     .eq("event_id", event_id as string)
     .eq("status", "active");
 
@@ -164,6 +164,33 @@ async function handleSingleParticipant(
   const raceBasePrice = matchedRace
     ? (isEarlyBird ? (matchedRace.early_bird_price as number) : matchedRace.price)
     : null;
+
+  // Race-level gender and age validation (single participant path)
+  if (matchedRace) {
+    const mr = matchedRace as { gender_restriction?: string | null; min_age?: number | null; max_age?: number | null };
+    const catLabel = chosenCategory ?? "this category";
+
+    if (mr.gender_restriction && !["any", "all"].includes(mr.gender_restriction)) {
+      const participantGender = (gender as string | undefined)?.toLowerCase();
+      if (participantGender && participantGender !== mr.gender_restriction) {
+        return NextResponse.json({ error: `${catLabel} is open to ${mr.gender_restriction} participants only.` }, { status: 400 });
+      }
+    }
+
+    if ((mr.min_age || mr.max_age) && date_of_birth) {
+      const birth = new Date(date_of_birth as string);
+      const now = new Date();
+      let age = now.getFullYear() - birth.getFullYear();
+      const mon = now.getMonth() - birth.getMonth();
+      if (mon < 0 || (mon === 0 && now.getDate() < birth.getDate())) age--;
+      if (mr.min_age && age < mr.min_age) {
+        return NextResponse.json({ error: `You must be at least ${mr.min_age} years old for ${catLabel}.` }, { status: 400 });
+      }
+      if (mr.max_age && age > mr.max_age) {
+        return NextResponse.json({ error: `You must be ${mr.max_age} years or younger for ${catLabel}.` }, { status: 400 });
+      }
+    }
+  }
 
   const VALID_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
   if ((ev as { collect_tshirt?: boolean }).collect_tshirt) {
