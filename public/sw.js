@@ -1,17 +1,20 @@
 // ── Offline cache ─────────────────────────────────────────────────────────────
 
-const CACHE_NAME  = "cs-offline-v1";
+const CACHE_NAME  = "cs-offline-v2";
 const OFFLINE_URL = "/offline.html";
 
+// Shell pages that volunteers use on race day — pre-cached so check-in works
+// even when the venue network is unreliable. Scans that can't reach the server
+// are queued in localStorage and synced automatically when online.
+const SHELL_PAGES = [
+  OFFLINE_URL,
+  "/logo.png",
+];
+
 self.addEventListener("install", (event) => {
-  // Pre-cache the offline fallback page and app icon so they're available
-  // even if the user first opens the app without a connection.
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache =>
-      cache.addAll([OFFLINE_URL, "/logo.png"])
-    )
+    caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL_PAGES))
   );
-  // Activate immediately — don't wait for existing tabs to close.
   self.skipWaiting();
 });
 

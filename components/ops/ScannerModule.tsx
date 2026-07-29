@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { enqueueOfflineScan, getPendingScans, syncPendingScans } from "@/lib/offline-queue";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Phase = "idle" | "looking_up" | "preview" | "confirming" | "done" | "scan_error";
+type Phase = "idle" | "looking_up" | "preview" | "confirming" | "done" | "scan_error" | "queued";
 type CamState = "starting" | "active" | "needs-gesture" | "denied" | "no-device";
 
 interface ParticipantInfo {
@@ -85,6 +86,8 @@ export default function ScannerModule({
   const [actionData,   setActionData]   = useState<ApiResponse | null>(null);
   const [countdown,    setCountdown]    = useState(DISPLAY_SECS);
   const [sessionCount, setSessionCount] = useState(0);
+  const [queueCount,   setQueueCount]   = useState(0);
+  const [syncing,      setSyncing]      = useState(false);
 
   const videoRef    = useRef<HTMLVideoElement>(null);
   const canvasRef   = useRef<HTMLCanvasElement>(null);
@@ -155,6 +158,41 @@ export default function ScannerModule({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
+
+  // ── Offline queue management ──────────────────────────────────────────────
+
+  const refreshQueueCount = useCallback(() => {
+    setQueueCount(getPendingScans().length);
+  }, []);
+
+  useEffect(() => {
+    refreshQueueCount();
+  }, [refreshQueueCount]);
+
+  const handleSync = useCallback(async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const { synced } = await syncPendingScans();
+      if (synced > 0) {
+        setSessionCount(c => {
+          const next = c + synced;
+          onScanCount?.(next);
+          return next;
+        });
+      }
+    } finally {
+      refreshQueueCount();
+      setSyncing(false);
+    }
+  }, [syncing, onScanCount, refreshQueueCount]);
+
+  // Auto-sync when browser reports online
+  useEffect(() => {
+    const onOnline = () => { void handleSync(); };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [handleSync]);
 
   // Countdown in done state
   useEffect(() => {
@@ -228,8 +266,16 @@ export default function ScannerModule({
       }
       setPhase("done");
     } catch {
-      setActionData({ valid: false, message: "Network error. Please try again." });
-      setPhase("scan_error");
+      // Network failure — save to offline queue instead of showing error
+      const participantName = lookupData?.participant?.name ?? null;
+      enqueueOfflineScan({
+        event_id:         eventId,
+        service,
+        qr_token:         scannedToken,
+        participant_name: participantName,
+      });
+      refreshQueueCount();
+      setPhase("queued");
     }
   }
 
@@ -251,14 +297,23 @@ export default function ScannerModule({
   return (
     <div style={{ maxWidth: 560, margin: "0 auto", padding: "clamp(0.75rem,3vw,1.25rem) 14px 80px", fontFamily: "'Inter',system-ui,sans-serif" }}>
 
-      {/* Session count chip */}
-      {sessionCount > 0 && (
-        <div style={{ textAlign: "center", marginBottom: 14 }}>
+      {/* Session count chip + offline queue badge */}
+      <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+        {sessionCount > 0 && (
           <span style={{ fontSize: 13, fontWeight: 700, color: accentColor, background: `${accentColor}18`, padding: "4px 16px", borderRadius: 999 }}>
             {sessionCount} {serviceLabel.toLowerCase()} this session
           </span>
-        </div>
-      )}
+        )}
+        {queueCount > 0 && (
+          <button
+            onClick={() => void handleSync()}
+            disabled={syncing}
+            style={{ fontSize: 12, fontWeight: 700, color: "#f59e0b", background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)", padding: "4px 14px", borderRadius: 999, cursor: syncing ? "wait" : "pointer", fontFamily: "inherit" }}
+          >
+            {syncing ? "Syncing…" : `⚡ ${queueCount} offline — tap to sync`}
+          </button>
+        )}
+      </div>
 
       {/* ── IDLE / LOOKING-UP — camera + manual input ── */}
       {(phase === "idle" || phase === "looking_up") && (
@@ -487,6 +542,38 @@ export default function ScannerModule({
                 color: "#ccc", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
               }}>
               Next Scan →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── QUEUED OFFLINE ── */}
+      {phase === "queued" && (
+        <div style={{
+          borderRadius: 20, overflow: "hidden",
+          border: "1px solid rgba(245,158,11,0.35)",
+          background: "rgba(245,158,11,0.07)",
+          animation: "fadeUp .2s ease",
+        }}>
+          <div style={{ height: 5, background: "#f59e0b" }} />
+          <div style={{ padding: "22px 20px 24px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+              <span style={{ fontSize: 36, lineHeight: 1 }}>⚡</span>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#f59e0b" }}>Saved Offline</div>
+                <div style={{ fontSize: 13, color: "#aaa", marginTop: 3 }}>
+                  No internet — scan queued locally and will sync automatically when you&rsquo;re back online.
+                </div>
+              </div>
+            </div>
+            {lookupData?.participant?.name && (
+              <div style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>
+                Participant: <strong style={{ color: "#ccc" }}>{lookupData.participant.name}</strong>
+              </div>
+            )}
+            <button onClick={goIdle}
+              style={{ width: "100%", padding: "14px", borderRadius: 12, background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)", color: "#f59e0b", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+              Scan Next →
             </button>
           </div>
         </div>

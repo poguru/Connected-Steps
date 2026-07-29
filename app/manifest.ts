@@ -29,6 +29,21 @@ export default function manifest(): MetadataRoute.Manifest {
         url:       "/events",
         icons:     [{ src: "/logo.png", sizes: "96x96" }],
       },
+      {
+        name:       "Event Check-In",
+        short_name: "Check-In",
+        url:        "/ops",
+        description: "Race-day volunteer check-in portal",
+        icons:      [{ src: "/logo.png", sizes: "96x96" }],
+      },
+      {
+        name:       "My Event Pass",
+        short_name: "Pass",
+        url:        "/dashboard/events",
+        description: "View your race day pass",
+        icons:      [{ src: "/logo.png", sizes: "96x96" }],
+      },
     ],
+    prefer_related_applications: false,
   };
 }
