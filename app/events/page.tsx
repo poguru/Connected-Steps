@@ -30,7 +30,7 @@ async function getEvents(): Promise<Event[]> {
 
     const { data } = await db
       .from("events")
-      .select("id, title, description, event_type, cover_image, start_date, start_time, end_date, end_time, registration_closes_at, location, price, featured, max_participants, share_slug")
+      .select("id, title, description, event_type, cover_image, start_date, start_time, end_date, end_time, registration_closes_at, distance_categories, location, price, featured, max_participants, share_slug")
       .eq("status", "published")
       .or(
         `end_date.gt.${today},` +

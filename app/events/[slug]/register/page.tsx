@@ -184,6 +184,7 @@ export default function RegisterPage() {
   const [showSizeGuide,    setShowSizeGuide]    = useState(false);
   const [submitting,  setSubmitting]  = useState(false);
   const [submitErr,   setSubmitErr]   = useState("");
+  const [capacityFull, setCapacityFull] = useState(false);
   const [alreadyReg,  setAlreadyReg]  = useState<string | null>(null);
   const [userEmail,   setUserEmail]   = useState("");
   const [userToken,   setUserToken]   = useState("");
@@ -562,7 +563,10 @@ export default function RegisterPage() {
       });
       const data = await res.json();
       if (res.status === 401) { handleAuthExpiry(`/events/${slug}/register`); return; }
-      if (!res.ok) { setSubmitErr(data.error ?? "Registration failed."); setSubmitting(false); return; }
+      if (!res.ok) {
+        if (res.status === 409) setCapacityFull(true);
+        setSubmitErr(data.error ?? "Registration failed."); setSubmitting(false); return;
+      }
       if (data.already || data.free) {
         router.push(`/events/${slug}/register/success?code=${data.registration_code}`);
         return;
@@ -630,7 +634,10 @@ export default function RegisterPage() {
       });
       const data = await res.json();
       if (res.status === 401) { handleAuthExpiry(`/events/${slug}/register`); return; }
-      if (!res.ok) { setSubmitErr(data.error ?? "Registration failed."); setSubmitting(false); return; }
+      if (!res.ok) {
+        if (res.status === 409) setCapacityFull(true);
+        setSubmitErr(data.error ?? "Registration failed."); setSubmitting(false); return;
+      }
       if (data.already || data.free) {
         router.push(`/events/${slug}/register/success?code=${data.registration_code}`);
         return;
@@ -1022,8 +1029,14 @@ export default function RegisterPage() {
             </div>
 
             {submitErr && (
-              <div style={{ padding: "10px 14px", borderRadius: "8px", marginBottom: "1rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", fontSize: "0.82rem" }}>
+              <div style={{ padding: "12px 14px", borderRadius: "8px", marginBottom: "1rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", fontSize: "0.82rem" }}>
                 {submitErr}
+                {capacityFull && (
+                  <a href={`/events/${slug}/waitlist${distanceCategory ? `?category=${encodeURIComponent(distanceCategory)}` : ""}`}
+                    style={{ display: "inline-block", marginTop: 8, padding: "7px 16px", borderRadius: 7, background: "rgba(96,165,250,0.12)", border: "1px solid rgba(96,165,250,0.3)", color: "#60a5fa", textDecoration: "none", fontSize: "0.8rem", fontWeight: 700 }}>
+                    Join Waitlist →
+                  </a>
+                )}
               </div>
             )}
 
@@ -1066,23 +1079,32 @@ export default function RegisterPage() {
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
               {(ev.distance_categories ?? []).map(cat => {
-                const d   = getDistanceOption(cat);
-                const sel = distanceCategory === cat;
+                const d    = getDistanceOption(cat);
+                const sel  = distanceCategory === cat;
+                const race = (ev.races ?? []).find(r => r.distance === cat) ?? null;
+                const isCatFull = race?.max_slots != null && race.slot_reserved >= race.max_slots;
+                const slotsLeft = race?.max_slots != null ? Math.max(0, race.max_slots - race.slot_reserved) : null;
                 return (
                   <button key={cat} type="button"
                     onClick={() => { setDistanceCategory(cat); setSubmitErr(""); }}
+                    disabled={isCatFull}
                     style={{
                       padding: "10px 22px", borderRadius: "10px",
-                      border: `2px solid ${sel ? d.color : "rgba(255,255,255,0.12)"}`,
-                      cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
-                      background: sel ? d.bg : "transparent",
-                      color: sel ? d.color : "rgba(255,255,255,0.55)",
-                      fontWeight: sel ? 800 : 500, fontSize: "1rem",
+                      border: `2px solid ${isCatFull ? "rgba(239,68,68,0.3)" : sel ? d.color : "rgba(255,255,255,0.12)"}`,
+                      cursor: isCatFull ? "not-allowed" : "pointer", fontFamily: "inherit", transition: "all 0.15s",
+                      background: isCatFull ? "rgba(239,68,68,0.05)" : sel ? d.bg : "transparent",
+                      color: isCatFull ? "#ef4444" : sel ? d.color : "rgba(255,255,255,0.55)",
+                      fontWeight: sel ? 800 : 500, fontSize: "1rem", opacity: isCatFull ? 0.7 : 1,
                       boxShadow: sel ? `0 0 0 1px ${d.border}` : "none",
                     }}>
                     {cat}
-                    <div style={{ fontSize: "11px", fontWeight: 400, opacity: 0.75, marginTop: "1px" }}>
-                      {getDistanceOption(cat).label !== cat ? getDistanceOption(cat).label : ""}
+                    <div style={{ fontSize: "11px", fontWeight: 400, opacity: isCatFull ? 1 : 0.75, marginTop: "1px",
+                      color: isCatFull ? "#ef4444" : undefined }}>
+                      {isCatFull
+                        ? "Sold Out"
+                        : slotsLeft !== null && slotsLeft <= 20
+                          ? `${slotsLeft} left`
+                          : getDistanceOption(cat).label !== cat ? getDistanceOption(cat).label : ""}
                     </div>
                   </button>
                 );
@@ -1317,8 +1339,14 @@ export default function RegisterPage() {
           </div>
 
           {submitErr && (
-            <div style={{ padding: "10px 14px", borderRadius: "8px", marginBottom: "1rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", fontSize: "0.82rem" }}>
+            <div style={{ padding: "12px 14px", borderRadius: "8px", marginBottom: "1rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", fontSize: "0.82rem" }}>
               {submitErr}
+              {capacityFull && (
+                <a href={`/events/${slug}/waitlist${distanceCategory ? `?category=${encodeURIComponent(distanceCategory)}` : ""}`}
+                  style={{ display: "inline-block", marginTop: 8, padding: "7px 16px", borderRadius: 7, background: "rgba(96,165,250,0.12)", border: "1px solid rgba(96,165,250,0.3)", color: "#60a5fa", textDecoration: "none", fontSize: "0.8rem", fontWeight: 700 }}>
+                  Join Waitlist →
+                </a>
+              )}
             </div>
           )}
 
