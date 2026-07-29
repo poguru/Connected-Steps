@@ -17,6 +17,12 @@ interface RateLimitData {
   summary: { active_keys: number; at_limit_now: number; total_rpm: number; total_rph: number };
 }
 
+interface DeadLetter {
+  id: string; job_type: string; payload: Record<string, unknown> | null;
+  attempts: number; max_attempts: number; last_error: string | null;
+  created_at: string; completed_at: string | null;
+}
+
 const S: Record<string, React.CSSProperties> = {
   page:   { padding: "28px 24px", maxWidth: 920, margin: "0 auto" },
   title:  { fontSize: "1.3rem", fontWeight: 700, color: "#fff", margin: "0 0 24px" },
@@ -40,13 +46,15 @@ function StatCard({ num, label, warn }: { num: number | string; label: string; w
 }
 
 export default function MonitoringPage() {
-  const [tab, setTab] = useState<"api" | "webhooks" | "limits">("api");
-  const [apiData,   setApiData]   = useState<ApiUsageData | null>(null);
-  const [whData,    setWhData]    = useState<WebhookData  | null>(null);
-  const [rlData,    setRlData]    = useState<RateLimitData | null>(null);
-  const [loading,   setLoading]   = useState(false);
+  const [tab, setTab] = useState<"api" | "webhooks" | "limits" | "dead-letters">("api");
+  const [apiData,    setApiData]    = useState<ApiUsageData | null>(null);
+  const [whData,     setWhData]     = useState<WebhookData  | null>(null);
+  const [rlData,     setRlData]     = useState<RateLimitData | null>(null);
+  const [dlData,     setDlData]     = useState<DeadLetter[] | null>(null);
+  const [loading,    setLoading]    = useState(false);
+  const [expandedDl, setExpandedDl] = useState<string | null>(null);
 
-  async function load(t: "api" | "webhooks" | "limits") {
+  async function load(t: "api" | "webhooks" | "limits" | "dead-letters") {
     setLoading(true);
     try {
       if (t === "api") {
@@ -57,10 +65,14 @@ export default function MonitoringPage() {
         const r = await fetch("/api/admin/monitoring/webhooks");
         const d = await r.json();
         setWhData(d.data ?? null);
-      } else {
+      } else if (t === "limits") {
         const r = await fetch("/api/admin/monitoring/rate-limits");
         const d = await r.json();
         setRlData(d.data ?? null);
+      } else {
+        const r = await fetch("/api/admin/dead-letters?limit=100");
+        const d = await r.json();
+        setDlData(d.jobs ?? []);
       }
     } catch { /* ignore */ }
     finally { setLoading(false); }
@@ -73,9 +85,9 @@ export default function MonitoringPage() {
       <h1 style={S.title}>📊 Monitoring</h1>
 
       <div style={S.tabs}>
-        {(["api", "webhooks", "limits"] as const).map(t => (
+        {(["api", "webhooks", "limits", "dead-letters"] as const).map(t => (
           <button key={t} style={{ ...S.tabBase, fontWeight: tab === t ? 600 : 400, color: tab === t ? "#fff" : "rgba(255,255,255,0.45)", borderBottom: tab === t ? "2px solid #6366f1" : "2px solid transparent" }} onClick={() => setTab(t)}>
-            {t === "api" ? "API Usage" : t === "webhooks" ? "Webhook Health" : "Rate Limits"}
+            {t === "api" ? "API Usage" : t === "webhooks" ? "Webhook Health" : t === "limits" ? "Rate Limits" : "Dead Letters"}
           </button>
         ))}
       </div>
@@ -158,6 +170,55 @@ export default function MonitoringPage() {
               </div>
             </div>
           ))}
+        </>
+      )}
+
+      {/* Dead letters tab */}
+      {!loading && tab === "dead-letters" && (
+        <>
+          {!dlData || dlData.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "3rem 1rem", color: "rgba(255,255,255,0.3)", fontSize: "0.9rem" }}>
+              <div style={{ fontSize: "2rem", marginBottom: 8 }}>✓</div>
+              No dead-letter jobs — all workers are healthy
+            </div>
+          ) : (
+            <>
+              <div style={{ ...S.row, marginBottom: 16 }}>
+                <StatCard num={dlData.length} label="Dead Jobs" warn={dlData.length > 0} />
+                <StatCard num={[...new Set(dlData.map(j => j.job_type))].length} label="Job Types Affected" />
+              </div>
+              {dlData.map(job => {
+                const isOpen = expandedDl === job.id;
+                return (
+                  <div key={job.id} style={{ ...S.card, borderColor: "rgba(248,113,113,0.2)", marginBottom: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+                      <div>
+                        <span style={{ ...S.mono, color: "#f87171" }}>{job.job_type}</span>
+                        <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.35)", marginTop: 3 }}>
+                          {new Date(job.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
+                          {" · "}{job.attempts}/{job.max_attempts} attempts
+                        </div>
+                        {job.last_error && (
+                          <div style={{ fontSize: "0.78rem", color: "#f87171", marginTop: 4, fontFamily: "monospace" }}>
+                            {job.last_error.slice(0, 120)}{job.last_error.length > 120 ? "…" : ""}
+                          </div>
+                        )}
+                      </div>
+                      <button onClick={() => setExpandedDl(isOpen ? null : job.id)}
+                        style={{ background: isOpen ? "rgba(99,102,241,0.15)" : "rgba(255,255,255,0.04)", border: `1px solid ${isOpen ? "rgba(99,102,241,0.3)" : "rgba(255,255,255,0.1)"}`, borderRadius: 5, color: isOpen ? "#a5b4fc" : "#666", fontSize: "0.75rem", padding: "3px 10px", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
+                        {isOpen ? "▲ Hide" : "▼ Payload"}
+                      </button>
+                    </div>
+                    {isOpen && job.payload && (
+                      <pre style={{ fontSize: "0.78rem", color: "#888", background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 6, padding: "10px 12px", marginTop: 10, overflowX: "auto", lineHeight: 1.5, fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                        {JSON.stringify(job.payload, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+                );
+              })}
+            </>
+          )}
         </>
       )}
     </div>
