@@ -70,6 +70,7 @@ const NAV_ITEMS = [
   { key: "pricing",       icon: "🏷️", label: "Pricing Rules",  inline: true  },
   { key: "registration",  icon: "🧾", label: "Registration",   inline: true  },
   { key: "cat-changes",   icon: "🔄", label: "Cat. Changes",   inline: true  },
+  { key: "waitlist",      icon: "⏳", label: "Waitlist",       inline: true  },
   { key: "route-maps",    icon: "🗺️", label: "Route Maps",     inline: true  },
   { key: "landing",       icon: "🌐", label: "Landing Page",   inline: true  },
   { key: "communicate",   icon: "📢", label: "Communicate",    inline: false, href: "communicate"   },
@@ -531,6 +532,61 @@ export default function EventManagePage() {
       return;
     }
     await loadCatChanges();
+  }
+
+  // ── Waitlist state ────────────────────────────────────────────────────────
+
+  interface WaitlistEntry {
+    id: string; position: number | null; user_name: string; user_email: string;
+    phone: string | null; distance_category: string | null; status: string;
+    notes: string | null; approved_at: string | null; notified_at: string | null;
+    created_at: string;
+  }
+
+  const [waitlist,        setWaitlist]        = useState<WaitlistEntry[]>([]);
+  const [waitlistLoading, setWaitlistLoading] = useState(false);
+  const [waitlistError,   setWaitlistError]   = useState("");
+  const [wlCatFilter,     setWlCatFilter]     = useState("all");
+  const [wlStatusFilter,  setWlStatusFilter]  = useState<"waiting" | "approved" | "all">("waiting");
+  const [wlActing,        setWlActing]        = useState<string | null>(null);
+
+  const loadWaitlist = useCallback(async () => {
+    setWaitlistLoading(true); setWaitlistError("");
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/waitlist`);
+      const data = await res.json() as { waitlist?: WaitlistEntry[]; error?: string };
+      if (!res.ok) { setWaitlistError(data.error ?? "Failed"); return; }
+      setWaitlist(data.waitlist ?? []);
+    } catch { setWaitlistError("Network error"); }
+    finally { setWaitlistLoading(false); }
+  }, [eventId]);
+
+  useEffect(() => {
+    if (tab === "waitlist") void loadWaitlist();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  async function waitlistAction(entryId: string, action: "approve" | "reject" | "delete") {
+    setWlActing(entryId); setWaitlistError("");
+    try {
+      if (action === "delete") {
+        const r = await fetch(`/api/admin/events/${eventId}/waitlist`, {
+          method: "DELETE", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ waitlist_id: entryId }),
+        });
+        if (!r.ok) { setWaitlistError("Delete failed"); return; }
+        setWaitlist(w => w.filter(e => e.id !== entryId));
+      } else {
+        const r = await fetch(`/api/admin/events/${eventId}/waitlist`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ waitlist_id: entryId, action }),
+        });
+        const d = await r.json() as { success?: boolean; status?: string; error?: string };
+        if (!r.ok) { setWaitlistError(d.error ?? "Failed"); return; }
+        setWaitlist(w => w.map(e => e.id === entryId ? { ...e, status: d.status ?? e.status, approved_at: action === "approve" ? new Date().toISOString() : e.approved_at } : e));
+      }
+    } catch { setWaitlistError("Network error"); }
+    finally { setWlActing(null); }
   }
 
   // ── Version History state ─────────────────────────────────────────────────
@@ -1910,6 +1966,152 @@ export default function EventManagePage() {
                         </div>
                       ))}
                     </div>
+                  );
+                })()}
+              </div>
+            </SectionBoundary>
+          )}
+
+          {/* ── WAITLIST ─────────────────────────────────────────────────── */}
+          {tab === "waitlist" && (
+            <SectionBoundary title="Waitlist">
+              <div style={{ maxWidth: 780 }}>
+                {(() => {
+                  const cats = Array.from(new Set(waitlist.map(e => e.distance_category).filter(Boolean) as string[]));
+                  const filtered = waitlist.filter(e => {
+                    if (wlStatusFilter !== "all" && e.status !== wlStatusFilter) return false;
+                    if (wlCatFilter !== "all" && e.distance_category !== wlCatFilter) return false;
+                    return true;
+                  });
+                  const waiting  = waitlist.filter(e => e.status === "waiting").length;
+                  const approved = waitlist.filter(e => e.status === "approved").length;
+                  const total    = waitlist.length;
+
+                  return (
+                    <>
+                      {/* Stats row */}
+                      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+                        {[
+                          { label: "Waiting",  val: waiting,           col: "#fbbf24" },
+                          { label: "Approved", val: approved,          col: "#4ade80" },
+                          { label: "Total",    val: total,             col: "#888"    },
+                        ].map(s => (
+                          <div key={s.label} style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 8, padding: "8px 14px", minWidth: 80 }}>
+                            <div style={{ fontSize: "1.2rem", fontWeight: 800, color: s.col }}>{s.val}</div>
+                            <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: ".07em", fontWeight: 700, marginTop: 2 }}>{s.label}</div>
+                          </div>
+                        ))}
+                        <button onClick={() => void loadWaitlist()} style={{ marginLeft: "auto", padding: "6px 12px", borderRadius: 8, background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", border: "none", cursor: "pointer", fontSize: 12, alignSelf: "center" }}>↻ Refresh</button>
+                      </div>
+
+                      {/* Filter bar */}
+                      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+                        {(["waiting", "approved", "all"] as const).map(f => (
+                          <button key={f} onClick={() => setWlStatusFilter(f)}
+                            style={{ padding: "5px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600,
+                              background: wlStatusFilter === f ? "#e8620a" : "rgba(255,255,255,0.08)",
+                              color:      wlStatusFilter === f ? "#fff"    : "rgba(255,255,255,0.5)" }}>
+                            {f === "waiting" ? "Waiting" : f === "approved" ? "Approved" : "All"}
+                          </button>
+                        ))}
+                        {cats.length > 0 && (
+                          <select value={wlCatFilter} onChange={e => setWlCatFilter(e.target.value)}
+                            style={{ padding: "5px 10px", borderRadius: 8, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)", color: wlCatFilter !== "all" ? "#e8620a" : "rgba(255,255,255,0.5)", fontSize: 12, cursor: "pointer", colorScheme: "dark" }}>
+                            <option value="all">All Categories</option>
+                            {cats.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        )}
+                      </div>
+
+                      {waitlistError && <div style={{ color: "#f87171", fontSize: 13, marginBottom: 12 }}>{waitlistError}</div>}
+
+                      {waitlistLoading ? (
+                        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 14 }}>Loading…</div>
+                      ) : filtered.length === 0 ? (
+                        <div style={{ textAlign: "center", padding: "40px 20px", color: "rgba(255,255,255,0.3)", fontSize: 14 }}>
+                          {total === 0 ? "Nobody on the waitlist yet." : "No entries match the current filter."}
+                        </div>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          {filtered.map(entry => {
+                            const isWaiting  = entry.status === "waiting";
+                            const isApproved = entry.status === "approved";
+                            const acting     = wlActing === entry.id;
+                            const joinedAgo  = (() => {
+                              const ms = Date.now() - new Date(entry.created_at).getTime();
+                              const h  = Math.floor(ms / 3_600_000);
+                              const d  = Math.floor(h / 24);
+                              return d > 0 ? `${d}d ago` : h > 0 ? `${h}h ago` : "just now";
+                            })();
+                            const approvedAgo = entry.approved_at ? (() => {
+                              const ms = Date.now() - new Date(entry.approved_at).getTime();
+                              const h  = Math.floor(ms / 3_600_000);
+                              const d  = Math.floor(h / 24);
+                              return d > 0 ? `approved ${d}d ago` : h > 0 ? `approved ${h}h ago` : "just approved";
+                            })() : null;
+                            const statusCol = isWaiting ? "#fbbf24" : isApproved ? "#4ade80" : "#f87171";
+
+                            return (
+                              <div key={entry.id} style={{ background: "rgba(255,255,255,0.025)", border: `1px solid ${isWaiting ? "rgba(251,191,36,0.15)" : isApproved ? "rgba(74,222,128,0.12)" : "rgba(255,255,255,0.06)"}`, borderRadius: 10, padding: "12px 14px" }}>
+                                <div style={{ display: "flex", gap: 10, alignItems: "flex-start", flexWrap: "wrap" }}>
+
+                                  {/* Position badge (waiting only) */}
+                                  {isWaiting && entry.position && (
+                                    <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, color: "#fbbf24", flexShrink: 0 }}>
+                                      #{entry.position}
+                                    </div>
+                                  )}
+
+                                  {/* Info */}
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 3 }}>
+                                      <span style={{ fontWeight: 700, fontSize: 13, color: "#eee" }}>{entry.user_name}</span>
+                                      <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 99, background: `${statusCol}18`, color: statusCol }}>
+                                        {entry.status}
+                                      </span>
+                                      {entry.distance_category && (
+                                        <span style={{ fontSize: 10, color: "#e8620a", background: "rgba(232,98,10,0.1)", padding: "2px 7px", borderRadius: 99, fontWeight: 700 }}>
+                                          {entry.distance_category}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: "#555" }}>
+                                      {entry.user_email}
+                                      {entry.phone && <span style={{ marginLeft: 10 }}>📞 {entry.phone}</span>}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: "#444", marginTop: 3 }}>
+                                      Joined {joinedAgo}
+                                      {approvedAgo && <span style={{ marginLeft: 8, color: "#4ade80" }}>{approvedAgo}{entry.notified_at ? " · email sent" : " · not notified"}</span>}
+                                    </div>
+                                    {entry.notes && <div style={{ fontSize: 11, color: "#555", marginTop: 3, fontStyle: "italic" }}>{entry.notes}</div>}
+                                  </div>
+
+                                  {/* Actions */}
+                                  <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" }}>
+                                    {isWaiting && (
+                                      <>
+                                        <button disabled={acting} onClick={() => void waitlistAction(entry.id, "approve")}
+                                          style={{ padding: "5px 12px", borderRadius: 6, background: "rgba(74,222,128,0.12)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.25)", cursor: "pointer", fontSize: 12, fontWeight: 700, opacity: acting ? 0.5 : 1 }}>
+                                          {acting ? "…" : "Approve"}
+                                        </button>
+                                        <button disabled={acting} onClick={() => void waitlistAction(entry.id, "reject")}
+                                          style={{ padding: "5px 12px", borderRadius: 6, background: "rgba(248,113,113,0.1)", color: "#f87171", border: "1px solid rgba(248,113,113,0.2)", cursor: "pointer", fontSize: 12, fontWeight: 700, opacity: acting ? 0.5 : 1 }}>
+                                          {acting ? "…" : "Reject"}
+                                        </button>
+                                      </>
+                                    )}
+                                    <button disabled={acting} onClick={() => { if (confirm("Remove this entry from the waitlist?")) void waitlistAction(entry.id, "delete"); }}
+                                      style={{ padding: "5px 10px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: "#666", border: "1px solid rgba(255,255,255,0.06)", cursor: "pointer", fontSize: 12, opacity: acting ? 0.5 : 1 }}>
+                                      ×
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
                   );
                 })()}
               </div>

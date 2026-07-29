@@ -43,8 +43,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   await db.from("event_waitlist").update({
     status:      newStatus,
-    approved_at: new Date().toISOString(),
-    notified_at: new Date().toISOString(),
+    ...(action === "approve" ? { approved_at: new Date().toISOString(), notified_at: new Date().toISOString() } : {}),
   }).eq("id", waitlist_id);
 
   // Email notification
