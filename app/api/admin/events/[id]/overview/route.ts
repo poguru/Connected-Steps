@@ -16,6 +16,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     { data: races },
     { data: history },
     { data: emailQ },
+    { count: waitlistCount },
   ] = await Promise.all([
     db.from("events")
       .select("id, title, status, start_date, start_time, end_date, end_time, location, max_participants, price, cover_image, registration_closes_at, distance_categories, featured, share_slug, registration_config")
@@ -43,6 +44,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     db.from("email_queue")
       .select("status")
       .eq("event_id", id),
+
+    // Waitlist count (waiting only)
+    db.from("event_waitlist")
+      .select("*", { count: "exact", head: true })
+      .eq("event_id", id)
+      .eq("status", "waiting"),
   ]);
 
   if (evErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
@@ -100,5 +107,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     },
     races:        races ?? [],
     recent_comms: hist.slice(0, 5),
+    waitlist:     { waiting: waitlistCount ?? 0 },
   });
 }

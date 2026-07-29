@@ -55,6 +55,7 @@ interface EventOverview {
   emails:    { campaigns: number; confirmation_sent: number; confirmation_failed: number; campaign_delivered: number; campaign_failed: number; campaign_queued: number };
   races:     Array<{ id: string; name: string; distance: string; price: number; max_slots: number | null; status: string; gun_time: string | null; flag_off_time: string | null; report_time: string | null }>;
   recent_comms: Array<{ sent: number; failed: number; status: string; sent_at: string; subject: string; channel: string | null; recipients: number }>;
+  waitlist:  { waiting: number };
 }
 
 // ── Nav definition ─────────────────────────────────────────────────────────────
@@ -175,6 +176,7 @@ export default function EventManagePage() {
         emails:        { campaigns: 0, confirmation_sent: 0, confirmation_failed: 0, campaign_delivered: 0, campaign_failed: 0, campaign_queued: 0, ...json.emails },
         races:         json.races         ?? [],
         recent_comms:  json.recent_comms  ?? [],
+        waitlist:      json.waitlist       ?? { waiting: 0 },
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -1088,6 +1090,7 @@ export default function EventManagePage() {
   const rev   = data.revenue;
   const emails= data.emails;
   const races = data.races;
+  const wl    = data.waitlist;
   const badge = getBadge(ev);
   const isPub = ev.status === "published";
   const capPct= cap.max && cap.max > 0 ? safePct(cap.filled, cap.max) : 0;
@@ -1212,6 +1215,11 @@ export default function EventManagePage() {
                     <EventStatCard label="Pending"    value={fmt(reg.pending)}    color={reg.pending > 0 ? "#fbbf24" : "#555"} accent={reg.pending > 0} />
                     <EventStatCard label="Checked In" value={fmt(reg.checked_in)} color="#a78bfa" accent />
                     <EventStatCard label="Cancelled"  value={fmt(reg.cancelled)}  color={reg.cancelled > 0 ? "#f87171" : "#555"} />
+                    {wl.waiting > 0 && (
+                      <button onClick={() => setTab("waitlist")} style={{ all: "unset", cursor: "pointer" }}>
+                        <EventStatCard label="Waitlisted" value={fmt(wl.waiting)} color="#fbbf24" accent />
+                      </button>
+                    )}
                   </div>
                 </div>
               </SectionBoundary>
