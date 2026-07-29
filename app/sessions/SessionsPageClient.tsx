@@ -69,9 +69,10 @@ function fmtTime(t: string | null) {
 
 export default function SessionsPage() {
   const router = useRouter();
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [now,      setNow]      = useState(() => new Date());
+  const [sessions,   setSessions]   = useState<Session[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [now,        setNow]        = useState(() => new Date());
+  const [joinedIds,  setJoinedIds]  = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetch("/api/sessions")
@@ -85,6 +86,19 @@ export default function SessionsPage() {
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60 * 1000);
     return () => clearInterval(id);
+  }, []);
+
+  // Load joined sessions if user is logged in
+  useEffect(() => {
+    const raw   = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
+    const token = raw ? (() => { try { return JSON.parse(raw).token as string | undefined; } catch { return undefined; } })() : undefined;
+    if (!token) return;
+    fetch("/api/user/joined-sessions", { headers: { "x-user-token": token } })
+      .then(r => r.ok ? r.json() : null)
+      .then((d: { session_ids?: string[] } | null) => {
+        if (d?.session_ids) setJoinedIds(new Set(d.session_ids));
+      })
+      .catch(() => {});
   }, []);
 
   function join(id: string) {
@@ -146,7 +160,7 @@ export default function SessionsPage() {
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(290px,1fr))", gap: 20 }}>
               {sessions.map(s => (
-                <SessionCard key={s.id} session={s} onJoin={join} now={now} />
+                <SessionCard key={s.id} session={s} onJoin={join} now={now} isJoined={joinedIds.has(s.id)} />
               ))}
             </div>
           )}
@@ -160,8 +174,8 @@ export default function SessionsPage() {
 // ── Session card ───────────────────────────────────────────────────────────────
 
 function SessionCard({
-  session: s, onJoin, now,
-}: { session: Session; onJoin: (id: string) => void; now: Date }) {
+  session: s, onJoin, now, isJoined,
+}: { session: Session; onJoin: (id: string) => void; now: Date; isJoined: boolean }) {
   const [hovered, setHovered] = useState(false);
   const cd = countdown(s.date, s.time, now);
 
@@ -177,9 +191,10 @@ function SessionCard({
         borderRadius: 16,
         overflow: "hidden",
         border: `1px solid ${
-          cd.isLive ? "rgba(74,222,128,0.3)"  :
-          hovered   ? "rgba(232,98,10,0.4)"  :
-                      "rgba(255,255,255,0.08)"
+          cd.isLive  ? "rgba(74,222,128,0.3)"  :
+          isJoined   ? "rgba(74,222,128,0.25)" :
+          hovered    ? "rgba(232,98,10,0.4)"   :
+                       "rgba(255,255,255,0.08)"
         }`,
         background: "rgba(255,255,255,0.02)",
         cursor: "pointer",
@@ -200,6 +215,16 @@ function SessionCard({
         }}>
           Session
         </span>
+        {isJoined && (
+          <span style={{
+            fontSize: 9, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase",
+            padding: "3px 8px", borderRadius: 999,
+            background: "rgba(74,222,128,0.18)", color: "#4ade80",
+            border: "1px solid rgba(74,222,128,0.4)",
+          }}>
+            ✓ Registered
+          </span>
+        )}
         <span style={{ flex: 1 }} />
         <span style={{
           fontSize: 9, fontWeight: 700, padding: "3px 9px", borderRadius: 999,
