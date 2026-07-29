@@ -304,6 +304,7 @@ export default function EventAnalyticsPage() {
             {[
               { label: "Checked In",         ...race_day.checked_in,    color: "#60a5fa" },
               { label: "BIB Collected",      ...race_day.bib_collected, color: "#a78bfa" },
+              { label: "T-Shirt Issued",     count: data.tshirt_issued ?? 0, pct: funnel.confirmed > 0 ? Math.round((data.tshirt_issued ?? 0) / funnel.confirmed * 100) : 0, color: "#f9a8d4" },
               { label: "Breakfast Issued",   ...race_day.breakfast,     color: "#a3e635" },
               { label: "Finishers",          ...race_day.finishers,     color: "#4ade80" },
               { label: "Certificates Sent",  ...race_day.certificates,  color: "#fbbf24" },
