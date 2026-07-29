@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
-// POST /api/events/waitlist -- public endpoint to join waitlist for a sold-out event
+// POST /api/events/waitlist -- public endpoint to join waitlist for a sold-out event/category
 export async function POST(req: NextRequest) {
   try {
     const { event_id, name, email, phone, distance_category, notes } =
@@ -14,12 +14,11 @@ export async function POST(req: NextRequest) {
 
     const db = getSupabaseServer();
 
-    // Release any expired slot reservations before checking capacity
     void (async () => {
       try { await db.rpc("release_expired_slots"); } catch { /* non-critical */ }
     })();
 
-    // Verify event is published and at capacity (waitlist only makes sense for full events)
+    // Verify event is published
     const { data: ev } = await db
       .from("events")
       .select("id, title, max_participants, participant_count, status")
@@ -29,35 +28,85 @@ export async function POST(req: NextRequest) {
 
     if (!ev) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
-    const isFull = ev.max_participants !== null && (ev.participant_count ?? 0) >= ev.max_participants;
-    if (!isFull) return NextResponse.json({ error: "Event still has spots -- please register directly" }, { status: 400 });
+    // ── Capacity check: per-category or event-wide ────────────────────────────
+    let isFull = false;
+    let categoryLabel = "";
 
-    // Only block users who have a CONFIRMED registration (paid or free, not cancelled).
-    // Pending/expired rows from abandoned or failed payment flows must NOT block waitlist
-    // enrollment -- those users never received a confirmed slot.
+    if (distance_category) {
+      // Check if the specific race category is full
+      const { data: race } = await db
+        .from("event_races")
+        .select("id, max_slots, name")
+        .eq("event_id", event_id)
+        .eq("distance", distance_category)
+        .maybeSingle();
+
+      if (race?.max_slots) {
+        // Count confirmed registrations for this category
+        const { count } = await db
+          .from("event_registrations")
+          .select("*", { count: "exact", head: true })
+          .eq("event_id", event_id)
+          .eq("distance_category", distance_category)
+          .neq("status", "cancelled")
+          .in("payment_status", ["paid", "free"]);
+
+        isFull = (count ?? 0) >= race.max_slots;
+        categoryLabel = ` for the ${race.name ?? distance_category} category`;
+      } else {
+        // Race has no per-race cap — fall back to event-level
+        isFull = ev.max_participants !== null && (ev.participant_count ?? 0) >= ev.max_participants;
+      }
+    } else {
+      // No category — event-level check
+      isFull = ev.max_participants !== null && (ev.participant_count ?? 0) >= ev.max_participants;
+    }
+
+    if (!isFull) {
+      return NextResponse.json({ error: `Spots are still available${categoryLabel} — please register directly` }, { status: 400 });
+    }
+
+    // ── Block already-confirmed registrants ───────────────────────────────────
+    // Only block users with a CONFIRMED registration (paid/free, not cancelled).
+    // Pending/abandoned rows must not block waitlist enrollment.
     const { data: existing } = await db
       .from("event_registrations")
-      .select("id, payment_status, status")
+      .select("id, payment_status, status, distance_category")
       .eq("event_id", event_id)
       .eq("user_email", email.toLowerCase().trim())
+      .neq("status", "cancelled")
+      .in("payment_status", ["paid", "free"])
       .maybeSingle();
-    const isConfirmedReg = existing
-      && existing.status !== "cancelled"
-      && (existing.payment_status === "paid" || existing.payment_status === "free");
-    if (isConfirmedReg)
-      return NextResponse.json({ error: "You are already registered for this event" }, { status: 400 });
 
-    // Check already on waitlist
-    const { data: onList } = await db
+    if (existing) {
+      const sameCategory = !distance_category || existing.distance_category === distance_category;
+      if (sameCategory) {
+        return NextResponse.json({ error: "You are already registered for this event" }, { status: 400 });
+      }
+    }
+
+    // ── Check already on waitlist for this category ───────────────────────────
+    const wlQuery = db
       .from("event_waitlist")
       .select("id, position")
       .eq("event_id", event_id)
       .eq("user_email", email.toLowerCase().trim())
-      .eq("status", "waiting")
-      .maybeSingle();
-    if (onList) return NextResponse.json({ already: true, position: onList.position, message: `You are already on the waitlist at position #${onList.position}` });
+      .eq("status", "waiting");
 
-    // Add to waitlist
+    // Match on category: both null or both equal
+    const { data: onList } = distance_category
+      ? await wlQuery.eq("distance_category", distance_category).maybeSingle()
+      : await wlQuery.is("distance_category", null).maybeSingle();
+
+    if (onList) {
+      return NextResponse.json({
+        already: true,
+        position: onList.position,
+        message: `You are already on the waitlist${categoryLabel} at position #${onList.position}`,
+      });
+    }
+
+    // ── Add to waitlist ───────────────────────────────────────────────────────
     const { data: entry, error } = await db
       .from("event_waitlist")
       .insert({
@@ -76,9 +125,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success:  true,
       position: entry?.position,
-      message:  `You're on the waitlist at position #${entry?.position}. We'll notify you if a spot opens up.`,
+      message:  `You're on the waitlist${categoryLabel} at position #${entry?.position}. We'll notify you if a spot opens up.`,
     });
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

@@ -480,6 +480,14 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
                     {race.timing_chip && (
                       <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.38)", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 6, marginTop: 2 }}>⏱ Timing Chip</div>
                     )}
+
+                    {/* Per-category waitlist CTA */}
+                    {rFull && lifecycle.canRegister && (
+                      <a href={`/events/${ev.share_slug ?? ev.id}/waitlist?category=${encodeURIComponent(race.distance)}`}
+                        style={{ display: "block", textAlign: "center", padding: "7px 10px", marginTop: 4, borderRadius: 7, background: "rgba(96,165,250,0.07)", border: "1px solid rgba(96,165,250,0.18)", color: "#60a5fa", fontSize: "11px", fontWeight: 700, textDecoration: "none" }}>
+                        Join Waitlist →
+                      </a>
+                    )}
                   </div>
                 );
               })}

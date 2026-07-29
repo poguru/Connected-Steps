@@ -172,20 +172,52 @@ async function handleSingleParticipant(
   }
   const chosenTshirtSize: string | null = tshirt_size && VALID_SIZES.includes(tshirt_size as string) ? (tshirt_size as string) : null;
 
-  // Approved waitlist members may register even when the event is full.
-  // Check their status before enforcing the capacity gate.
+  // Capacity gate — check per-race first, fall back to event-level.
+  // Approved waitlist members bypass the gate.
   let approvedWaitlistId: string | null = null;
-  if (ev.max_participants && (ev.participant_count ?? 0) >= ev.max_participants) {
-    const { data: wl } = await db
+
+  // Check per-race max_slots when the race has an explicit cap
+  const { data: raceForCap } = matchedRace?.id ? await db
+    .from("event_races")
+    .select("max_slots")
+    .eq("id", matchedRace.id)
+    .single() : { data: null };
+
+  let capacityExceeded = false;
+  let capacityError = "This event is fully booked.";
+
+  if (raceForCap?.max_slots) {
+    // Count confirmed registrations for this category
+    const { count: catCount } = await db
+      .from("event_registrations")
+      .select("*", { count: "exact", head: true })
+      .eq("event_id", event_id as string)
+      .eq("distance_category", chosenCategory as string)
+      .neq("status", "cancelled")
+      .in("payment_status", ["paid", "free"]);
+
+    if ((catCount ?? 0) >= raceForCap.max_slots) {
+      capacityExceeded = true;
+      capacityError = "This category is fully booked.";
+    }
+  } else if (ev.max_participants && (ev.participant_count ?? 0) >= ev.max_participants) {
+    capacityExceeded = true;
+  }
+
+  if (capacityExceeded) {
+    // Allow approved waitlist members through
+    const wlQuery = db
       .from("event_waitlist")
       .select("id")
       .eq("event_id", event_id as string)
       .eq("user_email", (email as string).toLowerCase().trim())
-      .eq("status", "approved")
-      .maybeSingle();
+      .eq("status", "approved");
+    const { data: wl } = chosenCategory
+      ? await wlQuery.eq("distance_category", chosenCategory).maybeSingle()
+      : await wlQuery.is("distance_category", null).maybeSingle();
     approvedWaitlistId = wl?.id ?? null;
     if (!approvedWaitlistId) {
-      return NextResponse.json({ error: "This event is fully booked." }, { status: 409 });
+      return NextResponse.json({ error: capacityError }, { status: 409 });
     }
   }
 
