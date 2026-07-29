@@ -434,6 +434,19 @@ export default function Dashboard() {
         });
       });
     }
+
+    // Claim any pending referral code stored before registration
+    const pendingCode = localStorage.getItem("cs_pending_referral");
+    if (pendingCode && u.email) {
+      fetch("/api/referrals/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-user-token": userToken },
+        body: JSON.stringify({ email: u.email, code: pendingCode }),
+      }).finally(() => {
+        // Remove regardless of success/failure — avoid infinite retries on invalid codes
+        localStorage.removeItem("cs_pending_referral");
+      });
+    }
   }, [router]);
 
   useEffect(() => {

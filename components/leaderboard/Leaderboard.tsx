@@ -66,10 +66,33 @@ export default function Leaderboard() {
   const [visibleCount, setVisibleCount] = useState(47); // 3 podium + 47 = 50 total visible
   const [viewMode,     setViewMode]     = useState<"overall" | "location">("overall");
 
+  interface BreakdownSession { session_id: string; title: string; date: string; base_pts: number; bonus_pts: number; total_pts: number; }
+  interface Breakdown { sessions: BreakdownSession[]; session_points: number; weekly_bonus: number; extra_points: number; total_month: number; }
+  const [breakdown,        setBreakdown]        = useState<Breakdown | null>(null);
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
+
   const tabRef     = useRef(tab);
   const liveRef    = useRef(false);
   const rawRef     = useRef<Entry[]>([]); // cached raw entries so tab switches don't re-fetch
   useEffect(() => { tabRef.current = tab; }, [tab]);
+
+  // Fetch score breakdown when user opens their own profile
+  useEffect(() => {
+    if (!preview || !user || preview.user_email !== user.email) {
+      setBreakdown(null);
+      return;
+    }
+    setBreakdownLoading(true);
+    const month  = new Date().toISOString().slice(0, 7);
+    const tok    = typeof window !== "undefined" ? (localStorage.getItem("cs_user_token") ?? "") : "";
+    fetch(`/api/leaderboard/breakdown?email=${encodeURIComponent(user.email)}&month=${month}`, {
+      headers: { "x-user-token": tok },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then((d: Breakdown | null) => setBreakdown(d))
+      .catch(() => {})
+      .finally(() => setBreakdownLoading(false));
+  }, [preview, user]);
 
   // Lock body scroll while the profile sheet is open
   useEffect(() => {
@@ -706,8 +729,42 @@ export default function Leaderboard() {
 
                   {/* If viewing own profile */}
                   {isMe && (
-                    <div style={{ textAlign: "center", fontSize: "0.82rem", color: "var(--muted-foreground)", padding: "0.5rem 0" }}>
-                      This is you
+                    <div style={{ marginTop: "0.75rem" }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-foreground)", marginBottom: 10 }}>
+                        This Month&apos;s Points
+                      </div>
+                      {breakdownLoading ? (
+                        <div style={{ fontSize: 12, color: "var(--muted-foreground)", textAlign: "center", padding: "12px 0" }}>Loading…</div>
+                      ) : breakdown && breakdown.sessions.length > 0 ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                          {breakdown.sessions.map(s => (
+                            <div key={s.session_id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", background: "rgba(255,255,255,0.03)", borderRadius: 8 }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--foreground)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.title}</div>
+                                <div style={{ fontSize: "0.7rem", color: "var(--muted-foreground)" }}>
+                                  {new Date(s.date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                                  {s.bonus_pts > 0 && <span style={{ color: "var(--cs-orange)", marginLeft: 6 }}>+{s.bonus_pts} bonus</span>}
+                                </div>
+                              </div>
+                              <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--cs-orange)", flexShrink: 0 }}>+{s.total_pts}</div>
+                            </div>
+                          ))}
+                          {(breakdown.weekly_bonus > 0 || breakdown.extra_points > 0) && (
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 10px", background: "rgba(232,98,10,0.06)", borderRadius: 8, borderTop: "1px solid rgba(232,98,10,0.12)", marginTop: 4 }}>
+                              <span style={{ fontSize: "0.78rem", color: "var(--muted-foreground)" }}>
+                                {breakdown.weekly_bonus > 0 && `Weekly streak +${breakdown.weekly_bonus}`}
+                                {breakdown.extra_points > 0 && (breakdown.weekly_bonus > 0 ? ` · Extra +${breakdown.extra_points}` : `Extra +${breakdown.extra_points}`)}
+                              </span>
+                            </div>
+                          )}
+                          <div style={{ display: "flex", justifyContent: "space-between", padding: "9px 10px 0", borderTop: "1px solid var(--border)", marginTop: 4 }}>
+                            <span style={{ fontSize: "0.82rem", color: "var(--muted-foreground)", fontWeight: 600 }}>Total this month</span>
+                            <span style={{ fontSize: "0.95rem", fontWeight: 800, color: "var(--cs-orange)" }}>{breakdown.total_month} pts</span>
+                          </div>
+                        </div>
+                      ) : breakdown && breakdown.sessions.length === 0 ? (
+                        <div style={{ fontSize: 12, color: "var(--muted-foreground)", textAlign: "center", padding: "12px 0" }}>No sessions attended this month yet</div>
+                      ) : null}
                     </div>
                   )}
                 </div>
