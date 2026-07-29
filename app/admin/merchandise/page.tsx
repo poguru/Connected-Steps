@@ -25,15 +25,32 @@ interface Variant {
   price_override: number | null;
 }
 
+interface OrderItem {
+  product_id: string;
+  variant_id?: string;
+  product_name: string;
+  variant_name?: string;
+  qty: number;
+  unit_price_paise: number;
+  line_total_paise: number;
+}
+
 interface Order {
   id: string;
   user_name: string;
   user_email: string;
+  user_phone: string | null;
+  items: OrderItem[];
   total_paise: number;
   total_rupees: number;
+  subtotal_rupees: number;
+  gst_rupees: number;
   status: string;
   payment_status: string;
   fulfillment_type: string;
+  shipping_address: string | null;
+  tracking_number: string | null;
+  notes: string | null;
   created_at: string;
 }
 
@@ -51,13 +68,14 @@ function fmtR(r: number) {
 }
 
 export default function MerchandisePage() {
-  const [tab,       setTab]       = useState<"products" | "orders">("products");
-  const [products,  setProducts]  = useState<Product[]>([]);
-  const [orders,    setOrders]    = useState<Order[]>([]);
-  const [totalOrds, setTotalOrds] = useState(0);
-  const [loading,   setLoading]   = useState(true);
-  const [showForm,  setShowForm]  = useState(false);
-  const [saving,    setSaving]    = useState(false);
+  const [tab,        setTab]        = useState<"products" | "orders">("products");
+  const [products,   setProducts]   = useState<Product[]>([]);
+  const [orders,     setOrders]     = useState<Order[]>([]);
+  const [totalOrds,  setTotalOrds]  = useState(0);
+  const [loading,    setLoading]    = useState(true);
+  const [showForm,   setShowForm]   = useState(false);
+  const [saving,     setSaving]     = useState(false);
+  const [expandedOrd, setExpandedOrd] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     organization_id: "00000000-0000-0000-0000-000000000001",
@@ -262,43 +280,86 @@ export default function MerchandisePage() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-                  {["Customer","Total","Fulfillment","Status","Payment","Date","Action"].map(h => (
+                  {["Customer","Items","Total","Fulfillment","Status","Payment","Date","Action"].map(h => (
                     <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {orders.map(o => (
-                  <tr key={o.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                    <td style={{ padding: "10px 12px" }}>
-                      <div style={{ color: "#ccc", fontWeight: 500 }}>{o.user_name}</div>
-                      <div style={{ fontSize: 11, color: "#555" }}>{o.user_email}</div>
-                    </td>
-                    <td style={{ padding: "10px 12px", color: "#e8620a", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmtR(o.total_rupees)}</td>
-                    <td style={{ padding: "10px 12px", color: "#666", textTransform: "capitalize" }}>{o.fulfillment_type.replace("_", " ")}</td>
-                    <td style={{ padding: "10px 12px" }}>
-                      <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, color: STATUS_COLORS[o.status] ?? "#888", border: `1px solid ${STATUS_COLORS[o.status] ?? "#888"}` }}>
-                        {o.status}
-                      </span>
-                    </td>
-                    <td style={{ padding: "10px 12px" }}>
-                      <span style={{ fontSize: 11, color: o.payment_status === "paid" ? "#22c55e" : "#f59e0b" }}>{o.payment_status}</span>
-                    </td>
-                    <td style={{ padding: "10px 12px", color: "#555", fontSize: 11 }}>{o.created_at.slice(0, 10)}</td>
-                    <td style={{ padding: "10px 12px" }}>
-                      {o.status !== "delivered" && o.status !== "cancelled" && (
-                        <select
-                          defaultValue={o.status}
-                          onChange={e => updateOrderStatus(o.id, e.target.value)}
-                          style={{ background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, color: "#888", fontSize: 11, padding: "2px 6px", fontFamily: "inherit", cursor: "pointer" }}>
-                          {["pending","confirmed","packed","dispatched","delivered","cancelled"].map(s => (
-                            <option key={s} value={s}>{s}</option>
-                          ))}
-                        </select>
+                {orders.map(o => {
+                  const isOpen = expandedOrd === o.id;
+                  return (
+                    <>
+                      <tr key={o.id} style={{ borderBottom: isOpen ? "none" : "1px solid rgba(255,255,255,0.04)", background: isOpen ? "rgba(232,98,10,0.04)" : "transparent" }}>
+                        <td style={{ padding: "10px 12px" }}>
+                          <div style={{ color: "#ccc", fontWeight: 500 }}>{o.user_name}</div>
+                          <div style={{ fontSize: 11, color: "#555" }}>{o.user_email}</div>
+                          {o.user_phone && <div style={{ fontSize: 10, color: "#444" }}>{o.user_phone}</div>}
+                        </td>
+                        <td style={{ padding: "10px 12px" }}>
+                          <button onClick={() => setExpandedOrd(isOpen ? null : o.id)}
+                            style={{ background: isOpen ? "rgba(232,98,10,0.15)" : "rgba(255,255,255,0.04)", border: `1px solid ${isOpen ? "rgba(232,98,10,0.3)" : "rgba(255,255,255,0.1)"}`, borderRadius: 5, color: isOpen ? "#e8620a" : "#888", fontSize: 11, padding: "3px 10px", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
+                            {(o.items ?? []).length} item{(o.items ?? []).length !== 1 ? "s" : ""} {isOpen ? "▲" : "▼"}
+                          </button>
+                        </td>
+                        <td style={{ padding: "10px 12px", color: "#e8620a", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmtR(o.total_rupees)}</td>
+                        <td style={{ padding: "10px 12px", color: "#666", textTransform: "capitalize" }}>{o.fulfillment_type.replace(/_/g, " ")}</td>
+                        <td style={{ padding: "10px 12px" }}>
+                          <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, color: STATUS_COLORS[o.status] ?? "#888", border: `1px solid ${STATUS_COLORS[o.status] ?? "#888"}` }}>
+                            {o.status}
+                          </span>
+                        </td>
+                        <td style={{ padding: "10px 12px" }}>
+                          <span style={{ fontSize: 11, color: o.payment_status === "paid" ? "#22c55e" : "#f59e0b" }}>{o.payment_status}</span>
+                        </td>
+                        <td style={{ padding: "10px 12px", color: "#555", fontSize: 11 }}>{o.created_at.slice(0, 10)}</td>
+                        <td style={{ padding: "10px 12px" }}>
+                          {o.status !== "delivered" && o.status !== "cancelled" && (
+                            <select
+                              defaultValue={o.status}
+                              onChange={e => updateOrderStatus(o.id, e.target.value)}
+                              style={{ background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, color: "#888", fontSize: 11, padding: "2px 6px", fontFamily: "inherit", cursor: "pointer" }}>
+                              {["pending","confirmed","packed","dispatched","delivered","cancelled"].map(s => (
+                                <option key={s} value={s}>{s}</option>
+                              ))}
+                            </select>
+                          )}
+                        </td>
+                      </tr>
+                      {isOpen && (
+                        <tr key={`${o.id}-items`} style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", background: "rgba(232,98,10,0.03)" }}>
+                          <td colSpan={8} style={{ padding: "0 16px 14px 16px" }}>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                              {(o.items ?? []).map((item, idx) => (
+                                <div key={idx} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", background: "rgba(0,0,0,0.3)", borderRadius: 6, border: "1px solid rgba(255,255,255,0.05)" }}>
+                                  <div>
+                                    <span style={{ fontSize: 13, fontWeight: 600, color: "#ddd" }}>{item.product_name}</span>
+                                    {item.variant_name && <span style={{ fontSize: 11, color: "#666", marginLeft: 8 }}>{item.variant_name}</span>}
+                                  </div>
+                                  <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+                                    <span style={{ fontSize: 12, color: "#888" }}>×{item.qty}</span>
+                                    <span style={{ fontSize: 13, fontWeight: 600, color: "#e8620a", fontVariantNumeric: "tabular-nums" }}>{fmt(item.line_total_paise)}</span>
+                                  </div>
+                                </div>
+                              ))}
+                              {o.notes && (
+                                <div style={{ fontSize: 11, color: "#555", padding: "6px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 4, border: "1px solid rgba(255,255,255,0.04)" }}>
+                                  Note: {o.notes}
+                                </div>
+                              )}
+                              {o.shipping_address && (
+                                <div style={{ fontSize: 11, color: "#555", padding: "6px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 4, border: "1px solid rgba(255,255,255,0.04)" }}>
+                                  Ship to: {o.shipping_address}
+                                  {o.tracking_number && <span style={{ marginLeft: 12, color: "#60a5fa" }}>Tracking: {o.tracking_number}</span>}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
                       )}
-                    </td>
-                  </tr>
-                ))}
+                    </>
+                  );
+                })}
               </tbody>
             </table>
           </div>
