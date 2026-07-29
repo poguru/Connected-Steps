@@ -19,7 +19,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     { count: waitlistCount },
   ] = await Promise.all([
     db.from("events")
-      .select("id, title, status, start_date, start_time, end_date, end_time, location, max_participants, price, cover_image, registration_closes_at, distance_categories, featured, share_slug, registration_config")
+      .select("id, title, status, start_date, start_time, end_date, end_time, location, max_participants, price, cover_image, registration_closes_at, distance_categories, featured, share_slug, registration_config, allow_multi_participant, max_per_registration")
       .eq("id", id)
       .single(),
 

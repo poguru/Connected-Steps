@@ -47,7 +47,9 @@ interface EventOverview {
     registration_closes_at: string | null;
     distance_categories: string[] | null;
     featured: boolean; share_slug: string | null;
-    registration_config: Record<string, unknown> | null;
+    registration_config:     Record<string, unknown> | null;
+    allow_multi_participant: boolean;
+    max_per_registration:    number;
   } | null;
   registrations: { total: number; confirmed: number; pending: number; cancelled: number; paid: number; free: number; checked_in: number; active: number };
   capacity:  { max: number | null; filled: number; remaining: number | null };
@@ -469,10 +471,17 @@ export default function EventManagePage() {
   const [regConfigSaved,   setRegConfigSaved]   = useState(false);
   const [regConfigLoaded,  setRegConfigLoaded]  = useState(false);
 
+  const [multiEnabled,     setMultiEnabled]     = useState(false);
+  const [maxPerReg,        setMaxPerReg]        = useState(10);
+  const [multiSaving,      setMultiSaving]      = useState(false);
+  const [multiSaved,       setMultiSaved]       = useState(false);
+
   useEffect(() => {
     if (tab === "registration" && !regConfigLoaded && data) {
       const saved = data.event?.registration_config as Partial<RegConfig> | null | undefined;
       if (saved) setRegConfig({ ...REG_DEFAULTS, ...saved });
+      setMultiEnabled(data.event?.allow_multi_participant ?? false);
+      setMaxPerReg(data.event?.max_per_registration ?? 10);
       setRegConfigLoaded(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -485,10 +494,21 @@ export default function EventManagePage() {
     try {
       const res = await fetch(`/api/admin/events/${eventId}/edit`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ registration_config: next }),
+        body: JSON.stringify({ fields: { registration_config: next } }),
       });
       if (res.ok) { setRegConfigSaved(true); setTimeout(() => setRegConfigSaved(false), 2000); }
     } finally { setRegConfigSaving(false); }
+  }
+
+  async function saveMultiConfig(enabled: boolean, maxPer: number) {
+    setMultiSaving(true); setMultiSaved(false);
+    try {
+      const res = await fetch(`/api/admin/events/${eventId}/edit`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fields: { allow_multi_participant: enabled, max_per_registration: Math.max(1, maxPer) } }),
+      });
+      if (res.ok) { setMultiSaved(true); setTimeout(() => setMultiSaved(false), 2000); }
+    } finally { setMultiSaving(false); }
   }
 
   // ── Category Changes state ────────────────────────────────────────────────
@@ -1901,6 +1921,60 @@ export default function EventManagePage() {
                     </div>
                   );
                 })()}
+
+                {/* ── Group / Multi-participant ── */}
+                <div style={{ marginTop: 32, paddingTop: 24, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)", marginBottom: 8 }}>Group / Multi-participant Registration</div>
+
+                  {/* Toggle */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "#ddd" }}>Allow group registration</div>
+                      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>One person registers and pays for multiple participants in a single booking</div>
+                    </div>
+                    <button
+                      onClick={() => { const next = !multiEnabled; setMultiEnabled(next); void saveMultiConfig(next, maxPerReg); }}
+                      style={{
+                        width: 44, height: 24, borderRadius: 12, border: "none", cursor: "pointer", flexShrink: 0,
+                        background: multiEnabled ? "#e8620a" : "rgba(255,255,255,0.12)",
+                        position: "relative", transition: "background 0.2s",
+                      }}
+                      aria-label="Toggle group registration"
+                    >
+                      <span style={{
+                        position: "absolute", top: 3, left: multiEnabled ? 23 : 3,
+                        width: 18, height: 18, borderRadius: "50%", background: "#fff",
+                        transition: "left 0.2s",
+                      }} />
+                    </button>
+                  </div>
+
+                  {/* Max per registration — only shown when enabled */}
+                  {multiEnabled && (
+                    <div style={{ padding: "14px 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                      <label style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", display: "block", marginBottom: 6 }}>
+                        Maximum participants per booking
+                        <span style={{ marginLeft: 6, fontSize: 11, color: "rgba(255,255,255,0.3)" }}>(1 = individual only, 2–20 = group allowed)</span>
+                      </label>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <input
+                          type="number" min={1} max={20}
+                          value={maxPerReg}
+                          onChange={e => setMaxPerReg(Math.max(1, Math.min(20, Number(e.target.value))))}
+                          onBlur={() => void saveMultiConfig(multiEnabled, maxPerReg)}
+                          style={{ width: 80, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 7, padding: "7px 10px", color: "#fff", fontSize: 14, outline: "none" }}
+                        />
+                        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.35)" }}>participants max</span>
+                      </div>
+                      <div style={{ marginTop: 6, fontSize: 11, color: "rgba(255,255,255,0.25)" }}>
+                        Each participant gets their own QR code. Pricing is calculated per-race category (flat per booking or per person depending on race settings).
+                      </div>
+                    </div>
+                  )}
+
+                  {multiSaving && <div style={{ marginTop: 12, fontSize: 13, color: "rgba(255,255,255,0.4)" }}>Saving…</div>}
+                  {multiSaved  && <div style={{ marginTop: 12, fontSize: 13, color: "#4ade80" }}>Saved</div>}
+                </div>
               </div>
             </SectionBoundary>
           )}

@@ -19,6 +19,8 @@ const EDITABLE_FIELDS = new Set([
   "tshirt_size_chart_url",
   "registration_config",
   "whatsapp_community_url",
+  "allow_multi_participant",
+  "max_per_registration",
 ]);
 
 // Columns that must be null rather than empty string when blank
