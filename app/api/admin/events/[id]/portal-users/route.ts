@@ -18,8 +18,8 @@ export async function GET(req: NextRequest, { params }: Params) {
   const { data: assignments, error } = await db
     .from("event_portal_assignments")
     .select(`
-      id, role, is_active, created_at,
-      event_portal_users ( id, email, name, is_active )
+      id, role, is_active, created_at, notes, shift_start, shift_end,
+      event_portal_users ( id, email, name, is_active, phone )
     `)
     .eq("event_id", eventId)
     .eq("is_active", true)
@@ -122,21 +122,50 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 }
 
 // PUT /api/admin/events/[id]/portal-users
-// Body: { assignment_id, new_role } — change the role on an existing assignment
+// Body A: { assignment_id, new_role }                       — change role
+// Body B: { assignment_id, notes?, shift_start?, shift_end? } — update shift/notes
 export async function PUT(req: NextRequest, { params }: Params) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id: eventId } = await params;
   const adminEmail = getAdminEmail(req) ?? "admin";
-  const body = await req.json().catch(() => ({})) as { assignment_id?: string; new_role?: string };
-  const { assignment_id, new_role } = body;
+  const body = await req.json().catch(() => ({})) as {
+    assignment_id?: string;
+    new_role?: string;
+    notes?: string | null;
+    shift_start?: string | null;
+    shift_end?: string | null;
+  };
+  const { assignment_id } = body;
 
-  if (!assignment_id || !new_role)
-    return NextResponse.json({ error: "assignment_id and new_role are required" }, { status: 400 });
-  if (!Object.keys(OPS_ROLE_LABELS).includes(new_role))
-    return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+  if (!assignment_id)
+    return NextResponse.json({ error: "assignment_id is required" }, { status: 400 });
 
   const db = getSupabaseServer();
+
+  // ── Path B: notes / shift update ─────────────────────────────────────────
+  if (body.new_role === undefined && (body.notes !== undefined || body.shift_start !== undefined || body.shift_end !== undefined)) {
+    const patch: Record<string, unknown> = {};
+    if (body.notes       !== undefined) patch.notes       = body.notes       ?? null;
+    if (body.shift_start !== undefined) patch.shift_start = body.shift_start ?? null;
+    if (body.shift_end   !== undefined) patch.shift_end   = body.shift_end   ?? null;
+
+    const { error: patchErr } = await db
+      .from("event_portal_assignments")
+      .update(patch)
+      .eq("id", assignment_id)
+      .eq("event_id", eventId);
+
+    if (patchErr) return NextResponse.json({ error: patchErr.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+
+  // ── Path A: role change ───────────────────────────────────────────────────
+  const { new_role } = body;
+  if (!new_role)
+    return NextResponse.json({ error: "new_role is required for a role change" }, { status: 400 });
+  if (!Object.keys(OPS_ROLE_LABELS).includes(new_role))
+    return NextResponse.json({ error: "Invalid role" }, { status: 400 });
 
   // Fetch current assignment to compare and audit
   const { data: current, error: fetchErr } = await db
@@ -178,35 +207,48 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
 
-  // Audit trail
   await db.from("audit_logs").insert({
     action:      "portal_role_change",
     actor_email: adminEmail,
     target:      userEmail,
-    detail: {
-      assignment_id,
-      event_id:   eventId,
-      old_role:   oldRole,
-      new_role,
-      user_email: userEmail,
-    },
+    detail: { assignment_id, event_id: eventId, old_role: oldRole, new_role, user_email: userEmail },
   });
 
   return NextResponse.json({ ok: true });
 }
 
 // PATCH /api/admin/events/[id]/portal-users
-// Body: { portal_user_id, password } — reset password for a portal user
+// Body A: { portal_user_id, password } — reset password
+// Body B: { portal_user_id, phone }    — update phone number
 export async function PATCH(req: NextRequest, { params }: Params) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   await params; // consume params
-  const body = await req.json().catch(() => ({})) as { portal_user_id?: string; password?: string };
-  if (!body.portal_user_id || !body.password || body.password.length < 8) {
-    return NextResponse.json({ error: "portal_user_id and password (min 8 chars) are required" }, { status: 400 });
-  }
+  const body = await req.json().catch(() => ({})) as {
+    portal_user_id?: string;
+    password?: string;
+    phone?: string | null;
+  };
+
+  if (!body.portal_user_id)
+    return NextResponse.json({ error: "portal_user_id is required" }, { status: 400 });
 
   const db = getSupabaseServer();
+
+  // Path B: phone update
+  if (body.phone !== undefined) {
+    const { error } = await db
+      .from("event_portal_users")
+      .update({ phone: body.phone ?? null })
+      .eq("id", body.portal_user_id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+
+  // Path A: password reset
+  if (!body.password || body.password.length < 8) {
+    return NextResponse.json({ error: "password (min 8 chars) or phone is required" }, { status: 400 });
+  }
   const password_hash = await bcrypt.hash(body.password, 10);
   const { error } = await db
     .from("event_portal_users")
