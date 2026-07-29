@@ -56,6 +56,8 @@ interface EventRace {
   reporting_time: string | null; gun_time: string | null;
   timing_chip: boolean;
   perks: RacePerks | null;
+  gender_restriction: string | null;
+  min_age: number | null; max_age: number | null;
   display_order: number; status: string;
 }
 
@@ -118,7 +120,7 @@ async function getRaces(eventId: string): Promise<EventRace[]> {
   try {
     const { data } = await getSupabaseServer()
       .from("event_races")
-      .select("id, name, distance, price, early_bird_price, price_type, min_participants, max_participants, max_slots, slot_reserved, reporting_time, gun_time, timing_chip, perks, display_order, status")
+      .select("id, name, distance, price, early_bird_price, price_type, min_participants, max_participants, max_slots, slot_reserved, reporting_time, gun_time, timing_chip, perks, gender_restriction, min_age, max_age, display_order, status")
       .eq("event_id", eventId)
       .eq("status", "active")
       .order("display_order");
@@ -453,6 +455,27 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
                         👥 {(race.min_participants ?? 1) === (race.max_participants ?? 1) ? `${race.min_participants} people` : `${race.min_participants}–${race.max_participants} people`}
                       </div>
                     )}
+
+                    {/* Age / gender restriction hints */}
+                    {(() => {
+                      const tags: { label: string; color: string; bg: string }[] = [];
+                      const gr = race.gender_restriction;
+                      if (gr && gr !== "any" && gr !== "all") {
+                        const label = gr === "male" ? "♂ Male only" : gr === "female" ? "♀ Female only" : gr;
+                        tags.push({ label, color: "#a78bfa", bg: "rgba(167,139,250,0.1)" });
+                      }
+                      if (race.min_age && race.max_age) tags.push({ label: `${race.min_age}–${race.max_age} yrs`, color: "rgba(255,255,255,0.45)", bg: "rgba(255,255,255,0.04)" });
+                      else if (race.min_age) tags.push({ label: `${race.min_age}+ yrs`, color: "rgba(255,255,255,0.45)", bg: "rgba(255,255,255,0.04)" });
+                      else if (race.max_age) tags.push({ label: `Up to ${race.max_age} yrs`, color: "rgba(255,255,255,0.45)", bg: "rgba(255,255,255,0.04)" });
+                      if (tags.length === 0) return null;
+                      return (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                          {tags.map(t => (
+                            <span key={t.label} style={{ fontSize: "10px", fontWeight: 700, color: t.color, background: t.bg, borderRadius: 4, padding: "2px 6px" }}>{t.label}</span>
+                          ))}
+                        </div>
+                      );
+                    })()}
 
                     {/* Perks */}
                     {perkList.length > 0 && (
