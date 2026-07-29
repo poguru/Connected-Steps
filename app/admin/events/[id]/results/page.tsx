@@ -14,6 +14,8 @@ interface Result {
   bib_number:        string | null;
   distance_category: string | null;
   finish_time:       string | null;
+  gun_time_secs:     number | null;
+  chip_time_secs:    number | null;
   pace:              string | null;
   overall_position:  number | null;
   category_position: number | null;
@@ -104,6 +106,13 @@ export default function ResultsPage() {
     { key: "certificates", label: "Certificates" },
   ];
 
+  const hasChip = results.some(r => r.chip_time_secs != null);
+  function fmtSecs(s: number | null) {
+    if (s == null) return null;
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    return h > 0 ? `${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}` : `${m}:${String(sec).padStart(2,"0")}`;
+  }
+
   return (
     <div style={S.page}>
       <header style={S.header}>
@@ -149,10 +158,11 @@ export default function ResultsPage() {
                 action={<Button onClick={() => setTab("import")}>Import Results</Button>} />
             ) : (
               <Card style={{ padding: 0, overflow: "hidden" }}>
+                <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-                      {["Pos", "BIB", "Name", "Category", "Finish Time", "Pace", "Status"].map(h => (
+                      {["Pos", "BIB", "Name", "Category", "Finish Time", ...(hasChip ? ["Chip Time"] : []), "Pace", "Status"].map(h => (
                         <th key={h} style={{ padding: "10px 14px", textAlign: "left" as const, fontSize: 10, color: "#555", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: ".07em" }}>{h}</th>
                       ))}
                     </tr>
@@ -175,13 +185,21 @@ export default function ResultsPage() {
                         </td>
                         <td style={{ padding: "10px 14px", color: "#aaa" }}>{r.distance_category ?? "—"}</td>
                         <td style={{ padding: "10px 14px" }}><code style={{ color: "#fff", fontSize: 14, fontWeight: 700 }}>{r.finish_time ?? "—"}</code></td>
+                        {hasChip && (
+                          <td style={{ padding: "10px 14px" }}>
+                            {fmtSecs(r.chip_time_secs)
+                              ? <code style={{ color: "#a78bfa", fontSize: 13, fontWeight: 600 }}>{fmtSecs(r.chip_time_secs)}</code>
+                              : <span style={{ color: "#333" }}>—</span>}
+                          </td>
+                        )}
                         <td style={{ padding: "10px 14px", color: "#666" }}>{r.pace ?? "—"}</td>
                         <td style={{ padding: "10px 14px" }}>{statusBadge(r.status)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-            </Card>
+                </div>
+              </Card>
             )}
           </div>
         )}
