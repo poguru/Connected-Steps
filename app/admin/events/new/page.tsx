@@ -4,9 +4,36 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Button, Alert, Badge, Spinner } from "@/components/ui/ds";
+import dynamic from "next/dynamic";
+import { Button, Alert, Spinner } from "@/components/ui/ds";
+
+// ── TipTap (lazy-loaded) ──────────────────────────────────────────────────────
+
+const RichTextEditor = dynamic(
+  () => import("@/components/admin/RichEmailEditor"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="wiz-input" style={{ minHeight: 160, display: "flex", alignItems: "center", justifyContent: "center", color: "#333", fontSize: 12 }}>
+        Loading editor…
+      </div>
+    ),
+  }
+);
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+interface FaqItem { question: string; answer: string; }
+
+interface RegConfig {
+  require_gender:           boolean;
+  require_dob:              boolean;
+  require_blood_group:      boolean;
+  require_emergency_contact: boolean;
+  show_notes:               boolean;
+  notes_label:              string;
+  notes_placeholder:        string;
+}
 
 interface RaceForm {
   id?:                string;
@@ -25,33 +52,40 @@ interface RaceForm {
 }
 
 interface WizardState {
-  title:                   string;
-  event_category:          string;
-  event_type:              string;
-  description:             string;
-  start_date:              string;
-  end_date:                string;
-  start_time:              string;
-  end_time:                string;
-  location:                string;
-  meeting_point:           string;
-  maps_url:                string;
-  organizer:               string;
-  organizer_email:         string;
-  organizer_phone:         string;
-  support_email:           string;
-  cover_image:             string;
-  website:                 string;
-  registration_closes_at:  string;
-  early_bird_ends_at:      string;
-  max_participants:        string;
-  waiting_list_enabled:    boolean;
-  require_login:           boolean;
-  approval_required:       boolean;
-  collect_tshirt:          boolean;
-  refund_policy:           string;
-  cancellation_policy:     string;
-  visibility:              string;
+  title:                  string;
+  short_description:      string;
+  event_category:         string;
+  event_type:             string;
+  description:            string;
+  start_date:             string;
+  end_date:               string;
+  start_time:             string;
+  end_time:               string;
+  location:               string;
+  meeting_point:          string;
+  maps_url:               string;
+  organizer:              string;
+  organizer_email:        string;
+  organizer_phone:        string;
+  support_email:          string;
+  cover_image:            string;
+  banner_image:           string;
+  website:                string;
+  registration_opens_at:  string;
+  registration_closes_at: string;
+  early_bird_ends_at:     string;
+  max_participants:       string;
+  waiting_list_enabled:   boolean;
+  require_login:          boolean;
+  approval_required:      boolean;
+  collect_tshirt:         boolean;
+  refund_policy:          string;
+  cancellation_policy:    string;
+  terms_conditions:       string;
+  visibility:             string;
+  highlights:             string[];
+  faqs:                   FaqItem[];
+  gallery_images:         string[];
 }
 
 interface EventTemplate {
@@ -78,17 +112,22 @@ interface EventTemplate {
   created_at:           string;
 }
 
+// ── Constants ─────────────────────────────────────────────────────────────────
+
 const BLANK: WizardState = {
-  title: "", event_category: "community", event_type: "running",
+  title: "", short_description: "", event_category: "community", event_type: "running",
   description: "", start_date: "", end_date: "", start_time: "", end_time: "",
   location: "", meeting_point: "", maps_url: "",
   organizer: "Connected Steps", organizer_email: "info@connectedsteps.in",
   organizer_phone: "+91 97036 20570", support_email: "info@connectedsteps.in",
-  cover_image: "", website: "",
-  registration_closes_at: "", early_bird_ends_at: "", max_participants: "",
+  cover_image: "", banner_image: "", website: "",
+  registration_opens_at: "", registration_closes_at: "", early_bird_ends_at: "",
+  max_participants: "",
   waiting_list_enabled: false, require_login: true, approval_required: false,
   collect_tshirt: false,
-  refund_policy: "", cancellation_policy: "", visibility: "public",
+  refund_policy: "", cancellation_policy: "", terms_conditions: "",
+  visibility: "public",
+  highlights: [], faqs: [], gallery_images: [],
 };
 
 const BLANK_RACE: RaceForm = {
@@ -97,21 +136,32 @@ const BLANK_RACE: RaceForm = {
   gender_restriction: "", min_age: "", max_age: "", description: "",
 };
 
+const REG_CONFIG_BLANK: RegConfig = {
+  require_gender:            true,
+  require_dob:               true,
+  require_blood_group:       true,
+  require_emergency_contact: true,
+  show_notes:                true,
+  notes_label:               "Notes / Special Requests",
+  notes_placeholder:         "Medical conditions, dietary needs, or any questions. Enter NA if none.",
+};
+
 const STEPS = [
   { label: "Event Details",    icon: "📋" },
-  { label: "Race Setup",       icon: "🏃" },
+  { label: "Categories",       icon: "🏃" },
   { label: "Registration",     icon: "📅" },
+  { label: "Content & Media",  icon: "🖼️" },
   { label: "Review & Publish", icon: "🚀" },
 ];
 
 const EVENT_CATEGORIES = [
-  { value: "community",  label: "Community Run",        emoji: "🤝" },
-  { value: "marathon",   label: "Marathon / Half",      emoji: "🏆" },
-  { value: "corporate",  label: "Corporate Wellness",   emoji: "🏢" },
-  { value: "virtual",    label: "Virtual Challenge",    emoji: "💻" },
-  { value: "walkathon",  label: "Walkathon",            emoji: "🚶" },
-  { value: "cycling",    label: "Cycling Event",        emoji: "🚴" },
-  { value: "triathlon",  label: "Triathlon",            emoji: "🔱" },
+  { value: "community",  label: "Community Run",      emoji: "🤝" },
+  { value: "marathon",   label: "Marathon / Half",    emoji: "🏆" },
+  { value: "corporate",  label: "Corporate Wellness", emoji: "🏢" },
+  { value: "virtual",    label: "Virtual Challenge",  emoji: "💻" },
+  { value: "walkathon",  label: "Walkathon",          emoji: "🚶" },
+  { value: "cycling",    label: "Cycling Event",      emoji: "🚴" },
+  { value: "triathlon",  label: "Triathlon",          emoji: "🔱" },
 ];
 
 const EVENT_TYPES = [
@@ -125,8 +175,7 @@ const EVENT_TYPES = [
 
 const DISTANCES = ["1K", "3K", "5K", "10K", "15K", "21.1K", "42.2K", "Custom"];
 
-// ── Global CSS injection ──────────────────────────────────────────────────────
-// Injects dark-theme styles for native form elements once on mount.
+// ── Global CSS ────────────────────────────────────────────────────────────────
 
 const GLOBAL_CSS = `
   .wiz-input, .wiz-select, .wiz-textarea {
@@ -149,7 +198,16 @@ const GLOBAL_CSS = `
   .wiz-card-hover:hover { border-color: rgba(255,255,255,0.14); }
   .wiz-label { display: block; font-size: 11px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 7px; }
   .wiz-err { color: #f87171; font-size: 12px; margin-top: 5px; }
-  .wiz-race-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+  .wiz-steps { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .wiz-steps::-webkit-scrollbar { display: none; }
+  .wiz-grid { display: grid; }
+  @media (max-width: 600px) {
+    .wiz-grid-m1 { grid-template-columns: 1fr !important; }
+    .wiz-grid-m2 { grid-template-columns: 1fr 1fr !important; }
+    .wiz-step-label { display: none; }
+    .wiz-header-title { display: none; }
+    .wiz-bottom-label { display: none; }
+  }
 `;
 
 // ── Utility components ────────────────────────────────────────────────────────
@@ -176,35 +234,279 @@ function SectionCard({ title, children, noPad }: { title?: string; children: Rea
   );
 }
 
-function Grid({ cols, children, gap = 16 }: { cols: string; children: React.ReactNode; gap?: number }) {
-  return <div style={{ display: "grid", gridTemplateColumns: cols, gap, marginBottom: 0 }}>{children}</div>;
+function Grid({ cols, children, gap = 16, mobile = "1" }: { cols: string; children: React.ReactNode; gap?: number; mobile?: "1" | "2" }) {
+  return (
+    <div
+      className={`wiz-grid wiz-grid-m${mobile}`}
+      style={{ gridTemplateColumns: cols, gap }}
+    >
+      {children}
+    </div>
+  );
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+function Toggle({ value, onChange, label, hint }: { value: boolean; onChange: (v: boolean) => void; label: string; hint?: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }} onClick={() => onChange(!value)}>
+      <div style={{ width: 36, height: 20, borderRadius: 10, background: value ? "#e8620a" : "rgba(255,255,255,0.1)", position: "relative", transition: "background .2s", flexShrink: 0, marginTop: 2 }}>
+        <div style={{ position: "absolute", top: 2, left: value ? 18 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left .2s" }} />
+      </div>
+      <div>
+        <div style={{ fontSize: 13, color: "#ccc", fontWeight: 600 }}>{label}</div>
+        {hint && <div style={{ fontSize: 11, color: "#444", marginTop: 1 }}>{hint}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── Wizard Image Uploader ─────────────────────────────────────────────────────
+
+function WizardImageUploader({
+  eventId, purpose, currentUrl, onUploaded, onAutoSave, hint, height = 180,
+}: {
+  eventId:     string | null;
+  purpose:     string;
+  currentUrl:  string;
+  onUploaded:  (url: string) => void;
+  onAutoSave:  () => Promise<string | null>;
+  hint?:       string;
+  height?:     number;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [error,     setError]     = useState("");
+  const [dragOver,  setDragOver]  = useState(false);
+  const [fileInfo,  setFileInfo]  = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFile(file: File) {
+    setUploading(true); setError("");
+    const sz = file.size < 1024 * 1024
+      ? `${Math.round(file.size / 1024)} KB`
+      : `${(file.size / 1024 / 1024).toFixed(1)} MB`;
+    setFileInfo(sz);
+    try {
+      let id = eventId;
+      if (!id) {
+        id = await onAutoSave();
+        if (!id) { setError("Enter title, date & venue first, then try again"); setUploading(false); return; }
+      }
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("purpose", purpose);
+      const res  = await fetch(`/api/admin/events/${id}/upload`, { method: "POST", body: fd });
+      const data = await res.json() as { url?: string; error?: string };
+      if (!res.ok || !data.url) { setError(data.error ?? "Upload failed"); return; }
+      onUploaded(data.url);
+    } catch { setError("Network error"); }
+    finally { setUploading(false); if (inputRef.current) inputRef.current.value = ""; }
+  }
+
+  return (
+    <div>
+      <div
+        onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
+        onClick={() => !uploading && inputRef.current?.click()}
+        style={{
+          width: "100%", height, border: `2px dashed ${dragOver ? "#e8620a" : currentUrl ? "rgba(232,98,10,0.4)" : "rgba(255,255,255,0.12)"}`,
+          borderRadius: 10, overflow: "hidden", position: "relative",
+          cursor: uploading ? "wait" : "pointer",
+          background: dragOver ? "rgba(232,98,10,0.05)" : "#0d0d0d",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          transition: "border-color 0.15s, background 0.15s",
+        }}
+      >
+        {currentUrl ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={currentUrl} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <div
+              style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center", gap: 6, opacity: 0, transition: "opacity 0.2s" }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = "1")}
+              onMouseLeave={e => (e.currentTarget.style.opacity = "0")}
+            >
+              <div style={{ fontSize: 24 }}>📷</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>Click to replace</div>
+              <div style={{ fontSize: 10, color: "#ccc" }}>or drag a new image here</div>
+            </div>
+          </>
+        ) : (
+          <div style={{ textAlign: "center", color: "#555", pointerEvents: "none" }}>
+            {uploading ? (
+              <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 8 }}>
+                <Spinner size={20} />
+                <div style={{ fontSize: 11 }}>Uploading {fileInfo}…</div>
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>📷</div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Drag & drop or click to upload</div>
+                <div style={{ fontSize: 11 }}>JPG, PNG, WebP · Max 10 MB</div>
+              </>
+            )}
+          </div>
+        )}
+        {uploading && currentUrl && (
+          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center", gap: 8 }}>
+            <Spinner size={20} />
+            <div style={{ fontSize: 11, color: "#ccc" }}>Uploading {fileInfo}…</div>
+          </div>
+        )}
+      </div>
+      {hint && <div style={{ fontSize: 10, color: "#555", marginTop: 4 }}>{hint}</div>}
+      {error && <div style={{ fontSize: 11, color: "#f87171", marginTop: 4 }}>{error}</div>}
+      {currentUrl && !uploading && (
+        <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
+          {fileInfo && <span style={{ fontSize: 11, color: "#555" }}>{fileInfo}</span>}
+          <button
+            onClick={e => { e.stopPropagation(); onUploaded(""); setFileInfo(""); }}
+            style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 6, padding: "3px 10px", color: "#f87171", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}
+          >Remove</button>
+          <button
+            onClick={e => { e.stopPropagation(); inputRef.current?.click(); }}
+            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "3px 10px", color: "#888", fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}
+          >Replace</button>
+        </div>
+      )}
+      <input ref={inputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
+    </div>
+  );
+}
+
+// ── FAQ Editor ────────────────────────────────────────────────────────────────
+
+function FaqEditor({ faqs, onChange }: { faqs: FaqItem[]; onChange: (f: FaqItem[]) => void }) {
+  function update(i: number, key: keyof FaqItem, v: string) {
+    onChange(faqs.map((f, idx) => idx === i ? { ...f, [key]: v } : f));
+  }
+  return (
+    <div>
+      {faqs.map((faq, i) => (
+        <div key={i} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".06em" }}>FAQ #{i + 1}</span>
+            <button onClick={() => onChange(faqs.filter((_, idx) => idx !== i))} style={{ background: "none", border: "none", color: "#f87171", cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 2px", fontFamily: "inherit" }}>×</button>
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <div className="wiz-label">Question</div>
+            <input className="wiz-input" value={faq.question} onChange={e => update(i, "question", e.target.value)} placeholder="What is included in the registration fee?" />
+          </div>
+          <div>
+            <div className="wiz-label">Answer</div>
+            <textarea className="wiz-textarea" style={{ minHeight: 70 }} value={faq.answer} onChange={e => update(i, "answer", e.target.value)} placeholder="Your answer here…" />
+          </div>
+        </div>
+      ))}
+      <button onClick={() => onChange([...faqs, { question: "", answer: "" }])} style={{ padding: "8px 16px", background: "rgba(232,98,10,0.1)", border: "1px solid rgba(232,98,10,0.25)", borderRadius: 8, color: "#e8620a", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+        + Add FAQ
+      </button>
+    </div>
+  );
+}
+
+// ── Highlights Editor ─────────────────────────────────────────────────────────
+
+function HighlightsEditor({ items, onChange }: { items: string[]; onChange: (v: string[]) => void }) {
+  return (
+    <div>
+      {items.map((item, i) => (
+        <div key={i} style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}>
+          <span style={{ color: "#e8620a", fontSize: 14, flexShrink: 0 }}>•</span>
+          <input className="wiz-input" style={{ flex: 1 }} value={item} onChange={e => onChange(items.map((x, idx) => idx === i ? e.target.value : x))} placeholder="Event highlight, perk, or feature…" />
+          <button onClick={() => onChange(items.filter((_, idx) => idx !== i))} style={{ background: "none", border: "none", color: "#f87171", cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 4px", flexShrink: 0, fontFamily: "inherit" }}>×</button>
+        </div>
+      ))}
+      <button onClick={() => onChange([...items, ""])} style={{ padding: "7px 14px", background: "rgba(232,98,10,0.1)", border: "1px solid rgba(232,98,10,0.25)", borderRadius: 8, color: "#e8620a", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+        + Add Highlight
+      </button>
+    </div>
+  );
+}
+
+// ── Publish Success Modal ─────────────────────────────────────────────────────
+
+function PublishModal({ eventId, shareSlug, eventTitle, onClose }: { eventId: string; shareSlug: string; eventTitle: string; onClose: () => void }) {
+  const router    = useRouter();
+  const publicUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/events/${shareSlug}`;
+  const [copied, setCopied] = useState(false);
+
+  function copyLink() {
+    navigator.clipboard.writeText(publicUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }).catch(() => {});
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.87)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+      <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 20, width: "100%", maxWidth: 460, padding: "2rem" }}>
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <div style={{ fontSize: 48, marginBottom: 10 }}>🎉</div>
+          <div style={{ fontWeight: 800, fontSize: 20, color: "#4ade80", marginBottom: 6 }}>Event Published!</div>
+          <div style={{ fontSize: 14, color: "#666" }}>{eventTitle}</div>
+        </div>
+
+        <div style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "10px 14px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 12, color: "#555", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{publicUrl}</span>
+          <button
+            onClick={copyLink}
+            style={{ background: copied ? "rgba(74,222,128,0.15)" : "rgba(255,255,255,0.07)", border: `1px solid ${copied ? "rgba(74,222,128,0.3)" : "rgba(255,255,255,0.12)"}`, borderRadius: 7, padding: "5px 12px", color: copied ? "#4ade80" : "#ccc", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", flexShrink: 0, transition: "all 0.2s" }}
+          >{copied ? "✓ Copied" : "Copy"}</button>
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".08em", marginBottom: 10 }}>What&apos;s Next</div>
+          {["Test a registration on the public page", "Manage registrations from the Event Hub", "Customise the confirmation email", "Add route maps and results after the event"].map((item, i) => (
+            <div key={i} style={{ display: "flex", gap: 10, fontSize: 13, color: "#777", marginBottom: 7 }}>
+              <span style={{ color: "#e8620a", flexShrink: 0 }}>→</span>{item}
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
+          <Button onClick={() => router.push(`/admin/events/${eventId}/manage`)} style={{ flex: 1 }}>Go to Event Hub</Button>
+          <a href={publicUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+            <Button variant="secondary">View Live ↗</Button>
+          </a>
+          <a href={`https://wa.me/?text=${encodeURIComponent(`Register for ${eventTitle}: ${publicUrl}`)}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+            <Button variant="ghost">WhatsApp</Button>
+          </a>
+        </div>
+
+        <button onClick={onClose} style={{ marginTop: 14, width: "100%", background: "none", border: "none", color: "#444", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+          Close and stay here
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Wizard Component ─────────────────────────────────────────────────────
 
 export default function NewEventWizard() {
   const router = useRouter();
 
-  const [step,         setStep]         = useState(0);
-  const [form,         setForm]         = useState<WizardState>(BLANK);
-  const [races,        setRaces]        = useState<RaceForm[]>([]);
-  const [raceForm,     setRaceForm]     = useState<RaceForm>(BLANK_RACE);
-  const [editIdx,      setEditIdx]      = useState<number | null>(null);
-  const [eventId,      setEventId]      = useState<string | null>(null);
-  const [saving,       setSaving]       = useState(false);
-  const [errors,       setErrors]       = useState<Record<string, string>>({});
-  const [savedAt,      setSavedAt]      = useState<string>("");
-  const [toast,        setToast]        = useState<{ msg: string; type: "ok" | "err" } | null>(null);
-  const [hasDraft,     setHasDraft]     = useState(false);
-  const [skipRaces,    setSkipRaces]    = useState(false);
-  const autoRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const [step,              setStep]              = useState(0);
+  const [form,              setForm]              = useState<WizardState>(BLANK);
+  const [regConfig,         setRegConfig]         = useState<RegConfig>(REG_CONFIG_BLANK);
+  const [races,             setRaces]             = useState<RaceForm[]>([]);
+  const [raceForm,          setRaceForm]          = useState<RaceForm>(BLANK_RACE);
+  const [editIdx,           setEditIdx]           = useState<number | null>(null);
+  const [eventId,           setEventId]           = useState<string | null>(null);
+  const [shareSlug,         setShareSlug]         = useState<string | null>(null);
+  const [saving,            setSaving]            = useState(false);
+  const [errors,            setErrors]            = useState<Record<string, string>>({});
+  const [savedAt,           setSavedAt]           = useState("");
+  const [toast,             setToast]             = useState<{ msg: string; type: "ok" | "err" } | null>(null);
+  const [hasDraft,          setHasDraft]          = useState(false);
+  const [skipRaces,         setSkipRaces]         = useState(false);
+  const [showPublishModal,  setShowPublishModal]  = useState(false);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [templates,         setTemplates]         = useState<EventTemplate[]>([]);
+  const [templatesLoading,  setTemplatesLoading]  = useState(false);
+
+  const autoRef  = useRef<ReturnType<typeof setTimeout>>(null);
   const isMounted = useRef(true);
 
-  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
-  const [templates,          setTemplates]          = useState<EventTemplate[]>([]);
-  const [templatesLoading,   setTemplatesLoading]   = useState(false);
-
-  // ── CSS injection ───────────────────────────────────────────────────────────
+  // ── CSS injection ─────────────────────────────────────────────────────────
   useEffect(() => {
     const style = document.createElement("style");
     style.textContent = GLOBAL_CSS;
@@ -212,12 +514,12 @@ export default function NewEventWizard() {
     return () => { document.head.removeChild(style); isMounted.current = false; };
   }, []);
 
-  // ── Draft recovery — only restore if user confirms ─────────────────────────
+  // ── Draft recovery ────────────────────────────────────────────────────────
   useEffect(() => {
     const saved = localStorage.getItem("cs_new_event_draft");
     if (saved) {
       try {
-        const d = JSON.parse(saved) as { form: WizardState; races: RaceForm[]; step: number; eventId: string | null; skipRaces?: boolean };
+        const d = JSON.parse(saved) as { form: WizardState; step?: number };
         if (d.form?.title) setHasDraft(true);
       } catch { /* ignore */ }
     }
@@ -227,90 +529,56 @@ export default function NewEventWizard() {
     const saved = localStorage.getItem("cs_new_event_draft");
     if (!saved) return;
     try {
-      const d = JSON.parse(saved) as { form: WizardState; races: RaceForm[]; step: number; eventId: string | null; skipRaces?: boolean };
-      setForm(d.form); setRaces(d.races ?? []); setStep(d.step ?? 0);
-      setEventId(d.eventId ?? null); setSkipRaces(d.skipRaces ?? false);
+      const d = JSON.parse(saved) as {
+        form: WizardState; races: RaceForm[]; step: number;
+        eventId: string | null; shareSlug: string | null; skipRaces?: boolean;
+        regConfig?: RegConfig;
+      };
+      setForm({ ...BLANK, ...d.form });
+      setRaces(d.races ?? []);
+      setStep(d.step ?? 0);
+      setEventId(d.eventId ?? null);
+      setShareSlug(d.shareSlug ?? null);
+      setSkipRaces(d.skipRaces ?? false);
+      if (d.regConfig) setRegConfig(d.regConfig);
       setHasDraft(false);
     } catch { /* ignore */ }
   }
 
   function discardDraft() { localStorage.removeItem("cs_new_event_draft"); setHasDraft(false); }
 
-  // ── Templates ────────────────────────────────────────────────────────────────
-  async function loadAndShowTemplates() {
-    setShowTemplatePicker(true);
-    if (templates.length > 0) return;
-    setTemplatesLoading(true);
-    try {
-      const res  = await fetch("/api/admin/event-templates");
-      const data = await res.json() as { templates?: EventTemplate[] };
-      if (isMounted.current) setTemplates(data.templates ?? []);
-    } catch { /* non-critical */ }
-    finally { if (isMounted.current) setTemplatesLoading(false); }
-  }
-
-  function applyTemplate(t: EventTemplate) {
-    setForm(prev => ({
-      ...prev,
-      event_category:       t.event_category,
-      event_type:           t.event_type,
-      description:          t.event_description ?? prev.description,
-      organizer:            t.organizer ?? prev.organizer,
-      organizer_email:      t.organizer_email ?? prev.organizer_email,
-      organizer_phone:      t.organizer_phone ?? prev.organizer_phone,
-      support_email:        t.support_email ?? prev.support_email,
-      website:              t.website ?? prev.website,
-      cover_image:          t.cover_image ?? prev.cover_image,
-      max_participants:     t.max_participants != null ? String(t.max_participants) : prev.max_participants,
-      waiting_list_enabled: t.waiting_list_enabled,
-      require_login:        t.require_login,
-      approval_required:    t.approval_required,
-      collect_tshirt:       t.collect_tshirt,
-      refund_policy:        t.refund_policy ?? prev.refund_policy,
-      cancellation_policy:  t.cancellation_policy ?? prev.cancellation_policy,
-      visibility:           t.visibility,
-    }));
-    if (t.races.length > 0) setRaces(t.races.map(r => ({ ...r })));
-    setSkipRaces(t.races.length === 0);
-    setShowTemplatePicker(false);
-    showToast(`Template "${t.name}" applied ✓`);
-  }
-
-  async function deleteTemplate(id: string) {
-    await fetch(`/api/admin/event-templates/${id}`, { method: "DELETE" });
-    setTemplates(prev => prev.filter(t => t.id !== id));
-  }
-
-  // ── Auto-save draft to localStorage ────────────────────────────────────────
+  // ── Auto-save draft to localStorage ──────────────────────────────────────
   const saveDraft = useCallback(() => {
-    localStorage.setItem("cs_new_event_draft", JSON.stringify({ form, races, step, eventId, skipRaces }));
-  }, [form, races, step, eventId, skipRaces]);
+    localStorage.setItem("cs_new_event_draft", JSON.stringify({ form, races, step, eventId, shareSlug, skipRaces, regConfig }));
+  }, [form, races, step, eventId, shareSlug, skipRaces, regConfig]);
 
   useEffect(() => {
     if (autoRef.current) clearTimeout(autoRef.current);
     autoRef.current = setTimeout(saveDraft, 600);
-  }, [form, races, saveDraft]);
+  }, [form, races, regConfig, saveDraft]);
 
-  // ── Helpers ─────────────────────────────────────────────────────────────────
-  const set = (k: keyof WizardState, v: unknown) => setForm(p => ({ ...p, [k]: v }));
-  const setRF = (k: keyof RaceForm, v: unknown) => setRaceForm(p => ({ ...p, [k]: v }));
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const set   = (k: keyof WizardState, v: unknown) => setForm(p => ({ ...p, [k]: v }));
+  const setRF = (k: keyof RaceForm, v: unknown)    => setRaceForm(p => ({ ...p, [k]: v }));
+  const setRC = (k: keyof RegConfig, v: unknown)   => setRegConfig(p => ({ ...p, [k]: v }));
 
   const showToast = (msg: string, type: "ok" | "err" = "ok") => {
     setToast({ msg, type });
     setTimeout(() => { if (isMounted.current) setToast(null); }, 3200);
   };
 
-  // ── Validation ──────────────────────────────────────────────────────────────
+  // ── Validation ────────────────────────────────────────────────────────────
   function validate(): boolean {
     const e: Record<string, string> = {};
     if (step === 0) {
-      if (!form.title.trim())       e.title       = "Event name is required";
-      if (!form.start_date)         e.start_date  = "Start date is required";
-      if (!form.location.trim())    e.location    = "Venue is required";
-      if (!form.description.trim()) e.description = "Description is required";
+      if (!form.title.trim())     e.title      = "Event name is required";
+      if (!form.start_date)       e.start_date = "Start date is required";
+      if (!form.location.trim())  e.location   = "Venue is required";
+      const descText = form.description.replace(/<[^>]*>/g, "").trim();
+      if (!descText)              e.description = "Description is required";
     }
     if (step === 1 && !skipRaces && races.length === 0) {
-      e.races = 'Add at least one race, or click "Skip — No Races" below';
+      e.races = 'Add at least one race/category, or click "Skip — No Categories" below';
     }
     if (step === 2) {
       if (!form.registration_closes_at) e.registration_closes_at = "Registration close date is required";
@@ -319,53 +587,63 @@ export default function NewEventWizard() {
     return Object.keys(e).length === 0;
   }
 
-  // ── Save to server ──────────────────────────────────────────────────────────
+  // ── Save to server ────────────────────────────────────────────────────────
   async function saveToServer(publish = false): Promise<string | null> {
     setSaving(true);
     try {
       const body = {
-        title:                   form.title.trim(),
-        description:             form.description,
-        event_type:              form.event_type,
-        event_category:          form.event_category,
-        cover_image:             form.cover_image || null,
-        start_date:              form.start_date,
-        start_time:              form.start_time || null,
-        end_date:                form.end_date || form.start_date,
-        end_time:                form.end_time || null,
-        location:                form.location.trim(),
-        meeting_point:           form.meeting_point || null,
-        maps_url:                form.maps_url || null,
-        organizer:               form.organizer,
-        organizer_email:         form.organizer_email || null,
-        organizer_phone:         form.organizer_phone || null,
-        support_email:           form.support_email || null,
-        website:                 form.website || null,
-        registration_closes_at:  form.registration_closes_at ? `${form.registration_closes_at}:00` : null,
-        early_bird_ends_at:      form.early_bird_ends_at ? `${form.early_bird_ends_at}:00` : null,
-        max_participants:        form.max_participants ? Number(form.max_participants) : null,
-        waiting_list_enabled:    form.waiting_list_enabled,
-        require_login:           form.require_login,
-        approval_required:       form.approval_required,
-        collect_tshirt:          form.collect_tshirt,
-        refund_policy:           form.refund_policy || null,
-        cancellation_policy:     form.cancellation_policy || null,
-        visibility:              form.visibility,
-        status:                  publish ? "published" : "draft",
-        price:                   races[0] ? Number(races[0].price) || 0 : 0,
-        registration_required:   true,
-        distance_categories:     races.map(r => r.distance).filter(Boolean),
+        title:                  form.title.trim(),
+        short_description:      form.short_description || null,
+        description:            form.description || null,
+        event_type:             form.event_type,
+        event_category:         form.event_category,
+        cover_image:            form.cover_image || null,
+        banner_image:           form.banner_image || null,
+        start_date:             form.start_date,
+        start_time:             form.start_time || null,
+        end_date:               form.end_date || form.start_date,
+        end_time:               form.end_time || null,
+        location:               form.location.trim(),
+        meeting_point:          form.meeting_point || null,
+        maps_url:               form.maps_url || null,
+        organizer:              form.organizer,
+        organizer_email:        form.organizer_email || null,
+        organizer_phone:        form.organizer_phone || null,
+        support_email:          form.support_email || null,
+        website:                form.website || null,
+        registration_opens_at:  form.registration_opens_at ? `${form.registration_opens_at}:00` : null,
+        registration_closes_at: form.registration_closes_at ? `${form.registration_closes_at}:00` : null,
+        early_bird_ends_at:     form.early_bird_ends_at ? `${form.early_bird_ends_at}:00` : null,
+        max_participants:       form.max_participants ? Number(form.max_participants) : null,
+        waiting_list_enabled:   form.waiting_list_enabled,
+        require_login:          form.require_login,
+        approval_required:      form.approval_required,
+        collect_tshirt:         form.collect_tshirt,
+        refund_policy:          form.refund_policy || null,
+        cancellation_policy:    form.cancellation_policy || null,
+        terms_conditions:       form.terms_conditions || null,
+        visibility:             form.visibility,
+        highlights:             form.highlights,
+        faqs:                   form.faqs,
+        gallery_images:         form.gallery_images,
+        registration_config:    regConfig,
+        status:                 publish ? "published" : "draft",
+        price:                  races[0] ? Number(races[0].price) || 0 : 0,
+        registration_required:  true,
+        distance_categories:    races.map(r => r.distance).filter(Boolean),
       };
 
-      const method    = eventId ? "PATCH" : "POST";
-      const reqBody   = eventId ? { id: eventId, ...body } : body;
-      const res       = await fetch("/api/admin/events", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(reqBody) });
-      const data      = await res.json();
+      const method  = eventId ? "PATCH" : "POST";
+      const reqBody = eventId ? { id: eventId, ...body } : body;
+      const res     = await fetch("/api/admin/events", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(reqBody) });
+      const data    = await res.json();
 
       if (!res.ok) { showToast(data.error ?? "Save failed", "err"); return null; }
 
-      const id = data.data?.id ?? eventId;
-      if (id && isMounted.current) setEventId(id);
+      const id   = data.data?.id   ?? eventId;
+      const slug = data.data?.share_slug ?? shareSlug;
+      if (id   && isMounted.current) setEventId(id);
+      if (slug && isMounted.current) setShareSlug(slug);
 
       // Sync races
       if (id && !skipRaces) {
@@ -392,10 +670,16 @@ export default function NewEventWizard() {
     }
   }
 
-  // ── Navigation ──────────────────────────────────────────────────────────────
+  // ── Auto-save for uploads (returns eventId, saving first if needed) ───────
+  async function autoSaveForUpload(): Promise<string | null> {
+    if (eventId) return eventId;
+    if (!form.title.trim() || !form.start_date || !form.location.trim()) return null;
+    return saveToServer(false);
+  }
+
+  // ── Navigation ────────────────────────────────────────────────────────────
   async function handleNext() {
     if (!validate()) return;
-    // Save on all step transitions (not just 0 and 2)
     if (form.title.trim() && form.start_date && form.location.trim()) {
       await saveToServer(false);
     }
@@ -415,12 +699,62 @@ export default function NewEventWizard() {
     const id = await saveToServer(true);
     if (id) {
       localStorage.removeItem("cs_new_event_draft");
-      showToast("Event published! 🎉");
-      setTimeout(() => router.push(`/admin/events/${id}/manage`), 1400);
+      setShowPublishModal(true);
     }
   }
 
-  // ── Race management ─────────────────────────────────────────────────────────
+  async function handlePreview() {
+    if (!shareSlug) return;
+    await saveToServer(false);
+    window.open(`/events/${shareSlug}?preview=1`, "_blank");
+  }
+
+  // ── Templates ─────────────────────────────────────────────────────────────
+  async function loadAndShowTemplates() {
+    setShowTemplatePicker(true);
+    if (templates.length > 0) return;
+    setTemplatesLoading(true);
+    try {
+      const res  = await fetch("/api/admin/event-templates");
+      const data = await res.json() as { templates?: EventTemplate[] };
+      if (isMounted.current) setTemplates(data.templates ?? []);
+    } catch { /* non-critical */ }
+    finally { if (isMounted.current) setTemplatesLoading(false); }
+  }
+
+  function applyTemplate(t: EventTemplate) {
+    setForm(prev => ({
+      ...prev,
+      event_category:      t.event_category,
+      event_type:          t.event_type,
+      description:         t.event_description ?? prev.description,
+      organizer:           t.organizer ?? prev.organizer,
+      organizer_email:     t.organizer_email ?? prev.organizer_email,
+      organizer_phone:     t.organizer_phone ?? prev.organizer_phone,
+      support_email:       t.support_email ?? prev.support_email,
+      website:             t.website ?? prev.website,
+      cover_image:         t.cover_image ?? prev.cover_image,
+      max_participants:    t.max_participants != null ? String(t.max_participants) : prev.max_participants,
+      waiting_list_enabled: t.waiting_list_enabled,
+      require_login:       t.require_login,
+      approval_required:   t.approval_required,
+      collect_tshirt:      t.collect_tshirt,
+      refund_policy:       t.refund_policy ?? prev.refund_policy,
+      cancellation_policy: t.cancellation_policy ?? prev.cancellation_policy,
+      visibility:          t.visibility,
+    }));
+    if (t.races.length > 0) setRaces(t.races.map(r => ({ ...r })));
+    setSkipRaces(t.races.length === 0);
+    setShowTemplatePicker(false);
+    showToast(`Template "${t.name}" applied ✓`);
+  }
+
+  async function deleteTemplate(id: string) {
+    await fetch(`/api/admin/event-templates/${id}`, { method: "DELETE" });
+    setTemplates(prev => prev.filter(t => t.id !== id));
+  }
+
+  // ── Race management ───────────────────────────────────────────────────────
   function addOrUpdateRace() {
     if (!raceForm.name.trim()) { setErrors(e => ({ ...e, race_name: "Race name is required" })); return; }
     if (!raceForm.distance.trim()) { setErrors(e => ({ ...e, race_dist: "Distance is required" })); return; }
@@ -435,24 +769,43 @@ export default function NewEventWizard() {
   }
 
   function editRace(i: number) { setRaceForm({ ...races[i] }); setEditIdx(i); }
-  function deleteRace(i: number) { setRaces(rs => rs.filter((_, idx) => idx !== i)); if (editIdx === i) { setEditIdx(null); setRaceForm(BLANK_RACE); } }
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  function deleteRace(i: number) {
+    setRaces(rs => rs.filter((_, idx) => idx !== i));
+    if (editIdx === i) { setEditIdx(null); setRaceForm(BLANK_RACE); }
+  }
+
+  function duplicateRace(i: number) {
+    setRaces(rs => [...rs, { ...rs[i], name: `${rs[i].name} (Copy)` }]);
+  }
+
+  function reorderRace(from: number, to: number) {
+    setRaces(rs => {
+      const next = [...rs];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  const isReady = Boolean(form.title && form.start_date && form.location && form.registration_closes_at);
+
   return (
     <div style={{ minHeight: "100vh", background: "#080808", color: "#fff", fontFamily: "system-ui, -apple-system, sans-serif" }}>
 
       {/* Header */}
-      <header style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(8,8,8,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0 2rem", height: 58, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Link href="/admin/events" style={{ display: "flex", alignItems: "center", textDecoration: "none", opacity: 0.7 }}>
+      <header style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(8,8,8,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0 1.5rem", height: 58, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+          <Link href="/admin/events" style={{ display: "flex", alignItems: "center", textDecoration: "none", opacity: 0.7, flexShrink: 0 }}>
             <Image src="/logo.png" alt="" width={26} height={26} style={{ borderRadius: "50%" }} />
           </Link>
-          <div style={{ width: 1, height: 18, background: "rgba(255,255,255,0.1)" }} />
-          <span style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>New Event</span>
-          {form.title && <span style={{ fontSize: 12, color: "#444", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>— {form.title}</span>}
+          <div style={{ width: 1, height: 18, background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
+          <span style={{ fontWeight: 700, fontSize: 14, color: "#fff", whiteSpace: "nowrap" as const }}>New Event</span>
+          {form.title && <span className="wiz-header-title" style={{ fontSize: 12, color: "#444", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>— {form.title}</span>}
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {savedAt && <span style={{ fontSize: 11, color: "#333" }}>Saved {savedAt}</span>}
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+          {savedAt && <span style={{ fontSize: 11, color: "#333", whiteSpace: "nowrap" as const }}>Saved {savedAt}</span>}
           <Button size="sm" variant="ghost" onClick={loadAndShowTemplates}>🗂️ Template</Button>
           <Button size="sm" variant="secondary" loading={saving} onClick={handleSaveDraft}>Save Draft</Button>
           <Link href="/admin/events" style={{ textDecoration: "none" }}>
@@ -463,7 +816,7 @@ export default function NewEventWizard() {
 
       {/* Draft restore banner */}
       {hasDraft && (
-        <Alert variant="warning" style={{ margin: "0", borderRadius: 0, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <Alert variant="warning" style={{ margin: 0, borderRadius: 0, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" as const, gap: 8 }}>
           <span>You have an unsaved draft. Continue where you left off?</span>
           <div style={{ display: "flex", gap: 8 }}>
             <Button size="xs" onClick={restoreDraft}>Restore Draft</Button>
@@ -473,20 +826,20 @@ export default function NewEventWizard() {
       )}
 
       {/* Step progress */}
-      <div style={{ background: "#0c0c0c", borderBottom: "1px solid rgba(255,255,255,0.05)", padding: "0 2rem" }}>
-        <div style={{ maxWidth: 860, margin: "0 auto", display: "flex", alignItems: "stretch" }}>
+      <div style={{ background: "#0c0c0c", borderBottom: "1px solid rgba(255,255,255,0.05)", padding: "0 1.5rem" }}>
+        <div className="wiz-steps" style={{ maxWidth: 860, margin: "0 auto", display: "flex", alignItems: "stretch" }}>
           {STEPS.map((s, i) => (
             <button
               key={s.label}
-              onClick={() => i < step && setStep(i)}
+              onClick={() => i < step ? setStep(i) : undefined}
               disabled={i > step}
-              style={{ flex: 1, display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center", gap: 4, padding: "14px 8px", background: "none", border: "none", borderBottom: i === step ? "2px solid #e8620a" : "2px solid transparent", cursor: i < step ? "pointer" : "default", transition: "all 0.15s" }}
+              style={{ flex: 1, display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center", gap: 4, padding: "14px 6px", background: "none", border: "none", borderBottom: i === step ? "2px solid #e8620a" : "2px solid transparent", cursor: i < step ? "pointer" : "default", transition: "all 0.15s", minWidth: 48 }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <div style={{ width: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: i < step ? "#4ade80" : i === step ? "#e8620a" : "rgba(255,255,255,0.07)", fontSize: 11, fontWeight: 800, color: i <= step ? "#fff" : "#444", flexShrink: 0 }}>
                   {i < step ? "✓" : i + 1}
                 </div>
-                <span style={{ fontSize: 12, fontWeight: i === step ? 700 : 400, color: i === step ? "#fff" : i < step ? "#4ade80" : "#3a3a3a", whiteSpace: "nowrap" as const }}>
+                <span className="wiz-step-label" style={{ fontSize: 12, fontWeight: i === step ? 700 : 400, color: i === step ? "#fff" : i < step ? "#4ade80" : "#3a3a3a", whiteSpace: "nowrap" as const }}>
                   {s.label}
                 </span>
               </div>
@@ -495,45 +848,79 @@ export default function NewEventWizard() {
         </div>
       </div>
 
-      {/* Content */}
-      <div style={{ maxWidth: 860, margin: "0 auto", padding: "2rem 2rem 6rem" }}>
+      {/* Step content */}
+      <div style={{ maxWidth: 860, margin: "0 auto", padding: "2rem 1.5rem 6rem" }}>
 
-        {step === 0 && <StepDetails form={form} set={set} errors={errors} />}
+        {step === 0 && (
+          <StepDetails
+            form={form} set={set} errors={errors}
+            eventId={eventId} onAutoSave={autoSaveForUpload}
+          />
+        )}
+
         {step === 1 && (
-          <StepRaces
+          <StepCategories
             races={races} raceForm={raceForm} setRF={setRF}
             editIdx={editIdx} errors={errors} skipRaces={skipRaces}
             onSkipToggle={() => { setSkipRaces(s => !s); setErrors(e => { const n = { ...e }; delete n.races; return n; }); }}
             onAdd={addOrUpdateRace} onEdit={editRace} onDelete={deleteRace}
+            onDuplicate={duplicateRace} onReorder={reorderRace}
             onCancel={() => { setEditIdx(null); setRaceForm(BLANK_RACE); }}
           />
         )}
-        {step === 2 && <StepRegistration form={form} set={set} errors={errors} />}
-        {step === 3 && <StepReview form={form} races={races} skipRaces={skipRaces} onPublish={handlePublish} saving={saving} />}
 
-        {/* Navigation bar */}
-        <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "rgba(8,8,8,0.96)", backdropFilter: "blur(12px)", borderTop: "1px solid rgba(255,255,255,0.06)", padding: "14px 2rem", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 40 }}>
+        {step === 2 && (
+          <StepRegistration
+            form={form} set={set} errors={errors}
+            regConfig={regConfig} setRC={setRC}
+          />
+        )}
+
+        {step === 3 && (
+          <StepContent
+            form={form} set={set}
+            eventId={eventId} onAutoSave={autoSaveForUpload}
+          />
+        )}
+
+        {step === 4 && (
+          <StepReview
+            form={form} races={races} skipRaces={skipRaces} isReady={isReady}
+            eventId={eventId} shareSlug={shareSlug}
+            onPublish={handlePublish} onPreview={handlePreview} saving={saving}
+          />
+        )}
+
+        {/* Bottom nav bar */}
+        <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "rgba(8,8,8,0.96)", backdropFilter: "blur(12px)", borderTop: "1px solid rgba(255,255,255,0.06)", padding: "14px 1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 40, gap: 12 }}>
           <Button variant="secondary" disabled={step === 0 || saving} onClick={handleBack}>← Back</Button>
-
-          <div style={{ fontSize: 12, color: "#2a2a2a" }}>
-            Step {step + 1} of {STEPS.length}
-          </div>
-
+          <span className="wiz-bottom-label" style={{ fontSize: 12, color: "#2a2a2a" }}>Step {step + 1} of {STEPS.length}</span>
           {step < STEPS.length - 1 ? (
             <Button loading={saving} onClick={handleNext}>Continue →</Button>
           ) : (
-            <Button loading={saving} onClick={handlePublish}>🚀 Publish Event</Button>
+            <Button loading={saving} onClick={handlePublish} disabled={!isReady}>🚀 Publish Now</Button>
           )}
         </div>
       </div>
 
       {/* Toast */}
       {toast && (
-        <div style={{ position: "fixed", bottom: 80, left: "50%", transform: "translateX(-50%)", background: toast.type === "err" ? "#3b0a0a" : "#0f1a0f", border: `1px solid ${toast.type === "err" ? "rgba(239,68,68,0.3)" : "rgba(74,222,128,0.3)"}`, borderRadius: 24, padding: "10px 22px", fontSize: 13, fontWeight: 600, color: toast.type === "err" ? "#f87171" : "#4ade80", zIndex: 9999, whiteSpace: "nowrap", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}>
+        <div style={{ position: "fixed", bottom: 80, left: "50%", transform: "translateX(-50%)", background: toast.type === "err" ? "#3b0a0a" : "#0f1a0f", border: `1px solid ${toast.type === "err" ? "rgba(239,68,68,0.3)" : "rgba(74,222,128,0.3)"}`, borderRadius: 24, padding: "10px 22px", fontSize: 13, fontWeight: 600, color: toast.type === "err" ? "#f87171" : "#4ade80", zIndex: 9999, whiteSpace: "nowrap" as const, boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}>
           {toast.msg}
         </div>
       )}
 
+      {/* Publish success modal */}
+      {showPublishModal && eventId && shareSlug && (
+        <PublishModal
+          eventId={eventId}
+          shareSlug={shareSlug}
+          eventTitle={form.title}
+          onClose={() => setShowPublishModal(false)}
+        />
+      )}
+
+      {/* Template picker */}
       {showTemplatePicker && (
         <TemplatePicker
           templates={templates}
@@ -549,72 +936,82 @@ export default function NewEventWizard() {
   );
 }
 
-// ── Step 1: Event Details ─────────────────────────────────────────────────────
+// ── Step 0: Event Details ─────────────────────────────────────────────────────
 
-function StepDetails({ form, set, errors }: { form: WizardState; set: (k: keyof WizardState, v: unknown) => void; errors: Record<string, string> }) {
-  const [imgOk, setImgOk] = useState(false);
-
+function StepDetails({
+  form, set, errors, eventId, onAutoSave,
+}: {
+  form: WizardState;
+  set: (k: keyof WizardState, v: unknown) => void;
+  errors: Record<string, string>;
+  eventId: string | null;
+  onAutoSave: () => Promise<string | null>;
+}) {
   return (
     <div>
       <SectionCard title="Basic Information">
-        <Grid cols="2fr 1fr" gap={16}>
-          <Field label="Event Name" required error={errors.title}>
-            <input className="wiz-input" value={form.title} onChange={e => set("title", e.target.value)} placeholder="e.g. Connected Steps 5K Community Run" />
-          </Field>
-          <Field label="Category" required>
-            <select className="wiz-select" value={form.event_category} onChange={e => set("event_category", e.target.value)}>
-              {EVENT_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.emoji} {c.label}</option>)}
-            </select>
-          </Field>
-        </Grid>
+        <div style={{ marginBottom: 14 }}>
+          <Grid cols="2fr 1fr" gap={16} mobile="1">
+            <Field label="Event Name" required error={errors.title}>
+              <input className="wiz-input" value={form.title} onChange={e => set("title", e.target.value)} placeholder="e.g. Connected Steps 5K Community Run" />
+            </Field>
+            <Field label="Category" required>
+              <select className="wiz-select" value={form.event_category} onChange={e => set("event_category", e.target.value)}>
+                {EVENT_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.emoji} {c.label}</option>)}
+              </select>
+            </Field>
+          </Grid>
+        </div>
 
-        <div style={{ height: 14 }} />
-
-        <Grid cols="1fr 1fr" gap={16}>
-          <Field label="Event Type">
-            <select className="wiz-select" value={form.event_type} onChange={e => set("event_type", e.target.value)}>
-              {EVENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
+        <div style={{ marginBottom: 14 }}>
+          <Field label="Tagline / Short Description" hint="One sentence shown in event listings and share cards (max 160 chars)">
+            <input className="wiz-input" value={form.short_description} onChange={e => set("short_description", e.target.value)} placeholder="Join us for a fun community 5K run through the park!" maxLength={160} />
           </Field>
-          <Field label="Visibility">
-            <select className="wiz-select" value={form.visibility} onChange={e => set("visibility", e.target.value)}>
-              <option value="public">🌐 Public</option>
-              <option value="private">🔒 Private (link only)</option>
-              <option value="unlisted">🔗 Unlisted</option>
-            </select>
-          </Field>
-        </Grid>
+        </div>
 
-        <div style={{ height: 14 }} />
+        <div style={{ marginBottom: 14 }}>
+          <Grid cols="1fr 1fr" gap={16} mobile="1">
+            <Field label="Event Type">
+              <select className="wiz-select" value={form.event_type} onChange={e => set("event_type", e.target.value)}>
+                {EVENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Visibility">
+              <select className="wiz-select" value={form.visibility} onChange={e => set("visibility", e.target.value)}>
+                <option value="public">🌐 Public — shown in all listings</option>
+                <option value="private">🔒 Private — link only</option>
+                <option value="unlisted">🔗 Unlisted</option>
+              </select>
+            </Field>
+          </Grid>
+        </div>
 
-        <Field label="Description" required error={errors.description} hint="Tell participants what makes this event special.">
-          <textarea className="wiz-textarea" style={{ minHeight: 120 }} value={form.description} onChange={e => set("description", e.target.value)} placeholder="Describe the event, highlights, what to expect…" rows={5} />
+        <Field label="Description" required error={errors.description} hint="Tell participants what makes this event special. Rich text supported.">
+          <div style={{ borderRadius: 10, overflow: "hidden", border: errors.description ? "1px solid rgba(248,113,113,0.4)" : "1px solid rgba(255,255,255,0.1)", marginTop: 2 }}>
+            <RichTextEditor
+              content={form.description}
+              onChange={(html) => set("description", html)}
+              placeholder="Describe the event, route, what to expect, and why participants should join…"
+              minHeight={160}
+            />
+          </div>
         </Field>
       </SectionCard>
 
       <SectionCard title="Cover Image">
-        <Grid cols="1fr auto" gap={14}>
-          <Field label="Image URL" hint="Paste a direct image link (JPG, PNG, WebP)">
-            <input className="wiz-input" value={form.cover_image} onChange={e => { set("cover_image", e.target.value); setImgOk(false); }} placeholder="https://images.unsplash.com/…" />
-          </Field>
-          {form.cover_image && (
-            <div style={{ alignSelf: "flex-end" }}>
-              <Image
-                src={form.cover_image}
-                alt="Cover preview"
-                width={80} height={56}
-                style={{ borderRadius: 8, objectFit: "cover", border: `1px solid ${imgOk ? "rgba(74,222,128,0.3)" : "rgba(255,255,255,0.1)"}` }}
-                onLoad={() => setImgOk(true)}
-                onError={() => setImgOk(false)}
-                unoptimized
-              />
-            </div>
-          )}
-        </Grid>
+        <WizardImageUploader
+          eventId={eventId}
+          purpose="poster"
+          currentUrl={form.cover_image}
+          onUploaded={url => set("cover_image", url)}
+          onAutoSave={onAutoSave}
+          height={200}
+          hint="Recommended: 1200 × 630 px (1.9:1 ratio). Shown in listings and share previews."
+        />
       </SectionCard>
 
       <SectionCard title="Date & Time">
-        <Grid cols="1fr 1fr 1fr 1fr" gap={14}>
+        <Grid cols="1fr 1fr 1fr 1fr" gap={14} mobile="2">
           <Field label="Start Date" required error={errors.start_date}>
             <input type="date" className="wiz-input" value={form.start_date} onChange={e => set("start_date", e.target.value)} />
           </Field>
@@ -635,9 +1032,9 @@ function StepDetails({ form, set, errors }: { form: WizardState; set: (k: keyof 
           <input className="wiz-input" value={form.location} onChange={e => set("location", e.target.value)} placeholder="Botanical Garden Gate-1, Kondapur, Hyderabad" />
         </Field>
         <div style={{ height: 14 }} />
-        <Grid cols="1fr 1fr" gap={14}>
-          <Field label="Meeting Point" hint="Where participants gather before the event">
-            <input className="wiz-input" value={form.meeting_point} onChange={e => set("meeting_point", e.target.value)} placeholder="Gate 1, Parking Area" />
+        <Grid cols="1fr 1fr" gap={14} mobile="1">
+          <Field label="Meeting Point" hint="Where participants gather before the event starts">
+            <input className="wiz-input" value={form.meeting_point} onChange={e => set("meeting_point", e.target.value)} placeholder="Gate 1 Parking Area" />
           </Field>
           <Field label="Google Maps URL">
             <input className="wiz-input" value={form.maps_url} onChange={e => set("maps_url", e.target.value)} placeholder="https://maps.google.com/…" />
@@ -646,16 +1043,17 @@ function StepDetails({ form, set, errors }: { form: WizardState; set: (k: keyof 
       </SectionCard>
 
       <SectionCard title="Organizer Details">
-        <Grid cols="1fr 1fr" gap={14}>
-          <Field label="Organizer Name">
-            <input className="wiz-input" value={form.organizer} onChange={e => set("organizer", e.target.value)} />
-          </Field>
-          <Field label="Website">
-            <input className="wiz-input" value={form.website} onChange={e => set("website", e.target.value)} placeholder="https://connectedsteps.in" />
-          </Field>
-        </Grid>
-        <div style={{ height: 14 }} />
-        <Grid cols="1fr 1fr 1fr" gap={14}>
+        <div style={{ marginBottom: 14 }}>
+          <Grid cols="1fr 1fr" gap={14} mobile="1">
+            <Field label="Organizer Name">
+              <input className="wiz-input" value={form.organizer} onChange={e => set("organizer", e.target.value)} />
+            </Field>
+            <Field label="Website">
+              <input className="wiz-input" value={form.website} onChange={e => set("website", e.target.value)} placeholder="https://connectedsteps.in" />
+            </Field>
+          </Grid>
+        </div>
+        <Grid cols="1fr 1fr 1fr" gap={14} mobile="1">
           <Field label="Contact Email">
             <input type="email" className="wiz-input" value={form.organizer_email} onChange={e => set("organizer_email", e.target.value)} />
           </Field>
@@ -671,45 +1069,74 @@ function StepDetails({ form, set, errors }: { form: WizardState; set: (k: keyof 
   );
 }
 
-// ── Step 2: Race Setup ────────────────────────────────────────────────────────
+// ── Step 1: Categories / Races ────────────────────────────────────────────────
 
-function StepRaces({
+function StepCategories({
   races, raceForm, setRF, editIdx, errors, skipRaces,
-  onSkipToggle, onAdd, onEdit, onDelete, onCancel,
+  onSkipToggle, onAdd, onEdit, onDelete, onDuplicate, onReorder, onCancel,
 }: {
-  races: RaceForm[]; raceForm: RaceForm; setRF: (k: keyof RaceForm, v: unknown) => void;
-  editIdx: number | null; errors: Record<string, string>; skipRaces: boolean;
-  onSkipToggle: () => void; onAdd: () => void; onEdit: (i: number) => void;
-  onDelete: (i: number) => void; onCancel: () => void;
+  races:       RaceForm[];
+  raceForm:    RaceForm;
+  setRF:       (k: keyof RaceForm, v: unknown) => void;
+  editIdx:     number | null;
+  errors:      Record<string, string>;
+  skipRaces:   boolean;
+  onSkipToggle: () => void;
+  onAdd:       () => void;
+  onEdit:      (i: number) => void;
+  onDelete:    (i: number) => void;
+  onDuplicate: (i: number) => void;
+  onReorder:   (from: number, to: number) => void;
+  onCancel:    () => void;
 }) {
+  const [dragIdx,    setDragIdx]    = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const customDist = !["1K","3K","5K","10K","15K","21.1K","42.2K",""].includes(raceForm.distance);
 
   return (
     <div>
-      {/* Existing races */}
+      {/* Race list */}
       {races.length > 0 && (
         <div style={{ marginBottom: 20 }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: "#e8620a", textTransform: "uppercase" as const, letterSpacing: ".1em", marginBottom: 12 }}>
-            Races Added ({races.length})
+            Races / Categories ({races.length}) — drag to reorder
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", flexDirection: "column" as const, gap: 8 }}>
             {races.map((r, i) => (
-              <div key={i} className="wiz-card wiz-card-hover" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(232,98,10,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🏃</div>
+              <div
+                key={i}
+                draggable
+                onDragStart={() => setDragIdx(i)}
+                onDragOver={e => { e.preventDefault(); setDragOverIdx(i); }}
+                onDrop={() => { if (dragIdx !== null && dragIdx !== i) onReorder(dragIdx, i); setDragIdx(null); setDragOverIdx(null); }}
+                onDragEnd={() => { setDragIdx(null); setDragOverIdx(null); }}
+                className="wiz-card wiz-card-hover"
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px",
+                  cursor: "grab",
+                  opacity: dragIdx === i ? 0.4 : 1,
+                  borderColor: dragOverIdx === i ? "rgba(232,98,10,0.5)" : undefined,
+                  transition: "opacity 0.15s, border-color 0.15s",
+                  flexWrap: "wrap" as const,
+                  gap: 10,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ color: "#333", fontSize: 18, flexShrink: 0, cursor: "grab" }}>⋮⋮</span>
+                  <div style={{ width: 36, height: 36, borderRadius: 8, background: "rgba(232,98,10,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>🏃</div>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 15, color: "#fff" }}>{r.name}</div>
-                    <div style={{ display: "flex", gap: 8, marginTop: 3 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>{r.name}</div>
+                    <div style={{ display: "flex", gap: 6, marginTop: 3, flexWrap: "wrap" as const }}>
                       {r.distance && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: "rgba(255,255,255,0.07)", color: "#888" }}>{r.distance}</span>}
                       {r.price ? <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: "rgba(232,98,10,0.12)", color: "#e8620a" }}>₹{r.price}</span> : <span style={{ fontSize: 11, color: "#555" }}>Free</span>}
                       {r.max_slots && <span style={{ fontSize: 11, color: "#666" }}>{r.max_slots} slots</span>}
-                      {r.reporting_time && <span style={{ fontSize: 11, color: "#555" }}>Report {r.reporting_time}</span>}
-                      {r.gun_time && <span style={{ fontSize: 11, color: "#555" }}>Gun {r.gun_time}</span>}
+                      {r.gun_time && <span style={{ fontSize: 11, color: "#555" }}>🏁 {r.gun_time}</span>}
                     </div>
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 6 }}>
+                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                   <Button size="xs" variant="ghost" onClick={() => onEdit(i)}>Edit</Button>
+                  <Button size="xs" variant="ghost" onClick={() => onDuplicate(i)}>Copy</Button>
                   <Button size="xs" variant="danger" onClick={() => onDelete(i)}>Remove</Button>
                 </div>
               </div>
@@ -720,65 +1147,65 @@ function StepRaces({
 
       {errors.races && <Alert variant="error" style={{ marginBottom: 14 }}>{errors.races}</Alert>}
 
-      {/* Add/Edit form */}
+      {/* Add / Edit form */}
       {!skipRaces && (
-        <SectionCard title={editIdx !== null ? "Edit Race" : "Add a Race"}>
-          <Grid cols="1fr 1fr 1fr" gap={14}>
-            <Field label="Race Name" required error={errors.race_name}>
-              <input className="wiz-input" value={raceForm.name} onChange={e => setRF("name", e.target.value)} placeholder="5K Open" />
-            </Field>
-            <Field label="Distance" required error={errors.race_dist}>
-              <select className="wiz-select" value={customDist ? "Custom" : (raceForm.distance || "")} onChange={e => {
-                if (e.target.value !== "Custom") setRF("distance", e.target.value);
-                else setRF("distance", "");
-              }}>
-                <option value="">Select distance</option>
-                {DISTANCES.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-              {(customDist || raceForm.distance === "") && raceForm.distance !== undefined && (
-                <input className="wiz-input" style={{ marginTop: 8 }} value={raceForm.distance} onChange={e => setRF("distance", e.target.value)} placeholder="e.g. 3K, 100M, 2.5K" />
-              )}
-            </Field>
-            <Field label="Entry Fee (₹)" hint="0 = Free entry">
-              <input type="number" className="wiz-input" value={raceForm.price} onChange={e => setRF("price", e.target.value)} placeholder="0" min="0" />
-            </Field>
-          </Grid>
+        <SectionCard title={editIdx !== null ? "Edit Race" : "Add a Race / Category"}>
+          <div style={{ marginBottom: 14 }}>
+            <Grid cols="1fr 1fr 1fr" gap={14} mobile="1">
+              <Field label="Race Name" required error={errors.race_name}>
+                <input className="wiz-input" value={raceForm.name} onChange={e => setRF("name", e.target.value)} placeholder="5K Open" />
+              </Field>
+              <Field label="Distance" required error={errors.race_dist}>
+                <select className="wiz-select" value={customDist ? "Custom" : (raceForm.distance || "")} onChange={e => {
+                  if (e.target.value !== "Custom") setRF("distance", e.target.value);
+                  else setRF("distance", "");
+                }}>
+                  <option value="">Select distance</option>
+                  {DISTANCES.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+                {(customDist || (raceForm.distance === "" && !["1K","3K","5K","10K","15K","21.1K","42.2K"].includes(raceForm.distance))) && (
+                  <input className="wiz-input" style={{ marginTop: 8 }} value={raceForm.distance} onChange={e => setRF("distance", e.target.value)} placeholder="e.g. 3K, 100M, 2.5K" />
+                )}
+              </Field>
+              <Field label="Entry Fee (₹)" hint="0 = Free">
+                <input type="number" className="wiz-input" value={raceForm.price} onChange={e => setRF("price", e.target.value)} placeholder="0" min="0" />
+              </Field>
+            </Grid>
+          </div>
 
-          <div style={{ height: 14 }} />
+          <div style={{ marginBottom: 14 }}>
+            <Grid cols="1fr 1fr 1fr" gap={14} mobile="1">
+              <Field label="Max Slots" hint="Blank = unlimited">
+                <input type="number" className="wiz-input" value={raceForm.max_slots} onChange={e => setRF("max_slots", e.target.value)} placeholder="Unlimited" min="1" />
+              </Field>
+              <Field label="Reporting Time">
+                <input type="time" className="wiz-input" value={raceForm.reporting_time} onChange={e => setRF("reporting_time", e.target.value)} />
+              </Field>
+              <Field label="Gun / Flag-off Time">
+                <input type="time" className="wiz-input" value={raceForm.gun_time} onChange={e => setRF("gun_time", e.target.value)} />
+              </Field>
+            </Grid>
+          </div>
 
-          <Grid cols="1fr 1fr 1fr" gap={14}>
-            <Field label="Max Slots" hint="Leave blank for unlimited">
-              <input type="number" className="wiz-input" value={raceForm.max_slots} onChange={e => setRF("max_slots", e.target.value)} placeholder="Unlimited" min="1" />
-            </Field>
-            <Field label="Reporting Time">
-              <input type="time" className="wiz-input" value={raceForm.reporting_time} onChange={e => setRF("reporting_time", e.target.value)} />
-            </Field>
-            <Field label="Gun / Flag-off Time">
-              <input type="time" className="wiz-input" value={raceForm.gun_time} onChange={e => setRF("gun_time", e.target.value)} />
-            </Field>
-          </Grid>
+          <div style={{ marginBottom: 14 }}>
+            <Grid cols="1fr 1fr 1fr" gap={14} mobile="1">
+              <Field label="Gender Restriction">
+                <select className="wiz-select" value={raceForm.gender_restriction} onChange={e => setRF("gender_restriction", e.target.value)}>
+                  <option value="">All Genders</option>
+                  <option value="male">Men Only</option>
+                  <option value="female">Women Only</option>
+                </select>
+              </Field>
+              <Field label="Min Age">
+                <input type="number" className="wiz-input" value={raceForm.min_age} onChange={e => setRF("min_age", e.target.value)} placeholder="No minimum" min="0" />
+              </Field>
+              <Field label="Max Age">
+                <input type="number" className="wiz-input" value={raceForm.max_age} onChange={e => setRF("max_age", e.target.value)} placeholder="No maximum" min="0" />
+              </Field>
+            </Grid>
+          </div>
 
-          <div style={{ height: 14 }} />
-
-          <Grid cols="1fr 1fr 1fr" gap={14}>
-            <Field label="Gender Restriction">
-              <select className="wiz-select" value={raceForm.gender_restriction} onChange={e => setRF("gender_restriction", e.target.value)}>
-                <option value="">All Genders</option>
-                <option value="male">Men Only</option>
-                <option value="female">Women Only</option>
-              </select>
-            </Field>
-            <Field label="Min Age">
-              <input type="number" className="wiz-input" value={raceForm.min_age} onChange={e => setRF("min_age", e.target.value)} placeholder="No minimum" min="0" />
-            </Field>
-            <Field label="Max Age">
-              <input type="number" className="wiz-input" value={raceForm.max_age} onChange={e => setRF("max_age", e.target.value)} placeholder="No maximum" min="0" />
-            </Field>
-          </Grid>
-
-          <div style={{ height: 16 }} />
-
-          <div style={{ display: "flex", gap: 20, marginBottom: 18 }}>
+          <div style={{ display: "flex", gap: 20, marginBottom: 16, flexWrap: "wrap" as const }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, color: "#bbb" }}>
               <input type="checkbox" className="wiz-checkbox" checked={raceForm.timing_chip} onChange={e => setRF("timing_chip", e.target.checked)} />
               Timing Chip
@@ -789,7 +1216,7 @@ function StepRaces({
             </label>
           </div>
 
-          <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
             <Button onClick={onAdd}>{editIdx !== null ? "Update Race" : "+ Add Race"}</Button>
             {editIdx !== null && <Button variant="secondary" onClick={onCancel}>Cancel</Button>}
           </div>
@@ -797,59 +1224,91 @@ function StepRaces({
       )}
 
       {/* Skip option */}
-      <div style={{ marginTop: 20, padding: "14px 18px", background: skipRaces ? "rgba(74,222,128,0.07)" : "rgba(255,255,255,0.02)", border: `1px solid ${skipRaces ? "rgba(74,222,128,0.2)" : "rgba(255,255,255,0.07)"}`, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ marginTop: 20, padding: "14px 18px", background: skipRaces ? "rgba(74,222,128,0.07)" : "rgba(255,255,255,0.02)", border: `1px solid ${skipRaces ? "rgba(74,222,128,0.2)" : "rgba(255,255,255,0.07)"}`, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" as const }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: skipRaces ? "#4ade80" : "#555" }}>
-            {skipRaces ? "✓ No races — event has no race categories" : "This event has no race categories (e.g. walkathon, workshop)"}
+            {skipRaces ? "✓ No races — participants register directly" : "This event has no race categories"}
           </div>
-          <div style={{ fontSize: 11, color: "#444", marginTop: 2 }}>Participants register directly without choosing a distance</div>
+          <div style={{ fontSize: 11, color: "#444", marginTop: 2 }}>Walkathon, workshop, or any event with a single entry</div>
         </div>
-        <Button size="sm" variant={skipRaces ? "ghost" : "secondary"} onClick={onSkipToggle}>{skipRaces ? "Add Races" : "Skip — No Races"}</Button>
+        <Button size="sm" variant={skipRaces ? "ghost" : "secondary"} onClick={onSkipToggle}>{skipRaces ? "Add Races" : "Skip — No Categories"}</Button>
       </div>
     </div>
   );
 }
 
-// ── Step 3: Registration Settings ────────────────────────────────────────────
+// ── Step 2: Registration ──────────────────────────────────────────────────────
 
-function StepRegistration({ form, set, errors }: { form: WizardState; set: (k: keyof WizardState, v: unknown) => void; errors: Record<string, string> }) {
+function StepRegistration({
+  form, set, errors, regConfig, setRC,
+}: {
+  form:      WizardState;
+  set:       (k: keyof WizardState, v: unknown) => void;
+  errors:    Record<string, string>;
+  regConfig: RegConfig;
+  setRC:     (k: keyof RegConfig, v: unknown) => void;
+}) {
   return (
     <div>
       <SectionCard title="Registration Window">
-        <Grid cols="1fr 1fr" gap={16}>
-          <Field label="Registration Closes *" required error={errors.registration_closes_at} hint="After this date/time, registrations are blocked">
-            <input type="datetime-local" className="wiz-input" value={form.registration_closes_at} onChange={e => set("registration_closes_at", e.target.value)} />
-          </Field>
-          <Field label="Early Bird Ends" hint="Optional — for early bird pricing">
-            <input type="datetime-local" className="wiz-input" value={form.early_bird_ends_at} onChange={e => set("early_bird_ends_at", e.target.value)} />
-          </Field>
-        </Grid>
-        <div style={{ height: 14 }} />
-        <Grid cols="1fr 1fr" gap={16}>
-          <Field label="Total Capacity" hint="Maximum registrations across all races. Leave blank for unlimited.">
-            <input type="number" className="wiz-input" value={form.max_participants} onChange={e => set("max_participants", e.target.value)} placeholder="Unlimited" min="1" />
-          </Field>
-        </Grid>
+        <div style={{ marginBottom: 14 }}>
+          <Grid cols="1fr 1fr" gap={16} mobile="1">
+            <Field label="Registration Opens" hint="Leave blank to open immediately on publish">
+              <input type="datetime-local" className="wiz-input" value={form.registration_opens_at} onChange={e => set("registration_opens_at", e.target.value)} />
+            </Field>
+            <Field label="Registration Closes *" required error={errors.registration_closes_at} hint="After this date/time, new registrations are blocked">
+              <input type="datetime-local" className="wiz-input" value={form.registration_closes_at} onChange={e => set("registration_closes_at", e.target.value)} />
+            </Field>
+          </Grid>
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <Grid cols="1fr 1fr" gap={16} mobile="1">
+            <Field label="Early Bird Ends" hint="Optional — for tiered pricing">
+              <input type="datetime-local" className="wiz-input" value={form.early_bird_ends_at} onChange={e => set("early_bird_ends_at", e.target.value)} />
+            </Field>
+            <Field label="Total Capacity" hint="Across all races. Blank = unlimited.">
+              <input type="number" className="wiz-input" value={form.max_participants} onChange={e => set("max_participants", e.target.value)} placeholder="Unlimited" min="1" />
+            </Field>
+          </Grid>
+        </div>
       </SectionCard>
 
-      <SectionCard title="Options">
-        <div style={{ display: "flex", flexWrap: "wrap" as const, gap: "16px 40px", marginBottom: 20 }}>
-          {[
-            { key: "require_login",        label: "Require Login",        hint: "Users must be logged in to register" },
-            { key: "waiting_list_enabled", label: "Enable Waiting List",  hint: "Accept registrations after capacity is full" },
-            { key: "approval_required",    label: "Manual Approval",      hint: "Admin approves each registration manually" },
-            { key: "collect_tshirt",       label: "Collect T-Shirt Size", hint: "Participants must choose a size (XS–XXXL) during registration" },
-          ].map(({ key, label, hint }) => (
-            <label key={key} style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
-              <input type="checkbox" className="wiz-checkbox" style={{ marginTop: 2 }} checked={Boolean(form[key as keyof WizardState])} onChange={e => set(key as keyof WizardState, e.target.checked)} />
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#ccc" }}>{label}</div>
-                <div style={{ fontSize: 11, color: "#444", marginTop: 1 }}>{hint}</div>
-              </div>
-            </label>
-          ))}
+      <SectionCard title="Registration Options">
+        <div style={{ display: "flex", flexDirection: "column" as const, gap: 16, marginBottom: 20 }}>
+          <Toggle value={form.require_login}        onChange={v => set("require_login", v)}        label="Require Login"        hint="Participants must be logged in to register" />
+          <Toggle value={form.waiting_list_enabled} onChange={v => set("waiting_list_enabled", v)} label="Enable Waiting List"  hint="Accept registrations after capacity is full" />
+          <Toggle value={form.approval_required}    onChange={v => set("approval_required", v)}    label="Manual Approval"      hint="Admin must approve each registration before it's confirmed" />
+          <Toggle value={form.collect_tshirt}       onChange={v => set("collect_tshirt", v)}       label="Collect T-Shirt Size" hint="Participants choose a size (XS–XXXL) during registration" />
         </div>
-        <Grid cols="1fr 1fr" gap={16}>
+      </SectionCard>
+
+      <SectionCard title="Built-in Registration Fields">
+        <div style={{ fontSize: 12, color: "#555", marginBottom: 16 }}>
+          These fields are always collected. Toggle off to hide a field from the registration form.
+        </div>
+        <div style={{ display: "flex", flexDirection: "column" as const, gap: 14 }}>
+          <Toggle value={regConfig.require_gender}            onChange={v => setRC("require_gender", v)}            label="Require Gender" />
+          <Toggle value={regConfig.require_dob}               onChange={v => setRC("require_dob", v)}               label="Require Date of Birth" />
+          <Toggle value={regConfig.require_blood_group}       onChange={v => setRC("require_blood_group", v)}       label="Require Blood Group" />
+          <Toggle value={regConfig.require_emergency_contact} onChange={v => setRC("require_emergency_contact", v)} label="Require Emergency Contact" />
+          <Toggle value={regConfig.show_notes}                onChange={v => setRC("show_notes", v)}                label="Show Notes / Special Requests Field" />
+        </div>
+        {regConfig.show_notes && (
+          <div style={{ marginTop: 16, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 16 }}>
+            <Grid cols="1fr 1fr" gap={14} mobile="1">
+              <Field label="Notes Field Label">
+                <input className="wiz-input" value={regConfig.notes_label} onChange={e => setRC("notes_label", e.target.value)} placeholder="Notes / Special Requests" />
+              </Field>
+              <Field label="Notes Placeholder Text">
+                <input className="wiz-input" value={regConfig.notes_placeholder} onChange={e => setRC("notes_placeholder", e.target.value)} placeholder="Medical conditions, dietary needs…" />
+              </Field>
+            </Grid>
+          </div>
+        )}
+      </SectionCard>
+
+      <SectionCard title="Policies">
+        <Grid cols="1fr 1fr" gap={16} mobile="1">
           <Field label="Refund Policy">
             <textarea className="wiz-textarea" style={{ minHeight: 80 }} value={form.refund_policy} onChange={e => set("refund_policy", e.target.value)} placeholder="e.g. No refunds after registration is confirmed." />
           </Field>
@@ -862,43 +1321,172 @@ function StepRegistration({ form, set, errors }: { form: WizardState; set: (k: k
   );
 }
 
+// ── Step 3: Content & Media ───────────────────────────────────────────────────
+
+function StepContent({
+  form, set, eventId, onAutoSave,
+}: {
+  form:       WizardState;
+  set:        (k: keyof WizardState, v: unknown) => void;
+  eventId:    string | null;
+  onAutoSave: () => Promise<string | null>;
+}) {
+  const [galUploading, setGalUploading] = useState(false);
+  const [galError,     setGalError]     = useState("");
+  const galInputRef = useRef<HTMLInputElement>(null);
+
+  async function addGalleryImage(file: File) {
+    setGalUploading(true); setGalError("");
+    try {
+      let id = eventId;
+      if (!id) { id = await onAutoSave(); if (!id) { setGalError("Enter title, date & venue first"); setGalUploading(false); return; } }
+      const fd = new FormData();
+      fd.append("file", file); fd.append("purpose", "gallery");
+      const res  = await fetch(`/api/admin/events/${id}/upload`, { method: "POST", body: fd });
+      const data = await res.json() as { url?: string; error?: string };
+      if (!res.ok || !data.url) { setGalError(data.error ?? "Upload failed"); return; }
+      set("gallery_images", [...form.gallery_images, data.url]);
+    } catch { setGalError("Network error"); }
+    finally { setGalUploading(false); if (galInputRef.current) galInputRef.current.value = ""; }
+  }
+
+  return (
+    <div>
+      <SectionCard title="Event Highlights">
+        <div style={{ fontSize: 12, color: "#555", marginBottom: 12 }}>Key selling points shown prominently on the event page (4–6 is ideal)</div>
+        <HighlightsEditor items={form.highlights} onChange={items => set("highlights", items)} />
+      </SectionCard>
+
+      <SectionCard title="FAQs">
+        <div style={{ fontSize: 12, color: "#555", marginBottom: 12 }}>Common questions answered for participants</div>
+        <FaqEditor faqs={form.faqs} onChange={faqs => set("faqs", faqs)} />
+      </SectionCard>
+
+      <SectionCard title="Terms & Conditions">
+        <div style={{ fontSize: 12, color: "#555", marginBottom: 10 }}>Participants must agree to these before completing registration</div>
+        <div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid rgba(255,255,255,0.1)" }}>
+          <RichTextEditor
+            content={form.terms_conditions}
+            onChange={(html) => set("terms_conditions", html)}
+            placeholder="Participation waivers, event rules, indemnity clause…"
+            minHeight={120}
+          />
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Banner Image">
+        <WizardImageUploader
+          eventId={eventId}
+          purpose="banner"
+          currentUrl={form.banner_image}
+          onUploaded={url => set("banner_image", url)}
+          onAutoSave={onAutoSave}
+          height={180}
+          hint="Wide banner (16:9 ratio) displayed at the top of the event page. Optional — cover image is used as fallback."
+        />
+      </SectionCard>
+
+      <SectionCard title={`Gallery (${form.gallery_images.length} image${form.gallery_images.length !== 1 ? "s" : ""})`}>
+        <div style={{ fontSize: 12, color: "#555", marginBottom: 12 }}>Additional photos shown in the event gallery</div>
+
+        {form.gallery_images.length > 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
+            {form.gallery_images.map((url, i) => (
+              <div key={i} style={{ position: "relative", borderRadius: 8, overflow: "hidden", aspectRatio: "4/3" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <button
+                  onClick={() => set("gallery_images", form.gallery_images.filter((_, idx) => idx !== i))}
+                  style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.7)", border: "none", borderRadius: "50%", width: 22, height: 22, color: "#f87171", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", lineHeight: 1 }}
+                >×</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div
+          onClick={() => !galUploading && galInputRef.current?.click()}
+          style={{ border: "2px dashed rgba(255,255,255,0.12)", borderRadius: 10, padding: "20px", textAlign: "center", cursor: galUploading ? "wait" : "pointer", color: "#555", transition: "border-color 0.15s" }}
+          onMouseEnter={e => { if (!galUploading) (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(232,98,10,0.4)"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.12)"; }}
+        >
+          {galUploading
+            ? <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Spinner size={16} /><span style={{ fontSize: 12 }}>Uploading…</span></div>
+            : <><div style={{ fontSize: 28, marginBottom: 4 }}>+</div><div style={{ fontSize: 12 }}>Click to add photos to the gallery</div></>
+          }
+        </div>
+        {galError && <div style={{ fontSize: 11, color: "#f87171", marginTop: 6 }}>{galError}</div>}
+        <input ref={galInputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) addGalleryImage(f); }} />
+      </SectionCard>
+    </div>
+  );
+}
+
 // ── Step 4: Review & Publish ──────────────────────────────────────────────────
 
-function StepReview({ form, races, skipRaces, onPublish, saving }: { form: WizardState; races: RaceForm[]; skipRaces: boolean; onPublish: () => void; saving: boolean }) {
+function StepReview({
+  form, races, skipRaces, isReady, eventId, shareSlug, onPublish, onPreview, saving,
+}: {
+  form:      WizardState;
+  races:     RaceForm[];
+  skipRaces: boolean;
+  isReady:   boolean;
+  eventId:   string | null;
+  shareSlug: string | null;
+  onPublish: () => void;
+  onPreview: () => void;
+  saving:    boolean;
+}) {
   const Row = ({ label, value }: { label: string; value: string | undefined | null }) =>
     value ? (
       <div style={{ display: "flex", alignItems: "flex-start", gap: 16, padding: "9px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-        <span style={{ width: 150, flexShrink: 0, fontSize: 11, color: "#444", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: ".05em", paddingTop: 1 }}>{label}</span>
+        <span style={{ width: 140, flexShrink: 0, fontSize: 11, color: "#444", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: ".05em", paddingTop: 1 }}>{label}</span>
         <span style={{ fontSize: 13, color: "#ccc", lineHeight: 1.5 }}>{value}</span>
       </div>
     ) : null;
 
-  const isReady = form.title && form.start_date && form.location && form.registration_closes_at;
+  const descText = form.description.replace(/<[^>]*>/g, "").trim().slice(0, 120);
 
   return (
     <div>
+      {/* Preview button */}
+      {shareSlug && (
+        <div style={{ marginBottom: 20, padding: "14px 18px", background: "rgba(232,98,10,0.06)", border: "1px solid rgba(232,98,10,0.2)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" as const }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13, color: "#e8620a" }}>Preview your event</div>
+            <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>Opens the participant view in a new tab — only you can see it until published</div>
+          </div>
+          <Button size="sm" variant="secondary" onClick={onPreview} loading={saving}>👁 Preview</Button>
+        </div>
+      )}
+
       <SectionCard title="Event Summary">
         <Row label="Event Name"    value={form.title} />
+        <Row label="Tagline"       value={form.short_description} />
         <Row label="Category"      value={EVENT_CATEGORIES.find(c => c.value === form.event_category)?.label} />
         <Row label="Date"          value={form.start_date + (form.end_date && form.end_date !== form.start_date ? ` → ${form.end_date}` : "")} />
         <Row label="Time"          value={[form.start_time, form.end_time].filter(Boolean).join(" – ")} />
         <Row label="Venue"         value={form.location} />
         <Row label="Meeting Point" value={form.meeting_point} />
         <Row label="Organizer"     value={form.organizer} />
-        <Row label="Reg. Closes"   value={form.registration_closes_at?.replace("T", " at ").slice(0, -3)} />
+        <Row label="Reg. Closes"   value={form.registration_closes_at?.replace("T", " at ").slice(0, 16)} />
         <Row label="Capacity"      value={form.max_participants ? `${form.max_participants} participants` : "Unlimited"} />
         <Row label="Visibility"    value={form.visibility.charAt(0).toUpperCase() + form.visibility.slice(1)} />
+        <Row label="Description"   value={descText ? `${descText}…` : null} />
+        {form.highlights.length > 0 && <Row label="Highlights"  value={`${form.highlights.length} added`} />}
+        {form.faqs.length > 0 && <Row label="FAQs"         value={`${form.faqs.length} added`} />}
+        {form.gallery_images.length > 0 && <Row label="Gallery" value={`${form.gallery_images.length} photo${form.gallery_images.length !== 1 ? "s" : ""}`} />}
       </SectionCard>
 
       {!skipRaces && races.length > 0 && (
-        <SectionCard title={`Races (${races.length})`}>
+        <SectionCard title={`Races / Categories (${races.length})`}>
           {races.map((r, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < races.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < races.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", flexWrap: "wrap" as const, gap: 8 }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <span style={{ fontWeight: 700, color: "#fff" }}>{r.name}</span>
                 {r.distance && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: "rgba(255,255,255,0.07)", color: "#666" }}>{r.distance}</span>}
               </div>
-              <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#555", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 10, fontSize: 12, color: "#555", alignItems: "center" }}>
                 {r.price ? <span style={{ color: "#e8620a", fontWeight: 700 }}>₹{r.price}</span> : <span>Free</span>}
                 {r.max_slots && <span>{r.max_slots} slots</span>}
                 {r.gun_time && <span>🏁 {r.gun_time}</span>}
@@ -907,6 +1495,7 @@ function StepReview({ form, races, skipRaces, onPublish, saving }: { form: Wizar
           ))}
         </SectionCard>
       )}
+
       {skipRaces && (
         <div style={{ padding: "12px 16px", background: "rgba(255,255,255,0.02)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)", marginBottom: 20, fontSize: 13, color: "#555" }}>
           No race categories — participants register directly
@@ -917,7 +1506,7 @@ function StepReview({ form, races, skipRaces, onPublish, saving }: { form: Wizar
       {!isReady && (
         <div style={{ padding: "14px 18px", background: "rgba(251,191,36,0.07)", borderRadius: 10, border: "1px solid rgba(251,191,36,0.2)", marginBottom: 20 }}>
           <div style={{ fontWeight: 700, color: "#fbbf24", marginBottom: 6, fontSize: 13 }}>⚠️ Some required fields are missing</div>
-          <div style={{ fontSize: 12, color: "#666" }}>
+          <div style={{ fontSize: 12, color: "#666", lineHeight: 1.8 }}>
             {!form.title && "• Event name  "}
             {!form.start_date && "• Start date  "}
             {!form.location && "• Venue  "}
@@ -927,7 +1516,7 @@ function StepReview({ form, races, skipRaces, onPublish, saving }: { form: Wizar
       )}
 
       {/* Publish card */}
-      <div style={{ background: isReady ? "rgba(22,163,74,0.08)" : "rgba(255,255,255,0.02)", border: `1px solid ${isReady ? "rgba(22,163,74,0.2)" : "rgba(255,255,255,0.07)"}`, borderRadius: 14, padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ background: isReady ? "rgba(22,163,74,0.08)" : "rgba(255,255,255,0.02)", border: `1px solid ${isReady ? "rgba(22,163,74,0.2)" : "rgba(255,255,255,0.07)"}`, borderRadius: 14, padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" as const }}>
         <div>
           <div style={{ fontWeight: 800, fontSize: 16, color: isReady ? "#4ade80" : "#555", marginBottom: 4 }}>
             {isReady ? "Ready to publish!" : "Complete the form to publish"}
@@ -935,6 +1524,8 @@ function StepReview({ form, races, skipRaces, onPublish, saving }: { form: Wizar
           <div style={{ fontSize: 13, color: "#444", lineHeight: 1.5 }}>
             {isReady ? "The event goes live immediately and appears on the website." : "Go back and fill in the required fields."}
           </div>
+          {!eventId && <div style={{ fontSize: 11, color: "#555", marginTop: 4 }}>This event hasn&apos;t been saved to the server yet — we&apos;ll save it on publish.</div>}
+          {eventId && <div style={{ fontSize: 11, color: "#555", marginTop: 4 }}>Event ID: {eventId}</div>}
         </div>
         <Button loading={saving} disabled={!isReady} onClick={onPublish}>🚀 Publish Now</Button>
       </div>
@@ -953,19 +1544,18 @@ function TemplatePicker({
   templates, loading, onSelect, onDelete, onClose,
 }: {
   templates: EventTemplate[];
-  loading: boolean;
-  onSelect: (t: EventTemplate) => void;
-  onDelete: (id: string) => void;
-  onClose: () => void;
+  loading:   boolean;
+  onSelect:  (t: EventTemplate) => void;
+  onDelete:  (id: string) => void;
+  onClose:   () => void;
 }) {
   return (
     <div
       style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.82)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, width: "100%", maxWidth: 560, maxHeight: "80vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, width: "100%", maxWidth: 560, maxHeight: "80vh", display: "flex", flexDirection: "column" as const, overflow: "hidden" }}>
 
-        {/* Header */}
         <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.07)", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexShrink: 0 }}>
           <div>
             <div style={{ fontWeight: 800, fontSize: 15, color: "#fff" }}>Start from Template</div>
@@ -974,17 +1564,11 @@ function TemplatePicker({
               You still fill in: title, dates, venue, and registration window.
             </div>
           </div>
-          <button
-            onClick={onClose}
-            style={{ background: "rgba(255,255,255,0.07)", border: "none", borderRadius: 8, width: 30, height: 30, cursor: "pointer", color: "#888", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0 }}
-          >✕</button>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.07)", border: "none", borderRadius: 8, width: 30, height: 30, cursor: "pointer", color: "#888", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0 }}>✕</button>
         </div>
 
-        {/* Body */}
         <div style={{ overflowY: "auto", flex: 1, padding: "12px 14px" }}>
-          {loading && (
-            <div style={{ textAlign: "center", padding: "2.5rem", color: "#555", fontSize: 13 }}>Loading templates…</div>
-          )}
+          {loading && <div style={{ textAlign: "center", padding: "2.5rem", color: "#555", fontSize: 13 }}>Loading templates…</div>}
 
           {!loading && templates.length === 0 && (
             <div style={{ textAlign: "center", padding: "3rem 1.5rem" }}>
@@ -1017,14 +1601,8 @@ function TemplatePicker({
                 </div>
               </div>
               <div style={{ display: "flex", gap: 6, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                <button
-                  onClick={() => onSelect(t)}
-                  style={{ background: "#e8620a", border: "none", borderRadius: 7, padding: "5px 12px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
-                >Apply</button>
-                <button
-                  onClick={() => { if (confirm(`Delete template "${t.name}"?`)) onDelete(t.id); }}
-                  style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 7, padding: "5px 8px", color: "#f87171", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}
-                >✕</button>
+                <button onClick={() => onSelect(t)} style={{ background: "#e8620a", border: "none", borderRadius: 7, padding: "5px 12px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Apply</button>
+                <button onClick={() => { if (confirm(`Delete template "${t.name}"?`)) onDelete(t.id); }} style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 7, padding: "5px 8px", color: "#f87171", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>✕</button>
               </div>
             </div>
           ))}

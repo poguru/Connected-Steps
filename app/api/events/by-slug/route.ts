@@ -1,18 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { isAdminOrCoach } from "@/lib/admin-auth";
 
 // GET /api/events/by-slug?slug=gandipet-cycling-ride
+// Add ?preview=1 (admin only) to bypass the published status filter.
 export async function GET(req: NextRequest) {
-  const slug = req.nextUrl.searchParams.get("slug") ?? "";
+  const slug    = req.nextUrl.searchParams.get("slug") ?? "";
+  const preview = req.nextUrl.searchParams.get("preview") === "1";
   if (!slug) return NextResponse.json({ event: null }, { status: 200 });
 
   const db = getSupabaseServer();
-  const { data } = await db
-    .from("events")
-    .select("*")
-    .eq("share_slug", slug)
-    .eq("status", "published")
-    .single();
+
+  // Preview mode: admin can view any event regardless of status.
+  const skipStatusFilter = preview && (await isAdminOrCoach(req));
+
+  let q = db.from("events").select("*").eq("share_slug", slug);
+  if (!skipStatusFilter) q = q.eq("status", "published");
+
+  const { data } = await q.single();
 
   if (!data) return NextResponse.json({ event: null }, { status: 404 });
 
