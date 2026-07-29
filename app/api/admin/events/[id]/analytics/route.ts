@@ -28,7 +28,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       .select("status, finish_time, overall_position, distance_category")
       .eq("event_id", eventId),
     db.from("event_participants")
-      .select("registration_id, checked_in_at, bib_collected_at, breakfast_availed")
+      .select("registration_id, checked_in_at, bib_collected_at, breakfast_availed, tshirt_issued")
       .eq("event_id", eventId)
       .neq("status", "cancelled"),
   ]);
@@ -101,7 +101,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     if (byRace[cat] && r.status === "finisher") byRace[cat].finishers++;
   }
 
-  // ── Registrations over time (daily, last 30 days or since event created) ──
+  // ── Registrations over time (daily) ──────────────────────────────────────
   const dailyCounts: Record<string, number> = {};
   for (const r of regs) {
     const day = r.created_at.slice(0, 10);
@@ -110,6 +110,36 @@ export async function GET(req: NextRequest, { params }: Params) {
   const registrationTimeline = Object.entries(dailyCounts)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, count]) => ({ date, count }));
+
+  // ── Weekly registration cohorts with check-in conversion ─────────────────
+  // Groups registrations by ISO week; shows how many from each cohort checked in.
+  const weeklyGroups: Record<string, { registered: number; checkin: number; paid: number; cancelled: number }> = {};
+  const checkinByRegId = new Map(participants.map(p => [p.registration_id, Boolean(p.checked_in_at)]));
+
+  for (const r of regs) {
+    const d    = new Date(r.created_at);
+    // Monday-based week start
+    const day  = d.getDay();
+    const diff = (day === 0 ? -6 : 1 - day);
+    const mon  = new Date(d); mon.setDate(d.getDate() + diff); mon.setHours(0, 0, 0, 0);
+    const week = mon.toISOString().slice(0, 10);
+    if (!weeklyGroups[week]) weeklyGroups[week] = { registered: 0, checkin: 0, paid: 0, cancelled: 0 };
+    weeklyGroups[week].registered++;
+    if (r.payment_status === "paid" || r.payment_status === "free") weeklyGroups[week].paid++;
+    if (r.status === "cancelled") weeklyGroups[week].cancelled++;
+    if (checkinByRegId.get(r.id)) weeklyGroups[week].checkin++;
+  }
+  const cohortWeeks = Object.entries(weeklyGroups)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([week, v]) => ({
+      week,
+      registered: v.registered,
+      paid:       v.paid,
+      checkin:    v.checkin,
+      cancelled:  v.cancelled,
+      paid_pct:   v.registered > 0 ? Math.round(v.paid / v.registered * 100) : 0,
+      checkin_pct: v.paid > 0 ? Math.round(v.checkin / v.paid * 100) : 0,
+    }));
 
   // ── Capacity utilisation ──────────────────────────────────────────────────
   const capacity     = ev?.max_participants ?? null;
@@ -139,5 +169,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
     by_race: byRace,
     registration_timeline: registrationTimeline,
+    cohort_weeks: cohortWeeks,
+    tshirt_issued: participants.filter(p => p.tshirt_issued).length,
   });
 }
