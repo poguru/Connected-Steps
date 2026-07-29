@@ -8,6 +8,12 @@ interface Automation {
   is_active: boolean; created_by: string; created_at: string;
 }
 
+interface RunLogEntry {
+  id: string; trigger_event: string; status: string;
+  actions_taken: unknown[]; error: string | null;
+  duration_ms: number | null; created_at: string;
+}
+
 const TRIGGERS = [
   "payment.succeeded","payment.failed","registration.created","registration.cancelled",
   "participant.checked_in","certificate.generated","refund.completed","membership.renewed",
@@ -36,11 +42,13 @@ const S: Record<string, React.CSSProperties> = {
 function fmtDate(d: string) { return new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }); }
 
 export default function AutomationsPage() {
-  const [rules,   setRules]   = useState<Automation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState("");
-  const [form,    setForm]    = useState(false);
-  const [saving,  setSaving]  = useState(false);
+  const [rules,      setRules]      = useState<Automation[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState("");
+  const [form,       setForm]       = useState(false);
+  const [saving,     setSaving]     = useState(false);
+  const [logMap,     setLogMap]     = useState<Record<string, RunLogEntry[] | null>>({});
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Form state
   const [name,    setName]    = useState("");
@@ -97,6 +105,20 @@ export default function AutomationsPage() {
     load();
   }
 
+  async function toggleRunLog(id: string) {
+    if (expandedId === id) { setExpandedId(null); return; }
+    setExpandedId(id);
+    if (logMap[id] !== undefined) return;
+    setLogMap(prev => ({ ...prev, [id]: null }));
+    try {
+      const r = await fetch(`/api/admin/automations/${id}/run-log?per_page=25`);
+      const d = await r.json();
+      setLogMap(prev => ({ ...prev, [id]: d.data ?? [] }));
+    } catch {
+      setLogMap(prev => ({ ...prev, [id]: [] }));
+    }
+  }
+
   return (
     <div style={S.page}>
       <div style={S.header}>
@@ -110,11 +132,17 @@ export default function AutomationsPage() {
         <div style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.85rem" }}>Loading…</div>
       ) : rules.length === 0 ? (
         <div style={{ color: "rgba(255,255,255,0.35)", fontSize: "0.85rem", textAlign: "center", padding: "40px 0" }}>No automation rules yet.</div>
-      ) : rules.map(r => (
+      ) : rules.map(r => {
+        const isExpanded = expandedId === r.id;
+        const log        = logMap[r.id];
+        return (
         <div key={r.id} style={{ ...S.card, opacity: r.is_active ? 1 : 0.55 }}>
           <div style={{ ...S.row, justifyContent: "space-between", marginBottom: 6 }}>
             <span style={{ fontWeight: 600, color: "#fff" }}>{r.name}</span>
             <div style={S.row}>
+              <button style={{ ...S.btnSm, color: isExpanded ? "#a5b4fc" : undefined }} onClick={() => toggleRunLog(r.id)}>
+                {isExpanded ? "▲ Log" : "▼ Log"}
+              </button>
               <button style={S.btnSm} onClick={() => toggle(r)}>{r.is_active ? "Disable" : "Enable"}</button>
               <button style={S.btnDang} onClick={() => del(r.id)}>Delete</button>
             </div>
@@ -129,8 +157,28 @@ export default function AutomationsPage() {
             {(r.actions as Array<{ type: string }>).map((a, i) => <span key={i} style={S.chip}>{a.type}</span>)}
           </div>
           <div style={{ fontSize: "0.73rem", color: "rgba(255,255,255,0.3)", marginTop: 8 }}>Created {fmtDate(r.created_at)} by {r.created_by}</div>
+
+          {/* Run log panel */}
+          {isExpanded && (
+            <div style={{ marginTop: 14, borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: 12 }}>
+              <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 8 }}>Run Log (last 25)</div>
+              {log === null && <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.35)" }}>Loading…</div>}
+              {log !== null && log.length === 0 && <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.3)" }}>No runs yet.</div>}
+              {log !== null && log.length > 0 && log.map(entry => (
+                <div key={entry.id} style={{ marginBottom: 6, paddingBottom: 6, borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                  <div style={{ display: "flex", gap: 10, fontSize: "0.78rem", alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 600, color: entry.status === "success" ? "#4ade80" : entry.status === "failed" ? "#f87171" : "#fbbf24" }}>{entry.status}</span>
+                    <span style={{ color: "rgba(255,255,255,0.35)" }}>{fmtDate(entry.created_at)}</span>
+                    {entry.duration_ms != null && <span style={{ color: "#555", fontSize: "0.72rem" }}>{entry.duration_ms}ms</span>}
+                  </div>
+                  {entry.error && <div style={{ fontSize: "0.72rem", color: "#f87171", fontFamily: "monospace", marginTop: 2 }}>{entry.error.slice(0, 120)}{entry.error.length > 120 ? "…" : ""}</div>}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      ))}
+        );
+      })}
 
       {form && (
         <div style={S.overlay} onClick={() => setForm(false)}>
