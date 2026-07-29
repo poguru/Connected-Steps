@@ -36,7 +36,13 @@ interface Registration {
   certificate_url: string | null; certificate_generated_at: string | null;
   participant_count: number; created_at: string;
   invoice: { invoice_number: string; total_amount: number; invoice_status: string } | null;
-  bib_slot: unknown | null;
+  bib_slot: {
+    id: string; status: string; booked_at: string | null;
+    bib_collection_slots: {
+      slot_date: string; start_time: string; end_time: string;
+      bib_collection_centers: { name: string; address: string | null; maps_url: string | null };
+    } | null;
+  } | null;
   result: { finish_time: string | null; overall_position: number | null; chip_time_secs: number | null; status: string } | null;
 }
 
@@ -591,6 +597,41 @@ export default function EventHubPage() {
                   </div>
                 );
               })}
+            </SectionCard>
+          )}
+
+          {/* ── BIB Collection Appointment ──────────────────────────────────── */}
+          {reg?.bib_slot && reg.bib_slot.bib_collection_slots && (
+            <SectionCard>
+              <SectionLabel>BIB Collection Appointment</SectionLabel>
+              {(() => {
+                const slot = reg.bib_slot!.bib_collection_slots!;
+                const center = slot.bib_collection_centers;
+                const dateStr = fmtDate(slot.slot_date);
+                const timeStr = `${slot.start_time.slice(0, 5)} – ${slot.end_time.slice(0, 5)}`;
+                return (
+                  <div>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                      <div style={{ fontSize: 28, lineHeight: 1 }}>🎽</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "#e8620a", marginBottom: 2 }}>{center.name}</div>
+                        {center.address && <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>{center.address}</div>}
+                        <div style={{ fontSize: 12, color: "#ccc", marginBottom: 2 }}>📅 {dateStr}</div>
+                        <div style={{ fontSize: 12, color: "#ccc", marginBottom: 10 }}>🕐 {timeStr}</div>
+                        {center.maps_url && (
+                          <a href={center.maps_url} target="_blank" rel="noopener noreferrer"
+                            style={{ display: "inline-block", padding: "5px 12px", background: "rgba(232,98,10,0.12)", border: "1px solid rgba(232,98,10,0.3)", borderRadius: 7, color: "#e8620a", textDecoration: "none", fontSize: 11, fontWeight: 700 }}>
+                            📍 Open in Maps
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    {reg.bib_slot!.status === "collected" && (
+                      <div style={{ marginTop: 10, fontSize: 12, color: "#4ade80" }}>✅ BIB already collected</div>
+                    )}
+                  </div>
+                );
+              })()}
             </SectionCard>
           )}
 
