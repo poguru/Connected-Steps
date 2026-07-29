@@ -21,7 +21,8 @@ export type OpsRole =
   | "certificate"
   | "support"
   | "medical"
-  | "photography";
+  | "photography"
+  | "sponsor";
 
 export interface OpsSessionData {
   uid: string;   // event_portal_users.id
@@ -81,6 +82,7 @@ export const OPS_ROLE_LABELS: Record<OpsRole, string> = {
   support:           "Support Desk",
   medical:           "Medical",
   photography:       "Photography",
+  sponsor:           "Sponsor",
 };
 
 // Default module each role lands on after login
@@ -96,10 +98,12 @@ export const ROLE_DEFAULT_MODULE: Record<OpsRole, string> = {
   support:           "registrations",
   medical:           "checkin",
   photography:       "dashboard",
+  sponsor:           "sponsor",
 };
 
 // Priority order for role selection when a user has multiple assignments
 export const ROLE_PRIORITY: OpsRole[] = [
   "event_admin", "registration_desk", "checkin", "tshirt",
   "breakfast", "bib", "medal", "certificate", "support", "medical", "photography",
+  "sponsor",
 ];

@@ -38,7 +38,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const { id: eventId } = await params;
   const body = await req.json().catch(() => ({})) as {
-    email?: string; name?: string; password?: string; role?: string;
+    email?: string; name?: string; password?: string; role?: string; sponsor_id?: string;
   };
 
   const email = body.email?.toLowerCase().trim();
@@ -90,9 +90,12 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ ok: true, user, assignment_id: existing.id });
   }
 
+  const assignmentRow: Record<string, unknown> = { portal_user_id: user!.id, event_id: eventId, role, is_active: true };
+  if (body.sponsor_id) assignmentRow.sponsor_id = body.sponsor_id;
+
   const { data: assignment, error: assignErr } = await db
     .from("event_portal_assignments")
-    .insert({ portal_user_id: user!.id, event_id: eventId, role, is_active: true })
+    .insert(assignmentRow)
     .select("id")
     .single();
 

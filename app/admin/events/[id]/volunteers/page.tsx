@@ -16,6 +16,7 @@ const OPS_ROLE_LABELS: Record<string, string> = {
   support:           "Support Desk",
   medical:           "Medical",
   photography:       "Photography",
+  sponsor:           "Sponsor",
 };
 
 interface PortalUser {
@@ -71,8 +72,11 @@ export default function VolunteersPage({ params }: { params: Promise<{ id: strin
   const [shareSlug,   setShareSlug]   = useState<string | null>(null);
   const [eventTitle,  setEventTitle]  = useState("");
 
+  // Sponsor list (loaded when role=sponsor is selected)
+  const [sponsors, setSponsors] = useState<{ id: string; name: string; tier: string }[]>([]);
+
   // Add form
-  const [form,       setForm]       = useState({ email: "", name: "", password: "", role: "checkin", phone: "" });
+  const [form,       setForm]       = useState({ email: "", name: "", password: "", role: "checkin", phone: "", sponsor_id: "" });
   const [isExisting, setIsExisting] = useState(false);
   const [saving,     setSaving]     = useState(false);
   const [msg,        setMsg]        = useState("");
@@ -97,10 +101,11 @@ export default function VolunteersPage({ params }: { params: Promise<{ id: strin
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [usersRes, evRes, actRes] = await Promise.all([
+      const [usersRes, evRes, actRes, spRes] = await Promise.all([
         fetch(`/api/admin/events/${eventId}/portal-users`),
         fetch(`/api/admin/events/${eventId}/overview`),
         fetch(`/api/admin/events/${eventId}/ops/volunteers`),
+        fetch(`/api/admin/events/${eventId}/sponsors`),
       ]);
       if (usersRes.status === 401) { router.replace("/admin/login"); return; }
       if (usersRes.ok) {
@@ -115,6 +120,10 @@ export default function VolunteersPage({ params }: { params: Promise<{ id: strin
       if (actRes.ok) {
         const d = await actRes.json() as { volunteers?: VolActivity[] };
         setActivity(d.volunteers ?? []);
+      }
+      if (spRes?.ok) {
+        const d = await spRes.json() as { sponsors?: { id: string; name: string; tier: string }[] };
+        setSponsors(d.sponsors ?? []);
       }
     } finally { setLoading(false); }
   }, [eventId, router]);
@@ -147,14 +156,15 @@ export default function VolunteersPage({ params }: { params: Promise<{ id: strin
     setSaving(true); setMsg("");
     const body: Record<string, string> = { email: form.email.trim(), name: form.name.trim(), role: form.role };
     if (!isExisting) body.password = form.password;
-    if (form.phone.trim()) body.phone = form.phone.trim();
+    if (form.phone.trim())      body.phone      = form.phone.trim();
+    if (form.sponsor_id.trim()) body.sponsor_id = form.sponsor_id.trim();
     const r = await fetch(`/api/admin/events/${eventId}/portal-users`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     });
     const d = await r.json() as { ok?: boolean; error?: string };
     if (r.ok) {
       setMsg("Added!");
-      setForm({ email: "", name: "", password: "", role: "checkin", phone: "" });
+      setForm({ email: "", name: "", password: "", role: "checkin", phone: "", sponsor_id: "" });
       setIsExisting(false);
       void load();
     } else setMsg(d.error ?? "Error");
@@ -312,13 +322,22 @@ export default function VolunteersPage({ params }: { params: Promise<{ id: strin
                 <input style={S.input} value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+91 98765 43210" />
               </div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8, alignItems: "flex-end" }}>
+            <div style={{ display: "grid", gridTemplateColumns: form.role === "sponsor" && sponsors.length > 0 ? "1fr 1fr 1fr auto" : "1fr 1fr auto", gap: 8, alignItems: "flex-end" }}>
               <div>
                 <label style={S.label}>Role</label>
-                <select style={{ ...S.input, cursor: "pointer", colorScheme: "dark" as const }} value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
+                <select style={{ ...S.input, cursor: "pointer", colorScheme: "dark" as const }} value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value, sponsor_id: "" }))}>
                   {Object.entries(OPS_ROLE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>
               </div>
+              {form.role === "sponsor" && sponsors.length > 0 && (
+                <div>
+                  <label style={S.label}>Sponsor</label>
+                  <select style={{ ...S.input, cursor: "pointer", colorScheme: "dark" as const }} value={form.sponsor_id} onChange={e => setForm(f => ({ ...f, sponsor_id: e.target.value }))}>
+                    <option value="">— Select sponsor —</option>
+                    {sponsors.map(s => <option key={s.id} value={s.id}>{s.name} ({s.tier})</option>)}
+                  </select>
+                </div>
+              )}
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                   <label style={{ ...S.label, marginBottom: 0 }}>Password</label>
