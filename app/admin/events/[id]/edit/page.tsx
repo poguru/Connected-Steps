@@ -1222,6 +1222,15 @@ export default function EditEventPage() {
                               <Field label="Min Participants"><input type="number" style={S.input} min={1} value={raceForm.min_participants} onChange={e => setRaceForm(f => ({ ...f, min_participants: Number(e.target.value) }))} /></Field>
                               <Field label="Max Participants"><input type="number" style={S.input} min={1} value={raceForm.max_participants} onChange={e => setRaceForm(f => ({ ...f, max_participants: Number(e.target.value) }))} /></Field>
                             </>}
+                            <Field label="Gender">
+                              <select style={S.select} value={raceForm.gender_restriction ?? ""} onChange={e => setRaceForm(f => ({ ...f, gender_restriction: e.target.value || null }))}>
+                                <option value="">All genders</option>
+                                <option value="male">Male only</option>
+                                <option value="female">Female only</option>
+                              </select>
+                            </Field>
+                            <Field label="Min Age"><input type="number" style={S.input} min={1} max={99} value={raceForm.min_age ?? ""} onChange={e => setRaceForm(f => ({ ...f, min_age: e.target.value ? Number(e.target.value) : null }))} placeholder="None" /></Field>
+                            <Field label="Max Age"><input type="number" style={S.input} min={1} max={99} value={raceForm.max_age ?? ""} onChange={e => setRaceForm(f => ({ ...f, max_age: e.target.value ? Number(e.target.value) : null }))} placeholder="None" /></Field>
                           </div>
                           <div style={{ marginBottom: 12 }}>
                             <div style={{ fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase" as const, letterSpacing: ".08em", marginBottom: 8 }}>Perks</div>
@@ -1274,6 +1283,15 @@ export default function EditEventPage() {
                   <Field label="Early Bird (₹)"><input type="number" style={S.input} value={raceForm.early_bird_price ?? ""} onChange={e => setRaceForm(f => ({ ...f, early_bird_price: e.target.value ? Number(e.target.value) : null }))} placeholder="Blank = none" /></Field>
                   <Field label="Max Slots"><input type="number" style={S.input} value={raceForm.max_slots ?? ""} onChange={e => setRaceForm(f => ({ ...f, max_slots: e.target.value ? Number(e.target.value) : null }))} placeholder="Unlimited" /></Field>
                   <Field label="BIB Prefix"><input style={S.input} value={raceForm.bib_prefix ?? ""} onChange={e => setRaceForm(f => ({ ...f, bib_prefix: e.target.value || null }))} placeholder="Optional" /></Field>
+                  <Field label="Gender">
+                    <select style={S.select} value={raceForm.gender_restriction ?? ""} onChange={e => setRaceForm(f => ({ ...f, gender_restriction: e.target.value || null }))}>
+                      <option value="">All genders</option>
+                      <option value="male">Male only</option>
+                      <option value="female">Female only</option>
+                    </select>
+                  </Field>
+                  <Field label="Min Age"><input type="number" style={S.input} min={1} max={99} value={raceForm.min_age ?? ""} onChange={e => setRaceForm(f => ({ ...f, min_age: e.target.value ? Number(e.target.value) : null }))} placeholder="None" /></Field>
+                  <Field label="Max Age"><input type="number" style={S.input} min={1} max={99} value={raceForm.max_age ?? ""} onChange={e => setRaceForm(f => ({ ...f, max_age: e.target.value ? Number(e.target.value) : null }))} placeholder="None" /></Field>
                 </div>
                 <Button size="sm" loading={raceSaving} onClick={async () => {
                   if (!raceForm.name?.trim() || !raceForm.distance?.trim()) { setRaceErr("Name and distance are required."); return; }
