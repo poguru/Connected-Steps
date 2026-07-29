@@ -49,6 +49,7 @@ export default function WebhooksPage() {
   const [deliveries,  setDeliveries]  = useState<{ hookId: string; rows: Delivery[] } | null>(null);
   const [testing,     setTesting]     = useState<string | null>(null);
   const [testResult,  setTestResult]  = useState<{ success: boolean; http_status: number | null; error: string | null } | null>(null);
+  const [replayingId, setReplayingId] = useState<string | null>(null);
 
   // Form
   const [name,    setName]    = useState("");
@@ -115,6 +116,17 @@ export default function WebhooksPage() {
     setTesting(null);
   }
 
+  async function replayDelivery(hookId: string, deliveryId: string) {
+    setReplayingId(deliveryId);
+    try {
+      await fetch(`/api/admin/webhooks/${hookId}/replay`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ delivery_id: deliveryId }),
+      });
+      await loadDeliveries(hookId); // refresh list
+    } finally { setReplayingId(null); }
+  }
+
   function toggleEvent(e: string) {
     setEvents(prev => prev.includes(e) ? prev.filter(x => x !== e) : [...prev, e]);
   }
@@ -162,11 +174,28 @@ export default function WebhooksPage() {
               {deliveries.rows.length === 0 ? (
                 <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.35)" }}>No deliveries yet.</div>
               ) : deliveries.rows.map(d => (
-                <div key={d.id} style={{ display: "flex", gap: 10, fontSize: "0.78rem", marginBottom: 4, alignItems: "center" }}>
-                  <span style={{ color: d.status === "success" ? "#34d399" : d.status === "failed" ? "#f87171" : d.status === "pending" ? "#fbbf24" : "rgba(255,255,255,0.5)" }}>{d.status}</span>
-                  <span style={{ color: "rgba(255,255,255,0.4)" }}>{d.event_type}</span>
-                  {d.http_status && <span style={{ color: "rgba(255,255,255,0.4)" }}>HTTP {d.http_status}</span>}
-                  <span style={{ color: "rgba(255,255,255,0.3)" }}>{fmtDate(d.created_at)}</span>
+                <div key={d.id} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                  <div style={{ display: "flex", gap: 10, fontSize: "0.78rem", alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ color: d.status === "success" ? "#34d399" : d.status === "failed" ? "#f87171" : d.status === "pending" ? "#fbbf24" : "rgba(255,255,255,0.5)", fontWeight: 600 }}>{d.status}</span>
+                    <span style={{ color: "rgba(255,255,255,0.4)" }}>{d.event_type}</span>
+                    {d.http_status && <span style={{ color: "rgba(255,255,255,0.4)" }}>HTTP {d.http_status}</span>}
+                    <span style={{ color: "rgba(255,255,255,0.25)" }}>{d.attempt_count} attempt{d.attempt_count !== 1 ? "s" : ""}</span>
+                    <span style={{ color: "rgba(255,255,255,0.25)" }}>{fmtDate(d.created_at)}</span>
+                    {d.status === "failed" && (
+                      <button
+                        style={{ ...S.btnSm, fontSize: "0.7rem", padding: "2px 8px", opacity: replayingId === d.id ? 0.5 : 1, marginLeft: "auto" }}
+                        onClick={() => replayDelivery(deliveries.hookId, d.id)}
+                        disabled={replayingId === d.id}
+                      >
+                        {replayingId === d.id ? "Replaying…" : "↺ Replay"}
+                      </button>
+                    )}
+                  </div>
+                  {d.error_message && (
+                    <div style={{ fontSize: "0.72rem", color: "#f87171", fontFamily: "monospace", marginTop: 3, paddingLeft: 4 }}>
+                      {d.error_message.slice(0, 150)}{d.error_message.length > 150 ? "…" : ""}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
