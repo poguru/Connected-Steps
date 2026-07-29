@@ -71,6 +71,16 @@ function fmtDateTime(ts: string | null) {
   });
 }
 
+function fmtChipTime(secs: number | null): string | null {
+  if (secs == null) return null;
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  return h > 0
+    ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+    : `${m}:${String(s).padStart(2, "0")}`;
+}
+
 function daysUntil(dateStr: string): number {
   const eventDate = new Date(dateStr + "T00:00:00+05:30");
   const now = new Date();
@@ -647,6 +657,45 @@ export default function EventHubPage() {
               )}
             </div>
           </SectionCard>
+
+          {/* ── Race Results ────────────────────────────────────────────────── */}
+          {reg?.result && (
+            <SectionCard>
+              <SectionLabel>Race Results</SectionLabel>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                {reg.result.chip_time_secs != null && (
+                  <div style={{ flex: 1, minWidth: 120, background: "rgba(232,98,10,0.07)", border: "1px solid rgba(232,98,10,0.2)", borderRadius: 12, padding: "12px 16px", textAlign: "center" }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#e8620a", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>Chip Time</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: "#fff", fontVariantNumeric: "tabular-nums" }}>
+                      {fmtChipTime(reg.result.chip_time_secs)}
+                    </div>
+                  </div>
+                )}
+                {reg.result.overall_position != null && (
+                  <div style={{ flex: 1, minWidth: 100, background: "rgba(251,191,36,0.07)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 12, padding: "12px 16px", textAlign: "center" }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#fbbf24", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>Overall</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: "#fff", fontVariantNumeric: "tabular-nums" }}>
+                      #{reg.result.overall_position}
+                    </div>
+                  </div>
+                )}
+                {reg.result.finish_time && (
+                  <div style={{ flex: 2, minWidth: 140, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "12px 16px" }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>Finish Time</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#ccc" }}>{reg.result.finish_time}</div>
+                    <div style={{ marginTop: 6 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999,
+                        background: reg.result.status === "finisher" ? "rgba(74,222,128,0.1)" : "rgba(239,68,68,0.1)",
+                        border: `1px solid ${reg.result.status === "finisher" ? "rgba(74,222,128,0.3)" : "rgba(239,68,68,0.3)"}`,
+                        color: reg.result.status === "finisher" ? "#4ade80" : "#f87171" }}>
+                        {reg.result.status?.toUpperCase() ?? "—"}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </SectionCard>
+          )}
 
           {/* ── Event Info ──────────────────────────────────────────────────── */}
           <SectionCard>
