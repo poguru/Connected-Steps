@@ -10,6 +10,7 @@ interface Result {
   distance_category: string | null;
   finish_time:       string | null;
   gun_time_secs:     number | null;
+  chip_time_secs:    number | null;
   pace:              string | null;
   overall_position:  number | null;
   category_position: number | null;
@@ -28,7 +29,7 @@ async function getData(slug: string) {
 
   const { data: results } = await db
     .from("event_results")
-    .select("id, bib_number, user_name, distance_category, finish_time, gun_time_secs, pace, overall_position, category_position, status")
+    .select("id, bib_number, user_name, distance_category, finish_time, gun_time_secs, chip_time_secs, pace, overall_position, category_position, status")
     .eq("event_id", ev.id)
     .order("overall_position", { ascending: true, nullsFirst: false });
 
@@ -68,6 +69,18 @@ export default async function ResultsPage({ params }: { params: Promise<{ slug: 
     if (pos === 3) return "🥉";
     return null;
   }
+
+  function fmtSecs(secs: number | null): string | null {
+    if (secs == null) return null;
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    return h > 0
+      ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+      : `${m}:${String(s).padStart(2, "0")}`;
+  }
+
+  const hasChipTime = results.some(r => r.chip_time_secs != null);
 
   return (
     <div style={{ minHeight: "100vh", background: "#0d0d10", color: "#fff", fontFamily: "inherit" }}>
@@ -129,14 +142,15 @@ export default async function ResultsPage({ params }: { params: Promise<{ slug: 
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                       <thead>
                         <tr style={{ background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-                          {["#", "Pos", "BIB", "Name", "Finish Time", "Pace"].map(h => (
+                          {["#", "Pos", "BIB", "Name", "Finish Time", ...(hasChipTime ? ["Chip Time"] : []), "Pace"].map(h => (
                             <th key={h} style={{ padding: "10px 14px", textAlign: "left" as const, fontSize: 10, color: "#555", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: ".07em" }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {catResults.map((r, i) => {
-                          const medal = positionMedal(r.category_position);
+                          const medal    = positionMedal(r.category_position);
+                          const chipTime = fmtSecs(r.chip_time_secs);
                           return (
                             <tr key={r.id} style={{ borderTop: "1px solid rgba(255,255,255,0.04)", background: i < 3 ? `rgba(232,98,10,${0.04 - i * 0.01})` : "transparent" }}>
                               <td style={{ padding: "10px 14px", color: "#555", fontSize: 12 }}>{i + 1}</td>
@@ -146,6 +160,11 @@ export default async function ResultsPage({ params }: { params: Promise<{ slug: 
                               <td style={{ padding: "10px 14px", color: "#e8620a", fontFamily: "monospace", fontWeight: 700, fontSize: 12 }}>{r.bib_number ?? "—"}</td>
                               <td style={{ padding: "10px 14px", fontWeight: 600, color: "#fff" }}>{r.user_name}</td>
                               <td style={{ padding: "10px 14px", fontWeight: 700, color: "#4ade80", fontFamily: "monospace" }}>{r.finish_time ?? "—"}</td>
+                              {hasChipTime && (
+                                <td style={{ padding: "10px 14px", fontWeight: 600, color: "#a78bfa", fontFamily: "monospace" }}>
+                                  {chipTime ?? <span style={{ color: "#333" }}>—</span>}
+                                </td>
+                              )}
                               <td style={{ padding: "10px 14px", color: "#888", fontSize: 12 }}>{r.pace ?? "—"}</td>
                             </tr>
                           );
