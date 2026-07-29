@@ -409,6 +409,10 @@ export default function CommunicatePage() {
   const [emailTemplate, setEmailTemplate] = useState("custom");
   const [showPreview,   setShowPreview]   = useState(false);
 
+  // AI draft state
+  const [aiIntent,   setAiIntent]   = useState("");
+  const [aiDrafting, setAiDrafting] = useState(false);
+
   // Async send state machine
   const [send, setSend] = useState<SendState>(INITIAL_SEND);
   const pollRef         = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -1005,6 +1009,59 @@ export default function CommunicatePage() {
                 <select style={S.select} value={emailFilter} onChange={e => setEmailFilter(e.target.value as RecipientFilter)} disabled={send.phase === "sending"}>
                   {FILTERS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
                 </select>
+              </div>
+
+              {/* AI Draft */}
+              <div style={{ padding: "12px 14px", background: "rgba(232,98,10,0.06)", border: "1px solid rgba(232,98,10,0.18)", borderRadius: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#e8620a" }}>✨ AI Draft</div>
+                  <div style={{ fontSize: 10, color: "#666" }}>Fills Subject &amp; Body</div>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    style={{ ...S.input, flex: 1, marginBottom: 0, fontSize: 12 }}
+                    value={aiIntent}
+                    onChange={e => setAiIntent(e.target.value)}
+                    placeholder="e.g. Remind participants to collect their BIB on Saturday morning"
+                    disabled={aiDrafting || send.phase === "sending"}
+                    onKeyDown={async e => {
+                      if (e.key === "Enter" && aiIntent.trim() && !aiDrafting) {
+                        e.preventDefault();
+                        setAiDrafting(true);
+                        try {
+                          const r = await fetch(`/api/admin/events/${eventId}/ai/draft-message`, {
+                            method: "POST", headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ intent: aiIntent, segment: FILTERS.find(f => f.value === emailFilter)?.label ?? "all registrants", channel: "email" }),
+                          });
+                          const d = await r.json() as { subject?: string; body_html?: string; error?: string };
+                          if (!r.ok || d.error) { showToast(d.error ?? "AI draft failed"); }
+                          else { setEmailSubject(d.subject ?? ""); setEmailHtml(d.body_html ?? ""); setEmailTemplate("custom"); showToast("Draft filled in — review before sending"); }
+                        } catch { showToast("Could not reach AI service"); }
+                        finally { setAiDrafting(false); }
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={async () => {
+                      if (!aiIntent.trim() || aiDrafting) return;
+                      setAiDrafting(true);
+                      try {
+                        const r = await fetch(`/api/admin/events/${eventId}/ai/draft-message`, {
+                          method: "POST", headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ intent: aiIntent, segment: FILTERS.find(f => f.value === emailFilter)?.label ?? "all registrants", channel: "email" }),
+                        });
+                        const d = await r.json() as { subject?: string; body_html?: string; error?: string };
+                        if (!r.ok || d.error) { showToast(d.error ?? "AI draft failed"); }
+                        else { setEmailSubject(d.subject ?? ""); setEmailHtml(d.body_html ?? ""); setEmailTemplate("custom"); showToast("Draft filled in — review before sending"); }
+                      } catch { showToast("Could not reach AI service"); }
+                      finally { setAiDrafting(false); }
+                    }}
+                    disabled={!aiIntent.trim() || aiDrafting || send.phase === "sending"}
+                    style={{ padding: "0 16px", height: 38, background: "#e8620a", border: "none", borderRadius: 8, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6, flexShrink: 0, opacity: (!aiIntent.trim() || aiDrafting || send.phase === "sending") ? 0.5 : 1 }}
+                  >
+                    {aiDrafting ? <><Spinner size={12} /> Drafting…</> : "Generate"}
+                  </button>
+                </div>
               </div>
 
               <div>

@@ -238,6 +238,9 @@ export default function OpsCommandCenter({ params }: { params: Promise<{ id: str
   const [incForm, setIncForm] = useState({ title: "", incident_type: "other", priority: "medium", description: "" });
   const [incSaving, setIncSaving] = useState(false);
 
+  // Client-side anomaly alerts (computed from live SSE data)
+  const [localAlerts, setLocalAlerts] = useState<Array<{ id: string; severity: "critical" | "warning"; message: string }>>([]);
+
 
   const fetchCheckpoints = useCallback(async () => {
     try {
@@ -321,6 +324,68 @@ export default function OpsCommandCenter({ params }: { params: Promise<{ id: str
     }, 30000);
     return () => clearInterval(id);
   }, [fetchCheckpoints, fetchIncidents]);
+
+  // ── Client-side anomaly detection ────────────────────────────────────────
+  // Rule-based checks run every time SSE delivers fresh data.
+  // Produces localAlerts independently of the server-side health/alerts system.
+  useEffect(() => {
+    const m = ops?.metrics;
+    if (!m) return;
+
+    const next: typeof localAlerts = [];
+    const now = Date.now();
+
+    // Rule 1: No scan in last 5 minutes while event is mid-flow
+    const anyActive = m.checked_in > 0 && m.checked_in < (m.confirmed ?? 0) * 0.95;
+    if (anyActive && scans.length > 0) {
+      const lastScanMs = new Date(scans[0].created_at).getTime();
+      const gapMin = (now - lastScanMs) / 60000;
+      if (gapMin >= 5) {
+        next.push({
+          id: "no-scan-idle",
+          severity: gapMin >= 10 ? "critical" : "warning",
+          message: `No scans in the last ${Math.round(gapMin)} min — is the scanner running?`,
+        });
+      }
+    }
+
+    // Rule 2: BIB collection lagging behind check-in
+    if ((m.checked_in ?? 0) > 10 && (m.bib_collected ?? 0) < (m.checked_in ?? 0) * 0.5) {
+      const lag = (m.checked_in ?? 0) - (m.bib_collected ?? 0);
+      next.push({
+        id: "bib-bottleneck",
+        severity: lag > 30 ? "critical" : "warning",
+        message: `BIB collection is lagging — ${lag} checked-in runners haven't collected their BIB yet`,
+      });
+    }
+
+    // Rule 3: Check-in rate below 20% and event likely in progress
+    const checkinPct = m.confirmed ? Math.round((m.checked_in / m.confirmed) * 100) : 0;
+    if ((m.confirmed ?? 0) >= 50 && checkinPct < 20 && (m.checked_in ?? 0) > 0) {
+      next.push({
+        id: "low-checkin-rate",
+        severity: "warning",
+        message: `Check-in rate is only ${checkinPct}% — ${m.confirmed - m.checked_in} confirmed runners have not checked in`,
+      });
+    }
+
+    // Rule 4: Active volunteer with no scan in last 15 min
+    const staleVols = volunteers.filter(v =>
+      v.is_active &&
+      v.last_active &&
+      (now - new Date(v.last_active).getTime()) > 15 * 60 * 1000
+    );
+    if (staleVols.length > 0) {
+      next.push({
+        id: "volunteer-idle",
+        severity: "warning",
+        message: `${staleVols.length} active volunteer${staleVols.length > 1 ? "s" : ""} (${staleVols.map(v => v.name || v.email).slice(0, 2).join(", ")}) idle for 15+ min`,
+      });
+    }
+
+    setLocalAlerts(next);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ops, scans, volunteers]);
 
   // ── Checkpoint actions ────────────────────────────────────────────────────
 
@@ -511,8 +576,25 @@ export default function OpsCommandCenter({ params }: { params: Promise<{ id: str
       {/* ── Main content ─────────────────────────────────────────────────── */}
       <div style={{ maxWidth: 1400, margin: "0 auto", padding: "20px 20px 60px" }}>
 
-        {/* Alerts */}
+        {/* Alerts — server-side + client-side anomaly detection */}
         <AlertBanner alerts={alerts} />
+        {localAlerts.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 18 }}>
+            {localAlerts.map(a => (
+              <div key={a.id} style={{
+                display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
+                background: a.severity === "critical" ? "rgba(239,68,68,0.08)" : "rgba(245,158,11,0.08)",
+                border: `1px solid ${a.severity === "critical" ? "rgba(239,68,68,0.25)" : "rgba(245,158,11,0.25)"}`,
+                borderRadius: 8, fontSize: 12,
+              }}>
+                <span style={{ fontSize: 14 }}>{a.severity === "critical" ? "🔴" : "🟡"}</span>
+                <span style={{ color: a.severity === "critical" ? "#f87171" : "#f59e0b", fontWeight: 600 }}>
+                  ⚡ {a.message}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* ── OVERVIEW TAB ─────────────────────────────────────────────── */}
         {tab === "overview" && (
@@ -591,6 +673,7 @@ export default function OpsCommandCenter({ params }: { params: Promise<{ id: str
                   { href: `/admin/events/${eventId}/registrations`,  label: "👥 Registrations" },
                   { href: `/admin/events/${eventId}/analytics`,      label: "📈 Analytics" },
                   { href: `/admin/events/${eventId}/volunteers`,     label: "🙋 Volunteers" },
+                  { href: `/admin/events/${eventId}/teams`,          label: "🏢 Corp. Wellness" },
                   { href: `/admin/events/${eventId}/communicate`,    label: "📢 Communicate" },
                   { href: `/admin/events/${eventId}/bib`,            label: "📦 BIB Collection" },
                   { href: `/admin/events/${eventId}/results`,        label: "🏅 Results" },

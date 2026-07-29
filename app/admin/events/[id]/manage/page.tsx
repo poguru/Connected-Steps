@@ -80,6 +80,7 @@ const NAV_ITEMS = [
   { key: "analytics",     icon: "📈", label: "Analytics",      inline: false, href: "analytics"     },
   { key: "sponsors",      icon: "🤝", label: "Sponsors",       inline: false, href: "sponsors"      },
   { key: "volunteers",    icon: "🙋", label: "Volunteers",     inline: false, href: "volunteers"    },
+  { key: "teams",         icon: "🏢", label: "Corp. Wellness", inline: false, href: "teams"         },
   { key: "services",      icon: "🔧", label: "Services",       inline: false, href: "services"      },
   { key: "cancellations", icon: "↩️", label: "Cancellations",  inline: false, href: "cancellations" },
   { key: "finance",       icon: "💰", label: "Finance",        inline: true  },
