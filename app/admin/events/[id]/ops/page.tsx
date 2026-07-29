@@ -58,8 +58,6 @@ interface Incident {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const POLL_MS = 8000;
-
 const SERVICE_META: Record<string, { label: string; color: string; bg: string }> = {
   checkin:     { label: "Check-In",    color: "#10b981", bg: "rgba(16,185,129,0.12)" },
   tshirt:      { label: "T-Shirt",     color: "#f59e0b", bg: "rgba(245,158,11,0.12)" },
@@ -228,8 +226,9 @@ export default function OpsCommandCenter({ params }: { params: Promise<{ id: str
   const [loading,     setLoading]     = useState(true);
   const [tab,         setTab]         = useState<"overview" | "scans" | "volunteers" | "checkpoints" | "incidents">("overview");
   const [scanFilter,  setScanFilter]  = useState("");
-  const [scanSince,   setScanSince]   = useState<string | null>(null);
   const [scanSearch,  setScanSearch]  = useState("");
+  const [connStatus,  setConnStatus]  = useState<"connecting" | "connected" | "error">("connecting");
+  const [reconnectKey, setReconnectKey] = useState(0);
 
   // Checkpoint add form
   const [cpForm, setCpForm] = useState({ label: "", planned_at: "", owner_email: "" });
@@ -239,50 +238,6 @@ export default function OpsCommandCenter({ params }: { params: Promise<{ id: str
   const [incForm, setIncForm] = useState({ title: "", incident_type: "other", priority: "medium", description: "" });
   const [incSaving, setIncSaving] = useState(false);
 
-  const [err, setErr] = useState("");
-
-  // ── Data fetchers ─────────────────────────────────────────────────────────
-
-  const fetchOps = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/admin/events/${eventId}/ops`);
-      if (!res.ok) { setErr("Failed to load command center data"); return; }
-      const data = await res.json() as OpsResponse;
-      setOps(data);
-      setLastUpdated(new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
-    } catch { setErr("Network error"); }
-    finally { setLoading(false); }
-  }, [eventId]);
-
-  const fetchScans = useCallback(async (since?: string | null) => {
-    try {
-      const q = new URLSearchParams({ limit: "60" });
-      if (since) q.set("since", since);
-      if (scanFilter) q.set("service", scanFilter);
-      const res = await fetch(`/api/admin/events/${eventId}/ops/scans?${q}`);
-      if (!res.ok) return;
-      const data = await res.json() as { scans: Scan[]; as_of: string };
-      if (since) {
-        setScans(prev => {
-          const existing = new Set(prev.map(s => s.id));
-          const newOnes  = data.scans.filter(s => !existing.has(s.id));
-          return [...newOnes, ...prev].slice(0, 100);
-        });
-      } else {
-        setScans(data.scans);
-      }
-      if (data.scans.length > 0) setScanSince(data.scans[0].created_at);
-    } catch { /* keep last */ }
-  }, [eventId, scanFilter]);
-
-  const fetchVolunteers = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/admin/events/${eventId}/ops/volunteers`);
-      if (!res.ok) return;
-      const data = await res.json() as { volunteers: Volunteer[] };
-      setVolunteers(data.volunteers);
-    } catch { /* keep last */ }
-  }, [eventId]);
 
   const fetchCheckpoints = useCallback(async () => {
     try {
@@ -302,28 +257,63 @@ export default function OpsCommandCenter({ params }: { params: Promise<{ id: str
     } catch { /* keep last */ }
   }, [eventId]);
 
-  // ── Initial load ──────────────────────────────────────────────────────────
+  // ── SSE live feed ─────────────────────────────────────────────────────────
+  // Replaces 8 s polling. Sends a full "initial" snapshot on connect, then
+  // streams incremental scan events (~3 s), metrics, and volunteers (~9 s).
+  // EventSource auto-reconnects on drop; each reconnect re-sends "initial".
 
   useEffect(() => {
-    void fetchOps();
-    void fetchScans();
-    void fetchVolunteers();
+    setLoading(true);
+    setConnStatus("connecting");
+    const es = new EventSource(`/api/admin/events/${eventId}/ops/stream`);
+
+    es.addEventListener("initial", (e) => {
+      type InitialPayload = OpsResponse & { scans: Scan[]; volunteers: Volunteer[] };
+      const d = JSON.parse((e as MessageEvent).data as string) as InitialPayload;
+      setOps(d);
+      setScans(Array.isArray(d.scans)      ? d.scans      : []);
+      setVolunteers(Array.isArray(d.volunteers) ? d.volunteers : []);
+      setLastUpdated(new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      setLoading(false);
+      setConnStatus("connected");
+    });
+
+    es.addEventListener("metrics", (e) => {
+      setOps(JSON.parse((e as MessageEvent).data as string) as OpsResponse);
+      setLastUpdated(new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+    });
+
+    es.addEventListener("scans", (e) => {
+      const d = JSON.parse((e as MessageEvent).data as string) as { scans: Scan[] };
+      if (d.scans.length > 0) {
+        setScans(prev => {
+          const seen  = new Set(prev.map(s => s.id));
+          const fresh = d.scans.filter(s => !seen.has(s.id));
+          return [...fresh, ...prev].slice(0, 100);
+        });
+        setLastUpdated(new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      }
+    });
+
+    es.addEventListener("volunteers", (e) => {
+      const d = JSON.parse((e as MessageEvent).data as string) as { volunteers: Volunteer[] };
+      setVolunteers(d.volunteers);
+    });
+
+    es.onerror = () => setConnStatus("error");
+
+    return () => es.close();
+  // reconnectKey lets the Refresh button force a new SSE connection
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventId, reconnectKey]);
+
+  // Checkpoints + incidents: still polled (30 s) — user-mutated in-page,
+  // and SSE push for them would conflict with optimistic local updates.
+  useEffect(() => {
     void fetchCheckpoints();
     void fetchIncidents();
-  }, [fetchOps, fetchScans, fetchVolunteers, fetchCheckpoints, fetchIncidents]);
+  }, [fetchCheckpoints, fetchIncidents]);
 
-  // ── Auto-poll ─────────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      void fetchOps();
-      void fetchScans(scanSince);
-      void fetchVolunteers();
-    }, POLL_MS);
-    return () => clearInterval(id);
-  }, [fetchOps, fetchScans, fetchVolunteers, scanSince]);
-
-  // Re-fetch checkpoints / incidents every 30 seconds
   useEffect(() => {
     const id = setInterval(() => {
       void fetchCheckpoints();
@@ -331,13 +321,6 @@ export default function OpsCommandCenter({ params }: { params: Promise<{ id: str
     }, 30000);
     return () => clearInterval(id);
   }, [fetchCheckpoints, fetchIncidents]);
-
-  // Re-fetch scans when filter changes
-  useEffect(() => {
-    setScanSince(null);
-    void fetchScans();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scanFilter]);
 
   // ── Checkpoint actions ────────────────────────────────────────────────────
 
@@ -416,11 +399,11 @@ export default function OpsCommandCenter({ params }: { params: Promise<{ id: str
     );
   }
 
-  if (err && !ops) {
+  if (connStatus === "error" && !ops) {
     return (
       <div style={{ minHeight: "100vh", background: "#080808", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
-        <div style={{ color: "#f87171", fontSize: 14 }}>{err}</div>
-        <button onClick={() => { setErr(""); void fetchOps(); }} style={{ ...BTN, background: "#e8620a", color: "#fff" }}>Retry</button>
+        <div style={{ color: "#f87171", fontSize: 14 }}>Failed to connect to live stream</div>
+        <button onClick={() => setReconnectKey(k => k + 1)} style={{ ...BTN, background: "#e8620a", color: "#fff" }}>Retry</button>
       </div>
     );
   }
@@ -435,13 +418,15 @@ export default function OpsCommandCenter({ params }: { params: Promise<{ id: str
   const tshirtRate  = pct(m.tshirt_issued, m.confirmed);
   const breakfastRate = pct(m.breakfast_issued, m.confirmed);
 
-  const filteredScans = scanSearch
-    ? scans.filter(s =>
-        s.participant_name.toLowerCase().includes(scanSearch.toLowerCase()) ||
-        (s.registration_code ?? "").toLowerCase().includes(scanSearch.toLowerCase()) ||
-        (s.volunteer_email ?? "").toLowerCase().includes(scanSearch.toLowerCase())
-      )
-    : scans;
+  // SSE sends all scans; both service filter and search are now client-side
+  const filteredScans = scans.filter(s =>
+    (!scanFilter || s.service_name === scanFilter) &&
+    (!scanSearch || (
+      s.participant_name.toLowerCase().includes(scanSearch.toLowerCase()) ||
+      (s.registration_code ?? "").toLowerCase().includes(scanSearch.toLowerCase()) ||
+      (s.volunteer_email ?? "").toLowerCase().includes(scanSearch.toLowerCase())
+    ))
+  );
 
   const openIncidents = incidents.filter(i => i.status === "open" || i.status === "in_progress");
 
@@ -455,6 +440,10 @@ export default function OpsCommandCenter({ params }: { params: Promise<{ id: str
 
   return (
     <div style={{ minHeight: "100vh", background: "#080808", color: "#fff", fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <style>{`
+        @keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+        .live-dot--on { animation: livePulse 2s ease-in-out infinite; box-shadow: 0 0 5px #10b981; }
+      `}</style>
 
       {/* ── Sticky header ───────────────────────────────────────────────── */}
       <div style={{
@@ -473,8 +462,16 @@ export default function OpsCommandCenter({ params }: { params: Promise<{ id: str
 
           <HealthBadge score={health.score} status={health.status} />
 
+          {/* Live connection status indicator */}
+          <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", background: "rgba(16,16,16,0.8)", border: `1px solid ${connStatus === "connected" ? "rgba(16,185,129,0.25)" : connStatus === "error" ? "rgba(239,68,68,0.25)" : "rgba(245,158,11,0.25)"}`, borderRadius: 99 }}>
+            <span className={connStatus === "connected" ? "live-dot live-dot--on" : "live-dot"} style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: connStatus === "connected" ? "#10b981" : connStatus === "error" ? "#ef4444" : "#f59e0b" }} />
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", color: connStatus === "connected" ? "#10b981" : connStatus === "error" ? "#f87171" : "#f59e0b" }}>
+              {connStatus === "connected" ? "LIVE" : connStatus === "error" ? "RECONNECTING" : "CONNECTING"}
+            </span>
+          </div>
+
           <button
-            onClick={() => { void fetchOps(); void fetchScans(); void fetchVolunteers(); }}
+            onClick={() => setReconnectKey(k => k + 1)}
             style={{ ...BTN, background: "rgba(255,255,255,0.06)", color: "#888", border: "1px solid #222" }}
           >↻ Refresh</button>
 
