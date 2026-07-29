@@ -6,6 +6,7 @@ import { recalculateMonth } from "@/lib/recalculate-leaderboard";
 import { cacheDel, CK } from "@/lib/cache";
 import { autoFeedSessionCompleted } from "@/lib/auto-feed";
 import { createNotification } from "@/lib/notify-inapp";
+import { validateDailyAttendanceQR } from "@/lib/daily-attendance-qr";
 
 function isoMondayKey(dateStr: string): string {
   const d = new Date(dateStr.slice(0, 10) + "T12:00:00Z");
@@ -39,10 +40,166 @@ export async function POST(req: NextRequest) {
     .eq("token", token)
     .single();
 
-  if (!qr) return NextResponse.json({ error: "Invalid QR code" }, { status: 404 });
+  if (!qr) {
+    // ── Fallback: check daily attendance QR ──────────────────────────────────
+    const dailyResult = await validateDailyAttendanceQR(token);
+
+    if (!dailyResult) {
+      return NextResponse.json({ error: "Invalid QR code" }, { status: 404 });
+    }
+
+    if (!dailyResult.valid) {
+      return NextResponse.json(
+        { error: "Attendance QR has expired. Please use today's latest QR." },
+        { status: 410 },
+      );
+    }
+
+    // Find today's session to attribute the attendance to
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+    const todayIST = new Date(Date.now() + IST_OFFSET_MS).toISOString().slice(0, 10);
+
+    const { data: todaySession } = await db
+      .from("sessions")
+      .select("id, title, date, time, location")
+      .eq("date", todayIST)
+      .order("time", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (todaySession) {
+      // Record against today's session using the same path as a session QR scan
+      const { data: existingAtt } = await db
+        .from("session_attendance")
+        .select("attended, check_in_method")
+        .eq("session_id", todaySession.id)
+        .eq("user_email", userEmail.toLowerCase())
+        .single();
+
+      if (existingAtt?.attended) {
+        return NextResponse.json({
+          success: true,
+          already_checked_in: true,
+          message: `You're already checked in to ${todaySession.title ?? "today's session"}.`,
+          session: todaySession,
+        });
+      }
+
+      const now2 = new Date().toISOString();
+      let capturedDailyName: string | undefined;
+
+      if (existingAtt) {
+        await db
+          .from("session_attendance")
+          .update({ attended: true, check_in_time: now2, check_in_method: "daily_qr" })
+          .eq("session_id", todaySession.id)
+          .eq("user_email", userEmail.toLowerCase());
+      } else {
+        const { data: user2 } = await db
+          .from("users")
+          .select("first_name, last_name")
+          .eq("email", userEmail.toLowerCase())
+          .single();
+        capturedDailyName = user2 ? `${user2.first_name} ${user2.last_name}`.trim() : userEmail;
+
+        await db.from("session_attendance").insert({
+          session_id:      todaySession.id,
+          user_email:      userEmail.toLowerCase(),
+          user_name:       capturedDailyName,
+          attended:        true,
+          check_in_time:   now2,
+          check_in_method: "daily_qr",
+        });
+      }
+
+      const capturedDailyEmail   = userEmail.toLowerCase();
+      const capturedDailySession = todaySession;
+      const capturedDailyNameF   = capturedDailyName;
+
+      after(async () => {
+        const bgDb2 = getSupabaseServer();
+        let displayName2 = capturedDailyNameF;
+        if (!displayName2) {
+          const { data: up } = await bgDb2.from("users").select("first_name, last_name").eq("email", capturedDailyEmail).single();
+          displayName2 = up ? `${up.first_name} ${up.last_name}`.trim() : capturedDailyEmail.split("@")[0];
+        }
+        try {
+          await bgDb2.from("points_ledger").insert({
+            user_email: capturedDailyEmail, session_id: capturedDailySession.id,
+            points: 5, reason: "Attendance", category: "attendance", awarded_by: null,
+          });
+        } catch { /* ignore */ }
+        try {
+          await cacheDel(CK.userAchievements(capturedDailyEmail), CK.userJoinedSessions(capturedDailyEmail));
+        } catch { /* ignore */ }
+        try {
+          const month = (capturedDailySession.date as string).slice(0, 7);
+          await recalculateMonth(month, { force: true });
+        } catch { /* ignore */ }
+        try {
+          await autoFeedSessionCompleted(capturedDailySession.id, [{ email: capturedDailyEmail, name: displayName2 }]);
+        } catch { /* ignore */ }
+        try {
+          await createNotification({
+            user_email: capturedDailyEmail,
+            type: "achievement",
+            title: "Attendance Confirmed!",
+            body: `You earned 5 points for attending ${capturedDailySession.title ?? "today's session"}!`,
+            action_url: "/leaderboard",
+          });
+        } catch { /* ignore */ }
+      });
+
+      return NextResponse.json({
+        success: true,
+        already_checked_in: false,
+        message: `Attendance recorded for ${todaySession.title ?? "today's session"}!`,
+        session: todaySession,
+      });
+    }
+
+    // No session today — record as a standalone daily check-in
+    const { data: existingDaily } = await db
+      .from("daily_attendance_records")
+      .select("id")
+      .eq("qr_id", dailyResult.qrId!)
+      .eq("user_email", userEmail.toLowerCase())
+      .maybeSingle();
+
+    if (existingDaily) {
+      return NextResponse.json({
+        success: true,
+        already_checked_in: true,
+        message: "You've already checked in today.",
+      });
+    }
+
+    const { data: userInfo } = await db
+      .from("users")
+      .select("first_name, last_name")
+      .eq("email", userEmail.toLowerCase())
+      .single();
+    const userName = userInfo ? `${userInfo.first_name} ${userInfo.last_name}`.trim() : userEmail;
+
+    await db.from("daily_attendance_records").insert({
+      qr_id:      dailyResult.qrId,
+      user_email: userEmail.toLowerCase(),
+      user_name:  userName,
+      location_id: dailyResult.locationId ?? null,
+    });
+
+    return NextResponse.json({
+      success: true,
+      already_checked_in: false,
+      message: "Attendance confirmed! Great work showing up today.",
+    });
+  }
 
   if (new Date(qr.expires_at) < new Date()) {
-    return NextResponse.json({ error: "This QR code has expired. Ask your coach to generate a new one." }, { status: 410 });
+    return NextResponse.json(
+      { error: "This QR code has expired. Ask your coach to generate a new one." },
+      { status: 410 },
+    );
   }
 
   // 2. Get session info for the confirmation message

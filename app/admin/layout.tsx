@@ -48,9 +48,10 @@ const NAV_GROUPS = [
     label: "Participants",
     icon:  "👥",
     links: [
-      { label: "Members",   href: "/admin/users",           exact: false, icon: "👤" },
-      { label: "Coaches",   href: "/admin/coaches",         exact: false, icon: "🏅" },
-      { label: "Sessions",  href: "/admin/sessions",        exact: false, icon: "📍" },
+      { label: "Members",      href: "/admin/users",           exact: false, icon: "👤" },
+      { label: "Coaches",      href: "/admin/coaches",         exact: false, icon: "🏅" },
+      { label: "Sessions",     href: "/admin/sessions",        exact: false, icon: "📍" },
+      { label: "Daily QR",     href: "/admin/attendance-qr",   exact: false, icon: "📲" },
     ],
   },
   {
