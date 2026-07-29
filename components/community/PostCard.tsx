@@ -315,6 +315,7 @@ export default function PostCard({ post, currentUserEmail, onDeleted }: Props) {
             description: `by ${post.author_name ?? "Community Member"} · Connected Steps`,
             url:         `${typeof window !== "undefined" ? window.location.origin : "https://www.connectedsteps.in"}/s/post/${post.id}`,
             imageUrl:    `${typeof window !== "undefined" ? window.location.origin : "https://www.connectedsteps.in"}/api/og/post/${post.id}`,
+            storyUrl:    `${typeof window !== "undefined" ? window.location.origin : "https://www.connectedsteps.in"}/api/og/post/${post.id}?format=story`,
             authorName:  post.author_name ?? undefined,
           }}
           onClose={() => setShowShare(false)}

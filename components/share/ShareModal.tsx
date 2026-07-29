@@ -14,7 +14,8 @@ export interface ShareConfig {
   title:       string;
   description?: string;
   url:         string;
-  imageUrl?:   string;   // OG/story image URL (1080×1920 or 1200×630)
+  imageUrl?:   string;   // 1200×630 OG image (for link previews)
+  storyUrl?:   string;   // 1080×1920 Instagram Story image (for download / save)
   authorName?: string;
 }
 
@@ -176,14 +177,15 @@ export default function ShareModal({ config, onClose }: Props) {
     setTimeout(() => setToast(""), 3500);
   }, []);
 
-  // Pre-fetch image blob (cached in ref)
+  // Pre-fetch story/image blob (cached in ref). Prefers storyUrl (1080×1920).
   async function getBlob(): Promise<Blob | null> {
-    if (!config.imageUrl) return null;
+    const src = config.storyUrl ?? config.imageUrl;
+    if (!src) return null;
     if (blobRef.current) return blobRef.current;
     try {
       const res = await Promise.race([
-        fetch(config.imageUrl),
-        new Promise<null>((_, reject) => setTimeout(() => reject(new Error("timeout")), 6000)),
+        fetch(src),
+        new Promise<null>((_, reject) => setTimeout(() => reject(new Error("timeout")), 10000)),
       ]) as Response;
       if (!res.ok) return null;
       blobRef.current = await res.blob();
@@ -414,19 +416,21 @@ export default function ShareModal({ config, onClose }: Props) {
             {/* Divider */}
             <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "0.25rem 0" }} />
 
-            {/* Instagram */}
-            <button
-              onClick={shareInstagram}
-              disabled={imgBusy}
-              style={{
-                ...primaryBtn("linear-gradient(135deg,#833ab4 0%,#fd1d1d 50%,#fcb045 100%)"),
-                opacity: imgBusy ? 0.7 : 1,
-                cursor: imgBusy ? "wait" : "pointer",
-              }}
-            >
-              <IconInstagram />
-              {imgBusy ? "Preparing…" : "Instagram (save image)"}
-            </button>
+            {/* Instagram Story */}
+            {(config.storyUrl ?? config.imageUrl) && (
+              <button
+                onClick={shareInstagram}
+                disabled={imgBusy}
+                style={{
+                  ...primaryBtn("linear-gradient(135deg,#833ab4 0%,#fd1d1d 50%,#fcb045 100%)"),
+                  opacity: imgBusy ? 0.7 : 1,
+                  cursor: imgBusy ? "wait" : "pointer",
+                }}
+              >
+                <IconInstagram />
+                {imgBusy ? "Preparing story…" : "Instagram Story (save image)"}
+              </button>
+            )}
 
             {/* Secondary actions */}
             <button onClick={copyLink} style={secondaryBtn}
@@ -435,7 +439,7 @@ export default function ShareModal({ config, onClose }: Props) {
               <IconLink /> Copy Link
             </button>
 
-            {config.imageUrl && (
+            {(config.storyUrl ?? config.imageUrl) && (
               <button
                 onClick={downloadImage}
                 disabled={imgBusy}
@@ -443,7 +447,7 @@ export default function ShareModal({ config, onClose }: Props) {
                 onMouseEnter={e => { if (!imgBusy) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.1)"; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)"; }}>
                 <IconDownload />
-                {imgBusy ? "Preparing image…" : "Download Image"}
+                {imgBusy ? "Preparing image…" : "Download Story Image"}
               </button>
             )}
 
