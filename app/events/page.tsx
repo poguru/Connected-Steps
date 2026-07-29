@@ -18,7 +18,7 @@ interface Event {
   registration_closes_at: string | null;
   distance_categories:    string[] | null;
   location: string; price: number; featured: boolean;
-  max_participants: number | null; share_slug: string | null;
+  max_participants: number | null; participant_count: number | null; share_slug: string | null;
 }
 
 async function getEvents(): Promise<Event[]> {
@@ -30,7 +30,7 @@ async function getEvents(): Promise<Event[]> {
 
     const { data } = await db
       .from("events")
-      .select("id, title, description, event_type, cover_image, start_date, start_time, end_date, end_time, registration_closes_at, distance_categories, location, price, featured, max_participants, share_slug")
+      .select("id, title, description, event_type, cover_image, start_date, start_time, end_date, end_time, registration_closes_at, distance_categories, location, price, featured, max_participants, participant_count, share_slug")
       .eq("status", "published")
       .or(
         `end_date.gt.${today},` +

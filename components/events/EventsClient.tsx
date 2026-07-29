@@ -15,7 +15,7 @@ interface Event {
   registration_closes_at: string | null;
   distance_categories:    string[] | null;
   location: string; price: number; featured: boolean;
-  max_participants: number | null; share_slug: string | null;
+  max_participants: number | null; participant_count: number | null; share_slug: string | null;
 }
 
 const TYPE: Record<string, { label: string; icon: string; color: string; bg: string }> = {
@@ -40,9 +40,10 @@ function fmtTime(s: string | null) {
 type Tab = "upcoming" | "past" | "mine";
 
 function EventCard({ ev }: { ev: Event }) {
-  const conf = t(ev.event_type);
-  const ls   = getEventLifecycleStatus(ev);
-  const lsCol = LIFECYCLE_COLOR[ls];
+  const conf     = t(ev.event_type);
+  const ls       = getEventLifecycleStatus(ev);
+  const lsCol    = LIFECYCLE_COLOR[ls];
+  const isSoldOut = ev.max_participants != null && (ev.participant_count ?? 0) >= ev.max_participants;
 
   return (
     <Link href={`/events/${ev.share_slug ?? ev.id}`} style={{ textDecoration: "none" }}>
@@ -68,9 +69,14 @@ function EventCard({ ev }: { ev: Event }) {
             <span style={{ fontSize: "10px", fontWeight: 700, color: conf.color, background: conf.bg, border: `1px solid ${conf.color}30`, padding: "1px 7px", borderRadius: 999 }}>
               {conf.label.toUpperCase()}
             </span>
-            {ev.price === 0 && (
+            {ev.price === 0 && !isSoldOut && (
               <span style={{ fontSize: "10px", fontWeight: 700, color: "#4ade80", background: "#4ade8015", border: "1px solid #4ade8030", padding: "1px 7px", borderRadius: 999 }}>
                 FREE
+              </span>
+            )}
+            {isSoldOut && (
+              <span style={{ fontSize: "10px", fontWeight: 700, color: "#ef4444", background: "#ef444415", border: "1px solid #ef444430", padding: "1px 7px", borderRadius: 999 }}>
+                SOLD OUT
               </span>
             )}
             {/* Live lifecycle countdown badge — replaces static "UPCOMING" label */}
