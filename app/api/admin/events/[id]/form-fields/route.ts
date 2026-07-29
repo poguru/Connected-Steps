@@ -24,7 +24,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   const { data, error } = await db
     .from("event_form_fields")
-    .select("id, field_key, field_type, label, placeholder, help_text, required, options, display_order, is_active, created_at, conditions, default_value, max_length, validation_pattern, editable_after_reg, section")
+    .select("id, field_key, field_type, label, placeholder, help_text, required, options, display_order, is_active, created_at, conditions, default_value, max_length, validation_pattern, editable_after_reg, section, race_ids")
     .eq("event_id", id)
     .order("display_order", { ascending: true })
     .order("created_at", { ascending: true });
@@ -71,6 +71,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     ? (body.options as unknown[]).filter(o => typeof o === "string").map(o => String(o).trim()).filter(Boolean)
     : [];
 
+  const raceIds = Array.isArray(body.race_ids)
+    ? (body.race_ids as unknown[]).filter(o => typeof o === "string").map(o => String(o).trim()).filter(Boolean)
+    : [];
+
   const { data, error } = await db
     .from("event_form_fields")
     .insert({
@@ -82,6 +86,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       help_text:     body.help_text   ? String(body.help_text).trim()   : null,
       required:      body.required === true,
       options,
+      race_ids:      raceIds,
       display_order,
       is_active:     true,
     })
@@ -126,6 +131,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
   if (body.options !== undefined && Array.isArray(body.options)) {
     allowed.options = (body.options as unknown[]).filter(o => typeof o === "string").map(o => String(o).trim()).filter(Boolean);
+  }
+  if (body.race_ids !== undefined && Array.isArray(body.race_ids)) {
+    allowed.race_ids = (body.race_ids as unknown[]).filter(o => typeof o === "string").map(o => String(o).trim()).filter(Boolean);
   }
 
   if (Object.keys(allowed).length === 0) return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });

@@ -896,6 +896,7 @@ export default function NewEventWizard() {
           <StepRegistration
             form={form} set={set} errors={errors}
             regConfig={regConfig} setRC={setRC}
+            eventId={eventId} races={races}
           />
         )}
 
@@ -1302,16 +1303,291 @@ function StepCategories({
   );
 }
 
+// ── Form Builder ─────────────────────────────────────────────────────────────
+
+interface BuiltField {
+  id:           string;
+  field_key:    string;
+  field_type:   string;
+  label:        string;
+  placeholder:  string | null;
+  help_text:    string | null;
+  required:     boolean;
+  options:      string[];
+  section:      string | null;
+  race_ids:     string[];
+  display_order: number;
+  is_active:    boolean;
+}
+
+const FIELD_TYPES = [
+  { value: "text",         label: "Short Text" },
+  { value: "textarea",     label: "Long Text" },
+  { value: "select",       label: "Dropdown" },
+  { value: "radio",        label: "Radio Buttons" },
+  { value: "multi_select", label: "Multi-Select" },
+  { value: "checkbox",     label: "Checkbox" },
+  { value: "number",       label: "Number" },
+  { value: "date",         label: "Date" },
+  { value: "email",        label: "Email" },
+  { value: "phone",        label: "Phone" },
+  { value: "file",         label: "File Upload" },
+  { value: "waiver",       label: "Waiver / Consent" },
+];
+
+const HAS_OPTIONS = new Set(["select", "radio", "multi_select"]);
+
+function FormBuilder({ eventId, races }: { eventId: string | null; races: RaceForm[] }) {
+  const [fields,     setFields]     = useState<BuiltField[]>([]);
+  const [loading,    setLoading]    = useState(false);
+  const [saving,     setSaving]     = useState(false);
+  const [err,        setErr]        = useState("");
+  const [editId,     setEditId]     = useState<string | null>(null);
+
+  // Form state for add/edit
+  const [fLabel,     setFLabel]     = useState("");
+  const [fType,      setFType]      = useState("text");
+  const [fRequired,  setFRequired]  = useState(false);
+  const [fPlaceholder, setFPlaceholder] = useState("");
+  const [fHelp,      setFHelp]      = useState("");
+  const [fSection,   setFSection]   = useState("");
+  const [fOptions,   setFOptions]   = useState("");  // comma-separated
+  const [fRaceIds,   setFRaceIds]   = useState<string[]>([]);
+
+  // Drag state
+  const [dragIdx,    setDragIdx]    = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!eventId) return;
+    setLoading(true);
+    fetch(`/api/admin/events/${eventId}/form-fields`)
+      .then(r => r.json())
+      .then(d => setFields(d.fields ?? []))
+      .catch(() => setErr("Could not load fields"))
+      .finally(() => setLoading(false));
+  }, [eventId]);
+
+  function resetForm() {
+    setEditId(null); setFLabel(""); setFType("text"); setFRequired(false);
+    setFPlaceholder(""); setFHelp(""); setFSection(""); setFOptions(""); setFRaceIds([]);
+    setErr("");
+  }
+
+  function startEdit(f: BuiltField) {
+    setEditId(f.id); setFLabel(f.label); setFType(f.field_type);
+    setFRequired(f.required); setFPlaceholder(f.placeholder ?? "");
+    setFHelp(f.help_text ?? ""); setFSection(f.section ?? "");
+    setFOptions(f.options.join(", ")); setFRaceIds(f.race_ids ?? []);
+    setErr("");
+  }
+
+  async function saveField() {
+    if (!eventId || !fLabel.trim()) { setErr("Label is required."); return; }
+    setSaving(true); setErr("");
+    const options = HAS_OPTIONS.has(fType)
+      ? fOptions.split(",").map(s => s.trim()).filter(Boolean)
+      : [];
+    const body = {
+      label: fLabel.trim(), field_type: fType, required: fRequired,
+      placeholder: fPlaceholder.trim() || null, help_text: fHelp.trim() || null,
+      section: fSection.trim() || null, options, race_ids: fRaceIds,
+    };
+    try {
+      if (editId) {
+        const res  = await fetch(`/api/admin/events/${eventId}/form-fields`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editId, ...body }) });
+        const data = await res.json();
+        if (!res.ok) { setErr(data.error ?? "Save failed"); return; }
+        setFields(fs => fs.map(f => f.id === editId ? { ...f, ...data.field } : f));
+      } else {
+        const res  = await fetch(`/api/admin/events/${eventId}/form-fields`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        const data = await res.json();
+        if (!res.ok) { setErr(data.error ?? "Save failed"); return; }
+        setFields(fs => [...fs, data.field]);
+      }
+      resetForm();
+    } catch { setErr("Network error."); }
+    finally { setSaving(false); }
+  }
+
+  async function deleteField(id: string) {
+    if (!eventId) return;
+    await fetch(`/api/admin/events/${eventId}/form-fields`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    setFields(fs => fs.filter(f => f.id !== id));
+    if (editId === id) resetForm();
+  }
+
+  async function reorderField(from: number, to: number) {
+    if (!eventId || from === to) return;
+    const next = [...fields];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setFields(next);
+    await fetch(`/api/admin/events/${eventId}/form-fields/reorder`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: next.map(f => f.id) }),
+    });
+  }
+
+  function toggleRaceId(id: string) {
+    setFRaceIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  }
+
+  const raceOptions = races.filter(r => r.name.trim());
+
+  if (!eventId) {
+    return (
+      <div style={{ padding: "24px 20px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.08)", textAlign: "center" as const }}>
+        <div style={{ fontSize: 13, color: "#444", marginBottom: 6 }}>Save the event first to add custom registration fields</div>
+        <div style={{ fontSize: 11, color: "#333" }}>Click "Save Draft" above, then come back to this step.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Field list */}
+      {loading ? (
+        <div style={{ fontSize: 12, color: "#444", padding: "12px 0" }}>Loading fields…</div>
+      ) : fields.length > 0 ? (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase" as const, letterSpacing: ".08em", marginBottom: 10 }}>
+            Custom Fields ({fields.length}) — drag to reorder
+          </div>
+          <div style={{ display: "flex", flexDirection: "column" as const, gap: 8 }}>
+            {fields.map((f, i) => {
+              const scopedTo = (f.race_ids ?? []).length > 0
+                ? races.filter(r => (f.race_ids ?? []).includes(r.id ?? "")).map(r => r.name || r.distance).join(", ")
+                : null;
+              return (
+                <div
+                  key={f.id}
+                  draggable
+                  onDragStart={() => setDragIdx(i)}
+                  onDragOver={e => { e.preventDefault(); setDragOverIdx(i); }}
+                  onDrop={() => { if (dragIdx !== null && dragIdx !== i) reorderField(dragIdx, i); setDragIdx(null); setDragOverIdx(null); }}
+                  onDragEnd={() => { setDragIdx(null); setDragOverIdx(null); }}
+                  className="wiz-card"
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px",
+                    cursor: "grab", opacity: dragIdx === i ? 0.4 : 1,
+                    borderColor: dragOverIdx === i ? "rgba(232,98,10,0.5)" : editId === f.id ? "rgba(232,98,10,0.4)" : undefined,
+                    gap: 10, flexWrap: "wrap" as const,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                    <span style={{ color: "#333", fontSize: 16, cursor: "grab", flexShrink: 0 }}>⋮⋮</span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" as const }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: "#ddd" }}>{f.label}</span>
+                        {f.required && <span style={{ fontSize: 10, color: "#e8620a", fontWeight: 700 }}>Required</span>}
+                        <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, background: "rgba(255,255,255,0.06)", color: "#666" }}>{f.field_type}</span>
+                        {scopedTo && <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, background: "rgba(99,102,241,0.12)", color: "#818cf8" }}>🎯 {scopedTo}</span>}
+                        {!f.is_active && <span style={{ fontSize: 10, color: "#444" }}>Hidden</span>}
+                      </div>
+                      {f.section && <div style={{ fontSize: 10, color: "#555", marginTop: 2 }}>§ {f.section}</div>}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                    <Button size="xs" variant="ghost" onClick={() => startEdit(f)}>Edit</Button>
+                    <Button size="xs" variant="danger" onClick={() => deleteField(f.id)}>Remove</Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div style={{ fontSize: 12, color: "#444", padding: "8px 0 16px", fontStyle: "italic" as const }}>No custom fields yet.</div>
+      )}
+
+      {/* Add / Edit form */}
+      <SectionCard title={editId ? "Edit Field" : "Add Custom Field"}>
+        {err && <Alert variant="error" style={{ marginBottom: 12 }}>{err}</Alert>}
+        <Grid cols="1fr 1fr" gap={14} mobile="1">
+          <Field label="Field Label" required>
+            <input className="wiz-input" value={fLabel} onChange={e => setFLabel(e.target.value)} placeholder="e.g. T-shirt message" />
+          </Field>
+          <Field label="Field Type">
+            <select className="wiz-select" value={fType} onChange={e => setFType(e.target.value)}>
+              {FIELD_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+          </Field>
+        </Grid>
+
+        {HAS_OPTIONS.has(fType) && (
+          <div style={{ marginTop: 10 }}>
+            <Field label="Options" hint="Comma-separated, e.g. Option A, Option B, Option C">
+              <input className="wiz-input" value={fOptions} onChange={e => setFOptions(e.target.value)} placeholder="Option A, Option B, Option C" />
+            </Field>
+          </div>
+        )}
+
+        <div style={{ marginTop: 10 }}>
+          <Grid cols="1fr 1fr" gap={14} mobile="1">
+            <Field label="Placeholder Text" hint="Shown inside the input">
+              <input className="wiz-input" value={fPlaceholder} onChange={e => setFPlaceholder(e.target.value)} placeholder="Optional hint text" />
+            </Field>
+            <Field label="Section Heading" hint="Groups fields under a heading">
+              <input className="wiz-input" value={fSection} onChange={e => setFSection(e.target.value)} placeholder="e.g. Medical Information" />
+            </Field>
+          </Grid>
+        </div>
+
+        <div style={{ marginTop: 10 }}>
+          <Field label="Help Text" hint="Appears below the field">
+            <input className="wiz-input" value={fHelp} onChange={e => setFHelp(e.target.value)} placeholder="Additional instructions for participants" />
+          </Field>
+        </div>
+
+        {raceOptions.length > 1 && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase" as const, letterSpacing: ".08em", marginBottom: 8 }}>
+              Show only for these categories (leave blank = all)
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 8 }}>
+              {raceOptions.map(r => {
+                const sel = r.id ? fRaceIds.includes(r.id) : false;
+                return (
+                  <label key={r.id ?? r.name} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "5px 10px", borderRadius: 6, background: sel ? "rgba(99,102,241,0.12)" : "rgba(255,255,255,0.04)", border: `1px solid ${sel ? "rgba(99,102,241,0.4)" : "rgba(255,255,255,0.08)"}`, fontSize: 12, color: sel ? "#818cf8" : "#666" }}>
+                    <input type="checkbox" checked={sel} onChange={() => r.id && toggleRaceId(r.id)} style={{ accentColor: "#818cf8" }} />
+                    {r.name || r.distance}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 14 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, color: "#bbb" }}>
+            <input type="checkbox" className="wiz-checkbox" checked={fRequired} onChange={e => setFRequired(e.target.checked)} />
+            Required field
+          </label>
+        </div>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" as const }}>
+          <Button onClick={saveField} loading={saving}>{editId ? "Update Field" : "+ Add Field"}</Button>
+          {editId && <Button variant="secondary" onClick={resetForm}>Cancel</Button>}
+        </div>
+      </SectionCard>
+    </div>
+  );
+}
+
 // ── Step 2: Registration ──────────────────────────────────────────────────────
 
 function StepRegistration({
-  form, set, errors, regConfig, setRC,
+  form, set, errors, regConfig, setRC, eventId, races,
 }: {
   form:      WizardState;
   set:       (k: keyof WizardState, v: unknown) => void;
   errors:    Record<string, string>;
   regConfig: RegConfig;
   setRC:     (k: keyof RegConfig, v: unknown) => void;
+  eventId:   string | null;
+  races:     RaceForm[];
 }) {
   return (
     <div>
@@ -1381,6 +1657,14 @@ function StepRegistration({
             <textarea className="wiz-textarea" style={{ minHeight: 80 }} value={form.cancellation_policy} onChange={e => set("cancellation_policy", e.target.value)} placeholder="e.g. Cancellations accepted up to 48 hours before the event." />
           </Field>
         </Grid>
+      </SectionCard>
+
+      <SectionCard title="Custom Registration Fields">
+        <div style={{ fontSize: 12, color: "#555", marginBottom: 16 }}>
+          Add questions specific to this event — e.g. club name, corporate team, qualifying time, t-shirt message.
+          Category-specific fields only appear to participants registering for that category.
+        </div>
+        <FormBuilder eventId={eventId} races={races} />
       </SectionCard>
     </div>
   );

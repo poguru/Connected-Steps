@@ -203,14 +203,17 @@ async function handleSingleParticipant(
     return NextResponse.json({ already: true, registration_code: existing.registration_code });
   }
 
-  // Custom form field validation
+  // Custom form field validation — respects race_ids scoping
   const { data: formFields } = await db
     .from("event_form_fields")
-    .select("field_key, label, required")
+    .select("field_key, label, required, race_ids")
     .eq("event_id", event_id as string)
     .eq("is_active", true);
 
   for (const f of (formFields ?? [])) {
+    const raceIds: string[] = (f as { race_ids?: string[] }).race_ids ?? [];
+    // Skip validation if this field is scoped to a race that the participant didn't select
+    if (raceIds.length > 0 && matchedRace && !raceIds.includes(matchedRace.id)) continue;
     if (f.required && !customFieldsRaw[f.field_key]?.trim()) {
       return NextResponse.json({ error: `"${f.label}" is required.` }, { status: 400 });
     }
@@ -225,7 +228,8 @@ async function handleSingleParticipant(
   // Coupon
   let couponId: string | null = null;
   let discount = 0, discountType = "", discountValue = 0;
-  if (coupon_code && ev.price > 0) {
+  const singleBasePrice = raceBasePrice ?? ev.price;
+  if (coupon_code && singleBasePrice > 0) {
     const { data: coupon, error: cpErr } = await db
       .from("coupons")
       .select("id, discount_type, discount_value, expires_at, use_count, max_uses, event_id, assigned_to_email")
@@ -239,10 +243,10 @@ async function handleSingleParticipant(
     const { data: uses } = await db.from("coupon_uses").select("id").eq("coupon_id", coupon.id).eq("used_by_email", (email as string).toLowerCase()).limit(1);
     if (uses && uses.length > 0) return NextResponse.json({ error: "You have already used this coupon." }, { status: 400 });
     couponId = coupon.id; discountType = coupon.discount_type; discountValue = coupon.discount_value;
-    discount = calcDiscount(ev.price, discountType, discountValue);
+    discount = calcDiscount(singleBasePrice, discountType, discountValue);
   }
 
-  const originalPrice = raceBasePrice ?? ev.price;
+  const originalPrice = singleBasePrice;
   const finalPrice    = Math.max(0, originalPrice - discount);
 
   // Free path
@@ -504,7 +508,7 @@ async function handleMultiParticipant(
 
   const { data: ev } = await db
     .from("events")
-    .select("id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories, collect_tshirt, allow_multi_participant, max_per_registration, early_bird_ends_at")
+    .select("id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories, collect_tshirt, allow_multi_participant, max_per_registration, early_bird_ends_at, organization_id")
     .eq("id", event_id as string)
     .single();
   if (!ev || ev.status !== "published") {
@@ -514,9 +518,22 @@ async function handleMultiParticipant(
     return NextResponse.json({ error: "This event does not support multi-participant registration." }, { status: 400 });
   }
 
-  const maxPer = (ev as { max_per_registration?: number }).max_per_registration ?? 0;
-  if (maxPer > 0 && participants.length > maxPer) {
-    return NextResponse.json({ error: `Maximum ${maxPer} participants per booking for this event.` }, { status: 400 });
+  // Fetch active races for per-race pricing and per-race participant limits
+  const { data: multiRaces } = await db
+    .from("event_races")
+    .select("id, distance, price, early_bird_price, price_type, min_participants, max_participants")
+    .eq("event_id", event_id as string)
+    .eq("status", "active");
+
+  // Enforce per-race max_participants — use the lead participant's race as the constraint
+  // (all participants in a group booking share the same race in most scenarios)
+  const leadCat = participants[0]?.distance_category ?? null;
+  const leadRace = multiRaces?.find(r => r.distance === leadCat) ?? multiRaces?.[0] ?? null;
+  const raceMaxPer = leadRace?.max_participants ?? 0;
+  const evMaxPer   = (ev as { max_per_registration?: number }).max_per_registration ?? 0;
+  const effectiveMax = raceMaxPer > 0 ? raceMaxPer : (evMaxPer > 0 ? evMaxPer : 20);
+  if (participants.length > effectiveMax) {
+    return NextResponse.json({ error: `Maximum ${effectiveMax} participants per booking for this category.` }, { status: 400 });
   }
 
   if (ev.registration_closes_at && new Date() >= new Date(ev.registration_closes_at)) {
@@ -575,14 +592,16 @@ async function handleMultiParticipant(
     return NextResponse.json({ already: true, registration_code: existing.registration_code });
   }
 
-  // Custom form field validation (multi-participant: one set of custom fields per booking)
+  // Custom form field validation — respects race_ids scoping (booking-level custom fields)
   const { data: multiFormFields } = await db
     .from("event_form_fields")
-    .select("field_key, label, required")
+    .select("field_key, label, required, race_ids")
     .eq("event_id", event_id as string)
     .eq("is_active", true);
 
   for (const f of (multiFormFields ?? [])) {
+    const raceIds: string[] = (f as { race_ids?: string[] }).race_ids ?? [];
+    if (raceIds.length > 0 && leadRace && !raceIds.includes(leadRace.id)) continue;
     if (f.required && !multiCustomFieldsRaw[f.field_key]?.trim()) {
       return NextResponse.json({ error: `"${f.label}" is required.` }, { status: 400 });
     }
@@ -593,11 +612,33 @@ async function handleMultiParticipant(
     if (multiValidKeys.has(k)) multiCustomFields[k] = String(v).trim();
   }
 
+  // Per-race pricing: sum up each participant's race price.
+  // For per_registration races (flat fee), only count once regardless of participant count.
+  const earlyBirdActiveMulti =
+    !!(ev as { early_bird_ends_at?: string | null }).early_bird_ends_at &&
+    new Date() < new Date((ev as { early_bird_ends_at: string }).early_bird_ends_at);
+
+  let totalBeforeDiscount = 0;
+  for (const p of participants) {
+    const pRace = multiRaces?.find(r => r.distance === (p.distance_category ?? leadCat)) ?? leadRace;
+    if (pRace) {
+      const pIsEarly = earlyBirdActiveMulti && !!pRace.early_bird_price;
+      const pPrice   = pIsEarly ? (pRace.early_bird_price as number) : pRace.price;
+      if (pRace.price_type === "per_registration") {
+        // Flat fee — only add once (use the first participant's price for the whole booking)
+        if (p === participants[0]) totalBeforeDiscount += pPrice;
+      } else {
+        totalBeforeDiscount += pPrice;
+      }
+    } else {
+      totalBeforeDiscount += ev.price;
+    }
+  }
+
   // Coupon — applied once to the total booking, not N times
   let couponId: string | null = null;
   let discount = 0, discountType = "", discountValue = 0;
-  const totalBeforeDiscount = ev.price * participants.length;
-  if (coupon_code && ev.price > 0) {
+  if (coupon_code && totalBeforeDiscount > 0) {
     const { data: coupon, error: cpErr } = await db
       .from("coupons")
       .select("id, discount_type, discount_value, expires_at, use_count, max_uses, event_id, assigned_to_email")
