@@ -15,7 +15,7 @@ interface Reg {
   coupon_discount: number; original_price: number; final_price: number;
   payment_status: string; razorpay_payment_id: string | null; status: string;
   checked_in_at: string | null; created_at: string; distance_category: string | null;
-  qr_token: string | null;
+  qr_token: string | null; bib_number: string | null;
   breakfast_availed?: boolean; breakfast_availed_at?: string | null;
   tshirt_size?: string | null; tshirt_issued?: boolean;
 }
@@ -416,12 +416,21 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
 
   function exportCSV() {
     const rows = [
-      ["Code", "Name", "Email", "Phone", "Category", "Price", "Payment", "Status", "Checked In", "Registered"].join(","),
+      ["Code", "BIB", "Name", "Email", "Phone", "Blood Group", "Category", "T-Shirt", "Price", "Payment", "Status", "Checked In", "Breakfast", "Registered"].join(","),
       ...filtered.map(r => [
-        r.registration_code, r.user_name, r.user_email, r.phone ?? "",
+        r.registration_code,
+        r.bib_number ?? "",
+        r.user_name,
+        r.user_email,
+        r.phone ?? "",
+        r.blood_group ?? "",
         r.distance_category ?? "",
-        r.final_price, r.payment_status, r.status,
-        r.checked_in_at ? new Date(r.checked_in_at).toLocaleTimeString("en-IN") : "—",
+        r.tshirt_size ?? "",
+        r.final_price,
+        r.payment_status,
+        r.status,
+        r.checked_in_at ? new Date(r.checked_in_at).toLocaleTimeString("en-IN") : "",
+        r.breakfast_availed ? "Yes" : "",
         new Date(r.created_at).toLocaleDateString("en-IN"),
       ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")),
     ].join("\n");
@@ -764,7 +773,10 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
                       <tr><td colSpan={10} style={{ padding: "2rem", textAlign: "center", color: "#555" }}>No registrations found.</td></tr>
                     ) : filtered.map(r => (
                       <tr key={r.id} style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                        <td style={{ padding: "10px 14px" }}><span style={{ fontFamily: "monospace", color: "#e8620a", fontSize: "0.78rem" }}>{r.registration_code}</span></td>
+                        <td style={{ padding: "10px 14px" }}>
+                          <span style={{ fontFamily: "monospace", color: "#e8620a", fontSize: "0.78rem" }}>{r.registration_code}</span>
+                          {r.bib_number && <div style={{ fontSize: "10px", color: "#fbbf24", fontWeight: 700, marginTop: 2 }}>BIB {r.bib_number}</div>}
+                        </td>
                         <td style={{ padding: "10px 14px" }}>
                           <div style={{ fontWeight: 600, color: "#fff" }}>{r.user_name}</div>
                           <div style={{ color: "#666", fontSize: "0.75rem" }}>{r.user_email}</div>

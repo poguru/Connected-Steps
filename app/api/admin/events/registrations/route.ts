@@ -45,6 +45,7 @@ export async function GET(req: NextRequest) {
       distance_category, qr_token, checked_in_at,
       breakfast_availed, breakfast_availed_at,
       tshirt_size, tshirt_issued,
+      bib_number,
       events ( id, title, start_date, location )
     `, { count: "exact" })
     .order(sort, { ascending: asc });
