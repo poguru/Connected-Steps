@@ -24,6 +24,7 @@ interface Event {
   location:                string;
   organizer:               string | null;
   max_participants:         number | null;
+  participant_count:        number;
   registration_required:   boolean;
   price:                   number;
   featured:                boolean;
@@ -297,7 +298,21 @@ export default function AdminEventsPage() {
                         <div style={{ fontSize: "0.78rem", color: "#888", marginBottom: "2px" }}>📍 {ev.location}</div>
                         {closeAt && <div style={{ fontSize: "0.72rem", color: "#e8620a", marginBottom: "2px" }}>🔒 Reg. closes: {closeAt} IST</div>}
                         {ev.organizer && <div style={{ fontSize: "0.75rem", color: "#666" }}>Organizer: {ev.organizer}</div>}
-                        {ev.max_participants && <div style={{ fontSize: "0.75rem", color: "#666" }}>Max: {ev.max_participants} participants</div>}
+                        {ev.max_participants != null && (() => {
+                          const filled = ev.participant_count ?? 0;
+                          const pct    = Math.min(100, Math.round(filled / ev.max_participants * 100));
+                          const col    = pct >= 90 ? "#f87171" : pct >= 70 ? "#fbbf24" : "#4ade80";
+                          return (
+                            <div style={{ marginTop: 2 }}>
+                              <div style={{ fontSize: "0.72rem", color: pct >= 90 ? "#f87171" : "#666", marginBottom: 3 }}>
+                                {filled} / {ev.max_participants} filled ({pct}%){pct >= 90 ? " ⚠" : ""}
+                              </div>
+                              <div style={{ height: 3, background: "rgba(255,255,255,0.06)", borderRadius: 2, width: "100%", maxWidth: 160 }}>
+                                <div style={{ height: "100%", width: `${pct}%`, background: col, borderRadius: 2, transition: "width 0.3s" }} />
+                              </div>
+                            </div>
+                          );
+                        })()}
                         <div style={{ fontSize: "0.75rem", color: ev.price ? "#e8620a" : "#555" }}>
                           {ev.price ? `₹${ev.price}` : "Free"}{ev.featured ? " · ★ Featured" : ""}
                         </div>
