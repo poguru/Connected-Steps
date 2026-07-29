@@ -9,6 +9,11 @@ interface ApiKey {
   created_by: string; created_at: string;
 }
 
+interface KeyUsageData {
+  monthly_stats: { month_bucket: string; request_count: number; avg_latency_ms: number; error_count: number }[];
+  recent: { endpoint: string; method: string; status_code: number; latency_ms: number; created_at: string }[];
+}
+
 const S: Record<string, React.CSSProperties> = {
   page:    { padding: "28px 24px", maxWidth: 900, margin: "0 auto" },
   header:  { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 },
@@ -38,11 +43,13 @@ const ALL_SCOPES = [
 function fmtDate(d: string) { return new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }); }
 
 export default function ApiKeysPage() {
-  const [keys,     setKeys]     = useState<ApiKey[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [error,    setError]    = useState("");
-  const [creating, setCreating] = useState(false);
-  const [newKey,   setNewKey]   = useState<{ raw_key: string } | null>(null);
+  const [keys,       setKeys]       = useState<ApiKey[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState("");
+  const [creating,   setCreating]   = useState(false);
+  const [newKey,     setNewKey]     = useState<{ raw_key: string } | null>(null);
+  const [usageMap,   setUsageMap]   = useState<Record<string, KeyUsageData | null>>({});
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Form state
   const [name,       setName]       = useState("");
@@ -97,6 +104,20 @@ export default function ApiKeysPage() {
     if (r.ok) { setNewKey({ raw_key: d.data.raw_key }); load(); }
   }
 
+  async function toggleUsage(id: string) {
+    if (expandedId === id) { setExpandedId(null); return; }
+    setExpandedId(id);
+    if (usageMap[id] !== undefined) return; // already loaded
+    setUsageMap(prev => ({ ...prev, [id]: null })); // null = loading
+    try {
+      const r = await fetch(`/api/admin/api-keys/${id}/usage`);
+      const d = await r.json();
+      setUsageMap(prev => ({ ...prev, [id]: d.data ?? null }));
+    } catch {
+      setUsageMap(prev => ({ ...prev, [id]: null }));
+    }
+  }
+
   function toggleScope(s: string) {
     setScopes(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
   }
@@ -114,11 +135,17 @@ export default function ApiKeysPage() {
         <div style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.85rem" }}>Loading…</div>
       ) : keys.length === 0 ? (
         <div style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.85rem", textAlign: "center", padding: "40px 0" }}>No API keys yet. Create one to get started.</div>
-      ) : keys.map(k => (
+      ) : keys.map(k => {
+        const isExpanded = expandedId === k.id;
+        const usage      = usageMap[k.id];
+        return (
         <div key={k.id} style={{ ...S.card, opacity: k.is_active ? 1 : 0.5 }}>
           <div style={{ ...S.row, justifyContent: "space-between", marginBottom: 8 }}>
             <span style={{ fontWeight: 600, color: "#fff", fontSize: "0.95rem" }}>{k.name}</span>
             <div style={S.row}>
+              <button style={{ ...S.btnSm, color: isExpanded ? "#a5b4fc" : undefined, borderColor: isExpanded ? "rgba(99,102,241,0.4)" : undefined }} onClick={() => toggleUsage(k.id)}>
+                {isExpanded ? "▲ Usage" : "▼ Usage"}
+              </button>
               {k.is_active && <button style={S.btnSm} onClick={() => rotateKey(k.id)}>Rotate</button>}
               {k.is_active && <button style={S.btnDang} onClick={() => revokeKey(k.id)}>Revoke</button>}
               {!k.is_active && <span style={{ fontSize: "0.75rem", color: "#f87171" }}>Revoked</span>}
@@ -136,8 +163,74 @@ export default function ApiKeysPage() {
             {k.expires_at && ` · Expires ${fmtDate(k.expires_at)}`}
             {k.last_used_at && ` · Last used ${fmtDate(k.last_used_at)}`}
           </div>
+
+          {/* Usage panel */}
+          {isExpanded && (
+            <div style={{ marginTop: 14, borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: 14 }}>
+              {usage === null && <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.35)" }}>Loading…</div>}
+              {usage && (
+                <>
+                  {usage.monthly_stats.length === 0 ? (
+                    <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.3)" }}>No usage recorded yet.</div>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 8 }}>Monthly Usage (last 12 months)</div>
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78rem" }}>
+                          <thead>
+                            <tr>
+                              {["Month", "Requests", "Avg Latency", "Errors"].map(h => (
+                                <th key={h} style={{ padding: "5px 10px", textAlign: "left", fontSize: "0.68rem", color: "rgba(255,255,255,0.3)", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em" }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {usage.monthly_stats.map(m => (
+                              <tr key={m.month_bucket} style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+                                <td style={{ padding: "5px 10px", color: "rgba(255,255,255,0.6)" }}>{m.month_bucket}</td>
+                                <td style={{ padding: "5px 10px", color: "#fff", fontWeight: 600 }}>{m.request_count.toLocaleString()}</td>
+                                <td style={{ padding: "5px 10px", color: "rgba(255,255,255,0.5)" }}>{m.avg_latency_ms}ms</td>
+                                <td style={{ padding: "5px 10px", color: m.error_count > 0 ? "#f87171" : "#444" }}>{m.error_count}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                  {usage.recent.length > 0 && (
+                    <div style={{ marginTop: 14 }}>
+                      <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 8 }}>Recent Requests (last 50)</div>
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78rem" }}>
+                          <thead>
+                            <tr>
+                              {["Method", "Endpoint", "Status", "Latency"].map(h => (
+                                <th key={h} style={{ padding: "4px 10px", textAlign: "left", fontSize: "0.68rem", color: "rgba(255,255,255,0.3)", fontWeight: 700, textTransform: "uppercase" }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {usage.recent.map((r, i) => (
+                              <tr key={i} style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+                                <td style={{ padding: "4px 10px", fontFamily: "monospace", color: "#a5b4fc", fontSize: "0.73rem" }}>{r.method}</td>
+                                <td style={{ padding: "4px 10px", fontFamily: "monospace", color: "rgba(255,255,255,0.6)", fontSize: "0.73rem" }}>{r.endpoint}</td>
+                                <td style={{ padding: "4px 10px", color: r.status_code < 400 ? "#4ade80" : "#f87171" }}>{r.status_code}</td>
+                                <td style={{ padding: "4px 10px", color: "rgba(255,255,255,0.4)" }}>{r.latency_ms}ms</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
-      ))}
+        );
+      })}
 
       {/* Create form modal */}
       {formOpen && (
