@@ -473,16 +473,11 @@ export default function EventHubPage() {
         <span style={{ fontSize: 13, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "60vw" }}>
           {ev?.title ?? code}
         </span>
-        {ppts.length > 0 && ppts[0].qr_token && (
-          <button
-            onClick={() => {
-              const p = ppts[0];
-              const url = `${BASE_URL}/api/events/qr/${encodeURIComponent(p.qr_token!)}`;
-              window.open(url, "_blank");
-            }}
-            style={{ padding: "5px 12px", background: "rgba(232,98,10,0.12)", border: "1px solid rgba(232,98,10,0.3)", borderRadius: 7, color: "#e8620a", cursor: "pointer", fontFamily: "inherit", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>
-            🎫 QR
-          </button>
+        {isPaid && !isCancelled && (
+          <Link href={`/my-events/${code}/pass`}
+            style={{ padding: "5px 12px", background: "rgba(232,98,10,0.12)", border: "1px solid rgba(232,98,10,0.3)", borderRadius: 7, color: "#e8620a", textDecoration: "none", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>
+            🎫 Pass
+          </Link>
         )}
       </nav>
 
@@ -554,7 +549,11 @@ export default function EventHubPage() {
                   ))}
                 </div>
               )}
-              <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.05)", display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.05)", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <Link href={`/my-events/${code}/pass`}
+                  style={{ padding: "6px 14px", background: "rgba(232,98,10,0.12)", border: "1px solid rgba(232,98,10,0.3)", borderRadius: 7, color: "#e8620a", textDecoration: "none", fontSize: 11, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  🎫 Race Day Pass
+                </Link>
                 <button onClick={handleResendQR} disabled={resendLoad}
                   style={{ padding: "6px 14px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#888", cursor: resendLoad ? "not-allowed" : "pointer", fontFamily: "inherit", fontSize: 11, fontWeight: 600, opacity: resendLoad ? 0.6 : 1 }}>
                   {resendLoad ? "Sending…" : "📧 Resend QR to Email"}
