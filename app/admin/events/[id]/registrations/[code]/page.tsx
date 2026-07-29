@@ -101,6 +101,15 @@ interface Invoice {
   created_at:     string;
 }
 
+interface EmailLog {
+  id:             string;
+  status:         string;
+  provider:       string | null;
+  sent_at:        string | null;
+  error:          string | null;
+  ses_message_id: string | null;
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function fmtDate(iso: string | null | undefined, short = false): string {
@@ -136,6 +145,7 @@ export default function ParticipantDetailPage() {
   const [reg,          setReg]          = useState<Registration | null>(null);
   const [participants, setParticipants] = useState<EventParticipant[]>([]);
   const [invoice,      setInvoice]      = useState<Invoice | null>(null);
+  const [emailLogs,    setEmailLogs]    = useState<EmailLog[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState("");
   const [action,       setAction]       = useState("");   // "resending" | "cancelling" | "changing_category" | "regenerating_qr" | ""
@@ -157,6 +167,7 @@ export default function ParticipantDetailPage() {
       setReg(data.registration);
       setParticipants(data.participants ?? []);
       setInvoice(data.invoice ?? null);
+      setEmailLogs(data.email_logs ?? []);
     } catch (e) { setError(String(e)); }
     finally { setLoading(false); }
   }
@@ -523,6 +534,42 @@ export default function ParticipantDetailPage() {
                     </a>
                   </div>
                 )}
+              </Section>
+            )}
+
+            {/* Email Delivery Logs */}
+            {emailLogs.length > 0 && (
+              <Section title="Email Delivery Log">
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                        {["Status","Provider","Sent At","Message ID","Error"].map(h => (
+                          <th key={h} style={{ padding: "4px 8px", textAlign: "left", color: "#555", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.04em" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {emailLogs.map(log => (
+                        <tr key={log.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                          <td style={{ padding: "6px 8px" }}>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: log.status === "sent" ? "#4ade80" : log.status === "failed" ? "#f87171" : "#fbbf24" }}>
+                              {log.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: "6px 8px", color: "#888", fontSize: 11 }}>{log.provider ?? "—"}</td>
+                          <td style={{ padding: "6px 8px", color: "#888", fontSize: 11, whiteSpace: "nowrap" }}>{fmtDate(log.sent_at, true)}</td>
+                          <td style={{ padding: "6px 8px", fontFamily: "monospace", fontSize: 10, color: "#555", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={log.ses_message_id ?? ""}>
+                            {log.ses_message_id ?? "—"}
+                          </td>
+                          <td style={{ padding: "6px 8px", color: "#f87171", fontSize: 11, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={log.error ?? ""}>
+                            {log.error ?? "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </Section>
             )}
 
