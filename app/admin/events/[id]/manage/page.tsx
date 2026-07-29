@@ -71,6 +71,7 @@ const NAV_ITEMS = [
   { key: "registration",  icon: "🧾", label: "Registration",   inline: true  },
   { key: "cat-changes",   icon: "🔄", label: "Cat. Changes",   inline: true  },
   { key: "route-maps",    icon: "🗺️", label: "Route Maps",     inline: true  },
+  { key: "landing",       icon: "🌐", label: "Landing Page",   inline: true  },
   { key: "communicate",   icon: "📢", label: "Communicate",    inline: false, href: "communicate"   },
   { key: "announce",      icon: "📣", label: "Announce",       inline: true  },
   { key: "race-day",      icon: "🏃", label: "Race Day",       inline: false, href: "race-day"      },
@@ -752,6 +753,34 @@ export default function EventManagePage() {
     else setPricingError("Delete failed");
   }
 
+  // ── Landing page builder state ───────────────────────────────────────────
+
+  interface LpHighlight { icon: string; title: string; description: string }
+  interface LpFaq       { question: string; answer: string }
+
+  const [lpLoaded,          setLpLoaded]          = useState(false);
+  const [lpLoading,         setLpLoading]         = useState(false);
+  const [lpError,           setLpError]           = useState("");
+  const [lpSaving,          setLpSaving]          = useState(false);
+  const [lpSavedSection,    setLpSavedSection]    = useState<string | null>(null);
+  const [lpCoverUrl,        setLpCoverUrl]        = useState("");
+  const [lpBannerUrl,       setLpBannerUrl]       = useState("");
+  const [lpCoverUpl,        setLpCoverUpl]        = useState(false);
+  const [lpBannerUpl,       setLpBannerUpl]       = useState(false);
+  const [lpHighlights,      setLpHighlights]      = useState<LpHighlight[]>([]);
+  const [lpHlEdit,          setLpHlEdit]          = useState<number | null>(null);
+  const [lpHlForm,          setLpHlForm]          = useState<LpHighlight>({ icon: "", title: "", description: "" });
+  const [lpGallery,         setLpGallery]         = useState<string[]>([]);
+  const [lpGalleryUpl,      setLpGalleryUpl]      = useState(false);
+  const [lpFaqs,            setLpFaqs]            = useState<LpFaq[]>([]);
+  const [lpFaqEdit,         setLpFaqEdit]         = useState<number | null>(null);
+  const [lpFaqForm,         setLpFaqForm]         = useState<LpFaq>({ question: "", answer: "" });
+  const [lpTerms,           setLpTerms]           = useState("");
+  const [lpWa,              setLpWa]              = useState("");
+  const lpCoverRef   = useRef<HTMLInputElement>(null);
+  const lpBannerRef  = useRef<HTMLInputElement>(null);
+  const lpGalleryRef = useRef<HTMLInputElement>(null);
+
   // ── Form field inline-edit state ──────────────────────────────────────────
 
   const [editingFieldData, setEditingFieldData] = useState<{
@@ -864,6 +893,122 @@ export default function EventManagePage() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids: next.map(f => f.id) }),
     });
+  }
+
+  // ── Landing page functions ───────────────────────────────────────────────
+
+  const loadLanding = useCallback(async () => {
+    setLpLoading(true); setLpError("");
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/edit`);
+      const d    = await res.json();
+      if (!res.ok) { setLpError(d.error ?? "Failed to load"); return; }
+      const lev  = d.event;
+      setLpCoverUrl( lev.cover_image            ?? "");
+      setLpBannerUrl(lev.banner_image           ?? "");
+      setLpHighlights(Array.isArray(lev.highlights)     ? lev.highlights     : []);
+      setLpGallery(   Array.isArray(lev.gallery_images)  ? lev.gallery_images  : []);
+      setLpFaqs(      Array.isArray(lev.faqs)            ? lev.faqs            : []);
+      setLpTerms(lev.terms_conditions           ?? "");
+      setLpWa(   lev.whatsapp_community_url     ?? "");
+      setLpLoaded(true);
+    } catch { setLpError("Network error"); }
+    finally { setLpLoading(false); }
+  }, [eventId]);
+
+  useEffect(() => {
+    if (tab === "landing" && !lpLoaded && !lpLoading) void loadLanding();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  async function saveLpFields(fields: Record<string, unknown>, section: string) {
+    setLpSaving(true); setLpError(""); setLpSavedSection(null);
+    try {
+      const res = await fetch(`/api/admin/events/${eventId}/edit`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fields }),
+      });
+      const d = await res.json();
+      if (!res.ok) { setLpError(d.error ?? "Save failed"); return; }
+      setLpSavedSection(section);
+      setTimeout(() => setLpSavedSection(null), 2500);
+    } catch { setLpError("Network error"); }
+    finally { setLpSaving(false); }
+  }
+
+  async function uploadLpImage(file: File, purpose: string): Promise<string | null> {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("purpose", purpose);
+    const res = await fetch(`/api/admin/events/${eventId}/upload`, { method: "POST", body: form });
+    const d   = await res.json();
+    if (!res.ok) { setLpError(d.error ?? "Upload failed"); return null; }
+    return d.url as string;
+  }
+
+  async function handleLpCoverUpload(file: File) {
+    setLpCoverUpl(true); setLpError("");
+    const url = await uploadLpImage(file, "poster");
+    if (url) { setLpCoverUrl(url); await saveLpFields({ cover_image: url }, "cover"); }
+    setLpCoverUpl(false);
+  }
+
+  async function handleLpBannerUpload(file: File) {
+    setLpBannerUpl(true); setLpError("");
+    const url = await uploadLpImage(file, "banner");
+    if (url) { setLpBannerUrl(url); await saveLpFields({ banner_image: url }, "banner"); }
+    setLpBannerUpl(false);
+  }
+
+  async function handleLpGalleryUpload(file: File) {
+    setLpGalleryUpl(true); setLpError("");
+    const url = await uploadLpImage(file, "gallery");
+    if (url) {
+      const next = [...lpGallery, url];
+      setLpGallery(next);
+      await saveLpFields({ gallery_images: next }, "gallery");
+    }
+    setLpGalleryUpl(false);
+  }
+
+  function removeLpGalleryImage(idx: number) {
+    const next = lpGallery.filter((_, i) => i !== idx);
+    setLpGallery(next);
+    void saveLpFields({ gallery_images: next }, "gallery");
+  }
+
+  function saveHighlight() {
+    if (!lpHlForm.title.trim()) return;
+    const next = lpHlEdit !== null && lpHlEdit >= 0
+      ? lpHighlights.map((h, i) => i === lpHlEdit ? lpHlForm : h)
+      : [...lpHighlights, lpHlForm];
+    setLpHighlights(next);
+    setLpHlEdit(null);
+    setLpHlForm({ icon: "", title: "", description: "" });
+    void saveLpFields({ highlights: next }, "highlights");
+  }
+
+  function removeHighlight(idx: number) {
+    const next = lpHighlights.filter((_, i) => i !== idx);
+    setLpHighlights(next);
+    void saveLpFields({ highlights: next }, "highlights");
+  }
+
+  function saveFaq() {
+    if (!lpFaqForm.question.trim()) return;
+    const next = lpFaqEdit !== null && lpFaqEdit >= 0
+      ? lpFaqs.map((f, i) => i === lpFaqEdit ? lpFaqForm : f)
+      : [...lpFaqs, lpFaqForm];
+    setLpFaqs(next);
+    setLpFaqEdit(null);
+    setLpFaqForm({ question: "", answer: "" });
+    void saveLpFields({ faqs: next }, "faqs");
+  }
+
+  function removeFaq(idx: number) {
+    const next = lpFaqs.filter((_, i) => i !== idx);
+    setLpFaqs(next);
+    void saveLpFields({ faqs: next }, "faqs");
   }
 
   // ── Loading ──────────────────────────────────────────────────────────────────
@@ -2052,6 +2197,326 @@ export default function EventManagePage() {
                     </button>
                   </div>
                 </div>
+              </div>
+            </SectionBoundary>
+          )}
+
+          {/* ── LANDING PAGE BUILDER ─────────────────────────────────── */}
+          {tab === "landing" && (
+            <SectionBoundary title="Landing Page Builder">
+              <div style={{ maxWidth: 760 }}>
+                {/* Header */}
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24, gap: 12, flexWrap: "wrap" as const }}>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 3 }}>Landing Page Builder</div>
+                    <div style={{ fontSize: 11, color: "#555" }}>Edit what participants see on the public event page.</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                    {ev.share_slug && (
+                      <a href={`/events/${ev.share_slug}${ev.status !== "published" ? "?preview=1" : ""}`}
+                        target="_blank" rel="noopener noreferrer"
+                        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "rgba(232,98,10,0.1)", border: "1px solid rgba(232,98,10,0.25)", borderRadius: 8, color: "#e8620a", fontSize: 12, fontWeight: 600, textDecoration: "none" }}>
+                        Preview ↗
+                      </a>
+                    )}
+                    <Link href={`/admin/events/${eventId}/edit`}
+                      style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#aaa", fontSize: 12, fontWeight: 600, textDecoration: "none" }}>
+                      Full Edit →
+                    </Link>
+                  </div>
+                </div>
+
+                {lpError && <Alert variant="error" style={{ marginBottom: 16 }}>{lpError}</Alert>}
+
+                {lpLoading ? (
+                  <div style={{ textAlign: "center", padding: "3rem" }}><Spinner /></div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+
+                    {/* Hero Images */}
+                    <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "18px 20px" }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: (lpSavedSection === "cover" || lpSavedSection === "banner") ? "#4ade80" : "#555", textTransform: "uppercase" as const, letterSpacing: ".08em", marginBottom: 14 }}>
+                        Hero Images {(lpSavedSection === "cover" || lpSavedSection === "banner") && "— Saved ✓"}
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                        {/* Cover */}
+                        <div>
+                          <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>Cover <span style={{ color: "#555", fontSize: 10 }}>(portrait / square)</span></div>
+                          {lpCoverUrl ? (
+                            <div style={{ position: "relative", marginBottom: 8 }}>
+                              <img src={lpCoverUrl} alt="Cover" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", display: "block" }} />
+                              <button onClick={() => { setLpCoverUrl(""); void saveLpFields({ cover_image: null }, "cover"); }}
+                                style={{ position: "absolute", top: 6, right: 6, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.75)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
+                                ×
+                              </button>
+                            </div>
+                          ) : (
+                            <div style={{ width: "100%", aspectRatio: "4/3", background: "rgba(255,255,255,0.03)", border: "2px dashed rgba(255,255,255,0.1)", borderRadius: 8, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, marginBottom: 8 }}>
+                              <span style={{ fontSize: 22 }}>🖼️</span>
+                              <span style={{ fontSize: 11, color: "#444" }}>No cover image</span>
+                            </div>
+                          )}
+                          <input ref={lpCoverRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }}
+                            onChange={e => { const f = e.target.files?.[0]; if (f) void handleLpCoverUpload(f); if (lpCoverRef.current) lpCoverRef.current.value = ""; }} />
+                          <button onClick={() => lpCoverRef.current?.click()} disabled={lpCoverUpl}
+                            style={{ width: "100%", padding: "7px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#aaa", fontSize: 12, cursor: lpCoverUpl ? "wait" : "pointer", fontFamily: "inherit" }}>
+                            {lpCoverUpl ? "Uploading…" : lpCoverUrl ? "Replace Cover" : "Upload Cover"}
+                          </button>
+                        </div>
+                        {/* Banner */}
+                        <div>
+                          <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>Banner <span style={{ color: "#555", fontSize: 10 }}>(landscape hero)</span></div>
+                          {lpBannerUrl ? (
+                            <div style={{ position: "relative", marginBottom: 8 }}>
+                              <img src={lpBannerUrl} alt="Banner" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", display: "block" }} />
+                              <button onClick={() => { setLpBannerUrl(""); void saveLpFields({ banner_image: null }, "banner"); }}
+                                style={{ position: "absolute", top: 6, right: 6, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.75)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
+                                ×
+                              </button>
+                            </div>
+                          ) : (
+                            <div style={{ width: "100%", aspectRatio: "4/3", background: "rgba(255,255,255,0.03)", border: "2px dashed rgba(255,255,255,0.1)", borderRadius: 8, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, marginBottom: 8 }}>
+                              <span style={{ fontSize: 22 }}>🌄</span>
+                              <span style={{ fontSize: 11, color: "#444" }}>No banner image</span>
+                            </div>
+                          )}
+                          <input ref={lpBannerRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }}
+                            onChange={e => { const f = e.target.files?.[0]; if (f) void handleLpBannerUpload(f); if (lpBannerRef.current) lpBannerRef.current.value = ""; }} />
+                          <button onClick={() => lpBannerRef.current?.click()} disabled={lpBannerUpl}
+                            style={{ width: "100%", padding: "7px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#aaa", fontSize: 12, cursor: lpBannerUpl ? "wait" : "pointer", fontFamily: "inherit" }}>
+                            {lpBannerUpl ? "Uploading…" : lpBannerUrl ? "Replace Banner" : "Upload Banner"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Event Highlights */}
+                    <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "18px 20px" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: lpSavedSection === "highlights" ? "#4ade80" : "#555", textTransform: "uppercase" as const, letterSpacing: ".08em" }}>
+                          Event Highlights ({lpHighlights.length}) {lpSavedSection === "highlights" && "— Saved ✓"}
+                        </div>
+                        {lpHlEdit === null && (
+                          <button onClick={() => { setLpHlEdit(-1); setLpHlForm({ icon: "", title: "", description: "" }); }}
+                            style={{ padding: "5px 12px", background: "rgba(232,98,10,0.12)", border: "1px solid rgba(232,98,10,0.25)", borderRadius: 7, color: "#e8620a", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                            + Add
+                          </button>
+                        )}
+                      </div>
+                      {lpHlEdit !== null && (
+                        <div style={{ background: "rgba(232,98,10,0.05)", border: "1px solid rgba(232,98,10,0.15)", borderRadius: 10, padding: 16, marginBottom: 14 }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "60px 1fr", gap: 10, marginBottom: 10 }}>
+                            <div>
+                              <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4, textTransform: "uppercase" as const, fontWeight: 700 }}>Icon</label>
+                              <input value={lpHlForm.icon} onChange={e => setLpHlForm(f => ({ ...f, icon: e.target.value }))}
+                                placeholder="🏃" maxLength={2}
+                                style={{ width: "100%", padding: "7px 4px", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#fff", fontSize: 18, textAlign: "center" as const, boxSizing: "border-box" as const, fontFamily: "inherit" }} />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4, textTransform: "uppercase" as const, fontWeight: 700 }}>Title *</label>
+                              <input value={lpHlForm.title} onChange={e => setLpHlForm(f => ({ ...f, title: e.target.value }))}
+                                placeholder="e.g. Certified Course"
+                                style={{ width: "100%", padding: "7px 10px", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#fff", fontSize: 13, boxSizing: "border-box" as const, fontFamily: "inherit" }} />
+                            </div>
+                          </div>
+                          <div style={{ marginBottom: 12 }}>
+                            <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4, textTransform: "uppercase" as const, fontWeight: 700 }}>Description</label>
+                            <input value={lpHlForm.description} onChange={e => setLpHlForm(f => ({ ...f, description: e.target.value }))}
+                              placeholder="Short description"
+                              style={{ width: "100%", padding: "7px 10px", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#fff", fontSize: 13, boxSizing: "border-box" as const, fontFamily: "inherit" }} />
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                            <button onClick={() => { setLpHlEdit(null); setLpHlForm({ icon: "", title: "", description: "" }); }}
+                              style={{ padding: "6px 14px", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#777", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                            <button onClick={saveHighlight} disabled={!lpHlForm.title.trim() || lpSaving}
+                              style={{ padding: "6px 16px", background: "#e8620a", border: "none", borderRadius: 7, color: "#fff", fontSize: 12, fontWeight: 600, cursor: !lpHlForm.title.trim() || lpSaving ? "not-allowed" : "pointer", opacity: !lpHlForm.title.trim() || lpSaving ? 0.5 : 1, fontFamily: "inherit" }}>
+                              {lpSaving ? "Saving…" : lpHlEdit >= 0 ? "Update" : "Add Highlight"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {lpHighlights.length === 0 ? (
+                        <div style={{ textAlign: "center", padding: "24px", color: "#444", fontSize: 13 }}>No highlights yet. Highlight key features of your event.</div>
+                      ) : (
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
+                          {lpHighlights.map((h, i) => (
+                            <div key={i} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "12px 14px" }}>
+                              {h.icon && <div style={{ fontSize: 20, marginBottom: 6 }}>{h.icon}</div>}
+                              <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", marginBottom: h.description ? 4 : 0 }}>{h.title}</div>
+                              {h.description && <div style={{ fontSize: 11, color: "#666", lineHeight: 1.5 }}>{h.description}</div>}
+                              <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
+                                <button onClick={() => { setLpHlEdit(i); setLpHlForm({ ...h }); }}
+                                  style={{ padding: "3px 8px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 5, color: "#aaa", fontSize: 10, cursor: "pointer", fontFamily: "inherit" }}>Edit</button>
+                                <button onClick={() => removeHighlight(i)}
+                                  style={{ padding: "3px 8px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)", borderRadius: 5, color: "#f87171", fontSize: 10, cursor: "pointer", fontFamily: "inherit" }}>×</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Photo Gallery */}
+                    <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "18px 20px" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: lpSavedSection === "gallery" ? "#4ade80" : "#555", textTransform: "uppercase" as const, letterSpacing: ".08em" }}>
+                          Photo Gallery ({lpGallery.length}) {lpSavedSection === "gallery" && "— Saved ✓"}
+                        </div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          {lpGalleryUpl && <span style={{ fontSize: 11, color: "#e8620a" }}>Uploading…</span>}
+                          <input ref={lpGalleryRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }}
+                            onChange={e => { const f = e.target.files?.[0]; if (f) void handleLpGalleryUpload(f); if (lpGalleryRef.current) lpGalleryRef.current.value = ""; }} />
+                          <button onClick={() => lpGalleryRef.current?.click()} disabled={lpGalleryUpl}
+                            style={{ padding: "5px 12px", background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.25)", borderRadius: 7, color: "#60a5fa", fontSize: 12, fontWeight: 600, cursor: lpGalleryUpl ? "wait" : "pointer", fontFamily: "inherit" }}>
+                            + Add Photo
+                          </button>
+                        </div>
+                      </div>
+                      {lpGallery.length === 0 ? (
+                        <div style={{ textAlign: "center", padding: "24px", color: "#444", fontSize: 13 }}>No gallery photos yet.</div>
+                      ) : (
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8 }}>
+                          {lpGallery.map((url, i) => (
+                            <div key={i} style={{ position: "relative", aspectRatio: "1" }}>
+                              <img src={url} alt={`Gallery ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", display: "block" }} />
+                              <button onClick={() => removeLpGalleryImage(i)}
+                                style={{ position: "absolute", top: 4, right: 4, width: 20, height: 20, borderRadius: "50%", background: "rgba(0,0,0,0.75)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* FAQs */}
+                    <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "18px 20px" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: lpSavedSection === "faqs" ? "#4ade80" : "#555", textTransform: "uppercase" as const, letterSpacing: ".08em" }}>
+                          FAQs ({lpFaqs.length}) {lpSavedSection === "faqs" && "— Saved ✓"}
+                        </div>
+                        {lpFaqEdit === null && (
+                          <button onClick={() => { setLpFaqEdit(-1); setLpFaqForm({ question: "", answer: "" }); }}
+                            style={{ padding: "5px 12px", background: "rgba(232,98,10,0.12)", border: "1px solid rgba(232,98,10,0.25)", borderRadius: 7, color: "#e8620a", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                            + Add FAQ
+                          </button>
+                        )}
+                      </div>
+                      {lpFaqEdit !== null && (
+                        <div style={{ background: "rgba(232,98,10,0.05)", border: "1px solid rgba(232,98,10,0.15)", borderRadius: 10, padding: 16, marginBottom: 14 }}>
+                          <div style={{ marginBottom: 10 }}>
+                            <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4, textTransform: "uppercase" as const, fontWeight: 700 }}>Question *</label>
+                            <input value={lpFaqForm.question} onChange={e => setLpFaqForm(f => ({ ...f, question: e.target.value }))}
+                              placeholder="e.g. Can I transfer my registration?"
+                              style={{ width: "100%", padding: "7px 10px", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#fff", fontSize: 13, boxSizing: "border-box" as const, fontFamily: "inherit" }} />
+                          </div>
+                          <div style={{ marginBottom: 12 }}>
+                            <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4, textTransform: "uppercase" as const, fontWeight: 700 }}>Answer</label>
+                            <textarea value={lpFaqForm.answer} onChange={e => setLpFaqForm(f => ({ ...f, answer: e.target.value }))}
+                              rows={3} placeholder="Provide a clear, helpful answer"
+                              style={{ width: "100%", padding: "7px 10px", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#fff", fontSize: 13, boxSizing: "border-box" as const, fontFamily: "inherit", resize: "vertical" as const }} />
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                            <button onClick={() => { setLpFaqEdit(null); setLpFaqForm({ question: "", answer: "" }); }}
+                              style={{ padding: "6px 14px", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#777", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                            <button onClick={saveFaq} disabled={!lpFaqForm.question.trim() || lpSaving}
+                              style={{ padding: "6px 16px", background: "#e8620a", border: "none", borderRadius: 7, color: "#fff", fontSize: 12, fontWeight: 600, cursor: !lpFaqForm.question.trim() || lpSaving ? "not-allowed" : "pointer", opacity: !lpFaqForm.question.trim() || lpSaving ? 0.5 : 1, fontFamily: "inherit" }}>
+                              {lpSaving ? "Saving…" : lpFaqEdit >= 0 ? "Update FAQ" : "Add FAQ"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {lpFaqs.length === 0 ? (
+                        <div style={{ textAlign: "center", padding: "24px", color: "#444", fontSize: 13 }}>No FAQs yet.</div>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          {lpFaqs.map((faq, i) => (
+                            <div key={i} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "flex-start", gap: 10 }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", marginBottom: 4 }}>{faq.question}</div>
+                                {faq.answer && <div style={{ fontSize: 12, color: "#666", lineHeight: 1.6, whiteSpace: "pre-line" as const }}>{faq.answer}</div>}
+                              </div>
+                              <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                                <button onClick={() => { setLpFaqEdit(i); setLpFaqForm({ ...faq }); }}
+                                  style={{ padding: "3px 8px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 5, color: "#aaa", fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>Edit</button>
+                                <button onClick={() => removeFaq(i)}
+                                  style={{ padding: "3px 8px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)", borderRadius: 5, color: "#f87171", fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>×</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Terms & Conditions */}
+                    <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "18px 20px" }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: lpSavedSection === "terms" ? "#4ade80" : "#555", textTransform: "uppercase" as const, letterSpacing: ".08em", marginBottom: 10 }}>
+                        Terms &amp; Conditions {lpSavedSection === "terms" && "— Saved ✓"}
+                      </div>
+                      <textarea
+                        value={lpTerms}
+                        onChange={e => setLpTerms(e.target.value)}
+                        rows={6}
+                        placeholder="Enter your event terms and conditions. Shown as a collapsible section on the event page."
+                        style={{ width: "100%", padding: "9px 12px", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, fontFamily: "inherit", resize: "vertical" as const, boxSizing: "border-box" as const, lineHeight: 1.7 }}
+                      />
+                      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
+                        <button onClick={() => void saveLpFields({ terms_conditions: lpTerms || null }, "terms")} disabled={lpSaving}
+                          style={{ padding: "7px 18px", background: "#e8620a", border: "none", borderRadius: 7, color: "#fff", fontSize: 12, fontWeight: 600, cursor: lpSaving ? "wait" : "pointer", fontFamily: "inherit" }}>
+                          {lpSaving ? "Saving…" : "Save Terms"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* WhatsApp Community */}
+                    <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "18px 20px" }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: lpSavedSection === "wa" ? "#4ade80" : "#555", textTransform: "uppercase" as const, letterSpacing: ".08em", marginBottom: 8 }}>
+                        WhatsApp Community {lpSavedSection === "wa" && "— Saved ✓"}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#555", marginBottom: 10 }}>A join button appears on the event page when this URL is set.</div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <input
+                          value={lpWa}
+                          onChange={e => setLpWa(e.target.value)}
+                          placeholder="https://chat.whatsapp.com/..."
+                          type="url"
+                          style={{ flex: 1, padding: "9px 12px", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, fontFamily: "inherit", minWidth: 0 }}
+                        />
+                        <button onClick={() => void saveLpFields({ whatsapp_community_url: lpWa || null }, "wa")} disabled={lpSaving}
+                          style={{ padding: "9px 18px", background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.3)", borderRadius: 8, color: "#4ade80", fontSize: 12, fontWeight: 700, cursor: lpSaving ? "wait" : "pointer", fontFamily: "inherit", flexShrink: 0 }}>
+                          {lpSaving ? "…" : "Save"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Route Maps shortcut */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", background: "rgba(96,165,250,0.04)", border: "1px solid rgba(96,165,250,0.12)", borderRadius: 12 }}>
+                      <span style={{ fontSize: 20 }}>🗺️</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#60a5fa", marginBottom: 2 }}>Route Maps</div>
+                        <div style={{ fontSize: 11, color: "#555" }}>Upload images, PDFs, or GPX files shown on the event page.</div>
+                      </div>
+                      <button onClick={() => setTab("route-maps" as TabKey)}
+                        style={{ padding: "7px 14px", background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.2)", borderRadius: 7, color: "#60a5fa", fontSize: 12, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
+                        Route Maps →
+                      </button>
+                    </div>
+
+                    {/* Sponsors shortcut */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12 }}>
+                      <span style={{ fontSize: 20 }}>🤝</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#ccc", marginBottom: 2 }}>Sponsors &amp; Partners</div>
+                        <div style={{ fontSize: 11, color: "#555" }}>Manage sponsor logos shown at the bottom of the event page.</div>
+                      </div>
+                      <Link href={`/admin/events/${eventId}/sponsors`}
+                        style={{ padding: "7px 14px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#aaa", fontSize: 12, textDecoration: "none", flexShrink: 0 }}>
+                        Manage Sponsors →
+                      </Link>
+                    </div>
+
+                  </div>
+                )}
               </div>
             </SectionBoundary>
           )}

@@ -18,6 +18,7 @@ const EDITABLE_FIELDS = new Set([
   "visibility",
   "tshirt_size_chart_url",
   "registration_config",
+  "whatsapp_community_url",
 ]);
 
 // Columns that must be null rather than empty string when blank
@@ -29,6 +30,7 @@ const NULLABLE_FIELDS = new Set([
   "organizer", "organizer_email", "organizer_phone",
   "support_email", "support_phone", "website",
   "tshirt_size_chart_url",
+  "whatsapp_community_url",
 ]);
 
 // Columns that store a local datetime string from <input type="datetime-local">
@@ -70,6 +72,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       faqs, highlights,
       organizer, organizer_email, organizer_phone,
       support_email, support_phone, website,
+      whatsapp_community_url,
       status, share_slug, visibility, participant_count
     `)
     .eq("id", id)
