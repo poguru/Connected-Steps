@@ -1086,15 +1086,14 @@ export default function RegisterPage() {
                 const slotsLeft = race?.max_slots != null ? Math.max(0, race.max_slots - race.slot_reserved) : null;
                 return (
                   <button key={cat} type="button"
-                    onClick={() => { setDistanceCategory(cat); setSubmitErr(""); }}
-                    disabled={isCatFull}
+                    onClick={() => { setDistanceCategory(cat); setSubmitErr(""); setCapacityFull(false); }}
                     style={{
                       padding: "10px 22px", borderRadius: "10px",
                       border: `2px solid ${isCatFull ? "rgba(239,68,68,0.3)" : sel ? d.color : "rgba(255,255,255,0.12)"}`,
-                      cursor: isCatFull ? "not-allowed" : "pointer", fontFamily: "inherit", transition: "all 0.15s",
-                      background: isCatFull ? "rgba(239,68,68,0.05)" : sel ? d.bg : "transparent",
+                      cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
+                      background: isCatFull ? (sel ? "rgba(239,68,68,0.1)" : "rgba(239,68,68,0.03)") : sel ? d.bg : "transparent",
                       color: isCatFull ? "#ef4444" : sel ? d.color : "rgba(255,255,255,0.55)",
-                      fontWeight: sel ? 800 : 500, fontSize: "1rem", opacity: isCatFull ? 0.7 : 1,
+                      fontWeight: sel ? 800 : 500, fontSize: "1rem", opacity: isCatFull ? 0.75 : 1,
                       boxShadow: sel ? `0 0 0 1px ${d.border}` : "none",
                     }}>
                     {cat}
