@@ -31,6 +31,15 @@ interface EventAnalytics {
   tshirt_issued?: number;
 }
 
+interface CommTotals {
+  email: {
+    totals:  { total: number; delivered: number; opened: number; clicked: number; failed: number; bounced: number };
+  };
+  whatsapp: {
+    totals: { total: number; sent: number; delivered: number; read: number; failed: number };
+  };
+}
+
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const S = {
@@ -180,17 +189,20 @@ export default function EventAnalyticsPage() {
   const [loading,      setLoading]      = useState(true);
   const [resending,    setResending]    = useState(false);
   const [resendResult, setResendResult] = useState<string>("");
+  const [commData,     setCommData]     = useState<CommTotals | null>(null);
 
   async function loadData() {
     setLoading(true);
     try {
       // Use shared stats endpoint — same source of truth as Event Hub
-      const [analyticsRes, statsRes] = await Promise.all([
+      const [analyticsRes, statsRes, commRes] = await Promise.all([
         fetch(`/api/admin/events/${eventId}/analytics`),
         fetch(`/api/admin/events/${eventId}/stats`),
+        fetch(`/api/admin/events/${eventId}/comm-analytics`),
       ]);
       const analytics = await analyticsRes.json();
       const shared    = await statsRes.json();
+      const comm      = commRes.ok ? await commRes.json() : null;
 
       // Merge: prefer shared stats for funnel/revenue, keep analytics for
       // race_day progression and email delivery details
@@ -204,6 +216,7 @@ export default function EventAnalyticsPage() {
         analytics.registration_timeline = s.timeline ?? [];
       }
       setData(analytics);
+      if (comm) setCommData(comm);
     } finally { setLoading(false); }
   }
 
@@ -326,6 +339,57 @@ export default function EventAnalyticsPage() {
               </div>
             </div>
           </div>
+
+          {/* Email engagement — only shown when ZeptoMail webhooks have data */}
+          {commData && (commData.email.totals.opened > 0 || commData.email.totals.clicked > 0 || commData.whatsapp.totals.total > 0) && (
+            <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#e8620a", textTransform: "uppercase" as const, letterSpacing: ".08em", marginBottom: 12 }}>Communication Engagement</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 10, marginBottom: commData.whatsapp.totals.total > 0 ? 14 : 0 }}>
+                {[
+                  { label: "Email Opened", value: commData.email.totals.opened,  color: "#a78bfa" },
+                  { label: "Email Clicked", value: commData.email.totals.clicked, color: "#34d399" },
+                  { label: "Bounced",  value: commData.email.totals.bounced,  color: commData.email.totals.bounced > 0 ? "#f59e0b" : "#555" },
+                  {
+                    label: "Open Rate",
+                    value: commData.email.totals.delivered > 0
+                      ? `${Math.round(commData.email.totals.opened / commData.email.totals.delivered * 100)}%`
+                      : "—",
+                    color: "#a78bfa",
+                  },
+                  {
+                    label: "Click Rate",
+                    value: commData.email.totals.opened > 0
+                      ? `${Math.round(commData.email.totals.clicked / commData.email.totals.opened * 100)}%`
+                      : "—",
+                    color: "#34d399",
+                  },
+                ].map(e => (
+                  <div key={e.label} style={{ textAlign: "center" as const }}>
+                    <div style={{ fontSize: 20, fontWeight: 900, color: e.color }}>{e.value}</div>
+                    <div style={{ fontSize: 10, color: "#555", fontWeight: 600, textTransform: "uppercase" as const }}>{e.label}</div>
+                  </div>
+                ))}
+              </div>
+              {commData.whatsapp.totals.total > 0 && (
+                <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12, marginTop: 4 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#22c55e", textTransform: "uppercase" as const, letterSpacing: ".08em", marginBottom: 8 }}>WhatsApp</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                    {[
+                      { label: "Sent",      value: commData.whatsapp.totals.sent,      color: "#22c55e" },
+                      { label: "Delivered", value: commData.whatsapp.totals.delivered, color: "#4ade80" },
+                      { label: "Read",      value: commData.whatsapp.totals.read,       color: "#a3e635" },
+                      { label: "Failed",    value: commData.whatsapp.totals.failed,    color: commData.whatsapp.totals.failed > 0 ? "#f87171" : "#555" },
+                    ].map(e => (
+                      <div key={e.label} style={{ textAlign: "center" as const }}>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: e.color }}>{e.value}</div>
+                        <div style={{ fontSize: 9, color: "#555", fontWeight: 600, textTransform: "uppercase" as const }}>{e.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Race distribution */}
           <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem" }}>
