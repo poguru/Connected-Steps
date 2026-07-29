@@ -271,6 +271,19 @@ export default function RegisterPage() {
     });
   }
 
+  // When the selected race changes, clamp participant count to the new min/max.
+  // Derives the race directly from state to avoid forward-reference issues.
+  useEffect(() => {
+    if (!isMulti || !ev) return;
+    const races = ev.races ?? [];
+    const race = races.find(r => r.distance === distanceCategory) ?? races[0] ?? null;
+    if (!race) return;
+    const min = race.min_participants ?? 1;
+    const max = Math.min(race.max_participants ?? 10, 20);
+    const clamped = Math.max(min, Math.min(participantCount, max));
+    if (clamped !== participantCount) changeCount(clamped);
+  }, [distanceCategory, ev?.id]); // eslint-disable-line
+
   function setParticipant(idx: number, field: keyof ParticipantData, value: string) {
     setParticipants(prev => {
       const next = [...prev];
