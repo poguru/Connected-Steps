@@ -3,9 +3,11 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
 
 const ALLOWED_KEYS = new Set([
-  "email_events", "email_training", "email_reminders", "email_marketing",
-  "wa_events",    "wa_training",    "wa_reminders",    "wa_marketing",
-  "push_events",  "push_training",  "push_reminders",
+  "email_events",    "email_training",  "email_reminders", "email_marketing",
+  "email_community", "email_partners",  "email_birthday",  "email_festive",
+  "wa_events",       "wa_training",     "wa_reminders",    "wa_marketing",
+  "wa_community",    "wa_partners",     "wa_birthday",     "wa_festive",
+  "push_events",     "push_training",   "push_reminders",
 ]);
 
 // GET /api/user/notification-preferences
@@ -29,9 +31,11 @@ export async function GET(req: NextRequest) {
     // Return defaults — row is created on first PATCH
     return NextResponse.json({
       preferences: {
-        email_events: true, email_training: true, email_reminders: true, email_marketing: false,
-        wa_events:    true, wa_training:    true, wa_reminders:    true, wa_marketing:    false,
-        push_events:  true, push_training:  true, push_reminders:  true,
+        email_events:    true,  email_training:  true,  email_reminders: true,  email_marketing: false,
+        email_community: true,  email_partners:  false, email_birthday:  true,  email_festive:   true,
+        wa_events:       true,  wa_training:     true,  wa_reminders:    true,  wa_marketing:    false,
+        wa_community:    true,  wa_partners:     false, wa_birthday:     true,  wa_festive:      true,
+        push_events:     true,  push_training:   true,  push_reminders:  true,
       },
     });
   }

@@ -30,7 +30,9 @@ const NAV_GROUPS = [
     label: "Communications",
     icon:  "📨",
     links: [
+      { label: "Campaigns",       href: "/admin/campaigns",            exact: false, icon: "📣" },
       { label: "Comm Center",     href: "/admin/communication",        exact: true,  icon: "📨" },
+      { label: "Consent Report",  href: "/api/admin/consent-report?format=csv", exact: true, icon: "📋" },
     ],
   },
   {

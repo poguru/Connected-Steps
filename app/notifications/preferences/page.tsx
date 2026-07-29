@@ -6,7 +6,9 @@ import { isTokenValid, handleAuthExpiry } from "@/lib/client-auth";
 
 interface Prefs {
   email_events:    boolean; email_training:  boolean; email_reminders: boolean; email_marketing: boolean;
+  email_community: boolean; email_partners:  boolean; email_birthday:  boolean; email_festive:   boolean;
   wa_events:       boolean; wa_training:     boolean; wa_reminders:    boolean; wa_marketing:    boolean;
+  wa_community:    boolean; wa_partners:     boolean; wa_birthday:     boolean; wa_festive:      boolean;
   push_events:     boolean; push_training:   boolean; push_reminders:  boolean;
 }
 
@@ -17,9 +19,13 @@ const SECTIONS = [
     color: "#60a5fa",
     items: [
       { key: "email_events",    label: "Event Updates",    detail: "Registration confirmations, QR codes, event changes" },
-      { key: "email_training",  label: "Training",         detail: "New sessions, training plan updates" },
+      { key: "email_training",  label: "Training Updates", detail: "New sessions, training plan updates, schedule changes" },
       { key: "email_reminders", label: "Reminders",        detail: "Event day reminders, BIB collection alerts" },
-      { key: "email_marketing", label: "Marketing",        detail: "New events, offers, newsletter" },
+      { key: "email_community", label: "Community News",   detail: "Community runs, stories, achievements" },
+      { key: "email_birthday",  label: "Birthday Messages",detail: "Birthday greetings from Connected Steps" },
+      { key: "email_festive",   label: "Festive Greetings",detail: "Diwali, New Year, and other festival wishes" },
+      { key: "email_partners",  label: "Partner Offers",   detail: "Exclusive offers from Connected Steps sponsors" },
+      { key: "email_marketing", label: "General Marketing",detail: "New events, offers, newsletter" },
     ],
   },
   {
@@ -28,9 +34,13 @@ const SECTIONS = [
     color: "#4ade80",
     items: [
       { key: "wa_events",    label: "Event Updates",    detail: "Event day updates, live alerts" },
-      { key: "wa_training",  label: "Training",         detail: "Session reminders, coach messages" },
+      { key: "wa_training",  label: "Training Updates", detail: "Session reminders, coach messages" },
       { key: "wa_reminders", label: "Reminders",        detail: "Event day countdowns, BIB collection" },
-      { key: "wa_marketing", label: "Marketing",        detail: "New events, promotions" },
+      { key: "wa_community", label: "Community News",   detail: "Community runs and updates via WhatsApp" },
+      { key: "wa_birthday",  label: "Birthday Messages",detail: "Birthday greetings on WhatsApp" },
+      { key: "wa_festive",   label: "Festive Greetings",detail: "Festival wishes via WhatsApp" },
+      { key: "wa_partners",  label: "Partner Offers",   detail: "Sponsor promotions via WhatsApp" },
+      { key: "wa_marketing", label: "General Marketing",detail: "New events, promotions" },
     ],
   },
   {

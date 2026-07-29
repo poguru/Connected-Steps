@@ -128,6 +128,42 @@ function fmtTime(t: string | null) {
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
 
+// ── Consent Checkbox ─────────────────────────────────────────────────────────
+
+const CONSENT_TEXT = "We'd like to keep you informed about your registrations, upcoming training sessions, events, route maps, schedule changes, exclusive offers, community activities, and other Connected Steps updates through email and WhatsApp. You can update your communication preferences at any time from your profile. We will not sell your personal information or send unrelated promotional content.";
+
+function ConsentCheckbox({ checked, onChange, showInfo, onToggleInfo }: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  showInfo: boolean;
+  onToggleInfo: () => void;
+}) {
+  return (
+    <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+      <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer" }}>
+        <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)}
+          style={{ marginTop: 3, accentColor: "#e8620a", flexShrink: 0 }} />
+        <span style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.7)", lineHeight: 1.5 }}>
+          I agree to receive promotional communications from Connected Steps via email and WhatsApp.
+          {" "}
+          <button type="button" onClick={e => { e.preventDefault(); onToggleInfo(); }}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.45)", fontSize: "0.82rem", padding: 0, verticalAlign: "baseline" }}>
+            ℹ️
+          </button>
+        </span>
+      </label>
+      {showInfo && (
+        <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 6, background: "rgba(255,255,255,0.05)", fontSize: "0.78rem", color: "rgba(255,255,255,0.55)", lineHeight: 1.6 }}>
+          {CONSENT_TEXT}
+        </div>
+      )}
+      <p style={{ margin: "6px 0 0 26px", fontSize: "0.72rem", color: "rgba(255,255,255,0.3)" }}>
+        Optional — transactional emails (registration confirmations, payment receipts, OTPs) are sent regardless.
+      </p>
+    </div>
+  );
+}
+
 // ── Razorpay loader ───────────────────────────────────────────────────────────
 
 declare global {
@@ -184,6 +220,8 @@ export default function RegisterPage() {
   const [distanceCategory, setDistanceCategory] = useState("");
   const [tshirtSize,       setTshirtSize]       = useState("");
   const [showSizeGuide,    setShowSizeGuide]    = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(false);
+  const [showConsentInfo,  setShowConsentInfo]  = useState(false);
   const [submitting,  setSubmitting]  = useState(false);
   const [submitErr,   setSubmitErr]   = useState("");
   const [capacityFull, setCapacityFull] = useState(false);
@@ -582,6 +620,7 @@ export default function RegisterPage() {
           distance_category: distanceCategory || undefined,
           tshirt_size:       tshirtSize || undefined,
           custom_fields:     customFieldValues,
+          marketing_consent: marketingConsent,
         }),
       });
       const data = await res.json();
@@ -648,6 +687,7 @@ export default function RegisterPage() {
           special_notes:     sharedNotes,
           coupon_code:       couponApplied ? coupon : undefined,
           custom_fields:     customFieldValues,
+          marketing_consent: marketingConsent,
           participants:      participants.map(p => ({
             first_name:        p.first_name.trim(),
             last_name:         p.last_name.trim() || undefined,
@@ -1096,6 +1136,12 @@ export default function RegisterPage() {
               </div>
             )}
 
+            <ConsentCheckbox
+              checked={marketingConsent}
+              onChange={setMarketingConsent}
+              showInfo={showConsentInfo}
+              onToggleInfo={() => setShowConsentInfo(v => !v)}
+            />
             <button type="submit" disabled={submitting}
               style={{ width: "100%", padding: "14px", borderRadius: "10px", background: submitting ? "rgba(232,98,10,0.45)" : "linear-gradient(135deg,#e8620a,#f07c2a)", border: "none", color: "#fff", fontWeight: 700, fontSize: "1rem", cursor: submitting ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: submitting ? "none" : "0 4px 20px rgba(232,98,10,0.35)" }}>
               {submitting
@@ -1418,6 +1464,12 @@ export default function RegisterPage() {
             </div>
           )}
 
+          <ConsentCheckbox
+            checked={marketingConsent}
+            onChange={setMarketingConsent}
+            showInfo={showConsentInfo}
+            onToggleInfo={() => setShowConsentInfo(v => !v)}
+          />
           <button
             type="submit"
             disabled={submitting || (submitted && Object.keys(errors).length > 0)}

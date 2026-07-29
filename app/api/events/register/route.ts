@@ -6,6 +6,7 @@ import { signEventQR } from "@/lib/event-qr";
 import { sendEmail, eventRegistrationEmailHTML } from "@/lib/notify";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
 import { evaluateAutomations } from "@/lib/automation-engine";
+import { recordConsent } from "@/lib/campaign-service";
 
 function genCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -68,7 +69,8 @@ async function handleSingleParticipant(
     blood_group, emergency_contact, special_notes, coupon_code,
     distance_category, tshirt_size,
   } = body as Record<string, string | null | undefined>;
-  const customFieldsRaw = (body.custom_fields ?? {}) as Record<string, string>;
+  const customFieldsRaw  = (body.custom_fields ?? {}) as Record<string, string>;
+  const marketingConsent = body.marketing_consent === true;
 
   void (async () => {
     try { await getSupabaseServer().rpc("release_expired_slots"); } catch { /* non-critical */ }
@@ -426,6 +428,30 @@ async function handleSingleParticipant(
         dispatchWebhookEvent(ev.organization_id as string, "registration.created", ctx).catch(() => {});
         evaluateAutomations(ev.organization_id as string, "registration.created", ctx).catch(() => {});
       }
+
+      // Save marketing consent
+      const bgDb2 = getSupabaseServer();
+      const lowerEmail = (email as string).toLowerCase().trim();
+      try {
+        await bgDb2.from("users").update({
+          marketing_consent:        marketingConsent,
+          marketing_consent_at:     new Date().toISOString(),
+          marketing_consent_source: "registration",
+        }).eq("email", lowerEmail);
+        await bgDb2.from("user_notification_preferences").upsert({
+          user_email:      lowerEmail,
+          email_marketing: marketingConsent,
+          wa_marketing:    marketingConsent,
+          updated_at:      new Date().toISOString(),
+        }, { onConflict: "user_email" });
+        await recordConsent({
+          userEmail:            lowerEmail,
+          action:               marketingConsent ? "opt_in" : "initial",
+          preferencesSnapshot:  { email_marketing: marketingConsent, wa_marketing: marketingConsent },
+          source:               "registration",
+          ipAddress:            req.headers.get("x-forwarded-for") ?? "",
+        });
+      } catch { /* non-critical */ }
     });
 
     // Consume the approved waitlist slot now that registration is confirmed.
