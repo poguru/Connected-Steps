@@ -82,7 +82,9 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState("");
   const [search,   setSearch]   = useState("");
-  const [filter,   setFilter]   = useState<"all" | "paid" | "free" | "pending">("all");
+  const [filter,      setFilter]      = useState<"all" | "paid" | "free" | "pending">("all");
+  const [catFilter,   setCatFilter]   = useState("all");
+  const [ciFilter,    setCiFilter]    = useState<"all" | "checked_in" | "not_checked_in">("all");
   const [cameraOpen, setCameraOpen] = useState(false);
 
   // Breakfast scanner state
@@ -456,8 +458,12 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
     finally { setRegLoading(false); }
   }
 
+  const allCategories = [...new Set(regs.map(r => r.distance_category).filter(Boolean))] as string[];
+
   const filtered = regs
     .filter(r => filter === "all" || r.payment_status === filter)
+    .filter(r => catFilter === "all" || r.distance_category === catFilter)
+    .filter(r => ciFilter === "all" || (ciFilter === "checked_in" ? !!r.checked_in_at : !r.checked_in_at))
     .filter(r => {
       if (!search) return true;
       const q = search.toLowerCase();
@@ -696,15 +702,48 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
 
             {/* Filters */}
             <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.5rem", flexWrap: "wrap", alignItems: "center" }}>
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, email, code…" style={{ ...S.input, flex: "1 1 240px" }} />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, email, code…" style={{ ...S.input, flex: "1 1 200px", maxWidth: 280 }} />
+
+              {/* Payment filter */}
               <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.04)", borderRadius: 7, padding: 3 }}>
                 {(["all","paid","free","pending"] as const).map(f => (
                   <button key={f} onClick={() => setFilter(f)}
-                    style={{ padding: "5px 14px", borderRadius: 5, border: "none", cursor: "pointer", fontSize: "0.78rem", fontWeight: 600, background: filter === f ? "#e8620a" : "transparent", color: filter === f ? "#fff" : "#888", fontFamily: "inherit" }}>
+                    style={{ padding: "5px 12px", borderRadius: 5, border: "none", cursor: "pointer", fontSize: "0.78rem", fontWeight: 600, background: filter === f ? "#e8620a" : "transparent", color: filter === f ? "#fff" : "#888", fontFamily: "inherit" }}>
                     {f.charAt(0).toUpperCase() + f.slice(1)}
                   </button>
                 ))}
               </div>
+
+              {/* Category filter */}
+              {allCategories.length > 1 && (
+                <select
+                  value={catFilter}
+                  onChange={e => setCatFilter(e.target.value)}
+                  style={{ padding: "6px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: catFilter !== "all" ? "#e8620a" : "#888", fontSize: "0.78rem", fontFamily: "inherit", cursor: "pointer", outline: "none" }}
+                >
+                  <option value="all">All Categories</option>
+                  {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              )}
+
+              {/* Check-in filter */}
+              <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.04)", borderRadius: 7, padding: 3 }}>
+                {([["all","All"], ["checked_in","✓ In"], ["not_checked_in","Not In"]] as const).map(([f, label]) => (
+                  <button key={f} onClick={() => setCiFilter(f)}
+                    style={{ padding: "5px 12px", borderRadius: 5, border: "none", cursor: "pointer", fontSize: "0.78rem", fontWeight: 600, background: ciFilter === f ? (f === "checked_in" ? "#22c55e" : f === "not_checked_in" ? "#555" : "#e8620a") : "transparent", color: ciFilter === f ? "#fff" : "#888", fontFamily: "inherit" }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {(catFilter !== "all" || ciFilter !== "all" || filter !== "all") && (
+                <button onClick={() => { setFilter("all"); setCatFilter("all"); setCiFilter("all"); }}
+                  style={{ fontSize: "0.75rem", color: "#e8620a", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "4px 8px" }}>
+                  Clear filters
+                </button>
+              )}
+
+              <span style={{ fontSize: "0.75rem", color: "#555", marginLeft: "auto" }}>{filtered.length} of {regs.length}</span>
             </div>
 
             {/* Table */}
