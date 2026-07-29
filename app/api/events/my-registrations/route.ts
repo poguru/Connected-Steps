@@ -27,8 +27,8 @@ export async function GET(req: NextRequest) {
   const regIds  = regs.map(r => r.id);
   const eventIds = [...new Set(regs.map(r => r.event_id))];
 
-  // Fetch events, participants, invoices, and pending category change requests in parallel
-  const [eventsRes, participantsRes, invoicesRes, catChangesRes] = await Promise.all([
+  // Fetch events, participants, invoices, pending category change requests, and waitlist in parallel
+  const [eventsRes, participantsRes, invoicesRes, catChangesRes, waitlistRes] = await Promise.all([
     db.from("events")
       .select("id, title, event_type, cover_image, banner_image, start_date, start_time, end_date, end_time, location, share_slug, whatsapp_community_url, route_map_url, route_map_type, tshirt_size_chart_url, distance_categories, registration_closes_at")
       .in("id", eventIds),
@@ -46,11 +46,29 @@ export async function GET(req: NextRequest) {
       .select("registration_id, status, old_category, new_category, created_at")
       .in("registration_id", regIds)
       .eq("status", "pending"),
+
+    // Separate event_waitlist entries (per-category waitlist, separate from event_registrations)
+    db.from("event_waitlist")
+      .select("id, event_id, distance_category, status, position, created_at, approved_at, notified_at")
+      .eq("user_email", userEmail.toLowerCase())
+      .in("status", ["waiting", "approved"])
+      .order("created_at", { ascending: false }),
   ]);
 
   type EvRow = NonNullable<typeof eventsRes.data>[number];
   const evMap: Record<string, EvRow> = {};
   for (const ev of eventsRes.data ?? []) evMap[ev.id] = ev;
+
+  // Waitlist entries — fetch event details for any event_ids not already in evMap
+  const wlEntries = waitlistRes.data ?? [];
+  const missingEvIds = [...new Set(wlEntries.map(w => w.event_id).filter(id => !evMap[id]))];
+  if (missingEvIds.length > 0) {
+    const { data: extra } = await db.from("events")
+      .select("id, title, event_type, cover_image, banner_image, start_date, start_time, end_date, end_time, location, share_slug, whatsapp_community_url, route_map_url, route_map_type, tshirt_size_chart_url, distance_categories, registration_closes_at")
+      .in("id", missingEvIds);
+    for (const ev of extra ?? []) evMap[ev.id] = ev;
+  }
+  const waitlistEntries = wlEntries.map(w => ({ ...w, events: evMap[w.event_id] ?? null }));
 
   type ParticipantRow = NonNullable<typeof participantsRes.data>[number];
   const participantsByReg: Record<string, ParticipantRow[]> = {};
@@ -77,5 +95,5 @@ export async function GET(req: NextRequest) {
     pending_category_change: pendingCatChange[r.id] ?? null,
   }));
 
-  return NextResponse.json({ registrations });
+  return NextResponse.json({ registrations, waitlist_entries: waitlistEntries });
 }

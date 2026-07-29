@@ -70,6 +70,30 @@ interface QRModalState {
   bibNumber:     string | null;
 }
 
+interface WaitlistEntry {
+  id:                string;
+  event_id:          string;
+  distance_category: string | null;
+  status:            string;
+  position:          number | null;
+  created_at:        string;
+  approved_at:       string | null;
+  notified_at:       string | null;
+  events: {
+    title:                  string;
+    event_type:             string;
+    cover_image:            string | null;
+    banner_image:           string | null;
+    start_date:             string;
+    start_time:             string | null;
+    end_date:               string | null;
+    end_time:               string | null;
+    location:               string;
+    share_slug:             string | null;
+    whatsapp_community_url: string | null;
+  } | null;
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const TYPE_ICON: Record<string, string> = {
@@ -683,10 +707,109 @@ function RegistrationCard({ reg, userToken, isUpcoming, onShowQR, onRefresh }: {
   );
 }
 
+// ── Waitlist Entry Card ───────────────────────────────────────────────────────
+
+function timeSince(isoStr: string): string {
+  const ms = Date.now() - new Date(isoStr).getTime();
+  const m  = Math.floor(ms / 60000);
+  const h  = Math.floor(ms / 3600000);
+  const d  = Math.floor(ms / 86400000);
+  if (d > 0)  return `${d}d ago`;
+  if (h > 0)  return `${h}h ago`;
+  if (m > 0)  return `${m}m ago`;
+  return "just now";
+}
+
+function WaitlistEntryCard({ entry }: { entry: WaitlistEntry }) {
+  const ev        = entry.events;
+  const banner    = ev?.banner_image ?? ev?.cover_image ?? null;
+  const eventHref = ev?.share_slug ? `/events/${ev.share_slug}` : "#";
+  const isApproved = entry.status === "approved";
+
+  return (
+    <div style={{
+      background: "rgba(255,255,255,0.025)",
+      border: `1px solid ${isApproved ? "rgba(74,222,128,0.25)" : "rgba(251,191,36,0.2)"}`,
+      borderRadius: 16, overflow: "hidden", marginBottom: 16,
+    }}>
+      {/* Banner */}
+      {banner && (
+        <div style={{ height: 80, overflow: "hidden", position: "relative" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={banner} alt={ev?.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.75))" }} />
+        </div>
+      )}
+
+      <div style={{ padding: "14px 18px", display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
+        {/* Position badge */}
+        <div style={{
+          minWidth: 52, height: 52, borderRadius: 12, flexShrink: 0,
+          background: isApproved ? "rgba(74,222,128,0.12)" : "rgba(251,191,36,0.1)",
+          border: `1px solid ${isApproved ? "rgba(74,222,128,0.3)" : "rgba(251,191,36,0.3)"}`,
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        }}>
+          {isApproved ? (
+            <span style={{ fontSize: 22 }}>✅</span>
+          ) : entry.position != null ? (
+            <>
+              <span style={{ fontSize: 9, fontWeight: 700, color: "#fbbf24", textTransform: "uppercase", letterSpacing: "0.06em" }}>Pos</span>
+              <span style={{ fontSize: 20, fontWeight: 800, color: "#fbbf24", lineHeight: 1 }}>#{entry.position}</span>
+            </>
+          ) : (
+            <span style={{ fontSize: 22 }}>⏳</span>
+          )}
+        </div>
+
+        {/* Info */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Link href={eventHref} style={{ fontSize: 14, fontWeight: 700, color: "#fff", textDecoration: "none",
+            display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {ev?.title ?? "Event"}
+          </Link>
+          {ev && (
+            <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>
+              📅 {fmtDate(ev.start_date)} · 📍 {ev.location}
+            </div>
+          )}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+            {entry.distance_category && (
+              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999,
+                background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.3)", color: "#a78bfa" }}>
+                {entry.distance_category}
+              </span>
+            )}
+            <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999,
+              background: isApproved ? "rgba(74,222,128,0.1)" : "rgba(251,191,36,0.08)",
+              border: `1px solid ${isApproved ? "rgba(74,222,128,0.3)" : "rgba(251,191,36,0.25)"}`,
+              color: isApproved ? "#4ade80" : "#fbbf24" }}>
+              {isApproved ? "Approved" : "Waiting"}
+            </span>
+            <span style={{ fontSize: 10, color: "#555" }}>
+              Joined {timeSince(entry.created_at)}
+            </span>
+          </div>
+          {isApproved && entry.approved_at && (
+            <div style={{ fontSize: 11, color: "#4ade80", marginTop: 4 }}>
+              ✓ Approved {timeSince(entry.approved_at)} — check your email for next steps
+            </div>
+          )}
+          {!isApproved && entry.position != null && (
+            <div style={{ fontSize: 11, color: "#888", marginTop: 4 }}>
+              You are #{entry.position} in the waitlist for this category. We&apos;ll notify you when a slot opens.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function MyEventsDashboard() {
   const [regs,      setRegs]      = useState<Reg[]>([]);
+  const [wlEntries, setWlEntries] = useState<WaitlistEntry[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [apiErr,    setApiErr]    = useState<string | null>(null);
   const [tab,       setTab]       = useState<"upcoming" | "past" | "waitlisted" | "cancelled">("upcoming");
@@ -702,6 +825,7 @@ export default function MyEventsDashboard() {
         const d = await r.json();
         if (!r.ok) throw new Error(d.error ?? `HTTP ${r.status}`);
         setRegs(d.registrations ?? []);
+        setWlEntries(d.waitlist_entries ?? []);
       })
       .catch(err => setApiErr(String(err)))
       .finally(() => setLoading(false));
@@ -718,14 +842,14 @@ export default function MyEventsDashboard() {
     loadRegs(token);
   }, [loadRegs]);
 
-  const upcoming   = regs.filter(r => r.status !== "cancelled" && r.status !== "waitlisted" && !isEventOver(r.events));
-  const past       = regs.filter(r => r.status !== "cancelled" && r.status !== "waitlisted" &&  isEventOver(r.events));
-  const waitlisted = regs.filter(r => r.status === "waitlisted");
-  const cancelled  = regs.filter(r => r.status === "cancelled");
+  const upcoming       = regs.filter(r => r.status !== "cancelled" && r.status !== "waitlisted" && !isEventOver(r.events));
+  const past           = regs.filter(r => r.status !== "cancelled" && r.status !== "waitlisted" &&  isEventOver(r.events));
+  const waitlistedRegs = regs.filter(r => r.status === "waitlisted");
+  const cancelled      = regs.filter(r => r.status === "cancelled");
   const shown = tab === "upcoming"   ? upcoming
               : tab === "past"       ? past
-              : tab === "waitlisted" ? waitlisted
-              : cancelled;
+              : tab === "cancelled"  ? cancelled
+              : [];
 
   return (
     <div style={{ minHeight: "100vh", background: "#080808", color: "#fff", fontFamily: "'Inter',system-ui,sans-serif" }}>
@@ -750,7 +874,7 @@ export default function MyEventsDashboard() {
           {([
             { key: "upcoming",   label: "Upcoming",   count: upcoming.length },
             { key: "past",       label: "Past",       count: past.length },
-            { key: "waitlisted", label: "Waitlist",   count: waitlisted.length },
+            { key: "waitlisted", label: "Waitlist",   count: waitlistedRegs.length + wlEntries.length },
             { key: "cancelled",  label: "Cancelled",  count: cancelled.length },
           ] as const).map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
@@ -776,11 +900,32 @@ export default function MyEventsDashboard() {
               <div key={i} style={{ height: 120, borderRadius: 16, background: "rgba(255,255,255,0.04)", animation: "pulse 1.4s infinite" }} />
             ))}
           </div>
+        ) : tab === "waitlisted" ? (
+          waitlistedRegs.length === 0 && wlEntries.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "3rem 0", color: "#555" }}>
+              <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
+              <div style={{ fontSize: 15 }}>No waitlist entries</div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+              {wlEntries.map(w => (
+                <WaitlistEntryCard key={w.id} entry={w} />
+              ))}
+              {waitlistedRegs.map(r => (
+                <RegistrationCard
+                  key={r.id} reg={r} userToken={userToken}
+                  isUpcoming={!isEventOver(r.events)}
+                  onShowQR={showQR}
+                  onRefresh={() => loadRegs(userToken)}
+                />
+              ))}
+            </div>
+          )
         ) : shown.length === 0 ? (
           <div style={{ textAlign: "center", padding: "3rem 0", color: "#555" }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>{tab === "upcoming" ? "🗓️" : "🏁"}</div>
             <div style={{ fontSize: 15, marginBottom: 8 }}>
-              {tab === "upcoming" ? "No upcoming registrations" : "No past registrations"}
+              {tab === "upcoming" ? "No upcoming registrations" : tab === "past" ? "No past registrations" : "No cancelled registrations"}
             </div>
             {tab === "upcoming" && (
               <Link href="/events" style={{ fontSize: 13, color: "#e8620a", textDecoration: "none", fontWeight: 600 }}>
