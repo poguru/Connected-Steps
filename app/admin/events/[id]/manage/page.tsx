@@ -551,6 +551,8 @@ export default function EventManagePage() {
   const [wlCatFilter,     setWlCatFilter]     = useState("all");
   const [wlStatusFilter,  setWlStatusFilter]  = useState<"waiting" | "approved" | "all">("waiting");
   const [wlActing,        setWlActing]        = useState<string | null>(null);
+  const [expiring,        setExpiring]        = useState(false);
+  const [expireMsg,       setExpireMsg]       = useState("");
 
   const loadWaitlist = useCallback(async () => {
     setWaitlistLoading(true); setWaitlistError("");
@@ -567,6 +569,17 @@ export default function EventManagePage() {
     if (tab === "waitlist") void loadWaitlist();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
+
+  async function expireStaleSlots() {
+    if (!confirm("Expire stale pending_payment registrations? This frees up slots for waitlisted users.")) return;
+    setExpiring(true); setExpireMsg("");
+    try {
+      const r = await fetch(`/api/admin/events/${eventId}/expire-stale`, { method: "POST" });
+      const d = await r.json() as { message?: string; error?: string };
+      setExpireMsg(d.message ?? d.error ?? "Done");
+    } catch { setExpireMsg("Network error"); }
+    finally { setExpiring(false); }
+  }
 
   async function waitlistAction(entryId: string, action: "approve" | "reject" | "delete") {
     setWlActing(entryId); setWaitlistError("");
@@ -2009,8 +2022,19 @@ export default function EventManagePage() {
                             <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: ".07em", fontWeight: 700, marginTop: 2 }}>{s.label}</div>
                           </div>
                         ))}
-                        <button onClick={() => void loadWaitlist()} style={{ marginLeft: "auto", padding: "6px 12px", borderRadius: 8, background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", border: "none", cursor: "pointer", fontSize: 12, alignSelf: "center" }}>↻ Refresh</button>
+                        <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                          <button onClick={() => void loadWaitlist()} style={{ padding: "6px 12px", borderRadius: 8, background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", border: "none", cursor: "pointer", fontSize: 12 }}>↻ Refresh</button>
+                          <button onClick={() => void expireStaleSlots()} disabled={expiring}
+                            style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid rgba(239,68,68,0.25)", background: "rgba(239,68,68,0.06)", color: "#f87171", cursor: expiring ? "not-allowed" : "pointer", fontSize: 12, fontFamily: "inherit" }}>
+                            {expiring ? "Expiring…" : "⏳ Expire Stale Slots"}
+                          </button>
+                        </div>
                       </div>
+                      {expireMsg && (
+                        <div style={{ marginBottom: 12, fontSize: 12, padding: "8px 12px", borderRadius: 7, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#ccc" }}>
+                          {expireMsg}
+                        </div>
+                      )}
 
                       {/* Filter bar */}
                       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
