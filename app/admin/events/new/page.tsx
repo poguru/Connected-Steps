@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Button, Alert, Spinner } from "@/components/ui/ds";
+import { EventFormBuilder } from "@/components/admin/EventFormBuilder";
 
 // ── TipTap (lazy-loaded) ──────────────────────────────────────────────────────
 
@@ -1214,14 +1215,32 @@ function StepCategories({
             </Grid>
           </div>
 
-          {raceForm.price_type === "per_registration" && (
+          <div style={{ marginBottom: 14 }}>
+            <Field label="Participation Type" hint="Individual = one person per booking; Group = 2+ people share one registration">
+              <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 24, paddingTop: 6 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 7, cursor: "pointer", fontSize: 13, color: raceForm.min_participants === "1" && raceForm.max_participants === "1" ? "#e8620a" : "inherit" }}>
+                  <input type="radio" name="participation-type"
+                    checked={raceForm.min_participants === "1" && raceForm.max_participants === "1"}
+                    onChange={() => { setRF("min_participants", "1"); setRF("max_participants", "1"); }} />
+                  Individual (1 per registration)
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 7, cursor: "pointer", fontSize: 13, color: (raceForm.min_participants !== "1" || raceForm.max_participants !== "1") ? "#e8620a" : "inherit" }}>
+                  <input type="radio" name="participation-type"
+                    checked={raceForm.min_participants !== "1" || raceForm.max_participants !== "1"}
+                    onChange={() => { setRF("min_participants", "2"); setRF("max_participants", "2"); }} />
+                  Group (2+ participants)
+                </label>
+              </div>
+            </Field>
+          </div>
+          {(raceForm.min_participants !== "1" || raceForm.max_participants !== "1") && (
             <div style={{ marginBottom: 14 }}>
               <Grid cols="1fr 1fr" gap={14} mobile="1">
-                <Field label="Min Participants per Booking">
-                  <input type="number" className="wiz-input" value={raceForm.min_participants} onChange={e => setRF("min_participants", e.target.value)} min="1" />
+                <Field label="Min Participants" hint="e.g. 2 for Duo, 4 for Relay, 5 for team">
+                  <input type="number" className="wiz-input" value={raceForm.min_participants} onChange={e => setRF("min_participants", e.target.value)} min="2" />
                 </Field>
-                <Field label="Max Participants per Booking">
-                  <input type="number" className="wiz-input" value={raceForm.max_participants} onChange={e => setRF("max_participants", e.target.value)} min="1" />
+                <Field label="Max Participants" hint="Same as Min for fixed groups (e.g. 2/2 = Duo; 5/20 = open team)">
+                  <input type="number" className="wiz-input" value={raceForm.max_participants} onChange={e => setRF("max_participants", e.target.value)} min="2" />
                 </Field>
               </Grid>
             </div>
@@ -1623,9 +1642,10 @@ function StepRegistration({
         </div>
       </SectionCard>
 
-      <SectionCard title="Built-in Registration Fields">
-        <div style={{ fontSize: 12, color: "#555", marginBottom: 16 }}>
-          These fields are always collected. Toggle off to hide a field from the registration form.
+      <SectionCard title="Legacy Built-in Fields">
+        <div style={{ fontSize: 12, color: "#555", marginBottom: 14 }}>
+          Quick toggles for standard fields. For new events, use the Form Builder below — it provides
+          these same fields as pre-built templates with full customisation options.
         </div>
         <div style={{ display: "flex", flexDirection: "column" as const, gap: 14 }}>
           <Toggle value={regConfig.require_gender}            onChange={v => setRC("require_gender", v)}            label="Require Gender" />
@@ -1659,12 +1679,16 @@ function StepRegistration({
         </Grid>
       </SectionCard>
 
-      <SectionCard title="Custom Registration Fields">
+      <SectionCard title="Registration Form Builder">
         <div style={{ fontSize: 12, color: "#555", marginBottom: 16 }}>
-          Add questions specific to this event — e.g. club name, corporate team, qualifying time, t-shirt message.
-          Category-specific fields only appear to participants registering for that category.
+          Build the complete registration form. Use pre-built templates (Gender, Blood Group, T-Shirt Size,
+          Emergency Contact, Notes) or create custom fields. Drag to reorder. Set conditional logic and
+          category filters per field. Save the event first to unlock this builder.
         </div>
-        <FormBuilder eventId={eventId} races={races} />
+        <EventFormBuilder
+          eventId={eventId}
+          races={races.filter(r => r.name.trim() || r.distance.trim()).map(r => ({ id: r.id ?? "", name: r.name, distance: r.distance }))}
+        />
       </SectionCard>
     </div>
   );

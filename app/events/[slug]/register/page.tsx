@@ -17,9 +17,11 @@ interface EventFormField {
   placeholder: string | null; help_text: string | null; required: boolean;
   options: string[]; display_order: number;
   conditions: FieldCondition[]; default_value: string | null;
-  max_length: number | null; validation_pattern: string | null;
+  max_length: number | null; min_length: number | null;
+  validation_pattern: string | null; validation_rules: Record<string, unknown>;
   editable_after_reg: boolean; section: string | null;
   race_ids: string[];
+  is_hidden: boolean; is_readonly: boolean;
 }
 
 interface RegConfig {
@@ -272,17 +274,17 @@ export default function RegisterPage() {
     });
   }
 
-  // When the selected race changes, clamp participant count to the new min/max.
-  // Derives the race directly from state to avoid forward-reference issues.
+  // When the selected race changes, initialize or clamp participant count.
   useEffect(() => {
-    if (!isMulti || !ev) return;
-    const races = ev.races ?? [];
-    const race = races.find(r => r.distance === distanceCategory) ?? races[0] ?? null;
-    if (!race) return;
-    const min = race.min_participants ?? 1;
-    const max = Math.min(race.max_participants ?? 10, 20);
-    const clamped = Math.max(min, Math.min(participantCount, max));
-    if (clamped !== participantCount) changeCount(clamped);
+    if (!ev || !selectedRace) return;
+    const min = selectedRace.min_participants ?? 1;
+    const max = Math.min(selectedRace.max_participants ?? 10, 20);
+    // Group categories: snap to min when category changes so participant cards auto-generate.
+    // Legacy multi / individual: clamp within [min, max].
+    const target = (selectedRace.max_participants ?? 1) > 1
+      ? min
+      : Math.max(min, Math.min(participantCount, max));
+    if (target !== participantCount) changeCount(target);
   }, [distanceCategory, ev?.id]); // eslint-disable-line
 
   function setParticipant(idx: number, field: keyof ParticipantData, value: string) {
@@ -437,9 +439,30 @@ export default function RegisterPage() {
     });
   };
 
+  // ── Race / pricing resolution ─────────────────────────────────────────────
+  // Computed before isMulti so group-category races can trigger the multi-participant path.
+  // Falls back to ev.price when no event_races rows exist (backward compat).
+  const races = ev?.races ?? [];
+  const selectedRace = races.find(r => r.distance === distanceCategory) ?? races[0] ?? null;
+  const pricePerPerson = selectedRace?.price ?? ev?.price ?? 0;
+  const selectedRaceMaxParticipants = selectedRace?.max_participants ?? ev?.max_per_registration ?? 10;
+  const selectedRaceMinParticipants = selectedRace?.min_participants ?? 1;
+  const isPricePerReg = selectedRace?.price_type === "per_registration";
+
+  // A group category has max_participants > 1 on the selected race.
+  // isMulti covers both group categories and the legacy event-level flag.
+  const isGroupCategory = (selectedRace?.max_participants ?? 1) > 1;
+
+  // When a group category is active, keep every participant entry's category in sync with the
+  // top-level distanceCategory selector so the server always receives it on submit.
+  useEffect(() => {
+    if (!isGroupCategory || !distanceCategory) return;
+    setParticipants(prev => prev.map(p => ({ ...p, distance_category: distanceCategory })));
+  }, [distanceCategory, isGroupCategory]); // eslint-disable-line
+
   // ── Coupon validation ──────────────────────────────────────────────────────
 
-  const isMulti = ev?.allow_multi_participant ?? false;
+  const isMulti = isGroupCategory || (ev?.allow_multi_participant ?? false);
 
   const applyCoupon = useCallback(async () => {
     if (!coupon.trim()) return;
@@ -584,6 +607,12 @@ export default function RegisterPage() {
     if (!ev) return;
     setMultiSubmitted(true);
 
+    // For group categories: require a category to be chosen when the event has multiple
+    if (isGroupCategory && (ev.distance_categories ?? []).length > 1 && !distanceCategory) {
+      setSubmitErr("Please select a category before registering.");
+      return;
+    }
+
     // Enforce min_participants for the selected race
     if (selectedRace && selectedRace.min_participants > 1 && participantCount < selectedRace.min_participants) {
       setSubmitErr(`The ${selectedRace.name ?? selectedRace.distance} category requires at least ${selectedRace.min_participants} participants.`);
@@ -650,15 +679,6 @@ export default function RegisterPage() {
   }
 
   // ── Price display ──────────────────────────────────────────────────────────
-
-  // Resolve the selected race from the races array so price is reactive to category selection.
-  // Falls back to ev.price if no races data (backward compat with events that have no event_races rows).
-  const races = ev?.races ?? [];
-  const selectedRace = races.find(r => r.distance === distanceCategory) ?? races[0] ?? null;
-  const pricePerPerson = selectedRace?.price ?? ev?.price ?? 0;
-  const selectedRaceMaxParticipants = selectedRace?.max_participants ?? ev?.max_per_registration ?? 10;
-  const selectedRaceMinParticipants = selectedRace?.min_participants ?? 1;
-  const isPricePerReg = selectedRace?.price_type === "per_registration";
 
   const totalBeforeDisc = isMulti
     ? (isPricePerReg ? pricePerPerson : pricePerPerson * participantCount)
@@ -742,8 +762,10 @@ export default function RegisterPage() {
   // ── Multi-participant form ─────────────────────────────────────────────────
 
   if (isMulti) {
-    const maxSlots = Math.min(selectedRaceMaxParticipants || 10, 20);
-    const cats     = ev.distance_categories ?? [];
+    const minPax       = selectedRaceMinParticipants;
+    const maxSlots     = Math.min(selectedRaceMaxParticipants || 10, 20);
+    const isFixedGroup = isGroupCategory && minPax === maxSlots && minPax > 1;
+    const cats         = ev.distance_categories ?? [];
 
     return (
       <div style={{ minHeight: "100vh", background: "#0d0d10", color: "#fff" }}>
@@ -755,13 +777,46 @@ export default function RegisterPage() {
           {EventHeader}
           {AlreadyBanner}
 
-          {/* Participant count selector */}
+          {/* Top-level category selector for group registrations */}
+          {isGroupCategory && cats.length > 0 && (
+            <section style={{ marginBottom: "1.75rem" }}>
+              <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.875rem" }}>
+                Category *
+              </div>
+              {cats.length > 1 ? (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                  {cats.map(cat => {
+                    const d   = getDistanceOption(cat);
+                    const sel = distanceCategory === cat;
+                    return (
+                      <button key={cat} type="button" onClick={() => setDistanceCategory(cat)}
+                        style={{
+                          padding: "8px 18px", borderRadius: "8px", cursor: "pointer",
+                          fontFamily: "inherit", transition: "all 0.15s",
+                          border: `2px solid ${sel ? d.color : "rgba(255,255,255,0.12)"}`,
+                          background: sel ? d.bg : "transparent",
+                          color: sel ? d.color : "rgba(255,255,255,0.55)",
+                          fontWeight: sel ? 800 : 500, fontSize: "0.9rem",
+                        }}>
+                        {cat}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.7)", padding: "8px 0" }}>{cats[0]}</div>
+              )}
+            </section>
+          )}
+
+          {/* Participant count selector — hidden for fixed-size groups (min === max > 1) */}
+          {!isFixedGroup && (
           <section style={{ marginBottom: "1.75rem" }}>
             <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.875rem" }}>
               Number of Participants *
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-              {Array.from({ length: maxSlots }, (_, i) => i + 1).map(n => (
+              {Array.from({ length: maxSlots - minPax + 1 }, (_, i) => minPax + i).map(n => (
                 <button key={n} type="button" onClick={() => changeCount(n)}
                   style={{
                     width: "44px", height: "44px", borderRadius: "10px", fontFamily: "inherit",
@@ -782,6 +837,7 @@ export default function RegisterPage() {
                 : `₹${pricePerPerson} per person`}
             </div>
           </section>
+          )}
 
           <form id="multi-participant-form" onSubmit={handleMultiSubmit} noValidate
             style={{ opacity: alreadyReg ? 0.4 : 1, pointerEvents: alreadyReg ? "none" : "auto" }}>
@@ -860,8 +916,8 @@ export default function RegisterPage() {
                     {multiErrors[idx]?.mobile && <Err>{multiErrors[idx].mobile}</Err>}
                   </div>
 
-                  {/* Distance category — per participant */}
-                  {cats.length > 1 && (
+                  {/* Distance category — per participant (legacy multi only; group uses top-level selector) */}
+                  {cats.length > 1 && !isGroupCategory && (
                     <div style={{ gridColumn: "1/-1" }}>
                       <label style={LABEL}>Distance Category *</label>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
@@ -887,7 +943,7 @@ export default function RegisterPage() {
                       {multiErrors[idx]?.distance_category && <Err>{multiErrors[idx].distance_category}</Err>}
                     </div>
                   )}
-                  {cats.length === 1 && (
+                  {cats.length === 1 && !isGroupCategory && (
                     <div style={{ gridColumn: "1/-1", fontSize: "11px", color: "#555" }}>
                       Category: {cats[0]}
                     </div>
@@ -1058,7 +1114,11 @@ export default function RegisterPage() {
     );
   }
 
-  // ── Single-participant form (original, unchanged) ─────────────────────────
+  // ── Single-participant form ───────────────────────────────────────────────
+  // dynKeys: if the admin has added a form-builder field with the same key as a
+  // hardcoded built-in (gender, date_of_birth, blood_group, etc.), the dynamic
+  // field takes priority and the hardcoded rendering is skipped.
+  const dynKeys = new Set((ev.form_fields ?? []).map(f => f.field_key));
 
   return (
     <div style={{ minHeight: "100vh", background: "#0d0d10", color: "#fff" }}>
@@ -1214,7 +1274,7 @@ export default function RegisterPage() {
                 {errors.phone && <Err>{errors.phone}</Err>}
               </div>
 
-              {regCfg.require_gender && (
+              {regCfg.require_gender && !dynKeys.has("gender") && (
                 <div id="field-gender">
                   <label style={LABEL}>Gender *</label>
                   <select style={{ ...INPUT, cursor: "pointer", colorScheme: "dark", borderColor: errors.gender ? "rgba(239,68,68,0.6)" : undefined }} value={form.gender} onChange={set("gender")}>
@@ -1227,7 +1287,7 @@ export default function RegisterPage() {
                 </div>
               )}
 
-              {regCfg.require_dob && (
+              {regCfg.require_dob && !dynKeys.has("date_of_birth") && (
                 <div id="field-date_of_birth">
                   <label style={LABEL}>Date of Birth *</label>
                   <input style={{ ...INPUT, colorScheme: "dark", borderColor: errors.date_of_birth ? "rgba(239,68,68,0.6)" : undefined }} type="date" value={form.date_of_birth} onChange={set("date_of_birth")} max={new Date().toISOString().split("T")[0]} />
@@ -1238,13 +1298,15 @@ export default function RegisterPage() {
             </div>
           </section>
 
-          {/* Event information */}
-          {(regCfg.require_blood_group || regCfg.require_emergency_contact || regCfg.show_notes) && (
+          {/* Event information (hardcoded built-in fields — skipped if replaced by dynamic form fields) */}
+          {((regCfg.require_blood_group && !dynKeys.has("blood_group")) ||
+            (regCfg.require_emergency_contact && !dynKeys.has("emergency_contact_name")) ||
+            (regCfg.show_notes && !dynKeys.has("notes"))) && (
           <section style={{ marginBottom: "1.5rem" }}>
             <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>Event Information</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
 
-              {regCfg.require_blood_group && (
+              {regCfg.require_blood_group && !dynKeys.has("blood_group") && (
                 <div id="field-blood_group">
                   <label style={LABEL}>Blood Group *</label>
                   <select style={{ ...INPUT, cursor: "pointer", colorScheme: "dark", borderColor: errors.blood_group ? "rgba(239,68,68,0.6)" : undefined }} value={form.blood_group} onChange={set("blood_group")}>
@@ -1255,7 +1317,7 @@ export default function RegisterPage() {
                 </div>
               )}
 
-              {regCfg.require_emergency_contact && (<>
+              {regCfg.require_emergency_contact && !dynKeys.has("emergency_contact_name") && (<>
                 <div id="field-emergency_contact_name">
                   <label style={LABEL}>Emergency Contact Name *</label>
                   <input style={{ ...INPUT, borderColor: errors.emergency_contact_name ? "rgba(239,68,68,0.6)" : undefined }} value={form.emergency_contact_name} onChange={set("emergency_contact_name")} placeholder="Contact person's name" />
@@ -1269,7 +1331,7 @@ export default function RegisterPage() {
                 </div>
               </>)}
 
-              {regCfg.show_notes && (
+              {regCfg.show_notes && !dynKeys.has("notes") && (
                 <div style={{ gridColumn: "1/-1" }} id="field-special_notes">
                   <label style={LABEL}>{regCfg.notes_label} *</label>
                   <textarea style={{ ...INPUT, minHeight: "70px", resize: "vertical", borderColor: errors.special_notes ? "rgba(239,68,68,0.6)" : undefined } as React.CSSProperties} value={form.special_notes} onChange={set("special_notes")} placeholder={regCfg.notes_placeholder} />
@@ -1285,6 +1347,7 @@ export default function RegisterPage() {
           {(() => {
             const builtins: Record<string, string> = { distance_category: distanceCategory, gender: form.gender, blood_group: form.blood_group };
             const visibleFields = (ev.form_fields ?? []).filter(f => {
+              if (f.is_hidden) return false;
               if (f.race_ids?.length > 0 && selectedRace && !f.race_ids.includes(selectedRace.id)) return false;
               return evaluateConditions(f.conditions ?? [], customFieldValues, builtins);
             });
@@ -1450,7 +1513,7 @@ function CustomFieldInput({
 
   return (
     <div id={`cf-${field.field_key}`}>
-      <label style={labelStyle}>{field.label}{field.required ? " *" : ""}</label>
+      {t !== "section_heading" && <label style={labelStyle}>{field.label}{field.required ? " *" : ""}</label>}
 
       {t === "textarea" && (
         <textarea
@@ -1526,6 +1589,12 @@ function CustomFieldInput({
         </label>
       )}
 
+      {t === "section_heading" && (
+        <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", paddingBottom: "6px", borderBottom: "1px solid rgba(232,98,10,0.2)", marginTop: "0.5rem" }}>
+          {field.label}
+        </div>
+      )}
+
       {(t === "text" || t === "number" || t === "date") && (
         <input
           style={{ ...baseInput, colorScheme: t === "date" ? "dark" : undefined } as React.CSSProperties}
@@ -1533,7 +1602,96 @@ function CustomFieldInput({
           value={value} onChange={e => onChange(e.target.value)}
           placeholder={field.placeholder ?? ""}
           maxLength={t === "text" && field.max_length ? field.max_length : undefined}
+          readOnly={field.is_readonly}
         />
+      )}
+
+      {t === "decimal" && (
+        <input style={baseInput} type="number" step="any"
+          value={value} onChange={e => onChange(e.target.value)}
+          placeholder={field.placeholder ?? ""}
+          readOnly={field.is_readonly}
+        />
+      )}
+
+      {t === "time" && (
+        <input style={{ ...baseInput, colorScheme: "dark" } as React.CSSProperties}
+          type="time" value={value} onChange={e => onChange(e.target.value)}
+          readOnly={field.is_readonly}
+        />
+      )}
+
+      {t === "datetime" && (
+        <input style={{ ...baseInput, colorScheme: "dark" } as React.CSSProperties}
+          type="datetime-local" value={value} onChange={e => onChange(e.target.value)}
+          readOnly={field.is_readonly}
+        />
+      )}
+
+      {t === "yes_no" && (
+        <div style={{ display: "flex", gap: "8px", paddingTop: "4px" }}>
+          {["Yes", "No"].map(opt => {
+            const sel = value === opt.toLowerCase();
+            return (
+              <button key={opt} type="button" onClick={() => !field.is_readonly && onChange(sel ? "" : opt.toLowerCase())}
+                style={{ padding: "8px 22px", borderRadius: "8px", cursor: field.is_readonly ? "default" : "pointer", fontFamily: "inherit", fontSize: "0.875rem",
+                  border: `2px solid ${sel ? "#e8620a" : "rgba(255,255,255,0.12)"}`,
+                  background: sel ? "rgba(232,98,10,0.15)" : "transparent",
+                  color: sel ? "#e8620a" : "rgba(255,255,255,0.55)", fontWeight: sel ? 700 : 500 }}>
+                {opt}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {t === "url" && (
+        <input style={baseInput} type="url"
+          value={value} onChange={e => onChange(e.target.value)}
+          placeholder={field.placeholder ?? "https://"}
+          readOnly={field.is_readonly}
+        />
+      )}
+
+      {(t === "country" || t === "state") && (
+        <input style={baseInput} type="text"
+          value={value} onChange={e => onChange(e.target.value)}
+          placeholder={field.placeholder ?? (t === "country" ? "e.g. India" : "e.g. Maharashtra")}
+          readOnly={field.is_readonly}
+        />
+      )}
+
+      {t === "pincode" && (
+        <input style={baseInput} type="number" min="100000" max="999999"
+          value={value} onChange={e => { if (e.target.value.length <= 6) onChange(e.target.value); }}
+          placeholder={field.placeholder ?? "6-digit PIN code"}
+          readOnly={field.is_readonly}
+        />
+      )}
+
+      {t === "image_upload" && (
+        <label style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          gap: "8px", padding: "20px 14px",
+          border: `2px dashed ${borderErr ?? "rgba(255,255,255,0.15)"}`,
+          borderRadius: "10px", cursor: field.is_readonly ? "default" : "pointer",
+          background: "rgba(255,255,255,0.02)", color: "rgba(255,255,255,0.5)",
+          fontSize: "0.875rem",
+        }}>
+          {!field.is_readonly && <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) onChange(f.name); }} />}
+          <span>🖼️ {value || (field.placeholder ?? "Click to upload an image")}</span>
+        </label>
+      )}
+
+      {t === "rating" && (
+        <div style={{ display: "flex", gap: "6px", paddingTop: "4px" }}>
+          {[1,2,3,4,5].map(n => (
+            <button key={n} type="button" onClick={() => !field.is_readonly && onChange(String(n))}
+              style={{ fontSize: "24px", background: "none", border: "none", cursor: field.is_readonly ? "default" : "pointer", color: Number(value || 0) >= n ? "#f59e0b" : "#333", lineHeight: 1 }}>
+              ★
+            </button>
+          ))}
+        </div>
       )}
 
       {t === "email" && (
