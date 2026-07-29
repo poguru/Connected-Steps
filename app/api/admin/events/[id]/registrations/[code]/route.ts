@@ -30,6 +30,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       confirmation_email_sent_at, email_status, email_ses_message_id,
       breakfast_availed, breakfast_availed_at, breakfast_verified_by,
       tshirt_size, tshirt_issued, tshirt_issued_at, tshirt_issued_by,
+      bib_number, bib_collected_at, bib_collected_by,
       slot_reserved_at, slot_expires_at,
       events (
         id, title, start_date, start_time, end_date, location,

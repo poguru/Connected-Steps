@@ -48,6 +48,9 @@ interface Registration {
   tshirt_issued:              boolean;
   tshirt_issued_at:           string | null;
   tshirt_issued_by:           string | null;
+  bib_number:                 string | null;
+  bib_collected_at:           string | null;
+  bib_collected_by:           string | null;
   events: {
     id:                   string;
     title:                string;
@@ -486,12 +489,15 @@ export default function ParticipantDetailPage() {
                 />
                 {svc?.tshirt_issued_by && <Row label="Issued by" value={svc.tshirt_issued_by} />}
               </>}
-              {svc?.bib_collected_at && <>
+              {reg.bib_number && (
+                <Row label="BIB Number" value={reg.bib_number} highlight />
+              )}
+              {(svc?.bib_collected_at ?? reg.bib_collected_at) && <>
                 <Row label="BIB"
-                     value={`✅ Collected ${fmtDate(svc.bib_collected_at, true)}`}
+                     value={`✅ Collected ${fmtDate(svc?.bib_collected_at ?? reg.bib_collected_at, true)}`}
                      color="#4ade80"
                 />
-                {svc?.bib_collected_by && <Row label="Collected by" value={svc.bib_collected_by} />}
+                {(svc?.bib_collected_by ?? reg.bib_collected_by) && <Row label="Collected by" value={(svc?.bib_collected_by ?? reg.bib_collected_by)!} />}
               </>}
               {svc && <Row label="Medal"
                    value={svc.medal_issued ? `✅ Issued ${fmtDate(svc.medal_issued_at, true)}` : "Not issued"}
