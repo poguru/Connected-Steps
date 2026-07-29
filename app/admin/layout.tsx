@@ -97,11 +97,12 @@ const NAV_GROUPS = [
     label: "Reports",
     icon:  "📊",
     links: [
-      { label: "Analytics",    href: "/admin/analytics",  exact: false, icon: "📈" },
-      { label: "Leaderboard",  href: "/admin/leaderboard",exact: false, icon: "🏆" },
-      { label: "Points",       href: "/admin/points",     exact: false, icon: "⭐" },
-      { label: "Memberships",  href: "/admin/membership", exact: false, icon: "🎖" },
-      { label: "Referrals",    href: "/admin/referrals",  exact: false, icon: "🔗" },
+      { label: "Analytics",       href: "/admin/analytics",       exact: false, icon: "📈" },
+      { label: "Share Analytics", href: "/admin/share-analytics", exact: false, icon: "↗" },
+      { label: "Leaderboard",     href: "/admin/leaderboard",     exact: false, icon: "🏆" },
+      { label: "Points",          href: "/admin/points",          exact: false, icon: "⭐" },
+      { label: "Memberships",     href: "/admin/membership",      exact: false, icon: "🎖" },
+      { label: "Referrals",       href: "/admin/referrals",       exact: false, icon: "🔗" },
     ],
   },
   {

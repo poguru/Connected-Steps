@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import type { UserPost } from "@/app/api/posts/route";
+import ShareModal from "@/components/share/ShareModal";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -69,6 +70,7 @@ export default function PostCard({ post, currentUserEmail, onDeleted }: Props) {
   const [reported,      setReported]      = useState(false);
   const [reactBusy,     setReactBusy]     = useState(false);
   const [photoOpen,     setPhotoOpen]     = useState(false);
+  const [showShare,     setShowShare]     = useState(false);
   const commentRef = useRef<HTMLTextAreaElement>(null);
 
   const isOwner = post.author_email.toLowerCase() === currentUserEmail.toLowerCase();
@@ -297,7 +299,27 @@ export default function PostCard({ post, currentUserEmail, onDeleted }: Props) {
           <span style={{ fontSize: "1rem" }}>💬</span>
           {commentCount > 0 && <span>{commentCount}</span>}
         </button>
+        <button onClick={() => setShowShare(true)}
+          style={{ display: "flex", alignItems: "center", gap: "0.3rem", padding: "5px 12px", borderRadius: 20, border: "1px solid var(--border)", background: "transparent", cursor: "pointer", fontSize: "0.78rem", color: "var(--muted-foreground)", fontFamily: "inherit", transition: "all 0.15s", marginLeft: "auto" }}>
+          <span style={{ fontSize: "0.9rem" }}>↗</span>
+          <span>Share</span>
+        </button>
       </div>
+
+      {showShare && (
+        <ShareModal
+          config={{
+            type:        "post",
+            id:          post.id,
+            title:       post.body.slice(0, 120),
+            description: `by ${post.author_name ?? "Community Member"} · Connected Steps`,
+            url:         `${typeof window !== "undefined" ? window.location.origin : "https://www.connectedsteps.in"}/s/post/${post.id}`,
+            imageUrl:    `${typeof window !== "undefined" ? window.location.origin : "https://www.connectedsteps.in"}/api/og/post/${post.id}`,
+            authorName:  post.author_name ?? undefined,
+          }}
+          onClose={() => setShowShare(false)}
+        />
+      )}
 
       {/* ── Comments section ── */}
       {showComments && (
