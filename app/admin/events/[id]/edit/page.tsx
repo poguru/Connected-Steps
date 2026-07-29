@@ -73,7 +73,27 @@ interface ChangeEntry {
   changed_at: string;
 }
 
-type TabKey = "general" | "schedule" | "registration" | "media" | "content" | "sponsors" | "log";
+type TabKey = "general" | "schedule" | "registration" | "media" | "content" | "sponsors" | "categories" | "form_fields" | "log";
+
+interface RacePerks { medal: boolean; bib: boolean; tshirt: boolean; breakfast: boolean; certificate: boolean; goodies: boolean; }
+
+interface RaceRow {
+  id: string; name: string; distance: string;
+  price: number; early_bird_price: number | null;
+  price_type: string; min_participants: number; max_participants: number;
+  max_slots: number | null; slot_reserved: number;
+  reporting_time: string | null; gun_time: string | null;
+  timing_chip: boolean; auto_bib: boolean; bib_prefix: string | null;
+  gender_restriction: string | null; min_age: number | null; max_age: number | null;
+  perks: RacePerks | null; display_order: number; status: string;
+}
+
+interface FormFieldRow {
+  id: string; field_key: string; field_type: string; label: string;
+  placeholder: string | null; help_text: string | null; required: boolean;
+  options: string[]; display_order: number; is_active: boolean;
+  section: string | null; race_ids: string[];
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -369,6 +389,35 @@ export default function EditEventPage() {
   // Reason for change (shared)
   const [reason, setReason] = useState("");
 
+  // Race / category state
+  const [races,          setRaces]          = useState<RaceRow[]>([]);
+  const [raceEditId,     setRaceEditId]     = useState<string | null>(null);
+  const [raceSaving,     setRaceSaving]     = useState(false);
+  const [raceErr,        setRaceErr]        = useState("");
+  const [raceForm,       setRaceForm]       = useState<Partial<RaceRow> & { price: number; early_bird_price: number | null; min_participants: number; max_participants: number }>({
+    name: "", distance: "", price: 0, early_bird_price: null,
+    price_type: "per_participant", min_participants: 1, max_participants: 1,
+    max_slots: null, reporting_time: null, gun_time: null,
+    timing_chip: false, auto_bib: false, bib_prefix: null,
+    gender_restriction: null, min_age: null, max_age: null,
+    perks: { medal: false, bib: true, tshirt: false, breakfast: false, certificate: false, goodies: false },
+    status: "active",
+  });
+
+  // Form fields state
+  const [formFields,     setFormFields]     = useState<FormFieldRow[]>([]);
+  const [ffEditId,       setFfEditId]       = useState<string | null>(null);
+  const [ffSaving,       setFfSaving]       = useState(false);
+  const [ffErr,          setFfErr]          = useState("");
+  const [ffLabel,        setFfLabel]        = useState("");
+  const [ffType,         setFfType]         = useState("text");
+  const [ffRequired,     setFfRequired]     = useState(false);
+  const [ffPlaceholder,  setFfPlaceholder]  = useState("");
+  const [ffHelp,         setFfHelp]         = useState("");
+  const [ffSection,      setFfSection]      = useState("");
+  const [ffOptions,      setFfOptions]      = useState("");
+  const [ffRaceIds,      setFfRaceIds]      = useState<string[]>([]);
+
   // Sponsor state
   const [sponsorAdding,      setSponsorAdding]      = useState(false);
   const [newSponsor,         setNewSponsor]         = useState({ name: "", tier: "community", website_url: "" });
@@ -386,14 +435,20 @@ export default function EditEventPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [evRes, spRes, logRes] = await Promise.all([
+    const [evRes, spRes, logRes, racesRes, ffRes] = await Promise.all([
       fetch(`/api/admin/events/${eventId}/edit`),
       fetch(`/api/admin/events/${eventId}/sponsors`),
       fetch(`/api/admin/events/${eventId}/change-log?limit=50`),
+      fetch(`/api/admin/events/${eventId}/races`),
+      fetch(`/api/admin/events/${eventId}/form-fields`),
     ]);
-    const evData  = await evRes.json()  as { event?: EventFields; confirmed_count?: number };
-    const spData  = await spRes.json()  as { sponsors?: Sponsor[] };
-    const logData = await logRes.json() as { log?: ChangeEntry[] };
+    const evData    = await evRes.json()    as { event?: EventFields; confirmed_count?: number };
+    const spData    = await spRes.json()    as { sponsors?: Sponsor[] };
+    const logData   = await logRes.json()   as { log?: ChangeEntry[] };
+    const racesData = await racesRes.json() as { races?: RaceRow[] };
+    const ffData    = await ffRes.json()    as { fields?: FormFieldRow[] };
+    setRaces(racesData.races ?? []);
+    setFormFields(ffData.fields ?? []);
 
     if (evData.event) {
       const e = evData.event;
@@ -546,13 +601,15 @@ export default function EditEventPage() {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   const TABS: { key: TabKey; label: string }[] = [
-    { key: "general",      label: "✏️ General"      },
-    { key: "schedule",     label: "📅 Schedule"     },
-    { key: "registration", label: "🎫 Registration" },
-    { key: "media",        label: "🖼 Media"         },
-    { key: "content",      label: "📄 Content"      },
-    { key: "sponsors",     label: "🤝 Sponsors"     },
-    { key: "log",          label: `📋 Log (${changeLog.length})` },
+    { key: "general",      label: "✏️ General"                     },
+    { key: "schedule",     label: "📅 Schedule"                    },
+    { key: "registration", label: "🎫 Registration"                },
+    { key: "categories",   label: `🏃 Categories (${races.length})` },
+    { key: "form_fields",  label: `📝 Fields (${formFields.length})` },
+    { key: "media",        label: "🖼 Media"                       },
+    { key: "content",      label: "📄 Content"                     },
+    { key: "sponsors",     label: "🤝 Sponsors"                    },
+    { key: "log",          label: `📋 Log (${changeLog.length})`   },
   ];
 
   if (loading) {
@@ -1080,6 +1137,338 @@ export default function EditEventPage() {
             )}
           </div>
         )}
+        {/* ── CATEGORIES ──────────────────────────────────────────────────────── */}
+        {tab === "categories" && (
+          <div style={S.card}>
+            <SectionHead title="Race Categories" desc="Add, edit, reorder, or change the status of each race category." />
+
+            {raceErr && <Alert variant="error" style={{ marginBottom: 14 }}>{raceErr}</Alert>}
+
+            {/* Race list */}
+            {races.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                {races.map(r => {
+                  const isEditing = raceEditId === r.id;
+                  const statusColor: Record<string, string> = { active: "#4ade80", paused: "#fbbf24", hidden: "#888", archived: "#555" };
+                  return (
+                    <div key={r.id} style={{ marginBottom: 10, border: `1px solid ${isEditing ? "rgba(232,98,10,0.4)" : "rgba(255,255,255,0.07)"}`, borderRadius: 10, overflow: "hidden" }}>
+                      {/* Summary row */}
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "rgba(255,255,255,0.02)", gap: 12, flexWrap: "wrap" as const }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 14, color: r.status === "archived" ? "#444" : "#fff" }}>{r.name}</div>
+                            <div style={{ display: "flex", gap: 6, marginTop: 3, flexWrap: "wrap" as const, alignItems: "center" }}>
+                              <span style={{ fontSize: 11, color: "#666" }}>{r.distance}</span>
+                              <span style={{ fontSize: 11, color: "#e8620a", fontWeight: 700 }}>{r.price === 0 ? "Free" : `₹${r.price}`}</span>
+                              {r.max_slots && <span style={{ fontSize: 11, color: "#555" }}>{r.slot_reserved}/{r.max_slots} slots</span>}
+                              <span style={{ fontSize: 10, fontWeight: 700, color: statusColor[r.status] ?? "#888", textTransform: "uppercase" as const }}>{r.status}</span>
+                              {r.timing_chip && <span style={{ fontSize: 10, color: "#60a5fa" }}>⏱ Chip</span>}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap" as const }}>
+                          <Button size="xs" variant="ghost" onClick={() => {
+                            setRaceEditId(isEditing ? null : r.id);
+                            if (!isEditing) {
+                              setRaceForm({ ...r, price: r.price, early_bird_price: r.early_bird_price, min_participants: r.min_participants, max_participants: r.max_participants });
+                              setRaceErr("");
+                            }
+                          }}>{isEditing ? "Cancel" : "Edit"}</Button>
+                          <Button size="xs" variant="ghost" onClick={async () => {
+                            const res  = await fetch(`/api/admin/events/${eventId}/races`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...r, name: `${r.name} (Copy)`, display_order: races.length }) });
+                            const data = await res.json() as { race?: RaceRow };
+                            if (data.race) { setRaces(rs => [...rs, data.race!]); setToast("✅ Duplicated"); }
+                          }}>Dupe</Button>
+                          {/* Status cycle */}
+                          {r.status === "active" && <Button size="xs" variant="secondary" onClick={async () => {
+                            await fetch(`/api/admin/events/${eventId}/races`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: r.id, status: "paused" }) });
+                            setRaces(rs => rs.map(x => x.id === r.id ? { ...x, status: "paused" } : x));
+                          }}>Pause</Button>}
+                          {r.status === "paused" && <Button size="xs" variant="secondary" onClick={async () => {
+                            await fetch(`/api/admin/events/${eventId}/races`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: r.id, status: "active" }) });
+                            setRaces(rs => rs.map(x => x.id === r.id ? { ...x, status: "active" } : x));
+                          }}>Activate</Button>}
+                          {r.status !== "archived" && <Button size="xs" variant="danger" onClick={async () => {
+                            if (!confirm(`Archive "${r.name}"? It will be hidden from registration.`)) return;
+                            await fetch(`/api/admin/events/${eventId}/races`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: r.id, status: "archived" }) });
+                            setRaces(rs => rs.map(x => x.id === r.id ? { ...x, status: "archived" } : x));
+                          }}>Archive</Button>}
+                          {r.status === "archived" && <Button size="xs" variant="ghost" onClick={async () => {
+                            await fetch(`/api/admin/events/${eventId}/races`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: r.id, status: "active" }) });
+                            setRaces(rs => rs.map(x => x.id === r.id ? { ...x, status: "active" } : x));
+                          }}>Restore</Button>}
+                        </div>
+                      </div>
+
+                      {/* Inline edit form */}
+                      {isEditing && (
+                        <div style={{ padding: "16px", borderTop: "1px solid rgba(255,255,255,0.06)", background: "rgba(232,98,10,0.03)" }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+                            <Field label="Name"><input style={S.input} value={raceForm.name ?? ""} onChange={e => setRaceForm(f => ({ ...f, name: e.target.value }))} /></Field>
+                            <Field label="Distance"><input style={S.input} value={raceForm.distance ?? ""} onChange={e => setRaceForm(f => ({ ...f, distance: e.target.value }))} /></Field>
+                            <Field label="Entry Fee (₹)"><input type="number" style={S.input} value={raceForm.price} onChange={e => setRaceForm(f => ({ ...f, price: Number(e.target.value) }))} min={0} /></Field>
+                            <Field label="Early Bird (₹)"><input type="number" style={S.input} value={raceForm.early_bird_price ?? ""} onChange={e => setRaceForm(f => ({ ...f, early_bird_price: e.target.value ? Number(e.target.value) : null }))} placeholder="Same as price" /></Field>
+                            <Field label="Max Slots"><input type="number" style={S.input} value={raceForm.max_slots ?? ""} onChange={e => setRaceForm(f => ({ ...f, max_slots: e.target.value ? Number(e.target.value) : null }))} placeholder="Unlimited" /></Field>
+                            <Field label="BIB Prefix"><input style={S.input} value={raceForm.bib_prefix ?? ""} onChange={e => setRaceForm(f => ({ ...f, bib_prefix: e.target.value || null }))} placeholder="e.g. 5K" /></Field>
+                            <Field label="Reporting Time"><input type="time" style={S.input} value={raceForm.reporting_time ?? ""} onChange={e => setRaceForm(f => ({ ...f, reporting_time: e.target.value || null }))} /></Field>
+                            <Field label="Gun Time"><input type="time" style={S.input} value={raceForm.gun_time ?? ""} onChange={e => setRaceForm(f => ({ ...f, gun_time: e.target.value || null }))} /></Field>
+                            <Field label="Pricing Model">
+                              <select style={S.select} value={raceForm.price_type ?? "per_participant"} onChange={e => setRaceForm(f => ({ ...f, price_type: e.target.value }))}>
+                                <option value="per_participant">Per Participant</option>
+                                <option value="per_registration">Per Registration (flat)</option>
+                              </select>
+                            </Field>
+                            {raceForm.price_type === "per_registration" && <>
+                              <Field label="Min Participants"><input type="number" style={S.input} min={1} value={raceForm.min_participants} onChange={e => setRaceForm(f => ({ ...f, min_participants: Number(e.target.value) }))} /></Field>
+                              <Field label="Max Participants"><input type="number" style={S.input} min={1} value={raceForm.max_participants} onChange={e => setRaceForm(f => ({ ...f, max_participants: Number(e.target.value) }))} /></Field>
+                            </>}
+                          </div>
+                          <div style={{ marginBottom: 12 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase" as const, letterSpacing: ".08em", marginBottom: 8 }}>Perks</div>
+                            <div style={{ display: "flex", gap: 14, flexWrap: "wrap" as const }}>
+                              {([ ["medal","🏅","Medal"], ["bib","📋","BIB"], ["tshirt","👕","T-Shirt"], ["breakfast","🍌","Breakfast"], ["certificate","📜","Certificate"], ["goodies","🎁","Goodies"] ] as [keyof RacePerks, string, string][]).map(([key, icon, label]) => (
+                                <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 13, color: (raceForm.perks ?? {})[key] ? "#e8620a" : "#666" }}>
+                                  <input type="checkbox" checked={(raceForm.perks ?? {})[key] ?? false} onChange={e => setRaceForm(f => ({ ...f, perks: { ...(f.perks ?? { medal: false, bib: true, tshirt: false, breakfast: false, certificate: false, goodies: false }), [key]: e.target.checked } }))} />
+                                  {icon} {label}
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", gap: 14, marginBottom: 14, flexWrap: "wrap" as const }}>
+                            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#bbb", cursor: "pointer" }}>
+                              <input type="checkbox" checked={raceForm.timing_chip ?? false} onChange={e => setRaceForm(f => ({ ...f, timing_chip: e.target.checked }))} />
+                              Timing Chip
+                            </label>
+                            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#bbb", cursor: "pointer" }}>
+                              <input type="checkbox" checked={raceForm.auto_bib ?? false} onChange={e => setRaceForm(f => ({ ...f, auto_bib: e.target.checked }))} />
+                              Auto BIB
+                            </label>
+                          </div>
+                          <Button size="sm" loading={raceSaving} onClick={async () => {
+                            if (!raceForm.name?.trim() || !raceForm.distance?.trim()) { setRaceErr("Name and distance are required."); return; }
+                            setRaceSaving(true); setRaceErr("");
+                            try {
+                              const res  = await fetch(`/api/admin/events/${eventId}/races`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: raceEditId, ...raceForm }) });
+                              const data = await res.json() as { race?: RaceRow; error?: string };
+                              if (!res.ok) { setRaceErr(data.error ?? "Save failed"); return; }
+                              if (data.race) { setRaces(rs => rs.map(x => x.id === raceEditId ? data.race! : x)); setRaceEditId(null); setToast("✅ Race updated"); }
+                            } catch { setRaceErr("Network error"); }
+                            finally { setRaceSaving(false); }
+                          }}>Save Changes</Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Add race form */}
+            {raceEditId === null && (
+              <div style={{ borderTop: races.length > 0 ? "1px solid rgba(255,255,255,0.07)" : undefined, paddingTop: races.length > 0 ? 20 : 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#888", textTransform: "uppercase" as const, letterSpacing: ".08em", marginBottom: 14 }}>Add New Category</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 14 }}>
+                  <Field label="Name *"><input style={S.input} value={raceForm.name ?? ""} onChange={e => setRaceForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. 5K Open" /></Field>
+                  <Field label="Distance *"><input style={S.input} value={raceForm.distance ?? ""} onChange={e => setRaceForm(f => ({ ...f, distance: e.target.value }))} placeholder="e.g. 5K" /></Field>
+                  <Field label="Entry Fee (₹)"><input type="number" style={S.input} value={raceForm.price} onChange={e => setRaceForm(f => ({ ...f, price: Number(e.target.value) }))} min={0} placeholder="0" /></Field>
+                  <Field label="Early Bird (₹)"><input type="number" style={S.input} value={raceForm.early_bird_price ?? ""} onChange={e => setRaceForm(f => ({ ...f, early_bird_price: e.target.value ? Number(e.target.value) : null }))} placeholder="Blank = none" /></Field>
+                  <Field label="Max Slots"><input type="number" style={S.input} value={raceForm.max_slots ?? ""} onChange={e => setRaceForm(f => ({ ...f, max_slots: e.target.value ? Number(e.target.value) : null }))} placeholder="Unlimited" /></Field>
+                  <Field label="BIB Prefix"><input style={S.input} value={raceForm.bib_prefix ?? ""} onChange={e => setRaceForm(f => ({ ...f, bib_prefix: e.target.value || null }))} placeholder="Optional" /></Field>
+                </div>
+                <Button size="sm" loading={raceSaving} onClick={async () => {
+                  if (!raceForm.name?.trim() || !raceForm.distance?.trim()) { setRaceErr("Name and distance are required."); return; }
+                  setRaceSaving(true); setRaceErr("");
+                  try {
+                    const res  = await fetch(`/api/admin/events/${eventId}/races`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...raceForm, display_order: races.length }) });
+                    const data = await res.json() as { race?: RaceRow; error?: string };
+                    if (!res.ok) { setRaceErr(data.error ?? "Save failed"); return; }
+                    if (data.race) {
+                      setRaces(rs => [...rs, data.race!]);
+                      setRaceForm({ name: "", distance: "", price: 0, early_bird_price: null, price_type: "per_participant", min_participants: 1, max_participants: 1, max_slots: null, reporting_time: null, gun_time: null, timing_chip: false, auto_bib: false, bib_prefix: null, gender_restriction: null, min_age: null, max_age: null, perks: { medal: false, bib: true, tshirt: false, breakfast: false, certificate: false, goodies: false }, status: "active" });
+                      setToast("✅ Category added");
+                    }
+                  } catch { setRaceErr("Network error"); }
+                  finally { setRaceSaving(false); }
+                }}>+ Add Category</Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── FORM FIELDS ──────────────────────────────────────────────────────── */}
+        {tab === "form_fields" && (
+          <div style={S.card}>
+            <SectionHead title="Custom Registration Fields" desc="Fields collected from participants at registration. Category-scoped fields only appear for that category." />
+
+            {ffErr && <Alert variant="error" style={{ marginBottom: 14 }}>{ffErr}</Alert>}
+
+            {/* Field list */}
+            {formFields.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                {formFields.map(f => {
+                  const isEditing = ffEditId === f.id;
+                  const scopedNames = (f.race_ids ?? []).length > 0
+                    ? races.filter(r => (f.race_ids ?? []).includes(r.id)).map(r => r.name || r.distance).join(", ")
+                    : null;
+                  return (
+                    <div key={f.id} style={{ marginBottom: 8, border: `1px solid ${isEditing ? "rgba(232,98,10,0.4)" : "rgba(255,255,255,0.07)"}`, borderRadius: 10, overflow: "hidden" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "rgba(255,255,255,0.02)", gap: 10, flexWrap: "wrap" as const }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: f.is_active ? "#ddd" : "#555" }}>{f.label}</span>
+                            {f.required && <span style={{ fontSize: 10, color: "#e8620a", fontWeight: 700 }}>Required</span>}
+                            <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, background: "rgba(255,255,255,0.06)", color: "#666" }}>{f.field_type}</span>
+                            {scopedNames && <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, background: "rgba(99,102,241,0.12)", color: "#818cf8" }}>🎯 {scopedNames}</span>}
+                            {!f.is_active && <span style={{ fontSize: 10, color: "#555", fontStyle: "italic" as const }}>hidden</span>}
+                          </div>
+                          {f.section && <div style={{ fontSize: 10, color: "#555", marginTop: 2 }}>§ {f.section}</div>}
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                          <Button size="xs" variant="ghost" onClick={() => {
+                            setFfEditId(isEditing ? null : f.id);
+                            if (!isEditing) {
+                              setFfLabel(f.label); setFfType(f.field_type); setFfRequired(f.required);
+                              setFfPlaceholder(f.placeholder ?? ""); setFfHelp(f.help_text ?? "");
+                              setFfSection(f.section ?? ""); setFfOptions(f.options.join(", ")); setFfRaceIds(f.race_ids ?? []);
+                              setFfErr("");
+                            }
+                          }}>{isEditing ? "Cancel" : "Edit"}</Button>
+                          <Button size="xs" variant="ghost" onClick={async () => {
+                            await fetch(`/api/admin/events/${eventId}/form-fields`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: f.id, is_active: !f.is_active }) });
+                            setFormFields(fs => fs.map(x => x.id === f.id ? { ...x, is_active: !f.is_active } : x));
+                          }}>{f.is_active ? "Hide" : "Show"}</Button>
+                          <Button size="xs" variant="danger" onClick={async () => {
+                            if (!confirm(`Delete "${f.label}"?`)) return;
+                            await fetch(`/api/admin/events/${eventId}/form-fields`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: f.id }) });
+                            setFormFields(fs => fs.filter(x => x.id !== f.id)); if (ffEditId === f.id) setFfEditId(null);
+                          }}>Delete</Button>
+                        </div>
+                      </div>
+
+                      {isEditing && (
+                        <div style={{ padding: "14px 16px", borderTop: "1px solid rgba(255,255,255,0.06)", background: "rgba(232,98,10,0.03)" }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                            <Field label="Label *"><input style={S.input} value={ffLabel} onChange={e => setFfLabel(e.target.value)} /></Field>
+                            <Field label="Type">
+                              <select style={S.select} value={ffType} onChange={e => setFfType(e.target.value)}>
+                                {[["text","Short Text"],["textarea","Long Text"],["select","Dropdown"],["radio","Radio"],["multi_select","Multi-Select"],["checkbox","Checkbox"],["number","Number"],["date","Date"],["email","Email"],["phone","Phone"],["file","File Upload"],["waiver","Waiver"]].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+                              </select>
+                            </Field>
+                            {["select","radio","multi_select"].includes(ffType) && (
+                              <div style={{ gridColumn: "1/-1" }}>
+                                <Field label="Options (comma-separated)"><input style={S.input} value={ffOptions} onChange={e => setFfOptions(e.target.value)} placeholder="Option A, Option B, Option C" /></Field>
+                              </div>
+                            )}
+                            <Field label="Placeholder"><input style={S.input} value={ffPlaceholder} onChange={e => setFfPlaceholder(e.target.value)} placeholder="Optional" /></Field>
+                            <Field label="Section Heading"><input style={S.input} value={ffSection} onChange={e => setFfSection(e.target.value)} placeholder="e.g. Medical" /></Field>
+                            <div style={{ gridColumn: "1/-1" }}>
+                              <Field label="Help Text"><input style={S.input} value={ffHelp} onChange={e => setFfHelp(e.target.value)} placeholder="Additional instructions" /></Field>
+                            </div>
+                          </div>
+                          {races.filter(r => r.status === "active").length > 1 && (
+                            <div style={{ marginBottom: 12 }}>
+                              <div style={{ fontSize: 11, color: "#666", marginBottom: 8 }}>Show only for (blank = all):</div>
+                              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
+                                {races.filter(r => r.status === "active").map(r => {
+                                  const sel = ffRaceIds.includes(r.id);
+                                  return (
+                                    <label key={r.id} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "4px 10px", borderRadius: 6, background: sel ? "rgba(99,102,241,0.12)" : "rgba(255,255,255,0.04)", border: `1px solid ${sel ? "rgba(99,102,241,0.4)" : "rgba(255,255,255,0.08)"}`, fontSize: 12, color: sel ? "#818cf8" : "#666" }}>
+                                      <input type="checkbox" checked={sel} onChange={() => setFfRaceIds(prev => prev.includes(r.id) ? prev.filter(x => x !== r.id) : [...prev, r.id])} style={{ accentColor: "#818cf8" }} />
+                                      {r.name || r.distance}
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                          <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
+                            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#bbb", cursor: "pointer" }}>
+                              <input type="checkbox" checked={ffRequired} onChange={e => setFfRequired(e.target.checked)} />
+                              Required
+                            </label>
+                          </div>
+                          <Button size="sm" loading={ffSaving} onClick={async () => {
+                            if (!ffLabel.trim()) { setFfErr("Label is required."); return; }
+                            setFfSaving(true); setFfErr("");
+                            const options = ["select","radio","multi_select"].includes(ffType) ? ffOptions.split(",").map(s => s.trim()).filter(Boolean) : [];
+                            try {
+                              const res  = await fetch(`/api/admin/events/${eventId}/form-fields`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: ffEditId, label: ffLabel.trim(), field_type: ffType, required: ffRequired, placeholder: ffPlaceholder.trim() || null, help_text: ffHelp.trim() || null, section: ffSection.trim() || null, options, race_ids: ffRaceIds }) });
+                              const data = await res.json() as { field?: FormFieldRow; error?: string };
+                              if (!res.ok) { setFfErr(data.error ?? "Save failed"); return; }
+                              if (data.field) { setFormFields(fs => fs.map(x => x.id === ffEditId ? data.field! : x)); setFfEditId(null); setToast("✅ Field updated"); }
+                            } catch { setFfErr("Network error"); }
+                            finally { setFfSaving(false); }
+                          }}>Save Field</Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Add new field */}
+            {ffEditId === null && (
+              <div style={{ borderTop: formFields.length > 0 ? "1px solid rgba(255,255,255,0.07)" : undefined, paddingTop: formFields.length > 0 ? 20 : 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#888", textTransform: "uppercase" as const, letterSpacing: ".08em", marginBottom: 14 }}>Add New Field</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                  <Field label="Label *"><input style={S.input} value={ffLabel} onChange={e => setFfLabel(e.target.value)} placeholder="e.g. Running Club Name" /></Field>
+                  <Field label="Type">
+                    <select style={S.select} value={ffType} onChange={e => setFfType(e.target.value)}>
+                      {[["text","Short Text"],["textarea","Long Text"],["select","Dropdown"],["radio","Radio"],["multi_select","Multi-Select"],["checkbox","Checkbox"],["number","Number"],["date","Date"],["email","Email"],["phone","Phone"],["file","File Upload"],["waiver","Waiver"]].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                  </Field>
+                  {["select","radio","multi_select"].includes(ffType) && (
+                    <div style={{ gridColumn: "1/-1" }}>
+                      <Field label="Options (comma-separated)"><input style={S.input} value={ffOptions} onChange={e => setFfOptions(e.target.value)} placeholder="Option A, Option B, Option C" /></Field>
+                    </div>
+                  )}
+                  <Field label="Placeholder"><input style={S.input} value={ffPlaceholder} onChange={e => setFfPlaceholder(e.target.value)} placeholder="Optional" /></Field>
+                  <Field label="Section Heading"><input style={S.input} value={ffSection} onChange={e => setFfSection(e.target.value)} placeholder="Optional grouping label" /></Field>
+                </div>
+                {races.filter(r => r.status === "active").length > 1 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 11, color: "#666", marginBottom: 8 }}>Show only for (blank = all categories):</div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
+                      {races.filter(r => r.status === "active").map(r => {
+                        const sel = ffRaceIds.includes(r.id);
+                        return (
+                          <label key={r.id} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "4px 10px", borderRadius: 6, background: sel ? "rgba(99,102,241,0.12)" : "rgba(255,255,255,0.04)", border: `1px solid ${sel ? "rgba(99,102,241,0.4)" : "rgba(255,255,255,0.08)"}`, fontSize: 12, color: sel ? "#818cf8" : "#666" }}>
+                            <input type="checkbox" checked={sel} onChange={() => setFfRaceIds(prev => prev.includes(r.id) ? prev.filter(x => x !== r.id) : [...prev, r.id])} style={{ accentColor: "#818cf8" }} />
+                            {r.name || r.distance}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 14 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#bbb", cursor: "pointer" }}>
+                    <input type="checkbox" checked={ffRequired} onChange={e => setFfRequired(e.target.checked)} />
+                    Required field
+                  </label>
+                </div>
+                <Button size="sm" loading={ffSaving} onClick={async () => {
+                  if (!ffLabel.trim()) { setFfErr("Label is required."); return; }
+                  setFfSaving(true); setFfErr("");
+                  const options = ["select","radio","multi_select"].includes(ffType) ? ffOptions.split(",").map(s => s.trim()).filter(Boolean) : [];
+                  try {
+                    const res  = await fetch(`/api/admin/events/${eventId}/form-fields`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ label: ffLabel.trim(), field_type: ffType, required: ffRequired, placeholder: ffPlaceholder.trim() || null, section: ffSection.trim() || null, options, race_ids: ffRaceIds }) });
+                    const data = await res.json() as { field?: FormFieldRow; error?: string };
+                    if (!res.ok) { setFfErr(data.error ?? "Save failed"); return; }
+                    if (data.field) {
+                      setFormFields(fs => [...fs, data.field!]);
+                      setFfLabel(""); setFfType("text"); setFfRequired(false); setFfPlaceholder(""); setFfSection(""); setFfOptions(""); setFfRaceIds([]);
+                      setToast("✅ Field added");
+                    }
+                  } catch { setFfErr("Network error"); }
+                  finally { setFfSaving(false); }
+                }}>+ Add Field</Button>
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
 
       {/* Toast */}
