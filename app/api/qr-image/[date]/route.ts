@@ -46,7 +46,7 @@ export async function GET(
       errorCorrectionLevel: "H",
     });
 
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       headers: {
         "Content-Type":  "image/png",
         // Cache for 1 hour; stale-while-revalidate covers email clients that
