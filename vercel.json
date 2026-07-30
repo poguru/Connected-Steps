@@ -68,7 +68,7 @@
     },
     {
       "path": "/api/cron/daily-attendance-qr",
-      "schedule": "30 0 * * *"
+      "schedule": "30 23 * * *"
     }
   ]
 }

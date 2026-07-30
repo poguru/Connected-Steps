@@ -1,8 +1,9 @@
-// Cron: runs at 22:30, 23:30, 0:30, 1:30, 2:30 UTC  (= 4:00, 5:00, 6:00, 7:00, 8:00 IST)
+// Cron: runs once daily at 23:30 UTC = 05:00 IST (Vercel Hobby: one cron per path).
 // Checks DB for configured generation_time and generates exactly once per day.
+// The 55-minute isWithinGenerationWindow window starts at the configured time (default 05:00 IST),
+// so the cron must fire at or within 55 minutes of that time.
 //
-// vercel.json entries:
-//   { "path": "/api/cron/daily-attendance-qr", "schedule": "30 22,23,0,1,2 * * *" }
+// vercel.json: { "path": "/api/cron/daily-attendance-qr", "schedule": "30 23 * * *" }
 
 import { NextRequest, NextResponse } from "next/server";
 import { acquireCronLock, releaseCronLock } from "@/lib/cron-lock";
