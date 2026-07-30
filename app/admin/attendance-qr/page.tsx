@@ -91,10 +91,15 @@ function HistoryTab() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res  = await fetch("/api/admin/attendance-qr");
-    const data = await res.json();
-    setQRs(data.qrs ?? []);
-    setLoading(false);
+    try {
+      const res  = await fetch("/api/admin/attendance-qr");
+      const data = await res.json();
+      setQRs(data.qrs ?? []);
+    } catch {
+      // Keep the existing list in place on refresh failure.
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -104,20 +109,34 @@ function HistoryTab() {
     setGenerating(true);
     setAlert(null);
     try {
-      const res  = await fetch("/api/admin/attendance-qr/generate", {
-        method: "POST",
+      const res = await fetch("/api/admin/attendance-qr/generate", {
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ send_email: sendEmail }),
+        body:    JSON.stringify({ send_email: sendEmail }),
       });
-      const data = await res.json();
+
+      // Separate JSON parsing from the response check so a non-JSON 500 body
+      // (e.g. server crash before response is flushed) shows a clear message
+      // instead of a raw "SyntaxError: Unexpected end of JSON input".
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch {
+        setAlert({ type: "error", msg: `Server error (HTTP ${res.status}) — no JSON response. Check server logs.` });
+        return;
+      }
+
       if (res.ok) {
-        setAlert({ type: "success", msg: `QR generated! ${data.emailsSent} email(s) sent.` });
+        const sent = Number(data.emailsSent ?? 0);
+        const sentMsg = sendEmail ? ` ${sent} email${sent !== 1 ? "s" : ""} sent.` : "";
+        setAlert({ type: "success", msg: `QR generated!${sentMsg}` });
         await load();
       } else {
-        setAlert({ type: "error", msg: data.error ?? "Generation failed" });
+        setAlert({ type: "error", msg: String(data.error ?? `Generation failed (HTTP ${res.status})`) });
       }
     } catch (e) {
-      setAlert({ type: "error", msg: String(e) });
+      setAlert({ type: "error", msg: e instanceof Error ? e.message : "Network error — check your connection." });
     } finally {
       setGenerating(false);
     }
