@@ -24,6 +24,19 @@ export interface EmailAttachment {
   name:      string;   // filename shown to recipient
 }
 
+/**
+ * Inline image embedded via CID (Content-ID) for email clients.
+ * Reference in HTML as <img src="cid:{contentId}">.
+ * ZeptoMail sends these as multipart/related — supported by Gmail, Outlook, Apple Mail.
+ * Do NOT use data: URIs; Gmail strips them as a security measure.
+ */
+export interface InlineImage {
+  content:    string;  // base64-encoded PNG/JPG
+  mime_type:  string;  // e.g. "image/png"
+  name:       string;  // filename (cosmetic)
+  content_id: string;  // referenced in HTML as cid:{content_id} — no angle brackets here
+}
+
 export interface EmailMessage {
   to:       string;
   subject:  string;
@@ -36,8 +49,13 @@ export interface EmailMessage {
    * Never set for OTP, QR codes, or payment receipts.
    */
   listUnsubscribeUrl?: string;
-  /** Files to attach inline. Content must be base64-encoded. */
+  /** Files attached as downloadable. Content must be base64-encoded. */
   attachments?: EmailAttachment[];
+  /**
+   * Images embedded inline via CID. Use instead of data: URIs — Gmail blocks those.
+   * Each entry must have a matching <img src="cid:{content_id}"> in the HTML.
+   */
+  inlineImages?: InlineImage[];
 }
 
 export interface BatchEmailJob {
@@ -156,6 +174,17 @@ export async function sendSingleEmail(msg: EmailMessage): Promise<SendResult> {
       content:   a.content,
       mime_type: a.mime_type,
       name:      a.name,
+    }));
+  }
+
+  // Inline images — ZeptoMail embeds these as multipart/related so clients render
+  // them via <img src="cid:{content_id}">. Gmail, Outlook, Apple Mail all support this.
+  if (msg.inlineImages && msg.inlineImages.length > 0) {
+    payload.inline_images = msg.inlineImages.map(img => ({
+      content:    img.content,
+      mime_type:  img.mime_type,
+      name:       img.name,
+      content_id: img.content_id,
     }));
   }
 

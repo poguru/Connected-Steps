@@ -150,14 +150,17 @@ export async function validateDailyAttendanceQR(token: string): Promise<Validate
 
 // ── Email template ────────────────────────────────────────────────────────────
 
+// CID used for the inline QR image in every attendance email.
+// Must match the content_id passed in inlineImages.
+const QR_CID = "attendance-qr";
+
 function buildQREmailHTML(opts: {
   date:        string;
   generatedAt: string;
   expiresAt:   string;
-  qrBase64:    string;
   locationName?: string;
 }): string {
-  const { date, generatedAt, expiresAt, qrBase64, locationName } = opts;
+  const { date, generatedAt, expiresAt, locationName } = opts;
   const displayDate = fmtDateIST(date + "T00:00:00");
   const genTime     = fmtTimeIST(generatedAt);
   const expTime     = fmtTimeIST(expiresAt);
@@ -198,7 +201,7 @@ function buildQREmailHTML(opts: {
               Display this QR code at the training session for participants to scan.
             </p>
             <div style="display:inline-block;padding:16px;background:#fff;border:2px solid #e5e7eb;border-radius:12px">
-              <img src="data:image/png;base64,${qrBase64}"
+              <img src="cid:${QR_CID}"
                    alt="Attendance QR Code"
                    width="280" height="280"
                    style="display:block;border-radius:4px"/>
@@ -310,8 +313,20 @@ export async function sendDailyQREmails(opts: {
     locationName = loc?.name;
   }
 
-  const html = buildQREmailHTML({ date, generatedAt, expiresAt, qrBase64, locationName });
+  const html = buildQREmailHTML({ date, generatedAt, expiresAt, locationName });
   const displayDate = fmtDateIST(date + "T00:00:00");
+
+  // Inline image — rendered via <img src="cid:attendance-qr"> in the HTML.
+  // Gmail, Outlook, and Apple Mail all support CID inline images.
+  // data: URIs are stripped by Gmail and must never be used in email HTML.
+  const inlineQR = {
+    content:    qrBase64,
+    mime_type:  "image/png",
+    name:       `attendance-qr-${date}.png`,
+    content_id: QR_CID,
+  };
+
+  // Attachment — kept as a separate downloadable fallback for printing / archiving.
   const attachment: EmailAttachment = {
     content:   qrBase64,
     mime_type: "image/png",
@@ -336,10 +351,11 @@ export async function sendDailyQREmails(opts: {
 
     try {
       const result = await sendSingleEmail({
-        to:          r.email,
-        subject:     `Attendance QR — ${displayDate}${locationName ? ` (${locationName})` : ""}`,
+        to:           r.email,
+        subject:      `Attendance QR — ${displayDate}${locationName ? ` (${locationName})` : ""}`,
         html,
-        attachments: [attachment],
+        inlineImages: [inlineQR],
+        attachments:  [attachment],
       });
 
       if (result.ok) {
