@@ -150,10 +150,6 @@ export async function validateDailyAttendanceQR(token: string): Promise<Validate
 
 // ── Email template ────────────────────────────────────────────────────────────
 
-// CID used for the inline QR image in every attendance email.
-// Must match the content_id passed in inlineImages.
-const QR_CID = "attendance-qr";
-
 function buildQREmailHTML(opts: {
   date:        string;
   generatedAt: string;
@@ -201,13 +197,13 @@ function buildQREmailHTML(opts: {
               Display this QR code at the training session for participants to scan.
             </p>
             <div style="display:inline-block;padding:16px;background:#fff;border:2px solid #e5e7eb;border-radius:12px">
-              <img src="cid:${QR_CID}"
+              <img src="${APP_URL}/api/qr-image/${date}"
                    alt="Attendance QR Code"
                    width="280" height="280"
                    style="display:block;border-radius:4px"/>
             </div>
             <p style="margin:16px 0 0;font-size:11px;color:#9ca3af">
-              If the QR image doesn't display, please use the attached image.
+              If the QR image doesn't display, the QR code is also attached to this email.
             </p>
           </td>
         </tr>
@@ -316,17 +312,9 @@ export async function sendDailyQREmails(opts: {
   const html = buildQREmailHTML({ date, generatedAt, expiresAt, locationName });
   const displayDate = fmtDateIST(date + "T00:00:00");
 
-  // Inline image — rendered via <img src="cid:attendance-qr"> in the HTML.
-  // Gmail, Outlook, and Apple Mail all support CID inline images.
-  // data: URIs are stripped by Gmail and must never be used in email HTML.
-  const inlineQR = {
-    content:    qrBase64,
-    mime_type:  "image/png",
-    name:       `attendance-qr-${date}.png`,
-    content_id: QR_CID,
-  };
-
-  // Attachment — kept as a separate downloadable fallback for printing / archiving.
+  // QR image is served via a public URL (/api/qr-image/[date]) embedded in the HTML.
+  // Gmail and most email clients render external HTTPS images without issues.
+  // The attachment is a downloadable fallback for clients that block remote images.
   const attachment: EmailAttachment = {
     content:   qrBase64,
     mime_type: "image/png",
@@ -351,11 +339,10 @@ export async function sendDailyQREmails(opts: {
 
     try {
       const result = await sendSingleEmail({
-        to:           r.email,
-        subject:      `Attendance QR — ${displayDate}${locationName ? ` (${locationName})` : ""}`,
+        to:          r.email,
+        subject:     `Attendance QR — ${displayDate}${locationName ? ` (${locationName})` : ""}`,
         html,
-        inlineImages: [inlineQR],
-        attachments:  [attachment],
+        attachments: [attachment],
       });
 
       if (result.ok) {
