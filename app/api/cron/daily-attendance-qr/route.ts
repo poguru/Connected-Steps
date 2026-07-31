@@ -1,7 +1,6 @@
-// Cron: runs once daily at 23:30 UTC = 05:00 IST (Vercel Hobby: one cron per path).
+// Cron: runs once daily at 23:30 UTC = 05:00 IST.
 // Checks DB for configured generation_time and generates exactly once per day.
-// The 55-minute isWithinGenerationWindow window starts at the configured time (default 05:00 IST),
-// so the cron must fire at or within 55 minutes of that time.
+// The 55-minute isWithinGenerationWindow window starts at the configured time (default 05:00 IST).
 //
 // vercel.json: { "path": "/api/cron/daily-attendance-qr", "schedule": "30 23 * * *" }
 
@@ -11,11 +10,14 @@ import {
   generateDailyAttendanceQR,
   sendDailyQREmails,
   getQRSettings,
+  createRunLog,
+  updateRunLog,
+  sendQRFailureAlert,
   todayIST,
 } from "@/lib/daily-attendance-qr";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
-const JOB_NAME     = "daily-attendance-qr";
+const JOB_NAME      = "daily-attendance-qr";
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
 function currentISTTimeHHMM(): string {
@@ -25,21 +27,16 @@ function currentISTTimeHHMM(): string {
   return `${h}:${m}`;
 }
 
-// Returns true if current IST time is within the 55-minute window after the configured time.
-// The cron fires every hour so we give a 55-min window to avoid missing the slot.
 function isWithinGenerationWindow(configuredTime: string): boolean {
   const [ch, cm] = configuredTime.split(":").map(Number);
   const configMinutes = ch * 60 + cm;
-
-  const nowIST = new Date(Date.now() + IST_OFFSET_MS);
-  const nowMinutes = nowIST.getUTCHours() * 60 + nowIST.getUTCMinutes();
-
-  const diff = nowMinutes - configMinutes;
+  const nowIST        = new Date(Date.now() + IST_OFFSET_MS);
+  const nowMinutes    = nowIST.getUTCHours() * 60 + nowIST.getUTCMinutes();
+  const diff          = nowMinutes - configMinutes;
   return diff >= 0 && diff < 55;
 }
 
 export async function GET(req: NextRequest) {
-  // Vercel cron auth
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = req.headers.get("authorization");
   if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
@@ -49,14 +46,12 @@ export async function GET(req: NextRequest) {
   const today = todayIST();
   const db    = getSupabaseServer();
 
-  // Check global settings (and per-location settings in future phases)
   const settings = await getQRSettings(null);
 
   if (!settings.auto_generate_enabled) {
     return NextResponse.json({ skipped: true, reason: "auto_generate disabled" });
   }
 
-  // Is it time?
   if (!isWithinGenerationWindow(settings.generation_time)) {
     const currentTime = currentISTTimeHHMM();
     return NextResponse.json({
@@ -70,6 +65,9 @@ export async function GET(req: NextRequest) {
   if (!locked) {
     return NextResponse.json({ skipped: true, reason: "Already ran today" });
   }
+
+  // Create execution log row (non-fatal if it fails)
+  const logId = await createRunLog({ executionDate: today, triggeredBy: "cron" });
 
   try {
     const generated = await generateDailyAttendanceQR({
@@ -91,37 +89,81 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Audit log
+    // Determine outcome
+    const hasEmailFailures = emailResult.failed > 0;
+    const status = !settings.auto_email_enabled
+      ? "success"
+      : emailResult.sent === 0 && emailResult.failed > 0
+        ? "failed"
+        : emailResult.failed > 0
+          ? "partial"
+          : "success";
+
+    // Persist outcome to execution log
+    await updateRunLog(logId, {
+      status,
+      qrId:         generated.qrId,
+      emailsSent:   emailResult.sent,
+      emailsFailed: emailResult.failed,
+    });
+
+    // Audit log (best-effort)
     await db.from("audit_logs").insert({
-      action:      "daily_qr_generated",
-      entity_type: "daily_attendance_qr",
-      entity_id:   generated.qrId,
+      action:       "daily_qr_generated",
+      entity_type:  "daily_attendance_qr",
+      entity_id:    generated.qrId,
       performed_by: "cron",
       metadata: {
-        date:         generated.date,
-        expires_at:   generated.expiresAt,
-        emails_sent:  emailResult.sent,
+        date:          generated.date,
+        expires_at:    generated.expiresAt,
+        emails_sent:   emailResult.sent,
         emails_failed: emailResult.failed,
       },
     }).maybeSingle();
 
-    // Alert admin on email failures
-    if (emailResult.failed > 0 && emailResult.sent === 0) {
-      console.error(`[daily-attendance-qr] All ${emailResult.failed} emails failed for ${today}`);
+    // Alert admin on any email failures
+    if (hasEmailFailures) {
+      console.error(
+        `[daily-attendance-qr] ${emailResult.failed} email(s) failed for ${today}` +
+        ` (sent: ${emailResult.sent})`,
+      );
+      await sendQRFailureAlert({
+        date:         today,
+        emailsSent:   emailResult.sent,
+        emailsFailed: emailResult.failed,
+        triggeredBy:  "cron",
+      });
     }
 
     return NextResponse.json({
-      ok:          true,
-      date:        generated.date,
-      qrId:        generated.qrId,
-      expiresAt:   generated.expiresAt,
-      emailsSent:  emailResult.sent,
+      ok:           true,
+      date:         generated.date,
+      qrId:         generated.qrId,
+      expiresAt:    generated.expiresAt,
+      emailsSent:   emailResult.sent,
       emailsFailed: emailResult.failed,
     });
   } catch (err) {
-    // Release lock on failure so the next cron invocation can retry
-    await releaseCronLock(JOB_NAME, today);
+    const message = err instanceof Error ? err.message : String(err);
     console.error("[daily-attendance-qr] Generation failed:", err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+
+    await updateRunLog(logId, {
+      status:       "failed",
+      errorMessage: message,
+    });
+
+    // Alert admin that the cron itself crashed
+    await sendQRFailureAlert({
+      date:         today,
+      emailsSent:   0,
+      emailsFailed: 0,
+      triggeredBy:  "cron",
+      errorSample:  message,
+    });
+
+    // Release lock so next invocation (or manual retry) can succeed
+    await releaseCronLock(JOB_NAME, today);
+
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

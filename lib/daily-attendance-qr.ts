@@ -403,4 +403,120 @@ export async function getQRSettings(locationId?: string | null) {
   };
 }
 
+// ── Execution log ─────────────────────────────────────────────────────────────
+// Tracks every automated + manual run in attendance_qr_cron_log.
+// The admin health dashboard reads this table. Failures here are NON-FATAL —
+// if the log write fails, the caller's operation is not affected.
+
+export type RunLogStatus = "running" | "success" | "partial" | "failed" | "skipped";
+
+export async function createRunLog(opts: {
+  executionDate: string;
+  triggeredBy:   "cron" | "manual";
+}): Promise<string | null> {
+  const db = getSupabaseServer();
+  const { data, error } = await db
+    .from("attendance_qr_cron_log")
+    .insert({
+      execution_date: opts.executionDate,
+      triggered_by:   opts.triggeredBy,
+      status:         "running",
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    console.error("[cron-log] createRunLog failed:", error.message);
+    return null;
+  }
+  return data?.id ?? null;
+}
+
+export async function updateRunLog(
+  logId: string | null,
+  opts: {
+    status:        RunLogStatus;
+    qrId?:         string | null;
+    emailsSent?:   number;
+    emailsFailed?: number;
+    errorMessage?: string;
+    details?:      Record<string, unknown>;
+  },
+): Promise<void> {
+  if (!logId) return;
+  const db = getSupabaseServer();
+
+  const { error } = await db
+    .from("attendance_qr_cron_log")
+    .update({
+      finished_at:    new Date().toISOString(),
+      status:         opts.status,
+      qr_id:          opts.qrId ?? null,
+      emails_sent:    opts.emailsSent    ?? 0,
+      emails_failed:  opts.emailsFailed  ?? 0,
+      error_message:  opts.errorMessage  ?? null,
+      details:        opts.details       ?? null,
+    })
+    .eq("id", logId);
+
+  if (error) {
+    console.error("[cron-log] updateRunLog failed:", error.message);
+  }
+}
+
+// ── Failure alert ──────────────────────────────────────────────────────────────
+// Sends an email to the admin when QR email distribution partially or fully fails.
+// Uses a plain HTML body with no attachments or inline images so ZeptoMail
+// cannot reject it.
+
+export async function sendQRFailureAlert(opts: {
+  date:          string;    // YYYY-MM-DD
+  emailsSent:    number;
+  emailsFailed:  number;
+  triggeredBy:   "cron" | "manual";
+  errorSample?:  string;
+}): Promise<void> {
+  const { date, emailsSent, emailsFailed, triggeredBy, errorSample } = opts;
+  const displayDate  = fmtDateIST(date + "T00:00:00");
+  const adminAddress = process.env.ZEPTOMAIL_FROM_EMAIL ?? "info@connectedsteps.in";
+  const trigger      = triggeredBy === "cron" ? "Automated Cron (05:00 IST)" : "Manual (Admin)";
+
+  const html = `<!DOCTYPE html>
+<html lang="en"><body style="font-family:sans-serif;max-width:580px;margin:0 auto;padding:24px">
+  <div style="background:#ef4444;color:#fff;padding:16px 24px;border-radius:8px 8px 0 0">
+    <h2 style="margin:0;font-size:18px">⚠️ Attendance QR Email Failed — ${displayDate}</h2>
+  </div>
+  <div style="background:#fef2f2;border:1px solid #fecaca;border-top:none;padding:20px 24px;border-radius:0 0 8px 8px">
+    <p style="margin:0 0 12px">The daily QR email failed to reach all configured recipients.</p>
+    <table style="width:100%;border-collapse:collapse;font-size:14px">
+      <tr><td style="padding:6px 0;color:#6b7280">Trigger</td><td style="font-weight:600">${trigger}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280">Date</td><td style="font-weight:600">${displayDate}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280">Sent</td><td style="font-weight:600;color:#16a34a">${emailsSent}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280">Failed</td><td style="font-weight:600;color:#dc2626">${emailsFailed}</td></tr>
+      ${errorSample ? `<tr><td style="padding:6px 0;color:#6b7280;vertical-align:top">Error</td><td style="font-family:monospace;font-size:12px;color:#dc2626">${errorSample}</td></tr>` : ""}
+    </table>
+    <p style="margin:16px 0 0">
+      <a href="${APP_URL}/admin/attendance-qr" style="background:#e8620a;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px">
+        Open Admin Panel →
+      </a>
+    </p>
+    <p style="margin:12px 0 0;font-size:12px;color:#9ca3af">
+      Use the Attendance QR admin panel to resend emails manually.
+    </p>
+  </div>
+</body></html>`;
+
+  try {
+    await sendSingleEmail({
+      to:      adminAddress,
+      subject: `⚠️ Attendance QR Email Failed — ${displayDate}`,
+      html,
+    });
+    console.log(`[daily-attendance-qr] Failure alert sent to ${adminAddress}`);
+  } catch (err) {
+    // Alert failure is non-fatal — log it but don't let it mask the original error.
+    console.error("[daily-attendance-qr] Could not send failure alert:", err);
+  }
+}
+
 export { todayIST, fmtDateIST, fmtTimeIST };

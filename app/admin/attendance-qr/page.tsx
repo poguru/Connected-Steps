@@ -402,6 +402,277 @@ function RecipientsTab() {
   );
 }
 
+// ── Tab: Health ───────────────────────────────────────────────────────────────
+
+interface RunLog {
+  id: string;
+  execution_date: string;
+  triggered_by: "cron" | "manual";
+  started_at: string;
+  finished_at: string | null;
+  status: "running" | "success" | "partial" | "failed" | "skipped";
+  emails_sent: number;
+  emails_failed: number;
+  error_message: string | null;
+}
+
+interface HealthData {
+  health: "healthy" | "degraded" | "critical" | "unknown";
+  today: { date: string; hasQR: boolean; qrId: string | null; generatedAt: string | null; expiresAt: string | null };
+  recipients: { activeCount: number };
+  runs: RunLog[];
+  lastRun: { at: string; status: string; emailsSent: number; emailsFailed: number; triggeredBy: string } | null;
+  lastSuccess: { at: string; emailsSent: number; triggeredBy: string } | null;
+  lastFailure: { at: string; status: string; emailsFailed: number; errorMessage: string | null; triggeredBy: string } | null;
+}
+
+const HEALTH_COLOR: Record<string, string> = {
+  healthy:  "#22c55e",
+  degraded: "#f59e0b",
+  critical: "#ef4444",
+  unknown:  "rgba(255,255,255,0.3)",
+};
+
+const HEALTH_LABEL: Record<string, string> = {
+  healthy:  "Healthy",
+  degraded: "Degraded — some emails failed",
+  critical: "Critical — automation failed",
+  unknown:  "Unknown — no run history",
+};
+
+const RUN_STATUS_COLOR: Record<string, string> = {
+  success: "#22c55e",
+  partial: "#f59e0b",
+  failed:  "#ef4444",
+  skipped: "rgba(255,255,255,0.3)",
+  running: "#60a5fa",
+};
+
+function HealthTab() {
+  const [data,    setData]    = useState<HealthData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [retrying, setRetrying] = useState(false);
+  const [alert,    setAlert]  = useState<{ type: "success" | "error"; msg: string } | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/attendance-qr/health");
+      if (res.ok) setData(await res.json());
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function retryToday() {
+    if (!confirm("Retry QR generation and email for today? This will create a new QR and attempt to send emails.")) return;
+    setRetrying(true);
+    setAlert(null);
+    try {
+      const res = await fetch("/api/admin/attendance-qr/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ send_email: true }),
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let body: any = {};
+      try { body = await res.json(); } catch { /* non-JSON */ }
+      if (res.ok) {
+        const sent = Number(body.emailsSent ?? 0);
+        setAlert({ type: "success", msg: `QR generated. ${sent} email${sent !== 1 ? "s" : ""} sent.` });
+        await load();
+      } else {
+        setAlert({ type: "error", msg: String(body.error ?? `Failed (HTTP ${res.status})`) });
+      }
+    } catch (e) {
+      setAlert({ type: "error", msg: e instanceof Error ? e.message : "Network error." });
+    } finally {
+      setRetrying(false);
+    }
+  }
+
+  if (loading) return <div style={{ padding: "2rem", textAlign: "center" }}><Spinner /></div>;
+  if (!data)   return <div style={{ padding: "2rem", color: "#f87171" }}>Failed to load health status.</div>;
+
+  const { health, today, recipients, runs, lastSuccess, lastFailure } = data;
+  const healthColor = HEALTH_COLOR[health];
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {alert && (
+        <Alert variant={alert.type === "success" ? "success" : "error"} style={{ marginBottom: 4 }}>
+          {alert.msg}
+        </Alert>
+      )}
+
+      {/* Status summary */}
+      <Card style={{ padding: "1.25rem" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{
+              width: 14, height: 14, borderRadius: "50%",
+              background: healthColor,
+              boxShadow: `0 0 8px ${healthColor}`,
+              flexShrink: 0,
+            }} />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: "0.95rem", color: healthColor }}>
+                {HEALTH_LABEL[health]}
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.4)", marginTop: 2 }}>
+                Automation status as of right now
+              </div>
+            </div>
+          </div>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+            <Button size="sm" variant="ghost" onClick={load}>↻ Refresh</Button>
+            {(health === "critical" || health === "degraded") && (
+              <Button size="sm" variant="primary" loading={retrying} onClick={retryToday}>
+                ⚡ Retry Today
+              </Button>
+            )}
+          </div>
+        </div>
+      </Card>
+
+      {/* Key metrics */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 10 }}>
+        {/* Today's QR */}
+        <Card style={{ padding: "1rem" }}>
+          <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Today&apos;s QR</div>
+          {today.hasQR ? (
+            <>
+              <div style={{ fontWeight: 700, color: "#22c55e", fontSize: "0.9rem" }}>Generated</div>
+              {today.generatedAt && (
+                <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginTop: 3 }}>
+                  at {fmtDateTime(today.generatedAt)}
+                </div>
+              )}
+              {today.expiresAt && (
+                <div style={{ fontSize: "0.72rem", color: isExpired(today.expiresAt) ? "#f87171" : "rgba(255,255,255,0.35)", marginTop: 2 }}>
+                  {isExpired(today.expiresAt) ? "Expired" : `Expires ${fmtDateTime(today.expiresAt)}`}
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{ fontWeight: 700, color: "#ef4444", fontSize: "0.9rem" }}>Missing</div>
+          )}
+        </Card>
+
+        {/* Recipients */}
+        <Card style={{ padding: "1rem" }}>
+          <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Recipients</div>
+          <div style={{ fontWeight: 700, fontSize: "1.4rem", color: "#fff" }}>{recipients.activeCount}</div>
+          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.35)", marginTop: 2 }}>active</div>
+        </Card>
+
+        {/* Last success */}
+        <Card style={{ padding: "1rem" }}>
+          <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Last Success</div>
+          {lastSuccess ? (
+            <>
+              <div style={{ fontWeight: 700, color: "#22c55e", fontSize: "0.85rem" }}>{lastSuccess.emailsSent} sent</div>
+              <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.4)", marginTop: 3 }}>
+                {fmtDateTime(lastSuccess.at)}
+              </div>
+              <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.3)", marginTop: 2 }}>
+                via {lastSuccess.triggeredBy}
+              </div>
+            </>
+          ) : (
+            <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.3)" }}>No successful runs yet</div>
+          )}
+        </Card>
+
+        {/* Last failure */}
+        <Card style={{ padding: "1rem" }}>
+          <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Last Failure</div>
+          {lastFailure ? (
+            <>
+              <div style={{ fontWeight: 700, color: "#ef4444", fontSize: "0.85rem" }}>{lastFailure.emailsFailed} failed</div>
+              <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.4)", marginTop: 3 }}>
+                {fmtDateTime(lastFailure.at)}
+              </div>
+              {lastFailure.errorMessage && (
+                <div style={{ fontSize: "0.7rem", color: "#f87171", marginTop: 4, fontFamily: "monospace", wordBreak: "break-word" }}>
+                  {lastFailure.errorMessage.slice(0, 80)}{lastFailure.errorMessage.length > 80 ? "…" : ""}
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{ fontSize: "0.8rem", color: "#22c55e" }}>No failures</div>
+          )}
+        </Card>
+      </div>
+
+      {/* Run history */}
+      <Card style={{ padding: "1.25rem" }}>
+        <div style={{ fontWeight: 700, fontSize: "0.85rem", marginBottom: 12 }}>Execution History (last 14 runs)</div>
+        {runs.length === 0 ? (
+          <div style={{ color: "rgba(255,255,255,0.35)", fontSize: "0.85rem" }}>
+            No runs recorded yet. History appears here after the first automated or manual run.
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                  {["Date", "Trigger", "Status", "Sent", "Failed", "Started", "Duration"].map(h => (
+                    <th key={h} style={{ padding: "5px 10px 8px 0", textAlign: "left", fontWeight: 600, color: "rgba(255,255,255,0.4)", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: ".05em", whiteSpace: "nowrap" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {runs.map(r => {
+                  const color = RUN_STATUS_COLOR[r.status] ?? "rgba(255,255,255,0.5)";
+                  const durationMs = r.finished_at
+                    ? new Date(r.finished_at).getTime() - new Date(r.started_at).getTime()
+                    : null;
+                  const duration = durationMs !== null
+                    ? durationMs < 60000 ? `${(durationMs / 1000).toFixed(1)}s` : `${(durationMs / 60000).toFixed(1)}m`
+                    : "—";
+                  return (
+                    <tr key={r.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                      <td style={{ padding: "7px 10px 7px 0", color: "#fff", whiteSpace: "nowrap" }}>
+                        {fmtDate(r.execution_date)}
+                      </td>
+                      <td style={{ padding: "7px 10px 7px 0", color: "rgba(255,255,255,0.5)", whiteSpace: "nowrap" }}>
+                        {r.triggered_by}
+                      </td>
+                      <td style={{ padding: "7px 10px 7px 0", whiteSpace: "nowrap" }}>
+                        <span style={{ color, fontWeight: 600 }}>{r.status}</span>
+                        {r.error_message && (
+                          <div style={{ color: "#f87171", fontSize: "0.7rem", maxWidth: 200, wordBreak: "break-word" }}>
+                            {r.error_message.slice(0, 60)}{r.error_message.length > 60 ? "…" : ""}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ padding: "7px 10px 7px 0", color: r.emails_sent > 0 ? "#4ade80" : "rgba(255,255,255,0.3)", fontVariantNumeric: "tabular-nums" }}>
+                        {r.emails_sent}
+                      </td>
+                      <td style={{ padding: "7px 10px 7px 0", color: r.emails_failed > 0 ? "#f87171" : "rgba(255,255,255,0.3)", fontVariantNumeric: "tabular-nums" }}>
+                        {r.emails_failed}
+                      </td>
+                      <td style={{ padding: "7px 10px 7px 0", color: "rgba(255,255,255,0.4)", whiteSpace: "nowrap" }}>
+                        {fmtDateTime(r.started_at)}
+                      </td>
+                      <td style={{ padding: "7px 0 7px 0", color: "rgba(255,255,255,0.35)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                        {duration}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 // ── Tab: Settings ─────────────────────────────────────────────────────────────
 
 function SettingsTab() {
@@ -554,12 +825,13 @@ function SettingsTab() {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-type Tab = "history" | "recipients" | "settings";
+type Tab = "health" | "history" | "recipients" | "settings";
 
 export default function AttendanceQRPage() {
-  const [tab, setTab] = useState<Tab>("history");
+  const [tab, setTab] = useState<Tab>("health");
 
   const tabs: { key: Tab; label: string }[] = [
+    { key: "health",     label: "Health" },
     { key: "history",    label: "QR History" },
     { key: "recipients", label: "Recipients" },
     { key: "settings",   label: "Settings" },
@@ -590,6 +862,7 @@ export default function AttendanceQRPage() {
         ))}
       </div>
 
+      {tab === "health"     && <HealthTab />}
       {tab === "history"    && <HistoryTab />}
       {tab === "recipients" && <RecipientsTab />}
       {tab === "settings"   && <SettingsTab />}

@@ -4,6 +4,8 @@ import {
   generateDailyAttendanceQR,
   sendDailyQREmails,
   getQRSettings,
+  createRunLog,
+  updateRunLog,
   todayIST,
 } from "@/lib/daily-attendance-qr";
 import { getSupabaseServer } from "@/lib/supabase-server";
@@ -28,6 +30,9 @@ export async function POST(req: NextRequest) {
     const settings   = await getQRSettings(locationId);
     const adminEmail = req.headers.get("x-admin-email") ?? "admin";
 
+    // Create execution log entry so manual runs appear in the health dashboard
+    const logId = await createRunLog({ executionDate: date, triggeredBy: "manual" });
+
     const generated = await generateDailyAttendanceQR({
       locationId,
       generatedBy:     adminEmail,
@@ -48,9 +53,22 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Audit log — intentionally outside try/catch; a logging failure must not
-    // roll back a successful generation. Supabase client returns {data, error}
-    // and never throws, so this is safe.
+    const status = !sendEmail
+      ? "success"
+      : emailResult.sent === 0 && emailResult.failed > 0
+        ? "failed"
+        : emailResult.failed > 0
+          ? "partial"
+          : "success";
+
+    await updateRunLog(logId, {
+      status,
+      qrId:         generated.qrId,
+      emailsSent:   emailResult.sent,
+      emailsFailed: emailResult.failed,
+    });
+
+    // Audit log (best-effort — Supabase client never throws)
     await db.from("audit_logs").insert({
       action:       "daily_qr_generated",
       entity_type:  "daily_attendance_qr",
