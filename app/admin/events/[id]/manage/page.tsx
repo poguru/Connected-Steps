@@ -240,9 +240,13 @@ export default function EventManagePage() {
   const [annSending,   setAnnSending]   = useState(false);
   const [annResult,    setAnnResult]    = useState<{ email_queued: number; wa_total: number; batch_id: string } | null>(null);
   const [annError,     setAnnError]     = useState("");
-  const [annDelivered, setAnnDelivered] = useState(0);
-  const [annPolling,   setAnnPolling]   = useState(false);
-  const [annPollTotal, setAnnPollTotal] = useState(0);
+  const [annDelivered,    setAnnDelivered]    = useState(0);
+  const [annFailed,       setAnnFailed]       = useState(0);
+  const [annPolling,      setAnnPolling]      = useState(false);
+  const [annPollTotal,    setAnnPollTotal]    = useState(0);
+  const [annTestEmail,    setAnnTestEmail]    = useState("");
+  const [annTestSending,  setAnnTestSending]  = useState(false);
+  const [annTestResult,   setAnnTestResult]   = useState<{ ok: boolean; msg: string } | null>(null);
 
   function defaultBody(_evTitle: string, _dateStr: string, timeStr: string, _location: string) {
     return `We're excited to announce an upcoming event!\n\n🏃 {event}\n📅 {date}${timeStr ? " at {time}" : ""}\n📍 {location}\n\nRegister now to secure your spot:\n{register_link}\n\nSee you there!\n\nTeam Connected Steps`;
@@ -276,7 +280,7 @@ export default function EventManagePage() {
       setAnnError("Subject and body are required."); return;
     }
     if (!confirm(`Send to ${annPreview?.member_count ?? "all"} active members via ${annChannels.join(" + ")}?`)) return;
-    setAnnSending(true); setAnnError(""); setAnnResult(null); setAnnDelivered(0);
+    setAnnSending(true); setAnnError(""); setAnnResult(null); setAnnDelivered(0); setAnnFailed(0); setAnnTestResult(null);
     try {
       const res  = await fetch(`/api/admin/events/${eventId}/announce`, {
         method: "POST",
@@ -294,21 +298,62 @@ export default function EventManagePage() {
     finally { setAnnSending(false); }
   }
 
+  // Status polling — updates delivered/failed counts every 3s
   useEffect(() => {
     if (!annPolling || !annResult?.batch_id) return;
     const batchId = annResult.batch_id;
-    const interval = setInterval(async () => {
+    const iv = setInterval(async () => {
       try {
         const res  = await fetch(`/api/admin/events/${eventId}/communicate/status?batch_id=${batchId}`);
-        const data = await res.json() as { queued: number; sending: number; delivered: number };
+        const data = await res.json() as { queued: number; sending: number; delivered: number; failed: number };
         setAnnDelivered(data.delivered ?? 0);
-        if (data.queued === 0 && data.sending === 0) {
-          setAnnPolling(false);
-        }
+        setAnnFailed(data.failed ?? 0);
+        if (data.queued === 0 && data.sending === 0) setAnnPolling(false);
       } catch { /* non-critical */ }
     }, 3000);
-    return () => clearInterval(interval);
+    return () => clearInterval(iv);
   }, [annPolling, annResult?.batch_id, eventId]);
+
+  // Send-next driver — processes one email every 1.1s so delivery doesn't
+  // depend solely on after() which is killed by Vercel's function timeout.
+  useEffect(() => {
+    if (!annPolling || !annResult?.batch_id) return;
+    const batchId = annResult.batch_id;
+    let inFlight = false;
+    const iv = setInterval(async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const res  = await fetch(`/api/admin/events/${eventId}/communicate/send-next`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ batch_id: batchId }),
+        });
+        const data = await res.json() as { done?: boolean };
+        if (data.done) setAnnPolling(false);
+      } catch { /* retry on next tick */ }
+      finally { inFlight = false; }
+    }, 1100);
+    return () => clearInterval(iv);
+  }, [annPolling, annResult?.batch_id, eventId]);
+
+  async function sendTestEmail() {
+    const to = annTestEmail.trim();
+    if (!to || !annSubject.trim() || !annBody.trim()) {
+      setAnnError("Enter a test email address, subject, and body first."); return;
+    }
+    setAnnTestSending(true); setAnnTestResult(null); setAnnError("");
+    try {
+      const res  = await fetch(`/api/admin/events/${eventId}/announce/test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to, subject: annSubject, email_body: annBody }),
+      });
+      const data = await res.json() as { ok?: boolean; message?: string; error?: string };
+      setAnnTestResult({ ok: !!res.ok, msg: res.ok ? (data.message ?? `Sent to ${to}`) : (data.error ?? "Failed") });
+    } catch { setAnnTestResult({ ok: false, msg: "Network error" }); }
+    finally { setAnnTestSending(false); }
+  }
 
   // ── Form Builder state ───────────────────────────────────────────────────────
 
@@ -1501,13 +1546,28 @@ export default function EventManagePage() {
                           <div style={{ fontSize: 13, color: "#aaa", marginTop: 4 }}>
                             Email:{" "}
                             {annPolling ? (
-                              <span style={{ color: "#eab308" }}>Delivering… {annDelivered}/{annPollTotal}</span>
+                              <span>
+                                <span style={{ color: "#eab308" }}>
+                                  {annDelivered}/{annPollTotal} sent
+                                </span>
+                                {annFailed > 0 && (
+                                  <span style={{ color: "#f87171", marginLeft: 8 }}>· {annFailed} failed</span>
+                                )}
+                                <span style={{ color: "#555", marginLeft: 8 }}>
+                                  · {Math.max(0, annPollTotal - annDelivered - annFailed)} pending
+                                </span>
+                              </span>
                             ) : (
-                              <strong style={{ color: "#4ade80" }}>{annDelivered} delivered</strong>
+                              <span>
+                                <strong style={{ color: "#4ade80" }}>{annDelivered} delivered</strong>
+                                {annFailed > 0 && (
+                                  <span style={{ color: "#f87171", marginLeft: 8 }}>· {annFailed} failed</span>
+                                )}
+                              </span>
                             )}
                           </div>
                         )}
-                        <button onClick={() => { setAnnResult(null); setAnnPreview(null); setAnnDelivered(0); setAnnSubject(""); setAnnBody(""); }}
+                        <button onClick={() => { setAnnResult(null); setAnnPreview(null); setAnnDelivered(0); setAnnFailed(0); setAnnSubject(""); setAnnBody(""); setAnnTestResult(null); }}
                           style={{ marginTop: 10, fontSize: 12, color: "#555", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: 0 }}>
                           Send another →
                         </button>
@@ -1570,6 +1630,36 @@ export default function EventManagePage() {
                                 style={{ width: "100%", padding: "9px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#fff", fontSize: 13, fontFamily: "monospace", outline: "none", resize: "vertical" as const, boxSizing: "border-box" as const }} />
                             </div>
                           </>
+                        )}
+
+                        {/* Test email — verify pipeline before bulk send */}
+                        {annChannels.includes("email") && (
+                          <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "12px 14px" }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", marginBottom: 8 }}>
+                              🧪 Test Email (verify delivery before bulk send)
+                            </div>
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <input
+                                type="email"
+                                value={annTestEmail}
+                                onChange={e => setAnnTestEmail(e.target.value)}
+                                placeholder="your@email.com"
+                                style={{ flex: 1, padding: "7px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none" }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => void sendTestEmail()}
+                                disabled={annTestSending || !annTestEmail.trim()}
+                                style={{ padding: "7px 14px", borderRadius: 7, background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.25)", color: "#60a5fa", fontSize: 12, fontWeight: 700, cursor: annTestSending || !annTestEmail.trim() ? "not-allowed" : "pointer", fontFamily: "inherit", whiteSpace: "nowrap" as const, opacity: annTestSending || !annTestEmail.trim() ? 0.6 : 1 }}>
+                                {annTestSending ? "Sending…" : "Send Test"}
+                              </button>
+                            </div>
+                            {annTestResult && (
+                              <div style={{ marginTop: 8, fontSize: 12, color: annTestResult.ok ? "#4ade80" : "#f87171" }}>
+                                {annTestResult.ok ? "✓ " : "✗ "}{annTestResult.msg}
+                              </div>
+                            )}
+                          </div>
                         )}
 
                         {annError && <Alert variant="error">{annError}</Alert>}
