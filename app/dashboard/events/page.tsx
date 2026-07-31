@@ -116,6 +116,11 @@ function fmtDate(d: string) {
   });
 }
 
+function formatTime(t: string) {
+  const [h, m] = t.split(":").map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+}
+
 function isEventOver(ev: Reg["events"]): boolean {
   if (!ev) return false;
   const ist     = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
@@ -219,6 +224,31 @@ function ActionBtn({ href, onClick, children, orange }: {
   };
   if (href) return <a href={href} target="_blank" rel="noopener noreferrer" style={style}>{children}</a>;
   return <button onClick={onClick} style={style}>{children}</button>;
+}
+
+function IconBtn({ icon, label, href, onClick }: {
+  icon: string; label: string; href?: string; onClick?: () => void;
+}) {
+  const s: React.CSSProperties = {
+    display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 2,
+    padding: "5px 8px", borderRadius: 8, fontSize: 9, fontWeight: 700,
+    background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
+    color: "#777", cursor: "pointer", fontFamily: "inherit", textDecoration: "none",
+    whiteSpace: "nowrap" as const, minWidth: 40, letterSpacing: "0.02em",
+  };
+  const inner = <><span style={{ fontSize: 15, lineHeight: 1 }}>{icon}</span>{label}</>;
+  if (href) return <a href={href} target="_blank" rel="noopener noreferrer" style={s}>{inner}</a>;
+  return <button onClick={onClick} style={s}>{inner}</button>;
+}
+
+function MoreItem({ label, onClick, href }: { label: string; onClick?: () => void; href?: string }) {
+  const s: React.CSSProperties = {
+    display: "block", width: "100%", padding: "9px 16px", textAlign: "left",
+    fontSize: 13, fontWeight: 500, color: "#ccc", background: "none", border: "none",
+    cursor: "pointer", fontFamily: "inherit", textDecoration: "none", whiteSpace: "nowrap" as const,
+  };
+  if (href) return <a href={href} target="_blank" rel="noopener noreferrer" style={s}>{label}</a>;
+  return <button onClick={onClick} style={s}>{label}</button>;
 }
 
 // ── QR Modal ─────────────────────────────────────────────────────────────────
@@ -407,6 +437,7 @@ function RegistrationCard({ reg, userToken, isUpcoming, onShowQR, onRefresh }: {
   const [catReason,        setCatReason]        = useState("");
   const [catLoading,       setCatLoading]       = useState(false);
   const [catResult,        setCatResult]        = useState<{ success?: boolean; message?: string; error?: string } | null>(null);
+  const [moreOpen,         setMoreOpen]         = useState(false);
 
   async function submitCategoryChange() {
     if (!newCategory) return;
@@ -429,10 +460,14 @@ function RegistrationCard({ reg, userToken, isUpcoming, onShowQR, onRefresh }: {
     finally { setCatLoading(false); }
   }
 
-  const ev        = reg.events;
-  const eventHref = ev?.share_slug ? `/events/${ev.share_slug}` : "#";
-  const banner    = ev?.banner_image ?? ev?.cover_image ?? null;
+  const ev           = reg.events;
+  const eventHref    = ev?.share_slug ? `/events/${ev.share_slug}` : "#";
+  const banner       = ev?.banner_image ?? ev?.cover_image ?? null;
   const participants = reg.participants ?? [];
+  const firstQRPart  = participants.find(p => !!p.qr_token);
+  const contactHref  = ev?.organizer_email
+    ? `mailto:${ev.organizer_email}`
+    : ev?.organizer_phone ? `tel:${ev.organizer_phone}` : null;
 
   const daysUntilEvent = ev ? (() => {
     const d = new Date(ev.start_date + "T00:00:00+05:30");
@@ -463,171 +498,63 @@ function RegistrationCard({ reg, userToken, isUpcoming, onShowQR, onRefresh }: {
       border: "1px solid rgba(255,255,255,0.08)",
       borderRadius: 16, overflow: "hidden", marginBottom: 16,
     }}>
-      {/* Banner */}
-      {banner && (
-        <div style={{ height: 100, overflow: "hidden", position: "relative" }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={banner}
-            alt={ev?.title}
-            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-          />
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.7))" }} />
-        </div>
-      )}
 
-      {/* Card header */}
-      <div style={{ padding: "16px 20px" }}>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
-          {!banner && (
-            <div style={{ fontSize: 28, flexShrink: 0, marginTop: 2 }}>
-              {TYPE_ICON[ev?.event_type ?? ""] ?? "🏃"}
-            </div>
-          )}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <Link href={eventHref}
-              style={{ fontSize: 15, fontWeight: 700, color: "#fff", textDecoration: "none", display: "block",
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {ev?.title ?? "Event"}
-            </Link>
-            {ev && (
-              <div style={{ fontSize: 12, color: "#666", marginTop: 3 }}>
-                📅 {fmtDate(ev.start_date)} · 📍 {ev.location}
-              </div>
-            )}
-            {/* Code + badges */}
-            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 8 }}>
-              <code style={{ fontSize: 11, color: "#e8620a", background: "rgba(232,98,10,0.1)", padding: "2px 7px", borderRadius: 5 }}>
-                {reg.registration_code}
-              </code>
-              <PayBadge status={reg.status} payment={reg.payment_status} />
-              {reg.final_price > 0 && <Chip color="#888">₹{reg.final_price}</Chip>}
-              {participants.length > 1 && <Chip color="#a78bfa">{participants.length} participants</Chip>}
-              {isUpcoming && daysUntilEvent !== null && daysUntilEvent >= 0 && (
-                <Chip color={daysUntilEvent === 0 ? "#f87171" : daysUntilEvent <= 7 ? "#fb923c" : "#60a5fa"}>
-                  {daysUntilEvent === 0 ? "Today!" : daysUntilEvent === 1 ? "Tomorrow" : `${daysUntilEvent}d away`}
-                </Chip>
-              )}
-            </div>
+      {/* Row 1: Thumbnail + Event info */}
+      <div style={{ display: "flex", gap: 12, padding: "14px 16px 10px", alignItems: "flex-start" }}>
+        {banner ? (
+          <div style={{ width: 72, height: 72, borderRadius: 10, overflow: "hidden", flexShrink: 0 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={banner} alt={ev?.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
           </div>
-
-          {/* Top-right actions */}
-          <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: "flex-start", flexWrap: "wrap" }}>
-            {/* View Hub */}
-            <a href={`/my-events/${reg.registration_code}`}
-              style={{ fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8,
-                background: "rgba(232,98,10,0.1)", border: "1px solid rgba(232,98,10,0.3)",
-                color: "#e8620a", textDecoration: "none", whiteSpace: "nowrap" }}>
-              View Hub →
-            </a>
-
-            {/* Invoice */}
-            {reg.invoice_number && (
-              <button
-                onClick={() => {
-                  const headers = new Headers({ "x-user-token": userToken });
-                  fetch(`/api/invoices/${reg.invoice_number}`, { headers })
-                    .then(r => r.text())
-                    .then(html => {
-                      const w = window.open("", "_blank");
-                      if (w) { w.document.write(html); w.document.close(); }
-                    }).catch(() => {});
-                }}
-                style={{ fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8,
-                  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)",
-                  color: "#ccc", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
-                📄 Invoice
-              </button>
-            )}
-
-            {/* Route Map */}
-            {ev?.route_map_url && (
-              <a
-                href={ev.route_map_url}
-                target="_blank" rel="noopener noreferrer"
-                style={{ fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8,
-                  background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.25)",
-                  color: "#60a5fa", textDecoration: "none", whiteSpace: "nowrap" }}>
-                🗺 Route Map
-              </a>
-            )}
-
-            {/* WhatsApp Community */}
-            {ev?.whatsapp_community_url && (
-              <a
-                href={ev.whatsapp_community_url}
-                target="_blank" rel="noopener noreferrer"
-                style={{ fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8,
-                  background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)",
-                  color: "#4ade80", textDecoration: "none", whiteSpace: "nowrap" }}>
-                💬 WhatsApp
-              </a>
-            )}
-
-            {/* Add to Calendar */}
-            {isUpcoming && ev && (
-              <button
-                onClick={() => generateICS(reg)}
-                style={{ fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8,
-                  background: "rgba(96,165,250,0.08)", border: "1px solid rgba(96,165,250,0.25)",
-                  color: "#60a5fa", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
-                📅 Calendar
-              </button>
-            )}
-
-            {/* Share Event */}
-            {ev?.share_slug && (
-              <button
-                onClick={() => void shareEvent(ev, reg.registration_code)}
-                style={{ fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8,
-                  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)",
-                  color: "#ccc", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
-                ↗ Share
-              </button>
-            )}
-
-            {/* Get Directions */}
-            {ev && (
-              <a
-                href={directionsUrl(ev)}
-                target="_blank" rel="noopener noreferrer"
-                style={{ fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8,
-                  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)",
-                  color: "#ccc", textDecoration: "none", whiteSpace: "nowrap" }}>
-                🗺 Directions
-              </a>
-            )}
-
-            {/* Contact Organiser */}
-            {(ev?.organizer_email || ev?.organizer_phone) && (
-              <a
-                href={ev.organizer_email ? `mailto:${ev.organizer_email}` : `tel:${ev.organizer_phone}`}
-                style={{ fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8,
-                  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)",
-                  color: "#ccc", textDecoration: "none", whiteSpace: "nowrap" }}>
-                ✉️ Organiser
-              </a>
-            )}
-
-            {/* Expand toggle */}
-            {participants.length > 0 && (
-              <button onClick={() => setExpanded(v => !v)}
-                style={{ fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8,
-                  background: "transparent", border: "1px solid rgba(255,255,255,0.1)",
-                  color: "#888", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
-                {expanded ? "Hide ▲" : "Show ▼"}
-              </button>
+        ) : (
+          <div style={{
+            width: 72, height: 72, borderRadius: 10, flexShrink: 0,
+            background: "rgba(232,98,10,0.08)", border: "1px solid rgba(232,98,10,0.15)",
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28,
+          }}>
+            {TYPE_ICON[ev?.event_type ?? ""] ?? "🏃"}
+          </div>
+        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Link href={eventHref} style={{
+            fontSize: 14, fontWeight: 700, color: "#fff", textDecoration: "none",
+            display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            {ev?.title ?? "Event"}
+          </Link>
+          {ev && (
+            <>
+              <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>
+                📅 {fmtDate(ev.start_date)}{ev.start_time && ` · ⏰ ${formatTime(ev.start_time)}`}
+              </div>
+              <div style={{ fontSize: 11, color: "#555" }}>📍 {ev.location}</div>
+            </>
+          )}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 7 }}>
+            <code style={{
+              fontSize: 10, color: "#e8620a", background: "rgba(232,98,10,0.1)",
+              padding: "1px 7px", borderRadius: 4, fontFamily: "monospace",
+            }}>
+              {reg.registration_code}
+            </code>
+            <PayBadge status={reg.status} payment={reg.payment_status} />
+            {reg.distance_category && <Chip color="#a78bfa">{reg.distance_category}</Chip>}
+            {reg.final_price > 0 && <Chip color="#888">₹{reg.final_price}</Chip>}
+            {participants.length > 1 && <Chip color="#a78bfa">{participants.length} pax</Chip>}
+            {isUpcoming && daysUntilEvent !== null && daysUntilEvent >= 0 && (
+              <Chip color={daysUntilEvent === 0 ? "#f87171" : daysUntilEvent <= 3 ? "#fb923c" : "#60a5fa"}>
+                {daysUntilEvent === 0 ? "Today!" : daysUntilEvent === 1 ? "Tomorrow" : `${daysUntilEvent}d`}
+              </Chip>
             )}
           </div>
         </div>
       </div>
 
-      {/* Participants */}
+      {/* Participants (collapsible) */}
       {expanded && participants.length > 0 && (
-        <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "12px 16px",
-          display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>
-            Participants &amp; QR Codes
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: "#444", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 2 }}>
+            Participants
           </div>
           {participants.map(p => (
             <ParticipantRow
@@ -652,149 +579,177 @@ function RegistrationCard({ reg, userToken, isUpcoming, onShowQR, onRefresh }: {
         </div>
       )}
 
-      {/* Category change request */}
-      {isUpcoming && reg.status !== "cancelled" && !reg.pending_category_change &&
-        (ev?.distance_categories ?? []).length > 1 && (
+      {/* Category change panel (opened from More menu) */}
+      {catChangeOpen && (
         <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", padding: "12px 16px" }}>
-          {!catChangeOpen ? (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-              <div style={{ fontSize: 11, color: "#444" }}>
-                Current category: <span style={{ color: "#a78bfa" }}>{reg.distance_category ?? "—"}</span>
-              </div>
-              <button onClick={() => { setCatChangeOpen(true); setCatResult(null); }}
-                style={{ fontSize: 11, fontWeight: 600, padding: "4px 12px", borderRadius: 6,
-                  background: "transparent", border: "1px solid rgba(167,139,250,0.3)",
-                  color: "#a78bfa", cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
-                🔄 Change Category
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#a78bfa", marginBottom: 8 }}>Request Category Change</div>
+          {catResult?.success ? (
+            <div style={{ padding: "10px 12px", borderRadius: 8, background: "rgba(74,222,128,0.08)",
+              border: "1px solid rgba(74,222,128,0.2)", fontSize: 12, color: "#4ade80" }}>
+              {catResult.message}
+              <button onClick={() => setCatChangeOpen(false)}
+                style={{ display: "block", marginTop: 8, fontSize: 11, color: "#555", cursor: "pointer",
+                  background: "none", border: "none", padding: 0, fontFamily: "inherit" }}>
+                Close
               </button>
             </div>
           ) : (
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#a78bfa", marginBottom: 8 }}>Request Category Change</div>
-              {catResult?.success ? (
-                <div style={{ padding: "10px 12px", borderRadius: 8, background: "rgba(74,222,128,0.08)",
-                  border: "1px solid rgba(74,222,128,0.2)", fontSize: 12, color: "#4ade80" }}>
-                  {catResult.message}
-                  <button onClick={() => setCatChangeOpen(false)}
-                    style={{ display: "block", marginTop: 8, fontSize: 11, color: "#555", cursor: "pointer",
-                      background: "none", border: "none", padding: 0, fontFamily: "inherit" }}>
-                    Close
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ fontSize: 11, color: "#666" }}>Select a new category. Our team will review your request.</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {(ev?.distance_categories ?? []).filter(c => c !== reg.distance_category).map(cat => (
+                  <button key={cat} onClick={() => setNewCategory(cat)}
+                    style={{ padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+                      background: newCategory === cat ? "rgba(167,139,250,0.15)" : "rgba(255,255,255,0.04)",
+                      border: `1px solid ${newCategory === cat ? "rgba(167,139,250,0.5)" : "rgba(255,255,255,0.1)"}`,
+                      color: newCategory === cat ? "#a78bfa" : "#888" }}>
+                    {cat}
                   </button>
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>
-                    Select a new category. Our team will review your request.
-                  </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {(ev?.distance_categories ?? []).filter(c => c !== reg.distance_category).map(cat => (
-                      <button key={cat} onClick={() => setNewCategory(cat)}
-                        style={{ padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
-                          background: newCategory === cat ? "rgba(167,139,250,0.15)" : "rgba(255,255,255,0.04)",
-                          border: `1px solid ${newCategory === cat ? "rgba(167,139,250,0.5)" : "rgba(255,255,255,0.1)"}`,
-                          color: newCategory === cat ? "#a78bfa" : "#888" }}>
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
-                  <textarea
-                    value={catReason}
-                    onChange={e => setCatReason(e.target.value)}
-                    placeholder="Reason (optional)…"
-                    rows={2}
-                    style={{ width: "100%", padding: "8px 10px", resize: "vertical",
-                      background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: 7, color: "#ccc", fontSize: 12, fontFamily: "inherit",
-                      boxSizing: "border-box" as const, outline: "none" }}
-                  />
-                  {catResult?.error && <div style={{ fontSize: 11, color: "#f87171" }}>{catResult.error}</div>}
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => void submitCategoryChange()} disabled={catLoading || !newCategory}
-                      style={{ flex: 1, padding: "7px 0", borderRadius: 7,
-                        background: catLoading || !newCategory ? "rgba(167,139,250,0.3)" : "rgba(167,139,250,0.7)",
-                        border: "none", color: "#fff", fontSize: 12, fontWeight: 700,
-                        cursor: catLoading || !newCategory ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
-                      {catLoading ? "Submitting…" : "Submit Request"}
-                    </button>
-                    <button type="button" onClick={() => { setCatChangeOpen(false); setCatResult(null); setCatReason(""); setNewCategory(""); }}
-                      style={{ padding: "7px 14px", borderRadius: 7, background: "rgba(255,255,255,0.06)",
-                        border: "1px solid rgba(255,255,255,0.08)", color: "#888", fontSize: 12,
-                        cursor: "pointer", fontFamily: "inherit" }}>
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
+                ))}
+              </div>
+              <textarea value={catReason} onChange={e => setCatReason(e.target.value)} placeholder="Reason (optional)…" rows={2}
+                style={{ width: "100%", padding: "8px 10px", resize: "vertical", background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: "#ccc", fontSize: 12,
+                  fontFamily: "inherit", boxSizing: "border-box" as const, outline: "none" }} />
+              {catResult?.error && <div style={{ fontSize: 11, color: "#f87171" }}>{catResult.error}</div>}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => void submitCategoryChange()} disabled={catLoading || !newCategory}
+                  style={{ flex: 1, padding: "7px 0", borderRadius: 7,
+                    background: catLoading || !newCategory ? "rgba(167,139,250,0.3)" : "rgba(167,139,250,0.7)",
+                    border: "none", color: "#fff", fontSize: 12, fontWeight: 700,
+                    cursor: catLoading || !newCategory ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                  {catLoading ? "Submitting…" : "Submit Request"}
+                </button>
+                <button type="button" onClick={() => { setCatChangeOpen(false); setCatResult(null); setCatReason(""); setNewCategory(""); }}
+                  style={{ padding: "7px 14px", borderRadius: 7, background: "rgba(255,255,255,0.06)",
+                    border: "1px solid rgba(255,255,255,0.08)", color: "#888", fontSize: 12,
+                    cursor: "pointer", fontFamily: "inherit" }}>
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
         </div>
       )}
 
-      {/* Cancellation */}
-      {isUpcoming && reg.status !== "cancelled" && (
+      {/* Cancellation panel (opened from More menu) */}
+      {cancelOpen && (
         <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", padding: "12px 16px" }}>
-          {!cancelOpen ? (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-              <div style={{ fontSize: 11, color: "#444" }}>
-                Need to cancel?{" "}
-                <a href="mailto:info@connectedsteps.in" style={{ color: "#666", textDecoration: "none" }}>info@connectedsteps.in</a>
-              </div>
-              <button onClick={() => { setCancelOpen(true); setCancelResult(null); }}
-                style={{ fontSize: 11, fontWeight: 600, padding: "4px 12px", borderRadius: 6,
-                  background: "transparent", border: "1px solid rgba(239,68,68,0.25)",
-                  color: "#f87171", cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
-                Request Cancellation
-              </button>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#f87171", marginBottom: 8 }}>Request Cancellation</div>
+          <div style={{ fontSize: 11, color: "#666", marginBottom: 10, lineHeight: 1.5 }}>
+            Cancellations are processed within 1–2 business days. Refunds are credited within 5–7 business days.
+          </div>
+          {cancelResult?.success ? (
+            <div style={{ padding: "10px 12px", borderRadius: 8, background: "rgba(74,222,128,0.08)",
+              border: "1px solid rgba(74,222,128,0.2)", fontSize: 12, color: "#4ade80" }}>
+              {cancelResult.message}
             </div>
           ) : (
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#f87171", marginBottom: 8 }}>Request Cancellation</div>
-              <div style={{ fontSize: 11, color: "#666", marginBottom: 10, lineHeight: 1.5 }}>
-                Cancellations are processed within 1–2 business days. Refunds are credited within 5–7 business days.
-              </div>
-              {cancelResult?.success ? (
-                <div style={{ padding: "10px 12px", borderRadius: 8, background: "rgba(74,222,128,0.08)",
-                  border: "1px solid rgba(74,222,128,0.2)", fontSize: 12, color: "#4ade80" }}>
-                  {cancelResult.message}
-                </div>
-              ) : (
-                <form onSubmit={submitCancelRequest} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <textarea
-                    value={cancelReason}
-                    onChange={e => setCancelReason(e.target.value)}
-                    placeholder="Please describe your reason (min 10 characters)…"
-                    required
-                    style={{ width: "100%", minHeight: 70, padding: "8px 10px", resize: "vertical",
-                      background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: 7, color: "#ccc", fontSize: 12, fontFamily: "inherit",
-                      boxSizing: "border-box" as const, outline: "none" }}
-                  />
-                  {cancelResult?.error && (
-                    <div style={{ fontSize: 11, color: "#f87171" }}>{cancelResult.error}</div>
-                  )}
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button type="submit" disabled={cancelLoading || cancelReason.trim().length < 10}
-                      style={{ flex: 1, padding: "7px 0", borderRadius: 7,
-                        background: cancelLoading || cancelReason.trim().length < 10
-                          ? "rgba(239,68,68,0.3)" : "rgba(239,68,68,0.8)",
+            <form onSubmit={submitCancelRequest} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <textarea value={cancelReason} onChange={e => setCancelReason(e.target.value)}
+                placeholder="Please describe your reason (min 10 characters)…" required
+                style={{ width: "100%", minHeight: 70, padding: "8px 10px", resize: "vertical",
+                  background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 7, color: "#ccc", fontSize: 12, fontFamily: "inherit",
+                  boxSizing: "border-box" as const, outline: "none" }} />
+              {cancelResult?.error && (
+                <div style={{ fontSize: 11, color: "#f87171" }}>{cancelResult.error}</div>
+              )}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="submit" disabled={cancelLoading || cancelReason.trim().length < 10}
+                  style={{ flex: 1, padding: "7px 0", borderRadius: 7,
+                    background: cancelLoading || cancelReason.trim().length < 10
+                      ? "rgba(239,68,68,0.3)" : "rgba(239,68,68,0.8)",
                         border: "none", color: "#fff", fontSize: 12, fontWeight: 700,
-                        cursor: cancelLoading || cancelReason.trim().length < 10 ? "not-allowed" : "pointer",
-                        fontFamily: "inherit" }}>
-                      {cancelLoading ? "Submitting…" : "Submit Request"}
-                    </button>
-                    <button type="button" onClick={() => { setCancelOpen(false); setCancelResult(null); setCancelReason(""); }}
-                      style={{ padding: "7px 14px", borderRadius: 7, background: "rgba(255,255,255,0.06)",
-                        border: "1px solid rgba(255,255,255,0.08)", color: "#888", fontSize: 12,
-                        cursor: "pointer", fontFamily: "inherit" }}>
-                      Cancel
-                    </button>
-                  </div>
-                </form>
+                    cursor: cancelLoading || cancelReason.trim().length < 10 ? "not-allowed" : "pointer",
+                    fontFamily: "inherit" }}>
+                  {cancelLoading ? "Submitting…" : "Submit Request"}
+                </button>
+                <button type="button" onClick={() => { setCancelOpen(false); setCancelResult(null); setCancelReason(""); }}
+                  style={{ padding: "7px 14px", borderRadius: 7, background: "rgba(255,255,255,0.06)",
+                    border: "1px solid rgba(255,255,255,0.08)", color: "#888", fontSize: 12,
+                    cursor: "pointer", fontFamily: "inherit" }}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+
+      {/* Action bar */}
+      <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "10px 14px",
+        display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        <Link href={`/my-events/${reg.registration_code}`}
+          style={{ fontSize: 11, fontWeight: 700, padding: "6px 14px", borderRadius: 8,
+            background: "rgba(232,98,10,0.12)", border: "1px solid rgba(232,98,10,0.3)",
+            color: "#e8620a", textDecoration: "none", whiteSpace: "nowrap" as const }}>
+          View Hub →
+        </Link>
+        {firstQRPart && (
+          <IconBtn icon="🎫" label="QR" onClick={() => onShowQR({
+            qrUrl:      `${BASE_URL}/api/events/qr/${encodeURIComponent(firstQRPart.qr_token!)}`,
+            name:       [firstQRPart.first_name, firstQRPart.last_name].filter(Boolean).join(" "),
+            eventTitle: ev?.title ?? "Event",
+            regCode:    reg.registration_code,
+            category:   firstQRPart.distance_category,
+            bibNumber:  firstQRPart.bib_number,
+          })} />
+        )}
+        {isUpcoming && ev && <IconBtn icon="📅" label="Cal" onClick={() => generateICS(reg)} />}
+        {ev && <IconBtn icon="🗺" label="Map" href={directionsUrl(ev)} />}
+        {ev?.share_slug && <IconBtn icon="↗" label="Share" onClick={() => void shareEvent(ev, reg.registration_code)} />}
+        {participants.length > 0 && (
+          <IconBtn
+            icon={expanded ? "▲" : "▼"}
+            label={expanded ? "Hide" : `${participants.length} pax`}
+            onClick={() => setExpanded(v => !v)}
+          />
+        )}
+        {/* More menu */}
+        <div style={{ position: "relative", marginLeft: "auto" }}>
+          <button onClick={() => setMoreOpen(v => !v)}
+            style={{ fontSize: 15, lineHeight: 1, padding: "4px 10px", borderRadius: 8,
+              background: moreOpen ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.1)", color: "#666",
+              cursor: "pointer", fontFamily: "inherit" }}>
+            ···
+          </button>
+          {moreOpen && (
+            <div onClick={() => setMoreOpen(false)}
+              style={{ position: "fixed", inset: 0, zIndex: 48 }} />
+          )}
+          {moreOpen && (
+            <div style={{ position: "absolute", right: 0, bottom: "calc(100% + 6px)", zIndex: 50,
+              background: "#1c1c1c", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12,
+              padding: "6px 0", minWidth: 200, boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}>
+              {reg.invoice_number && (
+                <MoreItem label="📄 Invoice" onClick={() => {
+                  setMoreOpen(false);
+                  fetch(`/api/invoices/${reg.invoice_number}`, { headers: { "x-user-token": userToken } })
+                    .then(r => r.text())
+                    .then(html => { const w = window.open("", "_blank"); if (w) { w.document.write(html); w.document.close(); } })
+                    .catch(() => {});
+                }} />
+              )}
+              {ev?.route_map_url && <MoreItem label="🗺 Route Map" href={ev.route_map_url} />}
+              {ev?.whatsapp_community_url && <MoreItem label="💬 WhatsApp Community" href={ev.whatsapp_community_url} />}
+              {contactHref && <MoreItem label="✉️ Contact Organiser" href={contactHref} />}
+              {isUpcoming && reg.status !== "cancelled" && !reg.pending_category_change
+                && (ev?.distance_categories ?? []).length > 1 && (
+                <MoreItem label="🔄 Change Category" onClick={() => {
+                  setMoreOpen(false); setCatChangeOpen(true); setCatResult(null);
+                }} />
+              )}
+              {isUpcoming && reg.status !== "cancelled" && (
+                <MoreItem label="❌ Request Cancellation" onClick={() => {
+                  setMoreOpen(false); setCancelOpen(true); setCancelResult(null);
+                }} />
               )}
             </div>
           )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -17,7 +17,8 @@ export async function GET(req: NextRequest, { params }: Params) {
   const { code } = await params;
   const db = getSupabaseServer();
 
-  // Fetch registration — must belong to the authenticated user
+  // Look up registration by code, then verify ownership separately so the two
+  // conditions don't silently collapse into a 404 when only the email mismatches.
   const { data: reg, error: regErr } = await db
     .from("event_registrations")
     .select(`
@@ -29,10 +30,14 @@ export async function GET(req: NextRequest, { params }: Params) {
       razorpay_payment_id
     `)
     .eq("registration_code", code.toUpperCase())
-    .eq("user_email", userEmail.toLowerCase())
     .single();
 
   if (regErr || !reg) return NextResponse.json({ error: "Registration not found" }, { status: 404 });
+
+  // Ownership check: user may only access their own registrations (IDOR prevention)
+  if (reg.user_email.toLowerCase().trim() !== userEmail.toLowerCase().trim()) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
 
   // Fetch related data in parallel
   const [eventRes, participantsRes, invoiceRes, bib_slotRes, resultRes] = await Promise.all([
