@@ -7,6 +7,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Button, Alert, Spinner } from "@/components/ui/ds";
 import { EventFormBuilder } from "@/components/admin/EventFormBuilder";
+import CreatableSelect, { type SelectOption } from "@/components/ui/CreatableSelect";
 
 // ── TipTap (lazy-loaded) ──────────────────────────────────────────────────────
 
@@ -168,23 +169,25 @@ const STEPS = [
   { label: "Review & Publish", icon: "🚀" },
 ];
 
-const EVENT_CATEGORIES = [
-  { value: "community",  label: "Community Run",      emoji: "🤝" },
-  { value: "marathon",   label: "Marathon / Half",    emoji: "🏆" },
-  { value: "corporate",  label: "Corporate Wellness", emoji: "🏢" },
-  { value: "virtual",    label: "Virtual Challenge",  emoji: "💻" },
-  { value: "walkathon",  label: "Walkathon",          emoji: "🚶" },
-  { value: "cycling",    label: "Cycling Event",      emoji: "🚴" },
-  { value: "triathlon",  label: "Triathlon",          emoji: "🔱" },
-];
-
-const EVENT_TYPES = [
+// Event types and categories are loaded from the database via /api/admin/event-config/*
+// Fallback seeds match the seeded migration values for offline/slow-load resilience.
+const FALLBACK_EVENT_TYPES: SelectOption[] = [
   { value: "running",   label: "Running"   },
   { value: "cycling",   label: "Cycling"   },
   { value: "training",  label: "Training"  },
   { value: "race",      label: "Race"      },
   { value: "community", label: "Community" },
   { value: "workshop",  label: "Workshop"  },
+];
+
+const FALLBACK_EVENT_CATEGORIES: SelectOption[] = [
+  { value: "community", label: "Community Run"      },
+  { value: "marathon",  label: "Marathon / Half"    },
+  { value: "corporate", label: "Corporate Wellness" },
+  { value: "virtual",   label: "Virtual Challenge"  },
+  { value: "walkathon", label: "Walkathon"          },
+  { value: "cycling",   label: "Cycling Event"      },
+  { value: "triathlon", label: "Triathlon"          },
 ];
 
 const DISTANCES = ["1K", "3K", "5K", "10K", "15K", "21.1K", "42.2K", "Custom"];
@@ -516,6 +519,10 @@ export default function NewEventWizard() {
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [templates,         setTemplates]         = useState<EventTemplate[]>([]);
   const [templatesLoading,  setTemplatesLoading]  = useState(false);
+  const [eventTypes,        setEventTypes]        = useState<SelectOption[]>(FALLBACK_EVENT_TYPES);
+  const [eventCategories,   setEventCategories]   = useState<SelectOption[]>(FALLBACK_EVENT_CATEGORIES);
+  const [creatingType,      setCreatingType]      = useState(false);
+  const [creatingCategory,  setCreatingCategory]  = useState(false);
 
   const autoRef  = useRef<ReturnType<typeof setTimeout>>(null);
   const isMounted = useRef(true);
@@ -526,6 +533,17 @@ export default function NewEventWizard() {
     style.textContent = GLOBAL_CSS;
     document.head.appendChild(style);
     return () => { document.head.removeChild(style); isMounted.current = false; };
+  }, []);
+
+  // ── Load event types & categories from DB ─────────────────────────────────
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/admin/event-config/types").then(r => r.json()),
+      fetch("/api/admin/event-config/categories").then(r => r.json()),
+    ]).then(([typesData, catsData]) => {
+      if (typesData.types?.length)      setEventTypes(typesData.types.map((t: { slug: string; name: string }) => ({ value: t.slug, label: t.name })));
+      if (catsData.categories?.length)  setEventCategories(catsData.categories.map((c: { slug: string; name: string }) => ({ value: c.slug, label: c.name })));
+    }).catch(() => { /* keep fallbacks */ });
   }, []);
 
   // ── Draft recovery ────────────────────────────────────────────────────────
@@ -879,6 +897,31 @@ export default function NewEventWizard() {
           <StepDetails
             form={form} set={set} errors={errors}
             eventId={eventId} onAutoSave={autoSaveForUpload}
+            eventTypes={eventTypes} eventCategories={eventCategories}
+            onCreateType={async (name) => {
+              setCreatingType(true);
+              try {
+                const res  = await fetch("/api/admin/event-config/types", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+                const data = await res.json();
+                if (!res.ok) { alert(data.error ?? "Failed to create type"); return null; }
+                const opt: SelectOption = { value: data.type.slug, label: data.type.name };
+                setEventTypes(prev => [...prev, opt]);
+                return opt;
+              } finally { setCreatingType(false); }
+            }}
+            onCreateCategory={async (name) => {
+              setCreatingCategory(true);
+              try {
+                const res  = await fetch("/api/admin/event-config/categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+                const data = await res.json();
+                if (!res.ok) { alert(data.error ?? "Failed to create category"); return null; }
+                const opt: SelectOption = { value: data.category.slug, label: data.category.name };
+                setEventCategories(prev => [...prev, opt]);
+                return opt;
+              } finally { setCreatingCategory(false); }
+            }}
+            creatingType={creatingType}
+            creatingCategory={creatingCategory}
           />
         )}
 
@@ -965,12 +1008,20 @@ export default function NewEventWizard() {
 
 function StepDetails({
   form, set, errors, eventId, onAutoSave,
+  eventTypes, eventCategories, onCreateType, onCreateCategory,
+  creatingType, creatingCategory,
 }: {
   form: WizardState;
   set: (k: keyof WizardState, v: unknown) => void;
   errors: Record<string, string>;
   eventId: string | null;
   onAutoSave: () => Promise<string | null>;
+  eventTypes:       SelectOption[];
+  eventCategories:  SelectOption[];
+  onCreateType:     (name: string) => Promise<SelectOption | null>;
+  onCreateCategory: (name: string) => Promise<SelectOption | null>;
+  creatingType:     boolean;
+  creatingCategory: boolean;
 }) {
   return (
     <div>
@@ -981,9 +1032,16 @@ function StepDetails({
               <input className="wiz-input" value={form.title} onChange={e => set("title", e.target.value)} placeholder="e.g. Connected Steps 5K Community Run" />
             </Field>
             <Field label="Category" required>
-              <select className="wiz-select" value={form.event_category} onChange={e => set("event_category", e.target.value)}>
-                {EVENT_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.emoji} {c.label}</option>)}
-              </select>
+              <CreatableSelect
+                value={form.event_category}
+                onChange={v => set("event_category", v)}
+                options={eventCategories}
+                onCreateOption={onCreateCategory}
+                creating={creatingCategory}
+                padding="11px 14px"
+                style={{ borderRadius: 10, fontSize: 14, background: "rgba(255,255,255,0.04)" }}
+                placeholder="Select or create category…"
+              />
             </Field>
           </Grid>
         </div>
@@ -997,9 +1055,16 @@ function StepDetails({
         <div style={{ marginBottom: 14 }}>
           <Grid cols="1fr 1fr" gap={16} mobile="1">
             <Field label="Event Type">
-              <select className="wiz-select" value={form.event_type} onChange={e => set("event_type", e.target.value)}>
-                {EVENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
+              <CreatableSelect
+                value={form.event_type}
+                onChange={v => set("event_type", v)}
+                options={eventTypes}
+                onCreateOption={onCreateType}
+                creating={creatingType}
+                padding="11px 14px"
+                style={{ borderRadius: 10, fontSize: 14, background: "rgba(255,255,255,0.04)" }}
+                placeholder="Select or create type…"
+              />
             </Field>
             <Field label="Visibility">
               <select className="wiz-select" value={form.visibility} onChange={e => set("visibility", e.target.value)}>
@@ -1836,7 +1901,7 @@ function StepReview({
       <SectionCard title="Event Summary">
         <Row label="Event Name"    value={form.title} />
         <Row label="Tagline"       value={form.short_description} />
-        <Row label="Category"      value={EVENT_CATEGORIES.find(c => c.value === form.event_category)?.label} />
+        <Row label="Category"      value={form.event_category ? form.event_category.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase()) : undefined} />
         <Row label="Date"          value={form.start_date + (form.end_date && form.end_date !== form.start_date ? ` → ${form.end_date}` : "")} />
         <Row label="Time"          value={[form.start_time, form.end_time].filter(Boolean).join(" – ")} />
         <Row label="Venue"         value={form.location} />

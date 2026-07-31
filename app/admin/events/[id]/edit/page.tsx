@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Button, Badge, Label, Alert, Spinner } from "@/components/ui/ds";
+import CreatableSelect, { type SelectOption } from "@/components/ui/CreatableSelect";
 
 const RichTextEditor = dynamic(() => import("@/components/admin/RichEmailEditor"), { ssr: false });
 
@@ -111,8 +112,17 @@ const TIER_LABELS: Record<string, string> = {
   powered_by:  "Powered By",
 };
 
-const EVENT_TYPES     = ["running","cycling","training","race","community","workshop"];
-const EVENT_CATS      = ["community","marathon","corporate","virtual","walkathon","cycling","triathlon"];
+// Fallback values — replaced by DB data once loaded
+const FALLBACK_TYPES: SelectOption[] = ["running","cycling","training","race","community","workshop"].map(v => ({ value: v, label: v.charAt(0).toUpperCase() + v.slice(1) }));
+const FALLBACK_CATS:  SelectOption[] = [
+  { value: "community", label: "Community Run"      },
+  { value: "marathon",  label: "Marathon / Half"    },
+  { value: "corporate", label: "Corporate Wellness" },
+  { value: "virtual",   label: "Virtual Challenge"  },
+  { value: "walkathon", label: "Walkathon"          },
+  { value: "cycling",   label: "Cycling Event"      },
+  { value: "triathlon", label: "Triathlon"          },
+];
 const VISIBILITY_OPTS = ["public","private","unlisted"];
 
 function toLocalDatetime(iso: string | null | undefined): string {
@@ -418,6 +428,12 @@ export default function EditEventPage() {
   const [ffOptions,      setFfOptions]      = useState("");
   const [ffRaceIds,      setFfRaceIds]      = useState<string[]>([]);
 
+  // Event type / category state (loaded from DB)
+  const [eventTypes,       setEventTypes]       = useState<SelectOption[]>(FALLBACK_TYPES);
+  const [eventCategories,  setEventCategories]  = useState<SelectOption[]>(FALLBACK_CATS);
+  const [creatingType,     setCreatingType]     = useState(false);
+  const [creatingCategory, setCreatingCategory] = useState(false);
+
   // Sponsor state
   const [sponsorAdding,      setSponsorAdding]      = useState(false);
   const [newSponsor,         setNewSponsor]         = useState({ name: "", tier: "community", website_url: "" });
@@ -491,6 +507,41 @@ export default function EditEventPage() {
   }, [eventId]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // Load event types & categories from DB
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/admin/event-config/types").then(r => r.json()),
+      fetch("/api/admin/event-config/categories").then(r => r.json()),
+    ]).then(([td, cd]) => {
+      if (td.types?.length)      setEventTypes(td.types.map((t: { slug: string; name: string }) => ({ value: t.slug, label: t.name })));
+      if (cd.categories?.length) setEventCategories(cd.categories.map((c: { slug: string; name: string }) => ({ value: c.slug, label: c.name })));
+    }).catch(() => { /* keep fallbacks */ });
+  }, []);
+
+  async function createEventType(name: string): Promise<SelectOption | null> {
+    setCreatingType(true);
+    try {
+      const res  = await fetch("/api/admin/event-config/types", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error ?? "Failed to create type"); return null; }
+      const opt: SelectOption = { value: data.type.slug, label: data.type.name };
+      setEventTypes(prev => [...prev, opt]);
+      return opt;
+    } finally { setCreatingType(false); }
+  }
+
+  async function createEventCategory(name: string): Promise<SelectOption | null> {
+    setCreatingCategory(true);
+    try {
+      const res  = await fetch("/api/admin/event-config/categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error ?? "Failed to create category"); return null; }
+      const opt: SelectOption = { value: data.category.slug, label: data.category.name };
+      setEventCategories(prev => [...prev, opt]);
+      return opt;
+    } finally { setCreatingCategory(false); }
+  }
 
   // ── Immediate-save image upload helpers ─────────────────────────────────────
 
@@ -703,14 +754,26 @@ export default function EditEventPage() {
 
               <div style={S.row}>
                 <Field label="Event Type">
-                  <select style={S.select} value={general.event_type ?? "running"} onChange={e => setGeneral(g => ({ ...g, event_type: e.target.value }))}>
-                    {EVENT_TYPES.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
-                  </select>
+                  <CreatableSelect
+                    value={general.event_type ?? "running"}
+                    onChange={v => setGeneral(g => ({ ...g, event_type: v }))}
+                    options={eventTypes}
+                    onCreateOption={createEventType}
+                    creating={creatingType}
+                    style={S.select}
+                    placeholder="Select or create type…"
+                  />
                 </Field>
                 <Field label="Event Category">
-                  <select style={S.select} value={general.event_category ?? "community"} onChange={e => setGeneral(g => ({ ...g, event_category: e.target.value }))}>
-                    {EVENT_CATS.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
-                  </select>
+                  <CreatableSelect
+                    value={general.event_category ?? "community"}
+                    onChange={v => setGeneral(g => ({ ...g, event_category: v }))}
+                    options={eventCategories}
+                    onCreateOption={createEventCategory}
+                    creating={creatingCategory}
+                    style={S.select}
+                    placeholder="Select or create category…"
+                  />
                 </Field>
               </div>
 

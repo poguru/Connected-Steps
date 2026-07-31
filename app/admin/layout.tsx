@@ -23,6 +23,7 @@ const NAV_GROUPS = [
       { label: "Registrations",   href: "/admin/events/registrations", exact: false, icon: "📋" },
       { label: "Scheduled Emails",href: "/admin/scheduled-emails",     exact: false, icon: "🕐" },
       { label: "Create Event",    href: "/admin/events/new",           exact: true,  icon: "➕" },
+      { label: "Event Config",    href: "/admin/events/config",        exact: false, icon: "⚙️" },
     ],
   },
   {
