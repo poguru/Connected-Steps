@@ -148,7 +148,7 @@ export default function SuccessPage() {
             </button>
           )}
 
-          <Link href="/dashboard"
+          <Link href="/dashboard/events"
             style={{ display: "block", padding: "12px", borderRadius: "10px", background: "linear-gradient(135deg,#e8620a,#f07c2a)", color: "#fff", textDecoration: "none", fontSize: "0.875rem", fontWeight: 700, textAlign: "center" }}>
             View My Registrations →
           </Link>

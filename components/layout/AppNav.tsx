@@ -8,8 +8,9 @@ import UserMenu, { MenuUser } from "@/components/ui/UserMenu";
 import NotificationBell from "@/components/ui/NotificationBell";
 
 const NAV_LINKS = [
-  { label: "Dashboard",    href: "/dashboard"    },
-  { label: "Sessions",     href: "/weekend-run"  },
+  { label: "Dashboard",    href: "/dashboard"         },
+  { label: "Events",       href: "/dashboard/events"  },
+  { label: "Sessions",     href: "/weekend-run"       },
   { label: "Leaderboard",  href: "/leaderboard"  },
   { label: "My Points",    href: "/points"       },
   { label: "Feed",         href: "/feed"         },

@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
   // Fetch events, participants, invoices, pending category change requests, and waitlist in parallel
   const [eventsRes, participantsRes, invoicesRes, catChangesRes, waitlistRes] = await Promise.all([
     db.from("events")
-      .select("id, title, event_type, cover_image, banner_image, start_date, start_time, end_date, end_time, location, share_slug, whatsapp_community_url, route_map_url, route_map_type, tshirt_size_chart_url, distance_categories, registration_closes_at")
+      .select("id, title, event_type, cover_image, banner_image, start_date, start_time, end_date, end_time, location, share_slug, whatsapp_community_url, route_map_url, route_map_type, tshirt_size_chart_url, distance_categories, registration_closes_at, organizer_email, organizer_phone, maps_url")
       .in("id", eventIds),
 
     db.from("event_participants")
@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
   const missingEvIds = [...new Set(wlEntries.map(w => w.event_id).filter(id => !evMap[id]))];
   if (missingEvIds.length > 0) {
     const { data: extra } = await db.from("events")
-      .select("id, title, event_type, cover_image, banner_image, start_date, start_time, end_date, end_time, location, share_slug, whatsapp_community_url, route_map_url, route_map_type, tshirt_size_chart_url, distance_categories, registration_closes_at")
+      .select("id, title, event_type, cover_image, banner_image, start_date, start_time, end_date, end_time, location, share_slug, whatsapp_community_url, route_map_url, route_map_type, tshirt_size_chart_url, distance_categories, registration_closes_at, organizer_email, organizer_phone, maps_url")
       .in("id", missingEvIds);
     for (const ev of extra ?? []) evMap[ev.id] = ev;
   }

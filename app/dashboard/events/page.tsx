@@ -58,6 +58,9 @@ interface Reg {
     tshirt_size_chart_url:  string | null;
     distance_categories:    string[] | null;
     registration_closes_at: string | null;
+    organizer_email:        string | null;
+    organizer_phone:        string | null;
+    maps_url:               string | null;
   } | null;
 }
 
@@ -122,6 +125,50 @@ function isEventOver(ev: Reg["events"]): boolean {
   if (endDate < today) return true;
   if (endDate === today && ev.end_time != null && ev.end_time.substring(0, 5) <= nowTime) return true;
   return false;
+}
+
+function generateICS(reg: Reg): void {
+  const ev = reg.events;
+  if (!ev) return;
+  const d0  = ev.start_date.replace(/-/g, "");
+  const t0  = ev.start_time ? ev.start_time.replace(/:/g, "").substring(0, 6) + "00" : null;
+  const d1  = (ev.end_date ?? ev.start_date).replace(/-/g, "");
+  const t1  = ev.end_time  ? ev.end_time.replace(/:/g, "").substring(0, 6)  + "00" : null;
+  const dtS = t0 ? `${d0}T${t0}` : d0;
+  const dtE = t1 ? `${d1}T${t1}` : d1;
+  const ics = [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Connected Steps//EN",
+    "BEGIN:VEVENT",
+    `UID:${reg.registration_code}@connectedsteps.in`,
+    `SUMMARY:${ev.title}`,
+    `DTSTART:${dtS}`, `DTEND:${dtE}`,
+    `LOCATION:${ev.location}`,
+    `DESCRIPTION:Registration ID\\: ${reg.registration_code}`,
+    "END:VEVENT", "END:VCALENDAR",
+  ].join("\r\n");
+  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement("a"), {
+    href: url, download: `${ev.title.replace(/\s+/g, "_")}.ics`,
+  });
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+async function shareEvent(ev: Reg["events"], regCode: string): Promise<void> {
+  if (!ev) return;
+  const url  = ev.share_slug ? `${BASE_URL}/events/${ev.share_slug}` : BASE_URL;
+  const text = `${ev.title} — Reg: ${regCode}`;
+  if (typeof navigator !== "undefined" && navigator.share) {
+    try { await navigator.share({ title: ev.title, text, url }); return; } catch { /* cancelled */ }
+  }
+  try { await navigator.clipboard.writeText(url); } catch { /* ignore */ }
+}
+
+function directionsUrl(ev: Reg["events"]): string {
+  if (!ev) return "#";
+  if (ev.maps_url) return ev.maps_url;
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(ev.location)}`;
 }
 
 // ── Atoms ─────────────────────────────────────────────────────────────────────
@@ -517,6 +564,51 @@ function RegistrationCard({ reg, userToken, isUpcoming, onShowQR, onRefresh }: {
               </a>
             )}
 
+            {/* Add to Calendar */}
+            {isUpcoming && ev && (
+              <button
+                onClick={() => generateICS(reg)}
+                style={{ fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8,
+                  background: "rgba(96,165,250,0.08)", border: "1px solid rgba(96,165,250,0.25)",
+                  color: "#60a5fa", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                📅 Calendar
+              </button>
+            )}
+
+            {/* Share Event */}
+            {ev?.share_slug && (
+              <button
+                onClick={() => void shareEvent(ev, reg.registration_code)}
+                style={{ fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8,
+                  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)",
+                  color: "#ccc", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                ↗ Share
+              </button>
+            )}
+
+            {/* Get Directions */}
+            {ev && (
+              <a
+                href={directionsUrl(ev)}
+                target="_blank" rel="noopener noreferrer"
+                style={{ fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8,
+                  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)",
+                  color: "#ccc", textDecoration: "none", whiteSpace: "nowrap" }}>
+                🗺 Directions
+              </a>
+            )}
+
+            {/* Contact Organiser */}
+            {(ev?.organizer_email || ev?.organizer_phone) && (
+              <a
+                href={ev.organizer_email ? `mailto:${ev.organizer_email}` : `tel:${ev.organizer_phone}`}
+                style={{ fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8,
+                  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)",
+                  color: "#ccc", textDecoration: "none", whiteSpace: "nowrap" }}>
+                ✉️ Organiser
+              </a>
+            )}
+
             {/* Expand toggle */}
             {participants.length > 0 && (
               <button onClick={() => setExpanded(v => !v)}
@@ -813,6 +905,7 @@ export default function MyEventsDashboard() {
   const [loading,   setLoading]   = useState(true);
   const [apiErr,    setApiErr]    = useState<string | null>(null);
   const [tab,       setTab]       = useState<"upcoming" | "past" | "waitlisted" | "cancelled">("upcoming");
+  const [search,    setSearch]    = useState("");
   const [userToken, setUserToken] = useState("");
   const [qrModal,   setQrModal]   = useState<QRModalState | null>(null);
 
@@ -842,10 +935,18 @@ export default function MyEventsDashboard() {
     loadRegs(token);
   }, [loadRegs]);
 
-  const upcoming       = regs.filter(r => r.status !== "cancelled" && r.status !== "waitlisted" && !isEventOver(r.events));
-  const past           = regs.filter(r => r.status !== "cancelled" && r.status !== "waitlisted" &&  isEventOver(r.events));
-  const waitlistedRegs = regs.filter(r => r.status === "waitlisted");
-  const cancelled      = regs.filter(r => r.status === "cancelled");
+  const searchLower    = search.toLowerCase().trim();
+  const filteredRegs   = searchLower
+    ? regs.filter(r =>
+        (r.events?.title ?? "").toLowerCase().includes(searchLower) ||
+        r.registration_code.toLowerCase().includes(searchLower)
+      )
+    : regs;
+
+  const upcoming       = filteredRegs.filter(r => r.status !== "cancelled" && r.status !== "waitlisted" && !isEventOver(r.events));
+  const past           = filteredRegs.filter(r => r.status !== "cancelled" && r.status !== "waitlisted" &&  isEventOver(r.events));
+  const waitlistedRegs = filteredRegs.filter(r => r.status === "waitlisted");
+  const cancelled      = filteredRegs.filter(r => r.status === "cancelled");
   const shown = tab === "upcoming"   ? upcoming
               : tab === "past"       ? past
               : tab === "cancelled"  ? cancelled
@@ -868,6 +969,21 @@ export default function MyEventsDashboard() {
       </nav>
 
       <div style={{ maxWidth: 720, margin: "0 auto", padding: "clamp(1rem,4vw,2rem) 16px 80px" }}>
+
+        {/* Search */}
+        <div style={{ marginBottom: 16 }}>
+          <input
+            type="search"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by event name or registration ID…"
+            style={{
+              width: "100%", padding: "10px 14px", boxSizing: "border-box",
+              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 10, color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none",
+            }}
+          />
+        </div>
 
         {/* Tabs */}
         <div style={{ display: "flex", gap: 4, overflowX: "auto", paddingBottom: 2, marginBottom: 24 }}>
@@ -923,14 +1039,39 @@ export default function MyEventsDashboard() {
           )
         ) : shown.length === 0 ? (
           <div style={{ textAlign: "center", padding: "3rem 0", color: "#555" }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>{tab === "upcoming" ? "🗓️" : "🏁"}</div>
-            <div style={{ fontSize: 15, marginBottom: 8 }}>
-              {tab === "upcoming" ? "No upcoming registrations" : tab === "past" ? "No past registrations" : "No cancelled registrations"}
+            <div style={{ fontSize: 36, marginBottom: 12 }}>
+              {tab === "upcoming" ? "🗓️" : tab === "past" ? "🏁" : "❌"}
             </div>
-            {tab === "upcoming" && (
-              <Link href="/events" style={{ fontSize: 13, color: "#e8620a", textDecoration: "none", fontWeight: 600 }}>
-                Browse events →
-              </Link>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#888", marginBottom: 8 }}>
+              {searchLower
+                ? `No ${tab} registrations matching "${search}"`
+                : tab === "upcoming" ? "You haven't registered for any upcoming events"
+                : tab === "past"     ? "No past registrations yet"
+                :                     "No cancelled registrations"}
+            </div>
+            {tab === "upcoming" && !searchLower && (
+              <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 10, alignItems: "center" }}>
+                <p style={{ fontSize: 13, color: "#555", margin: "0 0 4px" }}>
+                  You haven&apos;t registered for any events yet.
+                </p>
+                <Link href="/events"
+                  style={{ fontSize: 13, fontWeight: 700, padding: "9px 20px", borderRadius: 8,
+                    background: "rgba(232,98,10,0.12)", border: "1px solid rgba(232,98,10,0.3)",
+                    color: "#e8620a", textDecoration: "none" }}>
+                  Browse All Events →
+                </Link>
+                <Link href="/events?filter=upcoming"
+                  style={{ fontSize: 13, fontWeight: 600, color: "#888", textDecoration: "none" }}>
+                  View Upcoming Events →
+                </Link>
+              </div>
+            )}
+            {searchLower && (
+              <button onClick={() => setSearch("")}
+                style={{ marginTop: 16, fontSize: 12, color: "#e8620a", background: "none", border: "none",
+                  cursor: "pointer", fontFamily: "inherit" }}>
+                Clear search
+              </button>
             )}
           </div>
         ) : (
