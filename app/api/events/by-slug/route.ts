@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
   const [{ data: formFields }, { data: races }] = await Promise.all([
     db
       .from("event_form_fields")
-      .select("id, field_key, field_type, label, placeholder, help_text, required, options, display_order, conditions, default_value, max_length, validation_pattern, editable_after_reg, section, race_ids")
+      .select("id, field_key, field_type, label, placeholder, help_text, required, options, display_order, conditions, default_value, max_length, min_length, validation_pattern, validation_rules, editable_after_reg, section, race_ids, is_hidden, is_readonly")
       .eq("event_id", data.id)
       .eq("is_active", true)
       .order("display_order", { ascending: true }),

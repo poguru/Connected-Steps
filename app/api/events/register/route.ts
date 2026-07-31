@@ -21,6 +21,23 @@ function calcDiscount(price: number, type: string, value: number): number {
   return 0;
 }
 
+// Mirrors the REG_DEFAULTS / getRegConfig logic on the registration form page.
+// Both layers must stay in sync — this is the single source of truth for defaults.
+const REG_CONFIG_DEFAULTS = {
+  require_gender:            true,
+  require_dob:               true,
+  require_blood_group:       true,
+  require_emergency_contact: true,
+  show_notes:                true,
+};
+
+type RegConfig = typeof REG_CONFIG_DEFAULTS;
+
+function getRegCfg(raw: unknown): RegConfig {
+  const stored = raw && typeof raw === "object" ? raw as Partial<RegConfig> : {};
+  return { ...REG_CONFIG_DEFAULTS, ...stored };
+}
+
 interface ParticipantInput {
   first_name:        string;
   last_name?:        string;
@@ -99,16 +116,12 @@ async function handleSingleParticipant(
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
+  // Phase 1: always-required fields (independent of per-event configuration)
   const errs: string[] = [];
-  if (!name || (name as string).trim().length < 3)           errs.push("Full name must be at least 3 characters.");
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email as string)) errs.push("Valid email is required.");
+  if (!name || (name as string).trim().length < 3)                       errs.push("Full name must be at least 3 characters.");
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email as string))    errs.push("Valid email is required.");
   if (!phone || !/^\d{10}$/.test((phone as string).replace(/\s/g, ""))) errs.push("Phone must be exactly 10 digits.");
-  if (!gender)                                    errs.push("Gender is required.");
-  if (!date_of_birth)                             errs.push("Date of birth is required.");
-  if (date_of_birth && new Date(date_of_birth as string) >= new Date()) errs.push("Date of birth must be in the past.");
-  if (!blood_group)                               errs.push("Blood group is required.");
-  if (!emergency_contact)                         errs.push("Emergency contact is required.");
-  if (!special_notes || !(special_notes as string).trim()) errs.push("Special notes are required (enter NA if none).");
+  if (date_of_birth && new Date(date_of_birth as string) >= new Date())  errs.push("Date of birth must be in the past.");
   if (errs.length > 0) return NextResponse.json({ error: errs[0] }, { status: 400 });
 
   const db = getSupabaseServer();
@@ -122,12 +135,25 @@ async function handleSingleParticipant(
 
   const { data: ev } = await db
     .from("events")
-    .select("id, organization_id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories, collect_tshirt, early_bird_ends_at")
+    .select("id, organization_id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories, collect_tshirt, early_bird_ends_at, registration_config")
     .eq("id", event_id as string)
     .single();
   if (!ev || ev.status !== "published") {
     return NextResponse.json({ error: "Event not found." }, { status: 404 });
   }
+
+  // Phase 2: per-event-config field validation — mirrors regCfg on the frontend.
+  // Only enforce a field as required when the event is configured to show it.
+  // Also checks custom_fields[key] as a fallback: when an admin adds a custom
+  // EventFormBuilder field with the same field_key (e.g. "gender"), the frontend
+  // hides the built-in input and sends the value in custom_fields instead.
+  const regCfg = getRegCfg((ev as { registration_config?: unknown }).registration_config);
+  const cf = customFieldsRaw as Record<string, string>;
+  if (regCfg.require_gender            && !gender            && !cf["gender"]?.trim())            return NextResponse.json({ error: "Gender is required." },                                    { status: 400 });
+  if (regCfg.require_dob               && !date_of_birth     && !cf["date_of_birth"]?.trim())     return NextResponse.json({ error: "Date of birth is required." },                           { status: 400 });
+  if (regCfg.require_blood_group       && !blood_group       && !cf["blood_group"]?.trim())       return NextResponse.json({ error: "Blood group is required." },                             { status: 400 });
+  if (regCfg.require_emergency_contact && !emergency_contact && !cf["emergency_contact"]?.trim()) return NextResponse.json({ error: "Emergency contact is required." },                       { status: 400 });
+  if (regCfg.show_notes && (!special_notes || !(special_notes as string).trim()) && !cf["special_notes"]?.trim()) return NextResponse.json({ error: "Special notes are required (enter NA if none)." }, { status: 400 });
 
   if (ev.registration_closes_at && new Date() >= new Date(ev.registration_closes_at)) {
     return NextResponse.json({ error: "Registration for this event is now closed." }, { status: 403 });
@@ -572,28 +598,22 @@ async function handleMultiParticipant(
     return NextResponse.json({ error: "Between 1 and 10 participants are allowed per booking." }, { status: 400 });
   }
 
-  // Validate each participant
+  // Phase 1: always-required participant fields (independent of event configuration)
   const VALID_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
   for (let i = 0; i < participants.length; i++) {
     const p   = participants[i];
     const idx = i + 1;
-    if (!p.first_name?.trim())  return NextResponse.json({ error: `Participant ${idx}: first name is required.` }, { status: 400 });
-    if (!p.gender)              return NextResponse.json({ error: `Participant ${idx}: gender is required.` }, { status: 400 });
-    if (!p.date_of_birth)       return NextResponse.json({ error: `Participant ${idx}: date of birth is required.` }, { status: 400 });
-    if (new Date(p.date_of_birth) >= new Date()) return NextResponse.json({ error: `Participant ${idx}: date of birth must be in the past.` }, { status: 400 });
-    if (!p.blood_group)         return NextResponse.json({ error: `Participant ${idx}: blood group is required.` }, { status: 400 });
+    if (!p.first_name?.trim()) return NextResponse.json({ error: `Participant ${idx}: first name is required.` }, { status: 400 });
     if (!p.mobile || !/^\d{10}$/.test(p.mobile.replace(/\s/g, ""))) return NextResponse.json({ error: `Participant ${idx}: phone must be exactly 10 digits.` }, { status: 400 });
+    if (p.date_of_birth && new Date(p.date_of_birth) >= new Date()) return NextResponse.json({ error: `Participant ${idx}: date of birth must be in the past.` }, { status: 400 });
     if (p.tshirt_size && !VALID_SIZES.includes(p.tshirt_size)) return NextResponse.json({ error: `Participant ${idx}: invalid T-shirt size.` }, { status: 400 });
   }
-
-  if (!emergency_contact) return NextResponse.json({ error: "Emergency contact is required." }, { status: 400 });
-  if (!special_notes?.trim()) return NextResponse.json({ error: "Special notes are required (enter NA if none)." }, { status: 400 });
 
   const db = getSupabaseServer();
 
   const { data: ev } = await db
     .from("events")
-    .select("id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories, collect_tshirt, allow_multi_participant, max_per_registration, early_bird_ends_at, organization_id")
+    .select("id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories, collect_tshirt, allow_multi_participant, max_per_registration, early_bird_ends_at, organization_id, registration_config")
     .eq("id", event_id as string)
     .single();
   if (!ev || ev.status !== "published") {
@@ -602,6 +622,18 @@ async function handleMultiParticipant(
   if (!(ev as { allow_multi_participant?: boolean }).allow_multi_participant) {
     return NextResponse.json({ error: "This event does not support multi-participant registration." }, { status: 400 });
   }
+
+  // Phase 2: per-event-config field validation for each participant
+  const multiRegCfg = getRegCfg((ev as { registration_config?: unknown }).registration_config);
+  for (let i = 0; i < participants.length; i++) {
+    const p   = participants[i];
+    const idx = i + 1;
+    if (multiRegCfg.require_gender      && !p.gender)       return NextResponse.json({ error: `Participant ${idx}: gender is required.` },       { status: 400 });
+    if (multiRegCfg.require_dob         && !p.date_of_birth) return NextResponse.json({ error: `Participant ${idx}: date of birth is required.` }, { status: 400 });
+    if (multiRegCfg.require_blood_group && !p.blood_group)  return NextResponse.json({ error: `Participant ${idx}: blood group is required.` },  { status: 400 });
+  }
+  if (multiRegCfg.require_emergency_contact && !emergency_contact) return NextResponse.json({ error: "Emergency contact is required." }, { status: 400 });
+  if (multiRegCfg.show_notes && !special_notes?.trim()) return NextResponse.json({ error: "Special notes are required (enter NA if none)." }, { status: 400 });
 
   // Fetch active races for per-race pricing and per-race participant limits
   const { data: multiRaces } = await db
