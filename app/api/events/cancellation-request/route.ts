@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
+import { verifyUserToken } from "@/lib/admin-auth";
 
 // POST /api/events/cancellation-request
 // Authenticated user submits a cancellation request.
@@ -9,8 +9,7 @@ import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 
 export async function POST(req: NextRequest) {
   // ── Auth: require user session ───────────────────────────────────────────────
-  const token = req.cookies.get(USER_SESSION_COOKIE)?.value;
-  const email = token ? verifyUserToken(token) : null;
+  const email = verifyUserToken(req.headers.get("x-user-token") ?? "");
   if (!email) return NextResponse.json({ error: "Please log in to submit a cancellation request" }, { status: 401 });
 
   const body = await req.json() as { registration_code?: string; event_id?: string; reason?: string };

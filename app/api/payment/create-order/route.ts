@@ -5,8 +5,8 @@ import { verifyUserToken } from "@/lib/admin-auth";
 import { getRazorpaySDK as getRazorpay } from "@/lib/razorpay-client";
 
 function applyDiscount(amount: number, type: string, value: number): number {
-  if (type === "percent") return Math.max(100, Math.round(amount * (1 - value / 100)));
-  if (type === "fixed")   return Math.max(100, amount - value * 100);
+  if (type === "percentage") return Math.max(100, Math.round(amount * (1 - value / 100)));
+  if (type === "fixed")      return Math.max(100, amount - value * 100);
   return amount;
 }
 

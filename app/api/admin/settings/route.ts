@@ -1,15 +1,10 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminSession, ADMIN_SESSION_COOKIE } from "@/lib/admin-auth";
+import { isAdmin } from "@/lib/admin-auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
-
-function requireAdmin(req: NextRequest): boolean {
-  const token = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-  return !!(token && verifyAdminSession(token));
-}
 
 // GET â€” return all app_settings rows
 export async function GET(req: NextRequest) {
-  if (!requireAdmin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAdmin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const db = getSupabaseServer();
   const { data, error } = await db.from("app_settings").select("key, value, updated_at").order("key");
   if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
@@ -18,7 +13,7 @@ export async function GET(req: NextRequest) {
 
 // PUT â€” upsert a single setting: { key, value }
 export async function PUT(req: NextRequest) {
-  if (!requireAdmin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAdmin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { key, value } = await req.json();
     if (!key || value === undefined) return NextResponse.json({ error: "key and value required" }, { status: 400 });
