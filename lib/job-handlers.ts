@@ -175,6 +175,21 @@ export async function handleWeeklyDigestEmail(p: JobPayloads["weekly_digest_emai
 
 export async function handleBulkEmail(p: JobPayloads["bulk_email"]): Promise<void> {
   const result = await sendEmail(p.to, p.toName, p.subject, p.html, false, false);
+
+  if (p.emailQueueId) {
+    const db = getSupabaseServer();
+    await db.from("email_queue").update({
+      status:         result.ok ? "delivered" : "failed",
+      aws_message_id: result.messageId     ?? null,
+      failure_reason: result.error         ?? null,
+      failure_code:   result.errorCategory ?? null,
+      is_permanent:   result.ok ? null : (result.isTransient === false),
+      provider:       "zeptomail",
+      http_status:    result.httpStatus    ?? null,
+      sent_at:        result.ok ? new Date().toISOString() : null,
+    }).eq("id", p.emailQueueId);
+  }
+
   if (!result.ok) throw new Error(`Bulk email to ${p.to} failed: ${result.error ?? "unknown"}`);
 }
 

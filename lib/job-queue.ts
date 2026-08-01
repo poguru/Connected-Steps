@@ -82,11 +82,12 @@ export type JobPayloads = {
   };
 
   bulk_email: {
-    to:         string;
-    toName:     string;
-    subject:    string;
-    html:       string;
-    campaignId: string;  // used in idempotency key: bulk_email:{campaignId}:{to}
+    to:           string;
+    toName:       string;
+    subject:      string;
+    html:         string;
+    campaignId:   string;  // used in idempotency key: bulk_email:{campaignId}:{to}
+    emailQueueId?: string; // when set, handler marks the email_queue row delivered/failed
   };
 
   bulk_invoice: {

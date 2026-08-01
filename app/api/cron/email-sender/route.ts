@@ -115,6 +115,7 @@ export async function GET(req: NextRequest) {
         if (pending === 0) {
           const delivered = all.filter(r => r.status === "delivered").length;
           const failed    = all.filter(r => r.status === "failed").length;
+          const finalStatus = delivered === 0 ? "failed" : "sent";
 
           await Promise.all([
             db.from("email_campaigns").update({
@@ -124,8 +125,20 @@ export async function GET(req: NextRequest) {
               worker_last_seen_at: new Date().toISOString(),
             }).eq("id", campaign.id),
             db.from("event_comm_history")
-              .update({ sent: delivered, failed, status: delivered === 0 ? "failed" : "sent" })
+              .update({ sent: delivered, failed, status: finalStatus })
               .eq("batch_id", campaign.batch_id),
+            // Sync stats to communication_campaigns if this batch was created
+            // by the campaign hub (large-campaign path). No-op for event announces.
+            db.from("communication_campaigns").update({
+              status:          finalStatus,
+              sent_count:      delivered,
+              failed_count:    failed,
+              queued_count:    0,
+              recipient_count: all.length,
+              sent_at:         new Date().toISOString(),
+            })
+              .eq("batch_id", campaign.batch_id)
+              .in("status", ["sending", "failed"]),
           ]);
 
           log.push(`done ${campaign.batch_id.slice(0, 8)}: ${delivered}ok ${failed}fail`);

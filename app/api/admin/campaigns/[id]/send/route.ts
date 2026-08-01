@@ -10,6 +10,12 @@ import {
   sendCampaignWhatsApp,
 } from "@/lib/campaign-service";
 
+// Campaigns with more recipients than this threshold are handed off to the
+// email-sender cron (300s maxDuration, runs every minute) instead of being
+// processed inline via after(). This prevents Vercel function timeout on
+// large sends. Small campaigns still use after() for near-instant delivery.
+const LARGE_CAMPAIGN_THRESHOLD = 200;
+
 type Params = { params: Promise<{ id: string }> };
 
 // POST /api/admin/campaigns/[id]/send
@@ -83,8 +89,22 @@ export async function POST(req: NextRequest, { params }: Params) {
       sent_at:         null,
     }).eq("id", id);
 
-    // Process in background after response
-    after(() => processCampaignBatch(batchId));
+    if (recipients.length > LARGE_CAMPAIGN_THRESHOLD) {
+      // Hand off to the email-sender cron (300s maxDuration, runs every minute).
+      // The cron picks up email_campaigns rows with status='running' and processes
+      // them via claim_batch_emails (FOR UPDATE SKIP LOCKED), closing the timeout
+      // gap that existed when processCampaignBatch ran inside after().
+      await db.from("email_campaigns").insert({
+        batch_id:    batchId,
+        subject:     campaign.subject ?? null,
+        status:      "running",
+        total_count: recipients.length,
+        created_by:  id,   // communication_campaigns.id for back-reference
+      });
+    } else {
+      // Small campaign: process inline after response for near-instant delivery
+      after(() => processCampaignBatch(batchId));
+    }
 
     return NextResponse.json({ sent: true, recipientCount: recipients.length, batchId });
 
