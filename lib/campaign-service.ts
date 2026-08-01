@@ -386,23 +386,33 @@ const MAX_ATTEMPTS  = 3;
 export async function processCampaignBatch(batchId: string): Promise<void> {
   const db = getSupabaseServer();
 
+  // Fetch only queued rows — safe to re-run if interrupted; rows already
+  // processed are 'delivered'/'failed' and are not returned here.
   const { data: rows } = await db.from("email_queue")
     .select("id, recipient_email, recipient_name, subject, html_body, attachments, attempts")
     .eq("batch_id", batchId)
     .eq("status", "queued")
     .order("created_at");
 
-  if (!rows?.length) return;
+  if (!rows?.length) {
+    await refreshCampaignStats(batchId);
+    return;
+  }
 
-  // Claim all as 'sending' in one update
-  await db.from("email_queue")
-    .update({ status: "sending" })
-    .eq("batch_id", batchId)
-    .eq("status", "queued");
-
-  // Process in parallel chunks
+  // Claim one chunk at a time rather than bulk-claiming the full batch.
+  // If the function times out mid-run, only the in-flight chunk (max CONCURRENCY rows)
+  // is left at 'sending'. All unprocessed rows stay at 'queued' and are picked
+  // up on the next call, making the processor safely re-entrant.
   for (let i = 0; i < rows.length; i += CONCURRENCY) {
     const chunk = rows.slice(i, i + CONCURRENCY);
+    const ids   = chunk.map(r => r.id);
+
+    // Claim this chunk only
+    await db.from("email_queue")
+      .update({ status: "sending" })
+      .in("id", ids)
+      .eq("status", "queued");
+
     await Promise.allSettled(chunk.map(row => sendOne(db, row)));
     if (i + CONCURRENCY < rows.length) {
       await delay(INTER_BATCH_MS);

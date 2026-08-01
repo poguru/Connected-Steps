@@ -35,7 +35,10 @@ export async function GET(req: NextRequest) {
   else query.eq("assignment_id", asgn?.id ?? "00000000-0000-0000-0000-000000000000");
 
   const { data: leads, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("[ops/leads] DB error:", error.message);
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
+  }
 
   return NextResponse.json({
     leads: leads ?? [],

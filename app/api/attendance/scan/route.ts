@@ -232,14 +232,29 @@ export async function POST(req: NextRequest) {
   let capturedUserName: string | undefined;
 
   if (existing) {
-    // Already registered — mark attended
-    const { error: upErr } = await db
+    // Already registered — mark attended. Use `.select()` to detect the case
+    // where a concurrent scan already set attended=true between our SELECT and
+    // this UPDATE (the .eq("attended", false) guard returns 0 rows updated).
+    const { data: updated, error: upErr } = await db
       .from("session_attendance")
       .update({ attended: true, check_in_time: now, check_in_method: "qr" })
       .eq("session_id", qr.session_id)
-      .eq("user_email", userEmail.toLowerCase());
+      .eq("user_email", userEmail.toLowerCase())
+      .eq("attended", false)   // only update if not already attended (concurrent guard)
+      .select("id");
 
     if (upErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
+
+    if (!updated?.length) {
+      // Another concurrent request already marked attended between our SELECT
+      // and this UPDATE — return success, skip after() to avoid double points.
+      return NextResponse.json({
+        success: true,
+        already_checked_in: true,
+        message: `You're already checked in to ${session?.title ?? "this session"}.`,
+        session,
+      });
+    }
   } else {
     // Not registered — auto-register + mark attended
     const { data: user } = await db
@@ -261,7 +276,19 @@ export async function POST(req: NextRequest) {
         check_in_method:  "qr",
       });
 
-    if (insErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
+    if (insErr) {
+      // 23505 = unique constraint violation — a concurrent scan already inserted
+      // this row. Treat it as "already checked in" rather than an error.
+      if (insErr.code === "23505") {
+        return NextResponse.json({
+          success: true,
+          already_checked_in: true,
+          message: `You're already checked in to ${session?.title ?? "this session"}.`,
+          session,
+        });
+      }
+      return NextResponse.json({ error: "Database error" }, { status: 500 });
+    }
   }
 
   // Capture closure values before the response is sent.
