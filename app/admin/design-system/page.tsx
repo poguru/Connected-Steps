@@ -76,6 +76,11 @@ export default function DesignSystemPage() {
     <div style={{ minHeight: "100vh", background: color.black, color: "#fff", fontFamily: "var(--font-dm-sans), sans-serif" }}>
       <Container style={{ padding: "32px 24px 80px" }}>
         <PageHeader title="Design System" breadcrumb={<Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Design System" }]} />} />
+        <div style={{ background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.3)", borderRadius: 8, padding: "10px 16px", marginBottom: 24, display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 18 }}>🔧</span>
+          <span style={{ fontSize: "0.85rem", color: "#fbbf24", fontWeight: 600 }}>Internal Design System</span>
+          <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.45)", marginLeft: 4 }}>Developer / designer reference only — not visible to end users</span>
+        </div>
         <Text muted style={{ marginBottom: "40px" }}>
           Connected Steps UI component library. Import everything from <code style={{ color: color.orange }}>@/components/ui/ds</code>.
         </Text>

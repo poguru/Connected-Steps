@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
 import { createNotification } from "@/lib/notify-inapp";
+import { SUPPORT_EMAIL } from "@/lib/config";
 
 // PATCH /api/bug-reports/[id]/confirm
 // Body: { email: string; confirmed: boolean }
 // confirmed=true  → closes the bug (user verified fix)
 // confirmed=false → reopens to in_progress (user says issue persists)
 
-const ADMIN_EMAIL = "info@connectedsteps.in";
+const ADMIN_EMAIL = SUPPORT_EMAIL;
 
 export async function PATCH(
   req: NextRequest,

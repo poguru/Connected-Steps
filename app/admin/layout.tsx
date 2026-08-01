@@ -51,10 +51,11 @@ const NAV_GROUPS = [
     label: "Participants",
     icon:  "👥",
     links: [
-      { label: "Members",      href: "/admin/users",           exact: false, icon: "👤" },
-      { label: "Coaches",      href: "/admin/coaches",         exact: false, icon: "🏅" },
-      { label: "Sessions",     href: "/admin/sessions",        exact: false, icon: "📍" },
-      { label: "Daily QR",     href: "/admin/attendance-qr",   exact: false, icon: "📲" },
+      { label: "Members",          href: "/admin/users",              exact: false, icon: "👤" },
+      { label: "Coaches",          href: "/admin/coaches",            exact: false, icon: "🏅" },
+      { label: "Coach Assignments",href: "/admin/coach-assignments",  exact: false, icon: "🔗" },
+      { label: "Sessions",         href: "/admin/sessions",           exact: false, icon: "📍" },
+      { label: "Daily QR",         href: "/admin/attendance-qr",      exact: false, icon: "📲" },
     ],
   },
   {
@@ -102,8 +103,9 @@ const NAV_GROUPS = [
       { label: "Share Analytics", href: "/admin/share-analytics", exact: false, icon: "↗" },
       { label: "Leaderboard",     href: "/admin/leaderboard",     exact: false, icon: "🏆" },
       { label: "Points",          href: "/admin/points",          exact: false, icon: "⭐" },
-      { label: "Memberships",     href: "/admin/membership",      exact: false, icon: "🎖" },
-      { label: "Referrals",       href: "/admin/referrals",       exact: false, icon: "🔗" },
+      { label: "Memberships",      href: "/admin/membership",       exact: false, icon: "🎖" },
+      { label: "Membership Plans", href: "/admin/membership/plans", exact: false, icon: "🎯" },
+      { label: "Referrals",        href: "/admin/referrals",        exact: false, icon: "🔗" },
     ],
   },
   {

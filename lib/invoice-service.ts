@@ -11,17 +11,17 @@ import { gstFromInclusive, getCurrentGSTRate } from "@/lib/gst";
 import { sendEmail } from "@/lib/notify";
 import { logger } from "@/lib/logger";
 
-import { APP_URL } from "@/lib/config";
+import { APP_URL, LOGO_URL, SUPPORT_EMAIL } from "@/lib/config";
 // ── Business Constants ────────────────────────────────────────────────────────
 export const CS_BUSINESS = {
   name:    "Connected Steps",
   gstin:   "36AAVFC9839Q1Z4",
   type:    "Partnership Firm",
   address: "SVR Homes, 3rd Floor, Plot No. 8-169,\nIndra Reddy Allwyn Colony, Miyapur,\nHyderabad, Telangana – 500049",
-  email:   "info@connectedsteps.in",
+  email:   SUPPORT_EMAIL,
   phone:   "+91 97036 20570",
-  website: "https://www.connectedsteps.in",
-  logo:    "https://www.connectedsteps.in/logo.png",
+  website: APP_URL,
+  logo:    LOGO_URL,
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────

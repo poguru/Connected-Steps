@@ -4,6 +4,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 import { processEmailBatch } from "@/lib/process-email-batch";
 import type { AttachmentMeta } from "@/lib/email-attachments";
+import { SUPPORT_EMAIL } from "@/lib/config";
 
 type RecipientFilter = "all" | "paid" | "free" | "pending" | "checked_in" | "not_checked_in";
 
@@ -45,7 +46,7 @@ function applyVars(
     .replace(/\{\{eventVenue\}\}/gi,     eventVenue)
     .replace(/\{\{reportingTime\}\}/gi,  eventTime)
     .replace(/\{\{supportPhone\}\}/gi,   "+91-XXXXXXXXXX")
-    .replace(/\{\{supportEmail\}\}/gi,   "info@connectedsteps.in")
+    .replace(/\{\{supportEmail\}\}/gi,   SUPPORT_EMAIL)
     // Legacy single-brace variables (backward compatibility)
     .replace(/\{name\}/gi,  r.user_name  ?? "Participant")
     .replace(/\{email\}/gi, r.user_email ?? "")

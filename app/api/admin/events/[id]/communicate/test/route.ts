@@ -4,6 +4,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 import { sendSingleEmail } from "@/lib/email-service";
 import { loadAttachmentsAsBase64, type AttachmentMeta } from "@/lib/email-attachments";
+import { SUPPORT_EMAIL } from "@/lib/config";
 
 const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   allowedTags: [
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .replace(/\{\{category\}\}/gi,      "10K")
     .replace(/\{\{bibNumber\}\}/gi,     "1234")
     .replace(/\{\{supportPhone\}\}/gi,  "+91-XXXXXXXXXX")
-    .replace(/\{\{supportEmail\}\}/gi,  "info@connectedsteps.in")
+    .replace(/\{\{supportEmail\}\}/gi,  SUPPORT_EMAIL)
     .replace(/\{name\}/gi,  "Test Participant")
     .replace(/\{email\}/gi, to)
     .replace(/\{event\}/gi, eventTitle);

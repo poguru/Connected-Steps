@@ -3,6 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach, getAdminEmail } from "@/lib/admin-auth";
 import { sendEmail } from "@/lib/notify";
 import { createRefund } from "@/lib/razorpay-client";
+import { SUPPORT_EMAIL } from "@/lib/config";
 
 type Params = { params: Promise<{ id: string; code: string }> };
 
@@ -304,7 +305,7 @@ function buildCancellationEmail(opts: {
 
     <p style="font-size:13px;color:#666;margin:0 0 24px;">
       Questions? Contact us at
-      <a href="mailto:info@connectedsteps.in" style="color:#e8620a;">info@connectedsteps.in</a>.
+      <a href="mailto:${SUPPORT_EMAIL}" style="color:#e8620a;">${SUPPORT_EMAIL}</a>.
     </p>
     <p style="font-size:13px;color:#555;margin:0;">Team Connected Steps</p>
   </td></tr>

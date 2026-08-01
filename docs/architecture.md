@@ -1,6 +1,6 @@
 # Connected Steps — Architecture Guide
 
-**Version 3.0 · 2026-07-28**
+**Version 4.0 · 2026-08-02**
 
 ---
 
@@ -264,3 +264,155 @@ Write automation_run_log (status, actions_taken, duration_ms)
 | `UPSTASH_REDIS_REST_TOKEN` | Optional | Redis auth token |
 | `STRAVA_CLIENT_ID` | Optional | Strava OAuth client ID |
 | `STRAVA_CLIENT_SECRET` | Optional | Strava OAuth client secret |
+| `ADMIN_NOTIFY_EMAIL` | Optional | Fallback admin notification address (default: SUPPORT_EMAIL) |
+| `ALERT_WEBHOOK_URL` | Optional | Slack/Discord URL for system alerts |
+| `ZEPTOMAIL_FROM_EMAIL` | Optional | Verified sender address (default: info@connectedsteps.in) |
+| `ZEPTOMAIL_FROM_NAME` | Optional | Sender display name (default: Connected Steps) |
+
+---
+
+## Cron Architecture
+
+All crons require `Authorization: Bearer <CRON_SECRET>` (verified by `isCronAuthorized()` in `lib/cron-auth.ts`). On Vercel Pro, minute-level crons are available. `maxDuration: 300` applies to all cron routes.
+
+| Route | Schedule | Purpose |
+|---|---|---|
+| `/api/cron/job-worker` | `* * * * *` (every minute) | Process `job_queue` rows: webhooks, CSV imports, certificates, refunds |
+| `/api/cron/email-sender` | `* * * * *` (every minute) | Process large-campaign `email_campaigns` rows |
+| `/api/cron/hourly-session-alerts` | `0 * * * *` (every hour) | Session reminders + daily QR distribution (05:00 IST check) |
+| `/api/cron/daily-attendance-report` | `45 1 * * *` (1:45 AM UTC = 7:15 AM IST) | Daily attendance + system summary email |
+| `/api/cron/birthday-emails` | Configured in settings | Birthday greeting emails |
+| `/api/cron/weekly-digest` | `0 8 * * 0` (Sunday 8 AM UTC) | Weekly activity digest for active members |
+| `/api/cron/media-cleanup` | Daily | Remove orphan uploaded files from storage |
+| `/api/health` (Kubernetes probe) | External | Liveness check, returns 503 if dead jobs exist |
+
+---
+
+## Event Registration Flow
+
+```
+User loads /events/[slug]
+        ↓
+GET /api/events/[slug]  → event + race details + pricing
+
+User selects race + fills form
+        ↓
+POST /api/events/[slug]/register
+  └─ Validate capacity, user not already registered
+  └─ razorpay.orders.create({ amount, currency, receipt })
+  └─ Return { order_id, amount, key_id }
+        ↓
+Razorpay Checkout widget (client-side)
+  └─ User completes payment
+  └─ razorpay_payment_id, razorpay_order_id, razorpay_signature returned to client
+        ↓
+POST /api/payment/verify
+  └─ HMAC verify: sha256(order_id + "|" + payment_id, RAZORPAY_KEY_SECRET)
+  └─ INSERT event_registrations (status=confirmed, payment_status=paid)
+  └─ INSERT event_participants (QR token generated)
+  └─ sendEmail (confirmation with QR code PDF link)
+  └─ dispatchWebhookEvent("registration.created", payload)
+  └─ evaluateAutomations("registration.created", context)
+        ↓
+QR Code PDF at /api/registrations/[code]/qr
+```
+
+**Free events:** skip Razorpay entirely — `POST /api/events/[slug]/register-free` inserts directly.
+
+**Race-day check-in:**
+```
+Volunteer scans QR → POST /api/admin/events/[id]/participants/check-in
+  └─ Verify QR token → mark checked_in = true, checked_in_at = now()
+  └─ Idempotent: duplicate scans are no-ops
+```
+
+---
+
+## Payment Flow (General)
+
+```
+1. Order creation
+   POST /api/events/[slug]/register
+   └─ razorpay.orders.create → order_id stored in event_registrations.razorpay_order_id
+
+2. Payment capture (client-side Razorpay)
+   └─ razorpay_payment_id, razorpay_order_id, razorpay_signature returned
+
+3. Signature verification
+   POST /api/payment/verify
+   └─ HMAC: sha256(`${order_id}|${payment_id}`, RAZORPAY_KEY_SECRET)
+   └─ Registration marked paid, participant record created
+
+4. Razorpay webhook (async, backup)
+   POST /api/webhooks/razorpay
+   └─ HMAC verify against RAZORPAY_WEBHOOK_SECRET
+   └─ payment.captured → mark paid if not already
+   └─ refund.processed → update refund_status
+
+5. Refund
+   POST /api/admin/events/[id]/registrations/[code]/cancel
+   └─ razorpay.refunds.create({ payment_id, amount })
+   └─ Refund ID stored, refund_status tracked
+   └─ Idempotent: double-refund guard on refund_id column
+```
+
+---
+
+## Leaderboard & Points Flow
+
+```
+Points sources:
+  - Event registration: enqueueJob("award_points", { user_email, event_id, type:"event" })
+  - Session attendance: enqueueJob("award_points", ..., type:"session")
+  - Community post likes: incremental award
+  - Referral: awarded on referred user's first event
+
+Job handler (award_points):
+  └─ INSERT INTO user_points (user_email, points, reason, awarded_at)
+  └─ UPDATE leaderboard_summary (total_points, rank recomputed)
+  └─ createNotification (in-app: "You earned X points!")
+
+Leaderboard query:
+  GET /api/leaderboard
+  └─ SELECT user_email, total_points, rank FROM leaderboard_summary ORDER BY rank
+  └─ Cached in app_settings for 15 minutes (avoid full table scan per request)
+
+Admin leaderboard page:
+  /admin/leaderboard → shows full leaderboard, manual point adjustments
+```
+
+---
+
+## Coach / Volunteer Architecture
+
+```
+Coach portal: /coach/**
+Auth: cs_user_token in localStorage (HMAC token, 30-day TTL)
+  └─ Header: x-user-token: <base64url(email)>.<exp>.<hmac-sha256>
+  └─ Server: verifyUserToken(token) → lowercase email or null
+
+Coach home /coach → session schedule + attendance stats
+Coach sessions /coach/sessions → create/manage sessions
+Coach attendance /coach/sessions/[id]/attendance → QR check-in + manual mark
+
+Sessions:
+  sessions table (id, date, location, coach_email, capacity)
+  session_attendance (session_id, user_email, checked_in_at, is_manual)
+  UNIQUE INDEX: (session_id, user_email)
+
+Volunteer portal (race-day):
+  /admin/runs → race-day check-in for admin/volunteer
+  GET /api/admin/events/[id]/participants?search=&status=
+  POST /api/admin/events/[id]/participants/check-in { participant_ids: [] }
+  Supports bulk check-in, search by name/bib/email
+```
+
+---
+
+## Communication Architecture Reference
+
+See [docs/communication-architecture.md](./communication-architecture.md) for the full email campaign system documentation, including:
+- Small-campaign path (≤200 recipients via `after()`)
+- Large-campaign path (>200 via email-sender cron)
+- Retry flow, failure handling, recovery procedures
+- Alert conditions and cooldown logic

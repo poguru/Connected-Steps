@@ -11,8 +11,8 @@ import { sendEmail } from "@/lib/notify";
 import { acquireCronLock, releaseCronLock } from "@/lib/cron-lock";
 import { getISTNow } from "@/lib/date-utils";
 
-import { APP_URL } from "@/lib/config";
-const REPORT_TO      = "info@connectedsteps.in";
+import { APP_URL, SUPPORT_EMAIL } from "@/lib/config";
+const REPORT_TO      = SUPPORT_EMAIL;
 const REPORT_TO_NAME = "Connected Steps Admin";
 
 // ── Types ─────────────────────────────────────────────────────────────────────

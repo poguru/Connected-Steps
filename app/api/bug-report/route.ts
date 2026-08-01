@@ -4,8 +4,8 @@ import { sendEmail, bugStatusUpdateEmailHTML } from "@/lib/notify";
 import { createNotification } from "@/lib/notify-inapp";
 import { isRateLimited, recordFailure, getClientIp } from "@/lib/rate-limit";
 
-import { APP_URL } from "@/lib/config";
-const ADMIN_EMAIL = "info@connectedsteps.in";
+import { APP_URL, SUPPORT_EMAIL } from "@/lib/config";
+const ADMIN_EMAIL = SUPPORT_EMAIL;
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "rc1";
 
 interface Attachment { path: string; type: string; name: string; size: number; }

@@ -18,11 +18,11 @@ import { enqueueJob }                  from "@/lib/job-queue";
 import { handleInvoiceGenerate,
          handleMembershipEmail }       from "@/lib/job-handlers";
 import { autoFeedMembershipActivated } from "@/lib/auto-feed";
-import { APP_URL } from "@/lib/config";
+import { APP_URL, SUPPORT_EMAIL } from "@/lib/config";
 import { sendEmail, sendWhatsApp,
          membershipWAParams }          from "@/lib/notify";
 
-const ADMIN_EMAIL = "info@connectedsteps.in";
+const ADMIN_EMAIL = SUPPORT_EMAIL;
 
 export type MembershipActivateResult =
   | "activated"       // newly activated — all side effects fired
