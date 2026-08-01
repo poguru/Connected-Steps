@@ -19,6 +19,17 @@ interface Campaign {
 
 interface CronRun { date: string; status: string; ran_at: string }
 
+interface Throughput {
+  jobs_last_hour:      number;
+  emails_last_hour:    number;
+  failed_webhooks_24h: number;
+}
+
+interface DisasterRecovery {
+  pitr_enabled_note: string;
+  recovery_steps:    string;
+}
+
 interface HealthData {
   ok:         boolean;
   ts:         string;
@@ -30,6 +41,8 @@ interface HealthData {
   cron_last_run:    Record<string, CronRun>;
   active_campaigns: Campaign[];
   recent_campaigns: Campaign[];
+  throughput?:         Throughput;
+  disaster_recovery?:  DisasterRecovery;
   version:     string;
   environment: string;
 }
@@ -228,6 +241,46 @@ export default function SystemHealthPage() {
           </>
         )}
       </div>
+
+      {/* Throughput */}
+      {data.throughput && (
+        <div style={S.section}>
+          <div style={S.sHead}>Throughput</div>
+          <div style={S.statRow}>
+            <div style={S.stat}>
+              <div style={S.snum}>{data.throughput.jobs_last_hour}</div>
+              <div style={S.slbl}>jobs / last hour</div>
+            </div>
+            <div style={S.stat}>
+              <div style={S.snum}>{data.throughput.emails_last_hour}</div>
+              <div style={S.slbl}>emails delivered / last hour</div>
+            </div>
+            <div style={{ ...S.stat }}>
+              <div style={{ ...S.snum, color: data.throughput.failed_webhooks_24h > 0 ? "#fbbf24" : "#fff" }}>
+                {data.throughput.failed_webhooks_24h}
+              </div>
+              <div style={S.slbl}>failed webhooks / last 24h</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Disaster Recovery */}
+      {data.disaster_recovery && (
+        <div style={S.section}>
+          <div style={S.sHead}>Disaster Recovery</div>
+          <div style={{ ...S.card, maxWidth: 720 }}>
+            <div style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.7)", lineHeight: 1.6, marginBottom: 10 }}>
+              <span style={{ color: "#4ade80", fontWeight: 600 }}>PITR</span>{" "}
+              {data.disaster_recovery.pitr_enabled_note}
+            </div>
+            <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", lineHeight: 1.7 }}>
+              <span style={{ fontWeight: 600, color: "rgba(255,255,255,0.6)" }}>Recovery steps: </span>
+              {data.disaster_recovery.recovery_steps}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Active/paused campaigns */}
       {data.active_campaigns.length > 0 && (

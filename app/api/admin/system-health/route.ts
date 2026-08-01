@@ -78,11 +78,30 @@ export async function GET(req: NextRequest) {
   jqCounts.dead        = deadRes.count     ?? 0;
 
   const [processingRes, failedRes] = await Promise.all([
-    db.from("job_queue").select("*", { count: "exact", head: true }).eq("status", "processing"),
+    db.from("job_queue").select("*", { count: "exact", head: true }).eq("status", "running"),
     db.from("job_queue").select("*", { count: "exact", head: true }).eq("status", "failed"),
   ]);
   jqCounts.processing  = processingRes.count ?? 0;
   jqCounts.failed      = failedRes.count     ?? 0;
+
+  // ── Throughput & operational metrics (Phase 4-8) ─────────────────────────────
+  const oneHourAgo = new Date(Date.now() - 3_600_000).toISOString();
+  const oneDayAgo  = new Date(Date.now() - 86_400_000).toISOString();
+
+  const [jobThroughput, emailThroughput, failedWebhookCount] = await Promise.allSettled([
+    db.from("job_queue").select("*", { count: "exact", head: true })
+      .eq("status", "done").gte("completed_at", oneHourAgo),
+    db.from("email_queue").select("*", { count: "exact", head: true })
+      .eq("status", "delivered").gte("sent_at", oneHourAgo),
+    db.from("webhook_delivery_log").select("*", { count: "exact", head: true })
+      .in("status", ["failed", "dead"]).gte("created_at", oneDayAgo),
+  ]);
+
+  const throughput = {
+    jobs_last_hour:      jobThroughput.status      === "fulfilled" ? (jobThroughput.value.count      ?? 0) : 0,
+    emails_last_hour:    emailThroughput.status    === "fulfilled" ? (emailThroughput.value.count    ?? 0) : 0,
+    failed_webhooks_24h: failedWebhookCount.status === "fulfilled" ? (failedWebhookCount.value.count ?? 0) : 0,
+  };
 
   // ── Email / WhatsApp env config ───────────────────────────────────────────────
   const emailConfigured = !!(process.env.ZEPTO_MAIL_API_KEY || process.env.ZEPTO_TOKEN);
@@ -142,6 +161,11 @@ export async function GET(req: NextRequest) {
     cron_last_run:    lastCronByJob,
     active_campaigns: activeCampaigns,
     recent_campaigns: recentCampaigns,
+    throughput,
+    disaster_recovery: {
+      pitr_enabled_note: "PITR is enabled in Supabase dashboard under Project Settings → Database → Point in Time Recovery. Target RPO ≤ 1 min, RTO ≤ 30 min. PITR status cannot be queried via API — verify in the Supabase dashboard.",
+      recovery_steps:    "1. Open Supabase dashboard → Database → Backups. 2. Choose a restore point. 3. Click Restore. 4. Update NEXT_PUBLIC_SUPABASE_URL + service-role key if the restored project has a new URL. 5. Redeploy on Vercel.",
+    },
     version:     process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "dev",
     environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "unknown",
   });
