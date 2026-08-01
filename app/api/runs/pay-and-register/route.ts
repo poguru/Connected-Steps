@@ -1,6 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { verifyPaymentSignature } from "@/lib/razorpay-security";
 import { redeemCoupon } from "@/lib/coupon-redeem";
 import { verifyUserToken } from "@/lib/admin-auth";
 
@@ -27,18 +27,9 @@ export async function POST(req: NextRequest) {
     } = body;
 
     // Verify Razorpay signature
-    const razorpaySecret = process.env.RAZORPAY_KEY_SECRET;
-    if (!razorpaySecret) {
-      console.error("RAZORPAY_KEY_SECRET not set");
-      return NextResponse.json({ error: "Payment verification unavailable" }, { status: 503 });
-    }
-    const expected = crypto
-      .createHmac("sha256", razorpaySecret)
-      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-      .digest("hex");
-
-    if (expected !== razorpay_signature)
-      return NextResponse.json({ error: "Invalid payment signature" }, { status: 400 });
+    let sigValid: boolean;
+    try { sigValid = verifyPaymentSignature(razorpay_order_id, razorpay_payment_id, razorpay_signature); } catch { sigValid = false; }
+    if (!sigValid) return NextResponse.json({ error: "Invalid payment signature" }, { status: 400 });
 
     if (!first_name || !last_name || !email || !phone || !blood_group || !distance || !emergency_contact_name || !emergency_contact_phone)
       return NextResponse.json({ error: "Missing registration fields" }, { status: 400 });

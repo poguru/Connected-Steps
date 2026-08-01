@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { verifyPaymentSignature } from "@/lib/razorpay-security";
 import { verifyUserToken } from "@/lib/admin-auth";
 import { sendEmail, sendWhatsApp, membershipWAParams } from "@/lib/notify";
 import { autoFeedMembershipActivated } from "@/lib/auto-feed";
@@ -33,18 +33,14 @@ export async function POST(req: NextRequest) {
   const email = verifiedEmail.toLowerCase();
 
   // ── Step 1: Verify Razorpay HMAC signature ────────────────────────────────
-  const razorpaySecret = process.env.RAZORPAY_KEY_SECRET;
-  if (!razorpaySecret) {
+  let sigValid: boolean;
+  try {
+    sigValid = verifyPaymentSignature(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+  } catch {
     logger.error("payment/verify", "RAZORPAY_KEY_SECRET not configured");
     return NextResponse.json({ error: "Payment verification unavailable" }, { status: 503 });
   }
-
-  const expected = crypto
-    .createHmac("sha256", razorpaySecret)
-    .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-    .digest("hex");
-
-  if (expected !== razorpay_signature) {
+  if (!sigValid) {
     logger.warn("payment/verify", "Invalid signature — possible tampering", { email, orderId: razorpay_order_id, paymentId: razorpay_payment_id });
     return NextResponse.json({ error: "Invalid payment signature" }, { status: 400 });
   }

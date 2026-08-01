@@ -1,6 +1,35 @@
 import crypto from "crypto";
 import { logger } from "@/lib/logger";
 
+// ── Payment signature verification ───────────────────────────────────────────
+
+/**
+ * Verifies the Razorpay payment callback signature.
+ * Call this in every route that handles payment success callbacks.
+ * Returns true when the signature is valid.
+ *
+ * @throws {Error} when RAZORPAY_KEY_SECRET is not configured
+ */
+export function verifyPaymentSignature(
+  orderId:   string,
+  paymentId: string,
+  signature: string,
+): boolean {
+  const secret = process.env.RAZORPAY_KEY_SECRET;
+  if (!secret) throw new Error("RAZORPAY_KEY_SECRET not configured");
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update(`${orderId}|${paymentId}`)
+    .digest("hex");
+  try {
+    const a = Buffer.from(expected,  "hex");
+    const b = Buffer.from(signature, "hex");
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
 const REPLAY_TOLERANCE_SECONDS = parseInt(
   process.env.RAZORPAY_REPLAY_TOLERANCE_SECONDS ?? "300",
   10,

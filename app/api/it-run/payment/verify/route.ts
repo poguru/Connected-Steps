@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { verifyPaymentSignature } from "@/lib/razorpay-security";
 
 // POST /api/it-run/payment/verify
 // Called by the client after Razorpay checkout success.
@@ -17,15 +17,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify Razorpay signature
-    const secret  = process.env.RAZORPAY_KEY_SECRET ?? "";
-    const payload = `${orderId}|${paymentId}`;
-    const expected = crypto.createHmac("sha256", secret).update(payload).digest("hex");
-
-    let sigValid = false;
-    try {
-      sigValid = expected.length === signature.length &&
-        crypto.timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(signature, "hex"));
-    } catch { sigValid = false; }
+    let sigValid: boolean;
+    try { sigValid = verifyPaymentSignature(orderId, paymentId, signature); } catch { sigValid = false; }
 
     if (!sigValid) {
       console.error(`[it-run/payment/verify] invalid signature payment=${paymentId}`);

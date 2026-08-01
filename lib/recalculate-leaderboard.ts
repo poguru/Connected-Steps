@@ -1,5 +1,6 @@
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { cacheDel, cacheFlushPattern, CK } from "@/lib/cache";
+import { getISTNow } from "@/lib/date-utils";
 
 function lastDay(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
@@ -14,8 +15,7 @@ function lastDay(year: number, month: number): number {
  * upper-bound session filter to exclude same-day IST sessions.
  */
 function todayIST(): string {
-  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-  return new Date(Date.now() + IST_OFFSET_MS).toISOString().slice(0, 10);
+  return getISTNow().toISOString().slice(0, 10);
 }
 
 function mondayKey(dateStr: string): string {
