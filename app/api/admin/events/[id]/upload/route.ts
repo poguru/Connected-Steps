@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
+import { uploadBuffer } from "@/lib/storage";
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp", "image/svg+xml"]);
 const MAX_BYTES     = 10 * 1024 * 1024; // 10 MB
@@ -28,15 +29,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const buffer   = Buffer.from(await file.arrayBuffer());
 
   const db = getSupabaseServer();
-  const { error: upErr } = await db.storage
-    .from("event-media")
-    .upload(path, buffer, { contentType: file.type, upsert: true });
-
-  if (upErr) {
-    console.error("[event-upload] storage error:", upErr.message, "path:", path);
+  try {
+    const { publicUrl } = await uploadBuffer(db, "event-media", path, buffer, file.type, true);
+    return NextResponse.json({ url: publicUrl });
+  } catch (err) {
+    console.error("[event-upload] storage error:", (err as Error).message, "path:", path);
     return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }
-
-  const { data: urlData } = db.storage.from("event-media").getPublicUrl(path);
-  return NextResponse.json({ url: urlData.publicUrl });
 }

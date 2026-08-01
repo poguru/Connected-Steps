@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { uploadBuffer } from "@/lib/storage";
 
 // GET /api/sessions/[id]/photos  → list photos with like counts
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -58,13 +59,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const key = `${id}/${uploaderEmail.replace("@", "_")}_${Date.now()}.${ext}`;
     const buf = Buffer.from(await file.arrayBuffer());
 
-    const { error: upErr } = await db.storage
-      .from("session-photos")
-      .upload(key, buf, { contentType: file.type, upsert: false });
-
-    if (upErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
-
-    const { data: urlData } = db.storage.from("session-photos").getPublicUrl(key);
+    const { publicUrl: photoPublicUrl } = await uploadBuffer(db, "session-photos", key, buf, file.type);
 
     const { data, error: dbErr } = await db
       .from("session_photos")
@@ -72,7 +67,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         session_id:     id,
         uploader_email: uploaderEmail,
         uploader_name:  uploaderName ?? uploaderEmail.split("@")[0],
-        photo_url:      urlData.publicUrl,
+        photo_url:      photoPublicUrl,
         caption:        caption?.trim() || null,
       })
       .select()

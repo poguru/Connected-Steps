@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { uploadBuffer } from "@/lib/storage";
 
 // POST /api/upload
 // FormData: file (File), bucket (string)
@@ -26,15 +27,7 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const db     = getSupabaseServer();
 
-    const { error } = await db.storage
-      .from(bucket)
-      .upload(path, buffer, { contentType: file.type, upsert: false });
-
-    if (error) {
-      console.error("[upload] storage error:", error.message);
-      return NextResponse.json({ error: "Upload failed" }, { status: 500 });
-    }
-
+    await uploadBuffer(db, bucket, path, buffer, file.type);
     return NextResponse.json({ path });
   } catch (err) {
     console.error("[upload] unexpected:", err);

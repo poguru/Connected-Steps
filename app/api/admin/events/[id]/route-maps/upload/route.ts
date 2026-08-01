@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
+import { uploadBuffer } from "@/lib/storage";
 
 const ALLOWED: Record<string, string> = {
   "image/jpeg":       "image",
@@ -48,19 +49,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const db = getSupabaseServer();
-  const { error: upErr } = await db.storage
-    .from("event-media")
-    .upload(path, buffer, { contentType: file.type, upsert: true });
-
-  if (upErr) {
-    console.error("[route-map-upload] storage error:", upErr.message);
+  let publicUrl: string;
+  try {
+    ({ publicUrl } = await uploadBuffer(db, "event-media", path, buffer, file.type, true));
+  } catch (err) {
+    console.error("[route-map-upload] storage error:", (err as Error).message);
     return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }
 
-  const { data: urlData } = db.storage.from("event-media").getPublicUrl(path);
-
   return NextResponse.json({
-    url:       urlData.publicUrl,
+    url:       publicUrl,
     file_type: fileType,
     file_size: file.size,
     name:      name ?? file.name,

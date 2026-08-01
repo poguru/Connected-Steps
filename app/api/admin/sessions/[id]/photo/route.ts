@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
+import { uploadBuffer } from "@/lib/storage";
 
 
 export async function POST(
@@ -23,14 +24,12 @@ export async function POST(
 
   const db = getSupabaseServer();
 
-  const { error: upErr } = await db.storage
-    .from("session-photos")
-    .upload(fileName, buffer, { contentType: file.type, upsert: true });
-
-  if (upErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
-
-  const { data: urlData } = db.storage.from("session-photos").getPublicUrl(fileName);
-  const cover_image_url = urlData.publicUrl;
+  let cover_image_url: string;
+  try {
+    ({ publicUrl: cover_image_url } = await uploadBuffer(db, "session-photos", fileName, buffer, file.type, true));
+  } catch {
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
+  }
 
   // Update both cover_image_url and photo_url so the recent-sessions API can display it.
   // cover_image_url: used by admin UI; photo_url: used by the public recent API as fallback.
