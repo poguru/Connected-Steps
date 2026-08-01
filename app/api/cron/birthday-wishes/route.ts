@@ -11,6 +11,7 @@ import { isCronAuthorized } from "@/lib/cron-auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { acquireCronLock, releaseCronLock } from "@/lib/cron-lock";
 import { sendEmail, sendWhatsApp, birthdayEmailHTML, birthdayWAParams } from "@/lib/notify";
+import { getISTNow } from "@/lib/date-utils";
 
 export async function GET(req: NextRequest) {
   if (!isCronAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -18,9 +19,7 @@ export async function GET(req: NextRequest) {
   const db = getSupabaseServer();
 
   // Today in IST (UTC+5:30)
-  const nowUtc    = new Date();
-  const istOffset = 5.5 * 60 * 60 * 1000;
-  const nowIst    = new Date(nowUtc.getTime() + istOffset);
+  const nowIst    = getISTNow();
   const todayDay   = nowIst.getUTCDate();
   const todayMonth = nowIst.getUTCMonth() + 1;
   const todayStr   = nowIst.toISOString().slice(0, 10);   // YYYY-MM-DD in IST

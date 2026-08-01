@@ -17,6 +17,8 @@ import {
   type DigestPlanDay,
   type CommunityHighlight,
 } from "@/lib/weekly-digest-email";
+import { getISTNow } from "@/lib/date-utils";
+import { APP_URL } from "@/lib/config";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -40,10 +42,6 @@ function shortDate(iso: string): string {
   });
 }
 
-function appUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
-}
-
 // ── Cron handler ──────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
@@ -51,11 +49,11 @@ export async function GET(req: NextRequest) {
 
   const startMs = Date.now();
   const db  = getSupabaseServer();
-  const now = new Date();
+  const now           = new Date();
   const executionDate = now.toISOString().slice(0, 10);
 
   // ── Time windows ──────────────────────────────────────────────────────────
-  const todayIST         = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);
+  const todayIST         = getISTNow();
   const todayStr         = todayIST.toISOString().slice(0, 10);
   const weekEndStr       = new Date(todayIST.getTime() +  7 * 86400_000).toISOString().slice(0, 10);
   const twoWeeksEndStr   = new Date(todayIST.getTime() + 14 * 86400_000).toISOString().slice(0, 10);
@@ -233,7 +231,7 @@ export async function GET(req: NextRequest) {
 
     // Build per-user email batches
     const fromEmail    = `${process.env.ZEPTOMAIL_FROM_NAME ?? "Connected Steps"} <${process.env.ZEPTOMAIL_FROM_EMAIL ?? "info@connectedsteps.in"}>`;
-    const base         = appUrl();
+    const base         = APP_URL;
     const notifUsers:  { email: string }[] = [];
     const emailBatch:  { from: string; to: string[]; subject: string; html: string; listUnsubscribeUrl?: string }[] = [];
     let   skippedAlreadySent = 0;

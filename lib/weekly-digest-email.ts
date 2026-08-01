@@ -6,6 +6,8 @@
  */
 
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { getISTNow } from "@/lib/date-utils";
+import { APP_URL }   from "@/lib/config";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -62,10 +64,6 @@ function shortDate(iso: string): string {
   });
 }
 
-function appUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
-}
-
 // ── Email HTML builder ────────────────────────────────────────────────────────
 
 export function buildWeeklyDigestHTML(opts: WeeklyDigestOpts): string {
@@ -73,7 +71,7 @@ export function buildWeeklyDigestHTML(opts: WeeklyDigestOpts): string {
     name, sessions, events, rank, isPremium, planTitle, planCoach, planDays,
     attendedThisWeek, pointsThisWeek, daysUntilExpiry, communityPosts,
   } = opts;
-  const base = appUrl();
+  const base = APP_URL;
 
   // Activity recap (last 7 days)
   const hasActivity = attendedThisWeek.length > 0 || rank !== null;
@@ -284,8 +282,8 @@ export interface PerUserDigestData {
 
 export async function fetchWeeklyDigestDataForUser(userEmail: string): Promise<PerUserDigestData | null> {
   const db  = getSupabaseServer();
-  const now = new Date();
-  const todayIST          = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);
+  const now               = new Date();
+  const todayIST          = getISTNow();
   const todayStr          = todayIST.toISOString().slice(0, 10);
   const weekEndStr        = new Date(todayIST.getTime() +  7 * 86400_000).toISOString().slice(0, 10);
   const twoWeeksEndStr    = new Date(todayIST.getTime() + 14 * 86400_000).toISOString().slice(0, 10);
@@ -293,7 +291,7 @@ export async function fetchWeeklyDigestDataForUser(userEmail: string): Promise<P
   const yesterdayStr      = new Date(todayIST.getTime() -      86400_000).toISOString().slice(0, 10);
   const monthKey          = `${todayIST.getUTCFullYear()}-${String(todayIST.getUTCMonth() + 1).padStart(2, "0")}`;
   const email             = userEmail.toLowerCase();
-  const base              = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const base              = APP_URL;
 
   // Fetch most data in parallel
   const [userRes, lbRes, membershipRes, sessionsRes, eventsRes, communityRes] = await Promise.all([

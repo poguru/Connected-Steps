@@ -15,14 +15,13 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendSingleEmail }   from "@/lib/email-service";
 import type { EmailAttachment } from "@/lib/email-service";
 import QRCode from "qrcode";
-
-const APP_URL  = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.connectedsteps.in";
-const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+import { getISTNow } from "@/lib/date-utils";
+import { APP_URL }   from "@/lib/config";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function nowIST(): Date {
-  return new Date(Date.now() + IST_OFFSET_MS);
+  return getISTNow();
 }
 
 function todayIST(): string {

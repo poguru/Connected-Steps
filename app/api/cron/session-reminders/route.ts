@@ -13,6 +13,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail, sendWhatsApp, sessionWAParams } from "@/lib/notify";
 import { acquireCronLock, releaseCronLock } from "@/lib/cron-lock";
 import { sessionReminderEmailHTML, type SessionForEmail } from "@/lib/session-reminder-email";
+import { getISTNow } from "@/lib/date-utils";
 
 interface ActiveUser {
   email:      string;
@@ -28,7 +29,7 @@ export async function GET(req: NextRequest) {
   const startMs = Date.now();
 
   // ── Dates in IST (UTC+5:30) ────────────────────────────────────────────────
-  const nowIST        = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+  const nowIST        = getISTNow();
   const executionDate = nowIST.toISOString().slice(0, 10);       // today IST — cron lock + dedup key
   const tomorrowIST   = new Date(nowIST);
   tomorrowIST.setDate(tomorrowIST.getDate() + 1);

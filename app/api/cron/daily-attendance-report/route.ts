@@ -9,10 +9,10 @@ import { isCronAuthorized } from "@/lib/cron-auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail } from "@/lib/notify";
 import { acquireCronLock, releaseCronLock } from "@/lib/cron-lock";
+import { getISTNow } from "@/lib/date-utils";
 
 const REPORT_TO      = "info@connectedsteps.in";
 const REPORT_TO_NAME = "Connected Steps Admin";
-const IST_OFFSET_MS  = 5.5 * 60 * 60 * 1000;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -246,12 +246,11 @@ export async function GET(req: NextRequest) {
 
   const startMs      = Date.now();
   const db           = getSupabaseServer();
-  const nowUTC       = new Date();
-  const nowIST       = new Date(nowUTC.getTime() + IST_OFFSET_MS);
+  const nowIST       = getISTNow();
   const todayIST     = nowIST.toISOString().slice(0, 10);
   const yesterdayIST = new Date(nowIST.getTime() - 86_400_000).toISOString().slice(0, 10);
   const monthKey     = `${nowIST.getUTCFullYear()}-${String(nowIST.getUTCMonth() + 1).padStart(2, "0")}`;
-  const since24h     = new Date(nowUTC.getTime() - 86_400_000).toISOString();
+  const since24h     = new Date(Date.now() - 86_400_000).toISOString();
 
   console.log(`[daily-attendance-report] starting report_date=${yesterdayIST} exec_date=${todayIST}`);
 
@@ -341,7 +340,7 @@ export async function GET(req: NextRequest) {
 
   // ── Phase 3: build email and send (lock held) ──────────────────────────────
   try {
-    const generatedAt = new Date(Date.now() + IST_OFFSET_MS).toISOString().slice(11, 16);
+    const generatedAt = getISTNow().toISOString().slice(11, 16);
 
     const html = buildEmailHTML({
       reportDate:     yesterdayIST,
