@@ -24,11 +24,11 @@ CREATE INDEX IF NOT EXISTS idx_event_reg_event_category_status
 CREATE INDEX IF NOT EXISTS idx_event_reg_user_created
   ON event_registrations (user_email, created_at DESC);
 
--- BIB & ops portal lookups: already have individual indexes but the combined
--- event_id+bib_collected is a hot filter during event day ops.
+-- BIB & ops portal lookups: event_id + bib_collected_at is a hot filter
+-- during event day ops (NULL = not yet collected).
 CREATE INDEX IF NOT EXISTS idx_event_reg_event_bib
-  ON event_registrations (event_id, bib_collected)
-  WHERE bib_collected = false;
+  ON event_registrations (event_id, bib_collected_at)
+  WHERE bib_collected_at IS NULL;
 
 -- ── leaderboard ───────────────────────────────────────────────────────────────
 
