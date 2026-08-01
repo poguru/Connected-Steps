@@ -1,22 +1,13 @@
 import { NextRequest, NextResponse, after } from "next/server";
+import { isCronAuthorized } from "@/lib/cron-auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { processEmailBatch } from "@/lib/process-email-batch";
 
 // POST /api/cron/process-scheduled-emails
 // Called by Vercel cron every hour to start sending email batches whose
 // scheduled_for time has arrived.
-// Also accepts x-cron-secret header for manual triggering from admin UI.
 export async function POST(req: NextRequest) {
-  const secret = req.headers.get("x-cron-secret") ?? req.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET ?? "";
-
-  // Allow Vercel cron (no auth) or manual trigger with secret
-  const isVercelCron = req.headers.get("x-vercel-cron-signature") !== null;
-  const hasSecret    = cronSecret && (secret === cronSecret || secret === `Bearer ${cronSecret}`);
-
-  if (!isVercelCron && !hasSecret && process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isCronAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const db = getSupabaseServer();
 

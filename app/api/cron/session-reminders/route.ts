@@ -8,6 +8,7 @@
 //        duplicate sends even on partial-run retries.
 
 import { NextRequest, NextResponse } from "next/server";
+import { isCronAuthorized } from "@/lib/cron-auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail, sendWhatsApp, sessionWAParams } from "@/lib/notify";
 import { acquireCronLock, releaseCronLock } from "@/lib/cron-lock";
@@ -21,10 +22,7 @@ interface ActiveUser {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization") ?? "";
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isCronAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const db      = getSupabaseServer();
   const startMs = Date.now();

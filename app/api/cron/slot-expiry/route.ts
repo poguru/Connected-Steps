@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isCronAuthorized } from "@/lib/cron-auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 // Cron: /api/cron/slot-expiry -- runs every 30 minutes via Vercel cron.
@@ -6,10 +7,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 // status past their expiry window (default 30 minutes) so they can be claimed
 // by other participants.
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization");
-  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isCronAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const db = getSupabaseServer();
 

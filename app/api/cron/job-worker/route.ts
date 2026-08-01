@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isCronAuthorized } from "@/lib/cron-auth";
 import { claimNextJobs, completeJob, failJob, type JobRow, type JobType, type JobPayloads } from "@/lib/job-queue";
 import {
   handleInvoiceGenerate,
@@ -76,9 +77,7 @@ async function processJob(job: JobRow): Promise<"done" | "failed" | "dead"> {
 }
 
 export async function GET(req: NextRequest) {
-  if (req.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isCronAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const startMs = Date.now();
   const jobs    = await claimNextJobs(MAX_JOBS);

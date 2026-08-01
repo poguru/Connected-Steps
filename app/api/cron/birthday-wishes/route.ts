@@ -7,15 +7,13 @@
 // { "path": "/api/cron/birthday-wishes", "schedule": "30 3 * * *" }
 
 import { NextRequest, NextResponse } from "next/server";
+import { isCronAuthorized } from "@/lib/cron-auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { acquireCronLock, releaseCronLock } from "@/lib/cron-lock";
 import { sendEmail, sendWhatsApp, birthdayEmailHTML, birthdayWAParams } from "@/lib/notify";
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization") ?? "";
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isCronAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const db = getSupabaseServer();
 

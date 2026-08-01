@@ -6,6 +6,7 @@
 // { "path": "/api/cron/streak-at-risk", "schedule": "30 2 * * *" }
 
 import { NextRequest, NextResponse } from "next/server";
+import { isCronAuthorized } from "@/lib/cron-auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { createNotification } from "@/lib/notify-inapp";
 import { calcDateGapStreak, SESSION_GAP_DAYS } from "@/lib/streak-utils";
@@ -19,10 +20,7 @@ const INACTIVE_DAYS = 10;
 const COOLDOWN_DAYS = 7;
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization") ?? "";
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isCronAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const startMs = Date.now();
   const db  = getSupabaseServer();

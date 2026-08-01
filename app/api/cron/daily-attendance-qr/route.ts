@@ -5,6 +5,7 @@
 // vercel.json: { "path": "/api/cron/daily-attendance-qr", "schedule": "30 23 * * *" }
 
 import { NextRequest, NextResponse } from "next/server";
+import { isCronAuthorized } from "@/lib/cron-auth";
 import { acquireCronLock, releaseCronLock } from "@/lib/cron-lock";
 import {
   generateDailyAttendanceQR,
@@ -37,11 +38,7 @@ function isWithinGenerationWindow(configuredTime: string): boolean {
 }
 
 export async function GET(req: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-  const authHeader = req.headers.get("authorization");
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isCronAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const today = todayIST();
   const db    = getSupabaseServer();

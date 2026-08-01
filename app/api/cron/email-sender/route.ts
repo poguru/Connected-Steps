@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isCronAuthorized } from "@/lib/cron-auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendSingleEmail } from "@/lib/email-service";
 import { loadAttachmentsAsBase64, type AttachmentMeta } from "@/lib/email-attachments";
@@ -25,11 +26,7 @@ type ClaimedEmail = {
 };
 
 export async function GET(req: NextRequest) {
-  if (process.env.CRON_SECRET) {
-    if (req.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
+  if (!isCronAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const startMs = Date.now();
   const db      = getSupabaseServer();

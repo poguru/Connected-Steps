@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isCronAuthorized } from "@/lib/cron-auth";
 
 /**
  * Cron-triggered media cleanup job.
@@ -6,20 +7,13 @@ import { NextRequest, NextResponse } from "next/server";
  * Schedule: Run daily (e.g. 02:00 IST) via Vercel Cron, GitHub Actions,
  * or any external scheduler.
  *
- * Authentication: CRON_SECRET env var (header: x-cron-secret).
- * This keeps the endpoint inaccessible to public callers while allowing
- * scheduler-to-server auth without a user session.
+ * Authentication: CRON_SECRET via Authorization: Bearer (Vercel cron standard).
  *
  * It simply delegates to /api/admin/media/cleanup which contains all
  * the deletion logic, so the cleanup logic is not duplicated.
  */
 export async function GET(req: NextRequest) {
-  const secret = req.headers.get("x-cron-secret")
-    ?? new URL(req.url).searchParams.get("secret");
-
-  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isCronAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   // Delegate to the admin cleanup route, passing the cron secret as auth
   const base = new URL(req.url).origin;
@@ -27,7 +21,7 @@ export async function GET(req: NextRequest) {
     method:  "POST",
     headers: {
       "Content-Type":  "application/json",
-      "x-cron-secret": process.env.CRON_SECRET,
+      "x-cron-secret": process.env.CRON_SECRET ?? "",
     },
   });
 

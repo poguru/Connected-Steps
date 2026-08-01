@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse }      from "next/server";
+import { isCronAuthorized }              from "@/lib/cron-auth";
 import { runReconciliation }             from "@/lib/payment-reconcile";
 import { runMembershipReconciliation }   from "@/lib/membership-reconcile";
 
@@ -22,10 +23,7 @@ import { runMembershipReconciliation }   from "@/lib/membership-reconcile";
 // This cron is the secondary daily sweep.
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isCronAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const startMs = Date.now();
   console.log("[cron/payment-reconcile] starting daily sweep");

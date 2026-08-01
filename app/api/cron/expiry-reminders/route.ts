@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isCronAuthorized } from "@/lib/cron-auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { expiryReminderEmailHTML } from "@/lib/notify";
 import { createNotification } from "@/lib/notify-inapp";
@@ -15,10 +16,7 @@ const PLAN_LABELS: Record<string, string> = {
 // Runs daily at 7am IST via Vercel Cron (vercel.json)
 // Sends reminders at 7 days and 1 day before expiry
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isCronAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const startMs = Date.now();
   const db      = getSupabaseServer();

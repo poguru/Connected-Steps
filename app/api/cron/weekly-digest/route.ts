@@ -5,6 +5,7 @@
 // { "path": "/api/cron/weekly-digest", "schedule": "30 1 * * 1" }
 
 import { NextRequest, NextResponse } from "next/server";
+import { isCronAuthorized } from "@/lib/cron-auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { createNotifications } from "@/lib/notify-inapp";
 import { paginateAll } from "@/lib/paginate";
@@ -46,10 +47,7 @@ function appUrl(): string {
 // ── Cron handler ──────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization") ?? "";
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isCronAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const startMs = Date.now();
   const db  = getSupabaseServer();
