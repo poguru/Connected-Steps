@@ -3,6 +3,7 @@ import { isCronAuthorized } from "@/lib/cron-auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendSingleEmail } from "@/lib/email-service";
 import { loadAttachmentsAsBase64, type AttachmentMeta } from "@/lib/email-attachments";
+import { checkCampaignHealth } from "@/lib/alerting";
 
 // Background worker — runs every minute via Vercel cron (maxDuration: 300s).
 // Claims email_campaigns with status='running', sends emails in concurrent batches
@@ -142,6 +143,14 @@ export async function GET(req: NextRequest) {
           ]);
 
           log.push(`done ${campaign.batch_id.slice(0, 8)}: ${delivered}ok ${failed}fail`);
+
+          // Proactive alert if failure rate is high — fire-and-forget
+          checkCampaignHealth({
+            batchId: campaign.batch_id,
+            delivered,
+            failed,
+            total: all.length,
+          }).catch(() => {});
         }
         break;
       }

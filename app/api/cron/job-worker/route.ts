@@ -15,6 +15,7 @@ import {
   handleImportCsv,
 } from "@/lib/job-handlers";
 import { logger } from "@/lib/logger";
+import { checkQueueHealth } from "@/lib/alerting";
 
 // Runs every minute via Vercel Cron.
 // Claims up to MAX_JOBS pending jobs, processes them sequentially, and marks
@@ -101,6 +102,9 @@ export async function GET(req: NextRequest) {
   if (dead > 0) {
     logger.warn("job-worker", "Dead-letter jobs detected — requires manual review", { dead });
   }
+
+  // Proactive alerting — fire-and-forget; never blocks the response
+  checkQueueHealth().catch(() => {});
 
   return NextResponse.json({ ok: true, processed: jobs.length, done, failed, dead, durationMs });
 }
