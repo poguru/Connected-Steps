@@ -362,7 +362,12 @@ async function handleSingleParticipant(
       }, { onConflict: "event_id,user_email", ignoreDuplicates: false })
       .select("id, registration_code, qr_token")
       .single();
-    if (regErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
+    if (regErr) {
+      if (regErr.message?.includes("fully booked")) {
+        return NextResponse.json({ error: "This category is fully booked." }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Database error" }, { status: 500 });
+    }
 
     const finalCode  = reg?.registration_code ?? code;
     const finalQr    = reg?.qr_token          ?? qrToken;
@@ -799,7 +804,12 @@ async function handleMultiParticipant(
       }, { onConflict: "event_id,user_email", ignoreDuplicates: false })
       .select("id, registration_code")
       .single();
-    if (regErr || !reg) return NextResponse.json({ error: "Database error" }, { status: 500 });
+    if (regErr || !reg) {
+      if (regErr?.message?.includes("fully booked")) {
+        return NextResponse.json({ error: "This category is fully booked." }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Database error" }, { status: 500 });
+    }
 
     const regId    = reg.id;
     const finalCode = reg.registration_code;
