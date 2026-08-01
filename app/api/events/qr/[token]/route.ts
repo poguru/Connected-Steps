@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyEventQR } from "@/lib/event-qr";
 import QRCode from "qrcode";
 
+import { APP_URL } from "@/lib/config";
 // GET /api/events/qr/[token]
 // Returns the QR code as a PNG image. Used in emails so email clients
 // can fetch the image from a public URL (data: URLs are blocked by Gmail/Outlook).
@@ -18,7 +19,7 @@ export async function GET(
     return new NextResponse("Invalid QR token", { status: 400 });
   }
 
-  const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
   const qrContent = `${appUrl}/event-checkin?t=${encodeURIComponent(token)}`;
 
   const pngBuffer = await QRCode.toBuffer(qrContent, {

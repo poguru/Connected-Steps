@@ -3,12 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { redeemCoupon } from "@/lib/coupon-redeem";
 import { verifyUserToken } from "@/lib/admin-auth";
 import { getRazorpaySDK as getRazorpay } from "@/lib/razorpay-client";
-
-function applyDiscount(amount: number, type: string, value: number): number {
-  if (type === "percentage") return Math.max(100, Math.round(amount * (1 - value / 100)));
-  if (type === "fixed")      return Math.max(100, amount - value * 100);
-  return amount;
-}
+import { applyMembershipDiscount } from "@/lib/commerce/pricing";
 
 export async function POST(req: NextRequest) {
   const email = verifyUserToken(req.headers.get("x-user-token") ?? "");
@@ -57,7 +52,7 @@ export async function POST(req: NextRequest) {
 
     if (existingUse) {
       // Already claimed in a prior order — re-apply the discount without re-claiming.
-      amount          = applyDiscount(originalAmount, coupon.discount_type, coupon.discount_value);
+      amount          = applyMembershipDiscount(originalAmount, coupon.discount_type, coupon.discount_value);
       discountApplied = originalAmount - amount;
     } else {
       // Atomically claim the coupon use now. This prevents two concurrent users
@@ -66,7 +61,7 @@ export async function POST(req: NextRequest) {
       if (!claimed) {
         return NextResponse.json({ error: "This coupon has reached its usage limit." }, { status: 410 });
       }
-      amount          = applyDiscount(originalAmount, coupon.discount_type, coupon.discount_value);
+      amount          = applyMembershipDiscount(originalAmount, coupon.discount_type, coupon.discount_value);
       discountApplied = originalAmount - amount;
     }
   }

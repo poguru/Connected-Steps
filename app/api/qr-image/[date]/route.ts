@@ -8,9 +8,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer }         from "@/lib/supabase-server";
 import QRCode                        from "qrcode";
 
+import { APP_URL } from "@/lib/config";
 export const runtime = "nodejs";
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.connectedsteps.in";
 
 export async function GET(
   _req: NextRequest,

@@ -9,6 +9,7 @@ import { handleInvoiceGenerate, handleMembershipEmail } from "@/lib/job-handlers
 import { getRazorpaySDK as getRazorpay } from "@/lib/razorpay-client";
 import { logger } from "@/lib/logger";
 
+import { APP_URL } from "@/lib/config";
 export async function POST(req: NextRequest) {
   // Authenticate the request — email MUST come from the verified token,
   // not the request body, to prevent a user claiming payment for another account.
@@ -227,7 +228,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Admin notification — non-blocking, fire-and-forget
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
   sendEmail(
     "info@connectedsteps.in",
     "Connected Steps Admin",

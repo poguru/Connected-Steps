@@ -4,6 +4,7 @@ import { isAdminOrCoach } from "@/lib/admin-auth";
 import { generateCertificateHTML } from "@/lib/certificate-generator";
 import { enqueueJob } from "@/lib/job-queue";
 
+import { APP_URL } from "@/lib/config";
 type Params = { params: Promise<{ id: string }> };
 
 const BUCKET = "event-certificates";
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     event_registrations: { id: string; certificate_url: string | null; certificate_generated_at: string | null } | null;
   }>) ?? [];
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
   let generated = 0, skipped = 0, failed = 0;
   const errors: string[] = [];
 

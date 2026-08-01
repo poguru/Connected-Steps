@@ -15,6 +15,7 @@ import { acquireCronLock, releaseCronLock } from "@/lib/cron-lock";
 import { sessionReminderEmailHTML, type SessionForEmail } from "@/lib/session-reminder-email";
 import { getISTNow } from "@/lib/date-utils";
 
+import { APP_URL } from "@/lib/config";
 interface ActiveUser {
   email:      string;
   first_name: string | null;
@@ -70,7 +71,7 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Phase 3: send reminders (lock held) ───────────────────────────────────
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
 
   try {
     // Fetch ALL active members

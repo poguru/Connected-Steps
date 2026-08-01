@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
+import { APP_URL } from "@/lib/config";
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
@@ -35,7 +36,7 @@ async function sendCoachReplyEmail(q: {
   question:   string;
   answer:     string;
 }) {
-  const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
   const firstName = q.user_name?.split(" ")[0] || "there";
 
   const html = `

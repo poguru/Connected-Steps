@@ -2,8 +2,7 @@ import { Metadata } from "next";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import JoinClient from "./JoinClient";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
-
+import { APP_URL } from "@/lib/config";
 async function getSession(id: string) {
   const db = getSupabaseServer();
   const { data } = await db

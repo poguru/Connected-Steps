@@ -13,6 +13,7 @@ import { acquireCronLock, releaseCronLock } from "@/lib/cron-lock";
 import { sendEmail, sendWhatsApp, birthdayEmailHTML, birthdayWAParams } from "@/lib/notify";
 import { getISTNow } from "@/lib/date-utils";
 
+import { APP_URL } from "@/lib/config";
 export async function GET(req: NextRequest) {
   if (!isCronAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -106,7 +107,7 @@ export async function GET(req: NextRequest) {
             birthdayEmailHTML(firstName),
             false,  // isOtp
             false,  // isTransactional — birthday emails are non-transactional
-            `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in"}/api/unsubscribe?email=${encodeURIComponent(email)}`,
+            `${APP_URL}/api/unsubscribe?email=${encodeURIComponent(email)}`,
           );
 
           if (result.ok) {

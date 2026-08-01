@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 import { sendSingleEmail } from "@/lib/email-service";
 
+import { APP_URL } from "@/lib/config";
 // POST /api/admin/email-diagnostics
 // Sends a test email and returns the full SES/Resend diagnostic response.
 // Use this to verify the email pipeline is working before bulk sends.
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Valid recipient email required in body: { to: 'email@example.com' }" }, { status: 400 });
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
   const from   = `${process.env.ZEPTOMAIL_FROM_NAME ?? "Connected Steps"} <${process.env.ZEPTOMAIL_FROM_EMAIL ?? "info@connectedsteps.in"}>`;
 
   // Send a minimal test email and capture the full diagnostic response

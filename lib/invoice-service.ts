@@ -11,6 +11,7 @@ import { gstFromInclusive, getCurrentGSTRate } from "@/lib/gst";
 import { sendEmail } from "@/lib/notify";
 import { logger } from "@/lib/logger";
 
+import { APP_URL } from "@/lib/config";
 // ── Business Constants ────────────────────────────────────────────────────────
 export const CS_BUSINESS = {
   name:    "Connected Steps",
@@ -77,7 +78,7 @@ function generateInvoiceHTML(inv: {
   totalAmount:    number;
 }): string {
   const b       = CS_BUSINESS;
-  const appUrl  = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
   const fmt     = (n: number) => `₹${n.toFixed(2)}`;
   const inWords = amountInWords(inv.totalAmount);
   const typeLabel = inv.productType.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
@@ -524,7 +525,7 @@ async function sendInvoiceEmail(
   html:          string,
 ): Promise<void> {
   const db       = getSupabaseServer();
-  const appUrl   = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
   const viewUrl  = `${appUrl}/invoices/${encodeURIComponent(invoiceNumber)}`;
 
   const subject  = `Bill of Supply ${invoiceNumber} — ${input.productName}`;

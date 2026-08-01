@@ -3,9 +3,8 @@ import QRCode from "qrcode";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 
+import { APP_URL } from "@/lib/config";
 const QR_VALID_MINUTES = 90;
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
-
 // GET — return current QR for session (admin only)
 export async function GET(
   req: NextRequest,

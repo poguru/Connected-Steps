@@ -4,6 +4,7 @@ import { sendEmail, bugStatusUpdateEmailHTML } from "@/lib/notify";
 import { createNotification } from "@/lib/notify-inapp";
 import { isRateLimited, recordFailure, getClientIp } from "@/lib/rate-limit";
 
+import { APP_URL } from "@/lib/config";
 const ADMIN_EMAIL = "info@connectedsteps.in";
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "rc1";
 
@@ -22,7 +23,7 @@ function bugReportEmailHTML(r: {
     feature: "✨ Feature Request", performance: "⚡ Performance Issue",
   };
   const label  = categoryLabel[r.category] ?? r.category;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
 
   const attachmentRows = r.attachments.map((a, i) =>
     `<tr><td style="padding:6px 0;color:#6b7280">Screenshot ${i + 1}</td><td style="padding:6px 0"><a href="${appUrl}/api/admin/bug-reports/screenshot?path=${encodeURIComponent(a.path)}" style="color:#e8620a">${a.name}</a></td></tr>`

@@ -155,6 +155,14 @@ const NAV_GROUPS = [
       { label: "Birthday",         href: "/admin/birthday-settings",     exact: false, icon: "🎂" },
     ],
   },
+  {
+    key:   "system",
+    label: "System",
+    icon:  "🩺",
+    links: [
+      { label: "System Health",    href: "/admin/system-health",         exact: false, icon: "🩺" },
+    ],
+  },
 ] as const;
 
 // Mobile bottom nav — 5 key destinations

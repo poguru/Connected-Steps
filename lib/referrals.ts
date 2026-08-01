@@ -6,6 +6,7 @@
 
 import { getSupabaseServer } from "@/lib/supabase-server";
 
+import { APP_URL } from "@/lib/config";
 // ── Code generation ───────────────────────────────────────────────────────────
 
 function generateCode(): string {
@@ -234,7 +235,7 @@ export async function getReferralStats(email: string): Promise<ReferralStats> {
   const key  = email.toLowerCase();
   const code = await getOrCreateCode(key);
 
-  const appUrl   = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
   const shareUrl = `${appUrl}/invite/${code}`;
 
   const { data: rows } = await db

@@ -18,6 +18,7 @@ import { logger }                                     from "@/lib/logger";
 import { executeWebhookDelivery }                     from "@/lib/webhook-dispatch";
 import { parseCsvSimple }                             from "@/lib/csv-utils";
 
+import { APP_URL } from "@/lib/config";
 // ── invoice_generate ──────────────────────────────────────────────────────────
 // createAndSendInvoice() is already idempotent: it returns the existing invoice
 // when paymentId / registrationId already has one.
@@ -219,7 +220,7 @@ export async function handleCertificateGenerate(p: JobPayloads["certificate_gene
     return;
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
 
   const html = `
     <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#0a0a0a;color:#f0f0f0;border-radius:8px;">

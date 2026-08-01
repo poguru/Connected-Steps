@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 
+import { APP_URL } from "@/lib/config";
 export interface ShareSession {
   id:    string;
   title: string;
@@ -14,8 +15,6 @@ interface Props {
   session: ShareSession;
   onClose: () => void;
 }
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
 
 function formatDate(date: string) {
   return new Date(date + "T12:00:00Z").toLocaleDateString("en-IN", {

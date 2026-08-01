@@ -542,7 +542,7 @@ export function bugStatusUpdateEmailHTML(opts: {
   confirmUrl?:       string;
 }): string {
   const meta   = BUG_STATUS_META[opts.status] ?? { icon: "📋", heading: "Update on your report", accent: "#e8620a" };
-  const base   = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const base = APP_URL;
   const isResolved = opts.status === "resolved";
 
   return emailWrapper(`

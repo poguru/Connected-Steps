@@ -2,6 +2,7 @@
 import { getOrCreateCode } from "@/lib/referrals";
 import { verifyUserToken } from "@/lib/admin-auth";
 
+import { APP_URL } from "@/lib/config";
 // GET /api/referrals/code?email=
 export async function GET(req: NextRequest) {
   const email      = req.nextUrl.searchParams.get("email") ?? "";
@@ -12,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const code     = await getOrCreateCode(email);
-    const appUrl   = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+    const appUrl = APP_URL;
     const shareUrl = `${appUrl}/invite/${code}`;
     return NextResponse.json({ code, shareUrl });
   } catch (e: unknown) {

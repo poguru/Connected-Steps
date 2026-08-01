@@ -10,8 +10,7 @@ import { sendSingleEmail }    from "@/lib/email-service";
 import { sendWhatsAppTemplate } from "@/lib/whatsapp";
 import { loadAttachmentsAsBase64, type AttachmentMeta } from "@/lib/email-attachments";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://connectedsteps.in";
-
+import { APP_URL } from "@/lib/config";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface Recipient {

@@ -6,6 +6,7 @@ import { createNotification } from "@/lib/notify-inapp";
 import { paginateAll } from "@/lib/paginate";
 import { acquireCronLock, releaseCronLock } from "@/lib/cron-lock";
 
+import { APP_URL } from "@/lib/config";
 const PLAN_LABELS: Record<string, string> = {
   monthly:   "Monthly",
   quarterly: "3 Months",
@@ -168,7 +169,7 @@ async function sendExpiryEmail(
     subject,
     html:    expiryReminderEmailHTML(name, plan, expiresAt, daysLeft),
     // Expiry reminders are non-transactional — include unsubscribe header per RFC 2369
-    listUnsubscribeUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in"}/api/unsubscribe?email=${encodeURIComponent(email)}`,
+    listUnsubscribeUrl: `${APP_URL}/api/unsubscribe?email=${encodeURIComponent(email)}`,
   });
   return result.ok;
 }

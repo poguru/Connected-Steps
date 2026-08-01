@@ -11,6 +11,7 @@ import { sendEmail } from "@/lib/notify";
 import { acquireCronLock, releaseCronLock } from "@/lib/cron-lock";
 import { getISTNow } from "@/lib/date-utils";
 
+import { APP_URL } from "@/lib/config";
 const REPORT_TO      = "info@connectedsteps.in";
 const REPORT_TO_NAME = "Connected Steps Admin";
 
@@ -220,7 +221,7 @@ function buildEmailHTML(opts: {
     ? tbl(["Status", "Count"], statusRows)
     : `<p style="color:#6b7280;font-size:13px">Job queue is empty.</p>`;
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
 
   return `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;max-width:720px;margin:0 auto;padding:24px;background:#f5f5f5">
 <div style="background:#fff;border-radius:8px;padding:28px;border:1px solid #e5e7eb">

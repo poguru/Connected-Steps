@@ -7,18 +7,13 @@ import { sendEmail, eventRegistrationEmailHTML } from "@/lib/notify";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
 import { evaluateAutomations } from "@/lib/automation-engine";
 import { recordConsent } from "@/lib/campaign-service";
+import { calcEventDiscount } from "@/lib/commerce/pricing";
 
 function genCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let s = "";
   for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
   return `CS-EVT-${s}`;
-}
-
-function calcDiscount(price: number, type: string, value: number): number {
-  if (type === "percentage") return Math.min(price, Math.round(price * value / 100));
-  if (type === "fixed")      return Math.min(price, value);
-  return 0;
 }
 
 // Mirrors the REG_DEFAULTS / getRegConfig logic on the registration form page.
@@ -180,7 +175,7 @@ async function handleSingleParticipant(
   // Falls back to ev.price for legacy events that don't use event_races.
   const { data: races } = await db
     .from("event_races")
-    .select("id, distance, price, early_bird_price, gender_restriction, min_age, max_age")
+    .select("id, distance, price, early_bird_price, gender_restriction, min_age, max_age, max_slots")
     .eq("event_id", event_id as string)
     .eq("status", "active");
 
@@ -231,12 +226,8 @@ async function handleSingleParticipant(
   // Approved waitlist members bypass the gate.
   let approvedWaitlistId: string | null = null;
 
-  // Check per-race max_slots when the race has an explicit cap
-  const { data: raceForCap } = matchedRace?.id ? await db
-    .from("event_races")
-    .select("max_slots")
-    .eq("id", matchedRace.id)
-    .single() : { data: null };
+  // max_slots is already included in the races query above — no extra round-trip needed
+  const raceForCap = matchedRace ?? null;
 
   let capacityExceeded = false;
   let capacityError = "This event is fully booked.";
@@ -330,7 +321,7 @@ async function handleSingleParticipant(
     const { data: uses } = await db.from("coupon_uses").select("id").eq("coupon_id", coupon.id).eq("used_by_email", (email as string).toLowerCase()).limit(1);
     if (uses && uses.length > 0) return NextResponse.json({ error: "You have already used this coupon." }, { status: 400 });
     couponId = coupon.id; discountType = coupon.discount_type; discountValue = coupon.discount_value;
-    discount = calcDiscount(singleBasePrice, discountType, discountValue);
+    discount = calcEventDiscount(singleBasePrice, discountType, discountValue);
   }
 
   const originalPrice = singleBasePrice;
@@ -769,7 +760,7 @@ async function handleMultiParticipant(
     const { data: uses } = await db.from("coupon_uses").select("id").eq("coupon_id", coupon.id).eq("used_by_email", accountEmail).limit(1);
     if (uses && uses.length > 0) return NextResponse.json({ error: "You have already used this coupon." }, { status: 400 });
     couponId = coupon.id; discountType = coupon.discount_type; discountValue = coupon.discount_value;
-    discount = calcDiscount(totalBeforeDiscount, discountType, discountValue);
+    discount = calcEventDiscount(totalBeforeDiscount, discountType, discountValue);
   }
 
   const originalPrice = totalBeforeDiscount;

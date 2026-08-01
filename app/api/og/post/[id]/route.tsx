@@ -4,7 +4,6 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 
 export const runtime = "edge";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
 const ORANGE  = "#e8620a";
 const BLACK   = "#0a0a0a";
 const WHITE   = "#ffffff";

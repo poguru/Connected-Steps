@@ -2,14 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { recordConsent } from "@/lib/campaign-service";
 
+import { APP_URL } from "@/lib/config";
 // GET  /api/unsubscribe?token=X  — secure one-click from campaign emails (preferred)
 // GET  /api/unsubscribe?email=X  — legacy email-based unsubscribe (kept for backward compat)
 // POST /api/unsubscribe          — RFC 8058 List-Unsubscribe-Post (mail clients)
 //
 // All paths add the email to email_suppression so future non-transactional sends skip it.
 // Transactional emails (OTP, registration confirmation, payment receipt) are NOT affected.
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://connectedsteps.in";
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");

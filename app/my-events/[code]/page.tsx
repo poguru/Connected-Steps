@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { isTokenValid, handleAuthExpiry } from "@/lib/client-auth";
 
+import { APP_URL } from "@/lib/config";
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 interface Participant {
@@ -61,7 +62,7 @@ interface TimelineItem {
 
 const BASE_URL = typeof window !== "undefined"
   ? window.location.origin
-  : (process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in");
+  : (APP_URL);
 
 function fmtDate(d: string) {
   return new Date(d + "T12:00:00").toLocaleDateString("en-IN", {

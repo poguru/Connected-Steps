@@ -3,6 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import crypto from "crypto";
 import { isRateLimited, recordFailure, getClientIp } from "@/lib/rate-limit";
 
+import { APP_URL } from "@/lib/config";
 export async function POST(req: NextRequest) {
   try {
     // Rate limit: 5 attempts per IP per 15 minutes — prevents reset email spam
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
     // Store token
     await db.from("password_resets").insert({ email: email.toLowerCase().trim(), token, expires_at });
 
-    const appUrl   = process.env.NEXT_PUBLIC_APP_URL;
+    const appUrl = APP_URL;
     if (!appUrl) {
       console.error("[forgot-password] NEXT_PUBLIC_APP_URL not set — reset link will be broken");
     }

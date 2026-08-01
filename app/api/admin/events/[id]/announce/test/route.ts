@@ -3,6 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 import { sendSingleEmail } from "@/lib/email-service";
 
+import { APP_URL } from "@/lib/config";
 // POST /api/admin/events/[id]/announce/test
 // Sends one test email to a specified address to verify the pipeline.
 export async function POST(
@@ -28,7 +29,7 @@ export async function POST(
 
   if (!ev) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
-  const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
   const regLink   = ev.share_slug ? `${appUrl}/events/${ev.share_slug}` : appUrl;
   const dateStr   = ev.start_date
     ? new Date(ev.start_date + "T12:00:00Z").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })

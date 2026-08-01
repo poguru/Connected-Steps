@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button, Alert, Badge as DSBadge, Spinner } from "@/components/ui/ds";
 
+import { APP_URL } from "@/lib/config";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Registration {
@@ -233,7 +234,7 @@ export default function ParticipantDetailPage() {
     } finally { setAction(""); }
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
 
   if (loading) return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center" }}>

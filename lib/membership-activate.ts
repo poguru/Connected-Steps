@@ -18,6 +18,7 @@ import { enqueueJob }                  from "@/lib/job-queue";
 import { handleInvoiceGenerate,
          handleMembershipEmail }       from "@/lib/job-handlers";
 import { autoFeedMembershipActivated } from "@/lib/auto-feed";
+import { APP_URL } from "@/lib/config";
 import { sendEmail, sendWhatsApp,
          membershipWAParams }          from "@/lib/notify";
 
@@ -182,7 +183,7 @@ export async function activateMembership(opts: {
   autoFeedMembershipActivated(email, userName, planLabel).catch(() => {});
 
   // ── Admin notification email ────────────────────────────────────────────────
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
   sendEmail(
     ADMIN_EMAIL,
     "Connected Steps Admin",

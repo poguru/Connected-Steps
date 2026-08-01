@@ -5,6 +5,7 @@ import { verifyUserToken } from "@/lib/admin-auth";
 import { createNotification } from "@/lib/notify-inapp";
 import { cacheDel, CK } from "@/lib/cache";
 
+import { APP_URL } from "@/lib/config";
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -194,7 +195,7 @@ async function sendJoinConfirmationEmail(p: {
   time:      string | null;
   venue:     string | null;
 }) {
-  const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
   const firstName = p.firstName || "there";
   const dateLabel = formatDate(p.date) + (p.time ? ` at ${p.time}` : "");
 

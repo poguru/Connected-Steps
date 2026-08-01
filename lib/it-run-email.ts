@@ -1,6 +1,7 @@
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail }         from "@/lib/notify";
 
+import { APP_URL } from "@/lib/config";
 // Shared confirmation email helper for IT Run Sprint-2.
 // Used by both the client-side payment verify route and the Razorpay webhook fallback.
 export async function sendItRunConfirmationEmail(
@@ -32,7 +33,7 @@ export async function sendItRunConfirmationEmail(
 
   if (!parts?.length) { console.warn(`[it-run-email] No participants for ${registrationCode}`); return; }
 
-  const appUrl  = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
   const dashUrl = `${appUrl}/it-run/dashboard/${reg.registration_code}`;
   const name    = `${parts[0].first_name} ${parts[0].last_name}`;
   const ev      = reg.it_run_events;

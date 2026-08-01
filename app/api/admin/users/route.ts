@@ -2,6 +2,7 @@
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 
+import { APP_URL } from "@/lib/config";
 export async function GET(req: NextRequest) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -138,7 +139,7 @@ export async function PUT(req: NextRequest) {
     }
 
     // Delegate to the send-phone-otp endpoint via internal fetch
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+    const base = APP_URL;
     const res  = await fetch(`${base}/api/auth/send-phone-otp`, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },

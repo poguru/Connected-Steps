@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { isTokenValid, handleAuthExpiry } from "@/lib/client-auth";
 
+import { APP_URL } from "@/lib/config";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Participant {
@@ -106,7 +107,7 @@ const TYPE_ICON: Record<string, string> = {
 
 const BASE_URL = typeof window !== "undefined"
   ? window.location.origin
-  : (process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in");
+  : (APP_URL);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

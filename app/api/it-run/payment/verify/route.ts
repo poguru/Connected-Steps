@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyPaymentSignature } from "@/lib/razorpay-security";
 
+import { APP_URL } from "@/lib/config";
 // POST /api/it-run/payment/verify
 // Called by the client after Razorpay checkout success.
 // Verifies signature and confirms the registration.
@@ -97,7 +98,7 @@ async function sendConfirmationEmail(
 
   if (!parts?.length) return;
 
-  const appUrl  = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
   const dashUrl = `${appUrl}/it-run/dashboard/${reg.registration_code}`;
   const ev      = reg.it_run_events;
   const cat     = reg.it_run_categories;

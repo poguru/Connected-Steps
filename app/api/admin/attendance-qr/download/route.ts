@@ -3,8 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdmin } from "@/lib/admin-auth";
 import QRCode from "qrcode";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://connectedsteps.in";
-
+import { APP_URL } from "@/lib/config";
 // GET /api/admin/attendance-qr/download?id=<qr_id>
 // Returns a PNG QR image for download
 export async function GET(req: NextRequest) {

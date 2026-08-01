@@ -4,6 +4,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { isRateLimited, getClientIp } from "@/lib/rate-limit";
 import { sendEmail } from "@/lib/notify";
 
+import { APP_URL } from "@/lib/config";
 function verificationEmailHTML(name: string, verifyUrl: string): string {
   return `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#0a0a0a;color:#f0f0f0;border-radius:8px;">
   <div style="margin-bottom:24px;">
@@ -95,7 +96,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to send verification email. Please try again." }, { status: 500 });
   }
 
-  const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
   const verifyUrl = `${appUrl}/verify-email?token=${plainToken}`;
 
   const result = await sendEmail(

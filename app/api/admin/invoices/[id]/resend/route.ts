@@ -3,6 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 import { sendEmail } from "@/lib/notify";
 
+import { APP_URL } from "@/lib/config";
 // POST /api/admin/invoices/[id]/resend — resend invoice email to user
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   if (!inv) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
 
-  const appUrl  = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
   const viewUrl = `${appUrl}/invoices/${encodeURIComponent(inv.invoice_number)}`;
 
   const result = await sendEmail(

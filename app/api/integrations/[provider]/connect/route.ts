@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getProvider } from "@/lib/fitness/providers";
 import type { ProviderSource } from "@/lib/fitness/types";
 
+import { APP_URL } from "@/lib/config";
 // POST /api/integrations/[provider]/connect
 // Returns the OAuth authorization URL for web providers.
 // For native providers, returns instructions instead.
@@ -34,7 +35,7 @@ export async function POST(
     return NextResponse.json({ error: "Provider does not support OAuth" }, { status: 400 });
   }
 
-  const appUrl     = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
   const redirectUri = `${appUrl}/api/integrations/${providerId}/callback`;
 
   // State carries the user's email so callback can link the integration

@@ -5,6 +5,7 @@ import { isAdminOrCoach } from "@/lib/admin-auth";
 import { sendWhatsAppTemplate } from "@/lib/whatsapp";
 import { processEmailBatch } from "@/lib/process-email-batch";
 
+import { APP_URL } from "@/lib/config";
 type Params = { params: Promise<{ id: string }> };
 
 // GET — preview recipient count before sending
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   const members = userRows ?? [];
   if (!members.length) return NextResponse.json({ error: "No active members found" }, { status: 404 });
 
-  const appUrl       = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
   const registerLink = ev.share_slug ? `${appUrl}/events/${ev.share_slug}` : appUrl;
 
   // Format for WA template: {{1}}=name, {{2}}=title, {{3}}=date+time, {{4}}=location

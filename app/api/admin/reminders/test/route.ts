@@ -4,6 +4,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail, sendWhatsApp, sessionWAParams } from "@/lib/notify";
 import { sessionReminderEmailHTML, type SessionForEmail } from "@/lib/session-reminder-email";
 
+import { APP_URL } from "@/lib/config";
 function requireAdmin(req: NextRequest): boolean {
   const token = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
   return !!(token && verifyAdminSession(token));
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
-  const appUrl  = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
   const venue   = session.venue || session.location || "Hyderabad";
   const name    = test_email.split("@")[0] || "Admin";
 

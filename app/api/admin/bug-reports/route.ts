@@ -4,6 +4,7 @@ import { isAdminOrCoach, getAdminEmail } from "@/lib/admin-auth";
 import { createNotification } from "@/lib/notify-inapp";
 import { sendEmail, bugStatusUpdateEmailHTML } from "@/lib/notify";
 
+import { APP_URL } from "@/lib/config";
 // GET  /api/admin/bug-reports?status=all&category=all&priority=all&search=&page=1
 //      or ?id=<uuid> to fetch a single report with history
 // PATCH /api/admin/bug-reports  { id, status, priority, assigned_to, admin_notes,
@@ -131,7 +132,7 @@ export async function PATCH(req: NextRequest) {
     const firstName     = current.user_name?.split(" ")[0] || "there";
     const bugTitle      = current.title || current.description?.slice(0, 80) || "your report";
     const message       = STATUS_MESSAGES[status] ?? `The status of your report has been updated to ${status}.`;
-    const appBase       = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+    const appBase = APP_URL;
     const confirmUrl    = status === "resolved"
       ? `${appBase}/my-bugs?confirm=${id}`
       : undefined;

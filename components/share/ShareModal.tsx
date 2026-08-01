@@ -24,8 +24,6 @@ interface Props {
   onClose: () => void;
 }
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
-
 // ── Caption builders ──────────────────────────────────────────────────────────
 
 function buildCaption(config: ShareConfig): string {

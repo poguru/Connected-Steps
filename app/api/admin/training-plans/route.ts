@@ -2,6 +2,7 @@
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 
+import { APP_URL } from "@/lib/config";
 export async function GET(req: NextRequest) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -75,7 +76,7 @@ async function sendTrainingPlanEmail(p: {
   coach_name: string;
   days:       { type: string; detail: string; emoji: string }[];
 }) {
-  const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
   const firstName = p.firstName || "there";
 
   const dayRows = p.days.map((d, i) => {

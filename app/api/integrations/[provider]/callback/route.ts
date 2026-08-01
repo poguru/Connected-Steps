@@ -3,6 +3,7 @@ import { getProvider }       from "@/lib/fitness/providers";
 import { upsertIntegration, syncIntegration, loadTokens } from "@/lib/fitness/sync-service";
 import type { ProviderSource } from "@/lib/fitness/types";
 
+import { APP_URL } from "@/lib/config";
 // GET /api/integrations/[provider]/callback?code=xxx&state=xxx
 // OAuth callback — exchanges code for tokens, creates integration, triggers first sync.
 
@@ -12,7 +13,7 @@ export async function GET(
 ) {
   const { provider: providerId } = await params;
   const { searchParams }         = req.nextUrl;
-  const appUrl  = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
+  const appUrl = APP_URL;
   const profileUrl = `${appUrl}/profile?tab=apps`;
 
   const code  = searchParams.get("code");

@@ -4,6 +4,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 import { signEventQR } from "@/lib/event-qr";
 import { sendEmail, eventRegistrationEmailHTML } from "@/lib/notify";
+import { calcEventDiscount } from "@/lib/commerce/pricing";
 
 // POST /api/admin/events/[id]/register
 // Admin-only registration endpoint that bypasses:
@@ -17,12 +18,6 @@ function genCode(): string {
   let s = "";
   for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
   return `CS-EVT-${s}`;
-}
-
-function calcDiscount(price: number, type: string, value: number): number {
-  if (type === "percentage") return Math.min(price, Math.round(price * value / 100));
-  if (type === "fixed")      return Math.min(price, value);
-  return 0;
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -111,7 +106,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     couponId     = coupon.id;
     discountType = coupon.discount_type;
     discountValue = coupon.discount_value;
-    discount = calcDiscount(ev.price, discountType, discountValue);
+    discount = calcEventDiscount(ev.price, discountType, discountValue);
   }
 
   const originalPrice = ev.price;

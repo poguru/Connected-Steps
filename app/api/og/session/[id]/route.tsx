@@ -2,9 +2,9 @@ import { ImageResponse } from "next/og";
 import { NextRequest } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
+import { APP_URL } from "@/lib/config";
 export const runtime = "edge";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in";
 const ORANGE  = "#e8620a";
 const BLACK   = "#0a0a0a";
 const WHITE   = "#ffffff";
