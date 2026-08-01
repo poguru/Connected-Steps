@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 
-// GET — per-email status breakdown for a batch.
+// GET — per-email status breakdown for a batch, plus campaign-level tracking fields.
 // ?batch_id=   required
 // ?include_all=true   include every email row (not just failures) for the detail view
 // ?status=delivered|failed|queued|sending   optional filter when include_all is set
@@ -17,11 +17,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!batch_id) return NextResponse.json({ error: "batch_id required" }, { status: 400 });
 
   const db = getSupabaseServer();
-  const { data, error } = await db
-    .from("email_queue")
-    .select("status, failure_code, failure_reason, is_permanent, recipient_email, recipient_name, attempts, aws_message_id, sent_at, created_at, delivered_at, opened_at, clicked_at, bounce_type, bounce_reason")
-    .eq("batch_id", batch_id)
-    .order("created_at");
+
+  // Fetch queue rows and campaign record in parallel
+  const [{ data, error }, { data: campaign }] = await Promise.all([
+    db.from("email_queue")
+      .select("status, failure_code, failure_reason, is_permanent, recipient_email, recipient_name, attempts, aws_message_id, sent_at, created_at, delivered_at, opened_at, clicked_at, bounce_type, bounce_reason")
+      .eq("batch_id", batch_id)
+      .order("created_at"),
+    db.from("email_campaigns")
+      .select("status, total_count, worker_last_seen_at, started_at")
+      .eq("batch_id", batch_id)
+      .maybeSingle(),
+  ]);
 
   if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
@@ -39,11 +46,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const failures = rows
     .filter(r => r.status === "failed")
     .map(r => ({
-      email:         r.recipient_email,
-      error:         r.failure_reason,
-      code:          r.failure_code,
-      is_permanent:  r.is_permanent,
-      attempts:      r.attempts,
+      email:        r.recipient_email,
+      error:        r.failure_reason,
+      code:         r.failure_code,
+      is_permanent: r.is_permanent,
+      attempts:     r.attempts,
     }));
 
   // Full per-email list for the delivery detail view
@@ -74,7 +81,32 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         }))
     : undefined;
 
-  return NextResponse.json({ total, queued, sending, delivered, failed, retryable, opened, clicked, bounced, failures, emails });
+  // Campaign-level fields (null when no campaign record exists, e.g. older batches)
+  const campaignStatus     = campaign?.status ?? null;
+  const workerLastSeenAt   = campaign?.worker_last_seen_at ?? null;
+  const workerOffline      = workerLastSeenAt
+    ? (Date.now() - new Date(workerLastSeenAt).getTime()) / 1000 > 120
+    : campaignStatus === "running"; // running with no heartbeat = offline
+
+  // ETA: estimated completion based on delivery rate since campaign started
+  let eta: string | null = null;
+  if (campaignStatus === "running" && campaign?.started_at && delivered > 0) {
+    const ageMs  = Date.now() - new Date(campaign.started_at).getTime();
+    const rate   = delivered / (ageMs / 1000); // emails per second
+    const pending = queued + sending;
+    if (rate > 0 && pending > 0) {
+      eta = new Date(Date.now() + (pending / rate) * 1000).toISOString();
+    }
+  }
+
+  return NextResponse.json({
+    total, queued, sending, delivered, failed, retryable, opened, clicked, bounced,
+    failures, emails,
+    campaign_status:      campaignStatus,
+    worker_last_seen_at:  workerLastSeenAt,
+    worker_offline:       workerOffline,
+    eta,
+  });
 }
 
 // POST — re-queue transient failed emails for retry

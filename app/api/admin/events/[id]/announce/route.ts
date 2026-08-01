@@ -120,6 +120,17 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { error: insertErr } = await db.from("email_queue").insert(rows);
     if (!insertErr) {
       emailQueued = rows.length;
+
+      // Create campaign tracking record — the cron worker and status API read this
+      await db.from("email_campaigns").insert({
+        batch_id:    batchId,
+        event_id:    id,
+        subject,
+        status:      "running",
+        total_count: emailQueued,
+        started_at:  new Date().toISOString(),
+      });
+
       const { error: emailHistErr } = await db.from("event_comm_history").insert({
         event_id:         id,
         subject,
@@ -133,7 +144,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         batch_id:         batchId,
       });
       if (emailHistErr) console.error("[announce] email history insert failed:", emailHistErr.message, "batch:", batchId);
-      // Process email batch server-side after the response is sent
+      // Fast-start: process emails immediately after response; cron picks up any remainder
       after(() => processEmailBatch(batchId));
     }
   }

@@ -26,7 +26,19 @@ export async function processEmailBatch(batchId: string): Promise<void> {
   const attachmentMetas = ((histRow?.attachments ?? []) as AttachmentMeta[]);
   const emailAttachments = await loadAttachmentsAsBase64(attachmentMetas);
 
+  let claimCount = 0;
+
   while (true) {
+    // Check campaign status every 10 emails in case admin paused or cancelled via UI
+    if (claimCount > 0 && claimCount % 10 === 0) {
+      const { data: cs } = await db.from("email_campaigns")
+        .select("status")
+        .eq("batch_id", batchId)
+        .maybeSingle();
+      if (cs?.status === "paused" || cs?.status === "cancelled") break;
+    }
+    claimCount++;
+
     const { data: claimed, error: claimErr } = await db.rpc("claim_next_email", { p_batch_id: batchId });
     if (claimErr) {
       console.error("[processEmailBatch] claim_next_email RPC failed:", claimErr.message, "batch:", batchId);
@@ -45,6 +57,13 @@ export async function processEmailBatch(batchId: string): Promise<void> {
         .update({ sent: delivered, failed, status: delivered === 0 ? "failed" : "sent" })
         .eq("batch_id", batchId);
       if (histErr) console.error("[processEmailBatch] history update failed:", histErr.message, "batch:", batchId);
+
+      // Mark campaign complete if a tracking record exists (no-op if not)
+      await db.from("email_campaigns")
+        .update({ status: "completed", completed_at: new Date().toISOString(), worker_locked_at: null })
+        .eq("batch_id", batchId)
+        .eq("status", "running");
+
       break;
     }
 
