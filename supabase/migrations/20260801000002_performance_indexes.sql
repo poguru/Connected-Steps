@@ -63,11 +63,11 @@ CREATE INDEX IF NOT EXISTS idx_email_campaigns_status_created
 
 -- ── job_queue ─────────────────────────────────────────────────────────────────
 
--- The existing job_queue_pending_idx covers status, but the worker also filters
--- by scheduled_at <= now() and type. A partial index on pending rows only
--- keeps it small even when the queue grows large.
-CREATE INDEX IF NOT EXISTS idx_job_queue_pending_scheduled
-  ON job_queue (scheduled_at, type)
+-- The existing job_queue_pending_idx covers priority+created_at but the worker
+-- RPC also filters by run_after <= now(). Adding run_after as leading column
+-- on a partial pending index lets Postgres skip future-scheduled rows cheaply.
+CREATE INDEX IF NOT EXISTS idx_job_queue_pending_run_after
+  ON job_queue (run_after, job_type)
   WHERE status = 'pending';
 
 -- ── notifications ─────────────────────────────────────────────────────────────
