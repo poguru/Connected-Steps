@@ -5,7 +5,7 @@
     "app/api/cron/slot-expiry/route.ts":                                    { "maxDuration": 30  },
     "app/api/admin/events/[id]/communicate/send-next/route.ts":             { "maxDuration": 15  },
     "app/api/admin/events/[id]/communicate/status/route.ts":                { "maxDuration": 10  },
-    "app/api/cron/job-worker/route.ts":                                     { "maxDuration": 120 },
+    "app/api/cron/job-worker/route.ts":                                     { "maxDuration": 300 },
     "app/api/admin/leaderboard/recalculate/route.ts":                        { "maxDuration": 60  },
     "app/api/admin/events/registrations/resend-missing/route.ts":           { "maxDuration": 300 },
     "app/api/admin/events/registrations/reconcile/route.ts":                { "maxDuration": 300 },
@@ -16,7 +16,7 @@
   "crons": [
     {
       "path": "/api/cron/job-worker",
-      "schedule": "0 12 * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/cron/payment-reconcile",
@@ -48,7 +48,7 @@
     },
     {
       "path": "/api/cron/hourly-session-alerts",
-      "schedule": "0 8 * * *"
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/cron/slot-expiry",
