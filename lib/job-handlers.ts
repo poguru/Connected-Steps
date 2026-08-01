@@ -180,12 +180,12 @@ export async function handleBulkEmail(p: JobPayloads["bulk_email"]): Promise<voi
     const db = getSupabaseServer();
     await db.from("email_queue").update({
       status:         result.ok ? "delivered" : "failed",
-      aws_message_id: result.messageId     ?? null,
-      failure_reason: result.error         ?? null,
-      failure_code:   result.errorCategory ?? null,
-      is_permanent:   result.ok ? null : (result.isTransient === false),
-      provider:       "zeptomail",
-      http_status:    result.httpStatus    ?? null,
+      aws_message_id: result.messageId  ?? null,
+      failure_reason: result.error      ?? null,
+      failure_code:   null,              // NotifyResult doesn't expose errorCategory
+      is_permanent:   null,              // NotifyResult doesn't expose isTransient
+      provider:       result.provider   ?? "zeptomail",
+      http_status:    result.httpStatus ?? null,
       sent_at:        result.ok ? new Date().toISOString() : null,
     }).eq("id", p.emailQueueId);
   }

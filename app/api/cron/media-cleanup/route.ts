@@ -29,5 +29,4 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(body, { status: res.status });
 }
 
-// Vercel Cron config (ignored on other platforms)
-export const config = { runtime: "edge" };
+export const runtime = "edge";
