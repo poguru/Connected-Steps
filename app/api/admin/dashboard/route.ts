@@ -68,15 +68,17 @@ export async function GET(req: NextRequest) {
       .gte("created_at", monthStart)
       .in("payment_status", ["paid", "free"]),
 
-    // 7. Confirmed registrations for upcoming events
+    // 7. Total confirmed registrations (one row per booking, including multi-person bookings)
     db.from("event_registrations")
       .select("id", { count: "exact", head: true })
       .eq("status", "confirmed"),
 
-    // 8. Total unique participants across all events
-    db.from("event_registrations")
-      .select("user_email", { count: "exact", head: true })
-      .eq("status", "confirmed"),
+    // 8. Total active participant slots across all events.
+    // event_participants has one row per PHYSICAL PERSON — correctly counts multi-participant
+    // registrations (duo/family) where a single booking covers > 1 person.
+    db.from("event_participants")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "active"),
 
     // 9. Pending story approvals
     db.from("stories")

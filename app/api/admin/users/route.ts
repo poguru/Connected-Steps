@@ -23,11 +23,13 @@ export async function GET(req: NextRequest) {
     userQuery = userQuery.or(`email.ilike.%${search}%,first_name.ilike.%${search}%,last_name.ilike.%${search}%,phone.ilike.%${search}%`);
   }
 
-  const [usersRes, membershipsRes, leaderboardRes, sessionsRes] = await Promise.all([
+  const [usersRes, membershipsRes, leaderboardRes, sessionsRes, totalCountRes] = await Promise.all([
     userQuery,
     db.from("memberships").select("user_email, plan, status, expires_at"),
     db.from("leaderboard").select("user_email, total_points, month_points, total_runs, total_km"),
     db.from("session_attendance").select("user_email, attended").eq("attended", true),
+    // Separate HEAD-only count to get the true total (userQuery is paginated).
+    db.from("users").select("*", { count: "exact", head: true }),
   ]);
 
   const now = new Date();
@@ -67,7 +69,8 @@ export async function GET(req: NextRequest) {
   });
 
   const stats = {
-    total:         users.length,
+    // True total from the database (not the paginated page length).
+    total:         totalCountRes.count ?? 0,
     activeMembers: users.filter((u) => u.isActiveMember).length,
     withStrava:    (leaderboardRes.data ?? []).length,
     totalSessions: Object.values(sessionCountMap).reduce((s, n) => s + n, 0),
