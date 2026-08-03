@@ -104,8 +104,8 @@ export async function GET(req: NextRequest) {
   };
 
   // ── Email / WhatsApp env config ───────────────────────────────────────────────
-  const emailConfigured = !!(process.env.ZEPTO_MAIL_API_KEY || process.env.ZEPTO_TOKEN);
-  const waConfigured    = !!(process.env.META_WA_TOKEN && process.env.META_WA_PHONE_ID);
+  const emailConfigured = !!process.env.ZEPTOMAIL_API_KEY;
+  const waConfigured    = !!(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID);
 
   // ── Cron runs — last execution per job ───────────────────────────────────────
   const cronRows = cronRecent.status === "fulfilled" ? (cronRecent.value.data ?? []) : [];

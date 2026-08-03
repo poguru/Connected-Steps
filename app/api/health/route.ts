@@ -136,11 +136,11 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
 
   // ── Email service probe ───────────────────────────────────────────────────
   // ZeptoMail integration — just verify env is configured (pinging would use quota).
-  const emailConfigured = !!(process.env.ZEPTO_MAIL_API_KEY || process.env.ZEPTO_TOKEN);
+  const emailConfigured = !!process.env.ZEPTOMAIL_API_KEY;
   components.email = { ok: emailConfigured, configured: emailConfigured };
 
   // ── WhatsApp probe ────────────────────────────────────────────────────────
-  const waConfigured = !!(process.env.META_WA_TOKEN && process.env.META_WA_PHONE_ID);
+  const waConfigured = !!(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID);
   components.whatsapp = { ok: waConfigured, configured: waConfigured };
 
   const allOk = components.database.ok && components.cache.ok;  // hard failures only
