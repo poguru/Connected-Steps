@@ -3,7 +3,6 @@ import { NextRequest } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 import { APP_URL } from "@/lib/config";
-export const runtime = "edge";
 
 const ORANGE  = "#e8620a";
 const BLACK   = "#0a0a0a";
@@ -36,16 +35,16 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
   const db       = getSupabaseServer();
 
   const { data: event } = await Promise.race([
-    db.from("events").select("title, date, location, banner_image, distance_categories, registration_limit, participant_count").eq("slug", slug).single(),
+    db.from("events").select("title, start_date, location, banner_image, distance_categories, max_participants, participant_count").eq("share_slug", slug).single(),
     new Promise<{ data: null }>(resolve => setTimeout(() => resolve({ data: null }), 4000)),
-  ]) as { data: { title: string; date: string; location: string | null; banner_image: string | null; distance_categories: string[] | null; registration_limit: number | null; participant_count: number | null } | null };
+  ]) as { data: { title: string; start_date: string; location: string | null; banner_image: string | null; distance_categories: string[] | null; max_participants: number | null; participant_count: number | null } | null };
 
   const title     = event?.title ?? "Community Run";
-  const dateStr   = event?.date ? formatDate(event.date) : "";
+  const dateStr   = event?.start_date ? formatDate(event.start_date) : "";
   const location  = event?.location ?? "Hyderabad";
   const cats      = event?.distance_categories ?? [];
   const regCount  = event?.participant_count ?? 0;
-  const regLimit  = event?.registration_limit;
+  const regLimit  = event?.max_participants;
 
   const [logoDataUrl, bannerDataUrl] = await Promise.all([
     fetchImageAsDataUrl(`${APP_URL}/logo.png`),

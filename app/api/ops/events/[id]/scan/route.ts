@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { getOpsSession } from "@/lib/ops-auth";
+import { getOpsSession, OPS_ROLE_LABELS, type OpsRole } from "@/lib/ops-auth";
 import { verifyEventQR } from "@/lib/event-qr";
 
 type DB = ReturnType<typeof getSupabaseServer>;
@@ -41,6 +41,24 @@ interface Participant {
   status: string;
   event_registrations: RegInfo | null;
 }
+
+// Which scan services each volunteer role is permitted to invoke.
+// event_admin has unrestricted access. Roles absent from the map (or with an
+// empty array) cannot invoke any service — they will receive 403.
+const ROLE_SERVICE_MAP: Record<string, readonly string[]> = {
+  event_admin:       ["checkin", "tshirt", "breakfast", "medal", "bib", "certificate"],
+  registration_desk: ["checkin"],
+  checkin:           ["checkin"],
+  tshirt:            ["tshirt"],
+  breakfast:         ["breakfast"],
+  bib:               ["bib"],
+  medal:             ["medal"],
+  certificate:       ["certificate"],
+  support:           ["checkin"],
+  medical:           ["checkin"],
+  photography:       [],
+  sponsor:           [],
+};
 
 const SELECT =
   "id, event_id, registration_id, account_email, first_name, last_name, " +
@@ -227,6 +245,20 @@ export async function POST(
   const volunteerRole   = session.role;
   const participantName = [participant.first_name, participant.last_name].filter(Boolean).join(" ");
 
+  // ── Role-based service authorization ─────────────────────────────────────────
+  // Enforce that the volunteer's role permits the requested service.
+  // Must run before dry_run so preview mode is also gated.
+  const allowedServices = ROLE_SERVICE_MAP[volunteerRole] ?? [];
+  if (!allowedServices.includes(service)) {
+    const roleLabel = OPS_ROLE_LABELS[volunteerRole as OpsRole] ?? volunteerRole;
+    return NextResponse.json({
+      valid:   false,
+      code:    "ROLE_UNAUTHORIZED",
+      error:   `Your role does not have access to the ${service} service`,
+      message: `Your role (${roleLabel}) is not authorized to perform ${service} operations. Please contact the event administrator.`,
+    }, { status: 403 });
+  }
+
   // ── Dry-run: preview without DB update ─────────────────────────────────────
   if (dry_run) {
     // Service-specific validation (so the UI can show errors before the confirm click)
@@ -320,7 +352,8 @@ async function handleCheckin(
   const { error } = await db
     .from("event_participants")
     .update({ checked_in_at: now, checked_in_by: vol })
-    .eq("id", p.id);
+    .eq("id", p.id)
+    .is("checked_in_at", null);  // optimistic lock — prevent double check-in on concurrent scans
   if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   await logAction(db, eventId, p.id, p.registration_id, "checkin", "checkin", vol, role);
@@ -375,7 +408,7 @@ async function handleBreakfast(
 
   const { error } = await db.from("event_participants").update({
     breakfast_availed: true, breakfast_availed_at: now, breakfast_availed_by: vol,
-  }).eq("id", p.id);
+  }).eq("id", p.id).eq("breakfast_availed", false);  // optimistic lock
   if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   await logAction(db, eventId, p.id, p.registration_id, "breakfast", "breakfast_issued", vol, role);
@@ -401,7 +434,7 @@ async function handleMedal(
 
   const { error } = await db.from("event_participants").update({
     medal_issued: true, medal_issued_at: now, medal_issued_by: vol,
-  }).eq("id", p.id);
+  }).eq("id", p.id).eq("medal_issued", false);  // optimistic lock
   if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   await logAction(db, eventId, p.id, p.registration_id, "medal", "medal_issued", vol, role);
@@ -427,7 +460,7 @@ async function handleBib(
 
   const { error } = await db.from("event_participants").update({
     bib_collected_at: now, bib_collected_by: vol,
-  }).eq("id", p.id);
+  }).eq("id", p.id).is("bib_collected_at", null);  // optimistic lock
   if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   await logAction(db, eventId, p.id, p.registration_id, "bib", "bib_collected", vol, role);

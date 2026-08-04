@@ -420,10 +420,14 @@ describe("Razorpay webhook signature validation", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 9. Registration email/token mismatch (IDOR prevention)
+// 9. Registration email/token binding
 // ═══════════════════════════════════════════════════════════════════════════════
+// NOTE (H7 fix): Authenticated users may register a different person's email
+// (e.g., registering a family member). The token proves authentication; it no
+// longer enforces that the registrant's email matches the token.
+// The booking then lives under the participant's email, not the caller's.
 
-describe("IDOR prevention — registration email/token binding", () => {
+describe("Registration email/token binding", () => {
   jest.mock("@/lib/admin-auth", () => {
     const actual = jest.requireActual<typeof import("@/lib/admin-auth")>("@/lib/admin-auth");
     return { ...actual, verifyUserToken: jest.fn() };
@@ -432,8 +436,11 @@ describe("IDOR prevention — registration email/token binding", () => {
   const { POST } = require("@/app/api/events/register/route");
   const { verifyUserToken: mockVerify } = require("@/lib/admin-auth") as { verifyUserToken: jest.Mock };
 
-  test("registration is rejected when token email differs from request email", async () => {
-    // Attacker has token for their own email but sends another user's email
+  test("authenticated user can register another person's email (gift registration)", async () => {
+    // An authenticated user (attacker@test.com) submits a registration for
+    // victim@test.com. This is allowed — the confirmation goes to victim@test.com.
+    // The event lookup returns null here, so the route returns 404 (event not found),
+    // NOT 403 — proving the email-match gate was removed.
     mockVerify.mockReturnValue("attacker@test.com");
     mockDb.mockReturnValue({
       rpc:  jest.fn().mockResolvedValue({ data: 1, error: null }),
@@ -450,9 +457,8 @@ describe("IDOR prevention — registration email/token binding", () => {
       }),
     });
     const res  = await POST(req);
-    expect(res.status).toBe(403);
-    const body = await res.json();
-    expect(body.error).toMatch(/unauthorized/i);
+    // 404 (event not found) — NOT 403 — confirms the email-match check was removed.
+    expect(res.status).toBe(404);
   });
 });
 

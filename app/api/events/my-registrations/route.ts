@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
   const db = getSupabaseServer();
 
-  // Registrations
+  // ── Primary: registrations the user purchased ─────────────────────────────
   const { data: regs, error: regErr } = await db
     .from("event_registrations")
     .select("id, registration_code, payment_status, status, created_at, original_price, coupon_discount, final_price, event_id, distance_category, qr_token, checked_in_at, participant_count")
@@ -22,10 +22,43 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: false });
 
   if (regErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
-  if (!regs || regs.length === 0) return NextResponse.json({ registrations: [] });
 
-  const regIds  = regs.map(r => r.id);
-  const eventIds = [...new Set(regs.map(r => r.event_id))];
+  // ── Secondary: registrations where this user appears as a non-purchaser participant.
+  // Covers group bookings where someone else paid but this user was added as a participant.
+  const purchasedRegIds = new Set((regs ?? []).map(r => r.id));
+
+  const { data: participantRows } = await db
+    .from("event_participants")
+    .select("registration_id")
+    .eq("email", userEmail.toLowerCase())
+    .neq("account_email", userEmail.toLowerCase()); // exclude rows where user is purchaser (already covered above)
+
+  const nonPurchaserRegIds = [
+    ...new Set(
+      (participantRows ?? [])
+        .map(p => p.registration_id)
+        .filter(id => id && !purchasedRegIds.has(id))
+    ),
+  ] as string[];
+
+  // Fetch the non-purchaser registrations
+  let nonPurchaserRegs: typeof regs = [];
+  if (nonPurchaserRegIds.length > 0) {
+    const { data: npRegs } = await db
+      .from("event_registrations")
+      .select("id, registration_code, payment_status, status, created_at, original_price, coupon_discount, final_price, event_id, distance_category, qr_token, checked_in_at, participant_count")
+      .in("id", nonPurchaserRegIds)
+      .order("created_at", { ascending: false });
+    nonPurchaserRegs = npRegs ?? [];
+  }
+
+  // Merge: purchaser registrations first, then non-purchaser
+  const allRegs = [...(regs ?? []), ...nonPurchaserRegs];
+
+  if (allRegs.length === 0) return NextResponse.json({ registrations: [] });
+
+  const regIds   = allRegs.map(r => r.id);
+  const eventIds = [...new Set(allRegs.map(r => r.event_id))];
 
   // Fetch events, participants, invoices, pending category change requests, and waitlist in parallel
   const [eventsRes, participantsRes, invoicesRes, catChangesRes, waitlistRes] = await Promise.all([
@@ -87,7 +120,7 @@ export async function GET(req: NextRequest) {
     pendingCatChange[r.registration_id] = { old_category: r.old_category, new_category: r.new_category };
   }
 
-  const registrations = regs.map(r => ({
+  const registrations = allRegs.map(r => ({
     ...r,
     events:                 evMap[r.event_id] ?? null,
     participants:           participantsByReg[r.id] ?? [],

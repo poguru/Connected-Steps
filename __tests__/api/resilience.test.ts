@@ -26,10 +26,16 @@ const mockSendEmail = jest.fn();
 jest.mock("@/lib/notify", () => ({
   sendEmail:                  (...args: unknown[]) => mockSendEmail(...args),
   sendWhatsApp:               jest.fn().mockResolvedValue({ ok: true }),
+  runRegistrationWAParams:    jest.fn().mockReturnValue([]),
   eventRegistrationEmailHTML: jest.fn().mockReturnValue("<html>"),
   paymentEmailHTML:           jest.fn().mockReturnValue("<html>"),
   membershipWAParams:         jest.fn().mockReturnValue([]),
 }));
+jest.mock("@/lib/job-queue",    () => ({ enqueueJob: jest.fn().mockResolvedValue(undefined) }));
+jest.mock("@/lib/job-handlers", () => ({ handleEventQrEmail: jest.fn().mockResolvedValue(undefined) }));
+jest.mock("@/lib/webhook-dispatch",  () => ({ dispatchWebhookEvent: jest.fn() }));
+jest.mock("@/lib/automation-engine", () => ({ evaluateAutomations: jest.fn() }));
+jest.mock("@/lib/campaign-service",  () => ({ recordConsent: jest.fn() }));
 
 jest.mock("@/lib/admin-auth", () => {
   const actual = jest.requireActual<typeof import("@/lib/admin-auth")>("@/lib/admin-auth");

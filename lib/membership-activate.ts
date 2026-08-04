@@ -176,7 +176,18 @@ export async function activateMembership(opts: {
       user.phone,
       membershipWAParams(userName, planLabel, amountINR, expiryISO),
       "membership_confirmation",
-    ).catch(e => console.error(`[${logLabel}] WhatsApp failed payment=${paymentId}:`, e));
+    ).then(result => {
+      const db2 = getSupabaseServer();
+      void db2.from("wa_message_log").insert({
+        phone:         user!.phone,
+        user_email:    email,
+        message_id:    result.messageId ?? null,
+        template_name: "membership_confirmation",
+        purpose:       "membership",
+        status:        result.ok ? "sent" : "failed",
+        failure_reason: result.ok ? null : (result.error ?? "unknown"),
+      });
+    }).catch(e => console.error(`[${logLabel}] WhatsApp failed payment=${paymentId}:`, e));
   }
 
   // ── Feed post ───────────────────────────────────────────────────────────────

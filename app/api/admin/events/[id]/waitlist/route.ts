@@ -41,9 +41,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const newStatus = action === "approve" ? "approved" : "rejected";
 
+  const approvalExpiry = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
   await db.from("event_waitlist").update({
     status:      newStatus,
-    ...(action === "approve" ? { approved_at: new Date().toISOString(), notified_at: new Date().toISOString() } : {}),
+    ...(action === "approve" ? {
+      approved_at:         new Date().toISOString(),
+      notified_at:         new Date().toISOString(),
+      approval_expires_at: approvalExpiry, // 48-hour window to complete registration
+    } : {}),
   }).eq("id", waitlist_id);
 
   // Email notification
@@ -63,7 +68,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           </div>
           <p style="color:#ccc;">Hi <strong style="color:#fff;">${entry.user_name}</strong>,</p>
           <p style="color:#ccc;">Great news! A spot has opened up for <strong style="color:#fff;">${ev?.title ?? "the event"}</strong> and you're next on the waitlist.</p>
-          <p style="color:#ccc;">Please register now to secure your spot. Spots are limited and may fill quickly.</p>
+          <p style="color:#ccc;">Please register now to secure your spot — this offer expires in <strong style="color:#fff;">48 hours</strong>. Spots are limited and may fill quickly.</p>
           <div style="margin:24px 0;">
             <a href="${registerUrl}" style="padding:12px 24px;background:#e8620a;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;font-size:14px;">Register Now →</a>
           </div>

@@ -70,7 +70,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 // PATCH /api/admin/events/[id]/cancellations
-// Review a cancellation_request (approve or reject) without auto-cancelling.
+// Review a cancellation_request: approve (also cancels the registration)
+//   or reject (leaves registration unchanged).
 // Body: { request_id: string, action: "approve" | "reject", note?: string }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -85,7 +86,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { data: req_, error: fetchErr } = await db
     .from("cancellation_requests")
-    .select("id, registration_id, event_id, user_email, status")
+    .select("id, registration_id, event_id, user_email, status, reason")
     .eq("id", body.request_id)
     .eq("event_id", eventId)
     .single();
@@ -93,23 +94,77 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (fetchErr || !req_) return NextResponse.json({ error: "Request not found" }, { status: 404 });
   if (req_.status !== "pending") return NextResponse.json({ error: "Request is not pending" }, { status: 409 });
 
-  const now = new Date().toISOString();
+  const now     = new Date().toISOString();
+  const newStatus = body.action === "approve" ? "approved" : "rejected";
+
+  // ── Mark the cancellation request ────────────────────────────────────────────
   await db.from("cancellation_requests").update({
-    status:      body.action === "approve" ? "approved" : "rejected",
+    status:      newStatus,
     reviewed_at: now,
     reviewed_by: "admin",
     review_note: body.note ?? null,
   }).eq("id", body.request_id);
 
+  // ── On approval: also cancel the actual registration ─────────────────────────
+  // Without this step the slot is never freed and the participant can still scan.
+  let registrationCode: string | null = null;
+  if (body.action === "approve" && req_.registration_id) {
+    const { data: reg } = await db
+      .from("event_registrations")
+      .select("id, registration_code, status, payment_status")
+      .eq("id", req_.registration_id)
+      .single();
+
+    if (reg && reg.status !== "cancelled") {
+      registrationCode = reg.registration_code;
+
+      // Cancel the booking row
+      await db.from("event_registrations").update({
+        status:              "cancelled",
+        cancelled_at:        now,
+        cancelled_by:        "admin",
+        cancellation_reason: req_.reason ?? body.note ?? "Cancellation request approved by admin",
+        // Refund status: mark pending for paid registrations — admin must
+        // process via the Cancellations report page.
+        refund_status: reg.payment_status === "paid" ? "pending" : "not_applicable",
+      }).eq("id", reg.id);
+
+      // Invalidate all participant QR tokens so check-in scans are rejected
+      await db.from("event_participants")
+        .update({ status: "cancelled" })
+        .eq("registration_id", reg.id);
+
+      void db.from("cancellation_audit_log").insert({
+        event_id:          eventId,
+        registration_id:   req_.registration_id,
+        registration_code: reg.registration_code,
+        action:            "cancelled",
+        actor:             "admin",
+        actor_type:        "admin",
+        payload: {
+          reason:         "cancellation_request_approved",
+          request_id:     body.request_id,
+          note:           body.note,
+          user_reason:    req_.reason,
+          payment_status: reg.payment_status,
+        },
+      });
+    }
+  }
+
   void db.from("cancellation_audit_log").insert({
     event_id:          eventId,
     registration_id:   req_.registration_id,
-    registration_code: body.request_id,
+    registration_code: registrationCode ?? body.request_id,
     action:            "cancel_request_reviewed",
     actor:             "admin",
     actor_type:        "admin",
     payload:           { action: body.action, note: body.note, request_id: body.request_id },
   });
 
-  return NextResponse.json({ success: true, status: body.action === "approve" ? "approved" : "rejected" });
+  return NextResponse.json({
+    success:             true,
+    status:              newStatus,
+    registration_cancelled: body.action === "approve" && !!registrationCode,
+  });
 }

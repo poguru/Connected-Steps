@@ -16,6 +16,10 @@ process.env.NEXT_PUBLIC_SUPABASE_URL  = "https://test.supabase.co";
 process.env.RAZORPAY_KEY_SECRET       = "test-rp-secret";
 
 // ── Module mocks ───────────────────────────────────────────────────────────────
+jest.mock("next/server", () => {
+  const actual = jest.requireActual<typeof import("next/server")>("next/server");
+  return { ...actual, after: jest.fn((fn: () => unknown) => { Promise.resolve(fn()).catch(() => {}); }) };
+});
 jest.mock("@/lib/supabase-server", () => ({ getSupabaseServer: jest.fn() }));
 jest.mock("@/lib/admin-auth", () => {
   const actual = jest.requireActual<typeof import("@/lib/admin-auth")>("@/lib/admin-auth");
@@ -25,7 +29,16 @@ jest.mock("@/lib/notify", () => ({
   sendEmail:                  jest.fn().mockResolvedValue({ ok: true }),
   eventRegistrationEmailHTML: jest.fn().mockReturnValue("<html>"),
   paymentEmailHTML:           jest.fn().mockReturnValue("<html>"),
+  sendWhatsApp:               jest.fn().mockResolvedValue({ ok: true }),
+  runRegistrationWAParams:    jest.fn().mockReturnValue([]),
 }));
+// NOTE: do NOT mock @/lib/job-queue here — the Stage 2 tests verify that
+// enqueueJob actually calls db.from("job_queue"). Instead, each DB mock
+// includes job_queue handling so the real enqueueJob function can insert.
+jest.mock("@/lib/job-handlers", () => ({ handleEventQrEmail: jest.fn().mockResolvedValue(undefined) }));
+jest.mock("@/lib/webhook-dispatch",  () => ({ dispatchWebhookEvent: jest.fn() }));
+jest.mock("@/lib/automation-engine", () => ({ evaluateAutomations: jest.fn() }));
+jest.mock("@/lib/campaign-service",  () => ({ recordConsent: jest.fn() }));
 jest.mock("@/lib/coupon-redeem", () => ({ redeemCoupon: jest.fn().mockResolvedValue(undefined) }));
 jest.mock("next/cache", () => ({ revalidatePath: jest.fn() }));
 // job-handlers — use real functions but stub their Supabase calls through the global mock
@@ -169,6 +182,7 @@ describe("Stage 1 — Event Registration (free event)", () => {
         if (table === "event_races")         return ch([]);
         if (table === "event_form_fields")   return ch([]);
         if (table === "event_participants")  return ch({ id: "part-1" });
+        if (table === "job_queue")           return ch({ id: "job-1" }); // enqueueJob inserts
         if (table === "event_registrations") {
           if (n === 1) return ch(null);         // duplicate check → none
           if (n === 2) return ch(UPSERT_ROW);   // upsert result

@@ -103,14 +103,28 @@ const TYPE: Record<string, { label: string; icon: string; color: string }> = {
 async function getEvent(slug: string): Promise<Event | null> {
   try {
     const db = getSupabaseServer();
-    const { data } = await db
+
+    // Primary lookup: by share_slug (canonical URL for published events).
+    let { data } = await db
       .from("events")
       .select("*")
       .eq("share_slug", slug)
       .eq("status", "published")
-      .single();
+      .maybeSingle();
+
+    // Fallback: if no share_slug match and slug looks like a UUID,
+    // try by primary key so events without a share_slug are still accessible.
+    if (!data && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)) {
+      ({ data } = await db
+        .from("events")
+        .select("*")
+        .eq("id", slug)
+        .eq("status", "published")
+        .maybeSingle());
+    }
+
     if (data) {
-      db.from("events").update({ view_count: (data.view_count ?? 0) + 1 }).eq("share_slug", slug).then(() => {});
+      db.from("events").update({ view_count: (data.view_count ?? 0) + 1 }).eq("id", data.id).then(() => {});
     }
     return data ?? null;
   } catch { return null; }

@@ -6,7 +6,7 @@ import { redeemCoupon } from "@/lib/coupon-redeem";
 import { enqueueJob } from "@/lib/job-queue";
 import { handleEventQrEmail, handleInvoiceGenerate } from "@/lib/job-handlers";
 import { signEventQR } from "@/lib/event-qr";
-import { sendEmail, eventRegistrationEmailHTML } from "@/lib/notify";
+import { sendEmail, eventRegistrationEmailHTML, sendWhatsApp, runRegistrationWAParams } from "@/lib/notify";
 import { logger } from "@/lib/logger";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
 import { evaluateAutomations } from "@/lib/automation-engine";
@@ -48,13 +48,14 @@ export async function POST(req: NextRequest) {
     // Idempotency guard
     const { data: reg } = await db
       .from("event_registrations")
-      .select("id, coupon_id, user_email, user_name, payment_status, event_id, distance_category, final_price, participant_count, events(title, start_date, start_time, location)")
+      .select("id, coupon_id, user_email, user_name, phone, payment_status, event_id, distance_category, final_price, participant_count, events(title, start_date, start_time, location)")
       .eq("registration_code", registration_code)
       .single<{
         id: string;
         coupon_id: string | null;
         user_email: string;
         user_name: string;
+        phone: string | null;
         payment_status: string;
         event_id: string;
         distance_category: string | null;
@@ -175,24 +176,25 @@ export async function POST(req: NextRequest) {
       try {
         const { data: pendingParticipants } = await getSupabaseServer()
           .from("event_participants")
-          .select("id, first_name, last_name, distance_category, status")
+          .select("id, first_name, last_name, email, distance_category, status")
           .eq("registration_id", reg.id)
           .is("qr_token", null);
 
         if (pendingParticipants && pendingParticipants.length > 0) {
           const db2 = getSupabaseServer();
-          const signed: Array<{ id: string; first_name: string; last_name: string | null; qr_token: string; distance_category: string | null }> = [];
+          const signed: Array<{ id: string; first_name: string; last_name: string | null; email: string | null; qr_token: string; distance_category: string | null }> = [];
           for (const p of pendingParticipants) {
             const qr = signEventQR(p.id, reg.event_id);
             await db2.from("event_participants").update({ qr_token: qr, status: "active" }).eq("id", p.id);
-            signed.push({ id: p.id, first_name: p.first_name, last_name: p.last_name, qr_token: qr, distance_category: p.distance_category });
+            signed.push({ id: p.id, first_name: p.first_name, last_name: p.last_name, email: (p as { email?: string | null }).email ?? null, qr_token: qr, distance_category: p.distance_category });
           }
 
           if (isMultiParticipant) {
             for (const p of signed) {
-              const pName = [p.first_name, p.last_name].filter(Boolean).join(" ");
+              const pName          = [p.first_name, p.last_name].filter(Boolean).join(" ");
+              const recipientEmail = p.email?.trim() || reg.user_email;
               await sendEmail(
-                reg.user_email, pName,
+                recipientEmail, pName,
                 `Event Registration Confirmed - ${ev?.title ?? "Event"}`,
                 eventRegistrationEmailHTML({
                   name:             pName,
@@ -215,6 +217,17 @@ export async function POST(req: NextRequest) {
               qr_generated_at:            new Date().toISOString(),
             }).eq("id", reg.id);
             logger.info("verify-payment", "Multi-participant emails sent", { ...ctx, regId: reg.id, count: signed.length });
+
+            // WhatsApp confirmation to purchaser (single message for the group booking)
+            if (reg.phone?.trim()) {
+              sendWhatsApp(
+                reg.phone,
+                runRegistrationWAParams(reg.user_name, ev?.title ?? "Connected Steps Event", ev?.start_date ?? "", ev?.location ?? ""),
+                "run_registration",
+              ).catch((e: unknown) =>
+                logger.error("verify-payment", "WhatsApp confirmation failed (multi)", { ...ctx, regId: reg.id, error: String(e) })
+              );
+            }
             return;
           }
 
@@ -244,6 +257,17 @@ export async function POST(req: NextRequest) {
               .update({ email_status: "failed" })
               .eq("id", reg.id);
           } catch { /* non-critical */ }
+        }
+
+        // WhatsApp confirmation (fire-and-forget; non-critical)
+        if (reg.phone?.trim()) {
+          sendWhatsApp(
+            reg.phone,
+            runRegistrationWAParams(reg.user_name, ev?.title ?? "Connected Steps Event", ev?.start_date ?? "", ev?.location ?? ""),
+            "run_registration",
+          ).catch((e: unknown) =>
+            logger.error("verify-payment", "WhatsApp confirmation failed (single)", { ...ctx, regId: reg.id, error: String(e) })
+          );
         }
       }
 

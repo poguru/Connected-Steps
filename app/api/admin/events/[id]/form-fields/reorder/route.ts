@@ -4,9 +4,9 @@ import { isAdminOrCoach } from "@/lib/admin-auth";
 
 type Params = { params: Promise<{ id: string }> };
 
-// POST /api/admin/events/[id]/form-fields/reorder
+// PATCH /api/admin/events/[id]/form-fields/reorder
 // Body: { ids: string[] }  — ordered list of field IDs; sets display_order = array index
-export async function POST(req: NextRequest, { params }: Params) {
+export async function PATCH(req: NextRequest, { params }: Params) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id: event_id } = await params;

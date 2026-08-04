@@ -75,11 +75,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       logs.push({ event_id: eventId, registration_id: reg.id, recipient_email: reg.user_email ?? "", recipient_name: reg.user_name, subject: "", status: "skipped", error_message: "Invalid or missing email", ses_message_id: null, provider: null, http_status: null, batch_id: batchId });
       continue;
     }
-    if (seen.has(email)) {
-      logs.push({ event_id: eventId, registration_id: reg.id, recipient_email: email, recipient_name: reg.user_name, subject: "", status: "skipped", error_message: "Duplicate email", ses_message_id: null, provider: null, http_status: null, batch_id: batchId });
+    // Deduplicate by registration ID, not by email.
+    // A user can have multiple registrations (different categories, group bookings)
+    // and each registration deserves its own QR email.
+    if (seen.has(reg.id)) {
+      logs.push({ event_id: eventId, registration_id: reg.id, recipient_email: email, recipient_name: reg.user_name, subject: "", status: "skipped", error_message: "Duplicate registration", ses_message_id: null, provider: null, http_status: null, batch_id: batchId });
       continue;
     }
-    seen.add(email);
+    seen.add(reg.id);
     toSend.push(reg);
   }
 

@@ -17,7 +17,7 @@ function ch(data: unknown, error: unknown = null): Record<string, jest.Mock> {
   const result = { data, error };
   const self: Record<string, jest.Mock> = {} as Record<string, jest.Mock>;
 
-  for (const m of ["select", "eq", "neq", "order", "limit", "is", "not"]) {
+  for (const m of ["select", "eq", "neq", "order", "limit", "is", "not", "in"]) {
     self[m] = jest.fn().mockReturnValue(self);
   }
   self.single      = jest.fn().mockResolvedValue({ data: Array.isArray(data) ? (data[0] ?? null) : data, error });
@@ -61,6 +61,17 @@ function makeDb(cfg: DbCfg = {}): ReturnType<typeof getSupabaseServer> {
     insertedEntry = { position: 5 },
   } = cfg;
 
+  // Simulate the real DB filter the route applies:
+  // .neq("status", "cancelled").in("payment_status", ["paid", "free"])
+  // Only a confirmed (paid/free, non-cancelled) registration should block the waitlist.
+  const confirmedReg = (() => {
+    if (!existingReg) return null;
+    const r = existingReg as { status?: string; payment_status?: string };
+    if (r.status === "cancelled") return null;
+    if (!["paid", "free"].includes(r.payment_status ?? "")) return null;
+    return existingReg;
+  })();
+
   const counters: Record<string, number> = {};
 
   return {
@@ -80,7 +91,7 @@ function makeDb(cfg: DbCfg = {}): ReturnType<typeof getSupabaseServer> {
         insertChain.insert = jest.fn().mockImplementation(() => insertChain);
         return insertChain;
       }
-      if (table === "event_registrations") return ch(existingReg);
+      if (table === "event_registrations") return ch(confirmedReg);
       return ch(null);
     }),
   } as unknown as ReturnType<typeof getSupabaseServer>;
@@ -154,7 +165,7 @@ describe("POST /api/events/waitlist — event checks", () => {
     const res  = await POST(makeReq(VALID_BODY));
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toMatch(/still has spots/i);
+    expect(json.error).toMatch(/still available/i);
   });
 
   test("proceeds when max_participants is null (unlimited capacity is never full)", async () => {

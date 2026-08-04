@@ -33,7 +33,7 @@ jest.mock("@/lib/admin-auth", () => ({
   getAdminEmail:  jest.fn().mockReturnValue("admin"),
 }));
 
-let cacheGetImpl: () => Promise<unknown> = async () => null;
+let cacheGetImpl: (...args: unknown[]) => Promise<unknown> = async () => null;
 jest.mock("@/lib/cache", () => ({
   cacheGet: (...args: unknown[]) => cacheGetImpl(...args),
   cacheSet: jest.fn().mockResolvedValue(undefined),

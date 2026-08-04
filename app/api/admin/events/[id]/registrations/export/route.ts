@@ -96,15 +96,19 @@ export async function GET(req: NextRequest, { params }: Params) {
     ].join(",")),
   ].join("\n");
 
-  const eventTitle = ev?.title?.replace(/[^a-z0-9]/gi, "_") ?? "event";
-  const date       = ev?.start_date ?? new Date().toISOString().slice(0, 10);
-  const filename   = `${eventTitle}_${date}_registrations.csv`;
+  const eventTitle  = ev?.title?.replace(/[^a-z0-9]/gi, "_") ?? "event";
+  const date        = ev?.start_date ?? new Date().toISOString().slice(0, 10);
+  const filename    = `${eventTitle}_${date}_registrations.csv`;
+  const isTruncated = (rows?.length ?? 0) >= 5000;
 
   return new NextResponse(lines, {
     headers: {
       "Content-Type":        "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${filename}"`,
       "Cache-Control":       "no-store",
+      // Signals to the admin UI (and any scripted consumers) that not all rows
+      // were returned. The client should display a warning and offer pagination.
+      ...(isTruncated ? { "X-Truncated": "true", "X-Row-Limit": "5000" } : {}),
     },
   });
 }

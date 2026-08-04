@@ -4,12 +4,23 @@ process.env.USER_TOKEN_SECRET         = "test-user-secret";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key";
 process.env.NEXT_PUBLIC_SUPABASE_URL  = "https://test.supabase.co";
 
+jest.mock("next/server", () => {
+  const actual = jest.requireActual<typeof import("next/server")>("next/server");
+  return { ...actual, after: jest.fn((fn: () => unknown) => { Promise.resolve(fn()).catch(() => {}); }) };
+});
 jest.mock("@/lib/supabase-server", () => ({ getSupabaseServer: jest.fn() }));
 jest.mock("@/lib/notify", () => ({
   sendEmail:                  jest.fn().mockResolvedValue({ ok: true, messageId: "msg-1" }),
   eventRegistrationEmailHTML: jest.fn().mockReturnValue("<html>confirmation</html>"),
+  sendWhatsApp:               jest.fn().mockResolvedValue({ ok: true }),
+  runRegistrationWAParams:    jest.fn().mockReturnValue([]),
 }));
+jest.mock("@/lib/job-queue",    () => ({ enqueueJob: jest.fn().mockResolvedValue(undefined) }));
+jest.mock("@/lib/job-handlers", () => ({ handleEventQrEmail: jest.fn().mockResolvedValue(undefined) }));
 jest.mock("@/lib/coupon-redeem", () => ({ redeemCoupon: jest.fn().mockResolvedValue(undefined) }));
+jest.mock("@/lib/webhook-dispatch",  () => ({ dispatchWebhookEvent: jest.fn() }));
+jest.mock("@/lib/automation-engine", () => ({ evaluateAutomations: jest.fn() }));
+jest.mock("@/lib/campaign-service",  () => ({ recordConsent: jest.fn() }));
 jest.mock("@/lib/admin-auth", () => {
   const actual = jest.requireActual<typeof import("@/lib/admin-auth")>("@/lib/admin-auth");
   return { ...actual, verifyUserToken: jest.fn() };
@@ -207,6 +218,9 @@ beforeEach(() => {
 
 describe("POST /api/events/register — auth", () => {
   test("returns 401 when x-user-token header is missing", async () => {
+    // Auth check now happens after event fetch (to support guest-allowed events),
+    // so the db mock must be set up even for this auth test.
+    mockDb.mockReturnValue(makeDb());
     const req = new NextRequest("http://localhost/api/events/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -223,11 +237,14 @@ describe("POST /api/events/register — auth", () => {
     expect(res.status).toBe(401);
   });
 
-  test("returns 403 when token email does not match request email", async () => {
+  test("allows registration when token email differs from body email (H7: gift registration)", async () => {
+    // An authenticated user (other@test.com) can register someone else (runner@test.com).
+    // The email-match gate was intentionally removed in H7.
     mockVerify.mockReturnValue("other@test.com");
     mockDb.mockReturnValue(makeDb());
-    const res  = await POST(makeReq(VALID_SINGLE));
-    expect(res.status).toBe(403);
+    const res = await POST(makeReq(VALID_SINGLE));
+    // Should succeed (200), not reject with 403.
+    expect(res.status).toBe(200);
   });
 });
 

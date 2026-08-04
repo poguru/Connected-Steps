@@ -18,15 +18,18 @@ export async function GET(req: NextRequest) {
 
   const db = getSupabaseServer();
 
-  // Resolve phones for this user (may have multiple registrations)
+  // Resolve phones and event IDs for this user (purchaser view).
   const { data: regRows } = await db
     .from("event_registrations")
-    .select("phone")
+    .select("phone, event_id")
     .eq("user_email", userEmail.toLowerCase())
     .not("phone", "is", null)
-    .limit(20);
+    .limit(100);
 
-  const phones = [...new Set((regRows ?? []).map(r => r.phone).filter(Boolean) as string[])];
+  const phones       = [...new Set((regRows ?? []).map(r => r.phone).filter(Boolean) as string[])];
+  // Scope WA messages to events the user is actually registered for.
+  // This prevents cross-account leakage when two accounts share the same phone number.
+  const userEventIds = [...new Set((regRows ?? []).map(r => r.event_id).filter(Boolean) as string[])];
 
   // Fetch email_queue and wa_message_log in parallel
   let emailQ = db
@@ -36,11 +39,21 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: false })
     .limit(200);
 
+  // WA messages are scoped to:
+  //   1. Phone numbers belonging to this user's registrations AND
+  //   2. Event IDs the user is registered for (prevents shared-phone leakage)
+  // Messages with a null event_id (global/non-event notifications) are shown to
+  // any account that shares the phone — acceptable for truly global messages.
   let waQ = phones.length > 0
     ? db
         .from("wa_message_log")
         .select("id, phone, template_name, purpose, status, sent_at, event_id")
         .in("phone", phones)
+        .or(
+          userEventIds.length > 0
+            ? `event_id.in.(${userEventIds.join(",")}),event_id.is.null`
+            : "event_id.is.null"
+        )
         .order("sent_at", { ascending: false })
         .limit(200)
     : null;

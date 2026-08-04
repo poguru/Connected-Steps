@@ -3,7 +3,9 @@ import { after } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken } from "@/lib/admin-auth";
 import { signEventQR } from "@/lib/event-qr";
-import { sendEmail, eventRegistrationEmailHTML } from "@/lib/notify";
+import { sendEmail, eventRegistrationEmailHTML, sendWhatsApp, runRegistrationWAParams } from "@/lib/notify";
+import { enqueueJob } from "@/lib/job-queue";
+import { handleEventQrEmail } from "@/lib/job-handlers";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
 import { evaluateAutomations } from "@/lib/automation-engine";
 import { recordConsent } from "@/lib/campaign-service";
@@ -47,12 +49,14 @@ interface ParticipantInput {
 
 export async function POST(req: NextRequest) {
   try {
-    const token = req.headers.get("x-user-token");
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const tokenEmail = verifyUserToken(token);
-    if (!tokenEmail) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+    // Parse body first — event_id is needed to check require_login inside handlers.
     const body = await req.json();
+
+    // Token is optional at this point: handlers enforce authentication based on
+    // the event's require_login flag. If the event requires login (default) and
+    // tokenEmail is null the handler returns 401 after the event fetch.
+    const token      = req.headers.get("x-user-token");
+    const tokenEmail = token ? verifyUserToken(token) : null;
 
     // Detect multi-participant mode by the presence of a `participants` array
     const isMulti = Array.isArray(body.participants) && body.participants.length > 0;
@@ -73,7 +77,7 @@ export async function POST(req: NextRequest) {
 
 async function handleSingleParticipant(
   body: Record<string, unknown>,
-  tokenEmail: string,
+  tokenEmail: string | null,
   req: NextRequest,
 ): Promise<NextResponse> {
   const {
@@ -107,9 +111,10 @@ async function handleSingleParticipant(
   if (!event_id || !email || !name) {
     return NextResponse.json({ error: "event_id, email, and name are required." }, { status: 400 });
   }
-  if (tokenEmail.toLowerCase() !== (email as string).toLowerCase().trim()) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
+  // Note: we intentionally do NOT enforce tokenEmail === body.email here.
+  // An authenticated user may register another person (a family member, team-mate, etc.)
+  // in the single-participant path. The token only proves the caller is authenticated;
+  // ownership of the resulting registration belongs to the body.email address.
 
   // Phase 1: always-required fields (independent of per-event configuration)
   const errs: string[] = [];
@@ -121,20 +126,33 @@ async function handleSingleParticipant(
 
   const db = getSupabaseServer();
 
-  const { data: user } = await db
-    .from("users")
-    .select("email, first_name, last_name")
-    .eq("email", (email as string).toLowerCase().trim())
-    .single();
-  if (!user) return NextResponse.json({ error: "Account not found. Please sign up first." }, { status: 404 });
-
   const { data: ev } = await db
     .from("events")
-    .select("id, organization_id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories, collect_tshirt, early_bird_ends_at, registration_config")
+    .select("id, organization_id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories, collect_tshirt, early_bird_ends_at, registration_config, require_login")
     .eq("id", event_id as string)
     .single();
   if (!ev || ev.status !== "published") {
     return NextResponse.json({ error: "Event not found." }, { status: 404 });
+  }
+
+  // Guest-registration gate: events with require_login=false (explicit opt-out) allow
+  // unauthenticated registrations. All other events (default require_login=true or null)
+  // require a valid user token.
+  const isGuest = tokenEmail === null;
+  const requiresLogin = (ev as { require_login?: boolean }).require_login !== false;
+  if (requiresLogin && isGuest) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Authenticated path: verify the account exists.
+  // Skip this check for guest-allowed events — even token-bearing users need no account.
+  if (!isGuest && requiresLogin) {
+    const { data: user } = await db
+      .from("users")
+      .select("email")
+      .eq("email", (email as string).toLowerCase().trim())
+      .single();
+    if (!user) return NextResponse.json({ error: "Account not found. Please sign up first." }, { status: 404 });
   }
 
   // Phase 2: per-event-config field validation — mirrors regCfg on the frontend.
@@ -375,7 +393,33 @@ async function handleSingleParticipant(
 
     if (couponId) {
       const { redeemCoupon } = await import("@/lib/coupon-redeem");
-      redeemCoupon(couponId, (email as string).toLowerCase()).catch(console.error);
+      // Awaited so audit row is written before we confirm registration to the user.
+      // Returns false only under a concurrent race (both callers passed the pre-check);
+      // registration is kept — the user already has their confirmed spot.
+      const claimed = await redeemCoupon(couponId, (email as string).toLowerCase()).catch(() => false);
+      if (!claimed) {
+        console.warn(`[event-register] coupon ${couponId} could not be redeemed for ${email} — concurrent race or already exhausted; registration kept`);
+      }
+    }
+
+    // Enqueue for durability/retry — survives function restarts.
+    const qrPayload = {
+      registrationId:   regId,
+      registrationCode: finalCode,
+      eventId:          event_id as string,
+      userEmail:        (email as string).toLowerCase().trim(),
+      userName:         (name as string).trim(),
+      eventTitle:       ev.title,
+      startDate:        ev.start_date,
+      startTime:        ev.start_time ?? null,
+      location:         ev.location,
+      distanceCategory: chosenCategory,
+    };
+    if (regId) {
+      await enqueueJob("event_qr_email", qrPayload, {
+        idempotencyKey: `event_qr_email:${regId}`,
+        priority: 10,
+      });
     }
 
     // Create the participant row so the ops portal can scan this registration
@@ -403,46 +447,23 @@ async function handleSingleParticipant(
     }
 
     after(async () => {
-      if (!finalQr) {
-        console.error(`[event-register] no QR token for ${finalCode} — email not sent`);
-        await db.from("event_registrations")
-          .update({ email_status: "failed", qr_generated_at: null })
-          .eq("registration_code", finalCode);
+      if (!regId) {
+        console.error(`[event-register] no regId for ${finalCode} — email not sent`);
         return;
       }
-      const subject = `Event Registration Confirmed – ${ev.title}`;
       try {
-        const result = await sendEmail(
-          (email as string).toLowerCase().trim(),
-          (name as string).trim(),
-          subject,
-          eventRegistrationEmailHTML({
-            name:             (name as string).trim(),
-            eventTitle:       ev.title,
-            startDate:        ev.start_date,
-            startTime:        ev.start_time ?? null,
-            location:         ev.location,
-            registrationCode: finalCode,
-            distanceCategory: chosenCategory,
-            qrToken:          finalQr,
-          }),
-          false, true,
-        );
-        if (result.ok) {
-          await db.from("event_registrations").update({
-            confirmation_email_sent_at: new Date().toISOString(),
-            email_status:               "sent",
-            email_ses_message_id:       result.messageId ?? null,
-            qr_generated_at:            new Date().toISOString(),
-          }).eq("registration_code", finalCode);
-        } else {
-          await db.from("event_registrations")
-            .update({ email_status: "failed", qr_generated_at: new Date().toISOString() })
-            .eq("registration_code", finalCode);
-        }
+        await handleEventQrEmail(qrPayload);
       } catch (e) {
-        console.error("[event-register] email exception (registration intact):", e);
-        await db.from("event_registrations").update({ email_status: "failed" }).eq("registration_code", finalCode);
+        console.error("[event-register] QR email failed (registration intact):", e);
+      }
+
+      // WhatsApp confirmation (fire-and-forget — non-critical)
+      if (phone?.trim()) {
+        sendWhatsApp(
+          (phone as string).trim(),
+          runRegistrationWAParams((name as string).trim(), ev.title, ev.start_date, ev.location),
+          "run_registration",
+        ).catch((e: unknown) => console.error("[event-register] WhatsApp failed:", e));
       }
 
       if (ev.organization_id) {
@@ -565,7 +586,7 @@ async function handleSingleParticipant(
 
 async function handleMultiParticipant(
   body: Record<string, unknown>,
-  tokenEmail: string,
+  tokenEmail: string | null,
   _req: NextRequest,
 ): Promise<NextResponse> {
   void (async () => {
@@ -587,7 +608,9 @@ async function handleMultiParticipant(
     return NextResponse.json({ error: "event_id and email are required." }, { status: 400 });
   }
   const accountEmail = (accountEmailRaw as string).toLowerCase().trim();
-  if (tokenEmail.toLowerCase() !== accountEmail) {
+  // For authenticated users: verify token matches the booking email.
+  // Guests supply their email directly; the require_login gate is checked after event fetch.
+  if (tokenEmail !== null && tokenEmail.toLowerCase() !== accountEmail) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
   if (participants.length < 1 || participants.length > 10) {
@@ -609,7 +632,7 @@ async function handleMultiParticipant(
 
   const { data: ev } = await db
     .from("events")
-    .select("id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories, collect_tshirt, allow_multi_participant, max_per_registration, early_bird_ends_at, organization_id, registration_config")
+    .select("id, title, price, max_participants, participant_count, start_date, start_time, end_date, end_time, registration_closes_at, location, status, distance_categories, collect_tshirt, allow_multi_participant, max_per_registration, early_bird_ends_at, organization_id, registration_config, require_login")
     .eq("id", event_id as string)
     .single();
   if (!ev || ev.status !== "published") {
@@ -617,6 +640,10 @@ async function handleMultiParticipant(
   }
   if (!(ev as { allow_multi_participant?: boolean }).allow_multi_participant) {
     return NextResponse.json({ error: "This event does not support multi-participant registration." }, { status: 400 });
+  }
+  // Guest-registration gate for multi-participant path.
+  if ((ev as { require_login?: boolean }).require_login !== false && tokenEmail === null) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   // Phase 2: per-event-config field validation for each participant
@@ -642,9 +669,13 @@ async function handleMultiParticipant(
   // (all participants in a group booking share the same race in most scenarios)
   const leadCat = participants[0]?.distance_category ?? null;
   const leadRace = multiRaces?.find(r => r.distance === leadCat) ?? multiRaces?.[0] ?? null;
+  const raceMinPer = (leadRace as { min_participants?: number | null } | null)?.min_participants ?? 0;
   const raceMaxPer = leadRace?.max_participants ?? 0;
   const evMaxPer   = (ev as { max_per_registration?: number }).max_per_registration ?? 0;
   const effectiveMax = raceMaxPer > 0 ? raceMaxPer : (evMaxPer > 0 ? evMaxPer : 20);
+  if (raceMinPer > 0 && participants.length < raceMinPer) {
+    return NextResponse.json({ error: `Minimum ${raceMinPer} participants required per booking for this category.` }, { status: 400 });
+  }
   if (participants.length > effectiveMax) {
     return NextResponse.json({ error: `Maximum ${effectiveMax} participants per booking for this category.` }, { status: 400 });
   }
@@ -838,23 +869,28 @@ async function handleMultiParticipant(
     const { data: createdParticipants, error: pErr } = await db
       .from("event_participants")
       .insert(participantRows)
-      .select("id, first_name, last_name, qr_token, distance_category, tshirt_size");
+      .select("id, first_name, last_name, email, qr_token, distance_category, tshirt_size");
     if (pErr) console.error("[multi-register] participant insert error:", pErr.message);
 
     if (couponId) {
       const { redeemCoupon } = await import("@/lib/coupon-redeem");
-      redeemCoupon(couponId, accountEmail).catch(console.error);
+      const claimed = await redeemCoupon(couponId, accountEmail).catch(() => false);
+      if (!claimed) {
+        console.warn(`[multi-register] coupon ${couponId} could not be redeemed for ${accountEmail} — concurrent race or already exhausted; registration kept`);
+      }
     }
 
     after(async () => {
       if (!createdParticipants?.length) return;
       const subject = `Event Registration Confirmed – ${ev.title}`;
       try {
-        // Send one email per participant so each gets their individual QR
+        // Send one email per participant so each gets their individual QR.
+        // Use the participant's own email if provided; fall back to the purchaser's.
         for (const p of createdParticipants) {
           const participantName = [p.first_name, p.last_name].filter(Boolean).join(" ");
+          const recipientEmail  = (p as { email?: string | null }).email?.trim() || accountEmail;
           await sendEmail(
-            accountEmail,
+            recipientEmail,
             participantName,
             subject,
             eventRegistrationEmailHTML({
@@ -878,6 +914,15 @@ async function handleMultiParticipant(
       } catch (e) {
         console.error("[multi-register] email exception:", e);
         await db.from("event_registrations").update({ email_status: "failed" }).eq("id", regId);
+      }
+
+      // WhatsApp confirmation to lead participant (fire-and-forget — non-critical)
+      if (leadParticipant.mobile?.trim()) {
+        sendWhatsApp(
+          leadParticipant.mobile.trim(),
+          runRegistrationWAParams(leadName, ev.title, ev.start_date, ev.location),
+          "run_registration",
+        ).catch((e: unknown) => console.error("[multi-register] WhatsApp failed:", e));
       }
     });
 

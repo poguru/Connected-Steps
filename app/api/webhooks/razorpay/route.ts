@@ -20,6 +20,7 @@ import { sendItRunConfirmationEmail } from "@/lib/it-run-email";
 //   Secret: set RAZORPAY_WEBHOOK_SECRET in Vercel env vars
 //   Events: ✓ payment.captured  (mandatory)
 //           ✓ payment.failed    (optional — for logging)
+//           ✓ refund.created    (auto-cancel registration on external refund)
 //
 // The endpoint is idempotent — multiple deliveries of the same event are safe.
 
@@ -37,19 +38,31 @@ interface RzpPaymentEntity {
   error_description?: string;
 }
 
+interface RzpRefundEntity {
+  id:         string;
+  payment_id: string;
+  amount:     number;
+  currency:   string;
+  notes?:     Record<string, string>;
+  receipt?:   string | null;
+}
+
 interface RzpWebhookPayload {
-  entity:  string;
+  entity:     string;
   account_id: string;
-  event:   string;
+  event:      string;
   payload: {
-    payment: { entity: RzpPaymentEntity };
+    payment?: { entity: RzpPaymentEntity };
+    refund?:  { entity: RzpRefundEntity };
   };
 }
 
 // Razorpay sends this header for webhook signature verification.
 // The signature is HMAC-SHA256(raw_body, RAZORPAY_WEBHOOK_SECRET).
 // This is different from the payment signature (which uses key_secret).
-const WEBHOOK_HEADER = "x-razorpay-signature";
+const WEBHOOK_HEADER    = "x-razorpay-signature";
+const TIMESTAMP_HEADER  = "x-razorpay-timestamp";
+const REPLAY_WINDOW_SEC = 5 * 60; // reject webhooks older than 5 minutes
 
 export async function POST(req: NextRequest) {
   // ── 1. Read raw body (must be done before any JSON parsing) ──────────────
@@ -80,6 +93,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid webhook signature" }, { status: 400 });
   }
 
+  // ── 2b. Replay-attack protection — validate timestamp ─────────────────────
+  // Razorpay includes x-razorpay-timestamp (Unix epoch seconds) in all webhooks.
+  // Reject deliveries whose timestamp falls outside the ±5-minute window.
+  // When the header is absent (non-standard delivery) we log but do not reject,
+  // to preserve backward compatibility with any legacy integrations.
+  const tsHeader = req.headers.get(TIMESTAMP_HEADER);
+  if (tsHeader) {
+    const tsNum = parseInt(tsHeader, 10);
+    if (!Number.isFinite(tsNum)) {
+      console.error(`[razorpay-webhook] Malformed timestamp header: "${tsHeader}"`);
+      return NextResponse.json({ error: "Invalid webhook timestamp" }, { status: 400 });
+    }
+    const ageSec = Math.abs(Math.floor(Date.now() / 1000) - tsNum);
+    if (ageSec > REPLAY_WINDOW_SEC) {
+      console.error(`[razorpay-webhook] Stale webhook — age=${ageSec}s exceeds window=${REPLAY_WINDOW_SEC}s`);
+      return NextResponse.json({ error: "Webhook timestamp too old — possible replay attack" }, { status: 400 });
+    }
+  } else {
+    console.warn("[razorpay-webhook] Missing x-razorpay-timestamp header — replay protection skipped");
+  }
+
   // ── 3. Parse payload ──────────────────────────────────────────────────────
   let payload: RzpWebhookPayload;
   try {
@@ -90,8 +124,9 @@ export async function POST(req: NextRequest) {
 
   const event   = payload.event;
   const payment = payload.payload?.payment?.entity;
+  const refund  = payload.payload?.refund?.entity;
 
-  console.log(`[razorpay-webhook] event=${event} payment_id=${payment?.id} order_id=${payment?.order_id}`);
+  console.log(`[razorpay-webhook] event=${event} payment_id=${payment?.id ?? refund?.payment_id} order_id=${payment?.order_id}`);
 
   // ── 4. Route events ───────────────────────────────────────────────────────
   //
@@ -100,8 +135,8 @@ export async function POST(req: NextRequest) {
   //   If Razorpay auto-capture is enabled (default), captured fires within seconds.
   //   If NOT enabled, payments stay authorized forever and users never get confirmed.
   //   We handle BOTH so either dashboard setting works.
-  // order.paid — fires when the order amount is fully paid. Redundant with captured
-  //   but useful as an extra safety net.
+  // refund.created — fires when a refund is issued (from dashboard or API).
+  //   We auto-cancel the registration and free the slot so it can be re-sold.
   if (event === "payment.captured" && payment) {
     console.log(`[razorpay-webhook] Handling payment.captured — payment_id=${payment.id}`);
     await handlePaymentCaptured(payment);
@@ -121,6 +156,9 @@ export async function POST(req: NextRequest) {
       .update({ payment_status: "failed" })
       .eq("razorpay_order_id", payment.order_id ?? "")
       .eq("payment_status", "pending");
+  } else if (event === "refund.created" && refund) {
+    console.log(`[razorpay-webhook] Handling refund.created — refund_id=${refund.id} payment_id=${refund.payment_id}`);
+    await handleRefundCreated(refund);
   } else {
     console.log(`[razorpay-webhook] Unhandled event=${event} — no action taken`);
   }
@@ -360,4 +398,90 @@ async function handlePaymentCapturedForReg(
   await enqueueJob("invoice_generate", invoicePayload, { idempotencyKey: `invoice_generate:${paymentId}` });
   await handleEventQrEmail(qrPayload).catch(e => console.error(`[razorpay-webhook] QR email failed for ${reg.registration_code}:`, e));
   await handleInvoiceGenerate(invoicePayload).catch(e => console.error(`[razorpay-webhook] Invoice failed for ${reg.registration_code}:`, e));
+}
+
+// ── H18: Handle external Razorpay refunds ────────────────────────────────────
+// When a refund is issued from the Razorpay dashboard or API (without going
+// through our cancellation flow), this handler auto-cancels the registration
+// and frees the slot. Without this, the slot stays occupied and the participant
+// can still check in despite having been refunded.
+async function handleRefundCreated(refund: RzpRefundEntity): Promise<void> {
+  const { id: refundId, payment_id: paymentId, amount: refundAmountPaise } = refund;
+  const db = getSupabaseServer();
+  const label = `[razorpay-webhook/refund]`;
+
+  // Look up the registration by razorpay_payment_id
+  const { data: reg } = await db
+    .from("event_registrations")
+    .select("id, registration_code, status, payment_status, event_id")
+    .eq("razorpay_payment_id", paymentId)
+    .maybeSingle<{
+      id:                string;
+      registration_code: string;
+      status:            string;
+      payment_status:    string;
+      event_id:          string;
+    }>();
+
+  if (!reg) {
+    // Could be a membership or IT Run payment — just log and return
+    console.log(`${label} No event registration found for payment_id=${paymentId} — may be membership/it-run, skipping`);
+    return;
+  }
+
+  if (reg.status === "cancelled") {
+    // Already cancelled (e.g. our own cancel flow ran first) — just record refund details
+    console.log(`${label} Registration ${reg.registration_code} already cancelled — updating refund fields only`);
+    await db.from("event_registrations").update({
+      refund_status:  "processed",
+      refund_id:      refundId,
+      refund_amount:  refundAmountPaise,
+      refunded_at:    new Date().toISOString(),
+    }).eq("id", reg.id);
+    return;
+  }
+
+  const now = new Date().toISOString();
+
+  // Cancel the registration
+  const { error: cancelErr } = await db.from("event_registrations").update({
+    status:              "cancelled",
+    cancelled_at:        now,
+    cancelled_by:        "razorpay_webhook",
+    cancellation_reason: `Refund issued via Razorpay (refund_id=${refundId})`,
+    refund_status:       "processed",
+    refund_id:           refundId,
+    refund_amount:       refundAmountPaise,
+    refunded_at:         now,
+  })
+    .eq("id", reg.id)
+    .neq("status", "cancelled"); // optimistic lock — skip if already cancelled
+
+  if (cancelErr) {
+    console.error(`${label} Failed to cancel registration ${reg.registration_code}:`, cancelErr.message);
+    return;
+  }
+
+  // Invalidate participant QR tokens
+  await db.from("event_participants")
+    .update({ status: "cancelled" })
+    .eq("registration_id", reg.id);
+
+  // Audit log
+  void db.from("cancellation_audit_log").insert({
+    event_id:          reg.event_id,
+    registration_id:   reg.id,
+    registration_code: reg.registration_code,
+    action:            "cancelled",
+    actor:             "razorpay_webhook",
+    actor_type:        "system",
+    payload: {
+      reason:    "external_refund",
+      refund_id: refundId,
+      payment_id: paymentId,
+      refund_amount_paise: refundAmountPaise,
+    },
+  });
+
+  console.log(`${label} ✅ Registration ${reg.registration_code} auto-cancelled due to external refund — refund_id=${refundId}`);
 }

@@ -190,15 +190,15 @@ export default function ParticipantDetailPage() {
   }
 
   async function cancelRegistration() {
-    if (!reg || !confirm(`Cancel registration for ${reg.user_name}? This cannot be undone.`)) return;
+    if (!reg || !confirm(`Cancel registration for ${reg.user_name}? This will invalidate their QR code and trigger any configured refund. This cannot be undone.`)) return;
     setAction("cancelling");
     try {
-      const res = await fetch("/api/admin/events/registrations", {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: reg.id, status: "cancelled" }),
+      const res = await fetch(`/api/admin/events/${eventId}/registrations/${code}/cancel`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "Admin cancelled from registration detail page" }),
       });
       if (res.ok) { showToast("Registration cancelled"); await loadData(); }
-      else { const d = await res.json(); showToast(`❌ ${d.error}`); }
+      else { const d = await res.json() as { error?: string }; showToast(`❌ ${d.error ?? "Cancel failed"}`); }
     } finally { setAction(""); }
   }
 

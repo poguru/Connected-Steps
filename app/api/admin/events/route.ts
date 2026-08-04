@@ -125,15 +125,28 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ data });
 }
 
+// Columns this endpoint allows — status toggling from list/manage pages only.
+// Full event editing goes through /api/admin/events/[id]/edit which has its own whitelist.
+const PATCH_ALLOWED = new Set(["status", "featured", "visibility"]);
+
 export async function PATCH(req: NextRequest) {
   if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await req.json();
   const { id, ...fields } = body;
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+
+  const updates: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(fields)) {
+    if (PATCH_ALLOWED.has(key)) updates[key] = val;
+  }
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+  }
+
   const db = getSupabaseServer();
   const { data, error } = await db
     .from("events")
-    .update(fields)
+    .update(updates)
     .eq("id", id)
     .select()
     .single();
