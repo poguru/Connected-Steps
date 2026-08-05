@@ -8,7 +8,7 @@
 
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { gstFromInclusive, getCurrentGSTRate } from "@/lib/gst";
-import { sendEmail } from "@/lib/notify";
+import { sendSingleEmail } from "@/lib/email-service";
 import { logger } from "@/lib/logger";
 
 import { APP_URL, LOGO_URL, SUPPORT_EMAIL } from "@/lib/config";
@@ -546,7 +546,16 @@ async function sendInvoiceEmail(
     </div>`;
 
   try {
-    const result = await sendEmail(input.userEmail, input.userName, subject, emailHtml, false, true);
+    const result = await sendSingleEmail({
+      to:      input.userEmail,
+      subject,
+      html:    emailHtml,
+      attachments: [{
+        name:      `${invoiceNumber}.html`,
+        mime_type: "text/html",
+        content:   Buffer.from(html, "utf-8").toString("base64"),
+      }],
+    });
     if (result.ok) {
       await db.from("invoices").update({
         invoice_status:       "sent",
@@ -554,7 +563,7 @@ async function sendInvoiceEmail(
         email_sent_at:        new Date().toISOString(),
         email_ses_message_id: result.messageId ?? null,
       }).eq("id", invoiceId);
-      logger.info("invoice", "Email sent", { invoiceNumber, email: input.userEmail, messageId: result.messageId });
+      logger.info("invoice", "Email sent with attachment", { invoiceNumber, email: input.userEmail, messageId: result.messageId });
     } else {
       await db.from("invoices").update({ email_error: result.error ?? "unknown", email_retry_count: 1 }).eq("id", invoiceId);
       logger.error("invoice", "Email failed", { invoiceNumber, email: input.userEmail, error: result.error });
