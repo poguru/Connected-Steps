@@ -343,8 +343,6 @@ async function handleSingleParticipant(
     if (coupon.use_count >= coupon.max_uses) return NextResponse.json({ error: "This coupon has reached its usage limit." }, { status: 400 });
     if (coupon.event_id && coupon.event_id !== event_id) return NextResponse.json({ error: "This coupon is not valid for this event." }, { status: 400 });
     if (coupon.assigned_to_email && coupon.assigned_to_email.toLowerCase() !== (email as string).toLowerCase()) return NextResponse.json({ error: "This coupon is not assigned to your account." }, { status: 400 });
-    const { data: uses } = await db.from("coupon_uses").select("id").eq("coupon_id", coupon.id).eq("used_by_email", (email as string).toLowerCase()).limit(1);
-    if (uses && uses.length > 0) return NextResponse.json({ error: "You have already used this coupon." }, { status: 400 });
     couponId = coupon.id; discountType = coupon.discount_type; discountValue = coupon.discount_value;
     discount = calcEventDiscount(singleBasePrice, discountType, discountValue);
   }
@@ -354,6 +352,12 @@ async function handleSingleParticipant(
 
   // Free path
   if (finalPrice === 0) {
+    // For free registrations (including coupon-to-zero): block same-user re-use now.
+    // Paid path handles this check inside the reservation block below.
+    if (couponId) {
+      const { data: uses } = await db.from("coupon_uses").select("id").eq("coupon_id", couponId).eq("used_by_email", (email as string).toLowerCase()).limit(1);
+      if (uses && uses.length > 0) return NextResponse.json({ error: "You have already used this coupon." }, { status: 400 });
+    }
     const code    = genUniqueCode();
     const qrToken = signEventQR(code, event_id as string);
 
@@ -542,6 +546,35 @@ async function handleSingleParticipant(
       participant_count: 1,
     }, { onConflict: "event_id,user_email", ignoreDuplicates: false });
   if (regErr2) return NextResponse.json({ error: "Database error" }, { status: 500 });
+
+  // Claim the coupon atomically at reservation time (prevents concurrent users
+  // from both passing the quota check and both receiving the discount).
+  if (couponId) {
+    const { data: existingUse } = await db
+      .from("coupon_uses")
+      .select("id")
+      .eq("coupon_id", couponId)
+      .eq("used_by_email", (email as string).toLowerCase())
+      .maybeSingle();
+
+    if (existingUse) {
+      // Coupon already claimed. Allow only if this is a payment retry for the same
+      // pending registration (existing row is still unpaid). Otherwise reject.
+      const isRetry = existing != null && existing.payment_status === "pending";
+      if (!isRetry) {
+        return NextResponse.json({ error: "You have already used this coupon." }, { status: 400 });
+      }
+      // isRetry: discount already locked in — proceed without re-claiming.
+    } else {
+      const { redeemCoupon } = await import("@/lib/coupon-redeem");
+      const claimed = await redeemCoupon(couponId, (email as string).toLowerCase()).catch(() => false);
+      if (claimed === false) {
+        // Another concurrent registration won the last quota slot — undo the pending row.
+        await db.from("event_registrations").delete().eq("registration_code", code);
+        return NextResponse.json({ error: "This coupon has just reached its usage limit. Please register without the coupon." }, { status: 409 });
+      }
+    }
+  }
 
   // Create a pending participant row so it exists in the ops portal pre-payment.
   // Only insert if no participant row exists yet (handles payment re-attempts).
@@ -829,8 +862,6 @@ async function handleMultiParticipant(
     if (coupon.use_count >= coupon.max_uses) return NextResponse.json({ error: "This coupon has reached its usage limit." }, { status: 400 });
     if (coupon.event_id && coupon.event_id !== event_id) return NextResponse.json({ error: "This coupon is not valid for this event." }, { status: 400 });
     if (coupon.assigned_to_email && coupon.assigned_to_email.toLowerCase() !== accountEmail) return NextResponse.json({ error: "This coupon is not assigned to your account." }, { status: 400 });
-    const { data: uses } = await db.from("coupon_uses").select("id").eq("coupon_id", coupon.id).eq("used_by_email", accountEmail).limit(1);
-    if (uses && uses.length > 0) return NextResponse.json({ error: "You have already used this coupon." }, { status: 400 });
     couponId = coupon.id; discountType = coupon.discount_type; discountValue = coupon.discount_value;
     discount = calcEventDiscount(totalBeforeDiscount, discountType, discountValue);
   }
@@ -842,6 +873,11 @@ async function handleMultiParticipant(
 
   // ── Free (or fully-discounted) multi-participant path ────────────────────────
   if (finalPrice === 0) {
+    // Guard coupon re-use before confirming (paid path handles this in its own block).
+    if (couponId) {
+      const { data: uses } = await db.from("coupon_uses").select("id").eq("coupon_id", couponId).eq("used_by_email", accountEmail).limit(1);
+      if (uses && uses.length > 0) return NextResponse.json({ error: "You have already used this coupon." }, { status: 400 });
+    }
     const code = genUniqueCode();
 
     const { data: reg, error: regErr } = await db
@@ -998,6 +1034,30 @@ async function handleMultiParticipant(
       participant_count: participants.length,
     }, { onConflict: "event_id,user_email", ignoreDuplicates: false });
   if (regErr2) return NextResponse.json({ error: "Database error" }, { status: 500 });
+
+  // Claim coupon atomically at reservation time (same pattern as single-participant paid path).
+  if (couponId) {
+    const { data: existingUse } = await db
+      .from("coupon_uses")
+      .select("id")
+      .eq("coupon_id", couponId)
+      .eq("used_by_email", accountEmail)
+      .maybeSingle();
+
+    if (existingUse) {
+      const isRetry = existing != null && existing.payment_status === "pending";
+      if (!isRetry) {
+        return NextResponse.json({ error: "You have already used this coupon." }, { status: 400 });
+      }
+    } else {
+      const { redeemCoupon } = await import("@/lib/coupon-redeem");
+      const claimed = await redeemCoupon(couponId, accountEmail).catch(() => false);
+      if (claimed === false) {
+        await db.from("event_registrations").delete().eq("registration_code", code);
+        return NextResponse.json({ error: "This coupon has just reached its usage limit. Please register without the coupon." }, { status: 409 });
+      }
+    }
+  }
 
   const { data: pendingReg } = await db
     .from("event_registrations")

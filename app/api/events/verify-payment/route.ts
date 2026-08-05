@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyPaymentSignature } from "@/lib/razorpay-security";
-import { redeemCoupon } from "@/lib/coupon-redeem";
 import { enqueueJob } from "@/lib/job-queue";
 import { handleEventQrEmail, handleInvoiceGenerate } from "@/lib/job-handlers";
 import { signEventQR } from "@/lib/event-qr";
@@ -121,13 +120,6 @@ export async function POST(req: NextRequest) {
 
       logger.error("verify-payment", "DB update failed", { ...ctx, regId: reg.id, code: error.code });
       return NextResponse.json({ error: "Database error" }, { status: 500 });
-    }
-
-    // Redeem coupon atomically (fire-and-forget -- fast, non-critical)
-    if (reg.coupon_id) {
-      redeemCoupon(reg.coupon_id, reg.user_email).catch((e: unknown) =>
-        logger.error("verify-payment", "Coupon redeem failed", { ...ctx, regId: reg.id, error: String(e) })
-      );
     }
 
     const ev = reg.events;
