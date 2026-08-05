@@ -410,6 +410,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         {/* Live slot counter */}
         <EventSlotDisplay
           eventId={ev.id}
+          featured={ev.featured}
           initial={{
             participant_count: ev.participant_count ?? 0,
             max_participants:  ev.max_participants  ?? null,
@@ -522,22 +523,13 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
                       </div>
                     )}
 
-                    {/* Timing + slots */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: "3px", marginTop: 2 }}>
-                      {race.reporting_time && <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.38)" }}>🕐 Report {fmtTime(race.reporting_time)}</div>}
-                      {race.gun_time      && <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.38)" }}>🏁 Flag-off {fmtTime(race.gun_time)}</div>}
-                      {rSlotsLeft !== null && (
-                        <div style={{ fontSize: "11px", fontWeight: 700, color: rFull ? "#6b7280" : slotsColor(rSlotsLeft, race.max_slots!), marginTop: 1 }}>
-                          {rFull ? "⚫ Sold Out" : (() => {
-                            const pct = rSlotsLeft / race.max_slots!;
-                            if (pct > 0.5)  return `🟢 ${rSlotsLeft} / ${race.max_slots} available`;
-                            if (pct > 0.25) return `🟡 ${rSlotsLeft} slots available`;
-                            if (pct > 0.10) return `🟠 ${rSlotsLeft} slots left`;
-                            return `🔴 Only ${rSlotsLeft} left`;
-                          })()}
-                        </div>
-                      )}
-                    </div>
+                    {/* Timing */}
+                    {(race.reporting_time || race.gun_time) && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "3px", marginTop: 2 }}>
+                        {race.reporting_time && <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.38)" }}>🕐 Report {fmtTime(race.reporting_time)}</div>}
+                        {race.gun_time      && <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.38)" }}>🏁 Flag-off {fmtTime(race.gun_time)}</div>}
+                      </div>
+                    )}
 
                     {/* Timing chip badge */}
                     {race.timing_chip && (
