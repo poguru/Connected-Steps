@@ -210,25 +210,44 @@ describe("POST /api/events/verify-payment — payment protection", () => {
 
   /** Build a mock DB for verify-payment tests. */
   function makeVerifyDb(opts: {
-    reg?:        { id: string; coupon_id: string | null; user_email: string; user_name: string; payment_status: string; event_id: string; distance_category: string | null; final_price: number; events: { title: string; start_date: string; start_time: string | null; location: string } | null } | null;
-    dupPayment?: { id: string } | null;
-    updateError?: { message: string; code?: string } | null;
+    reg?:           { id: string; coupon_id: string | null; user_email: string; user_name: string; payment_status: string; event_id: string; distance_category: string | null; final_price: number; participant_count?: number; events: { title: string; start_date: string; start_time: string | null; location: string } | null } | null;
+    dupPayment?:    { id: string } | null;
+    updateError?:   { message: string; code?: string } | null;
+    approvedWl?:    { id: string } | null;  // approved waitlist entry for user
   }) {
-    const updateEqMock = jest.fn().mockResolvedValue({ error: opts.updateError ?? null });
+    // updateError is for the first update call (status→confirmed); subsequent update calls succeed.
+    let updateCallCount = 0;
+    const updateEqMock = jest.fn().mockImplementation(() => {
+      updateCallCount++;
+      return Promise.resolve({ error: updateCallCount === 1 ? (opts.updateError ?? null) : null });
+    });
     const updateMock   = jest.fn().mockReturnValue({ eq: updateEqMock });
 
     return {
       from: jest.fn().mockImplementation((table: string) => {
         if (table === "event_registrations") {
-          let callIdx = 0;
           return {
-            select:     jest.fn().mockReturnThis(),
-            eq:         jest.fn().mockImplementation(function(this: Record<string, jest.Mock>) {
-              return this;
-            }),
-            single:     jest.fn().mockResolvedValue({ data: opts.reg ?? null, error: null }),
+            select:      jest.fn().mockReturnThis(),
+            eq:          jest.fn().mockImplementation(function(this: Record<string, jest.Mock>) { return this; }),
+            single:      jest.fn().mockResolvedValue({ data: opts.reg ?? null, error: null }),
             maybeSingle: jest.fn().mockResolvedValue({ data: opts.dupPayment ?? null, error: null }),
-            update:     updateMock,
+            update:      updateMock,
+          };
+        }
+        if (table === "event_waitlist") {
+          return {
+            select:      jest.fn().mockReturnThis(),
+            eq:          jest.fn().mockImplementation(function(this: Record<string, jest.Mock>) { return this; }),
+            maybeSingle: jest.fn().mockResolvedValue({ data: opts.approvedWl ?? null, error: null }),
+            update:      jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({ error: null }) }),
+          };
+        }
+        if (table === "events") {
+          return {
+            select:  jest.fn().mockReturnThis(),
+            eq:      jest.fn().mockImplementation(function(this: Record<string, jest.Mock>) { return this; }),
+            single:  jest.fn().mockResolvedValue({ data: { max_participants: 100 }, error: null }),
+            update:  jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({ error: null }) }),
           };
         }
         if (table === "job_queue") {

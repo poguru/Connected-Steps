@@ -111,15 +111,63 @@ export async function POST(req: NextRequest) {
       const isFullBooked = error.message?.includes("fully booked")
         || error.message?.includes("P0001");
       if (isFullBooked) {
-        logger.warn("verify-payment", "Event fully booked at confirmation time", { ...ctx, regId: reg.id });
-        return NextResponse.json(
-          { error: "This event is now fully booked. Please contact support for a refund." },
-          { status: 409 },
-        );
-      }
+        // Check if this user has an approved waitlist entry — the admin committed a slot.
+        // If yes, expand max_participants by 1 to honour that commitment, then retry.
+        const { data: wlEntry } = await db
+          .from("event_waitlist")
+          .select("id")
+          .eq("event_id", reg.event_id)
+          .eq("user_email", reg.user_email.toLowerCase())
+          .eq("status", "approved")
+          .maybeSingle();
 
-      logger.error("verify-payment", "DB update failed", { ...ctx, regId: reg.id, code: error.code });
-      return NextResponse.json({ error: "Database error" }, { status: 500 });
+        if (wlEntry) {
+          // Fetch current max_participants and bump by 1 to make room for this slot.
+          const { data: evRow } = await db
+            .from("events")
+            .select("max_participants")
+            .eq("id", reg.event_id)
+            .single<{ max_participants: number | null }>();
+
+          const newMax = (evRow?.max_participants ?? 0) + 1;
+          await db.from("events").update({ max_participants: newMax }).eq("id", reg.event_id);
+
+          const { error: retryErr } = await db
+            .from("event_registrations")
+            .update({
+              payment_status:    "paid",
+              razorpay_order_id,
+              razorpay_payment_id,
+              razorpay_signature,
+              status:            "confirmed",
+            })
+            .eq("registration_code", registration_code);
+
+          if (!retryErr) {
+            await db.from("event_waitlist").update({ status: "used" }).eq("id", wlEntry.id);
+            logger.info("verify-payment", "Waitlist slot honoured — max_participants expanded by 1", { ...ctx, regId: reg.id, wlId: wlEntry.id });
+            // Fall through to the success path below (no return here).
+          } else {
+            // Roll back the capacity bump
+            await db.from("events").update({ max_participants: newMax - 1 }).eq("id", reg.event_id);
+            logger.warn("verify-payment", "Waitlist slot retry failed after expansion", { ...ctx, regId: reg.id, code: retryErr.code });
+            return NextResponse.json(
+              { error: "This event is now fully booked. Please contact support for a refund." },
+              { status: 409 },
+            );
+          }
+        } else {
+          logger.warn("verify-payment", "Event fully booked at confirmation time", { ...ctx, regId: reg.id });
+          return NextResponse.json(
+            { error: "This event is now fully booked. Please contact support for a refund." },
+            { status: 409 },
+          );
+        }
+        // Waitlist bypass succeeded — skip the generic DB error return below.
+      } else {
+        logger.error("verify-payment", "DB update failed", { ...ctx, regId: reg.id, code: error.code });
+        return NextResponse.json({ error: "Database error" }, { status: 500 });
+      }
     }
 
     const ev = reg.events;
