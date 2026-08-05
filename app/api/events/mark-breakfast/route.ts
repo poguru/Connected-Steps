@@ -89,6 +89,13 @@ export async function POST(req: NextRequest) {
 
   if (updateErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
+  // Mirror to event_participants so live-stats (which reads from participants) stays accurate.
+  await db
+    .from("event_participants")
+    .update({ breakfast_availed: true, breakfast_availed_at: now, breakfast_availed_by: adminEmail })
+    .eq("registration_id", reg.id)
+    .neq("status", "cancelled");
+
   console.log(`[breakfast] ✅ issued to=${reg.user_name} (${reg.registration_code}) by=${adminEmail}`);
 
   return NextResponse.json({

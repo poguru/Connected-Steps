@@ -315,7 +315,7 @@ export default function ParticipantDetailPage() {
               { at: reg.payment_status === "paid" ? reg.created_at : null, icon: "💳", color: "#4ade80", label: "Payment Confirmed", detail: reg.final_price > 0 ? `₹${reg.final_price}${reg.razorpay_payment_id ? ` · ${reg.razorpay_payment_id}` : ""}` : undefined },
               { at: reg.payment_status === "free" ? reg.created_at : null, icon: "🎁", color: "#60a5fa", label: "Free Registration",  detail: reg.coupon_code ? `Coupon: ${reg.coupon_code}` : "Complimentary" },
               { at: reg.qr_generated_at,              icon: "🎫", color: "#a78bfa", label: "QR Code Generated",       detail: reg.qr_token?.slice(0, 20) + "…" },
-              { at: reg.confirmation_email_sent_at,   icon: reg.email_status === "sent" ? "✅" : "❌", color: reg.email_status === "sent" ? "#4ade80" : "#f87171", label: "Confirmation Email", detail: reg.email_status === "sent" ? (reg.email_ses_message_id ? `SES: ${reg.email_ses_message_id.slice(0, 24)}…` : "Delivered") : "Failed" },
+              { at: reg.confirmation_email_sent_at,   icon: reg.email_status === "sent" ? "✅" : "❌", color: reg.email_status === "sent" ? "#4ade80" : "#f87171", label: "Confirmation Email", detail: reg.email_status === "sent" ? (reg.email_ses_message_id ? `ID: ${reg.email_ses_message_id.slice(0, 24)}…` : "Delivered") : "Failed" },
               { at: svc?.bib_collected_at,            icon: "🏷️", color: "#60a5fa", label: "BIB Collected",          detail: svc?.bib_collected_by ? `By: ${svc.bib_collected_by}` : undefined },
               { at: svc?.checked_in_at,               icon: "✅", color: "#4ade80", label: "Checked In",              detail: svc?.checked_in_by ? `By: ${svc.checked_in_by}` : "Race day check-in" },
               { at: svc?.breakfast_availed_at,        icon: "🍽️", color: "#34d399", label: "Breakfast Issued",       detail: svc?.breakfast_availed_by ? `By: ${svc.breakfast_availed_by}` : undefined },
@@ -478,7 +478,7 @@ export default function ParticipantDetailPage() {
             <Section title="Email Delivery">
               <Row label="Status"   value={reg.email_status ?? "Not sent"} />
               {reg.confirmation_email_sent_at && <Row label="Sent At" value={fmtDate(reg.confirmation_email_sent_at, true)} />}
-              {reg.email_ses_message_id && <Row label="SES ID" value={reg.email_ses_message_id} mono />}
+              {reg.email_ses_message_id && <Row label="Message ID" value={reg.email_ses_message_id} mono />}
             </Section>
 
             {/* Check-in, Breakfast, T-Shirt, BIB & Medal */}

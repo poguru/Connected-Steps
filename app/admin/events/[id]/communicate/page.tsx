@@ -1198,7 +1198,7 @@ export default function CommunicatePage() {
 
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
                     {send.phase === "sending" ? (
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#60a5fa" }}>📤 Sending… (server-side — safe to close tab)</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#60a5fa" }}>📤 Sending… (a background worker continues if you close this tab)</span>
                     ) : (
                       <span style={{ fontSize: 13, fontWeight: 700, color: send.failed === 0 ? "#4ade80" : "#fbbf24" }}>
                         {send.failed === 0 ? "✅ All emails delivered" : `⚠️ Completed with ${send.failed} failure${send.failed !== 1 ? "s" : ""}`}

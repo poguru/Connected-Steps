@@ -142,6 +142,13 @@ export async function POST(req: NextRequest) {
     })
     .eq("id", reg.id);
 
+  // Mirror to event_participants so live-stats (which reads from participants) stays accurate.
+  await db
+    .from("event_participants")
+    .update({ tshirt_issued: true, tshirt_issued_at: now, tshirt_issued_by: volunteerEmail })
+    .eq("registration_id", reg.id)
+    .neq("status", "cancelled");
+
   return NextResponse.json({
     valid:          true,
     already_issued: false,
