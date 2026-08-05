@@ -31,7 +31,6 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!isAdmin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const adminEmail = req.headers.get("x-admin-email") ?? "admin";
   const db  = getSupabaseServer();
   const body = await req.json() as Record<string, unknown>;
 
@@ -59,7 +58,7 @@ export async function POST(req: NextRequest) {
     attachments:      body.attachments    ?? [],
     scheduled_for:    body.scheduled_for  ?? null,
     status:           "draft",
-    created_by:       adminEmail,
+    created_by:       null,
   }).select().single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
