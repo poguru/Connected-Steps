@@ -20,13 +20,13 @@ export interface SlotData {
 interface FomoConfig { emoji: string; label: string; color: string; bg: string }
 
 function getFomo(pctLeft: number | null, isSoldOut: boolean): FomoConfig {
-  if (isSoldOut)        return { emoji: "❌", label: "Sold Out",                color: "#6b7280", bg: "rgba(107,114,128,0.08)" };
-  if (pctLeft === null) return { emoji: "🟢", label: "Registration Open",       color: "#4ade80", bg: "rgba(74,222,128,0.05)" };
-  if (pctLeft <= 0.05)  return { emoji: "🚨", label: "Last Few Spots",          color: "#ef4444", bg: "rgba(239,68,68,0.12)" };
-  if (pctLeft <= 0.10)  return { emoji: "🔴", label: "Almost Sold Out",         color: "#ef4444", bg: "rgba(239,68,68,0.08)" };
-  if (pctLeft <= 0.25)  return { emoji: "🟠", label: "Few Spots Left",          color: "#f97316", bg: "rgba(249,115,22,0.08)" };
-  if (pctLeft <= 0.50)  return { emoji: "🟡", label: "Filling Fast",            color: "#eab308", bg: "rgba(234,179,8,0.07)" };
-  return                       { emoji: "🟢", label: "Plenty of Spots",         color: "#4ade80", bg: "rgba(74,222,128,0.04)" };
+  if (isSoldOut)        return { emoji: "❌", label: "Sold Out",             color: "#6b7280", bg: "rgba(107,114,128,0.08)" };
+  if (pctLeft === null) return { emoji: "🟢", label: "Registration Open",    color: "#4ade80", bg: "rgba(74,222,128,0.05)" };
+  if (pctLeft <= 0.05)  return { emoji: "🚨", label: "Last Few Spots",       color: "#ef4444", bg: "rgba(239,68,68,0.12)" };
+  if (pctLeft <= 0.10)  return { emoji: "🔴", label: "Almost Sold Out",      color: "#ef4444", bg: "rgba(239,68,68,0.08)" };
+  if (pctLeft <= 0.25)  return { emoji: "🟠", label: "Few Spots Left",       color: "#f97316", bg: "rgba(249,115,22,0.08)" };
+  if (pctLeft <= 0.50)  return { emoji: "🟡", label: "Filling Fast",         color: "#eab308", bg: "rgba(234,179,8,0.07)" };
+  return                       { emoji: "🟢", label: "Spots Available",      color: "#4ade80", bg: "rgba(74,222,128,0.04)" };
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -36,20 +36,18 @@ export default function EventSlotDisplay({
   initial,
   featured,
 }: {
-  eventId:  string;
-  initial:  SlotData;
+  eventId:   string;
+  initial:   SlotData;
   featured?: boolean;
 }) {
   const [data,     setData]     = useState<SlotData>(initial);
   const [barReady, setBarReady] = useState(false);
 
-  // Trigger bar animation after first paint
   useEffect(() => {
     const t = setTimeout(() => setBarReady(true), 120);
     return () => clearTimeout(t);
   }, []);
 
-  // Poll for live slot updates (skip when tab is hidden)
   useEffect(() => {
     const poll = async () => {
       if (document.hidden) return;
@@ -62,18 +60,28 @@ export default function EventSlotDisplay({
     return () => clearInterval(id);
   }, [eventId]);
 
-  const hasCap    = data.max_participants !== null && data.max_participants > 0;
-  const count     = data.participant_count;
-  const max       = data.max_participants ?? 0;
+  // ── Derive effective capacity ─────────────────────────────────────────────
+  // Use event-level max_participants if set; otherwise fall back to
+  // sum of race max_slots so events with only race-level caps still show a counter.
+  const racesWithCap  = data.races.filter(r => r.max_slots !== null && r.max_slots > 0);
+  const raceTotalCap  = racesWithCap.reduce((s, r) => s + (r.max_slots ?? 0), 0);
+  const hasRaceCaps   = racesWithCap.length > 0;
+
+  const effectiveCap = (data.max_participants !== null && data.max_participants > 0)
+    ? data.max_participants
+    : (hasRaceCaps ? raceTotalCap : null);
+
+  const hasCap    = effectiveCap !== null && effectiveCap > 0;
+  const count     = data.participant_count;   // always the authoritative registered count
+  const max       = effectiveCap ?? 0;
   const left      = hasCap ? Math.max(0, max - count) : null;
   const pctFilled = hasCap && max > 0 ? count / max : 0;
   const pctLeft   = hasCap && max > 0 ? left! / max : null;
   const isSoldOut = hasCap && left === 0;
 
-  const fomo     = getFomo(pctLeft, isSoldOut);
-  const isPulse  = !isSoldOut && pctLeft !== null && pctLeft <= 0.10;
+  const fomo    = getFomo(pctLeft, isSoldOut);
+  const isPulse = !isSoldOut && pctLeft !== null && pctLeft <= 0.10;
 
-  // Bar color tracks fill level (green → yellow → orange → red)
   const barColor = isSoldOut
     ? "#6b7280"
     : pctFilled >= 0.95 ? "#ef4444"
@@ -82,7 +90,6 @@ export default function EventSlotDisplay({
     : "#4ade80";
 
   const barWidth = barReady ? +(Math.min(100, pctFilled * 100)).toFixed(2) : 0;
-
   const fmt = (n: number) => n.toLocaleString("en-IN");
 
   return (
@@ -95,9 +102,8 @@ export default function EventSlotDisplay({
       position: "relative",
       overflow: "hidden",
     }}>
-      {/* Keyframe animations injected once */}
       <style>{`
-        @keyframes cs-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(.7)} }
+        @keyframes cs-pulse  { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(.7)} }
         @keyframes cs-fadein { from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:translateY(0)} }
       `}</style>
 
@@ -107,7 +113,7 @@ export default function EventSlotDisplay({
         background: fomo.color, opacity: isSoldOut ? 0.4 : 0.75,
       }} />
 
-      {/* Header row — status label + optional featured badge */}
+      {/* Header row */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {isPulse && (
@@ -117,22 +123,15 @@ export default function EventSlotDisplay({
               animation: "cs-pulse 1.6s ease-in-out infinite",
             }} />
           )}
-          <span style={{
-            fontSize: "10px", fontWeight: 700, letterSpacing: ".12em",
-            textTransform: "uppercase", color: fomo.color,
-          }}>
-            {hasCap
-              ? (isSoldOut ? "❌ Sold Out" : "🔥 Limited Slots Available")
-              : "🟢 Registration Open"}
+          <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: fomo.color }}>
+            {hasCap ? (isSoldOut ? "❌ Sold Out" : "🔥 Limited Slots Available") : "🟢 Registration Open"}
           </span>
         </div>
-
         {featured && (
           <span style={{
             fontSize: "10px", fontWeight: 700, letterSpacing: ".06em",
             color: "#e8620a", background: "rgba(232,98,10,0.1)",
-            border: "1px solid rgba(232,98,10,0.25)",
-            padding: "2px 9px", borderRadius: 999,
+            border: "1px solid rgba(232,98,10,0.25)", padding: "2px 9px", borderRadius: 999,
           }}>
             ★ FEATURED
           </span>
@@ -144,62 +143,62 @@ export default function EventSlotDisplay({
         isSoldOut ? (
           /* ── Sold out ── */
           <div style={{ marginBottom: "14px", animation: "cs-fadein 0.4s ease" }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <span style={{ fontSize: "36px", fontWeight: 800, color: "#6b7280", lineHeight: 1, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+              <span style={{ fontSize: "38px", fontWeight: 800, color: "#6b7280", lineHeight: 1, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em" }}>
                 {fmt(max)}
               </span>
-              <span style={{ fontSize: "14px", color: "#6b7280", fontWeight: 600 }}>
-                / {fmt(max)}
-              </span>
+              <span style={{ fontSize: "15px", color: "#6b7280", fontWeight: 600 }}>/ {fmt(max)}</span>
             </div>
-            <div style={{ fontSize: "12px", color: "#6b7280", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".07em", marginTop: 3 }}>
+            <div style={{ fontSize: "12px", color: "#6b7280", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".07em", marginTop: 4 }}>
               Fully Booked
             </div>
           </div>
         ) : (
-          /* ── Spots remaining ── */
+          /* ── Slots left / total ── */
           <div style={{ marginBottom: "12px", animation: "cs-fadein 0.35s ease" }}>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 12, flexWrap: "wrap" }}>
-              <div>
-                <div style={{
-                  fontSize: "42px", fontWeight: 800, color: "#fff", lineHeight: 1,
-                  fontVariantNumeric: "tabular-nums", letterSpacing: "-0.03em",
-                }}>
-                  {fmt(left!)}
-                </div>
-                <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.45)", fontWeight: 500, marginTop: 3 }}>
-                  spots left
-                </div>
-              </div>
-              <div style={{ paddingBottom: 6 }}>
-                <div style={{
-                  fontSize: "11px", fontWeight: 800, color: fomo.color,
-                  textTransform: "uppercase", letterSpacing: ".08em",
-                }}>
-                  {fomo.emoji} {fomo.label}
-                </div>
-              </div>
+            {/* Big X / Y */}
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+              <span style={{
+                fontSize: "44px", fontWeight: 800, color: "#fff", lineHeight: 1,
+                fontVariantNumeric: "tabular-nums", letterSpacing: "-0.03em",
+              }}>
+                {fmt(left!)}
+              </span>
+              <span style={{ fontSize: "20px", fontWeight: 600, color: "rgba(255,255,255,0.25)", lineHeight: 1 }}>
+                /
+              </span>
+              <span style={{ fontSize: "20px", fontWeight: 700, color: "rgba(255,255,255,0.5)", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+                {fmt(max)}
+              </span>
+            </div>
+            {/* Sub labels */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <span style={{ fontSize: "13px", color: "rgba(255,255,255,0.4)", fontWeight: 500 }}>
+                slots remaining
+              </span>
+              <span style={{ fontSize: "11px", fontWeight: 800, color: fomo.color, textTransform: "uppercase", letterSpacing: ".08em" }}>
+                {fomo.emoji} {fomo.label}
+              </span>
             </div>
           </div>
         )
       ) : (
-        /* ── No cap configured ── */
+        /* ── No cap at all ── */
         <div style={{ marginBottom: "14px", animation: "cs-fadein 0.35s ease" }}>
-          <div style={{ fontSize: "42px", fontWeight: 800, color: "#4ade80", lineHeight: 1, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.03em" }}>
+          <div style={{ fontSize: "44px", fontWeight: 800, color: "#4ade80", lineHeight: 1, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.03em" }}>
             {fmt(count)}
           </div>
-          <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.45)", fontWeight: 500, marginTop: 3 }}>
+          <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.45)", fontWeight: 500, marginTop: 4 }}>
             registered
           </div>
         </div>
       )}
 
-      {/* Sub-stats row */}
+      {/* Sub-stats */}
       {hasCap && (
         <div style={{
-          fontSize: "12px", color: "rgba(255,255,255,0.32)",
-          marginBottom: "14px", display: "flex", gap: 8,
-          flexWrap: "wrap", alignItems: "center",
+          fontSize: "12px", color: "rgba(255,255,255,0.28)",
+          marginBottom: "14px", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center",
         }}>
           <span>{fmt(count)} already registered</span>
           <span style={{ color: "rgba(255,255,255,0.14)" }}>·</span>
@@ -212,8 +211,7 @@ export default function EventSlotDisplay({
         <div>
           <div style={{
             height: "7px", borderRadius: "4px",
-            background: "rgba(255,255,255,0.06)", overflow: "hidden",
-            marginBottom: "7px",
+            background: "rgba(255,255,255,0.06)", overflow: "hidden", marginBottom: "7px",
           }}>
             <div style={{
               height: "100%",
