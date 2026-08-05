@@ -14,15 +14,22 @@ export async function GET(req: NextRequest) {
   // Preview mode: admin can view any event regardless of status.
   const skipStatusFilter = preview && (await isAdminOrCoach(req));
 
+  // Primary lookup: by share_slug
   let q = db.from("events").select("*").eq("share_slug", slug);
   if (!skipStatusFilter) q = q.eq("status", "published");
+  let { data } = await q.maybeSingle();
 
-  const { data } = await q.single();
+  // UUID fallback: events that have no share_slug are still accessible via their id
+  if (!data && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)) {
+    let q2 = db.from("events").select("*").eq("id", slug);
+    if (!skipStatusFilter) q2 = q2.eq("status", "published");
+    ({ data } = await q2.maybeSingle());
+  }
 
   if (!data) return NextResponse.json({ event: null }, { status: 404 });
 
   // Increment view count (fire-and-forget)
-  db.from("events").update({ view_count: (data.view_count ?? 0) + 1 }).eq("share_slug", slug).then(() => {});
+  db.from("events").update({ view_count: (data.view_count ?? 0) + 1 }).eq("id", data.id).then(() => {});
 
   // Fetch active custom form fields and race categories in parallel
   const [{ data: formFields }, { data: races }] = await Promise.all([
@@ -49,9 +56,12 @@ export async function POST(req: NextRequest) {
   if (!slug) return NextResponse.json({ ok: false });
 
   const db = getSupabaseServer();
-  const { data } = await db.from("events").select("share_count").eq("share_slug", slug).single();
+  let { data } = await db.from("events").select("id, share_count").eq("share_slug", slug).maybeSingle();
+  if (!data && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)) {
+    ({ data } = await db.from("events").select("id, share_count").eq("id", slug).maybeSingle());
+  }
   if (data) {
-    await db.from("events").update({ share_count: (data.share_count ?? 0) + 1 }).eq("share_slug", slug);
+    await db.from("events").update({ share_count: (data.share_count ?? 0) + 1 }).eq("id", data.id);
   }
   return NextResponse.json({ ok: true });
 }

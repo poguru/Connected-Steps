@@ -34,10 +34,21 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
   const { slug } = await params;
   const db       = getSupabaseServer();
 
-  const { data: event } = await Promise.race([
-    db.from("events").select("title, start_date, location, banner_image, distance_categories, max_participants, participant_count").eq("share_slug", slug).single(),
+  type EventRow = { title: string; start_date: string; location: string | null; banner_image: string | null; distance_categories: string[] | null; max_participants: number | null; participant_count: number | null };
+  const COLS = "title, start_date, location, banner_image, distance_categories, max_participants, participant_count";
+
+  let { data: event } = await Promise.race([
+    db.from("events").select(COLS).eq("share_slug", slug).maybeSingle(),
     new Promise<{ data: null }>(resolve => setTimeout(() => resolve({ data: null }), 4000)),
-  ]) as { data: { title: string; start_date: string; location: string | null; banner_image: string | null; distance_categories: string[] | null; max_participants: number | null; participant_count: number | null } | null };
+  ]) as { data: EventRow | null };
+
+  // Fallback: if slug is a UUID, try looking up by id (events without share_slug)
+  if (!event && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)) {
+    ({ data: event } = await Promise.race([
+      db.from("events").select(COLS).eq("id", slug).maybeSingle(),
+      new Promise<{ data: null }>(resolve => setTimeout(() => resolve({ data: null }), 2000)),
+    ]) as { data: EventRow | null });
+  }
 
   const title     = event?.title ?? "Community Run";
   const dateStr   = event?.start_date ? formatDate(event.start_date) : "";

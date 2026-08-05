@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 import { APP_URL } from "@/lib/config";
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 const ORANGE  = "#e8620a";
 const BLACK   = "#0a0a0a";

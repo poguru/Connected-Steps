@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import { NextRequest } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 const ORANGE  = "#e8620a";
 const BLACK   = "#0a0a0a";
