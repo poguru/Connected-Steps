@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
       .limit(8),
 
     db.from("events")
-      .select("id, title, event_type, cover_image, start_date, start_time, location, price, early_bird_ends_at, registration_closes_at, max_participants, participant_count, featured, share_slug, registration_required")
+      .select("id, title, event_type, cover_image, start_date, start_time, location, price, early_bird_ends_at, registration_closes_at, distance_categories, max_participants, participant_count, featured, share_slug, registration_required")
       .eq("status", "published")
       .or(
         `end_date.gt.${today},` +
@@ -248,6 +248,8 @@ export async function GET(req: NextRequest) {
       early_bird_active:     info?.early_bird_active ?? false,
       has_multiple_prices:   info?.has_multiple_prices ?? false,
       registration_closes_at: (e.registration_closes_at ?? null) as string | null,
+      distance_categories:   (e.distance_categories ?? null) as string[] | null,
+      featured:              (e.featured ?? false) as boolean,
       max_participants:      (e.max_participants ?? null) as number | null,
       participant_count:     (e.participant_count ?? 0) as number,
       share_slug:            (e.share_slug ?? null) as string | null,

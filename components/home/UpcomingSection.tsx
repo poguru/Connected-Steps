@@ -38,6 +38,8 @@ interface EventItem {
   early_bird_active:     boolean;
   has_multiple_prices:   boolean;
   registration_closes_at: string | null;
+  distance_categories:   string[] | null;
+  featured:              boolean;
   max_participants:      number | null;
   participant_count:     number;
   share_slug:            string | null;
@@ -137,11 +139,33 @@ function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (i
   const isLow  = slots !== null && slots > 0 && slots <= 10;
   const isFree = item.kind === "event" && item.price === 0;
 
+  // Event urgency signals
+  const regOpen = item.kind === "event" && (
+    !item.registration_closes_at || new Date(item.registration_closes_at) > now
+  );
+  const fillingFast = item.kind === "event" && !isFull && !isLow &&
+    item.max_participants != null && item.max_participants > 0 && slots !== null &&
+    slots <= Math.ceil(item.max_participants * 0.25);
+  const closingSoon = item.kind === "event" && regOpen && item.registration_closes_at != null &&
+    new Date(item.registration_closes_at).getTime() - now.getTime() < 7 * 86400000;
+  const regClosesDaysLeft = item.kind === "event" && item.registration_closes_at
+    ? Math.ceil((new Date(item.registration_closes_at).getTime() - now.getTime()) / 86400000)
+    : null;
+
   const typeLabel = item.kind === "session" ? "Session" : evtConf(item.event_type).label;
   const typeColor = item.kind === "session" ? "#e8620a"  : evtConf(item.event_type).color;
   const typeBg    = item.kind === "session" ? "rgba(232,98,10,0.22)" : evtConf(item.event_type).bg;
 
   const pastCount = item.kind === "session" ? item.user_session_count : 0;
+
+  // Urgency badge for events
+  const urgency = item.kind === "event" && !item.registered && !isFull ? (
+    fillingFast ? { text: "🔥 Filling Fast", color: "#f97316", bg: "rgba(249,115,22,0.18)" } :
+    isLow       ? null :                                 // already shown as "{n} left"
+    closingSoon ? { text: "⏰ Closes soon",  color: "#ef4444", bg: "rgba(239,68,68,0.18)" } :
+    regOpen     ? { text: "🟢 Reg Open",    color: "#4ade80", bg: "rgba(74,222,128,0.12)" } :
+    null
+  ) : null;
 
   return (
     <div
@@ -155,10 +179,10 @@ function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (i
         borderRadius: 16,
         overflow: "hidden",
         border: `1px solid ${
-          cd.isLive     ? "rgba(74,222,128,0.3)"  :
-          item.registered ? "rgba(34,197,94,0.3)"  :
-          hovered       ? "rgba(232,98,10,0.4)"  :
-                          "rgba(255,255,255,0.08)"
+          cd.isLive        ? "rgba(74,222,128,0.3)"  :
+          item.registered  ? "rgba(34,197,94,0.3)"   :
+          hovered          ? "rgba(232,98,10,0.4)"   :
+                             "rgba(255,255,255,0.08)"
         }`,
         background: "rgba(255,255,255,0.02)",
         cursor: "pointer",
@@ -171,6 +195,14 @@ function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (i
         minWidth: 0,
       }}
     >
+      {/* ── Event cover image ── */}
+      {item.kind === "event" && item.cover_image && (
+        <div style={{ height: 120, position: "relative", overflow: "hidden", flexShrink: 0 }}>
+          <img src={item.cover_image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 55%)" }} />
+        </div>
+      )}
+
       {/* ── Badge row ── */}
       <div style={{ padding: "11px 13px 0", display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
         <span style={{
@@ -207,12 +239,17 @@ function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (i
         )}
         {isLow && !isFull && !item.registered && (
           <span style={{ fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 999, background: "rgba(239,68,68,0.85)", color: "#fff" }}>
-            {slots} left
+            ⚠ {slots} left
           </span>
         )}
         {isFull && (
           <span style={{ fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 999, background: "rgba(239,68,68,0.9)", color: "#fff" }}>
             Full
+          </span>
+        )}
+        {urgency && (
+          <span style={{ fontSize: 9, fontWeight: 800, padding: "3px 8px", borderRadius: 999, background: urgency.bg, color: urgency.color }}>
+            {urgency.text}
           </span>
         )}
         <span style={{ flex: 1 }} />
@@ -240,7 +277,7 @@ function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (i
           {item.title}
         </div>
 
-        {/* Difficulty + Points badges */}
+        {/* Difficulty + Points badges (session only) */}
         {item.kind === "session" && (
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
             {item.difficulty && DIFFICULTY_CONFIG[item.difficulty] && (
@@ -260,6 +297,17 @@ function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (i
             }}>
               🏆 Earn 5 pts
             </span>
+          </div>
+        )}
+
+        {/* Distance category badges (event only) */}
+        {item.kind === "event" && item.distance_categories && item.distance_categories.length > 0 && (
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            {item.distance_categories.slice(0, 4).map(cat => (
+              <span key={cat} style={{ fontSize: 8, fontWeight: 700, padding: "2px 6px", borderRadius: 999, background: "rgba(232,98,10,0.12)", color: "#e8620a", border: "1px solid rgba(232,98,10,0.22)" }}>
+                {cat}
+              </span>
+            ))}
           </div>
         )}
 
@@ -292,6 +340,14 @@ function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (i
             </div>
           )}
 
+          {/* Event: registration closes date */}
+          {item.kind === "event" && !isFull && regClosesDaysLeft !== null && regClosesDaysLeft >= 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: "0.68rem", color: regClosesDaysLeft <= 3 ? "#f87171" : "var(--muted-foreground)" }}>
+              <Clock size={9} style={{ flexShrink: 0 }} />
+              <span>Reg closes {regClosesDaysLeft === 0 ? "today" : `in ${regClosesDaysLeft}d`}</span>
+            </div>
+          )}
+
           {/* Attendance history */}
           {pastCount > 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: "0.68rem", color: "rgba(74,222,128,0.7)" }}>
@@ -306,31 +362,43 @@ function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (i
           {item.registered ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
               <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#4ade80", display: "flex", alignItems: "center", gap: 4 }}>
-                <CheckCircle2 size={11} /> You&apos;re in
+                <CheckCircle2 size={11} /> You&apos;re registered
               </span>
-              {cd.isSoon && !cd.isLive && (
+              {cd.isSoon && !cd.isLive && item.kind === "session" && (
                 <span style={{ fontSize: "0.67rem", color: "var(--cs-orange)", fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
                   <Clock size={9} /> QR available — scan at the venue
                 </span>
               )}
               {cd.isLive && (
                 <span style={{ fontSize: "0.67rem", color: "#4ade80", fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
-                  <Clock size={9} /> Session is live — head to the venue!
+                  <Clock size={9} /> {item.kind === "session" ? "Session is live — head to the venue!" : "Event is on — see you there!"}
+                </span>
+              )}
+              {item.kind === "event" && !cd.isLive && (
+                <span style={{ fontSize: "0.67rem", color: "var(--muted-foreground)", display: "flex", alignItems: "center", gap: 3 }}>
+                  View registration details →
                 </span>
               )}
             </div>
           ) : isFull ? (
             <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#f87171" }}>Join Waitlist →</span>
           ) : (
-            <span style={{
-              fontSize: "0.72rem", fontWeight: 700,
-              color: hovered ? "var(--cs-orange)" : "rgba(255,255,255,0.7)",
-              display: "flex", alignItems: "center", gap: 4,
-              transition: "color 0.15s",
-            }}>
-              {item.kind === "session" ? "Register free" : item.price === 0 ? "Register free" : "Register now"}
-              <ArrowRight size={11} />
-            </span>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{
+                fontSize: "0.72rem", fontWeight: 700,
+                color: hovered ? "var(--cs-orange)" : "rgba(255,255,255,0.7)",
+                display: "flex", alignItems: "center", gap: 4,
+                transition: "color 0.15s",
+              }}>
+                {item.kind === "session" ? "Register free" : isFree ? "Register free" : "Register now"}
+                <ArrowRight size={11} />
+              </span>
+              {item.kind === "event" && (
+                <span style={{ fontSize: "0.67rem", color: "var(--muted-foreground)" }}>
+                  View details
+                </span>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -434,6 +502,16 @@ export default function UpcomingSection() {
 
   const showEmpty = !loading && items.length === 0;
 
+  // Hero: featured event with cover image and open registration, or first such event
+  const heroEvent = (() => {
+    const evts = items.filter((i): i is EventItem => i.kind === "event" && !!i.cover_image);
+    const regOpenEvts = evts.filter(e => !e.registration_closes_at || new Date(e.registration_closes_at) > now);
+    return regOpenEvts.find(e => e.featured) ?? regOpenEvts[0] ?? null;
+  })();
+  const heroSlug   = heroEvent ? (heroEvent.share_slug ?? heroEvent.id) : null;
+  const heroSlots  = heroEvent ? slotsLeft(heroEvent.max_participants, heroEvent.participant_count) : null;
+  const heroFull   = heroSlots !== null && heroSlots === 0;
+
   return (
     <section id="upcoming" style={{ background: "var(--background)", padding: "clamp(3rem,6vh,5rem) 0" }}>
       <div className="container">
@@ -470,6 +548,85 @@ export default function UpcomingSection() {
             </a>
           </div>
         </div>
+
+        {/* ── Event hero banner ── */}
+        {!loading && heroEvent && (
+          <div
+            onClick={() => handleAction(heroEvent)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === "Enter" && handleAction(heroEvent)}
+            style={{
+              borderRadius: 18, overflow: "hidden", marginBottom: "1.5rem",
+              border: "1px solid rgba(232,98,10,0.25)", cursor: "pointer",
+              position: "relative",
+            }}
+          >
+            <div style={{ position: "relative", height: "clamp(180px, 38vw, 260px)" }}>
+              <img src={heroEvent.cover_image!} alt={heroEvent.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.15) 55%, transparent 100%)" }} />
+
+              {/* Top badges */}
+              <div style={{ position: "absolute", top: 12, left: 12, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 10, fontWeight: 800, padding: "3px 10px", borderRadius: 999, background: evtConf(heroEvent.event_type).bg, color: evtConf(heroEvent.event_type).color, border: `1px solid ${evtConf(heroEvent.event_type).color}40` }}>
+                  {evtConf(heroEvent.event_type).label.toUpperCase()}
+                </span>
+                {heroEvent.featured && (
+                  <span style={{ fontSize: 10, fontWeight: 800, padding: "3px 10px", borderRadius: 999, background: "rgba(232,98,10,0.2)", color: "#e8620a", border: "1px solid rgba(232,98,10,0.4)" }}>
+                    ⭐ FEATURED
+                  </span>
+                )}
+                {heroEvent.early_bird_active && (
+                  <span style={{ fontSize: 10, fontWeight: 800, padding: "3px 10px", borderRadius: 999, background: "rgba(234,179,8,0.2)", color: "#eab308", border: "1px solid rgba(234,179,8,0.4)" }}>
+                    🐦 Early Bird
+                  </span>
+                )}
+              </div>
+
+              {/* Bottom overlay content */}
+              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "clamp(0.75rem,2.5vw,1.25rem)" }}>
+                {/* Distance categories */}
+                {(heroEvent.distance_categories ?? []).length > 0 && (
+                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 7 }}>
+                    {(heroEvent.distance_categories ?? []).map(cat => (
+                      <span key={cat} style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: "rgba(232,98,10,0.25)", color: "#e8620a", border: "1px solid rgba(232,98,10,0.4)" }}>
+                        {cat}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <h3 style={{ fontSize: "clamp(1.1rem, 3.8vw, 1.6rem)", fontWeight: 800, color: "#fff", margin: "0 0 8px", lineHeight: 1.15 }}>
+                  {heroEvent.title}
+                </h3>
+                <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
+                  <span style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.75)" }}>📅 {fmtDate(heroEvent.date)}{heroEvent.time ? ` · ${fmtTime(heroEvent.time)}` : ""}</span>
+                  <span style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.75)" }}>📍 {heroEvent.location}</span>
+                  <span style={{ fontSize: "0.82rem", fontWeight: 700, color: heroEvent.price === 0 ? "#4ade80" : "#e8620a" }}>
+                    {heroEvent.price === 0 ? "Free"
+                      : heroEvent.early_bird_active && heroEvent.early_bird_price != null
+                        ? `Early Bird ₹${heroEvent.early_bird_price}`
+                        : heroEvent.has_multiple_prices
+                          ? `From ₹${heroEvent.price}`
+                          : `₹${heroEvent.price}`
+                    }
+                  </span>
+                  {heroSlots !== null && !heroFull && (
+                    <span style={{ fontSize: "0.75rem", color: heroSlots <= 10 ? "#f87171" : "rgba(255,255,255,0.6)" }}>
+                      {heroSlots <= 10 ? `⚠ ${heroSlots} slots left` : `${heroSlots} slots left`}
+                    </span>
+                  )}
+                </div>
+                <a
+                  href={heroFull ? `/events/${heroSlug}/waitlist` : `/events/${heroSlug}`}
+                  onClick={e => { e.stopPropagation(); }}
+                  style={{ display: "inline-block", background: "var(--cs-orange)", color: "#fff", padding: "8px 20px", borderRadius: 999, fontSize: "0.82rem", fontWeight: 700, textDecoration: "none" }}
+                >
+                  {heroEvent.registered ? "View Registration" : heroFull ? "Join Waitlist" : "Register Now"} →
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Grid / Carousel */}
         {loading ? (
