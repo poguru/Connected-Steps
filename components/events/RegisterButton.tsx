@@ -3,13 +3,14 @@
 import { useRouter } from "next/navigation";
 
 interface Props {
-  eventId:             string;
-  slug:                string;
-  price?:              number;
-  startDate?:          string | null; // YYYY-MM-DD
-  endDate?:            string | null; // YYYY-MM-DD
-  endTime?:            string | null; // HH:MM or HH:MM:SS
+  eventId:              string;
+  slug:                 string;
+  price?:               number;
+  startDate?:           string | null; // YYYY-MM-DD
+  endDate?:             string | null; // YYYY-MM-DD
+  endTime?:             string | null; // HH:MM or HH:MM:SS
   registrationClosesAt?: string | null; // full TIMESTAMPTZ ISO string
+  registrationOpensAt?:  string | null; // full TIMESTAMPTZ ISO string
 }
 
 function getIST() {
@@ -20,7 +21,7 @@ function getIST() {
   };
 }
 
-export default function RegisterButton({ slug, price = 0, startDate, endDate, endTime, registrationClosesAt }: Props) {
+export default function RegisterButton({ slug, price = 0, startDate, endDate, endTime, registrationClosesAt, registrationOpensAt }: Props) {
   const router = useRouter();
   const { date: today, time: nowTime } = getIST();
   const now = new Date();
@@ -36,6 +37,13 @@ export default function RegisterButton({ slug, price = 0, startDate, endDate, en
     !isCompleted &&
     registrationClosesAt != null &&
     now >= new Date(registrationClosesAt);
+
+  // Registration not yet open
+  const isRegistrationNotOpen =
+    !isCompleted &&
+    !isRegistrationClosed &&
+    registrationOpensAt != null &&
+    now < new Date(registrationOpensAt);
 
   function handleClick() {
     const user = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
@@ -73,6 +81,22 @@ export default function RegisterButton({ slug, price = 0, startDate, endDate, en
         marginBottom: "1rem", letterSpacing: "0.02em",
       }}>
         Registration Closed
+      </div>
+    );
+  }
+
+  if (isRegistrationNotOpen) {
+    const opensDate = new Date(registrationOpensAt!).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+    return (
+      <div style={{
+        display: "block", width: "100%", textAlign: "center",
+        padding: "14px 28px", borderRadius: "10px",
+        background: "rgba(234,179,8,0.08)", color: "#fbbf24",
+        fontWeight: 700, fontSize: "1rem",
+        border: "1px solid rgba(234,179,8,0.25)",
+        marginBottom: "1rem", letterSpacing: "0.02em",
+      }}>
+        Registration opens {opensDate}
       </div>
     );
   }

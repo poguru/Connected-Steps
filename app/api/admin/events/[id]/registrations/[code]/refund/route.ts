@@ -49,6 +49,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     : (reg.final_price ?? 0) * 100;  // final_price is in rupees; Razorpay needs paise
 
   if (amountPaise <= 0) return NextResponse.json({ error: "Refund amount must be positive" }, { status: 400 });
+  const maxRefundPaise = (reg.final_price ?? 0) * 100;
+  if (maxRefundPaise > 0 && amountPaise > maxRefundPaise) {
+    return NextResponse.json({ error: `Refund amount exceeds the original payment of ₹${reg.final_price}` }, { status: 400 });
+  }
 
   // ── Mark as processing ───────────────────────────────────────────────────────
   await db.from("event_registrations")

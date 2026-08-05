@@ -4,7 +4,7 @@ import { verifyUserToken, isAdminOrCoach } from "@/lib/admin-auth";
 
 // GET /api/invoices/[number]
 // Returns the invoice HTML for viewing/printing.
-// - Admin: can view any invoice
+// - Admin/coach: can view any invoice
 // - User: can only view their own invoice (verified via x-user-token)
 // - Public (no auth): returns 401
 export async function GET(
@@ -22,6 +22,16 @@ export async function GET(
 
   if (!inv) return new NextResponse("Invoice not found", { status: 404 });
 
+  // Auth: admin can view any invoice; user can only view their own
+  const isAdmin = await isAdminOrCoach(req);
+  if (!isAdmin) {
+    const token     = req.headers.get("x-user-token");
+    const userEmail = token ? await verifyUserToken(token) : null;
+    if (!userEmail || userEmail.toLowerCase() !== inv.user_email.toLowerCase()) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+  }
+
   let html: string | null = null;
 
   // New path: download HTML from Supabase Storage
@@ -37,9 +47,6 @@ export async function GET(
 
   if (!html) return new NextResponse("Invoice not yet generated", { status: 404 });
 
-  // Invoice URLs are semi-private (sequential but not enumerable without knowing
-  // the start). No PII beyond name/product/amount in the HTML.
-  // Public access is intentional — same model used by Stripe, Razorpay, QuickBooks.
   return new NextResponse(html, {
     headers: {
       "Content-Type":  "text/html; charset=utf-8",

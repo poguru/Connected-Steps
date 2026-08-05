@@ -2,7 +2,7 @@
 // POST /api/admin/event-config/categories   — create a new event category
 
 import { NextRequest, NextResponse } from "next/server";
-import { isAdmin }           from "@/lib/admin-auth";
+import { isAdminOrCoach }    from "@/lib/admin-auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 function makeSlug(name: string): string {
@@ -10,7 +10,7 @@ function makeSlug(name: string): string {
 }
 
 export async function GET(req: NextRequest) {
-  if (!isAdmin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const all = req.nextUrl.searchParams.get("all") === "1";
   const db  = getSupabaseServer();
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!isAdmin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!await isAdminOrCoach(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
   const name = String(body.name ?? "").trim();

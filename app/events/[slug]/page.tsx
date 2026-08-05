@@ -588,6 +588,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
               eventId={ev.id} slug={ev.share_slug ?? ev.id} price={startingPrice}
               startDate={ev.start_date} endDate={ev.end_date} endTime={ev.end_time}
               registrationClosesAt={ev.registration_closes_at}
+              registrationOpensAt={ev.registration_opens_at}
             />
           )}
         </div>

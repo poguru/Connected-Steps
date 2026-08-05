@@ -11,6 +11,7 @@ const EDITABLE_FIELDS = new Set([
   "location", "meeting_point", "maps_url",
   "registration_opens_at", "registration_closes_at", "early_bird_ends_at",
   "max_participants", "waiting_list_enabled", "require_login",
+  "featured", "approval_required", "collect_tshirt",
   "terms_conditions", "refund_policy", "cancellation_policy",
   "faqs", "highlights",
   "organizer", "organizer_email", "organizer_phone",

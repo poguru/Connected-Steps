@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 // POST /api/events/waitlist -- public endpoint to join waitlist for a sold-out event/category
@@ -14,9 +14,10 @@ export async function POST(req: NextRequest) {
 
     const db = getSupabaseServer();
 
-    void (async () => {
-      try { await db.rpc("release_expired_slots"); } catch { /* non-critical */ }
-    })();
+    after(async () => {
+      const { error } = await db.rpc("release_expired_slots");
+      if (error) console.error("[waitlist] release_expired_slots failed:", error.message);
+    });
 
     // Verify event is published
     const { data: ev } = await db
