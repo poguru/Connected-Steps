@@ -40,7 +40,23 @@ async function getEvents(): Promise<Event[]> {
       )
       .order("featured", { ascending: false })
       .order("start_date",  { ascending: true });
-    return (data ?? []) as Event[];
+    const events = (data ?? []) as Event[];
+    if (events.length === 0) return events;
+
+    // Correct price from event_races — events.price may be stale vs actual race prices
+    const eventIds = events.map(e => e.id);
+    const { data: races } = await db
+      .from("event_races")
+      .select("event_id, price")
+      .in("event_id", eventIds)
+      .eq("status", "active");
+    const minPriceMap: Record<string, number> = {};
+    for (const race of (races ?? [])) {
+      const eid = race.event_id as string;
+      const p   = race.price as number;
+      if (minPriceMap[eid] === undefined || p < minPriceMap[eid]) minPriceMap[eid] = p;
+    }
+    return events.map(e => ({ ...e, price: minPriceMap[e.id] ?? e.price }));
   } catch {
     return [];
   }

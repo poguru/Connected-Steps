@@ -34,6 +34,10 @@ interface EventItem {
   time:                  string | null;
   location:              string;
   price:                 number;
+  early_bird_price:      number | null;
+  early_bird_active:     boolean;
+  has_multiple_prices:   boolean;
+  registration_closes_at: string | null;
   max_participants:      number | null;
   participant_count:     number;
   share_slug:            string | null;
@@ -179,10 +183,16 @@ function ItemCard({ item, now, onAction }: { item: Item; now: Date; onAction: (i
         {item.kind === "event" && (
           <span style={{
             fontSize: 9, fontWeight: 800, padding: "3px 8px", borderRadius: 999,
-            background: isFree ? "rgba(34,197,94,0.18)" : "rgba(255,255,255,0.1)",
-            color: isFree ? "#22c55e" : "rgba(255,255,255,0.8)",
+            background: isFree ? "rgba(34,197,94,0.18)" : item.early_bird_active ? "rgba(232,98,10,0.15)" : "rgba(255,255,255,0.1)",
+            color: isFree ? "#22c55e" : item.early_bird_active ? "#e8620a" : "rgba(255,255,255,0.8)",
           }}>
-            {isFree ? "Free" : `₹${item.price}`}
+            {isFree ? "Free"
+              : item.early_bird_active && item.early_bird_price != null
+                ? <>{`Early Bird ₹${item.early_bird_price} `}<s style={{ fontStyle: "normal", opacity: 0.5 }}>{`₹${item.price}`}</s></>
+                : item.has_multiple_prices
+                  ? `From ₹${item.price}`
+                  : `₹${item.price}`
+            }
           </span>
         )}
         {item.registered && (

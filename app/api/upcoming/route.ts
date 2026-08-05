@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
       .limit(8),
 
     db.from("events")
-      .select("id, title, event_type, cover_image, start_date, start_time, location, price, max_participants, participant_count, featured, share_slug, registration_required")
+      .select("id, title, event_type, cover_image, start_date, start_time, location, price, early_bird_ends_at, registration_closes_at, max_participants, participant_count, featured, share_slug, registration_required")
       .eq("status", "published")
       .or(
         `end_date.gt.${today},` +
@@ -61,13 +61,16 @@ export async function GET(req: NextRequest) {
   const sessionTitles      = [...new Set(sessions.map(s => s.title as string))];
 
   // ── Round 2: counts, personalization, prev photos, past sessions ──────────────
-  const [attRes, , userSessRes, userEvtRes, prevPhotoRes, pastSessRes] = await Promise.all([
+  const [attRes, raceRes, userSessRes, userEvtRes, prevPhotoRes, pastSessRes] = await Promise.all([
     // All attendance counts for upcoming sessions
     sessionIds.length
       ? db.from("session_attendance").select("session_id").in("session_id", sessionIds)
       : Promise.resolve({ data: [] }),
 
-    Promise.resolve({ data: null }),
+    // Min race prices for event cards (events.price may be stale vs event_races.price)
+    eventIds.length
+      ? db.from("event_races").select("event_id, price, early_bird_price").in("event_id", eventIds).eq("status", "active")
+      : Promise.resolve({ data: [] }),
 
     // User's registrations for upcoming sessions
     userEmail && sessionIds.length
@@ -199,22 +202,59 @@ export async function GET(req: NextRequest) {
     user_session_count: userCountByTitle[s.title as string] ?? 0,
   }));
 
-  const eventItems = events.map((e) => ({
-    kind:                  "event" as const,
-    id:                    e.id as string,
-    title:                 e.title as string,
-    event_type:            e.event_type as string,
-    cover_image:           (e.cover_image ?? null) as string | null,
-    date:                  e.start_date as string,
-    time:                  (e.start_time ?? null) as string | null,
-    location:              e.location as string,
-    price:                 (e.price ?? 0) as number,
-    max_participants:      (e.max_participants ?? null) as number | null,
-    participant_count:     (e.participant_count ?? 0) as number,
-    share_slug:            (e.share_slug ?? null) as string | null,
-    registration_required: (e.registration_required ?? true) as boolean,
-    registered:            regEventSet.has(e.id as string),
-  }));
+  // Build race price map: event_id → actual min price from event_races
+  const racePriceMap: Record<string, { min_price: number; min_early_bird_price: number | null; has_multiple_prices: boolean; early_bird_active: boolean }> = {};
+  for (const race of (raceRes.data ?? [])) {
+    const eid   = race.event_id as string;
+    const price = race.price as number;
+    const eb    = race.early_bird_price as number | null;
+    if (!racePriceMap[eid]) {
+      racePriceMap[eid] = { min_price: price, min_early_bird_price: eb, has_multiple_prices: false, early_bird_active: false };
+    } else {
+      if (price !== racePriceMap[eid].min_price) racePriceMap[eid].has_multiple_prices = true;
+      if (price < racePriceMap[eid].min_price) racePriceMap[eid].min_price = price;
+      if (eb !== null && (racePriceMap[eid].min_early_bird_price === null || eb < (racePriceMap[eid].min_early_bird_price as number))) {
+        racePriceMap[eid].min_early_bird_price = eb;
+      }
+    }
+  }
+  for (const e of events) {
+    const entry = racePriceMap[e.id as string];
+    if (!entry) continue;
+    const ebEndsAt = e.early_bird_ends_at as string | null;
+    entry.early_bird_active = !!(
+      ebEndsAt &&
+      new Date(ebEndsAt) > new Date() &&
+      entry.min_early_bird_price !== null &&
+      entry.min_early_bird_price < entry.min_price
+    );
+  }
+
+  const eventItems = events.map((e) => {
+    const eid  = e.id as string;
+    const info = racePriceMap[eid];
+    const minPrice = info ? info.min_price : (e.price ?? 0) as number;
+    return {
+      kind:                  "event" as const,
+      id:                    eid,
+      title:                 e.title as string,
+      event_type:            e.event_type as string,
+      cover_image:           (e.cover_image ?? null) as string | null,
+      date:                  e.start_date as string,
+      time:                  (e.start_time ?? null) as string | null,
+      location:              e.location as string,
+      price:                 minPrice,
+      early_bird_price:      (info?.early_bird_active && info.min_early_bird_price !== null) ? info.min_early_bird_price : null,
+      early_bird_active:     info?.early_bird_active ?? false,
+      has_multiple_prices:   info?.has_multiple_prices ?? false,
+      registration_closes_at: (e.registration_closes_at ?? null) as string | null,
+      max_participants:      (e.max_participants ?? null) as number | null,
+      participant_count:     (e.participant_count ?? 0) as number,
+      share_slug:            (e.share_slug ?? null) as string | null,
+      registration_required: (e.registration_required ?? true) as boolean,
+      registered:            regEventSet.has(eid),
+    };
+  });
 
   // Registered items first, then sort by date
   const items = [...sessionItems, ...eventItems].sort((a, b) => {

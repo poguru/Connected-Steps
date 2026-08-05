@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 
+const MAX_REQUEUE_ATTEMPTS = 5;
+
 // PATCH /api/admin/events/[id]/announce/campaign
 // Controls the lifecycle of an active email campaign.
 // body: { batch_id: string; action: "pause" | "resume" | "cancel" | "retry" }
@@ -75,7 +77,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       .eq("batch_id", batch_id)
       .eq("status", "failed")
       .eq("is_permanent", false)
-      .lt("attempts", 5);
+      .lt("attempts", MAX_REQUEUE_ATTEMPTS);
 
     await db.from("email_campaigns")
       .update({ status: "running", completed_at: null, cancelled_at: null, worker_locked_at: null })

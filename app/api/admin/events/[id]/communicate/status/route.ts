@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdminOrCoach } from "@/lib/admin-auth";
 
+// Max attempts before an email is ineligible for admin re-queue.
+// send-next auto-retries stop at MAX_ATTEMPTS=3; admins can force up to this many total.
+const MAX_REQUEUE_ATTEMPTS = 5;
+
 // GET — per-email status breakdown for a batch, plus campaign-level tracking fields.
 // ?batch_id=   required
 // ?include_all=true   include every email row (not just failures) for the detail view
@@ -38,7 +42,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const sending   = rows.filter(r => r.status === "sending").length;
   const delivered = rows.filter(r => r.status === "delivered").length;
   const failed    = rows.filter(r => r.status === "failed").length;
-  const retryable = rows.filter(r => r.status === "failed" && r.is_permanent === false).length;
+  const retryable = rows.filter(r => r.status === "failed" && r.is_permanent === false && (r.attempts ?? 0) < MAX_REQUEUE_ATTEMPTS).length;
   const opened    = rows.filter(r => r.opened_at   != null).length;
   const clicked   = rows.filter(r => r.clicked_at  != null).length;
   const bounced   = rows.filter(r => r.bounce_type != null).length;
@@ -119,13 +123,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const db = getSupabaseServer();
 
-  // Only re-queue non-permanent failures with < 5 total attempts
+  // Only re-queue non-permanent failures within the admin retry limit
   const { error } = await db.from("email_queue")
     .update({ status: "queued" })
     .eq("batch_id", batch_id)
     .eq("status", "failed")
     .eq("is_permanent", false)
-    .lt("attempts", 5);
+    .lt("attempts", MAX_REQUEUE_ATTEMPTS);
 
   if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
