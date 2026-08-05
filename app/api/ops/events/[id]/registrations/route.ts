@@ -43,10 +43,26 @@ export async function GET(
     .range(from, from + limit - 1);
 
   if (q) {
-    // Search across name, email, BIB, account email
-    query = query.or(
-      `first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%,bib_number.ilike.%${q}%,account_email.ilike.%${q}%`
-    );
+    // Base OR across participant-table columns (including mobile/phone)
+    let orClause =
+      `first_name.ilike.%${q}%,last_name.ilike.%${q}%,` +
+      `email.ilike.%${q}%,mobile.ilike.%${q}%,` +
+      `bib_number.ilike.%${q}%,account_email.ilike.%${q}%`;
+
+    // registration_code lives in the parent event_registrations table —
+    // pre-fetch matching IDs and include their participants via registration_id.in.(...)
+    const { data: codeMatches } = await db
+      .from("event_registrations")
+      .select("id")
+      .eq("event_id", eventId)
+      .ilike("registration_code", `%${q}%`)
+      .returns<{ id: string }[]>();
+
+    if (codeMatches && codeMatches.length > 0) {
+      orClause += `,registration_id.in.(${codeMatches.map(r => r.id).join(",")})`;
+    }
+
+    query = query.or(orClause);
   }
 
   const { data: participants, count, error } = await query.returns<{

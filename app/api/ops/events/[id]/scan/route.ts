@@ -142,13 +142,9 @@ export async function POST(
           .eq("event_id", eventId)
           .maybeSingle();
         if (regRow) {
-          const { data: byReg } = await db
-            .from("event_participants")
-            .select(SELECT)
-            .eq("registration_id", regRow.id)
-            .eq("event_id", eventId)
-            .maybeSingle<Participant>();
-          participant = byReg;
+          const multiResult = await lookupByRegistrationId(db, regRow.id, eventId, SELECT);
+          if (multiResult.response) return multiResult.response;
+          participant = multiResult.participant;
         }
       }
     }
@@ -177,13 +173,9 @@ export async function POST(
             message: "This Registration ID belongs to a different event. Please check you are at the correct station.",
           }, { status: 400 });
         }
-        const { data } = await db
-          .from("event_participants")
-          .select(SELECT)
-          .eq("registration_id", regRow.id)
-          .eq("event_id", eventId)
-          .maybeSingle<Participant>();
-        participant = data;
+        const multiResult = await lookupByRegistrationId(db, regRow.id, eventId, SELECT);
+        if (multiResult.response) return multiResult.response;
+        participant = multiResult.participant;
       }
     }
 
@@ -299,6 +291,39 @@ export async function POST(
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// For group registrations, a registration_id maps to multiple event_participants.
+// maybeSingle() silently returns one arbitrarily — this helper fetches all and
+// returns a MULTI_PARTICIPANT response when there are more than one.
+async function lookupByRegistrationId(
+  db: DB, registrationId: string, eventId: string, select: string
+): Promise<{ participant: Participant | null; response: NextResponse | null }> {
+  const { data: parts } = await db
+    .from("event_participants")
+    .select(select)
+    .eq("registration_id", registrationId)
+    .eq("event_id", eventId)
+    .neq("status", "cancelled")
+    .order("first_name")
+    .returns<Participant[]>();
+
+  if (!parts || parts.length === 0) return { participant: null, response: null };
+
+  if (parts.length === 1) return { participant: parts[0], response: null };
+
+  // Group booking — return all participants so the UI can prompt for selection
+  return {
+    participant: null,
+    response: NextResponse.json({
+      valid: false,
+      code: "MULTI_PARTICIPANT",
+      message: "This is a group registration with multiple participants. Please scan individual QR codes or select a participant below.",
+      participants: parts.map(pp =>
+        participantCard(pp, [pp.first_name, pp.last_name].filter(Boolean).join(" "))
+      ),
+    }, { status: 200 }),
+  };
+}
 
 function participantCard(p: Participant, name: string) {
   return {

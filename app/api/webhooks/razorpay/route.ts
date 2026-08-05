@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 import { getSupabaseServer }    from "@/lib/supabase-server";
+import { validateRazorpayWebhook } from "@/lib/razorpay-security";
 import { handleEventQrEmail,
          handleInvoiceGenerate } from "@/lib/job-handlers";
 import { enqueueJob }           from "@/lib/job-queue";
@@ -57,61 +57,38 @@ interface RzpWebhookPayload {
   };
 }
 
-// Razorpay sends this header for webhook signature verification.
-// The signature is HMAC-SHA256(raw_body, RAZORPAY_WEBHOOK_SECRET).
-// This is different from the payment signature (which uses key_secret).
-const WEBHOOK_HEADER    = "x-razorpay-signature";
-const TIMESTAMP_HEADER  = "x-razorpay-timestamp";
-const REPLAY_WINDOW_SEC = 5 * 60; // reject webhooks older than 5 minutes
+function reasonToMessage(reason: string | undefined): string {
+  if (!reason) return "Webhook validation failed";
+  if (reason.startsWith("timestamp_too_old_")) return "Webhook timestamp too old — possible replay attack";
+  if (reason === "invalid_timestamp_format") return "Invalid webhook timestamp";
+  if (reason.includes("signature")) return "Invalid webhook signature";
+  return "Webhook validation failed";
+}
 
 export async function POST(req: NextRequest) {
   // ── 1. Read raw body (must be done before any JSON parsing) ──────────────
   const rawBody = await req.text();
-  const sig     = req.headers.get(WEBHOOK_HEADER) ?? "";
 
-  // ── 2. Verify webhook signature ───────────────────────────────────────────
+  // ── 2. Validate signature + replay-attack timestamp via shared lib ────────
   const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
   if (!webhookSecret) {
     console.error("[razorpay-webhook] RAZORPAY_WEBHOOK_SECRET env var not set");
     return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
   }
 
-  const expected = crypto
-    .createHmac("sha256", webhookSecret)
-    .update(rawBody)
-    .digest("hex");
+  const validation = validateRazorpayWebhook(
+    rawBody,
+    req.headers.get("x-razorpay-signature"),
+    req.headers.get("x-razorpay-timestamp"),
+    webhookSecret,
+    { ip: req.headers.get("x-forwarded-for") ?? "unknown" },
+  );
 
-  // Timing-safe comparison to prevent timing attacks
-  let sigValid = false;
-  try {
-    sigValid = sig.length === expected.length &&
-      crypto.timingSafeEqual(Buffer.from(sig, "hex"), Buffer.from(expected, "hex"));
-  } catch { sigValid = false; }
-
-  if (!sigValid) {
-    console.error(`[razorpay-webhook] Invalid signature — received=${sig.slice(0, 10)}... expected=${expected.slice(0, 10)}...`);
-    return NextResponse.json({ error: "Invalid webhook signature" }, { status: 400 });
-  }
-
-  // ── 2b. Replay-attack protection — validate timestamp ─────────────────────
-  // Razorpay includes x-razorpay-timestamp (Unix epoch seconds) in all webhooks.
-  // Reject deliveries whose timestamp falls outside the ±5-minute window.
-  // When the header is absent (non-standard delivery) we log but do not reject,
-  // to preserve backward compatibility with any legacy integrations.
-  const tsHeader = req.headers.get(TIMESTAMP_HEADER);
-  if (tsHeader) {
-    const tsNum = parseInt(tsHeader, 10);
-    if (!Number.isFinite(tsNum)) {
-      console.error(`[razorpay-webhook] Malformed timestamp header: "${tsHeader}"`);
-      return NextResponse.json({ error: "Invalid webhook timestamp" }, { status: 400 });
-    }
-    const ageSec = Math.abs(Math.floor(Date.now() / 1000) - tsNum);
-    if (ageSec > REPLAY_WINDOW_SEC) {
-      console.error(`[razorpay-webhook] Stale webhook — age=${ageSec}s exceeds window=${REPLAY_WINDOW_SEC}s`);
-      return NextResponse.json({ error: "Webhook timestamp too old — possible replay attack" }, { status: 400 });
-    }
-  } else {
-    console.warn("[razorpay-webhook] Missing x-razorpay-timestamp header — replay protection skipped");
+  if (!validation.valid) {
+    return NextResponse.json(
+      { error: reasonToMessage(validation.reason) },
+      { status: 400 },
+    );
   }
 
   // ── 3. Parse payload ──────────────────────────────────────────────────────
