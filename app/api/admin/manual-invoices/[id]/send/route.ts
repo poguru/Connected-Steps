@@ -13,26 +13,39 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const db   = getSupabaseServer();
   const body = await req.json() as {
-    to:        string[];
-    cc?:       string[];
-    bcc?:      string[];
-    subject:   string;
-    body_html: string;
+    to:         string[];
+    cc?:        string[];
+    bcc?:       string[];
+    subject:    string;
+    body?:      string;       // plain text from textarea
+    body_html?: string;       // pre-formatted HTML (takes precedence)
   };
 
   if (!body.to?.length) return NextResponse.json({ error: "At least one recipient required" }, { status: 400 });
   if (!body.subject)    return NextResponse.json({ error: "subject is required" }, { status: 400 });
 
   const { data: invoice } = await db.from("manual_invoices")
-    .select("id, invoice_number, payment_status").eq("id", id).single();
+    .select("id, invoice_number, payment_status, client_name").eq("id", id).single();
   if (!invoice) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (invoice.payment_status === "cancelled") {
     return NextResponse.json({ error: "Cannot send a cancelled invoice" }, { status: 409 });
   }
 
-  // Generate invoice HTML for the inline preview
+  // Build email HTML — accept pre-built HTML or convert plain text
+  const plainText = body.body ?? "";
+  const emailHtml = body.body_html ?? [
+    `<div style="font-family:Arial,sans-serif;font-size:14px;color:#333;line-height:1.75;max-width:580px;margin:0 auto">`,
+    plainText
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/\n/g, "<br>"),
+    `<br><br><hr style="border:none;border-top:1px solid #eee;margin:20px 0">`,
+    `<p style="font-size:11px;color:#999;margin:0">`,
+    `This email was sent by Connected Steps Events. `,
+    `<a href="${process.env.NEXT_PUBLIC_APP_URL ?? "https://connectedsteps.in"}/api/admin/manual-invoices/${id}/html" style="color:#e8620a">View invoice online</a>`,
+    `</p></div>`,
+  ].join("");
+
   const htmlUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/admin/manual-invoices/${id}/html`;
-  const emailHtml = body.body_html;
 
   // Send to all recipients
   let lastMessageId: string | null = null;

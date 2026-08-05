@@ -35,7 +35,7 @@ interface HistoryEntry {
 }
 
 interface EmailLog {
-  id: string; to_email: string; subject: string; status: string; sent_at: string;
+  id: string; to_emails: string[]; subject: string; status: string; sent_at: string;
 }
 
 interface Payment {
@@ -232,7 +232,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     setInvoice(data.invoice ?? null);
     setItems(data.items ?? []);
     setHistory(data.history ?? []);
-    setEmailLogs(data.emailLogs ?? []);
+    setEmailLogs(data.emails ?? []);
     setPayments(data.payments ?? []);
     setLoading(false);
   }
@@ -469,7 +469,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           {emailLogs.map(log => (
             <div key={log.id} style={{ display: "flex", gap: 12, padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.04)", fontSize: "0.8rem" }}>
               <span style={{ color: "#555", minWidth: 100, flexShrink: 0 }}>{fmtDate(log.sent_at)}</span>
-              <span style={{ color: "rgba(255,255,255,0.5)" }}>To: {log.to_email}</span>
+              <span style={{ color: "rgba(255,255,255,0.5)" }}>To: {(log.to_emails ?? []).join(", ")}</span>
               <span style={{ flex: 1, color: "rgba(255,255,255,0.5)" }}>{log.subject}</span>
               <Badge color={log.status === "sent" ? "green" : "red"} size="sm">{log.status}</Badge>
             </div>
