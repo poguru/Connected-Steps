@@ -54,14 +54,16 @@ const CHANNEL_ICON: Record<string, string> = { email: "📧", whatsapp: "💬", 
 export default function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
 
-  const [campaign,   setCampaign]   = useState<Campaign | null>(null);
-  const [rows,       setRows]       = useState<QueueRow[]>([]);
-  const [total,      setTotal]      = useState(0);
-  const [loading,    setLoading]    = useState(true);
-  const [sending,    setSending]    = useState(false);
-  const [retrying,   setRetrying]   = useState(false);
+  const [campaign,     setCampaign]     = useState<Campaign | null>(null);
+  const [rows,         setRows]         = useState<QueueRow[]>([]);
+  const [total,        setTotal]        = useState(0);
+  const [liveStats,    setLiveStats]    = useState<{ delivered: number; failed: number; queued: number; sending: number } | null>(null);
+  const [loading,      setLoading]      = useState(true);
+  const [sending,      setSending]      = useState(false);
+  const [retrying,     setRetrying]     = useState(false);
+  const [processing,   setProcessing]   = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [alert,      setAlert]      = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [alert,        setAlert]        = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
   const load = useCallback(async () => {
     const [cRes, sRes] = await Promise.all([
@@ -72,6 +74,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
     setCampaign(cData.campaign ?? null);
     setRows(sData.recipients ?? []);
     setTotal(sData.total ?? 0);
+    setLiveStats(sData.liveStats ?? null);
     setLoading(false);
   }, [id, statusFilter]);
 
@@ -108,6 +111,21 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
     if (res.ok) {
       setAlert({ type: "success", msg: `${data.retried} email(s) queued for retry.` });
       await load();
+    }
+  }
+
+  async function processQueue() {
+    if (!campaign) return;
+    setProcessing(true);
+    setAlert(null);
+    const res  = await fetch(`/api/admin/campaigns/${id}/process`, { method: "POST" });
+    const data = await res.json();
+    setProcessing(false);
+    if (res.ok) {
+      setAlert({ type: "success", msg: `Processing started · ${data.queuedRows} queued row(s) will be sent now.` });
+      await load();
+    } else {
+      setAlert({ type: "error", msg: data.error ?? "Process failed" });
     }
   }
 
@@ -159,6 +177,9 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
                 <Button onClick={sendNow} loading={sending} variant="primary" size="sm">Send Now</Button>
               </>
             )}
+            {campaign.status === "sending" && (
+              <Button onClick={processQueue} loading={processing} size="sm" variant="primary">⚡ Process Queue</Button>
+            )}
             {campaign.status === "sent" && campaign.failed_count > 0 && (
               <Button onClick={retryFailed} loading={retrying} size="sm" variant="outline">Retry Failed</Button>
             )}
@@ -168,27 +189,40 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
       </Card>
 
       {/* ── Stats row ── */}
-      {campaign.recipient_count > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 10, marginBottom: 16 }}>
-          {[
-            { label: "Recipients", value: campaign.recipient_count, color: "#fff" },
-            { label: "Queued",     value: campaign.queued_count,    color: "#facc15" },
-            { label: "Delivered",  value: campaign.sent_count,      color: "#4ade80" },
-            { label: "Failed",     value: campaign.failed_count,    color: "#f87171" },
-            { label: "Opened",     value: campaign.opened_count,    color: "#a78bfa" },
-            { label: "Clicked",    value: campaign.clicked_count,   color: "#60a5fa" },
-            { label: "Bounced",    value: campaign.bounced_count,   color: "#fb923c" },
-          ].map(stat => (
-            <Card key={stat.label} style={{ padding: "0.85rem", textAlign: "center" }}>
-              <div style={{ fontSize: "1.4rem", fontWeight: 800, color: stat.color }}>{stat.value}</div>
-              <div style={{ fontSize: "0.68rem", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginTop: 2 }}>{stat.label}</div>
-              {stat.label !== "Recipients" && campaign.recipient_count > 0 && (
-                <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.25)", marginTop: 1 }}>{pct(stat.value, total_)}</div>
-              )}
-            </Card>
-          ))}
-        </div>
-      )}
+      {campaign.recipient_count > 0 && (() => {
+        // During sending, use live counts from email_queue; otherwise use stored campaign stats
+        const useLive = campaign.status === "sending" && liveStats !== null;
+        const queuedVal    = useLive ? liveStats!.queued    : campaign.queued_count;
+        const deliveredVal = useLive ? liveStats!.delivered : campaign.sent_count;
+        const failedVal    = useLive ? liveStats!.failed    : campaign.failed_count;
+        return (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 10, marginBottom: 16 }}>
+            {[
+              { label: "Recipients", value: campaign.recipient_count, color: "#fff" },
+              { label: "Queued",     value: queuedVal,                color: "#facc15" },
+              { label: "Delivered",  value: deliveredVal,             color: "#4ade80" },
+              { label: "Failed",     value: failedVal,                color: "#f87171" },
+              { label: "Opened",     value: campaign.opened_count,    color: "#a78bfa" },
+              { label: "Clicked",    value: campaign.clicked_count,   color: "#60a5fa" },
+              { label: "Bounced",    value: campaign.bounced_count,   color: "#fb923c" },
+            ].map(stat => (
+              <Card key={stat.label} style={{ padding: "0.85rem", textAlign: "center" }}>
+                <div style={{ fontSize: "1.4rem", fontWeight: 800, color: stat.color }}>{stat.value}</div>
+                <div style={{ fontSize: "0.68rem", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginTop: 2 }}>{stat.label}</div>
+                {stat.label !== "Recipients" && campaign.recipient_count > 0 && (
+                  <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.25)", marginTop: 1 }}>{pct(stat.value, total_)}</div>
+                )}
+              </Card>
+            ))}
+            {useLive && liveStats!.sending > 0 && (
+              <Card style={{ padding: "0.85rem", textAlign: "center" }}>
+                <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "#60a5fa" }}>{liveStats!.sending}</div>
+                <div style={{ fontSize: "0.68rem", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginTop: 2 }}>In Flight</div>
+              </Card>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── Subject preview ── */}
       {campaign.channel === "email" && campaign.subject && (

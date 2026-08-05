@@ -94,13 +94,19 @@ export async function POST(req: NextRequest, { params }: Params) {
       // The cron picks up email_campaigns rows with status='running' and processes
       // them via claim_batch_emails (FOR UPDATE SKIP LOCKED), closing the timeout
       // gap that existed when processCampaignBatch ran inside after().
-      await db.from("email_campaigns").insert({
+      const { error: ecErr } = await db.from("email_campaigns").insert({
         batch_id:    batchId,
         subject:     campaign.subject ?? null,
         status:      "running",
         total_count: recipients.length,
         created_by:  id,   // communication_campaigns.id for back-reference
       });
+      if (ecErr) {
+        // email_campaigns table missing or insert failed — fall back to inline processing.
+        // processCampaignBatch is safe to run for large batches: it processes in chunks
+        // and is idempotent (skips already-delivered rows).
+        after(() => processCampaignBatch(batchId));
+      }
     } else {
       // Small campaign: process inline after response for near-instant delivery
       after(() => processCampaignBatch(batchId));

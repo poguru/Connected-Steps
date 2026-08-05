@@ -25,21 +25,37 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   let recipients = null;
   let total = 0;
+  let liveStats: { delivered: number; failed: number; queued: number; sending: number } | null = null;
 
   if (campaign.batch_id) {
+    const bid = campaign.batch_id;
+
     let q = db.from("email_queue")
       .select("id, recipient_email, recipient_name, status, attempts, failure_reason, failure_code, sent_at, opened_at, clicked_at, bounce_type", { count: "exact" })
-      .eq("batch_id", campaign.batch_id)
+      .eq("batch_id", bid)
       .order("created_at")
       .range(offset, offset + limit - 1);
     if (statusFilter) q = q.eq("status", statusFilter);
 
-    const { data, count } = await q;
-    recipients = data;
-    total = count ?? 0;
+    const [rowsRes, delivRes, failRes, queuedRes, sendingRes] = await Promise.all([
+      q,
+      db.from("email_queue").select("id", { count: "exact", head: true }).eq("batch_id", bid).eq("status", "delivered"),
+      db.from("email_queue").select("id", { count: "exact", head: true }).eq("batch_id", bid).eq("status", "failed"),
+      db.from("email_queue").select("id", { count: "exact", head: true }).eq("batch_id", bid).eq("status", "queued"),
+      db.from("email_queue").select("id", { count: "exact", head: true }).eq("batch_id", bid).eq("status", "sending"),
+    ]);
+
+    recipients = rowsRes.data;
+    total = rowsRes.count ?? 0;
+    liveStats = {
+      delivered: delivRes.count ?? 0,
+      failed:    failRes.count  ?? 0,
+      queued:    queuedRes.count ?? 0,
+      sending:   sendingRes.count ?? 0,
+    };
   }
 
-  return NextResponse.json({ campaign, recipients: recipients ?? [], total });
+  return NextResponse.json({ campaign, recipients: recipients ?? [], total, liveStats });
 }
 
 // POST /api/admin/campaigns/[id]/status/retry

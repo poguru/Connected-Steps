@@ -371,7 +371,8 @@ export async function queueCampaignEmails(opts: {
   // Insert in chunks to avoid hitting Supabase row limit per request
   const CHUNK = 500;
   for (let i = 0; i < rows.length; i += CHUNK) {
-    await db.from("email_queue").insert(rows.slice(i, i + CHUNK));
+    const { error } = await db.from("email_queue").insert(rows.slice(i, i + CHUNK));
+    if (error) throw new Error(`Failed to queue emails (chunk ${i}): ${error.message}`);
   }
 
   return batchId;
