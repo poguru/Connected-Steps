@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     waiting_list_enabled, require_login, approval_required, collect_tshirt,
     price, featured, terms_conditions, highlights, faqs, registration_config,
     distance_categories, refund_policy, cancellation_policy, visibility,
-    gallery_images, status,
+    gallery_images, whatsapp_community_url, status,
   } = body;
 
   if (!title || !location || !start_date) {
@@ -115,6 +115,7 @@ export async function POST(req: NextRequest) {
       cancellation_policy:    cancellation_policy || null,
       visibility:             visibility || "public",
       gallery_images:         Array.isArray(gallery_images) ? gallery_images : [],
+      whatsapp_community_url: whatsapp_community_url || null,
       status:                 status || "draft",
       share_slug:             slug,
     })

@@ -99,6 +99,7 @@ interface WizardState {
   highlights:             string[];
   faqs:                   FaqItem[];
   gallery_images:         string[];
+  whatsapp_community_url: string;
 }
 
 interface EventTemplate {
@@ -141,6 +142,7 @@ const BLANK: WizardState = {
   refund_policy: "", cancellation_policy: "", terms_conditions: "",
   visibility: "public",
   highlights: [], faqs: [], gallery_images: [],
+  whatsapp_community_url: "",
 };
 
 const BLANK_RACE: RaceForm = {
@@ -658,6 +660,7 @@ export default function NewEventWizard() {
         highlights:             form.highlights,
         faqs:                   form.faqs,
         gallery_images:         form.gallery_images,
+        whatsapp_community_url: form.whatsapp_community_url || null,
         registration_config:    regConfig,
         status:                 publish ? "published" : "draft",
         price:                  races[0] ? Number(races[0].price) || 0 : 0,
@@ -1855,6 +1858,17 @@ function StepContent({
         </div>
         {galError && <div style={{ fontSize: 11, color: "#f87171", marginTop: 6 }}>{galError}</div>}
         <input ref={galInputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) addGalleryImage(f); }} />
+      </SectionCard>
+
+      <SectionCard title="Community Links">
+        <Field label="WhatsApp Community URL" hint="Invite link shown to participants after registration so they can join the event group">
+          <input
+            className="wiz-input"
+            value={form.whatsapp_community_url}
+            onChange={e => set("whatsapp_community_url", e.target.value)}
+            placeholder="https://chat.whatsapp.com/…"
+          />
+        </Field>
       </SectionCard>
     </div>
   );
