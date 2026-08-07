@@ -43,6 +43,15 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Tell Vercel's file tracer to include the Chromium binary in the PDF routes.
+  // @sparticuz/chromium reads bin/chromium.br at runtime via a dynamic path that
+  // the tracer can't see statically — so we declare it explicitly.
+  outputFileTracingIncludes: {
+    "/api/admin/quotations/*/pdf":       ["./node_modules/@sparticuz/chromium/bin/**/*"],
+    "/api/admin/quotations/*/send":      ["./node_modules/@sparticuz/chromium/bin/**/*"],
+    "/api/admin/manual-invoices/*/pdf":  ["./node_modules/@sparticuz/chromium/bin/**/*"],
+    "/api/admin/manual-invoices/*/send": ["./node_modules/@sparticuz/chromium/bin/**/*"],
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [

@@ -1,5 +1,9 @@
 {
   "functions": {
+    "app/api/admin/quotations/[id]/pdf/route.ts":                           { "maxDuration": 60  },
+    "app/api/admin/quotations/[id]/send/route.ts":                          { "maxDuration": 60  },
+    "app/api/admin/manual-invoices/[id]/pdf/route.ts":                      { "maxDuration": 60  },
+    "app/api/admin/manual-invoices/[id]/send/route.ts":                     { "maxDuration": 60  },
     "app/api/cron/**/route.ts":                                              { "maxDuration": 300 },
     "app/api/cron/daily-attendance-report/route.ts":                        { "maxDuration": 60  },
     "app/api/cron/slot-expiry/route.ts":                                    { "maxDuration": 30  },
