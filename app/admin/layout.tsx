@@ -79,6 +79,7 @@ const NAV_GROUPS = [
       { label: "Finance Dashboard",   href: "/admin/finance/dashboard",       exact: false, icon: "📊" },
       { label: "Invoices",            href: "/admin/finance",                 exact: true,  icon: "🧾" },
       { label: "Manual Invoices",      href: "/admin/finance/manual-invoices", exact: false, icon: "🧾" },
+      { label: "Quotations",           href: "/admin/finance/quotations",      exact: false, icon: "📝" },
       { label: "Manual Payments",     href: "/admin/finance/manual-payments", exact: false, icon: "💵" },
       { label: "Payouts",             href: "/admin/finance/payouts",         exact: false, icon: "💸" },
       { label: "Reports & Export",    href: "/admin/finance/reports",         exact: false, icon: "📋" },
