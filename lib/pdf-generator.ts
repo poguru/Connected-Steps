@@ -3,78 +3,74 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 const PDF_BUCKET = "documents";
 
 // ── Chrome executable resolution ──────────────────────────────────────────────
-// Tries multiple strategies in order so the code works on Vercel, Lambda, VPS,
-// and local dev without any manual configuration.
 
-async function resolveChrome(): Promise<string> {
-  // 1. Explicit override via env var
+type ChromeHandle = { executablePath: string; args: string[]; headless: boolean | "shell" };
+
+const FALLBACK_ARGS = [
+  "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
+  "--disable-gpu", "--disable-software-rasterizer",
+  "--disable-features=VizDisplayCompositor",
+  "--font-render-hinting=none", "--single-process",
+];
+
+async function resolveChrome(): Promise<ChromeHandle> {
+  // 1. Explicit env var override
   for (const v of ["CHROME_EXECUTABLE_PATH", "PUPPETEER_EXECUTABLE_PATH", "CHROME_BIN"]) {
-    if (process.env[v]) return process.env[v]!;
+    if (process.env[v]) return { executablePath: process.env[v]!, args: FALLBACK_ARGS, headless: true };
   }
 
-  // 2. @sparticuz/chromium bundled binary — try multiple extraction directories in case
-  //    the default /tmp is too small or not writable on this host.
+  // 2. @sparticuz/chromium bundled binary.
+  //
+  //    @sparticuz gates library extraction (al2023.tar.br → libnss3.so etc.) and the
+  //    LD_LIBRARY_PATH setup behind isRunningInAwsLambdaNode20(), which checks
+  //    AWS_LAMBDA_JS_RUNTIME or AWS_EXECUTION_ENV. Vercel never sets those vars, so the
+  //    libraries are never extracted and Chrome crashes immediately with "libnss3.so not found".
+  //    Setting AWS_LAMBDA_JS_RUNTIME before the import fixes the detection.
+  if (!process.env.AWS_LAMBDA_JS_RUNTIME && !process.env.AWS_EXECUTION_ENV) {
+    process.env.AWS_LAMBDA_JS_RUNTIME = "nodejs20.x";
+  }
+
   const sparticuzErrors: string[] = [];
   try {
     const chromium = (await import("@sparticuz/chromium")).default;
-    for (const loc of [undefined, "/var/tmp", "/dev/shm", "/run"]) {
-      try {
-        const p = await (loc ? chromium.executablePath(loc) : chromium.executablePath());
-        if (p) { console.log("[PDF] @sparticuz chromium at:", p); return p; }
-      } catch (e) {
-        const msg = `${loc ?? "/tmp"}: ${(e as Error).message}`;
-        sparticuzErrors.push(msg);
-        console.warn("[PDF] @sparticuz failed for", msg);
-      }
+    const p = await chromium.executablePath();
+    if (p) {
+      console.log("[PDF] @sparticuz chromium:", p, "  LD_LIBRARY_PATH:", process.env.LD_LIBRARY_PATH);
+      // Use chromium.args (includes --single-process, correct headless flags, etc.)
+      return { executablePath: p, args: chromium.args, headless: chromium.headless };
     }
-  } catch (importErr) {
-    sparticuzErrors.push(`import: ${(importErr as Error).message}`);
+  } catch (e) {
+    sparticuzErrors.push((e as Error).message);
+    console.warn("[PDF] @sparticuz failed:", (e as Error).message);
   }
 
-  // 3. System Chrome (VPS with Chrome installed via apt-get)
+  // 3. System Chrome (VPS with Chrome installed)
   const { access } = await import("fs/promises");
   const sysPaths = [
-    "/usr/bin/google-chrome-stable",
-    "/usr/bin/google-chrome",
-    "/usr/bin/chromium-browser",
-    "/usr/bin/chromium",
-    "/snap/bin/chromium",
-    "/opt/google/chrome/chrome",
+    "/usr/bin/google-chrome-stable", "/usr/bin/google-chrome",
+    "/usr/bin/chromium-browser", "/usr/bin/chromium",
+    "/snap/bin/chromium", "/opt/google/chrome/chrome",
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
   ];
   for (const p of sysPaths) {
-    try { await access(p); console.log("[PDF] System Chrome at:", p); return p; } catch {}
+    try { await access(p); console.log("[PDF] System Chrome:", p); return { executablePath: p, args: FALLBACK_ARGS, headless: true }; } catch {}
   }
 
   throw new Error(
     `No Chrome executable found.\n` +
-    `@sparticuz/chromium errors: ${sparticuzErrors.join(" | ") || "none"}\n` +
+    `@sparticuz errors: ${sparticuzErrors.join(" | ") || "none"}\n` +
     `System paths tried: ${sysPaths.join(", ")}\n` +
-    `Fix: run [apt-get install -y google-chrome-stable] on the server, ` +
-    `or set the CHROME_EXECUTABLE_PATH environment variable.`
+    `Fix: set CHROME_EXECUTABLE_PATH env var or install google-chrome-stable.`
   );
 }
 
 // ── Core PDF generation ───────────────────────────────────────────────────────
 
 export async function generatePdfBuffer(html: string): Promise<Buffer> {
-  const executablePath = await resolveChrome();
+  const { executablePath, args, headless } = await resolveChrome();
 
   const { launch } = await import("puppeteer-core");
-  const browser = await launch({
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--disable-software-rasterizer",
-      "--disable-features=VizDisplayCompositor",
-      "--font-render-hinting=none",
-      "--run-all-compositor-stages-before-draw",
-    ],
-    executablePath,
-    headless: true,
-  });
+  const browser = await launch({ args, executablePath, headless });
 
   const page = await browser.newPage();
   try {
