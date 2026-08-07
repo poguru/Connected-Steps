@@ -43,6 +43,10 @@ export interface EmailMessage {
   html:     string;
   from?:    string;   // "Name <addr@domain>" or plain address
   replyTo?: string;
+  /** CC recipients — included in ZeptoMail cc field. */
+  cc?:      string[];
+  /** BCC recipients — included in ZeptoMail bcc field. */
+  bcc?:     string[];
   /**
    * When set, adds RFC 2369 List-Unsubscribe headers.
    * Use for bulk / non-transactional emails (digests, reminders).
@@ -161,6 +165,14 @@ export async function sendSingleEmail(msg: EmailMessage): Promise<SendResult> {
     htmlbody: msg.html,
     textbody: textBody,
   };
+
+  if (msg.cc && msg.cc.length > 0) {
+    payload.cc = msg.cc.map(addr => ({ email_address: { address: addr, name: "" } }));
+  }
+
+  if (msg.bcc && msg.bcc.length > 0) {
+    payload.bcc = msg.bcc.map(addr => ({ email_address: { address: addr, name: "" } }));
+  }
 
   if (msg.listUnsubscribeUrl) {
     payload.mime_headers = {

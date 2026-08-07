@@ -35,7 +35,8 @@ interface HistoryEntry {
 }
 
 interface EmailLog {
-  id: string; to_emails: string[]; subject: string; status: string; sent_at: string;
+  id: string; to_emails: string[]; cc_emails: string[] | null; subject: string;
+  status: string; sent_at: string | null; failure_reason: string | null;
 }
 
 interface Payment {
@@ -467,11 +468,39 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         <Card style={{ padding: "1rem 1.25rem", marginBottom: 14 }}>
           <div style={section}>Communication History</div>
           {emailLogs.map(log => (
-            <div key={log.id} style={{ display: "flex", gap: 12, padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.04)", fontSize: "0.8rem" }}>
-              <span style={{ color: "#555", minWidth: 100, flexShrink: 0 }}>{fmtDate(log.sent_at)}</span>
-              <span style={{ color: "rgba(255,255,255,0.5)" }}>To: {(log.to_emails ?? []).join(", ")}</span>
-              <span style={{ flex: 1, color: "rgba(255,255,255,0.5)" }}>{log.subject}</span>
-              <Badge color={log.status === "sent" ? "green" : "red"} size="sm">{log.status}</Badge>
+            <div key={log.id} style={{ padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.04)", fontSize: "0.8rem" }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-start", flexWrap: "wrap" }}>
+                <span style={{ color: "#555", minWidth: 90, flexShrink: 0 }}>{fmtDate(log.sent_at ?? "")}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: "rgba(255,255,255,0.6)", marginBottom: 2 }}>
+                    <strong style={{ color: "rgba(255,255,255,0.35)", fontWeight: 600 }}>To: </strong>
+                    {(log.to_emails ?? []).join(", ")}
+                  </div>
+                  {(log.cc_emails ?? []).length > 0 && (
+                    <div style={{ color: "#555", fontSize: "0.74rem" }}>
+                      CC: {(log.cc_emails ?? []).join(", ")}
+                    </div>
+                  )}
+                  <div style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.75rem", marginTop: 2 }}>{log.subject}</div>
+                  {log.status === "failed" && log.failure_reason && (
+                    <div style={{ marginTop: 4, padding: "4px 8px", background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: 4, color: "#f87171", fontSize: "0.74rem" }}>
+                      ⚠ {log.failure_reason}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
+                  <Badge color={log.status === "sent" ? "green" : "red"} size="sm">{log.status}</Badge>
+                  {log.status === "failed" && (
+                    <button
+                      type="button"
+                      onClick={() => setShowSend(true)}
+                      style={{ padding: "2px 10px", borderRadius: 4, background: "rgba(232,98,10,0.12)", border: "1px solid rgba(232,98,10,0.3)", color: "#e8620a", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}
+                    >
+                      Resend
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           ))}
         </Card>
