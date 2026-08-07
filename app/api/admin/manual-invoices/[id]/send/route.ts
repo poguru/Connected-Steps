@@ -3,6 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdmin } from "@/lib/admin-auth";
 import { sendSingleEmail } from "@/lib/email-service";
 import { generateManualInvoiceHtml } from "@/lib/manual-invoice-html";
+import { generatePdfBuffer, cachePdf } from "@/lib/pdf-generator";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -40,11 +41,21 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const invoiceHtml = await generateManualInvoiceHtml(id);
   if (!invoiceHtml) {
-    return NextResponse.json({ error: "Invoice PDF generation failed — invoice data not found" }, { status: 500 });
+    return NextResponse.json({ error: "Invoice not found" }, { status: 500 });
   }
 
-  const attachmentContent  = Buffer.from(invoiceHtml, "utf-8").toString("base64");
-  const attachmentFilename = `Invoice-${invoice.invoice_number}.html`;
+  let pdfBuffer: Buffer;
+  try {
+    pdfBuffer = await generatePdfBuffer(invoiceHtml);
+  } catch (err) {
+    console.error("[ManualInvoice/send] PDF generation failed:", err);
+    return NextResponse.json({ error: "Unable to generate PDF. Please try again." }, { status: 500 });
+  }
+
+  cachePdf(db, `manual-invoices/${id}.pdf`, pdfBuffer);
+
+  const attachmentContent  = pdfBuffer.toString("base64");
+  const attachmentFilename = `${invoice.invoice_number}.pdf`;
 
   // ── Build email body ──────────────────────────────────────────────────────
 
@@ -92,7 +103,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     <div style="background:#f8f9fc;border:1px solid #e8e8f0;border-radius:6px;padding:12px 16px;font-size:12px;color:#555">
       <strong style="color:#1a1a2e">📎 Attached:</strong> ${attachmentFilename}<br/>
-      <span style="font-size:11px;color:#888">Open the attached file in any browser to view &amp; print your invoice as PDF (File → Print → Save as PDF).</span>
+      <span style="font-size:11px;color:#888">The invoice is attached as a PDF. You can also view it online using the button above.</span>
     </div>
   </div>
 
@@ -125,7 +136,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       html:    emailHtml,
       attachments: [{
         content:   attachmentContent,
-        mime_type: "text/html",
+        mime_type: "application/pdf",
         name:      attachmentFilename,
       }],
     });

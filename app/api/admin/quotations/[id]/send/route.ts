@@ -3,6 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdmin } from "@/lib/admin-auth";
 import { sendSingleEmail } from "@/lib/email-service";
 import { generateQuotationHtml } from "@/lib/quotation-html";
+import { generatePdfBuffer, cachePdf } from "@/lib/pdf-generator";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -29,12 +30,23 @@ export async function POST(req: NextRequest, { params }: Params) {
     .eq("id", id).single();
   if (!quo) return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
 
-  // Generate proposal HTML and attach
+  // Generate proposal HTML → PDF
   const proposalHtml = await generateQuotationHtml(id);
   if (!proposalHtml) return NextResponse.json({ error: "Proposal generation failed" }, { status: 500 });
 
-  const attachmentContent  = Buffer.from(proposalHtml, "utf-8").toString("base64");
-  const attachmentFilename = `Proposal-${quo.quotation_number}.html`;
+  let pdfBuffer: Buffer;
+  try {
+    pdfBuffer = await generatePdfBuffer(proposalHtml);
+  } catch (err) {
+    console.error("[Quotation/send] PDF generation failed:", err);
+    return NextResponse.json({ error: "Unable to generate PDF. Please try again." }, { status: 500 });
+  }
+
+  // Cache PDF for download later
+  cachePdf(db, `quotations/${id}.pdf`, pdfBuffer);
+
+  const attachmentContent  = pdfBuffer.toString("base64");
+  const attachmentFilename = `${quo.quotation_number}.pdf`;
 
   const plainText = body.body ?? "";
   const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? "https://connectedsteps.in";
@@ -75,7 +87,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     <div style="background:#f8f9fc;border:1px solid #e8e8f0;border-radius:6px;padding:12px 16px;font-size:12px;color:#555">
       <strong style="color:#1a1a2e">📎 Attached:</strong> ${attachmentFilename}<br/>
-      <span style="font-size:11px;color:#888">Open the attached file in any browser to view &amp; save as PDF (File → Print → Save as PDF).</span>
+      <span style="font-size:11px;color:#888">The proposal is attached as a PDF. You can also view it online using the button above.</span>
     </div>
   </div>
 
@@ -105,7 +117,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       html:    emailHtml,
       attachments: [{
         content:   attachmentContent,
-        mime_type: "text/html",
+        mime_type: "application/pdf",
         name:      attachmentFilename,
       }],
     });

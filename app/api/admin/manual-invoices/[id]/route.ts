@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { isAdmin } from "@/lib/admin-auth";
+import { invalidatePdf } from "@/lib/pdf-generator";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -119,6 +120,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
     description: `Invoice ${current.invoice_number} updated`,
     actor:       "admin",
   });
+
+  // Invalidate cached PDF so next download reflects the latest changes
+  invalidatePdf(db, `manual-invoices/${id}.pdf`);
 
   return NextResponse.json({ invoice });
 }

@@ -303,8 +303,11 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               <Button size="sm" variant="outline">✏️ Edit</Button>
             </Link>
           )}
-          <a href={`/api/admin/manual-invoices/${id}/html`} target="_blank" rel="noopener noreferrer">
-            <Button size="sm" variant="outline">🖨 Print / PDF</Button>
+          <a href={`/api/admin/manual-invoices/${id}/pdf?disposition=inline`} target="_blank" rel="noopener noreferrer">
+            <Button size="sm" variant="outline">👁 Preview PDF</Button>
+          </a>
+          <a href={`/api/admin/manual-invoices/${id}/pdf`} download>
+            <Button size="sm" variant="outline">⬇ Download PDF</Button>
           </a>
           {canSend && <Button size="sm" variant="outline" onClick={() => setShowSend(true)}>📤 Send</Button>}
           {canMarkPaid && <Button size="sm" variant="primary" onClick={() => setShowMarkPaid(true)}>💰 Mark Paid</Button>}
@@ -332,11 +335,16 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           <div style={{ fontSize: "0.65rem", color: "#555", textTransform: "uppercase" }}>Balance Due</div>
         </div>
         <div style={{ flex: 1 }} />
-        {/* preview iframe link */}
-        <a href={`/api/admin/manual-invoices/${id}/html`} target="_blank" rel="noopener noreferrer"
-          style={{ fontSize: "0.78rem", color: "#e8620a", alignSelf: "center", textDecoration: "none" }}>
-          View Invoice Preview →
-        </a>
+        <div style={{ display: "flex", gap: 10, alignSelf: "center" }}>
+          <a href={`/api/admin/manual-invoices/${id}/pdf?disposition=inline`} target="_blank" rel="noopener noreferrer"
+            style={{ fontSize: "0.78rem", color: "#e8620a", textDecoration: "none" }}>
+            👁 Preview PDF →
+          </a>
+          <a href={`/api/admin/manual-invoices/${id}/pdf?regen=1&disposition=inline`} target="_blank" rel="noopener noreferrer"
+            style={{ fontSize: "0.72rem", color: "#555", textDecoration: "none" }}>
+            ↺ Regenerate
+          </a>
+        </div>
       </Card>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>

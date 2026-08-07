@@ -558,8 +558,25 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
               {canConvert && <Button variant="primary" size="sm" onClick={() => setShowConvert(true)}>→ Convert to Invoice</Button>}
               <Link href={`/admin/finance/quotations/new?edit=${id}`}><Button variant="ghost" size="sm" style={{ width: "100%" }} disabled={isConverted}>✎ Edit</Button></Link>
               <Button variant="ghost" size="sm" onClick={duplicate}>⧉ Duplicate</Button>
-              <a href={`/api/admin/quotations/${id}/html`} target="_blank" rel="noopener noreferrer">
-                <Button variant="ghost" size="sm" style={{ width: "100%" }}>🖨 View / Print PDF</Button>
+            </div>
+          </Card>
+
+          {/* PDF actions */}
+          <Card style={{ padding: "1rem" }}>
+            <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>PDF</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <a href={`/api/admin/quotations/${id}/pdf?disposition=inline`} target="_blank" rel="noopener noreferrer" style={{ display: "block" }}>
+                <Button variant="ghost" size="sm" style={{ width: "100%" }}>👁 Preview PDF</Button>
+              </a>
+              <a href={`/api/admin/quotations/${id}/pdf`} download style={{ display: "block" }}>
+                <Button variant="ghost" size="sm" style={{ width: "100%" }}>⬇ Download PDF</Button>
+              </a>
+              <a href={`/api/admin/quotations/${id}/pdf?disposition=inline`} target="_blank" rel="noopener noreferrer" style={{ display: "block" }}
+                onClick={e => { e.preventDefault(); const w = window.open(`/api/admin/quotations/${id}/pdf?disposition=inline`, "_blank"); w?.addEventListener("load", () => w.print()); }}>
+                <Button variant="ghost" size="sm" style={{ width: "100%" }}>🖨 Print PDF</Button>
+              </a>
+              <a href={`/api/admin/quotations/${id}/pdf?regen=1&disposition=inline`} target="_blank" rel="noopener noreferrer" style={{ display: "block" }}>
+                <Button variant="ghost" size="sm" style={{ width: "100%", color: "#888" }}>↺ Regenerate PDF</Button>
               </a>
             </div>
           </Card>
