@@ -33,15 +33,19 @@ export type SegmentType =
   | "waitlisted"
   | "admins"
   | "custom_emails"
-  | "custom_phones";
+  | "custom_phones"
+  | "external_contacts_all"    // all active external contacts with consent
+  | "external_contact_list";   // specific contact list(s)
 
 export interface SegmentConfig {
-  event_ids?:    string[];
-  location_ids?: string[];
-  categories?:   string[];
-  days?:         number;
-  emails?:       string[];
-  phones?:       string[];
+  event_ids?:       string[];
+  location_ids?:    string[];
+  categories?:      string[];
+  days?:            number;
+  emails?:          string[];
+  phones?:          string[];
+  contact_list_ids?: string[]; // for external_contact_list segment
+  require_consent?: boolean;   // for external segments; default true
 }
 
 export interface CampaignResult {
@@ -217,6 +221,38 @@ export async function resolveSegment(
         .filter(p => !foundPhones.has(p))
         .map(p => ({ email: "", firstName: "Subscriber", lastName: "", phone: p }));
       return [...found, ...missing];
+    }
+
+    // ── External contacts segments ──────────────────────────────────────────
+    case "external_contacts_all": {
+      const requireConsent = config.require_consent !== false;
+      let q = db.from("external_contacts")
+        .select("full_name, email, mobile, whatsapp_number")
+        .eq("is_active", true)
+        .eq("do_not_contact", false);
+      if (requireConsent) q = q.eq("email_consent", true);
+      const { data } = await q.limit(100_000);
+      return externalToRecipients(data);
+    }
+
+    case "external_contact_list": {
+      const listIds = config.contact_list_ids ?? [];
+      if (!listIds.length) return [];
+      const requireConsent = config.require_consent !== false;
+
+      const { data: members } = await db.from("contact_list_members")
+        .select("contact_id").in("list_id", listIds);
+      const ids = [...new Set((members ?? []).map(m => m.contact_id))];
+      if (!ids.length) return [];
+
+      let q = db.from("external_contacts")
+        .select("full_name, email, mobile, whatsapp_number")
+        .in("id", ids)
+        .eq("is_active", true)
+        .eq("do_not_contact", false);
+      if (requireConsent) q = q.eq("email_consent", true);
+      const { data } = await q.limit(100_000);
+      return externalToRecipients(data);
     }
 
     default:
@@ -564,6 +600,20 @@ export async function recordConsent(opts: {
 }
 
 // ── Utility ───────────────────────────────────────────────────────────────────
+
+function externalToRecipients(
+  rows: Array<{ full_name?: string | null; email?: string | null; mobile?: string | null; whatsapp_number?: string | null }> | null,
+): Recipient[] {
+  return (rows ?? []).map(r => {
+    const parts = (r.full_name ?? "Contact").split(" ");
+    return {
+      email:     r.email     ?? "",
+      firstName: parts[0]   ?? "",
+      lastName:  parts.slice(1).join(" ") ?? "",
+      phone:     r.mobile   ?? r.whatsapp_number ?? "",
+    };
+  });
+}
 
 function toRecipients(
   rows: Array<{ email: string; first_name?: string | null; last_name?: string | null; phone?: string | null }> | null,

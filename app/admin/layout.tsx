@@ -31,9 +31,12 @@ const NAV_GROUPS = [
     label: "Communications",
     icon:  "📨",
     links: [
-      { label: "Campaigns",       href: "/admin/campaigns",            exact: false, icon: "📣" },
+      { label: "Campaigns",         href: "/admin/campaigns",            exact: false, icon: "📣" },
       { label: "Comm Center",     href: "/admin/communication",        exact: true,  icon: "📨" },
-      { label: "Consent Report",  href: "/api/admin/consent-report?format=csv", exact: true, icon: "📋" },
+      { label: "External Contacts",href: "/admin/contacts",            exact: true,  icon: "👥" },
+      { label: "Contact Lists",   href: "/admin/contact-lists",        exact: false, icon: "📋" },
+      { label: "Import Contacts", href: "/admin/contacts/import",      exact: true,  icon: "📥" },
+      { label: "Consent Report",  href: "/api/admin/consent-report?format=csv", exact: true, icon: "📊" },
     ],
   },
   {
