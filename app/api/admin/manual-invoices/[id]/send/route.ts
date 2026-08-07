@@ -46,20 +46,25 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Invoice not found" }, { status: 500 });
   }
 
-  let pdfBuffer: Buffer;
+  let attachmentContent:  string;
+  let attachmentFilename: string;
+  let attachmentMime:     string;
+  let pdfWarning:         string | null = null;
+
   try {
-    pdfBuffer = await generatePdfBuffer(invoiceHtml);
+    const pdfBuffer = await generatePdfBuffer(invoiceHtml);
+    cachePdf(db, `manual-invoices/${id}.pdf`, pdfBuffer);
+    attachmentContent  = pdfBuffer.toString("base64");
+    attachmentFilename = `${invoice.invoice_number}.pdf`;
+    attachmentMime     = "application/pdf";
   } catch (err) {
     const msg = (err as Error).message ?? "Unknown error";
-    const stack = (err as Error).stack ?? "";
-    console.error("[ManualInvoice/send] PDF generation failed:\n", stack);
-    return NextResponse.json({ error: `PDF generation failed: ${msg}` }, { status: 500 });
+    console.error("[ManualInvoice/send] PDF failed, sending HTML fallback:", msg);
+    pdfWarning         = msg;
+    attachmentContent  = Buffer.from(invoiceHtml, "utf-8").toString("base64");
+    attachmentFilename = `Invoice-${invoice.invoice_number}.html`;
+    attachmentMime     = "text/html";
   }
-
-  cachePdf(db, `manual-invoices/${id}.pdf`, pdfBuffer);
-
-  const attachmentContent  = pdfBuffer.toString("base64");
-  const attachmentFilename = `${invoice.invoice_number}.pdf`;
 
   // ── Build email body ──────────────────────────────────────────────────────
 
@@ -107,7 +112,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     <div style="background:#f8f9fc;border:1px solid #e8e8f0;border-radius:6px;padding:12px 16px;font-size:12px;color:#555">
       <strong style="color:#1a1a2e">📎 Attached:</strong> ${attachmentFilename}<br/>
-      <span style="font-size:11px;color:#888">The invoice is attached as a PDF. You can also view it online using the button above.</span>
+      <span style="font-size:11px;color:#888">${pdfWarning ? "The invoice is attached as an HTML file (PDF temporarily unavailable). Open it in any web browser to view." : "The invoice is attached as a PDF. You can also view it online using the button above."}</span>
     </div>
   </div>
 
@@ -140,7 +145,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       html:    emailHtml,
       attachments: [{
         content:   attachmentContent,
-        mime_type: "application/pdf",
+        mime_type: attachmentMime,
         name:      attachmentFilename,
       }],
     });
@@ -201,5 +206,5 @@ export async function POST(req: NextRequest, { params }: Params) {
     );
   }
 
-  return NextResponse.json({ sent: true, messageId: lastMessageId, attachment: attachmentFilename });
+  return NextResponse.json({ sent: true, messageId: lastMessageId, attachment: attachmentFilename, ...(pdfWarning && { pdfWarning }) });
 }

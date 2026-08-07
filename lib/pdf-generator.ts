@@ -7,26 +7,33 @@ const PDF_BUCKET = "documents";
 // and local dev without any manual configuration.
 
 async function resolveChrome(): Promise<string> {
-  // 1. Explicit override via env var (user can set CHROME_EXECUTABLE_PATH on the server)
-  if (process.env.CHROME_EXECUTABLE_PATH) return process.env.CHROME_EXECUTABLE_PATH;
-  if (process.env.PUPPETEER_EXECUTABLE_PATH) return process.env.PUPPETEER_EXECUTABLE_PATH;
-  if (process.env.CHROME_BIN) return process.env.CHROME_BIN;
-
-  // 2. @sparticuz/chromium — bundled self-contained binary (works on Lambda/Vercel/VPS)
-  try {
-    const chromium = (await import("@sparticuz/chromium")).default;
-    const path = await chromium.executablePath();
-    if (path) {
-      console.log("[PDF] Using @sparticuz/chromium:", path);
-      return path;
-    }
-  } catch (e) {
-    console.warn("[PDF] @sparticuz/chromium failed:", (e as Error).message);
+  // 1. Explicit override via env var
+  for (const v of ["CHROME_EXECUTABLE_PATH", "PUPPETEER_EXECUTABLE_PATH", "CHROME_BIN"]) {
+    if (process.env[v]) return process.env[v]!;
   }
 
-  // 3. Common system Chrome locations (fallback for VPS with Chrome installed)
+  // 2. @sparticuz/chromium bundled binary — try multiple extraction directories in case
+  //    the default /tmp is too small or not writable on this host.
+  const sparticuzErrors: string[] = [];
+  try {
+    const chromium = (await import("@sparticuz/chromium")).default;
+    for (const loc of [undefined, "/var/tmp", "/dev/shm", "/run"]) {
+      try {
+        const p = await (loc ? chromium.executablePath(loc) : chromium.executablePath());
+        if (p) { console.log("[PDF] @sparticuz chromium at:", p); return p; }
+      } catch (e) {
+        const msg = `${loc ?? "/tmp"}: ${(e as Error).message}`;
+        sparticuzErrors.push(msg);
+        console.warn("[PDF] @sparticuz failed for", msg);
+      }
+    }
+  } catch (importErr) {
+    sparticuzErrors.push(`import: ${(importErr as Error).message}`);
+  }
+
+  // 3. System Chrome (VPS with Chrome installed via apt-get)
   const { access } = await import("fs/promises");
-  const candidates = [
+  const sysPaths = [
     "/usr/bin/google-chrome-stable",
     "/usr/bin/google-chrome",
     "/usr/bin/chromium-browser",
@@ -35,13 +42,16 @@ async function resolveChrome(): Promise<string> {
     "/opt/google/chrome/chrome",
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
   ];
-  for (const p of candidates) {
-    try { await access(p); console.log("[PDF] Using system Chrome:", p); return p; } catch {}
+  for (const p of sysPaths) {
+    try { await access(p); console.log("[PDF] System Chrome at:", p); return p; } catch {}
   }
 
   throw new Error(
-    "No Chrome executable found. Install Chrome on the server, or set CHROME_EXECUTABLE_PATH env var. " +
-    "@sparticuz/chromium also failed — check /tmp write permissions and available disk space."
+    `No Chrome executable found.\n` +
+    `@sparticuz/chromium errors: ${sparticuzErrors.join(" | ") || "none"}\n` +
+    `System paths tried: ${sysPaths.join(", ")}\n` +
+    `Fix: run [apt-get install -y google-chrome-stable] on the server, ` +
+    `or set the CHROME_EXECUTABLE_PATH environment variable.`
   );
 }
 

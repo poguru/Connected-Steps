@@ -32,25 +32,29 @@ export async function POST(req: NextRequest, { params }: Params) {
     .eq("id", id).single();
   if (!quo) return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
 
-  // Generate proposal HTML → PDF
+  // Generate proposal HTML → PDF (falls back to HTML attachment if PDF fails)
   const proposalHtml = await generateQuotationHtml(id);
   if (!proposalHtml) return NextResponse.json({ error: "Proposal generation failed" }, { status: 500 });
 
-  let pdfBuffer: Buffer;
+  let attachmentContent:  string;
+  let attachmentFilename: string;
+  let attachmentMime:     string;
+  let pdfWarning:         string | null = null;
+
   try {
-    pdfBuffer = await generatePdfBuffer(proposalHtml);
+    const pdfBuffer = await generatePdfBuffer(proposalHtml);
+    cachePdf(db, `quotations/${id}.pdf`, pdfBuffer);
+    attachmentContent  = pdfBuffer.toString("base64");
+    attachmentFilename = `${quo.quotation_number}.pdf`;
+    attachmentMime     = "application/pdf";
   } catch (err) {
     const msg = (err as Error).message ?? "Unknown error";
-    const stack = (err as Error).stack ?? "";
-    console.error("[Quotation/send] PDF generation failed:\n", stack);
-    return NextResponse.json({ error: `PDF generation failed: ${msg}` }, { status: 500 });
+    console.error("[Quotation/send] PDF failed, sending HTML fallback:", msg);
+    pdfWarning         = msg;
+    attachmentContent  = Buffer.from(proposalHtml, "utf-8").toString("base64");
+    attachmentFilename = `Proposal-${quo.quotation_number}.html`;
+    attachmentMime     = "text/html";
   }
-
-  // Cache PDF for download later
-  cachePdf(db, `quotations/${id}.pdf`, pdfBuffer);
-
-  const attachmentContent  = pdfBuffer.toString("base64");
-  const attachmentFilename = `${quo.quotation_number}.pdf`;
 
   const plainText = body.body ?? "";
   const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? "https://connectedsteps.in";
@@ -91,7 +95,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     <div style="background:#f8f9fc;border:1px solid #e8e8f0;border-radius:6px;padding:12px 16px;font-size:12px;color:#555">
       <strong style="color:#1a1a2e">📎 Attached:</strong> ${attachmentFilename}<br/>
-      <span style="font-size:11px;color:#888">The proposal is attached as a PDF. You can also view it online using the button above.</span>
+      <span style="font-size:11px;color:#888">${pdfWarning ? "The proposal is attached as an HTML file (PDF temporarily unavailable). Open it in any web browser to view." : "The proposal is attached as a PDF. You can also view it online using the button above."}</span>
     </div>
   </div>
 
@@ -121,7 +125,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       html:    emailHtml,
       attachments: [{
         content:   attachmentContent,
-        mime_type: "application/pdf",
+        mime_type: attachmentMime,
         name:      attachmentFilename,
       }],
     });
@@ -170,5 +174,5 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: lastError ?? "Send failed" }, { status: 500 });
   }
 
-  return NextResponse.json({ sent: true, messageId: lastMessageId, attachment: attachmentFilename });
+  return NextResponse.json({ sent: true, messageId: lastMessageId, attachment: attachmentFilename, ...(pdfWarning && { pdfWarning }) });
 }

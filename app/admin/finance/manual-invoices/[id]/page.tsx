@@ -80,7 +80,7 @@ const section: React.CSSProperties = {
 
 // ── Send modal ────────────────────────────────────────────────────────────────
 
-function SendModal({ invoice, onClose, onSent }: { invoice: Invoice; onClose: () => void; onSent: () => void }) {
+function SendModal({ invoice, onClose, onSent }: { invoice: Invoice; onClose: () => void; onSent: (pdfWarning?: string) => void }) {
   const [to,      setTo]      = useState(invoice.client_email ?? "");
   const [cc,      setCc]      = useState("");
   const [subject, setSubject] = useState(`Invoice ${invoice.invoice_number} from Connected Steps`);
@@ -99,7 +99,7 @@ function SendModal({ invoice, onClose, onSent }: { invoice: Invoice; onClose: ()
     const data = await res.json();
     setSending(false);
     if (!res.ok) { setError(data.error ?? "Send failed"); return; }
-    onSent();
+    onSent(data.pdfWarning);
   }
 
   return (
@@ -273,7 +273,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
   return (
     <div style={{ padding: "1.5rem", maxWidth: 960, margin: "0 auto" }}>
-      {showSend && <SendModal invoice={invoice} onClose={() => setShowSend(false)} onSent={() => { setShowSend(false); setAlert({ type: "success", msg: "Invoice sent!" }); load(); }} />}
+      {showSend && <SendModal invoice={invoice} onClose={() => setShowSend(false)} onSent={(w) => { setShowSend(false); setAlert({ type: "success", msg: w ? "Invoice sent (attached as HTML — PDF unavailable on server)" : "Invoice sent!" }); load(); }} />}
       {showMarkPaid && <MarkPaidModal invoice={invoice} onClose={() => setShowMarkPaid(false)} onPaid={() => { setShowMarkPaid(false); setAlert({ type: "success", msg: "Payment recorded" }); load(); }} />}
 
       {/* Breadcrumb */}

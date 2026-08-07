@@ -73,7 +73,7 @@ const inp: React.CSSProperties = {
 
 // ── Send Modal ─────────────────────────────────────────────────────────────────
 
-function SendModal({ quo, onClose, onSent }: { quo: Quotation; onClose: () => void; onSent: () => void }) {
+function SendModal({ quo, onClose, onSent }: { quo: Quotation; onClose: () => void; onSent: (pdfWarning?: string) => void }) {
   const [to,      setTo]      = useState(quo.client_email ?? "");
   const [cc,      setCc]      = useState("");
   const [bcc,     setBcc]     = useState("");
@@ -97,7 +97,7 @@ function SendModal({ quo, onClose, onSent }: { quo: Quotation; onClose: () => vo
     const data = await res.json();
     setSending(false);
     if (!res.ok) { setError(data.error ?? "Send failed"); return; }
-    onSent();
+    onSent(data.pdfWarning);
   }
 
   return (
@@ -280,7 +280,7 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
     <div style={{ padding: "1.5rem", maxWidth: 1000, margin: "0 auto" }}>
 
       {/* Modals */}
-      {showSend    && <SendModal    quo={q} onClose={() => setShowSend(false)} onSent={() => { setShowSend(false); setAlert({ type: "success", msg: "Proposal sent!" }); load(); }} />}
+      {showSend    && <SendModal    quo={q} onClose={() => setShowSend(false)} onSent={(w) => { setShowSend(false); setAlert({ type: "success", msg: w ? "Proposal sent (attached as HTML — PDF unavailable on server)" : "Proposal sent!" }); load(); }} />}
       {showStatus  && <StatusModal  id={id} currentStatus={q.status} onClose={() => setShowStatus(false)} onChanged={() => { setShowStatus(false); load(); }} />}
       {showConvert && <ConvertModal id={id} qno={q.quotation_number} onClose={() => setShowConvert(false)} onConverted={(invId) => { setShowConvert(false); router.push(`/admin/finance/manual-invoices/${invId}`); }} />}
 
