@@ -5,6 +5,8 @@ import { sendSingleEmail } from "@/lib/email-service";
 import { generateQuotationHtml } from "@/lib/quotation-html";
 import { generatePdfBuffer, cachePdf } from "@/lib/pdf-generator";
 
+export const runtime = "nodejs";
+
 type Params = { params: Promise<{ id: string }> };
 
 // POST /api/admin/quotations/[id]/send
@@ -38,8 +40,10 @@ export async function POST(req: NextRequest, { params }: Params) {
   try {
     pdfBuffer = await generatePdfBuffer(proposalHtml);
   } catch (err) {
-    console.error("[Quotation/send] PDF generation failed:", err);
-    return NextResponse.json({ error: "Unable to generate PDF. Please try again." }, { status: 500 });
+    const msg = (err as Error).message ?? "Unknown error";
+    const stack = (err as Error).stack ?? "";
+    console.error("[Quotation/send] PDF generation failed:\n", stack);
+    return NextResponse.json({ error: `PDF generation failed: ${msg}` }, { status: 500 });
   }
 
   // Cache PDF for download later

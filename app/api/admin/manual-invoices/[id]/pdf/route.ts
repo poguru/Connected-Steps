@@ -4,6 +4,9 @@ import { isAdmin } from "@/lib/admin-auth";
 import { generateManualInvoiceHtml } from "@/lib/manual-invoice-html";
 import { generatePdfBuffer, getCachedPdf, cachePdf } from "@/lib/pdf-generator";
 
+// Must run on Node.js runtime — Edge runtime has no filesystem access for Chrome
+export const runtime = "nodejs";
+
 type Params = { params: Promise<{ id: string }> };
 
 // GET /api/admin/manual-invoices/[id]/pdf
@@ -42,8 +45,13 @@ export async function GET(req: NextRequest, { params }: Params) {
     try {
       pdfBuffer = await generatePdfBuffer(html);
     } catch (err) {
-      console.error("[PDF/invoice] generation failed:", err);
-      return new NextResponse("PDF generation failed. Please try again.", { status: 500 });
+      const message = (err as Error).message ?? "Unknown error";
+      const stack   = (err as Error).stack ?? "";
+      console.error("[PDF/invoice] generation failed:\n", stack);
+      return new NextResponse(
+        `PDF generation failed.\n\nError: ${message}\n\nStack:\n${stack}`,
+        { status: 500, headers: { "Content-Type": "text/plain; charset=utf-8" } }
+      );
     }
 
     cachePdf(db, storagePath, pdfBuffer);

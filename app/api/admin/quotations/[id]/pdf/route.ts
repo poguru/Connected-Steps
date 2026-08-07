@@ -4,6 +4,9 @@ import { isAdmin } from "@/lib/admin-auth";
 import { generateQuotationHtml } from "@/lib/quotation-html";
 import { generatePdfBuffer, getCachedPdf, cachePdf } from "@/lib/pdf-generator";
 
+// Must run on Node.js runtime — Edge runtime has no filesystem access for Chrome
+export const runtime = "nodejs";
+
 type Params = { params: Promise<{ id: string }> };
 
 // GET /api/admin/quotations/[id]/pdf
@@ -31,12 +34,10 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   let pdfBuffer: Buffer | null = null;
 
-  // Try cache first (unless forced regeneration)
   if (!regen) {
     pdfBuffer = await getCachedPdf(db, storagePath);
   }
 
-  // Generate fresh PDF
   if (!pdfBuffer) {
     const html = await generateQuotationHtml(id);
     if (!html) return new NextResponse("Quotation not found", { status: 404 });
@@ -44,11 +45,16 @@ export async function GET(req: NextRequest, { params }: Params) {
     try {
       pdfBuffer = await generatePdfBuffer(html);
     } catch (err) {
-      console.error("[PDF/quotation] generation failed:", err);
-      return new NextResponse("PDF generation failed. Please try again.", { status: 500 });
+      const message = (err as Error).message ?? "Unknown error";
+      const stack   = (err as Error).stack ?? "";
+      console.error("[PDF/quotation] generation failed:\n", stack);
+      // Return the actual error so admins can diagnose
+      return new NextResponse(
+        `PDF generation failed.\n\nError: ${message}\n\nStack:\n${stack}`,
+        { status: 500, headers: { "Content-Type": "text/plain; charset=utf-8" } }
+      );
     }
 
-    // Cache asynchronously (don't await — serve immediately)
     cachePdf(db, storagePath, pdfBuffer);
   }
 

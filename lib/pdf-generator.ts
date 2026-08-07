@@ -1,26 +1,66 @@
-// @sparticuz/chromium bundles its own self-contained Chromium binary that works
-// on Lambda, Vercel, and VPS without system Chrome or system library dependencies.
-import chromium from "@sparticuz/chromium";
-import puppeteer from "puppeteer-core";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const PDF_BUCKET = "documents";
 
+// ── Chrome executable resolution ──────────────────────────────────────────────
+// Tries multiple strategies in order so the code works on Vercel, Lambda, VPS,
+// and local dev without any manual configuration.
+
+async function resolveChrome(): Promise<string> {
+  // 1. Explicit override via env var (user can set CHROME_EXECUTABLE_PATH on the server)
+  if (process.env.CHROME_EXECUTABLE_PATH) return process.env.CHROME_EXECUTABLE_PATH;
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) return process.env.PUPPETEER_EXECUTABLE_PATH;
+  if (process.env.CHROME_BIN) return process.env.CHROME_BIN;
+
+  // 2. @sparticuz/chromium — bundled self-contained binary (works on Lambda/Vercel/VPS)
+  try {
+    const chromium = (await import("@sparticuz/chromium")).default;
+    const path = await chromium.executablePath();
+    if (path) {
+      console.log("[PDF] Using @sparticuz/chromium:", path);
+      return path;
+    }
+  } catch (e) {
+    console.warn("[PDF] @sparticuz/chromium failed:", (e as Error).message);
+  }
+
+  // 3. Common system Chrome locations (fallback for VPS with Chrome installed)
+  const { access } = await import("fs/promises");
+  const candidates = [
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/google-chrome",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/chromium",
+    "/snap/bin/chromium",
+    "/opt/google/chrome/chrome",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  ];
+  for (const p of candidates) {
+    try { await access(p); console.log("[PDF] Using system Chrome:", p); return p; } catch {}
+  }
+
+  throw new Error(
+    "No Chrome executable found. Install Chrome on the server, or set CHROME_EXECUTABLE_PATH env var. " +
+    "@sparticuz/chromium also failed — check /tmp write permissions and available disk space."
+  );
+}
+
 // ── Core PDF generation ───────────────────────────────────────────────────────
 
 export async function generatePdfBuffer(html: string): Promise<Buffer> {
-  // chromium.args contains the flags needed for headless/Lambda environments.
-  // executablePath() extracts the bundled Chromium binary to /tmp and returns its path.
-  const executablePath = await chromium.executablePath();
+  const executablePath = await resolveChrome();
 
-  const browser = await puppeteer.launch({
+  const { launch } = await import("puppeteer-core");
+  const browser = await launch({
     args: [
-      ...chromium.args,
       "--no-sandbox",
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
       "--disable-gpu",
+      "--disable-software-rasterizer",
+      "--disable-features=VizDisplayCompositor",
       "--font-render-hinting=none",
+      "--run-all-compositor-stages-before-draw",
     ],
     executablePath,
     headless: true,
@@ -30,8 +70,8 @@ export async function generatePdfBuffer(html: string): Promise<Buffer> {
   try {
     // setContent only accepts "load" | "domcontentloaded" in puppeteer-core 25+
     await page.setContent(html, { waitUntil: "load", timeout: 30_000 });
-    // Let external images (Supabase Storage logo/signature) finish loading
-    await new Promise(r => setTimeout(r, 1500));
+    // Allow time for images from Supabase Storage (logo, signature) to load
+    await new Promise(r => setTimeout(r, 2000));
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true,
@@ -81,7 +121,7 @@ export async function cachePdf(
       upsert: true,
     });
   } catch {
-    // non-fatal — PDF still served without caching
+    // non-fatal
   }
 }
 

@@ -5,6 +5,8 @@ import { sendSingleEmail } from "@/lib/email-service";
 import { generateManualInvoiceHtml } from "@/lib/manual-invoice-html";
 import { generatePdfBuffer, cachePdf } from "@/lib/pdf-generator";
 
+export const runtime = "nodejs";
+
 type Params = { params: Promise<{ id: string }> };
 
 // POST /api/admin/manual-invoices/[id]/send
@@ -48,8 +50,10 @@ export async function POST(req: NextRequest, { params }: Params) {
   try {
     pdfBuffer = await generatePdfBuffer(invoiceHtml);
   } catch (err) {
-    console.error("[ManualInvoice/send] PDF generation failed:", err);
-    return NextResponse.json({ error: "Unable to generate PDF. Please try again." }, { status: 500 });
+    const msg = (err as Error).message ?? "Unknown error";
+    const stack = (err as Error).stack ?? "";
+    console.error("[ManualInvoice/send] PDF generation failed:\n", stack);
+    return NextResponse.json({ error: `PDF generation failed: ${msg}` }, { status: 500 });
   }
 
   cachePdf(db, `manual-invoices/${id}.pdf`, pdfBuffer);
