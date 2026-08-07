@@ -127,7 +127,7 @@ function SendModal({ quo, onClose, onSent }: { quo: Quotation; onClose: () => vo
             <textarea value={body} onChange={e => setBody(e.target.value)} rows={6} style={{ ...inp, resize: "vertical" }} />
           </div>
           <div style={{ fontSize: "0.72rem", color: "#555", background: "rgba(255,255,255,0.02)", borderRadius: 6, padding: "8px 10px" }}>
-            📎 Proposal-{quo.quotation_number}.html will be attached automatically
+            📎 {quo.quotation_number}.pdf will be attached automatically
           </div>
         </div>
 

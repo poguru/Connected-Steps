@@ -1,27 +1,36 @@
-import puppeteer from "puppeteer";
+// @sparticuz/chromium bundles its own self-contained Chromium binary that works
+// on Lambda, Vercel, and VPS without system Chrome or system library dependencies.
+import chromium from "@sparticuz/chromium";
+import puppeteer from "puppeteer-core";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 const PDF_BUCKET = "documents";
 
 // ── Core PDF generation ───────────────────────────────────────────────────────
 
 export async function generatePdfBuffer(html: string): Promise<Buffer> {
+  // chromium.args contains the flags needed for headless/Lambda environments.
+  // executablePath() extracts the bundled Chromium binary to /tmp and returns its path.
+  const executablePath = await chromium.executablePath();
+
   const browser = await puppeteer.launch({
-    headless: true,
     args: [
+      ...chromium.args,
       "--no-sandbox",
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
       "--disable-gpu",
       "--font-render-hinting=none",
-      "--disable-extensions",
     ],
+    executablePath,
+    headless: true,
   });
 
   const page = await browser.newPage();
   try {
-    // puppeteer 25+ setContent only accepts "load" | "domcontentloaded"
+    // setContent only accepts "load" | "domcontentloaded" in puppeteer-core 25+
     await page.setContent(html, { waitUntil: "load", timeout: 30_000 });
-    // Extra wait for images from external URLs (Supabase Storage)
+    // Let external images (Supabase Storage logo/signature) finish loading
     await new Promise(r => setTimeout(r, 1500));
     const pdf = await page.pdf({
       format: "A4",
@@ -37,8 +46,6 @@ export async function generatePdfBuffer(html: string): Promise<Buffer> {
 }
 
 // ── Supabase Storage helpers ──────────────────────────────────────────────────
-
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 async function ensureBucket(db: SupabaseClient) {
   const { data: buckets } = await db.storage.listBuckets();
