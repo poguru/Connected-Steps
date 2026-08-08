@@ -240,7 +240,7 @@ export default function EventRegisterFlow() {
 
       <p style={{ marginTop: 20, textAlign: "center", fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
         Already have an account?{" "}
-        <a href="/auth?tab=login" style={{ color: "var(--primary)" }}>Sign in</a>
+        <a href={`/auth?tab=login&redirect=${encodeURIComponent(returnUrl)}`} style={{ color: "var(--primary)" }}>Sign in</a>
       </p>
     </div>
   );

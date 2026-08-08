@@ -259,7 +259,7 @@ export default function RegisterPage() {
         mobile:     u.phone     ?? "",
         email:      u.email     ?? "",
       }]);
-    } catch { router.replace("/auth?tab=login"); }
+    } catch { router.replace(`/auth/event-register?return=${encodeURIComponent(`/events/${slug}/register`)}`); }
   }, [slug, router]);
 
   // Fetch event
