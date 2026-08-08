@@ -80,11 +80,28 @@ export async function POST(req: NextRequest) {
 
   // ── Actual import ─────────────────────────────────────────────────────────
 
+  // If no list specified, auto-assign to "General" (create it if needed)
+  let effectiveListIds = listIds;
+  if (!effectiveListIds.length) {
+    const { data: existing } = await db.from("contact_lists")
+      .select("id").ilike("name", "general").limit(1).single();
+    if (existing) {
+      effectiveListIds = [existing.id];
+    } else {
+      const { data: created } = await db.from("contact_lists").insert({
+        name: "General", color: "#6b7280",
+        description: "General contact list",
+        category: "general",
+      }).select("id").single();
+      if (created) effectiveListIds = [created.id];
+    }
+  }
+
   const importRecord = await db.from("contact_import_history").insert({
     filename, file_type: ext, duplicate_handling: dupHandling,
     total_rows: rows.length, status: "processing",
     compliance_acknowledged: complianceAck,
-    list_ids: listIds.length ? listIds : null,
+    list_ids: effectiveListIds.length ? effectiveListIds : null,
     imported_by: "admin",
   }).select().single();
 
@@ -172,9 +189,9 @@ export async function POST(req: NextRequest) {
       );
 
       // Bulk upsert list memberships
-      if (listIds.length) {
+      if (effectiveListIds.length) {
         await db.from("contact_list_members").upsert(
-          created.flatMap(c => listIds.map(lid => ({ list_id: lid, contact_id: c.id, added_by: "admin" }))),
+          created.flatMap(c => effectiveListIds.map(lid => ({ list_id: lid, contact_id: c.id, added_by: "admin" }))),
           { ignoreDuplicates: true }
         );
       }
