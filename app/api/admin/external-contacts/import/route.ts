@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
 
   const db = getSupabaseServer();
 
-  // Check duplicates against existing contacts
+  // Bulk-check duplicates against existing contacts in 3 parallel queries
   const emails  = rows.map(r => r.email).filter(Boolean) as string[];
   const mobiles = rows.map(r => r.mobile).filter(Boolean) as string[];
   const was     = rows.map(r => r.whatsapp_number).filter(Boolean) as string[];
@@ -64,13 +64,13 @@ export async function POST(req: NextRequest) {
     else if (row.whatsapp_number && waMap.has(row.whatsapp_number)) row.isDuplicate = { field: "whatsapp", existingId: waMap.get(row.whatsapp_number)! };
   }
 
-  // Dry run: return preview
+  // Dry run: return preview only
   if (dryRun) {
     const valid      = rows.filter(r => r.errors.length === 0);
     const withErrors = rows.filter(r => r.errors.length > 0);
     const duplicates = rows.filter(r => r.isDuplicate);
     return NextResponse.json({
-      preview:    rows.slice(0, 100), // cap preview at 100 rows
+      preview:    rows.slice(0, 100),
       total:      rows.length,
       valid:      valid.length,
       errors:     withErrors.length,
@@ -78,7 +78,8 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Actual import
+  // ── Actual import ─────────────────────────────────────────────────────────
+
   const importRecord = await db.from("contact_import_history").insert({
     filename, file_type: ext, duplicate_handling: dupHandling,
     total_rows: rows.length, status: "processing",
@@ -91,6 +92,22 @@ export async function POST(req: NextRequest) {
   let imported = 0, updated = 0, skipped = 0, failed = 0;
   const errors: Array<{ row: number; message: string }> = [];
 
+  // ── Separate rows into buckets in a single pass — no DB calls here ────────
+  type Payload = {
+    full_name: string; company_name: string | null; designation: string | null;
+    email: string | null; mobile: string | null; whatsapp_number: string | null;
+    city: string | null; state: string | null; country: string;
+    tags: string[]; notes: string | null;
+    email_consent: boolean; whatsapp_consent: boolean; sms_consent: boolean;
+    consent_date: string | null; consent_source: string; source: string;
+    import_id: string | null; is_active: boolean; do_not_contact: boolean;
+  };
+
+  const toInsert: Payload[] = [];
+  const toUpdate: { id: string; payload: Payload; rowNum: number }[] = [];
+
+  const now = new Date().toISOString();
+
   for (const row of rows) {
     if (row.errors.length > 0) {
       failed++;
@@ -98,7 +115,7 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
-    const payload = {
+    const payload: Payload = {
       full_name:        row.full_name,
       company_name:     row.company_name  ?? null,
       designation:      row.designation   ?? null,
@@ -113,7 +130,7 @@ export async function POST(req: NextRequest) {
       email_consent:    row.email_consent    ?? false,
       whatsapp_consent: row.whatsapp_consent ?? false,
       sms_consent:      row.sms_consent      ?? false,
-      consent_date:     (row.email_consent || row.whatsapp_consent) ? new Date().toISOString() : null,
+      consent_date:     (row.email_consent || row.whatsapp_consent) ? now : null,
       consent_source:   "import",
       source:           "import",
       import_id:        importId ?? null,
@@ -121,55 +138,74 @@ export async function POST(req: NextRequest) {
       do_not_contact:   false,
     };
 
-    try {
-      if (row.isDuplicate) {
-        if (dupHandling === "skip") {
-          skipped++;
-          continue;
-        } else if (dupHandling === "update" || dupHandling === "merge") {
-          const { error } = await db.from("external_contacts")
-            .update({ ...payload, updated_at: new Date().toISOString() })
-            .eq("id", row.isDuplicate.existingId);
-          if (error) { failed++; errors.push({ row: row.row, message: error.message }); }
-          else {
-            updated++;
-            await db.from("external_contact_activity").insert({
-              contact_id: row.isDuplicate.existingId, activity_type: "updated",
-              details: { source: "import", filename },
-            });
-          }
-          continue;
-        }
-      }
-
-      const { data: created, error } = await db.from("external_contacts").insert(payload).select("id").single();
-      if (error) {
-        if (error.code === "23505") { skipped++; continue; }
-        failed++;
-        errors.push({ row: row.row, message: error.message });
+    if (row.isDuplicate) {
+      if (dupHandling === "skip") {
+        skipped++;
       } else {
-        imported++;
-        if (created) {
-          await db.from("external_contact_activity").insert({
-            contact_id: created.id, activity_type: "imported",
-            details: { source: "import", filename },
-          });
-          // Add to selected lists
-          if (listIds.length) {
-            await db.from("contact_list_members").upsert(
-              listIds.map(lid => ({ list_id: lid, contact_id: created.id, added_by: "admin" })),
-              { ignoreDuplicates: true }
-            );
-          }
-        }
+        toUpdate.push({ id: row.isDuplicate.existingId, payload, rowNum: row.row });
       }
-    } catch (e) {
-      failed++;
-      errors.push({ row: row.row, message: (e as Error).message });
+    } else {
+      toInsert.push(payload);
     }
   }
 
-  // Update import record
+  // ── Bulk insert all new contacts in one query ─────────────────────────────
+  if (toInsert.length > 0) {
+    const { data: created, error: insertErr } = await db.from("external_contacts")
+      .insert(toInsert)
+      .select("id");
+
+    if (insertErr) {
+      // Shouldn't happen since we pre-checked duplicates, but handle gracefully
+      failed += toInsert.length;
+      errors.push({ row: -1, message: `Bulk insert failed: ${insertErr.message}` });
+    } else if (created?.length) {
+      imported = created.length;
+
+      // Bulk insert activity records
+      await db.from("external_contact_activity").insert(
+        created.map(c => ({
+          contact_id:    c.id,
+          activity_type: "imported",
+          details:       { source: "import", filename },
+        }))
+      );
+
+      // Bulk upsert list memberships
+      if (listIds.length) {
+        await db.from("contact_list_members").upsert(
+          created.flatMap(c => listIds.map(lid => ({ list_id: lid, contact_id: c.id, added_by: "admin" }))),
+          { ignoreDuplicates: true }
+        );
+      }
+    }
+  }
+
+  // ── Updates: done in parallel batches of 20 to avoid overwhelming the DB ──
+  if (toUpdate.length > 0) {
+    const BATCH = 20;
+    for (let i = 0; i < toUpdate.length; i += BATCH) {
+      await Promise.all(
+        toUpdate.slice(i, i + BATCH).map(async ({ id, payload, rowNum }) => {
+          const { error } = await db.from("external_contacts")
+            .update({ ...payload, updated_at: now })
+            .eq("id", id);
+          if (error) {
+            failed++;
+            errors.push({ row: rowNum, message: error.message });
+          } else {
+            updated++;
+            await db.from("external_contact_activity").insert({
+              contact_id: id, activity_type: "updated",
+              details: { source: "import", filename },
+            });
+          }
+        })
+      );
+    }
+  }
+
+  // Update import history record
   if (importId) {
     await db.from("contact_import_history").update({
       status: "completed", imported, updated, skipped, failed,
