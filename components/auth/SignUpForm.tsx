@@ -373,7 +373,16 @@ export default function SignUpForm({ onSwitchToLogin }: Props) {
       } else if (preferredLocation) {
         localStorage.setItem("cs_pending_location", preferredLocation);
       }
-      router.push("/dashboard");
+      // Honour any post-registration redirect stored by the event registration
+      // page (sessionStorage) or passed as the ?redirect= query param.
+      const stored  = sessionStorage.getItem("cs_post_login_redirect") ?? "";
+      sessionStorage.removeItem("cs_post_login_redirect");
+      const param   = searchParams?.get("redirect") ?? "";
+      const dest    = stored || param;
+      const safeDest = dest.startsWith("/") && !dest.startsWith("//") && !dest.includes(":")
+        ? dest
+        : "/dashboard";
+      router.push(safeDest);
     } catch { setFormError("Network error. Please try again."); }
     finally { setSubmitting(false); }
   }

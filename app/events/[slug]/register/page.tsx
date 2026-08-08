@@ -235,13 +235,16 @@ export default function RegisterPage() {
   useEffect(() => {
     const raw = localStorage.getItem("cs_user");
     if (!raw) {
-      sessionStorage.setItem("cs_post_login_redirect", `/events/${slug}/register`);
-      router.replace("/auth?tab=login");
+      // Send to the streamlined OTP registration flow; preserve this page as return URL
+      router.replace(`/auth/event-register?return=${encodeURIComponent(`/events/${slug}/register`)}`);
       return;
     }
     try {
       const u: StoredUser = JSON.parse(raw);
-      if (!u.email) { router.replace("/auth?tab=login"); return; }
+      if (!u.email) {
+        router.replace(`/auth/event-register?return=${encodeURIComponent(`/events/${slug}/register`)}`);
+        return;
+      }
       const storedToken = localStorage.getItem("cs_user_token") ?? "";
       if (!isTokenValid(storedToken)) { handleAuthExpiry(`/events/${slug}/register`); return; }
       setUserEmail(u.email);

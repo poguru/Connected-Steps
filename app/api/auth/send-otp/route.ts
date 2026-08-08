@@ -28,7 +28,7 @@ function generateOTP(): string {
 function otpEmailHTML(name: string, code: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>Your OTP â€“ Connected Steps</title></head>
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>Your OTP â€" Connected Steps</title></head>
 <body style="margin:0;padding:0;background:#f4f4f5;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
   <tr><td align="center">
@@ -63,11 +63,11 @@ function otpEmailHTML(name: string, code: string): string {
  * Body: { type, value, name?, purpose }
  *
  * purpose values:
- *   "register"      â€“ email/phone must NOT already exist
- *   "login"         â€“ email/phone MUST exist
- *   "change_email"  â€“ new email must NOT already exist
- *   "verify_phone"  â€“ no existence check; used by logged-in users to verify/re-verify their phone
- *   "change_phone"  â€“ new phone must NOT already exist (user is changing to a different number)
+ *   "register"      â€" email/phone must NOT already exist
+ *   "login"         â€" email/phone MUST exist
+ *   "change_email"  â€" new email must NOT already exist
+ *   "verify_phone"  â€" no existence check; used by logged-in users to verify/re-verify their phone
+ *   "change_phone"  â€" new phone must NOT already exist (user is changing to a different number)
  *
  * Phone OTPs expire in 5 minutes.
  * Email OTPs expire in 10 minutes.
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
       ? (value as string).toLowerCase().trim()
       : (value as string).trim();
 
-    // â”€â”€ General send-rate limit (shared across all purposes) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // â"€â"€ General send-rate limit (shared across all purposes) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
     const sendKey = `send-otp:${ip}:${identifier}`;
     if (await isRateLimited(sendKey)) {
       return NextResponse.json(
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
     }
     await recordFailure(sendKey);
 
-    // â”€â”€ Extra phone resend limit: max 3 per hour â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // â"€â"€ Extra phone resend limit: max 3 per hour â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
     if (type === "phone") {
       const phoneKey = `phone-otp-resend:${ip}:${identifier}`;
       if (await isRateLimitedCustom(phoneKey, PHONE_RESEND_MAX, PHONE_RESEND_WINDOW)) {
@@ -109,8 +109,9 @@ export async function POST(req: NextRequest) {
 
     const db = getSupabaseServer();
 
-    // â”€â”€ Existence check (skipped for verify_phone â€” caller is already logged in) â”€â”€
-    if (purpose !== "verify_phone") {
+    // Existence check: skipped for verify_phone (already logged in) and
+    // event_register (handles both new and existing users in one atomic flow).
+    if (purpose !== "verify_phone" && purpose !== "event_register") {
       if (type === "email") {
         const { data: existing, error: lookupErr } = await db
           .from("users")
@@ -152,7 +153,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // â”€â”€ Generate & store OTP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // â"€â"€ Generate & store OTP â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
     const code = generateOTP();
     // Phone OTPs expire in 5 minutes; email OTPs in 10 minutes (per security spec)
     const expiryMs  = type === "phone" ? 5 * 60 * 1000 : 10 * 60 * 1000;
@@ -168,7 +169,7 @@ export async function POST(req: NextRequest) {
     });
     if (insertErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
-    // â”€â”€ Dispatch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // â"€â"€ Dispatch â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
     const displayName = (name as string | undefined)?.trim() || "there";
     if (type === "email") {
       const result = await sendEmail(
@@ -176,7 +177,7 @@ export async function POST(req: NextRequest) {
         displayName,
         "Your Connected Steps verification code",
         otpEmailHTML(displayName, code),
-        true, // isOtp â€” must always send regardless of NON_OTP_EMAILS_DISABLED
+        true, // isOtp â€" must always send regardless of NON_OTP_EMAILS_DISABLED
       );
       if (!result.ok) {
         console.error(`[send-otp] email delivery failed for ${identifier}: ${result.error}`);

@@ -28,13 +28,42 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const batchId = campaign.batch_id;
 
-  // Count how many queued rows actually exist to give the caller useful feedback
-  const { count: queuedCount } = await db.from("email_queue")
-    .select("id", { count: "exact", head: true })
+  // Count queued rows
+  const { data: queuedRows } = await db.from("email_queue")
+    .select("id")
     .eq("batch_id", batchId)
     .eq("status", "queued");
 
+  const queuedCount = queuedRows?.length ?? 0;
+
+  if (queuedCount > 200) {
+    // Large campaign: ensure email_campaigns row exists so the cron picks it up.
+    // The initial send may have failed to insert it — this is self-healing.
+    const { data: existing } = await db.from("email_campaigns")
+      .select("id, status")
+      .eq("batch_id", batchId)
+      .maybeSingle();
+
+    if (existing) {
+      if (existing.status !== "running") {
+        await db.from("email_campaigns")
+          .update({ status: "running", worker_locked_at: null })
+          .eq("id", existing.id);
+      }
+    } else {
+      await db.from("email_campaigns").insert({
+        batch_id:    batchId,
+        status:      "running",
+        total_count: queuedCount,
+        created_by:  id,
+      });
+    }
+    // Cron picks up within 60s — no after() needed
+    return NextResponse.json({ started: true, batchId, queuedRows: queuedCount, via: "cron" });
+  }
+
+  // Small campaign: process inline after response
   after(() => processCampaignBatch(batchId));
 
-  return NextResponse.json({ started: true, batchId, queuedRows: queuedCount ?? 0 });
+  return NextResponse.json({ started: true, batchId, queuedRows: queuedCount, via: "inline" });
 }
