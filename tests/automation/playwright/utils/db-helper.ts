@@ -205,6 +205,40 @@ export const DbHelper = {
     return data;
   },
 
+  async getPaidPublishedEvent() {
+    const { data } = await db()
+      .from("events")
+      .select("id, title, price, start_date, location, share_slug, registration_closes_at, distance_categories")
+      .eq("status", "published")
+      .gt("price", 0)
+      .order("start_date", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    return data;
+  },
+
+  async getMultiParticipantEvent() {
+    const { data } = await db()
+      .from("events")
+      .select("id, title, price, share_slug, allow_multi_participant, max_per_registration, distance_categories")
+      .eq("status", "published")
+      .eq("allow_multi_participant", true)
+      .order("start_date", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    return data;
+  },
+
+  async getTwoPublishedEvents() {
+    const { data } = await db()
+      .from("events")
+      .select("id, title, price, share_slug, distance_categories")
+      .eq("status", "published")
+      .order("start_date", { ascending: true })
+      .limit(2);
+    return data ?? [];
+  },
+
   async getEventRegistration(eventId: string, userEmail: string) {
     const { data } = await db()
       .from("event_registrations")

@@ -37,10 +37,10 @@ export default defineConfig({
     // ── 0. Global setup: create auth storage state files ───────────────────
     { name: "setup", testDir: "./fixtures", testMatch: /global\.setup\.ts/ },
 
-    // ── 1. Main user tests (all specs except admin & security) ─────────────
+    // ── 1. Main user tests (all specs except admin, security & event-auth) ────
     {
       name: "chromium",
-      testIgnore: [/admin\/.+\.spec\.ts/, /security\/.+\.spec\.ts/],
+      testIgnore: [/admin\/.+\.spec\.ts/, /security\/.+\.spec\.ts/, /auth\/event-register.*\.spec\.ts/],
       use: {
         ...devices["Desktop Chrome"],
         storageState: "playwright/.auth/user.json",
@@ -64,6 +64,18 @@ export default defineConfig({
       name: "security",
       testMatch: /security\/.+\.spec\.ts/,
       use: { ...devices["Desktop Chrome"] },
+    },
+
+    // ── 4. Event-auth tests — OTP registration flow (no pre-existing session) ─
+    // Runs specs/auth/event-register.spec.ts without the global setup dependency
+    // because these tests provide their own auth via the OTP flow.
+    {
+      name: "event-auth",
+      testMatch: /auth\/event-register.*\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: { cookies: [], origins: [] },
+      },
     },
   ],
 

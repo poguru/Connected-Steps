@@ -30,5 +30,5 @@ export function handleAuthExpiry(returnPath: string): void {
   sessionStorage.setItem("cs_post_login_redirect", returnPath);
   // Clear the httpOnly session cookie server-side (fire-and-forget)
   fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
-  window.location.href = "/auth?tab=login";
+  window.location.href = `/auth?tab=login&redirect=${encodeURIComponent(returnPath)}`;
 }
