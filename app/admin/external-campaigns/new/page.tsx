@@ -144,10 +144,7 @@ export default function NewExternalCampaignPage() {
     setImporting(false);
     if (!res.ok) { setError(data.error ?? "Import failed"); return; }
     setImportResult(data);
-    // After import, refresh the list and switch to list mode
-    setListsLoaded(false);
-    setRecipientMode("lists");
-    loadLists();
+    // Stay in upload mode — campaign will target all external contacts (external_contacts_all)
   }
 
   // ── Recipient count estimate ───────────────────────────────────────────────
@@ -172,11 +169,10 @@ export default function NewExternalCampaignPage() {
         channel:          "email",
         message_type:     "general_update",
         is_transactional: false,
-        segment_type:     "external_contact_list",
-        segment_config:   {
-          contact_list_ids: selectedLists,
-          require_consent:  false,  // external contacts: consent was captured at import
-        },
+        segment_type:   recipientMode === "upload" ? "external_contacts_all" : "external_contact_list",
+        segment_config: recipientMode === "upload"
+          ? { require_consent: false }
+          : { contact_list_ids: selectedLists, require_consent: false },
         subject,
         html_body:   htmlBody,
         sender_name: senderName || null,
