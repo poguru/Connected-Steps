@@ -41,6 +41,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     "name", "description", "channel", "message_type", "is_transactional",
     "segment_type", "segment_config", "subject", "html_body", "text_body",
     "template_id", "wa_template_name", "wa_template_params", "attachments", "scheduled_for",
+    "sender_name", "reply_to",
   ];
   for (const key of editable) {
     if (key in body) allowed[key] = body[key];

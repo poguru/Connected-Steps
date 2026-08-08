@@ -56,7 +56,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   type ContactRow = { id: string; full_name: string; email: string | null; email_consent: boolean; do_not_contact: boolean; is_active: boolean };
 
   const allContacts = (memberRows ?? [])
-    .map(m => m.external_contacts as ContactRow | null)
+    .map(m => m.external_contacts as unknown as ContactRow | null)
     .filter(Boolean) as ContactRow[];
 
   const eligible = allContacts.filter(c => c.email && c.email_consent && !c.do_not_contact && c.is_active) as (ContactRow & { email: string })[];

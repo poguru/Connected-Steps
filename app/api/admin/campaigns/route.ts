@@ -7,19 +7,25 @@ export async function GET(req: NextRequest) {
   if (!isAdmin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = req.nextUrl;
-  const status  = searchParams.get("status");
-  const channel = searchParams.get("channel");
-  const limit   = Math.min(Number(searchParams.get("limit") ?? 50), 100);
-  const offset  = Number(searchParams.get("offset") ?? 0);
+  const status       = searchParams.get("status");
+  const channel      = searchParams.get("channel");
+  const segmentType  = searchParams.get("segment_type");   // comma-separated list
+  const limit        = Math.min(Number(searchParams.get("limit") ?? 50), 100);
+  const offset       = Number(searchParams.get("offset") ?? 0);
 
   const db = getSupabaseServer();
   let q = db.from("communication_campaigns")
-    .select("id, name, description, channel, message_type, is_transactional, segment_type, status, recipient_count, sent_count, failed_count, delivered_count, opened_count, created_by, created_at, updated_at, sent_at, scheduled_for", { count: "exact" })
+    .select("id, name, description, channel, message_type, is_transactional, segment_type, status, recipient_count, sent_count, failed_count, delivered_count, opened_count, queued_count, sender_name, reply_to, created_by, created_at, updated_at, sent_at, scheduled_for", { count: "exact" })
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
   if (status)  q = q.eq("status", status);
   if (channel) q = q.eq("channel", channel);
+  if (segmentType) {
+    const types = segmentType.split(",").map(s => s.trim()).filter(Boolean);
+    if (types.length === 1) q = q.eq("segment_type", types[0]);
+    else if (types.length > 1) q = q.in("segment_type", types);
+  }
 
   const { data, count, error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -57,6 +63,8 @@ export async function POST(req: NextRequest) {
     wa_template_params: body.wa_template_params ?? [],
     attachments:      body.attachments    ?? [],
     scheduled_for:    body.scheduled_for  ?? null,
+    sender_name:      body.sender_name    ?? null,
+    reply_to:         body.reply_to       ?? null,
     status:           "draft",
     created_by:       null,
   }).select().single();

@@ -14,10 +14,14 @@ import { APP_URL } from "@/lib/config";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface Recipient {
-  email:     string;
-  firstName: string;
-  lastName:  string;
-  phone?:    string;
+  email:       string;
+  firstName:   string;
+  lastName:    string;
+  phone?:      string;
+  // External contact fields (optional; only populated for external segments)
+  company?:    string;
+  designation?: string;
+  city?:       string;
 }
 
 export type SegmentType =
@@ -227,12 +231,13 @@ export async function resolveSegment(
     case "external_contacts_all": {
       const requireConsent = config.require_consent !== false;
       let q = db.from("external_contacts")
-        .select("full_name, email, mobile, whatsapp_number")
+        .select("full_name, email, mobile, whatsapp_number, company_name, designation, city")
         .eq("is_active", true)
         .eq("do_not_contact", false);
       if (requireConsent) q = q.eq("email_consent", true);
       const { data } = await q.limit(100_000);
-      return externalToRecipients(data);
+      const recipients = externalToRecipients(data);
+      return filterSuppressedExternal(db, recipients);
     }
 
     case "external_contact_list": {
@@ -246,13 +251,14 @@ export async function resolveSegment(
       if (!ids.length) return [];
 
       let q = db.from("external_contacts")
-        .select("full_name, email, mobile, whatsapp_number")
+        .select("full_name, email, mobile, whatsapp_number, company_name, designation, city")
         .in("id", ids)
         .eq("is_active", true)
         .eq("do_not_contact", false);
       if (requireConsent) q = q.eq("email_consent", true);
       const { data } = await q.limit(100_000);
-      return externalToRecipients(data);
+      const recipients = externalToRecipients(data);
+      return filterSuppressedExternal(db, recipients);
     }
 
     default:
@@ -317,6 +323,23 @@ export async function filterByConsent(
   return recipients.filter(r => !blocked.has(r.email));
 }
 
+// ── External-contact suppression filter ──────────────────────────────────────
+// Check email_suppression for bounces/complaints/unsubscribes from any channel.
+// do_not_contact=true is already filtered by the segment query; this adds the
+// global suppression layer (which also catches SES bounce/complaint reports).
+
+async function filterSuppressedExternal(
+  db: ReturnType<typeof getSupabaseServer>,
+  recipients: Recipient[],
+): Promise<Recipient[]> {
+  const emails = recipients.map(r => r.email).filter(Boolean);
+  if (!emails.length) return recipients;
+  const { data: suppressed } = await db.from("email_suppression")
+    .select("email").in("email", emails);
+  const suppressedSet = new Set((suppressed ?? []).map(s => s.email.toLowerCase()));
+  return recipients.filter(r => !suppressedSet.has(r.email.toLowerCase()));
+}
+
 // ── Unsubscribe tokens ────────────────────────────────────────────────────────
 
 export async function bulkGetOrCreateUnsubscribeTokens(
@@ -345,23 +368,62 @@ export async function bulkGetOrCreateUnsubscribeTokens(
   return tokenMap;
 }
 
+// Unsubscribe tokens for EXTERNAL contacts (no FK to users)
+export async function bulkGetOrCreateExtUnsubscribeTokens(
+  emails: string[],
+): Promise<Map<string, string>> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = getSupabaseServer() as any;
+
+  const { data: existing } = await db.from("ext_unsubscribe_tokens")
+    .select("email, token")
+    .in("email", emails)
+    .is("used_at", null);
+
+  const tokenMap = new Map<string, string>();
+  ((existing as Array<{ email: string; token: string }>) ?? []).forEach(t => tokenMap.set(t.email.toLowerCase(), t.token));
+
+  const missing = emails.filter(e => !tokenMap.has(e.toLowerCase()));
+  if (missing.length) {
+    const { data: newTokens } = await db.from("ext_unsubscribe_tokens")
+      .insert(missing.map((e: string) => ({ email: e.toLowerCase() })))
+      .select("email, token");
+    ((newTokens as Array<{ email: string; token: string }>) ?? []).forEach(t => tokenMap.set(t.email.toLowerCase(), t.token));
+  }
+
+  return tokenMap;
+}
+
 // ── Email personalization ─────────────────────────────────────────────────────
 
-function personalise(template: string, r: Recipient, unsubToken?: string): string {
-  const full = `${r.firstName} ${r.lastName}`.trim();
+function personalise(
+  template: string,
+  r: Recipient,
+  unsubToken?: string,
+  isExternal?: boolean,
+): string {
+  const full     = `${r.firstName} ${r.lastName}`.trim();
+  const nameVal  = r.firstName || "there";  // safe fallback for {{name}}
   let out = template
-    .replace(/\{\{firstName\}\}/gi, r.firstName || "")
-    .replace(/\{\{lastName\}\}/gi,  r.lastName  || "")
-    .replace(/\{\{fullName\}\}/gi,  full         || "");
+    .replace(/\{\{firstName\}\}/gi,   r.firstName    || "")
+    .replace(/\{\{lastName\}\}/gi,    r.lastName     || "")
+    .replace(/\{\{fullName\}\}/gi,    full           || "")
+    .replace(/\{\{name\}\}/gi,        nameVal)
+    .replace(/\{\{company\}\}/gi,     r.company      || "")
+    .replace(/\{\{designation\}\}/gi, r.designation  || "")
+    .replace(/\{\{city\}\}/gi,        r.city         || "");
+
   if (unsubToken) {
-    const url = `${APP_URL}/unsubscribe?token=${unsubToken}`;
-    // Inject unsubscribe footer if not already present
-    if (!out.includes("/unsubscribe?token=")) {
+    const url = isExternal
+      ? `${APP_URL}/unsubscribe-external?token=${unsubToken}`
+      : `${APP_URL}/unsubscribe?token=${unsubToken}`;
+    const alreadyHasLink = out.includes("/unsubscribe?token=") || out.includes("/unsubscribe-external?token=");
+    if (!alreadyHasLink) {
       out += `
-<div style="margin-top:32px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.08);text-align:center;font-size:11px;color:#888;">
-  You're receiving this because you registered on Connected Steps.
+<div style="margin-top:32px;padding-top:16px;border-top:1px solid #e8e8f0;text-align:center;font-size:11px;color:#aaa;">
+  You received this email because you are on our contact list.
   &nbsp;·&nbsp;
-  <a href="${url}" style="color:#888;text-decoration:underline;">Unsubscribe</a>
+  <a href="${url}" style="color:#aaa;text-decoration:underline;">Unsubscribe from promotional emails</a>
 </div>`;
     }
   }
@@ -377,30 +439,40 @@ export async function queueCampaignEmails(opts: {
   htmlBody:        string;
   attachments?:    AttachmentMeta[];
   isTransactional: boolean;
+  isExternal?:     boolean;   // use ext_unsubscribe_tokens + external unsubscribe URL
+  senderName?:     string;    // override display name (ZeptoMail FROM_NAME)
+  replyTo?:        string;    // reply-to address for bulk promotional sends
   scheduledFor?:   string;
 }): Promise<string> {
-  const { campaignId, recipients, subject, htmlBody, attachments, isTransactional, scheduledFor } = opts;
+  const { campaignId, recipients, subject, htmlBody, attachments, isTransactional, isExternal, senderName, replyTo, scheduledFor } = opts;
   const db      = getSupabaseServer();
   const batchId = crypto.randomUUID();
 
-  const tokenMap = isTransactional
-    ? new Map<string, string>()
-    : await bulkGetOrCreateUnsubscribeTokens(recipients.map(r => r.email));
+  let tokenMap: Map<string, string>;
+  if (isTransactional) {
+    tokenMap = new Map<string, string>();
+  } else if (isExternal) {
+    tokenMap = await bulkGetOrCreateExtUnsubscribeTokens(recipients.map(r => r.email));
+  } else {
+    tokenMap = await bulkGetOrCreateUnsubscribeTokens(recipients.map(r => r.email));
+  }
 
   const rows = recipients.map(r => {
-    const token = tokenMap.get(r.email);
-    const html  = personalise(htmlBody, r, token);
+    const token = tokenMap.get(r.email.toLowerCase()) ?? tokenMap.get(r.email);
+    const html  = personalise(htmlBody, r, token, isExternal);
     return {
       batch_id:        batchId,
       campaign_id:     campaignId,
       recipient_email: r.email,
       recipient_name:  `${r.firstName} ${r.lastName}`.trim() || r.email,
-      subject:         personalise(subject, r),
+      subject:         personalise(subject, r, undefined, isExternal),
       html_body:       html,
       status:          "queued" as const,
       provider:        "zeptomail" as const,
       attachments:     (attachments ?? []).map(a => ({ name: a.name, mime_type: a.mime_type, size: a.size, path: a.path })),
       scheduled_for:   scheduledFor ?? null,
+      sender_name:     senderName ?? null,
+      reply_to:        replyTo    ?? null,
     };
   });
 
@@ -426,7 +498,7 @@ export async function processCampaignBatch(batchId: string): Promise<void> {
   // Fetch only queued rows — safe to re-run if interrupted; rows already
   // processed are 'delivered'/'failed' and are not returned here.
   const { data: rows } = await db.from("email_queue")
-    .select("id, recipient_email, recipient_name, subject, html_body, attachments, attempts")
+    .select("id, recipient_email, recipient_name, subject, html_body, attachments, attempts, sender_name, reply_to")
     .eq("batch_id", batchId)
     .eq("status", "queued")
     .order("created_at");
@@ -470,16 +542,25 @@ async function sendOne(db: ReturnType<typeof getSupabaseServer>, row: {
   html_body: string;
   attachments: AttachmentMeta[];
   attempts: number;
+  sender_name?: string | null;
+  reply_to?: string | null;
 }) {
   const attachments = row.attachments?.length
     ? await loadAttachmentsAsBase64(row.attachments as AttachmentMeta[])
     : [];
+
+  const fromEmail = process.env.ZEPTOMAIL_FROM_EMAIL ?? "info@connectedsteps.in";
+  const fromField = row.sender_name
+    ? `${row.sender_name} <${fromEmail}>`
+    : undefined;
 
   const result = await sendSingleEmail({
     to:          row.recipient_email,
     subject:     row.subject,
     html:        row.html_body,
     attachments,
+    from:        fromField,
+    replyTo:     row.reply_to ?? undefined,
     listUnsubscribeUrl: undefined,
   });
 
@@ -602,15 +683,22 @@ export async function recordConsent(opts: {
 // ── Utility ───────────────────────────────────────────────────────────────────
 
 function externalToRecipients(
-  rows: Array<{ full_name?: string | null; email?: string | null; mobile?: string | null; whatsapp_number?: string | null }> | null,
+  rows: Array<{
+    full_name?: string | null; email?: string | null;
+    mobile?: string | null; whatsapp_number?: string | null;
+    company_name?: string | null; designation?: string | null; city?: string | null;
+  }> | null,
 ): Recipient[] {
   return (rows ?? []).map(r => {
     const parts = (r.full_name ?? "Contact").split(" ");
     return {
-      email:     r.email     ?? "",
-      firstName: parts[0]   ?? "",
-      lastName:  parts.slice(1).join(" ") ?? "",
-      phone:     r.mobile   ?? r.whatsapp_number ?? "",
+      email:       r.email        ?? "",
+      firstName:   parts[0]       ?? "",
+      lastName:    parts.slice(1).join(" ") ?? "",
+      phone:       r.mobile       ?? r.whatsapp_number ?? "",
+      company:     r.company_name ?? undefined,
+      designation: r.designation  ?? undefined,
+      city:        r.city         ?? undefined,
     };
   });
 }

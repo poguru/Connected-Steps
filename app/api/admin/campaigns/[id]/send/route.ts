@@ -71,6 +71,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ sent: true, recipientCount: 0, message: "No eligible recipients after consent filtering" });
   }
 
+  const EXTERNAL_SEGMENTS = ["external_contacts_all", "external_contact_list"];
+  const isExternal = EXTERNAL_SEGMENTS.includes(campaign.segment_type);
+
   if (campaign.channel === "email") {
     const batchId = await queueCampaignEmails({
       campaignId:      id,
@@ -79,6 +82,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       htmlBody:        campaign.html_body!,
       attachments:     campaign.attachments ?? [],
       isTransactional: campaign.is_transactional,
+      isExternal,
+      senderName:      campaign.sender_name ?? undefined,
+      replyTo:         campaign.reply_to    ?? undefined,
     });
 
     await db.from("communication_campaigns").update({

@@ -139,6 +139,7 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
   if (loading) return <div style={{ padding: "3rem", textAlign: "center" }}><Spinner /></div>;
 
   return (
+    <>
     <div style={{ padding: "1.5rem", maxWidth: 900, margin: "0 auto" }}>
 
       {/* Header */}
@@ -361,6 +362,7 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
         onSent={() => { setShowEmail(false); setAlert({ type: "success", msg: "Email sent!" }); load(); }}
       />
     )}
+    </>
   );
 }
 
