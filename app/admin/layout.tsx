@@ -95,6 +95,7 @@ const NAV_GROUPS = [
     label: "Commerce",
     icon:  "🛍",
     links: [
+      { label: "Coupons",        href: "/admin/coupons",            exact: false, icon: "🏷️" },
       { label: "Merchandise",    href: "/admin/merchandise",        exact: false, icon: "👕" },
       { label: "Donations",      href: "/admin/donations",          exact: false, icon: "🤲" },
       { label: "Sponsors",       href: "/admin/sponsors/packages",  exact: false, icon: "🤝" },
