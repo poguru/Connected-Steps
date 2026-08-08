@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button, Card, Alert, Spinner } from "@/components/ui/ds";
@@ -106,14 +106,15 @@ export default function NewExternalCampaignPage() {
   const [sending,    setSending]    = useState(false);
   const [error,      setError]      = useState("");
 
-  // ── Load lists when switching to list mode ─────────────────────────────────
+  // ── Load lists on mount ────────────────────────────────────────────────────
 
   const loadLists = useCallback(async () => {
-    if (listsLoaded) return;
     const res = await fetch("/api/admin/contact-lists?limit=100");
     if (res.ok) { const d = await res.json(); setLists(d.lists ?? []); }
     setListsLoaded(true);
-  }, [listsLoaded]);
+  }, []);
+
+  useEffect(() => { loadLists(); }, [loadLists]);
 
   // ── File preview ───────────────────────────────────────────────────────────
 
@@ -143,11 +144,10 @@ export default function NewExternalCampaignPage() {
     setImporting(false);
     if (!res.ok) { setError(data.error ?? "Import failed"); return; }
     setImportResult(data);
-    // After import, switch to list mode to select the imported contacts
+    // After import, refresh the list and switch to list mode
+    setListsLoaded(false);
     setRecipientMode("lists");
     loadLists();
-    setListsLoaded(false);
-    setTimeout(() => { setListsLoaded(false); loadLists(); }, 300);
   }
 
   // ── Recipient count estimate ───────────────────────────────────────────────
