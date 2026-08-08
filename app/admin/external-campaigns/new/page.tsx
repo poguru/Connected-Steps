@@ -88,7 +88,7 @@ export default function NewExternalCampaignPage() {
   const [preview,       setPreview]       = useState<ImportPreview | null>(null);
   const [previewing,    setPreviewing]    = useState(false);
   const [importing,     setImporting]     = useState(false);
-  const [importResult,  setImportResult]  = useState<{ imported: number; skipped: number; failed: number } | null>(null);
+  const [importResult,  setImportResult]  = useState<{ imported: number; skipped: number; failed: number; errors?: { row: number; message: string }[] } | null>(null);
 
   const [lists,         setLists]         = useState<ContactList[]>([]);
   const [listsLoaded,   setListsLoaded]   = useState(false);
@@ -337,13 +337,26 @@ export default function NewExternalCampaignPage() {
             </>
           ) : (
             <div style={{ textAlign: "center", padding: "20px 0" }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
-              <div style={{ fontWeight: 700, color: "#34d399", marginBottom: 6 }}>Import complete</div>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>{importResult.imported > 0 ? "✅" : "❌"}</div>
+              <div style={{ fontWeight: 700, color: importResult.imported > 0 ? "#34d399" : "#f87171", marginBottom: 6 }}>
+                {importResult.imported > 0 ? "Import complete" : "Import failed"}
+              </div>
               <div style={{ fontSize: "0.82rem", color: "#888" }}>
                 {importResult.imported} imported · {importResult.skipped} skipped
                 {importResult.failed > 0 ? ` · ${importResult.failed} failed` : ""}
               </div>
-              <div style={{ fontSize: "0.78rem", color: "#555", marginTop: 8 }}>Now select the contact list(s) to send to below</div>
+              {importResult.errors && importResult.errors.length > 0 && (
+                <div style={{ marginTop: 12, textAlign: "left", background: "rgba(248,113,113,0.07)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 8, padding: "10px 14px", maxHeight: 140, overflowY: "auto" }}>
+                  {importResult.errors.slice(0, 5).map((e, i) => (
+                    <div key={i} style={{ fontSize: "0.72rem", color: "#f87171", marginBottom: 4 }}>
+                      {e.row === -1 ? "DB Error" : `Row ${e.row}`}: {e.message}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {importResult.imported > 0 && (
+                <div style={{ fontSize: "0.78rem", color: "#555", marginTop: 8 }}>Continue to compose your email</div>
+              )}
             </div>
           )}
         </Card>

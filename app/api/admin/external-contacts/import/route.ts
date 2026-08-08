@@ -173,9 +173,9 @@ export async function POST(req: NextRequest) {
       .select("id");
 
     if (insertErr) {
-      // Shouldn't happen since we pre-checked duplicates, but handle gracefully
+      console.error("[import] bulk insert failed:", insertErr);
       failed += toInsert.length;
-      errors.push({ row: -1, message: `Bulk insert failed: ${insertErr.message}` });
+      errors.push({ row: -1, message: `Bulk insert failed: ${insertErr.message} (code: ${insertErr.code})` });
     } else if (created?.length) {
       imported = created.length;
 
