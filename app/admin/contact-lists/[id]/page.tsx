@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useEffect, useCallback } from "react";
+import { use, useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { Card, Button, Spinner, Alert } from "@/components/ui/ds";
 
@@ -25,12 +25,18 @@ const inp: React.CSSProperties = {
 
 export default function ContactListDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const [list,    setList]    = useState<ContactList | null>(null);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [alert,   setAlert]   = useState<{ type: "success" | "error"; msg: string } | null>(null);
-  const [total,   setTotal]   = useState(0);
-  const [offset,  setOffset]  = useState(0);
+  const [list,      setList]      = useState<ContactList | null>(null);
+  const [members,   setMembers]   = useState<Member[]>([]);
+  const [loading,   setLoading]   = useState(true);
+  const [alert,     setAlert]     = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [total,     setTotal]     = useState(0);
+  const [offset,    setOffset]    = useState(0);
+  const [showEmail, setShowEmail] = useState(false);
+
+  const eligibleCount = useMemo(
+    () => members.filter(m => m.email && m.email_consent && m.is_active).length,
+    [members],
+  );
   const LIMIT = 100;
 
   const load = useCallback(async () => {
@@ -80,6 +86,9 @@ export default function ContactListDetailPage({ params }: { params: Promise<{ id
           <Link href={`/admin/contacts?list_id=${id}`}>
             <Button variant="outline" size="sm">+ Add Contacts</Button>
           </Link>
+          <Button variant="primary" size="sm" onClick={() => setShowEmail(true)} disabled={eligibleCount === 0}>
+            📧 Send Email {eligibleCount > 0 ? `(${eligibleCount})` : ""}
+          </Button>
         </div>
       </div>
 
@@ -162,6 +171,79 @@ export default function ContactListDetailPage({ params }: { params: Promise<{ id
           </div>
         )}
       </Card>
+
+    {showEmail && list && (
+      <ListSendEmailModal
+        listId={id}
+        listName={list.name}
+        eligibleCount={eligibleCount}
+        onClose={() => setShowEmail(false)}
+        onSent={(result) => {
+          setShowEmail(false);
+          setAlert({ type: "success", msg: `Sent to ${result.sent} of ${result.total} contacts${result.skipped > 0 ? ` (${result.skipped} skipped — no email/consent)` : ""}` });
+        }}
+      />
+    )}
+    </div>
+  );
+}
+
+// ── Send Email Modal ───────────────────────────────────────────────────────────
+
+function ListSendEmailModal({
+  listId, listName, eligibleCount, onClose, onSent,
+}: {
+  listId: string; listName: string; eligibleCount: number;
+  onClose: () => void; onSent: (result: { sent: number; total: number; skipped: number }) => void;
+}) {
+  const [subject, setSubject] = useState("");
+  const [body,    setBody]    = useState("");
+  const [sending, setSending] = useState(false);
+  const [error,   setError]   = useState("");
+
+  async function send() {
+    if (!subject.trim()) { setError("Subject is required"); return; }
+    if (!body.trim())    { setError("Message is required"); return; }
+    setSending(true); setError("");
+    const res = await fetch(`/api/admin/contact-lists/${listId}/send-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subject, body }),
+    });
+    const data = await res.json();
+    setSending(false);
+    if (!res.ok) { setError(data.error ?? "Send failed"); return; }
+    onSent(data);
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 520, background: "#111", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 14, padding: 24 }}>
+        <div style={{ fontWeight: 800, fontSize: "1rem", color: "#fff", marginBottom: 4 }}>📧 Send Email to List</div>
+        <div style={{ fontSize: "0.78rem", color: "#555", marginBottom: 16 }}>
+          List: <strong style={{ color: "#888" }}>{listName}</strong> &nbsp;·&nbsp;
+          <span style={{ color: "#60a5fa" }}>{eligibleCount} eligible recipients</span>
+          <div style={{ fontSize: "0.7rem", color: "#444", marginTop: 2 }}>Only contacts with email + consent will receive this.</div>
+        </div>
+
+        {error && <div style={{ background: "rgba(248,113,113,0.1)", border: "1px solid #f87171", borderRadius: 6, padding: "8px 12px", fontSize: "0.8rem", color: "#f87171", marginBottom: 12 }}>{error}</div>}
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: "block", fontSize: "0.7rem", fontWeight: 600, color: "#555", textTransform: "uppercase", marginBottom: 4 }}>Subject *</label>
+          <input value={subject} onChange={e => setSubject(e.target.value)} style={{ ...inp, width: "100%", boxSizing: "border-box" as const }} placeholder="Subject line" />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: "block", fontSize: "0.7rem", fontWeight: 600, color: "#555", textTransform: "uppercase", marginBottom: 4 }}>Message *</label>
+          <textarea value={body} onChange={e => setBody(e.target.value)} rows={8} style={{ ...inp, width: "100%", boxSizing: "border-box" as const, resize: "vertical" }} placeholder="Type your message here…" />
+        </div>
+
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <Button size="sm" variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button size="sm" variant="primary" onClick={send} disabled={sending}>
+            {sending ? `Sending to ${eligibleCount}…` : `Send to ${eligibleCount} contacts`}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

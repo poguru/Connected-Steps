@@ -42,13 +42,14 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
   const isNew    = id === "new";
   const router   = useRouter();
 
-  const [contact,  setContact]  = useState<Contact | null>(null);
-  const [activity, setActivity] = useState<ActivityEntry[]>([]);
-  const [lists,    setLists]    = useState<Array<{ id: string; name: string; color: string }>>([]);
-  const [loading,  setLoading]  = useState(!isNew);
-  const [saving,   setSaving]   = useState(false);
-  const [editing,  setEditing]  = useState(isNew);
-  const [alert,    setAlert]    = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [contact,   setContact]   = useState<Contact | null>(null);
+  const [activity,  setActivity]  = useState<ActivityEntry[]>([]);
+  const [lists,     setLists]     = useState<Array<{ id: string; name: string; color: string }>>([]);
+  const [loading,   setLoading]   = useState(!isNew);
+  const [saving,    setSaving]    = useState(false);
+  const [editing,   setEditing]   = useState(isNew);
+  const [alert,     setAlert]     = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [showEmail, setShowEmail] = useState(false);
 
   // Form state
   const [form, setForm] = useState({
@@ -304,6 +305,21 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
         {/* Sidebar (view mode) */}
         {!editing && contact && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+
+            {/* Send Email */}
+            {contact.email && !contact.do_not_contact && (
+              <Card style={{ padding: "1rem" }}>
+                <Button variant="primary" size="sm" style={{ width: "100%" }} onClick={() => setShowEmail(true)}>
+                  📧 Send Email
+                </Button>
+                {!contact.email_consent && (
+                  <div style={{ fontSize: "0.68rem", color: "#f59e0b", marginTop: 6, lineHeight: 1.4 }}>
+                    ⚠ No email consent on file
+                  </div>
+                )}
+              </Card>
+            )}
+
             <Card style={{ padding: "1rem" }}>
               <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Lists</div>
               {lists.length === 0
@@ -333,6 +349,69 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
             </Card>
           </div>
         )}
+      </div>
+    </div>
+
+    {showEmail && contact && (
+      <SendEmailModal
+        contactId={contact.id}
+        contactName={contact.full_name}
+        email={contact.email!}
+        onClose={() => setShowEmail(false)}
+        onSent={() => { setShowEmail(false); setAlert({ type: "success", msg: "Email sent!" }); load(); }}
+      />
+    )}
+  );
+}
+
+// ── Send Email Modal ───────────────────────────────────────────────────────────
+
+function SendEmailModal({
+  contactId, contactName, email, onClose, onSent,
+}: { contactId: string; contactName: string; email: string; onClose: () => void; onSent: () => void }) {
+  const [subject, setSubject] = useState("");
+  const [body,    setBody]    = useState("");
+  const [sending, setSending] = useState(false);
+  const [error,   setError]   = useState("");
+
+  async function send() {
+    if (!subject.trim()) { setError("Subject is required"); return; }
+    if (!body.trim())    { setError("Message is required"); return; }
+    setSending(true); setError("");
+    const res = await fetch(`/api/admin/external-contacts/${contactId}/send-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subject, body }),
+    });
+    const data = await res.json();
+    setSending(false);
+    if (!res.ok) { setError(data.error ?? "Send failed"); return; }
+    onSent();
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 520, background: "#111", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 14, padding: 24 }}>
+        <div style={{ fontWeight: 800, fontSize: "1rem", color: "#fff", marginBottom: 4 }}>📧 Send Email</div>
+        <div style={{ fontSize: "0.78rem", color: "#555", marginBottom: 16 }}>To: {contactName} &lt;{email}&gt;</div>
+
+        {error && <div style={{ background: "rgba(248,113,113,0.1)", border: "1px solid #f87171", borderRadius: 6, padding: "8px 12px", fontSize: "0.8rem", color: "#f87171", marginBottom: 12 }}>{error}</div>}
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: "block", fontSize: "0.7rem", fontWeight: 600, color: "#555", textTransform: "uppercase", marginBottom: 4 }}>Subject *</label>
+          <input value={subject} onChange={e => setSubject(e.target.value)} style={{ ...inp, width: "100%", boxSizing: "border-box" as const }} placeholder="Subject line" />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: "block", fontSize: "0.7rem", fontWeight: 600, color: "#555", textTransform: "uppercase", marginBottom: 4 }}>Message *</label>
+          <textarea value={body} onChange={e => setBody(e.target.value)} rows={8} style={{ ...inp, width: "100%", boxSizing: "border-box" as const, resize: "vertical" }} placeholder="Type your message here…" />
+        </div>
+
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" size="sm" onClick={send} disabled={sending}>
+            {sending ? "Sending…" : "Send"}
+          </Button>
+        </div>
       </div>
     </div>
   );
