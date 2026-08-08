@@ -166,22 +166,31 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // ── Bulk upsert all new contacts — ON CONFLICT DO NOTHING for email/mobile ─
-  // Using upsert with ignoreDuplicates so duplicate emails (within the file or
-  // already in DB) are silently skipped rather than crashing the whole batch.
+  // ── Deduplicate within the batch (ec_email_unique is a functional partial
+  //    index on LOWER(email), so ON CONFLICT can't be used — dedupe in-memory)
   if (toInsert.length > 0) {
+    const seenEmails = new Set<string>();
+    const deduped: Payload[] = [];
+    for (const p of toInsert) {
+      const key = p.email ?? null;
+      if (key && seenEmails.has(key)) {
+        skipped++;   // in-file duplicate email
+      } else {
+        if (key) seenEmails.add(key);
+        deduped.push(p);
+      }
+    }
+
     const { data: created, error: insertErr } = await db.from("external_contacts")
-      .upsert(toInsert, { onConflict: "email", ignoreDuplicates: true })
+      .insert(deduped)
       .select("id");
 
     if (insertErr) {
-      console.error("[import] bulk upsert failed:", insertErr);
-      failed += toInsert.length;
+      console.error("[import] bulk insert failed:", insertErr);
+      failed += deduped.length;
       errors.push({ row: -1, message: `Bulk insert failed: ${insertErr.message} (code: ${insertErr.code})` });
     } else if (created !== null) {
       imported = created.length;
-      // Rows silently skipped due to duplicate email count as skipped
-      skipped += toInsert.length - created.length;
 
       // Bulk insert activity records
       await db.from("external_contact_activity").insert(
