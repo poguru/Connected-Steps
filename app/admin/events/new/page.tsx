@@ -1269,7 +1269,7 @@ function StepCategories({
           <div style={{ marginBottom: 14 }}>
             <Grid cols="1fr 1fr 1fr" gap={14} mobile="1">
               <Field label="Early Bird Price (₹)" hint="Blank = no early bird">
-                <input type="number" className="wiz-input" value={raceForm.early_bird_price} onChange={e => setRF("early_bird_price", e.target.value)} placeholder="Same as entry fee" min="0" />
+                <input type="number" className="wiz-input" value={raceForm.early_bird_price} onChange={e => setRF("early_bird_price", e.target.value)} placeholder="Same as entry fee" min="1" />
               </Field>
               <Field label="Pricing Model">
                 <select className="wiz-select" value={raceForm.price_type} onChange={e => setRF("price_type", e.target.value)}>

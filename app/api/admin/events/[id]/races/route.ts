@@ -51,6 +51,17 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "name and distance are required" }, { status: 400 });
   }
 
+  const basePrice = Number(price) || 0;
+  const parsedEarlyBirdPrice = early_bird_price ? Number(early_bird_price) : null;
+  if (parsedEarlyBirdPrice !== null) {
+    if (!Number.isFinite(parsedEarlyBirdPrice) || parsedEarlyBirdPrice <= 0) {
+      return NextResponse.json({ error: "early_bird_price must be a positive number" }, { status: 400 });
+    }
+    if (parsedEarlyBirdPrice >= basePrice) {
+      return NextResponse.json({ error: "early_bird_price must be less than the entry fee" }, { status: 400 });
+    }
+  }
+
   const db = getSupabaseServer();
 
   // Verify event exists and is owned/accessible
@@ -64,8 +75,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       name:                 String(name).trim(),
       distance:             String(distance).trim(),
       description:          description ? String(description) : null,
-      price:                Number(price) || 0,
-      early_bird_price:     early_bird_price ? Number(early_bird_price) : null,
+      price:                basePrice,
+      early_bird_price:     parsedEarlyBirdPrice,
       price_type:           ["per_participant","per_registration"].includes(String(price_type)) ? String(price_type) : "per_participant",
       min_participants:     Math.max(1, Number(min_participants) || 1),
       max_participants:     Math.max(1, Number(max_participants) || 1),
@@ -124,6 +135,26 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   for (const k of allowedKeys) {
     if (k in fields) allowed[k] = fields[k];
   }
+
+  // Validate and coerce early_bird_price — must be positive and < price
+  if ("early_bird_price" in fields) {
+    const rawEbp = fields.early_bird_price;
+    const ebp = (rawEbp !== null && rawEbp !== "" && rawEbp !== undefined)
+      ? Number(rawEbp)
+      : null;
+    if (ebp !== null) {
+      if (!Number.isFinite(ebp) || ebp <= 0) {
+        return NextResponse.json({ error: "early_bird_price must be a positive number" }, { status: 400 });
+      }
+      // Compare against updated price if provided, otherwise we'll validate after fetch
+      const newPrice = "price" in fields ? Number(fields.price) : null;
+      if (newPrice !== null && ebp >= newPrice) {
+        return NextResponse.json({ error: "early_bird_price must be less than the entry fee" }, { status: 400 });
+      }
+    }
+    allowed.early_bird_price = ebp;
+  }
+
   allowed.updated_at = new Date().toISOString();
 
   const { data, error } = await db

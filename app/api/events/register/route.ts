@@ -208,7 +208,7 @@ async function handleSingleParticipant(
   const earlyBirdActive =
     !!(ev as { early_bird_ends_at?: string | null }).early_bird_ends_at &&
     new Date() < new Date((ev as { early_bird_ends_at: string }).early_bird_ends_at);
-  const isEarlyBird = earlyBirdActive && !!matchedRace?.early_bird_price;
+  const isEarlyBird = earlyBirdActive && (matchedRace?.early_bird_price ?? 0) > 0;
   const raceBasePrice = matchedRace
     ? (isEarlyBird ? (matchedRace.early_bird_price as number) : matchedRace.price)
     : null;
@@ -835,7 +835,7 @@ async function handleMultiParticipant(
   for (const p of participants) {
     const pRace = multiRaces?.find(r => r.distance === (p.distance_category ?? leadCat)) ?? leadRace;
     if (pRace) {
-      const pIsEarly = earlyBirdActiveMulti && !!pRace.early_bird_price;
+      const pIsEarly = earlyBirdActiveMulti && (pRace.early_bird_price ?? 0) > 0;
       const pPrice   = pIsEarly ? (pRace.early_bird_price as number) : pRace.price;
       if (pRace.price_type === "per_registration") {
         // Flat fee — only add once (use the first participant's price for the whole booking)

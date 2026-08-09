@@ -226,6 +226,7 @@ export async function GET(req: NextRequest) {
       ebEndsAt &&
       new Date(ebEndsAt) > new Date() &&
       entry.min_early_bird_price !== null &&
+      entry.min_early_bird_price > 0 &&
       entry.min_early_bird_price < entry.min_price
     );
   }

@@ -443,7 +443,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
               {racesData.map(race => {
                 const rSlotsLeft = race.max_slots !== null ? Math.max(0, race.max_slots - race.slot_reserved) : null;
                 const rFull = rSlotsLeft !== null && rSlotsLeft === 0;
-                const showEarly = race.early_bird_price != null && race.early_bird_price < race.price && lifecycle.canRegister;
+                const showEarly = race.early_bird_price != null && race.early_bird_price > 0 && race.early_bird_price < race.price && lifecycle.canRegister;
                 const isGroup = (race.max_participants ?? 1) > 1;
                 const perks: RacePerks = race.perks ?? { medal: false, bib: false, tshirt: false, breakfast: false, certificate: false, goodies: false };
                 const perkList = [
