@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import RegisterButton from "@/components/events/RegisterButton";
-import { getEventLifecycleStatus, LIFECYCLE_LABEL, LIFECYCLE_COLOR } from "@/lib/event-status";
-import { getLifecycle } from "@/lib/event-lifecycle";
+import MobileRegisterCta from "@/components/events/MobileRegisterCta";
+import { getLifecycle, LIFECYCLE_BADGE } from "@/lib/event-lifecycle";
 import { getDistanceOption } from "@/lib/event-distances";
 import EventDetailCountdown from "@/components/events/EventDetailCountdown";
 import EventShareButton from "@/components/events/EventShareButton";
@@ -124,7 +125,11 @@ async function getEvent(slug: string): Promise<Event | null> {
     }
 
     if (data) {
-      db.from("events").update({ view_count: (data.view_count ?? 0) + 1 }).eq("id", data.id).then(() => {});
+      const h = await headers();
+      const isPrefetch = h.get("purpose") === "prefetch" || h.get("next-router-prefetch") === "1";
+      if (!isPrefetch) {
+        db.from("events").update({ view_count: (data.view_count ?? 0) + 1 }).eq("id", data.id).then(() => {});
+      }
     }
     return data ?? null;
   } catch { return null; }
@@ -275,22 +280,16 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
   const isFull = slotsLeft !== null && slotsLeft === 0;
 
   const conf      = TYPE[ev.event_type] ?? TYPE.running;
-  const ls        = getEventLifecycleStatus(ev);
   const lifecycle = getLifecycle(ev);
-  const lsCol     = LIFECYCLE_COLOR[ls];
+  const badgeCfg  = LIFECYCLE_BADGE[lifecycle.state];
   const closeAt   = ev.registration_closes_at
     ? new Date(ev.registration_closes_at).toLocaleString("en-IN", {
         timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
       })
     : null;
 
-  // Starting price — the lowest price across all active categories
-  const startingPrice = racesData.length > 0
-    ? Math.min(...racesData.map(r => r.price))
-    : ev.price ?? 0;
-
-  // Early bird: show banner when future date is set and races have early-bird prices
-  const hasEarlyBirdRaces = racesData.some(r => r.early_bird_price != null && r.early_bird_price < r.price);
+  // Early bird: show banner when future date is set and races have valid early-bird prices
+  const hasEarlyBirdRaces = racesData.some(r => r.early_bird_price != null && r.early_bird_price > 0 && r.early_bird_price < r.price);
   const earlyBirdEndsAt   = ev.early_bird_ends_at && hasEarlyBirdRaces && lifecycle.canRegister
     ? new Date(ev.early_bird_ends_at)
     : null;
@@ -298,6 +297,16 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
   const earlyBirdLabel    = earlyBirdActive
     ? earlyBirdEndsAt!.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
     : null;
+
+  // Starting price — lowest effective price (early bird when active, otherwise base)
+  const startingPrice = racesData.length > 0
+    ? Math.min(...racesData.map(r => {
+        if (earlyBirdActive && r.early_bird_price != null && r.early_bird_price > 0 && r.early_bird_price < r.price) {
+          return r.early_bird_price;
+        }
+        return r.price;
+      }))
+    : ev.price ?? 0;
 
   const heroImg = ev.banner_image ?? ev.cover_image;
   const highlights: Highlight[] = Array.isArray(ev.highlights) ? ev.highlights : [];
@@ -379,10 +388,10 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
           <span style={{ fontSize: "10px", fontWeight: 700, color: conf.color, background: `${conf.color}18`, border: `1px solid ${conf.color}30`, padding: "4px 10px", borderRadius: 999 }}>
             {conf.icon} {conf.label.toUpperCase()}
           </span>
-          <span style={{ fontSize: "10px", fontWeight: 700, color: lsCol.text, background: lsCol.bg, border: `1px solid ${lsCol.border}`, padding: "4px 10px", borderRadius: 999 }}>
-            {LIFECYCLE_LABEL[ls].toUpperCase()}
+          <span style={{ fontSize: "10px", fontWeight: 700, color: badgeCfg.color, background: badgeCfg.bg, border: `1px solid ${badgeCfg.border}`, padding: "4px 10px", borderRadius: 999 }}>
+            {badgeCfg.text}
           </span>
-          {(ev.distance_categories ?? []).map(cat => {
+          {[...new Set(racesData.map(r => r.distance))].map(cat => {
             const d = getDistanceOption(cat);
             return (
               <span key={cat} style={{ fontSize: "10px", fontWeight: 700, color: d.color, background: d.bg, border: `1px solid ${d.border}`, padding: "4px 10px", borderRadius: 999 }}>
@@ -410,7 +419,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         {/* Early bird banner */}
         {earlyBirdActive && earlyBirdLabel && (
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", marginBottom: "20px", background: "rgba(251,191,36,0.07)", border: "1px solid rgba(251,191,36,0.22)", borderRadius: "10px" }}>
-            <span style={{ fontSize: 18, flexShrink: 0 }}>🐦</span>
+            <span style={{ fontSize: 18, flexShrink: 0 }}>⚡</span>
             <div>
               <div style={{ fontSize: "13px", fontWeight: 700, color: "#fbbf24" }}>Early Bird Prices Active</div>
               <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", marginTop: 2 }}>Ends {earlyBirdLabel} IST</div>
@@ -431,9 +440,9 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
                 const perks: RacePerks = race.perks ?? { medal: false, bib: false, tshirt: false, breakfast: false, certificate: false, goodies: false };
                 const perkList = [
                   perks.medal       && { label: "Medal",       icon: "🏅" },
-                  perks.bib         && { label: "BIB",         icon: "📋" },
+                  perks.bib         && { label: "BIB",         icon: "🏷️" },
                   perks.tshirt      && { label: "T-Shirt",     icon: "👕" },
-                  perks.breakfast   && { label: "Breakfast",   icon: "🍌" },
+                  perks.breakfast   && { label: "Breakfast",   icon: "🍳" },
                   perks.certificate && { label: "Certificate", icon: "📜" },
                   perks.goodies     && { label: "Goodies",     icon: "🎁" },
                 ].filter(Boolean) as { label: string; icon: string }[];
@@ -862,10 +871,10 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
             Join Waitlist
           </a>
         ) : lifecycle.canRegister ? (
-          <a href={`/events/${ev.share_slug ?? ev.id}/register`}
-            style={{ display: "block", textAlign: "center", padding: "14px", borderRadius: "10px", background: "#e8620a", color: "#fff", fontWeight: 700, fontSize: "15px", textDecoration: "none" }}>
-            {startingPrice === 0 ? "Register Free" : racesData.length > 1 ? `Register · from ₹${startingPrice}` : `Register · ₹${startingPrice}`}
-          </a>
+          <MobileRegisterCta
+            slug={ev.share_slug ?? ev.id}
+            label={startingPrice === 0 ? "Register Free" : racesData.length > 1 ? `Register · from ₹${startingPrice}` : `Register · ₹${startingPrice}`}
+          />
         ) : null}
       </div>
     </div>
