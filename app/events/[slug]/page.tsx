@@ -8,7 +8,6 @@ import { getLifecycle } from "@/lib/event-lifecycle";
 import { getDistanceOption } from "@/lib/event-distances";
 import EventDetailCountdown from "@/components/events/EventDetailCountdown";
 import EventShareButton from "@/components/events/EventShareButton";
-import EventSlotDisplay from "@/components/events/EventSlotDisplay";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -407,22 +406,6 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
           registration_closes_at: ev.registration_closes_at,
         }} />
 
-        {/* Live slot counter */}
-        <EventSlotDisplay
-          eventId={ev.id}
-          featured={ev.featured}
-          initial={{
-            participant_count: ev.participant_count ?? 0,
-            max_participants:  ev.max_participants  ?? null,
-            races: racesData.map(r => ({
-              race_id:       r.id,
-              name:          r.name,
-              distance:      r.distance,
-              slot_reserved: r.slot_reserved,
-              max_slots:     r.max_slots ?? null,
-            })),
-          }}
-        />
 
         {/* Early bird banner */}
         {earlyBirdActive && earlyBirdLabel && (
