@@ -703,8 +703,12 @@ async function handleMultiParticipant(
   const raceMinPer = (leadRace as { min_participants?: number | null } | null)?.min_participants ?? 0;
   const raceMaxPer = leadRace?.max_participants ?? 0;
   const evMaxPer   = (ev as { max_per_registration?: number }).max_per_registration ?? 0;
-  const effectiveMax = raceMaxPer > 0 ? raceMaxPer : (evMaxPer > 0 ? evMaxPer : 20);
-  if (raceMinPer > 0 && participants.length < raceMinPer) {
+  // When registering others, the race's per-entry limit (e.g. 1 for a solo race) is a
+  // per-individual cap, not a batch cap. Use the event-level max or a generous default.
+  const effectiveMax = is_registering_others
+    ? (evMaxPer > 1 ? evMaxPer : 20)
+    : (raceMaxPer > 0 ? raceMaxPer : (evMaxPer > 0 ? evMaxPer : 20));
+  if (!is_registering_others && raceMinPer > 0 && participants.length < raceMinPer) {
     return NextResponse.json({ error: `Minimum ${raceMinPer} participants required per booking for this category.` }, { status: 400 });
   }
   if (participants.length > effectiveMax) {

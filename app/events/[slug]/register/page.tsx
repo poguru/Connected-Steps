@@ -318,8 +318,10 @@ export default function RegisterPage() {
   }
 
   // When the selected race changes, initialize or clamp participant count.
+  // Skip in "others" mode — the user controls count via Add/Remove buttons.
   useEffect(() => {
     if (!ev || !selectedRace) return;
+    if (registrantMode === "others") return;
     const min = selectedRace.min_participants ?? 1;
     const max = Math.min(selectedRace.max_participants ?? 10, 20);
     // Group categories: snap to min when category changes so participant cards auto-generate.
@@ -329,6 +331,12 @@ export default function RegisterPage() {
       : Math.max(min, Math.min(participantCount, max));
     if (target !== participantCount) changeCount(target);
   }, [distanceCategory, ev?.id]); // eslint-disable-line
+
+  function removeParticipant(idx: number) {
+    setParticipantCount(c => c - 1);
+    setParticipants(prev => prev.filter((_, i) => i !== idx));
+    setMultiErrors(prev => prev.filter((_, i) => i !== idx));
+  }
 
   function setParticipant(idx: number, field: keyof ParticipantData, value: string) {
     setParticipants(prev => {
@@ -822,9 +830,10 @@ export default function RegisterPage() {
   if (isMulti) {
     const minPax   = selectedRaceMinParticipants;
     // In "others" mode on a solo-race event, the race cap of 1 applies per individual,
-    // not per booking — override to the event-level max_per_registration (or 10).
+    // not per booking — use event-level max_per_registration when it's >1, else default to 10.
+    const othersMax = (ev.max_per_registration && ev.max_per_registration > 1) ? ev.max_per_registration : 10;
     const maxSlots = registrantMode === "others" && !isGroupCategory
-      ? Math.min(ev.max_per_registration ?? 10, 20)
+      ? Math.min(othersMax, 20)
       : Math.min(selectedRaceMaxParticipants || 10, 20);
     const isFixedGroup = isGroupCategory && minPax === maxSlots && minPax > 1;
     const cats         = ev.distance_categories ?? [];
@@ -880,8 +889,8 @@ export default function RegisterPage() {
             </section>
           )}
 
-          {/* Participant count selector — hidden for fixed-size groups (min === max > 1) */}
-          {!isFixedGroup && (
+          {/* Participant count selector — hidden for fixed-size groups and "others" mode (uses Add/Remove buttons instead) */}
+          {!isFixedGroup && registrantMode !== "others" && (
           <section style={{ marginBottom: "1.75rem" }}>
             <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.875rem" }}>
               Number of Participants *
@@ -921,8 +930,16 @@ export default function RegisterPage() {
                 border: "1px solid rgba(255,255,255,0.08)",
                 borderRadius: "14px", padding: "1.25rem",
               }}>
-                <div style={{ fontSize: "0.78rem", fontWeight: 800, color: "#e8620a", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: idx === 0 && registrantMode === "others" ? "0.5rem" : "1rem" }}>
-                  Participant {idx + 1}{idx === 0 && registrantMode !== "others" ? " (You)" : ""}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+                  <div style={{ fontSize: "0.78rem", fontWeight: 800, color: "#e8620a", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                    Participant {idx + 1}{idx === 0 && registrantMode !== "others" ? " (You)" : ""}
+                  </div>
+                  {registrantMode === "others" && participants.length > 1 && (
+                    <button type="button" onClick={() => removeParticipant(idx)}
+                      style={{ background: "none", border: "1px solid rgba(239,68,68,0.25)", borderRadius: "6px", cursor: "pointer", color: "rgba(239,68,68,0.65)", fontSize: "11px", fontFamily: "inherit", padding: "3px 10px", lineHeight: 1 }}>
+                      × Remove
+                    </button>
+                  )}
                 </div>
                 {idx === 0 && registrantMode === "others" && (
                   <button type="button"
@@ -1080,6 +1097,14 @@ export default function RegisterPage() {
                 </div>
               </div>
             ))}
+
+            {/* Add another person — "others" mode only */}
+            {registrantMode === "others" && participantCount < maxSlots && (
+              <button type="button" onClick={() => changeCount(participantCount + 1)}
+                style={{ width: "100%", padding: "13px", borderRadius: "10px", border: "2px dashed rgba(232,98,10,0.35)", background: "rgba(232,98,10,0.04)", color: "rgba(232,98,10,0.8)", fontWeight: 600, fontSize: "0.875rem", cursor: "pointer", fontFamily: "inherit", marginBottom: "1.5rem", letterSpacing: "0.02em" }}>
+                + Add Another Person
+              </button>
+            )}
 
             {/* Shared emergency contact */}
             {(regCfg.require_emergency_contact || regCfg.show_notes) && (

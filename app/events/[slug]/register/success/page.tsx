@@ -4,9 +4,18 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
+interface Participant {
+  id: string; first_name: string; last_name: string | null;
+  email: string | null; distance_category: string | null;
+  tshirt_size: string | null; qr_token: string | null;
+  checked_in_at: string | null;
+}
+
 interface Registration {
   registration_code: string; payment_status: string; status: string;
   user_name: string; final_price: number; created_at: string;
+  participant_count: number;
+  participants: Participant[];
   events: {
     id: string; title: string; event_type: string; start_date: string;
     start_time: string | null; location: string; share_slug: string | null;
@@ -117,6 +126,43 @@ export default function SuccessPage() {
                 {reg && <SRow label="Payment">{reg.payment_status === "paid" ? `₹${reg.final_price} Paid ✓` : reg.payment_status === "free" ? "Free Entry" : reg.payment_status}</SRow>}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Participants list — shown when there are 2+ participants (i.e., friend booking) */}
+        {!loading && reg && (reg.participants?.length ?? 0) > 1 && (
+          <div style={{ marginBottom: "1.75rem", textAlign: "left" }}>
+            <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.875rem", textAlign: "center" }}>
+              Registered Participants ({reg.participants.length})
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {reg.participants.map((p, i) => {
+                const name = [p.first_name, p.last_name].filter(Boolean).join(" ");
+                const qrUrl = p.qr_token
+                  ? `${typeof window !== "undefined" ? window.location.origin : ""}/api/events/qr/${encodeURIComponent(p.qr_token)}`
+                  : null;
+                return (
+                  <div key={p.id ?? i} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "1rem", display: "flex", alignItems: "center", gap: "1rem" }}>
+                    {qrUrl && (
+                      <img src={qrUrl} alt={`QR for ${name}`}
+                        style={{ width: 72, height: 72, borderRadius: 8, background: "#fff", flexShrink: 0 }} />
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#fff", marginBottom: "3px" }}>{name}</div>
+                      {p.distance_category && (
+                        <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.4)" }}>{p.distance_category}</div>
+                      )}
+                      {p.tshirt_size && (
+                        <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.35)" }}>T-Shirt: {p.tshirt_size}</div>
+                      )}
+                      {p.checked_in_at && (
+                        <div style={{ fontSize: "0.72rem", color: "#4ade80", marginTop: "2px" }}>✓ Checked in</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
