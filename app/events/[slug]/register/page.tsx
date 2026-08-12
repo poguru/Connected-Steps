@@ -273,9 +273,10 @@ export default function RegisterPage() {
           const fields: EventFormField[] = d.form_fields ?? [];
           const races: RaceInfo[] = d.races ?? [];
           setEv({ ...d.event, form_fields: fields, races });
-          // Pre-fill default values
+          // Pre-fill default values (skip tshirt_size — stored per-participant, not booking-level)
           const defaults: Record<string, string> = {};
           for (const f of fields) {
+            if (f.field_key === "tshirt_size") continue;
             if (f.default_value) defaults[f.field_key] = f.default_value;
           }
           if (Object.keys(defaults).length > 0) setCustomFieldValues(defaults);
@@ -410,7 +411,9 @@ export default function RegisterPage() {
     if (!p.mobile || !/^\d{10}$/.test(p.mobile.replace(/\s/g, ""))) e.mobile = "Phone must be exactly 10 digits.";
     const cats = event.distance_categories ?? [];
     if (cats.length > 1 && !p.distance_category) e.distance_category = "Please select a distance category.";
-    if (event.collect_tshirt && !p.tshirt_size) e.tshirt_size = "Please select a T-shirt size.";
+    const tshirtRequired = event.collect_tshirt ||
+      (event.form_fields ?? []).some(f => f.field_key === "tshirt_size" && f.required);
+    if (tshirtRequired && !p.tshirt_size) e.tshirt_size = "Please select a T-shirt size.";
 
     // Race-level age/gender restrictions for this participant's chosen category
     const pCat = p.distance_category || (cats.length === 1 ? cats[0] : null);
@@ -700,7 +703,8 @@ export default function RegisterPage() {
           emergency_contact:     `${sharedEmergency.name} / ${sharedEmergency.phone}`,
           special_notes:         sharedNotes,
           coupon_code:           couponApplied ? coupon : undefined,
-          custom_fields:         customFieldValues,
+          // Strip tshirt_size from shared custom_fields — it is stored per-participant
+          custom_fields:         Object.fromEntries(Object.entries(customFieldValues).filter(([k]) => k !== "tshirt_size")),
           marketing_consent:     marketingConsent,
           participants:          participants.map(p => ({
             first_name:        p.first_name.trim(),
@@ -1094,6 +1098,33 @@ export default function RegisterPage() {
                       {multiErrors[idx]?.tshirt_size && <Err>{multiErrors[idx].tshirt_size}</Err>}
                     </div>
                   )}
+
+                  {/* T-shirt via custom form field — per participant, only when collect_tshirt is not set */}
+                  {!ev.collect_tshirt && (() => {
+                    const tshirtField = (ev.form_fields ?? []).find(f => f.field_key === "tshirt_size");
+                    if (!tshirtField) return null;
+                    return (
+                      <div style={{ gridColumn: "1/-1" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "5px" }}>
+                          <label style={{ ...LABEL, marginBottom: 0 }}>
+                            {tshirtField.label}{tshirtField.required ? " *" : ""}
+                          </label>
+                          {ev.tshirt_size_chart_url && (
+                            <button type="button" onClick={() => setShowSizeGuide(true)}
+                              style={{ fontSize: "11px", color: "#60a5fa", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 600, padding: 0, textDecoration: "underline" }}>
+                              View Size Guide ↗
+                            </button>
+                          )}
+                        </div>
+                        <CustomFieldInput
+                          field={tshirtField}
+                          value={p.tshirt_size ?? ""}
+                          error={multiErrors[idx]?.tshirt_size}
+                          onChange={v => setParticipant(idx, "tshirt_size", v)}
+                        />
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             ))}
@@ -1141,10 +1172,11 @@ export default function RegisterPage() {
             </section>
             )}
 
-            {/* Custom form fields (shared for the booking) */}
+            {/* Custom form fields (booking-level only; tshirt_size is handled per-participant above) */}
             {(() => {
               const builtins: Record<string, string> = { distance_category: distanceCategory, gender: form.gender, blood_group: form.blood_group };
               const visibleFields = (ev.form_fields ?? []).filter(f => {
+                if (f.field_key === "tshirt_size") return false;  // rendered per-participant
                 if (f.race_ids?.length > 0 && selectedRace && !f.race_ids.includes(selectedRace.id)) return false;
                 return evaluateConditions(f.conditions ?? [], customFieldValues, builtins);
               });

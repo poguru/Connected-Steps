@@ -796,16 +796,38 @@ async function handleMultiParticipant(
     .eq("event_id", event_id as string)
     .eq("is_active", true);
 
+  // tshirt_size is a participant-level field — skip it in the booking-level validation loop
+  // and validate per-participant below.
+  const tshirtFormField = (multiFormFields ?? []).find(f => f.field_key === "tshirt_size");
+
   for (const f of (multiFormFields ?? [])) {
+    if (f.field_key === "tshirt_size") continue;  // validated per-participant
     const raceIds: string[] = (f as { race_ids?: string[] }).race_ids ?? [];
     if (raceIds.length > 0 && leadRace && !raceIds.includes(leadRace.id)) continue;
     if (f.required && !multiCustomFieldsRaw[f.field_key]?.trim()) {
       return NextResponse.json({ error: `"${f.label}" is required.` }, { status: 400 });
     }
   }
-  const multiValidKeys = new Set((multiFormFields ?? []).map(f => f.field_key));
+
+  // Per-participant tshirt_size validation (required if the custom field is marked required)
+  const requiresTshirtViaField = tshirtFormField?.required === true;
+  if (requiresTshirtViaField) {
+    for (let i = 0; i < participants.length; i++) {
+      if (!participants[i].tshirt_size?.trim()) {
+        return NextResponse.json(
+          { error: `Participant ${i + 1}: ${tshirtFormField!.label} is required.` },
+          { status: 400 },
+        );
+      }
+    }
+  }
+
+  const multiValidKeys = new Set(
+    (multiFormFields ?? []).filter(f => f.field_key !== "tshirt_size").map(f => f.field_key),
+  );
   const multiCustomFields: Record<string, string> = {};
   for (const [k, v] of Object.entries(multiCustomFieldsRaw)) {
+    if (k === "tshirt_size") continue;  // stored in event_participants.tshirt_size, not booking custom_fields
     if (multiValidKeys.has(k)) multiCustomFields[k] = String(v).trim();
   }
 
