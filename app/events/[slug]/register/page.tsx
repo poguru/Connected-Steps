@@ -205,6 +205,7 @@ export default function RegisterPage() {
   const [submitted, setSubmitted] = useState(false);
 
   // ── Multi-participant form state ──────────────────────────────────────────
+  const [registrantMode,   setRegistrantMode]   = useState<"myself" | "others" | null>(null);
   const [participantCount, setParticipantCount] = useState(1);
   const [participants,     setParticipants]     = useState<ParticipantData[]>([{ ...EMPTY_PARTICIPANT }]);
   const [multiErrors,      setMultiErrors]      = useState<Array<Record<string, string>>>([{}]);
@@ -503,7 +504,7 @@ export default function RegisterPage() {
 
   // ── Coupon validation ──────────────────────────────────────────────────────
 
-  const isMulti = isGroupCategory || (ev?.allow_multi_participant ?? false);
+  const isMulti = isGroupCategory || (ev?.allow_multi_participant ?? false) || registrantMode === "others";
 
   const applyCoupon = useCallback(async () => {
     if (!coupon.trim()) return;
@@ -820,6 +821,15 @@ export default function RegisterPage() {
           {EventHeader}
           {AlreadyBanner}
 
+          {registrantMode === "others" && !isGroupCategory && !(ev?.allow_multi_participant) && (
+            <div style={{ marginBottom: "1.5rem" }}>
+              <button type="button" onClick={() => setRegistrantMode(null)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.4)", fontSize: "0.8rem", fontFamily: "inherit", padding: 0 }}>
+                ← Change who you&apos;re registering
+              </button>
+            </div>
+          )}
+
           {/* Top-level category selector for group registrations */}
           {isGroupCategory && cats.length > 0 && (
             <section style={{ marginBottom: "1.75rem" }}>
@@ -893,9 +903,22 @@ export default function RegisterPage() {
                 border: "1px solid rgba(255,255,255,0.08)",
                 borderRadius: "14px", padding: "1.25rem",
               }}>
-                <div style={{ fontSize: "0.78rem", fontWeight: 800, color: "#e8620a", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>
-                  Participant {idx + 1}{idx === 0 ? " (You)" : ""}
+                <div style={{ fontSize: "0.78rem", fontWeight: 800, color: "#e8620a", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: idx === 0 && registrantMode === "others" ? "0.5rem" : "1rem" }}>
+                  Participant {idx + 1}{idx === 0 && registrantMode !== "others" ? " (You)" : ""}
                 </div>
+                {idx === 0 && registrantMode === "others" && (
+                  <button type="button"
+                    onClick={() => {
+                      const nameParts = form.name.trim().split(/\s+/);
+                      setParticipant(0, "first_name", nameParts[0] || "");
+                      setParticipant(0, "last_name", nameParts.slice(1).join(" "));
+                      setParticipant(0, "mobile", form.phone);
+                      setParticipant(0, "email", userEmail);
+                    }}
+                    style={{ marginBottom: "1rem", background: "none", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "6px", cursor: "pointer", color: "rgba(255,255,255,0.5)", fontSize: "11px", fontFamily: "inherit", padding: "4px 10px" }}>
+                    Fill with my details →
+                  </button>
+                )}
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                   <div>
@@ -957,6 +980,13 @@ export default function RegisterPage() {
                       onChange={e => setParticipant(idx, "mobile", e.target.value)}
                       placeholder="10-digit number" />
                     {multiErrors[idx]?.mobile && <Err>{multiErrors[idx].mobile}</Err>}
+                  </div>
+
+                  <div>
+                    <label style={LABEL}>Email (optional)</label>
+                    <input style={INPUT} type="email" value={p.email ?? ""}
+                      onChange={e => setParticipant(idx, "email", e.target.value)}
+                      placeholder="Participant's email for QR delivery" />
                   </div>
 
                   {/* Distance category — per participant (legacy multi only; group uses top-level selector) */}
@@ -1295,11 +1325,50 @@ export default function RegisterPage() {
           </div>
         )}
 
-        <h1 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1.75rem", color: "#fff" }}>Registration Form</h1>
+        {!isGroupCategory && !(ev?.allow_multi_participant) && registrantMode === null && !alreadyReg ? (
+          <div style={{ marginTop: "0.5rem" }}>
+            <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1.5rem" }}>
+              Who are you registering?
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <button type="button" onClick={() => setRegistrantMode("myself")}
+                style={{ width: "100%", padding: "16px 20px", borderRadius: "12px", border: "2px solid rgba(232,98,10,0.35)", background: "rgba(232,98,10,0.05)", color: "#fff", fontWeight: 700, fontSize: "0.95rem", cursor: "pointer", fontFamily: "inherit", textAlign: "left", display: "flex", alignItems: "center", gap: "14px" }}>
+                <span style={{ fontSize: "1.5rem" }}>👤</span>
+                <div>
+                  <div>Register Myself</div>
+                  <div style={{ fontSize: "12px", fontWeight: 400, color: "rgba(255,255,255,0.45)", marginTop: "2px" }}>I am attending this event</div>
+                </div>
+              </button>
+              <button type="button"
+                onClick={() => { setRegistrantMode("others"); setParticipantCount(1); setParticipants([{ ...EMPTY_PARTICIPANT }]); setMultiErrors([{}]); }}
+                style={{ width: "100%", padding: "16px 20px", borderRadius: "12px", border: "2px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.03)", color: "#fff", fontWeight: 700, fontSize: "0.95rem", cursor: "pointer", fontFamily: "inherit", textAlign: "left", display: "flex", alignItems: "center", gap: "14px" }}>
+                <span style={{ fontSize: "1.5rem" }}>👥</span>
+                <div>
+                  <div>Register Someone Else</div>
+                  <div style={{ fontSize: "12px", fontWeight: 400, color: "rgba(255,255,255,0.45)", marginTop: "2px" }}>Friend, family member, or colleague — you can add multiple people</div>
+                </div>
+              </button>
+            </div>
+            <p style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.3)", textAlign: "center", marginTop: "1.25rem" }}>
+              One payment · Individual QR codes for each participant
+            </p>
+          </div>
+        ) : (
+          <>
+            {registrantMode === "myself" && !isGroupCategory && !(ev?.allow_multi_participant) && (
+              <div style={{ marginBottom: "1.25rem" }}>
+                <button type="button" onClick={() => setRegistrantMode(null)}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.4)", fontSize: "0.8rem", fontFamily: "inherit", padding: 0 }}>
+                  ← Change who you&apos;re registering
+                </button>
+              </div>
+            )}
 
-        {AlreadyBanner}
+            <h1 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1.75rem", color: "#fff" }}>Registration Form</h1>
 
-        <form onSubmit={handleSubmit} noValidate style={{ opacity: alreadyReg ? 0.4 : 1, pointerEvents: alreadyReg ? "none" : "auto" }}>
+            {AlreadyBanner}
+
+            <form onSubmit={handleSubmit} noValidate style={{ opacity: alreadyReg ? 0.4 : 1, pointerEvents: alreadyReg ? "none" : "auto" }}>
 
           {/* Personal details */}
           <section style={{ marginBottom: "1.5rem" }}>
@@ -1484,6 +1553,8 @@ export default function RegisterPage() {
             By registering you agree to our terms &amp; conditions.
           </p>
         </form>
+          </>
+        )}
       </div>
 
       {/* T-Shirt Size Guide Modal */}

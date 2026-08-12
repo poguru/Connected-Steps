@@ -151,17 +151,6 @@ async function handleSingleParticipant(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Authenticated path: verify the account exists.
-  // Skip this check for guest-allowed events — even token-bearing users need no account.
-  if (!isGuest && requiresLogin) {
-    const { data: user } = await db
-      .from("users")
-      .select("email")
-      .eq("email", (email as string).toLowerCase().trim())
-      .single();
-    if (!user) return NextResponse.json({ error: "Account not found. Please sign up first." }, { status: 404 });
-  }
-
   // Phase 2: per-event-config field validation — mirrors regCfg on the frontend.
   // Only enforce a field as required when the event is configured to show it.
   // Also checks custom_fields[key] as a fallback: when an admin adds a custom
@@ -677,9 +666,6 @@ async function handleMultiParticipant(
     .single();
   if (!ev || ev.status !== "published") {
     return NextResponse.json({ error: "Event not found." }, { status: 404 });
-  }
-  if (!(ev as { allow_multi_participant?: boolean }).allow_multi_participant) {
-    return NextResponse.json({ error: "This event does not support multi-participant registration." }, { status: 400 });
   }
   // Guest-registration gate for multi-participant path.
   if ((ev as { require_login?: boolean }).require_login !== false && tokenEmail === null) {
