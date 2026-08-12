@@ -806,8 +806,12 @@ export default function RegisterPage() {
   // ── Multi-participant form ─────────────────────────────────────────────────
 
   if (isMulti) {
-    const minPax       = selectedRaceMinParticipants;
-    const maxSlots     = Math.min(selectedRaceMaxParticipants || 10, 20);
+    const minPax   = selectedRaceMinParticipants;
+    // In "others" mode on a solo-race event, the race cap of 1 applies per individual,
+    // not per booking — override to the event-level max_per_registration (or 10).
+    const maxSlots = registrantMode === "others" && !isGroupCategory
+      ? Math.min(ev.max_per_registration ?? 10, 20)
+      : Math.min(selectedRaceMaxParticipants || 10, 20);
     const isFixedGroup = isGroupCategory && minPax === maxSlots && minPax > 1;
     const cats         = ev.distance_categories ?? [];
 
