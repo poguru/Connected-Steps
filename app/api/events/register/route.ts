@@ -356,6 +356,7 @@ async function handleSingleParticipant(
         registration_code: code,
         event_id:          event_id as string,
         user_email:        (email as string).toLowerCase().trim(),
+        registrant_email:  (tokenEmail ?? (email as string)).toLowerCase().trim(),
         user_name:         (name as string).trim(),
         phone:             phone || null,
         gender:            gender || null,
@@ -513,6 +514,7 @@ async function handleSingleParticipant(
       registration_code: code,
       event_id:          event_id as string,
       user_email:        (email as string).toLowerCase().trim(),
+      registrant_email:  (tokenEmail ?? (email as string)).toLowerCase().trim(),
       user_name:         (name as string).trim(),
       phone:             phone || null,
       gender:            gender || null,
@@ -629,7 +631,10 @@ async function handleMultiParticipant(
     special_notes,
     coupon_code,
   } = body as Record<string, string | null | undefined>;
-  const multiCustomFieldsRaw = (body.custom_fields ?? {}) as Record<string, string>;
+  const multiCustomFieldsRaw   = (body.custom_fields ?? {}) as Record<string, string>;
+  // True when the authenticated user is registering OTHER people (not themselves).
+  // The frontend sends this flag when registrantMode === "others".
+  const is_registering_others  = body.is_registering_others === true;
 
   const participants = body.participants as ParticipantInput[];
 
@@ -780,17 +785,6 @@ async function handleMultiParticipant(
     if (cats.length === 1 && !p.distance_category) p.distance_category = cats[0];
   }
 
-  // Duplicate check
-  const { data: existing } = await db
-    .from("event_registrations")
-    .select("id, registration_code, payment_status, participant_count")
-    .eq("event_id", event_id as string)
-    .eq("user_email", accountEmail)
-    .maybeSingle();
-  if (existing && (existing.payment_status === "free" || existing.payment_status === "paid")) {
-    return NextResponse.json({ already: true, registration_code: existing.registration_code });
-  }
-
   // Custom form field validation — respects race_ids scoping (booking-level custom fields)
   const { data: multiFormFields } = await db
     .from("event_form_fields")
@@ -857,6 +851,58 @@ async function handleMultiParticipant(
   const leadParticipant = participants[0];
   const leadName = [leadParticipant.first_name, leadParticipant.last_name].filter(Boolean).join(" ");
 
+  // Determine user_email for the event_registrations row.
+  // When registering others: use the lead participant's email so the account owner's
+  // email does not conflict with their own existing self-registration.
+  // If the participant has no email: synthesize a unique key from their mobile so the
+  // UNIQUE(event_id, user_email) constraint still provides dedup protection.
+  // When registering self (group/legacy multi): keep accountEmail as before.
+  const regUserEmail = is_registering_others
+    ? (leadParticipant.email?.toLowerCase().trim() || `mob_${leadParticipant.mobile}@cs.booking`)
+    : accountEmail;
+
+  // Duplicate check — scoped to regUserEmail (participant's email when "others", account email otherwise).
+  // Prevents the same participant from registering twice while letting the same account
+  // register multiple different participants across separate transactions.
+  const { data: existing } = await db
+    .from("event_registrations")
+    .select("id, registration_code, payment_status, participant_count")
+    .eq("event_id", event_id as string)
+    .eq("user_email", regUserEmail)
+    .maybeSingle();
+  if (existing && (existing.payment_status === "free" || existing.payment_status === "paid")) {
+    if (is_registering_others) {
+      return NextResponse.json(
+        { error: `${leadParticipant.first_name} is already registered for this event.` },
+        { status: 409 }
+      );
+    }
+    return NextResponse.json({ already: true, registration_code: existing.registration_code });
+  }
+
+  // "Others" mode: cross-check every participant's email against existing event_participants
+  // to catch duplicates registered in a previous transaction by any account.
+  if (is_registering_others) {
+    const participantEmails = participants
+      .map(p => p.email?.toLowerCase().trim())
+      .filter((e): e is string => !!e && !e.endsWith("@cs.booking"));
+    if (participantEmails.length > 0) {
+      const { data: existingParticipants } = await db
+        .from("event_participants")
+        .select("first_name, email")
+        .eq("event_id", event_id as string)
+        .in("email", participantEmails)
+        .eq("status", "active");
+      if (existingParticipants && existingParticipants.length > 0) {
+        const dup = existingParticipants[0] as { first_name: string; email: string };
+        return NextResponse.json(
+          { error: `${dup.first_name} (${dup.email}) is already registered for this event.` },
+          { status: 409 }
+        );
+      }
+    }
+  }
+
   // ── Free (or fully-discounted) multi-participant path ────────────────────────
   if (finalPrice === 0) {
     // Guard coupon re-use before confirming (paid path handles this in its own block).
@@ -871,7 +917,8 @@ async function handleMultiParticipant(
       .upsert({
         registration_code: code,
         event_id:          event_id as string,
-        user_email:        accountEmail,
+        user_email:        regUserEmail,
+        registrant_email:  accountEmail,
         user_name:         leadName,
         phone:             leadParticipant.mobile || null,
         gender:            leadParticipant.gender || null,
@@ -999,7 +1046,8 @@ async function handleMultiParticipant(
     .upsert({
       registration_code: code,
       event_id:          event_id as string,
-      user_email:        accountEmail,
+      user_email:        regUserEmail,
+      registrant_email:  accountEmail,
       user_name:         leadName,
       phone:             leadParticipant.mobile || null,
       gender:            leadParticipant.gender || null,

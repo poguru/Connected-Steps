@@ -52,8 +52,26 @@ export async function GET(req: NextRequest) {
     nonPurchaserRegs = npRegs ?? [];
   }
 
-  // Merge: purchaser registrations first, then non-purchaser
-  const allRegs = [...(regs ?? []), ...nonPurchaserRegs];
+  // ── Tertiary: registrations created by this user for other people
+  // (registrant_email = userEmail but user_email != userEmail — pure friend bookings)
+  const allPrimaryAndSecondaryIds = new Set([
+    ...(regs ?? []).map(r => r.id),
+    ...nonPurchaserRegIds,
+  ]);
+
+  const { data: registrantRows } = await db
+    .from("event_registrations")
+    .select("id, registration_code, payment_status, status, created_at, original_price, coupon_discount, final_price, event_id, distance_category, qr_token, checked_in_at, participant_count")
+    .eq("registrant_email", userEmail.toLowerCase())
+    .neq("user_email", userEmail.toLowerCase())
+    .order("created_at", { ascending: false });
+
+  const tertiaryRegs = (registrantRows ?? [])
+    .filter(r => !allPrimaryAndSecondaryIds.has(r.id))
+    .map(r => ({ ...r, is_registrant_only: true as const }));
+
+  // Merge: purchaser registrations first, then non-purchaser, then registrant-only
+  const allRegs = [...(regs ?? []), ...nonPurchaserRegs, ...tertiaryRegs];
 
   if (allRegs.length === 0) return NextResponse.json({ registrations: [] });
 

@@ -292,9 +292,10 @@ export default function RegisterPage() {
       .then(r => r.json())
       .then(d => {
         const reg = (d.registrations ?? []).find(
-          (r: { events: { id: string } | null; payment_status: string; registration_code: string }) =>
+          (r: { events: { id: string } | null; payment_status: string; registration_code: string; is_registrant_only?: boolean }) =>
             r.events?.id === ev.id &&
-            (r.payment_status === "free" || r.payment_status === "paid")
+            (r.payment_status === "free" || r.payment_status === "paid") &&
+            !r.is_registrant_only
         );
         if (reg) setAlreadyReg(reg.registration_code);
       })
@@ -685,21 +686,24 @@ export default function RegisterPage() {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-user-token": userToken },
         body: JSON.stringify({
-          event_id:          ev.id,
-          email:             userEmail,
-          emergency_contact: `${sharedEmergency.name} / ${sharedEmergency.phone}`,
-          special_notes:     sharedNotes,
-          coupon_code:       couponApplied ? coupon : undefined,
-          custom_fields:     customFieldValues,
-          marketing_consent: marketingConsent,
-          participants:      participants.map(p => ({
+          event_id:              ev.id,
+          email:                 userEmail,
+          is_registering_others: registrantMode === "others",
+          emergency_contact:     `${sharedEmergency.name} / ${sharedEmergency.phone}`,
+          special_notes:         sharedNotes,
+          coupon_code:           couponApplied ? coupon : undefined,
+          custom_fields:         customFieldValues,
+          marketing_consent:     marketingConsent,
+          participants:          participants.map(p => ({
             first_name:        p.first_name.trim(),
             last_name:         p.last_name.trim() || undefined,
             gender:            p.gender,
             date_of_birth:     p.date_of_birth,
             blood_group:       p.blood_group,
             mobile:            p.mobile,
-            email:             p.email || userEmail,
+            // In "others" mode, don't fall back to the account owner's email — leave blank
+            // if the participant didn't provide one. The backend synthesises a unique key.
+            email:             registrantMode === "others" ? (p.email || undefined) : (p.email || userEmail),
             distance_category: p.distance_category || undefined,
             tshirt_size:       p.tshirt_size || undefined,
           })),
@@ -767,17 +771,27 @@ export default function RegisterPage() {
     </div>
   );
 
-  const AlreadyBanner = alreadyReg && (
-    <div style={{ padding: "1.25rem 1.5rem", borderRadius: "12px", background: "rgba(74,222,128,0.07)", border: "1px solid rgba(74,222,128,0.3)", marginBottom: "1.5rem", textAlign: "center" }}>
-      <div style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>✅</div>
-      <div style={{ fontWeight: 700, color: "#4ade80", marginBottom: "0.25rem" }}>You&apos;re already registered!</div>
-      <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)", marginBottom: "1rem", fontFamily: "monospace" }}>{alreadyReg}</div>
-      <Link href={`/events/${slug}/register/success?code=${alreadyReg}`}
-        style={{ display: "inline-block", padding: "10px 24px", borderRadius: "8px", background: "linear-gradient(135deg,#e8620a,#f07c2a)", color: "#fff", fontWeight: 700, fontSize: "0.875rem", textDecoration: "none" }}>
-        View Registration Details →
-      </Link>
-    </div>
-  );
+  const AlreadyBanner = alreadyReg ? (
+    registrantMode === "others" ? (
+      <div style={{ padding: "1rem 1.25rem", borderRadius: "12px", background: "rgba(74,222,128,0.07)", border: "1px solid rgba(74,222,128,0.25)", marginBottom: "1.5rem", display: "flex", alignItems: "flex-start", gap: "12px" }}>
+        <span style={{ fontSize: "1.25rem", flexShrink: 0, marginTop: "1px" }}>✅</span>
+        <div>
+          <div style={{ fontWeight: 700, color: "#4ade80", fontSize: "0.9rem" }}>Your spot is confirmed!</div>
+          <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)", marginTop: "2px" }}>You&apos;re registered. Fill in the details below to register additional participants.</div>
+        </div>
+      </div>
+    ) : (
+      <div style={{ padding: "1.25rem 1.5rem", borderRadius: "12px", background: "rgba(74,222,128,0.07)", border: "1px solid rgba(74,222,128,0.3)", marginBottom: "1.5rem", textAlign: "center" }}>
+        <div style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>✅</div>
+        <div style={{ fontWeight: 700, color: "#4ade80", marginBottom: "0.25rem" }}>You&apos;re already registered!</div>
+        <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)", marginBottom: "1rem", fontFamily: "monospace" }}>{alreadyReg}</div>
+        <Link href={`/events/${slug}/register/success?code=${alreadyReg}`}
+          style={{ display: "inline-block", padding: "10px 24px", borderRadius: "8px", background: "linear-gradient(135deg,#e8620a,#f07c2a)", color: "#fff", fontWeight: 700, fontSize: "0.875rem", textDecoration: "none" }}>
+          View Registration Details →
+        </Link>
+      </div>
+    )
+  ) : null;
 
   const CouponSection = (ev?.price ?? 0) > 0 || (ev?.races ?? []).some(r => r.price > 0) ? (
     <section style={{ marginBottom: "1.5rem" }}>
@@ -897,7 +911,7 @@ export default function RegisterPage() {
           )}
 
           <form id="multi-participant-form" onSubmit={handleMultiSubmit} noValidate
-            style={{ opacity: alreadyReg ? 0.4 : 1, pointerEvents: alreadyReg ? "none" : "auto" }}>
+            style={{ opacity: (alreadyReg && registrantMode !== "others") ? 0.4 : 1, pointerEvents: (alreadyReg && registrantMode !== "others") ? "none" : "auto" }}>
 
             {/* Per-participant sections */}
             {participants.map((p, idx) => (
@@ -1329,18 +1343,26 @@ export default function RegisterPage() {
           </div>
         )}
 
-        {!isGroupCategory && !(ev?.allow_multi_participant) && registrantMode === null && !alreadyReg ? (
+        {!isGroupCategory && !(ev?.allow_multi_participant) && registrantMode === null ? (
           <div style={{ marginTop: "0.5rem" }}>
             <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1.5rem" }}>
               Who are you registering?
             </div>
+            {alreadyReg && (
+              <div style={{ fontSize: "0.78rem", color: "#4ade80", background: "rgba(74,222,128,0.07)", border: "1px solid rgba(74,222,128,0.25)", borderRadius: "8px", padding: "10px 14px", marginBottom: "1rem", display: "flex", alignItems: "center", gap: "8px" }}>
+                <span>✅</span>
+                <span>You&apos;re already registered for this event.</span>
+              </div>
+            )}
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              <button type="button" onClick={() => setRegistrantMode("myself")}
-                style={{ width: "100%", padding: "16px 20px", borderRadius: "12px", border: "2px solid rgba(232,98,10,0.35)", background: "rgba(232,98,10,0.05)", color: "#fff", fontWeight: 700, fontSize: "0.95rem", cursor: "pointer", fontFamily: "inherit", textAlign: "left", display: "flex", alignItems: "center", gap: "14px" }}>
-                <span style={{ fontSize: "1.5rem" }}>👤</span>
+              <button type="button"
+                onClick={() => !alreadyReg && setRegistrantMode("myself")}
+                disabled={!!alreadyReg}
+                style={{ width: "100%", padding: "16px 20px", borderRadius: "12px", border: `2px solid ${alreadyReg ? "rgba(255,255,255,0.06)" : "rgba(232,98,10,0.35)"}`, background: alreadyReg ? "rgba(255,255,255,0.02)" : "rgba(232,98,10,0.05)", color: alreadyReg ? "rgba(255,255,255,0.3)" : "#fff", fontWeight: 700, fontSize: "0.95rem", cursor: alreadyReg ? "not-allowed" : "pointer", fontFamily: "inherit", textAlign: "left", display: "flex", alignItems: "center", gap: "14px" }}>
+                <span style={{ fontSize: "1.5rem", opacity: alreadyReg ? 0.4 : 1 }}>👤</span>
                 <div>
-                  <div>Register Myself</div>
-                  <div style={{ fontSize: "12px", fontWeight: 400, color: "rgba(255,255,255,0.45)", marginTop: "2px" }}>I am attending this event</div>
+                  <div>Register Myself {alreadyReg ? "(Already registered)" : ""}</div>
+                  <div style={{ fontSize: "12px", fontWeight: 400, color: "rgba(255,255,255,0.35)", marginTop: "2px" }}>I am attending this event</div>
                 </div>
               </button>
               <button type="button"
