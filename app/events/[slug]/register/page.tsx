@@ -273,6 +273,7 @@ export default function RegisterPage() {
   useEffect(() => () => { if (otpCooldownRef.current) clearInterval(otpCooldownRef.current); }, []);
 
   function startOtpCooldown() {
+    if (otpCooldownRef.current) clearInterval(otpCooldownRef.current);
     setOtpCooldown(30);
     otpCooldownRef.current = setInterval(() => {
       setOtpCooldown(c => {

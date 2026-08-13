@@ -9,10 +9,10 @@
  *   { email: string, code: string }
  *
  * Body (step 2 — profile for new users):
- *   { email: string, code: string, name: string, mobile: string }
+ *   { email: string, code: string, name: string, mobile?: string }
  *
  * Responses:
- *   { needs_profile: true }                              — new user, collect name+mobile
+ *   { needs_profile: true }                              — new user, collect name (mobile optional)
  *   { success: true, userToken, user: { ... } }          — authenticated (new or existing)
  *   { error: string }  (4xx)                             — failure
  *
