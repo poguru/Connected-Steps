@@ -896,11 +896,15 @@ export default function RegisterPage() {
   // ── Phase: select (pre-auth — category + quantity) ────────────────────────
   if (pagePhase === "select") {
     const cats     = ev.distance_categories ?? [];
-    const maxSlots = isGroupCategory
-      ? Math.min(selectedRaceMaxParticipants, 20)
-      : (ev.allow_multi_participant || ev.max_per_registration > 1)
-        ? Math.min(ev.max_per_registration > 1 ? ev.max_per_registration : 10, 20)
-        : 1;
+    const raceSlotAvail = selectedRace?.max_slots != null
+      ? Math.max(0, selectedRace.max_slots - selectedRace.slot_reserved)
+      : null;
+    const perRegCap = isGroupCategory
+      ? selectedRaceMaxParticipants
+      : (ev.max_per_registration > 1 ? ev.max_per_registration : 10);
+    const maxSlots = raceSlotAvail != null
+      ? Math.min(perRegCap, raceSlotAvail, 20)
+      : Math.min(perRegCap, 20);
     const showQty     = maxSlots > 1;
     const selectPrice = selectedRace?.price ?? ev.price ?? 0;
     const selectTotal = isPricePerReg ? selectPrice : selectPrice * participantCount;
