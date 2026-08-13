@@ -46,13 +46,7 @@ export default function RegisterButton({ slug, price = 0, startDate, endDate, en
     now < new Date(registrationOpensAt);
 
   function handleClick() {
-    const user = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
-    const dest = `/events/${slug}/register`;
-    if (user) {
-      router.push(dest);
-    } else {
-      router.push(`/auth?tab=login&redirect=${encodeURIComponent(dest)}`);
-    }
+    router.push(`/events/${slug}/register`);
   }
 
   if (isCompleted) {

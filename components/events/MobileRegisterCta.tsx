@@ -11,9 +11,7 @@ export default function MobileRegisterCta({ slug, label }: Props) {
   const router = useRouter();
 
   function handleClick() {
-    const user = typeof window !== "undefined" ? localStorage.getItem("cs_user") : null;
-    const dest = `/events/${slug}/register`;
-    router.push(user ? dest : `/auth?tab=login&redirect=${encodeURIComponent(dest)}`);
+    router.push(`/events/${slug}/register`);
   }
 
   return (
