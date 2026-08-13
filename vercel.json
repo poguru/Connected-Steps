@@ -35,10 +35,6 @@
       "schedule": "0 18 1 * *"
     },
     {
-      "path": "/api/cron/session-reminders",
-      "schedule": "30 12 * * *"
-    },
-    {
       "path": "/api/cron/streak-at-risk",
       "schedule": "30 2 * * *"
     },

@@ -4,7 +4,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { autoFeedMemberJoined } from "@/lib/auto-feed";
 import { getOrCreateCode, processReferral } from "@/lib/referrals";
 import { enqueueJob } from "@/lib/job-queue";
-import { sendEmail, welcomeEmailHTML, adminNewUserEmailHTML } from "@/lib/notify";
+import { sendEmail, welcomeEmailHTML } from "@/lib/notify";
 import { isRateLimited, getClientIp } from "@/lib/rate-limit";
 import { signUserToken, USER_SESSION_COOKIE, USER_TOKEN_TTL } from "@/lib/admin-auth";
 
@@ -187,20 +187,6 @@ export async function POST(req: NextRequest) {
       welcomeEmailHTML(firstName),
     ).catch(() => {});
 
-    // Admin notification
-    sendEmail(
-      "info@connectedsteps.in", "Connected Steps Admin",
-      `New Registration: ${firstName} ${lastName}`,
-      adminNewUserEmailHTML({
-        firstName, lastName,
-        email:        userEmail,
-        phone:        phone10 || "(no phone)",
-        dob:          dob ?? null,
-        location:     location ?? null,
-        referralCode: referralCode ?? null,
-        registeredAt,
-      }),
-    ).catch(() => {});
 
     const userToken = signUserToken(userEmail);
     const res = NextResponse.json({
