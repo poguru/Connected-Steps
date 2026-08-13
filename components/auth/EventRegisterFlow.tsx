@@ -169,11 +169,9 @@ export default function EventRegisterFlow() {
   // ── Step 3: Profile (new users only) ────────────────────────────────────
   const handleProfileSubmit = (e: FormEvent) => {
     e.preventDefault();
-    const trimmedName   = name.trim();
-    const trimmedMobile = mobile.trim();
+    const trimmedName = name.trim();
     if (!trimmedName) { setError("Please enter your full name."); return; }
-    if (!trimmedMobile) { setError("Please enter your mobile number."); return; }
-    verifyOtp(otp, trimmedName, trimmedMobile);
+    verifyOtp(otp, trimmedName);
   };
 
   // ── Shared styles ─────────────────────────────────────────────────────────
@@ -301,7 +299,7 @@ export default function EventRegisterFlow() {
       <Logo />
       <p style={heading}>Almost there!</p>
       <p style={sub}>
-        ✅ Email verified. Enter your name and mobile to create your account.
+        ✅ Email verified. Enter your name to continue. You can add your mobile number later from your profile.
       </p>
 
       {error && <Alert variant="error" style={{ marginBottom: 16 }}>{error}</Alert>}
@@ -315,27 +313,11 @@ export default function EventRegisterFlow() {
           autoFocus
           disabled={loading}
         />
-        <div style={{ display: "flex", alignItems: "center", border: "1.5px solid var(--border)", borderRadius: 10, overflow: "hidden", background: "var(--surface)" }}>
-          <span style={{ padding: "0 10px 0 14px", fontSize: "0.9rem", color: "var(--muted-foreground)", borderRight: "1.5px solid var(--border)", height: "100%", display: "flex", alignItems: "center", whiteSpace: "nowrap", minHeight: 44 }}>+91</span>
-          <input
-            type="tel"
-            inputMode="numeric"
-            placeholder="10-digit mobile"
-            value={mobile}
-            onChange={e => { setMobile(e.target.value.replace(/\D/g, "").slice(0, 10)); setError(""); }}
-            autoComplete="tel"
-            disabled={loading}
-            style={{
-              flex: 1, border: "none", outline: "none", padding: "11px 14px",
-              fontSize: "0.95rem", background: "transparent", color: "var(--foreground)",
-            }}
-          />
-        </div>
         <p style={{ margin: "0 0 4px", fontSize: "0.75rem", color: "var(--muted-foreground)" }}>
-          You can add more profile details (DOB, address, etc.) from your profile after registering.
+          You can complete your profile (mobile, DOB, etc.) from the dashboard after registering.
         </p>
         <button type="submit" style={btn} disabled={loading}>
-          {loading ? "Creating account…" : "Create account & continue →"}
+          {loading ? "Setting up…" : "Continue to registration →"}
         </button>
       </form>
     </div>

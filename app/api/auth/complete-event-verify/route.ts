@@ -141,37 +141,42 @@ export async function POST(req: NextRequest) {
     }
 
     // ── New user ──────────────────────────────────────────────────────────────
-    if (!name || !mobile) {
-      // OTP verified — ask the client to collect name + mobile
+    if (!name) {
+      // OTP verified — ask the client to collect name (mobile is optional)
       return NextResponse.json({ needs_profile: true });
     }
 
-    // Validate mobile (Indian 10-digit)
-    const phoneDigits = (mobile as string).replace(/\D/g, "");
-    const phone10 =
-      phoneDigits.length === 12 && phoneDigits.startsWith("91") ? phoneDigits.slice(2)
-      : phoneDigits.length === 13 && phoneDigits.startsWith("091") ? phoneDigits.slice(3)
-      : phoneDigits;
+    let phone10: string | null = null;
+    if (mobile) {
+      // Validate mobile (Indian 10-digit) — only if provided
+      const phoneDigits = (mobile as string).replace(/\D/g, "");
+      const normalized =
+        phoneDigits.length === 12 && phoneDigits.startsWith("91") ? phoneDigits.slice(2)
+        : phoneDigits.length === 13 && phoneDigits.startsWith("091") ? phoneDigits.slice(3)
+        : phoneDigits;
 
-    if (phone10.length !== 10 || !/^[6-9]\d{9}$/.test(phone10)) {
-      return NextResponse.json(
-        { error: "Please enter a valid 10-digit Indian mobile number." },
-        { status: 400 },
-      );
-    }
+      if (normalized.length !== 10 || !/^[6-9]\d{9}$/.test(normalized)) {
+        return NextResponse.json(
+          { error: "Please enter a valid 10-digit Indian mobile number." },
+          { status: 400 },
+        );
+      }
 
-    // Check mobile not already linked
-    const { data: existingPhone } = await db
-      .from("users")
-      .select("id")
-      .eq("phone", phone10)
-      .maybeSingle();
+      // Check mobile not already linked
+      const { data: existingPhone } = await db
+        .from("users")
+        .select("id")
+        .eq("phone", normalized)
+        .maybeSingle();
 
-    if (existingPhone) {
-      return NextResponse.json(
-        { error: "This mobile number is linked to another account. Please use a different number or sign in." },
-        { status: 409 },
-      );
+      if (existingPhone) {
+        return NextResponse.json(
+          { error: "This mobile number is linked to another account. Please use a different number or sign in." },
+          { status: 409 },
+        );
+      }
+
+      phone10 = normalized;
     }
 
     // Split full name into first / last

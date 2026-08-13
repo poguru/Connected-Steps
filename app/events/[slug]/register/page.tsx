@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { isTokenValid, handleAuthExpiry } from "@/lib/client-auth";
+import { isTokenValid } from "@/lib/client-auth";
 import { getDistanceOption } from "@/lib/event-distances";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -232,27 +232,32 @@ export default function RegisterPage() {
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [customFieldErrors, setCustomFieldErrors] = useState<Record<string, string>>({});
 
-  // Auth guard + pre-fill
+  // ── Event-first registration ───────────────────────────────────────────────
+  const [pagePhase,   setPagePhase]   = useState<"select" | "otp" | "form" | null>(null);
+  const [selectErr,   setSelectErr]   = useState("");
+  const [otpStep,     setOtpStep]     = useState<"email" | "otp" | "profile">("email");
+  const [otpEmail,    setOtpEmail]    = useState("");
+  const [otpCode,     setOtpCode]     = useState("");
+  const [otpName,     setOtpName]     = useState("");
+  const [otpErr,      setOtpErr]      = useState("");
+  const [otpLoading,  setOtpLoading]  = useState(false);
+  const [otpCooldown, setOtpCooldown] = useState(0);
+  const otpSubmitRef   = useRef(false);
+  const otpCooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Auth check — sets pagePhase; no redirect (event-first flow)
   useEffect(() => {
     const raw = localStorage.getItem("cs_user");
-    if (!raw) {
-      // Send to the streamlined OTP registration flow; preserve this page as return URL
-      router.replace(`/auth/event-register?return=${encodeURIComponent(`/events/${slug}/register`)}`);
-      return;
-    }
+    if (!raw) { setPagePhase("select"); return; }
     try {
       const u: StoredUser = JSON.parse(raw);
-      if (!u.email) {
-        router.replace(`/auth/event-register?return=${encodeURIComponent(`/events/${slug}/register`)}`);
-        return;
-      }
+      if (!u.email) { setPagePhase("select"); return; }
       const storedToken = localStorage.getItem("cs_user_token") ?? "";
-      if (!isTokenValid(storedToken)) { handleAuthExpiry(`/events/${slug}/register`); return; }
+      if (!isTokenValid(storedToken)) { setPagePhase("select"); return; }
       setUserEmail(u.email);
       setUserToken(storedToken);
       const fullName = `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim();
       setForm(f => ({ ...f, name: fullName, email: u.email ?? "", phone: u.phone ?? "" }));
-      // Pre-fill first participant with account info
       setParticipants([{
         ...EMPTY_PARTICIPANT,
         first_name: u.firstName ?? "",
@@ -260,8 +265,112 @@ export default function RegisterPage() {
         mobile:     u.phone     ?? "",
         email:      u.email     ?? "",
       }]);
-    } catch { router.replace(`/auth/event-register?return=${encodeURIComponent(`/events/${slug}/register`)}`); }
-  }, [slug, router]);
+      setPagePhase("form");
+    } catch { setPagePhase("select"); }
+  }, [slug]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Cleanup OTP cooldown on unmount
+  useEffect(() => () => { if (otpCooldownRef.current) clearInterval(otpCooldownRef.current); }, []);
+
+  function startOtpCooldown() {
+    setOtpCooldown(30);
+    otpCooldownRef.current = setInterval(() => {
+      setOtpCooldown(c => {
+        if (c <= 1) { clearInterval(otpCooldownRef.current!); return 0; }
+        return c - 1;
+      });
+    }, 1000);
+  }
+
+  async function sendOtpInline(target: string) {
+    if (otpSubmitRef.current) return;
+    otpSubmitRef.current = true;
+    setOtpLoading(true); setOtpErr("");
+    try {
+      const res  = await fetch("/api/auth/send-otp", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ type: "email", value: target, purpose: "event_register" }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setOtpErr(data.error ?? "Failed to send OTP."); return; }
+      setOtpCode(""); setOtpStep("otp"); startOtpCooldown();
+    } finally { setOtpLoading(false); otpSubmitRef.current = false; }
+  }
+
+  async function verifyOtpInline(code: string, extraName?: string) {
+    if (otpSubmitRef.current) return;
+    otpSubmitRef.current = true;
+    setOtpLoading(true); setOtpErr("");
+    try {
+      const body: Record<string, string> = { email: otpEmail, code };
+      if (extraName) body.name = extraName;
+      const res  = await fetch("/api/auth/complete-event-verify", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) { setOtpErr(data.error ?? "Verification failed."); return; }
+      if (data.needs_profile) { setOtpStep("profile"); return; }
+      if (data.success && data.user) {
+        const { userToken: tok, user } = data as {
+          userToken: string;
+          user: { firstName: string; lastName: string; email: string; phone: string | null;
+                  goal: string | null; location: string | null; photo: string | null; role: string; };
+        };
+        if (tok) localStorage.setItem("cs_user_token", tok);
+        localStorage.setItem("cs_user", JSON.stringify(user));
+        setUserEmail(user.email);
+        setUserToken(tok);
+        const fullName = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
+        setForm(f => ({ ...f, name: fullName, email: user.email, phone: user.phone ?? "" }));
+        setParticipants(prev => prev.map((p, i) => i === 0 ? {
+          ...p,
+          first_name: user.firstName ?? "",
+          last_name:  user.lastName  ?? "",
+          mobile:     user.phone     ?? "",
+          email:      user.email,
+        } : p));
+        if (participantCount > 1) setRegistrantMode("others");
+        else setRegistrantMode("myself");
+        setPagePhase("form");
+      }
+    } finally { setOtpLoading(false); otpSubmitRef.current = false; }
+  }
+
+  function handleSelectContinue() {
+    const cats         = ev?.distance_categories ?? [];
+    const effectiveCat = cats.length === 1 ? cats[0] : distanceCategory;
+    if (cats.length > 1 && !effectiveCat) {
+      setSelectErr("Please select a distance category to continue.");
+      return;
+    }
+    if (effectiveCat && !distanceCategory) setDistanceCategory(effectiveCat);
+    setSelectErr("");
+    const raw   = localStorage.getItem("cs_user");
+    const token = localStorage.getItem("cs_user_token");
+    if (raw && token) {
+      try {
+        const u: StoredUser = JSON.parse(raw);
+        if (u.email && isTokenValid(token)) {
+          setUserEmail(u.email);
+          setUserToken(token);
+          const fullName = `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim();
+          setForm(f => ({ ...f, name: fullName, email: u.email ?? "", phone: u.phone ?? "" }));
+          setParticipants(prev => prev.map((p, i) => i === 0 ? {
+            ...p, first_name: u.firstName ?? "", last_name: u.lastName ?? "",
+            mobile: u.phone ?? "", email: u.email ?? "",
+          } : p));
+          if (participantCount > 1) setRegistrantMode("others");
+          else setRegistrantMode("myself");
+          setPagePhase("form");
+          return;
+        }
+      } catch { /* fall through to OTP */ }
+    }
+    setPagePhase("otp");
+  }
 
   // Fetch event
   useEffect(() => {
@@ -640,7 +749,7 @@ export default function RegisterPage() {
         }),
       });
       const data = await res.json();
-      if (res.status === 401) { handleAuthExpiry(`/events/${slug}/register`); return; }
+      if (res.status === 401) { localStorage.removeItem("cs_user"); localStorage.removeItem("cs_user_token"); setUserEmail(""); setUserToken(""); setPagePhase("select"); return; }
       if (!res.ok) {
         if (res.status === 409) setCapacityFull(true);
         setSubmitErr(data.error ?? "Registration failed."); setSubmitting(false); return;
@@ -722,7 +831,7 @@ export default function RegisterPage() {
         }),
       });
       const data = await res.json();
-      if (res.status === 401) { handleAuthExpiry(`/events/${slug}/register`); return; }
+      if (res.status === 401) { localStorage.removeItem("cs_user"); localStorage.removeItem("cs_user_token"); setUserEmail(""); setUserToken(""); setPagePhase("select"); return; }
       if (!res.ok) {
         if (res.status === 409) setCapacityFull(true);
         setSubmitErr(data.error ?? "Registration failed."); setSubmitting(false); return;
@@ -749,7 +858,7 @@ export default function RegisterPage() {
 
   // ── Loading / error states ─────────────────────────────────────────────────
 
-  if (loading) {
+  if (loading || pagePhase === null) {
     return (
       <div style={{ minHeight: "100vh", background: "#0d0d10", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.3)" }}>
         Loading event…
@@ -782,6 +891,244 @@ export default function RegisterPage() {
       </div>
     </div>
   );
+
+  // ── Phase: select (pre-auth — category + quantity) ────────────────────────
+  if (pagePhase === "select") {
+    const cats     = ev.distance_categories ?? [];
+    const maxSlots = isGroupCategory
+      ? Math.min(selectedRaceMaxParticipants, 20)
+      : (ev.allow_multi_participant || ev.max_per_registration > 1)
+        ? Math.min(ev.max_per_registration > 1 ? ev.max_per_registration : 10, 20)
+        : 1;
+    const showQty     = maxSlots > 1;
+    const selectPrice = selectedRace?.price ?? ev.price ?? 0;
+    const selectTotal = isPricePerReg ? selectPrice : selectPrice * participantCount;
+    return (
+      <div style={{ minHeight: "100vh", background: "#0d0d10", color: "#fff" }}>
+        <nav style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(13,13,16,0.97)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 1.5rem", height: "56px", display: "flex", alignItems: "center" }}>
+          <Link href={`/events/${slug}`} style={{ fontSize: "0.875rem", color: "rgba(255,255,255,0.6)", textDecoration: "none" }}>← Event Details</Link>
+        </nav>
+        <div style={{ maxWidth: "520px", margin: "0 auto", padding: "2rem 1.5rem 5rem" }}>
+          {EventHeader}
+
+          {cats.length > 0 && (
+            <section style={{ marginBottom: "1.75rem" }}>
+              <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.875rem" }}>
+                Select Distance{cats.length > 1 ? " *" : ""}
+              </div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {cats.map(cat => {
+                  const d    = getDistanceOption(cat);
+                  const race = (ev.races ?? []).find(r => r.distance === cat) ?? null;
+                  const full = race?.max_slots != null && race.slot_reserved >= race.max_slots;
+                  const left = race?.max_slots != null ? Math.max(0, race.max_slots - race.slot_reserved) : null;
+                  const sel  = distanceCategory === cat;
+                  return (
+                    <button key={cat} type="button"
+                      onClick={() => { setDistanceCategory(cat); setSelectErr(""); }}
+                      style={{
+                        padding: "10px 22px", borderRadius: "10px",
+                        border: `2px solid ${full ? "rgba(239,68,68,0.3)" : sel ? d.color : "rgba(255,255,255,0.12)"}`,
+                        background: full ? "rgba(239,68,68,0.06)" : sel ? d.bg : "transparent",
+                        color: full ? "#ef4444" : sel ? d.color : "rgba(255,255,255,0.55)",
+                        fontWeight: sel ? 800 : 500, fontSize: "1rem",
+                        cursor: "pointer", fontFamily: "inherit", opacity: full ? 0.75 : 1,
+                        display: "flex", flexDirection: "column", alignItems: "center",
+                      }}>
+                      <span>{cat}</span>
+                      {(full || (left !== null && left <= 20)) && (
+                        <span style={{ fontSize: "11px", fontWeight: 400, marginTop: 1, color: full ? "#ef4444" : "rgba(255,255,255,0.5)" }}>
+                          {full ? "Sold Out" : `${left} left`}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {showQty && (
+            <section style={{ marginBottom: "1.75rem" }}>
+              <div style={{ fontSize: "10px", color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.875rem" }}>
+                Number of Participants
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                <button type="button"
+                  onClick={() => { if (participantCount > 1) changeCount(participantCount - 1); }}
+                  disabled={participantCount <= 1}
+                  style={{ width: 40, height: 40, borderRadius: 10, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.04)", color: participantCount <= 1 ? "rgba(255,255,255,0.2)" : "#fff", fontSize: "1.25rem", cursor: participantCount <= 1 ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                  −
+                </button>
+                <span style={{ fontSize: "1.5rem", fontWeight: 700, minWidth: 28, textAlign: "center" }}>{participantCount}</span>
+                <button type="button"
+                  onClick={() => { if (participantCount < maxSlots) changeCount(participantCount + 1); }}
+                  disabled={participantCount >= maxSlots}
+                  style={{ width: 40, height: 40, borderRadius: 10, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.04)", color: participantCount >= maxSlots ? "rgba(255,255,255,0.2)" : "#fff", fontSize: "1.25rem", cursor: participantCount >= maxSlots ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                  +
+                </button>
+                <span style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.4)", marginLeft: 4 }}>
+                  {selectPrice > 0 ? `₹${selectPrice}/person · max ${maxSlots}` : `max ${maxSlots} · free`}
+                </span>
+              </div>
+            </section>
+          )}
+
+          {selectPrice > 0 && (
+            <div style={{ padding: "1rem 1.25rem", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "12px", marginBottom: "1.5rem" }}>
+              <PriceLine
+                label={isPricePerReg ? "Registration Fee" : `₹${selectPrice} × ${participantCount} participant${participantCount > 1 ? "s" : ""}`}
+                value={`₹${selectTotal}`}
+              />
+              <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "0.75rem 0" }} />
+              <PriceLine label="Total" value={`₹${selectTotal}`} bold />
+            </div>
+          )}
+
+          {selectErr && (
+            <div style={{ padding: "10px 14px", borderRadius: 8, marginBottom: "1rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", fontSize: "0.82rem" }}>
+              {selectErr}
+            </div>
+          )}
+
+          <button type="button" onClick={handleSelectContinue}
+            style={{ width: "100%", padding: "14px", borderRadius: "10px", background: "linear-gradient(135deg,#e8620a,#f07c2a)", border: "none", color: "#fff", fontWeight: 700, fontSize: "1rem", cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 20px rgba(232,98,10,0.35)", marginBottom: "1rem" }}>
+            {selectPrice > 0 ? `Register · ₹${selectTotal}` : "Register for Free →"}
+          </button>
+
+          <p style={{ textAlign: "center", fontSize: "0.8rem", color: "rgba(255,255,255,0.35)", margin: 0 }}>
+            Already have an account?{" "}
+            <a href={`/auth?tab=login&redirect=${encodeURIComponent(`/events/${slug}/register`)}`}
+              style={{ color: "#e8620a", textDecoration: "none" }}>Sign in</a>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Phase: otp (inline OTP for unauthenticated users) ──────────────────────
+  if (pagePhase === "otp") {
+    return (
+      <div style={{ minHeight: "100vh", background: "#0d0d10", color: "#fff" }}>
+        <nav style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(13,13,16,0.97)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 1.5rem", height: "56px", display: "flex", alignItems: "center" }}>
+          <button type="button"
+            onClick={() => { setPagePhase("select"); setOtpStep("email"); setOtpErr(""); setOtpCode(""); }}
+            style={{ background: "none", border: "none", color: "rgba(255,255,255,0.6)", cursor: "pointer", fontSize: "0.875rem", fontFamily: "inherit", padding: 0 }}>
+            ← Back
+          </button>
+        </nav>
+        <div style={{ maxWidth: "460px", margin: "0 auto", padding: "2rem 1.5rem 5rem" }}>
+          <div style={{ padding: "0.875rem 1rem", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "10px", marginBottom: "1.75rem", fontSize: "0.82rem", color: "rgba(255,255,255,0.55)" }}>
+            <span style={{ fontWeight: 700, color: "#fff" }}>{ev.title}</span>
+            {distanceCategory && <span style={{ color: "#e8620a", marginLeft: 8 }}>{distanceCategory}</span>}
+            {participantCount > 1 && <span style={{ marginLeft: 8 }}>· {participantCount} participants</span>}
+          </div>
+
+          {otpStep === "email" && (
+            <>
+              <h1 style={{ fontSize: "1.4rem", fontWeight: 700, color: "#fff", marginBottom: "0.5rem" }}>Verify your email</h1>
+              <p style={{ fontSize: "0.875rem", color: "rgba(255,255,255,0.5)", marginBottom: "1.75rem", lineHeight: 1.6 }}>
+                Enter your email to continue. No password needed.
+              </p>
+              {otpErr && (
+                <div style={{ padding: "10px 14px", borderRadius: 8, marginBottom: "1rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", fontSize: "0.82rem" }}>
+                  {otpErr}
+                </div>
+              )}
+              <form
+                onSubmit={e => {
+                  e.preventDefault();
+                  const t = otpEmail.trim().toLowerCase();
+                  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)) { setOtpErr("Please enter a valid email address."); return; }
+                  setOtpEmail(t);
+                  sendOtpInline(t);
+                }}
+                style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <input type="email" placeholder="your@email.com" value={otpEmail}
+                  onChange={e => { setOtpEmail(e.target.value); setOtpErr(""); }}
+                  autoComplete="email" autoFocus disabled={otpLoading} style={INPUT} />
+                <button type="submit" disabled={otpLoading}
+                  style={{ padding: "13px", borderRadius: 10, border: "none", background: otpLoading ? "rgba(232,98,10,0.45)" : "linear-gradient(135deg,#e8620a,#f07c2a)", color: "#fff", fontWeight: 700, fontSize: "0.95rem", cursor: otpLoading ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                  {otpLoading ? "Sending…" : "Send OTP →"}
+                </button>
+              </form>
+            </>
+          )}
+
+          {otpStep === "otp" && (
+            <>
+              <h1 style={{ fontSize: "1.4rem", fontWeight: 700, color: "#fff", marginBottom: "0.5rem" }}>Check your email</h1>
+              <p style={{ fontSize: "0.875rem", color: "rgba(255,255,255,0.5)", marginBottom: "1.75rem", lineHeight: 1.6 }}>
+                We sent a 6-digit code to <strong style={{ color: "#fff" }}>{otpEmail}</strong>. It expires in 10 minutes.
+              </p>
+              {otpErr && (
+                <div style={{ padding: "10px 14px", borderRadius: 8, marginBottom: "1rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", fontSize: "0.82rem" }}>
+                  {otpErr}
+                </div>
+              )}
+              <div style={{ marginBottom: "1.5rem" }}>
+                <InlineOtpInput
+                  value={otpCode}
+                  onChange={v => { setOtpCode(v); setOtpErr(""); }}
+                  onComplete={code => verifyOtpInline(code)}
+                  disabled={otpLoading}
+                />
+              </div>
+              <button type="button" onClick={() => verifyOtpInline(otpCode)}
+                disabled={otpLoading || otpCode.length !== 6}
+                style={{ width: "100%", padding: "13px", borderRadius: 10, border: "none", background: (otpLoading || otpCode.length !== 6) ? "rgba(232,98,10,0.45)" : "linear-gradient(135deg,#e8620a,#f07c2a)", color: "#fff", fontWeight: 700, fontSize: "0.95rem", cursor: (otpLoading || otpCode.length !== 6) ? "not-allowed" : "pointer", fontFamily: "inherit", marginBottom: 12 }}>
+                {otpLoading ? "Verifying…" : "Verify & Continue →"}
+              </button>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <button type="button" onClick={() => { setOtpStep("email"); setOtpCode(""); setOtpErr(""); }}
+                  style={{ background: "none", border: "none", color: "#e8620a", fontSize: "0.82rem", cursor: "pointer", fontFamily: "inherit", padding: 0, textDecoration: "underline" }}>
+                  ← Change email
+                </button>
+                {otpCooldown > 0 ? (
+                  <span style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.4)" }}>Resend in {otpCooldown}s</span>
+                ) : (
+                  <button type="button"
+                    onClick={() => { setOtpCode(""); setOtpErr(""); sendOtpInline(otpEmail); }}
+                    disabled={otpLoading}
+                    style={{ background: "none", border: "none", color: "#e8620a", fontSize: "0.82rem", cursor: "pointer", fontFamily: "inherit", padding: 0, textDecoration: "underline" }}>
+                    Resend code
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+
+          {otpStep === "profile" && (
+            <>
+              <h1 style={{ fontSize: "1.4rem", fontWeight: 700, color: "#fff", marginBottom: "0.5rem" }}>Almost there!</h1>
+              <p style={{ fontSize: "0.875rem", color: "rgba(255,255,255,0.5)", marginBottom: "1.75rem", lineHeight: 1.6 }}>
+                ✅ Email verified. Enter your name to complete account setup.
+              </p>
+              {otpErr && (
+                <div style={{ padding: "10px 14px", borderRadius: 8, marginBottom: "1rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", fontSize: "0.82rem" }}>
+                  {otpErr}
+                </div>
+              )}
+              <form
+                onSubmit={e => { e.preventDefault(); const n = otpName.trim(); if (!n) { setOtpErr("Please enter your full name."); return; } verifyOtpInline(otpCode, n); }}
+                style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <input placeholder="Your full name *" value={otpName}
+                  onChange={e => { setOtpName(e.target.value); setOtpErr(""); }}
+                  autoComplete="name" autoFocus disabled={otpLoading} style={INPUT} />
+                <p style={{ margin: 0, fontSize: "0.75rem", color: "rgba(255,255,255,0.35)" }}>
+                  You can complete your profile (DOB, mobile, etc.) from the dashboard after registering.
+                </p>
+                <button type="submit" disabled={otpLoading}
+                  style={{ padding: "13px", borderRadius: 10, border: "none", background: otpLoading ? "rgba(232,98,10,0.45)" : "linear-gradient(135deg,#e8620a,#f07c2a)", color: "#fff", fontWeight: 700, fontSize: "0.95rem", cursor: otpLoading ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                  {otpLoading ? "Setting up…" : "Continue to registration →"}
+                </button>
+              </form>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   const AlreadyBanner = alreadyReg ? (
     registrantMode === "others" ? (
@@ -2013,6 +2360,53 @@ function PriceLine({ label, value, muted, bold }: { label: string; value: string
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.375rem" }}>
       <span style={{ fontSize: "0.82rem", color: muted ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.65)", fontStyle: muted ? "italic" : undefined }}>{label}</span>
       <span style={{ fontSize: bold ? "1rem" : "0.82rem", fontWeight: bold ? 700 : 500, color: muted ? "#4ade80" : bold ? "#fff" : "rgba(255,255,255,0.8)" }}>{value}</span>
+    </div>
+  );
+}
+
+function InlineOtpInput({ value, onChange, onComplete, disabled }: {
+  value: string; onChange: (v: string) => void; onComplete: (v: string) => void; disabled: boolean;
+}) {
+  function handleKeyDown(i: number, e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Backspace" && !value[i] && i > 0) {
+      (document.getElementById(`otp-reg-${i - 1}`) as HTMLInputElement | null)?.focus();
+    }
+  }
+  function handleChange(i: number, raw: string) {
+    const digit = raw.replace(/\D/g, "").slice(-1);
+    const next  = (value.slice(0, i) + digit + value.slice(i + 1)).slice(0, 6);
+    onChange(next);
+    if (digit && i < 5) (document.getElementById(`otp-reg-${i + 1}`) as HTMLInputElement | null)?.focus();
+    if (next.length === 6) onComplete(next);
+  }
+  return (
+    <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+      {[0,1,2,3,4,5].map(i => (
+        <input key={i} id={`otp-reg-${i}`}
+          type="text" inputMode="numeric" maxLength={1}
+          value={value[i] ?? ""}
+          onChange={e => handleChange(i, e.target.value)}
+          onKeyDown={e => handleKeyDown(i, e)}
+          onPaste={i === 0 ? (e => {
+            const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+            if (pasted.length >= 4) {
+              e.preventDefault();
+              onChange(pasted);
+              if (pasted.length === 6) onComplete(pasted);
+              (document.getElementById(`otp-reg-${Math.min(pasted.length - 1, 5)}`) as HTMLInputElement | null)?.focus();
+            }
+          }) : undefined}
+          disabled={disabled}
+          autoFocus={i === 0}
+          style={{
+            width: 44, height: 52, textAlign: "center", fontSize: "1.35rem", fontWeight: 700,
+            background: "rgba(255,255,255,0.06)",
+            border: `1.5px solid ${value[i] ? "#e8620a" : "rgba(255,255,255,0.15)"}`,
+            borderRadius: 8, color: "#fff", outline: "none", fontFamily: "inherit",
+            cursor: disabled ? "not-allowed" : "text", boxSizing: "border-box",
+          }}
+        />
+      ))}
     </div>
   );
 }
