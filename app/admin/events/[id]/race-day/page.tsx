@@ -17,6 +17,21 @@ interface Summary {
   check_in_rate:    number;
 }
 
+interface TshirtSizeRow {
+  size:    string;
+  total:   number;
+  issued:  number;
+  pending: number;
+}
+
+interface TshirtReport {
+  total:        number;
+  issued:       number;
+  pending:      number;
+  missing_size: number;
+  sizes:        TshirtSizeRow[];
+}
+
 interface RecentCheckin {
   registration_code: string;
   user_name:         string;
@@ -67,7 +82,7 @@ export default function RaceDayPage() {
   const params  = useParams();
   const eventId = params.id as string;
 
-  const [tab,           setTab]           = useState<"dashboard"|"checkin"|"breakfast"|"pending">("dashboard");
+  const [tab,           setTab]           = useState<"dashboard"|"checkin"|"breakfast"|"pending"|"tshirts">("dashboard");
   const [summary,       setSummary]       = useState<Summary | null>(null);
   const [recent,        setRecent]        = useState<RecentCheckin[]>([]);
   const [pending,       setPending]       = useState<PendingReg[]>([]);
@@ -82,6 +97,9 @@ export default function RaceDayPage() {
   const [scanning,      setScanning]      = useState(false);
   const [cameraOpen,    setCameraOpen]    = useState(false);
   const [lastSince,     setLastSince]     = useState<string>("");
+  const [tshirtReport,  setTshirtReport]  = useState<TshirtReport | null>(null);
+  const [tshirtLoading, setTshirtLoading] = useState(false);
+  const [tshirtUpdated, setTshirtUpdated] = useState<string>("");
 
   // Breakfast scanner state
   const [bfToken,       setBfToken]       = useState("");
@@ -114,6 +132,20 @@ export default function RaceDayPage() {
   }, [eventId]);
 
   useEffect(() => { load(); }, [load]);
+
+  const loadTshirt = useCallback(async () => {
+    setTshirtLoading(true);
+    try {
+      const res = await fetch(`/api/admin/events/${eventId}/tshirt-report`);
+      if (res.ok) {
+        setTshirtReport(await res.json() as TshirtReport);
+        setTshirtUpdated(new Date().toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      }
+    } finally { setTshirtLoading(false); }
+  }, [eventId]);
+
+  // Load t-shirt data when that tab is first selected
+  useEffect(() => { if (tab === "tshirts" && !tshirtReport) void loadTshirt(); }, [tab, tshirtReport, loadTshirt]);
 
   // Auto-refresh every 12 seconds
   useEffect(() => {
@@ -180,6 +212,7 @@ export default function RaceDayPage() {
     { key: "checkin",   label: "Check-In Scanner" },
     { key: "breakfast", label: "Breakfast Scanner" },
     { key: "pending",   label: `Pending (${pending.length})` },
+    { key: "tshirts",   label: "T-Shirts" },
   ];
 
   const checkInRate = summary?.check_in_rate ?? 0;
@@ -467,6 +500,110 @@ export default function RaceDayPage() {
                   </tbody>
                 </table>
               </div>
+            )}
+          </div>
+        )}
+
+        {/* ── T-Shirts Tab ─────────────────────────────────────────────────── */}
+        {tab === "tshirts" && (
+          <div style={{ maxWidth: 760, margin: "0 auto" }}>
+            {/* Header row */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#e8620a", textTransform: "uppercase" as const, letterSpacing: ".07em" }}>
+                T-Shirt Distribution
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                {tshirtUpdated && <span style={{ fontSize: 11, color: "#555" }}>Updated {tshirtUpdated}</span>}
+                <Button size="sm" variant="ghost" loading={tshirtLoading} onClick={() => void loadTshirt()}>Refresh</Button>
+              </div>
+            </div>
+
+            {tshirtLoading && !tshirtReport && (
+              <div style={{ display: "flex", justifyContent: "center", padding: "4rem 0" }}>
+                <Spinner />
+              </div>
+            )}
+
+            {tshirtReport && (
+              <>
+                {/* Summary stat cards */}
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(${tshirtReport.missing_size > 0 ? 4 : 3}, 1fr)`, gap: 12, marginBottom: 20 }}>
+                  <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "1.25rem" }}>
+                    <div style={{ fontSize: 36, fontWeight: 900, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{tshirtReport.total}</div>
+                    <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", marginTop: 6, fontWeight: 600 }}>Total</div>
+                  </div>
+                  <div style={{ background: "#111", border: "1px solid rgba(74,222,128,0.12)", borderRadius: 12, padding: "1.25rem" }}>
+                    <div style={{ fontSize: 36, fontWeight: 900, color: "#4ade80", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{tshirtReport.issued}</div>
+                    <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", marginTop: 6, fontWeight: 600 }}>Issued</div>
+                  </div>
+                  <div style={{ background: "#111", border: "1px solid rgba(251,191,36,0.12)", borderRadius: 12, padding: "1.25rem" }}>
+                    <div style={{ fontSize: 36, fontWeight: 900, color: "#fbbf24", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{tshirtReport.pending}</div>
+                    <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em", marginTop: 6, fontWeight: 600 }}>Pending</div>
+                  </div>
+                  {tshirtReport.missing_size > 0 && (
+                    <div style={{ background: "#111", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 12, padding: "1.25rem" }}>
+                      <div style={{ fontSize: 36, fontWeight: 900, color: "#f87171", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{tshirtReport.missing_size}</div>
+                      <div style={{ fontSize: 11, color: "#f87171", textTransform: "uppercase" as const, letterSpacing: ".07em", marginTop: 6, fontWeight: 600 }}>Missing Size</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Missing size alert */}
+                {tshirtReport.missing_size > 0 && (
+                  <div style={{ background: "rgba(248,113,113,0.06)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "#f87171" }}>
+                    ⚠ {tshirtReport.missing_size} participant{tshirtReport.missing_size !== 1 ? "s" : ""} have no T-shirt size recorded — they cannot be issued until a size is set in the Admin Dashboard.
+                  </div>
+                )}
+
+                {/* Progress bar */}
+                {tshirtReport.total > 0 && (
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#555", marginBottom: 6 }}>
+                      <span>{tshirtReport.issued} of {tshirtReport.total} issued</span>
+                      <span>{Math.round((tshirtReport.issued / tshirtReport.total) * 100)}%</span>
+                    </div>
+                    <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 999, height: 8, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${(tshirtReport.issued / tshirtReport.total) * 100}%`, background: "#4ade80", borderRadius: 999, transition: "width 0.4s ease" }} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Size breakdown table */}
+                {tshirtReport.sizes.length > 0 ? (
+                  <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, overflow: "hidden" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+                          {["Size", "Total", "Issued", "Pending"].map(h => (
+                            <th key={h} style={{ padding: "10px 16px", textAlign: h === "Size" ? "left" as const : "right" as const, fontSize: 10, color: "#555", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: ".07em" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tshirtReport.sizes.map(row => (
+                          <tr key={row.size} style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+                            <td style={{ padding: "10px 16px", fontWeight: 700, fontFamily: "monospace", fontSize: 14, color: "#e8620a" }}>{row.size}</td>
+                            <td style={{ padding: "10px 16px", textAlign: "right" as const, fontVariantNumeric: "tabular-nums" }}>{row.total}</td>
+                            <td style={{ padding: "10px 16px", textAlign: "right" as const, fontVariantNumeric: "tabular-nums", color: row.issued > 0 ? "#4ade80" : "#555" }}>{row.issued}</td>
+                            <td style={{ padding: "10px 16px", textAlign: "right" as const, fontVariantNumeric: "tabular-nums", color: row.pending > 0 ? "#fbbf24" : "#555" }}>{row.pending}</td>
+                          </tr>
+                        ))}
+                        {/* Totals row */}
+                        <tr style={{ borderTop: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.02)" }}>
+                          <td style={{ padding: "10px 16px", fontWeight: 700, fontSize: 11, color: "#555", textTransform: "uppercase" as const, letterSpacing: ".07em" }}>Total</td>
+                          <td style={{ padding: "10px 16px", textAlign: "right" as const, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{tshirtReport.sizes.reduce((s, r) => s + r.total, 0)}</td>
+                          <td style={{ padding: "10px 16px", textAlign: "right" as const, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: "#4ade80" }}>{tshirtReport.sizes.reduce((s, r) => s + r.issued, 0)}</td>
+                          <td style={{ padding: "10px 16px", textAlign: "right" as const, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: "#fbbf24" }}>{tshirtReport.sizes.reduce((s, r) => s + r.pending, 0)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div style={{ background: "#111", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "4rem", textAlign: "center", color: "#555", fontSize: 13 }}>
+                    {tshirtReport.total === 0 ? "No confirmed participants found." : "No T-shirt sizes recorded yet."}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
