@@ -123,7 +123,7 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
   const [regModal,   setRegModal]   = useState(false);
   const [regForm,    setRegForm]    = useState({ name: "", email: "", phone: "", distance_category: "", payment_status: "free" as "paid"|"free"|"pending", send_email: true, bypass_capacity: false });
   const [regLoading, setRegLoading] = useState(false);
-  const [regResult,  setRegResult]  = useState<{ success?: boolean; registration_code?: string; error?: string } | null>(null);
+  const [regResult,  setRegResult]  = useState<{ success?: boolean; already?: boolean; registration_code?: string; error?: string } | null>(null);
   const [eventCats,  setEventCats]  = useState<string[]>([]);
 
   const headers = { "Content-Type": "application/json" };
@@ -1307,11 +1307,17 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
               </div>
 
               {regResult && (
-                <div style={{ padding: "10px 12px", borderRadius: 8, background: regResult.success ? "rgba(74,222,128,0.08)" : "rgba(239,68,68,0.08)", border: `1px solid ${regResult.success ? "rgba(74,222,128,0.2)" : "rgba(239,68,68,0.2)"}`, fontSize: 13 }}>
+                <div style={{
+                  padding: "10px 12px", borderRadius: 8, fontSize: 13,
+                  background: regResult.success ? "rgba(74,222,128,0.08)" : regResult.already ? "rgba(234,179,8,0.08)" : "rgba(239,68,68,0.08)",
+                  border: `1px solid ${regResult.success ? "rgba(74,222,128,0.2)" : regResult.already ? "rgba(234,179,8,0.3)" : "rgba(239,68,68,0.2)"}`,
+                }}>
                   {regResult.success ? (
                     <div style={{ color: "#4ade80" }}>✅ Registered — Code: <strong>{regResult.registration_code}</strong></div>
+                  ) : regResult.already ? (
+                    <div style={{ color: "#eab308" }}>⚠️ Already registered — Code: <strong>{regResult.registration_code}</strong>. To update, change email or edit the existing registration.</div>
                   ) : (
-                    <div style={{ color: "#f87171" }}>❌ {regResult.error}</div>
+                    <div style={{ color: "#f87171" }}>❌ {regResult.error ?? "Registration failed."}</div>
                   )}
                 </div>
               )}
