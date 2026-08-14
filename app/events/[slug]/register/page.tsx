@@ -1145,14 +1145,13 @@ export default function RegisterPage() {
         </div>
       </div>
     ) : (
-      <div style={{ padding: "1.25rem 1.5rem", borderRadius: "12px", background: "rgba(74,222,128,0.07)", border: "1px solid rgba(74,222,128,0.3)", marginBottom: "1.5rem", textAlign: "center" }}>
-        <div style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>✅</div>
-        <div style={{ fontWeight: 700, color: "#4ade80", marginBottom: "0.25rem" }}>You&apos;re already registered!</div>
-        <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)", marginBottom: "1rem", fontFamily: "monospace" }}>{alreadyReg}</div>
-        <Link href={`/events/${slug}/register/success?code=${alreadyReg}`}
-          style={{ display: "inline-block", padding: "10px 24px", borderRadius: "8px", background: "linear-gradient(135deg,#e8620a,#f07c2a)", color: "#fff", fontWeight: 700, fontSize: "0.875rem", textDecoration: "none" }}>
-          View Registration Details →
-        </Link>
+      <div style={{ padding: "1rem 1.25rem", borderRadius: "12px", background: "rgba(251,191,36,0.07)", border: "1px solid rgba(251,191,36,0.3)", marginBottom: "1.5rem", display: "flex", alignItems: "flex-start", gap: "12px" }}>
+        <span style={{ fontSize: "1.25rem", flexShrink: 0, marginTop: "1px" }}>ℹ️</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, color: "#fbbf24", fontSize: "0.9rem", marginBottom: "0.25rem" }}>You have an existing registration</div>
+          <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)", marginBottom: "0.5rem" }}>Code: <span style={{ fontFamily: "monospace" }}>{alreadyReg}</span> — <Link href={`/events/${slug}/register/success?code=${alreadyReg}`} style={{ color: "#fbbf24", textDecoration: "underline" }}>View details</Link></div>
+          <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.4)" }}>You can continue below to create an additional registration.</div>
+        </div>
       </div>
     )
   ) : null;
@@ -1275,8 +1274,7 @@ export default function RegisterPage() {
           </section>
           )}
 
-          <form id="multi-participant-form" onSubmit={handleMultiSubmit} noValidate
-            style={{ opacity: (alreadyReg && registrantMode !== "others") ? 0.4 : 1, pointerEvents: (alreadyReg && registrantMode !== "others") ? "none" : "auto" }}>
+          <form id="multi-participant-form" onSubmit={handleMultiSubmit} noValidate>
 
             {/* Per-participant sections */}
             {participants.map((p, idx) => (
@@ -1765,12 +1763,11 @@ export default function RegisterPage() {
             )}
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               <button type="button"
-                onClick={() => !alreadyReg && setRegistrantMode("myself")}
-                disabled={!!alreadyReg}
-                style={{ width: "100%", padding: "16px 20px", borderRadius: "12px", border: `2px solid ${alreadyReg ? "rgba(255,255,255,0.06)" : "rgba(232,98,10,0.35)"}`, background: alreadyReg ? "rgba(255,255,255,0.02)" : "rgba(232,98,10,0.05)", color: alreadyReg ? "rgba(255,255,255,0.3)" : "#fff", fontWeight: 700, fontSize: "0.95rem", cursor: alreadyReg ? "not-allowed" : "pointer", fontFamily: "inherit", textAlign: "left", display: "flex", alignItems: "center", gap: "14px" }}>
-                <span style={{ fontSize: "1.5rem", opacity: alreadyReg ? 0.4 : 1 }}>👤</span>
+                onClick={() => setRegistrantMode("myself")}
+                style={{ width: "100%", padding: "16px 20px", borderRadius: "12px", border: "2px solid rgba(232,98,10,0.35)", background: "rgba(232,98,10,0.05)", color: "#fff", fontWeight: 700, fontSize: "0.95rem", cursor: "pointer", fontFamily: "inherit", textAlign: "left", display: "flex", alignItems: "center", gap: "14px" }}>
+                <span style={{ fontSize: "1.5rem" }}>👤</span>
                 <div>
-                  <div>Register Myself {alreadyReg ? "(Already registered)" : ""}</div>
+                  <div>Register Myself {alreadyReg ? "(Already registered — new booking)" : ""}</div>
                   <div style={{ fontSize: "12px", fontWeight: 400, color: "rgba(255,255,255,0.35)", marginTop: "2px" }}>I am attending this event</div>
                 </div>
               </button>
@@ -1803,7 +1800,7 @@ export default function RegisterPage() {
 
             {AlreadyBanner}
 
-            <form onSubmit={handleSubmit} noValidate style={{ opacity: alreadyReg ? 0.4 : 1, pointerEvents: alreadyReg ? "none" : "auto" }}>
+            <form onSubmit={handleSubmit} noValidate>
 
           {/* Personal details */}
           <section style={{ marginBottom: "1.5rem" }}>

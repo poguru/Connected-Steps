@@ -70,18 +70,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "distance_category required for this event" }, { status: 400 });
   }
 
-  // Duplicate check
-  const { data: existing } = await db
-    .from("event_registrations")
-    .select("id, registration_code, payment_status, status")
-    .eq("event_id", id)
-    .eq("user_email", email.toLowerCase().trim())
-    .maybeSingle();
-
-  if (existing && ["free", "paid"].includes(existing.payment_status) && existing.status === "confirmed") {
-    return NextResponse.json({ already: true, registration_code: existing.registration_code });
-  }
-
   // Coupon validation (same logic as public registration)
   let couponId: string | null = null;
   let discount = 0;
@@ -117,12 +105,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const paymentStatus = forcedPayment ?? (finalPrice === 0 ? "free" : "paid");
   const regStatus     = (paymentStatus === "paid" || paymentStatus === "free") ? "confirmed" : "pending_payment";
 
-  const code    = existing?.registration_code ?? genCode();
+  const code    = genCode();
   const qrToken = regStatus === "confirmed" ? signEventQR(code, id) : null;
 
   const { data: reg, error: regErr } = await db
     .from("event_registrations")
-    .upsert({
+    .insert({
       registration_code:  code,
       event_id:           id,
       user_email:         email.toLowerCase().trim(),
@@ -142,7 +130,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       payment_status:     paymentStatus,
       status:             regStatus,
       qr_token:           qrToken,
-    }, { onConflict: "event_id,user_email", ignoreDuplicates: false })
+    })
     .select("registration_code, qr_token")
     .single();
 

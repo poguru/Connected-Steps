@@ -281,19 +281,18 @@ async function handleSingleParticipant(
     }
   }
 
+  // Look for an active pending row only — used by the paid path for payment retry.
+  // Multiple confirmed registrations per account+event are now allowed; no early return.
   const { data: existing } = await db
     .from("event_registrations")
     .select("id, registration_code, payment_status")
     .eq("event_id", event_id as string)
     .eq("user_email", (email as string).toLowerCase().trim())
+    .eq("payment_status", "pending")
+    .eq("status", "pending_payment")
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
-  if (existing && (existing.payment_status === "free" || existing.payment_status === "paid")) {
-    // Also expire their waitlist entry if it's still pending
-    if (approvedWaitlistId) {
-      await db.from("event_waitlist").update({ status: "expired" }).eq("id", approvedWaitlistId);
-    }
-    return NextResponse.json({ already: true, registration_code: existing.registration_code });
-  }
 
   // Custom form field validation — respects race_ids scoping
   const { data: formFields } = await db
@@ -352,7 +351,7 @@ async function handleSingleParticipant(
 
     const { data: reg, error: regErr } = await db
       .from("event_registrations")
-      .upsert({
+      .insert({
         registration_code: code,
         event_id:          event_id as string,
         user_email:        (email as string).toLowerCase().trim(),
@@ -378,7 +377,7 @@ async function handleSingleParticipant(
         custom_fields:     customFields,
         qr_token:          qrToken,
         participant_count: 1,
-      }, { onConflict: "event_id,user_email", ignoreDuplicates: false })
+      })
       .select("id, registration_code, qr_token")
       .single();
     if (regErr) {
@@ -535,7 +534,7 @@ async function handleSingleParticipant(
       is_early_bird:     isEarlyBird,
       custom_fields:     customFields,
       participant_count: 1,
-    }, { onConflict: "event_id,user_email", ignoreDuplicates: false });
+    }, { onConflict: "registration_code", ignoreDuplicates: false });
   if (regErr2) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   // Claim the coupon atomically at reservation time (prevents concurrent users
@@ -887,24 +886,18 @@ async function handleMultiParticipant(
     ? (leadParticipant.email?.toLowerCase().trim() || `mob_${leadParticipant.mobile}@cs.booking`)
     : accountEmail;
 
-  // Duplicate check — scoped to regUserEmail (participant's email when "others", account email otherwise).
-  // Prevents the same participant from registering twice while letting the same account
-  // register multiple different participants across separate transactions.
+  // Look for an active pending row only — used by the paid path for payment retry.
+  // Multiple confirmed registrations per account+event are now allowed; no early return.
   const { data: existing } = await db
     .from("event_registrations")
-    .select("id, registration_code, payment_status, participant_count")
+    .select("id, registration_code, payment_status")
     .eq("event_id", event_id as string)
     .eq("user_email", regUserEmail)
+    .eq("payment_status", "pending")
+    .eq("status", "pending_payment")
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
-  if (existing && (existing.payment_status === "free" || existing.payment_status === "paid")) {
-    if (is_registering_others) {
-      return NextResponse.json(
-        { error: `${leadParticipant.first_name} is already registered for this event.` },
-        { status: 409 }
-      );
-    }
-    return NextResponse.json({ already: true, registration_code: existing.registration_code });
-  }
 
   // "Others" mode: cross-check every participant's email against existing event_participants
   // to catch duplicates registered in a previous transaction by any account.
@@ -940,7 +933,7 @@ async function handleMultiParticipant(
 
     const { data: reg, error: regErr } = await db
       .from("event_registrations")
-      .upsert({
+      .insert({
         registration_code: code,
         event_id:          event_id as string,
         user_email:        regUserEmail,
@@ -963,7 +956,7 @@ async function handleMultiParticipant(
         tshirt_size:       leadParticipant.tshirt_size ?? null,
         custom_fields:     multiCustomFields,
         participant_count: participants.length,
-      }, { onConflict: "event_id,user_email", ignoreDuplicates: false })
+      })
       .select("id, registration_code")
       .single();
     if (regErr || !reg) {
@@ -1092,7 +1085,7 @@ async function handleMultiParticipant(
       tshirt_size:       leadParticipant.tshirt_size ?? null,
       custom_fields:     multiCustomFields,
       participant_count: participants.length,
-    }, { onConflict: "event_id,user_email", ignoreDuplicates: false });
+    }, { onConflict: "registration_code", ignoreDuplicates: false });
   if (regErr2) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
   // Claim coupon atomically at reservation time (same pattern as single-participant paid path).
