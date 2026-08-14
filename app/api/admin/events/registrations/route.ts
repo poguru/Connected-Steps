@@ -46,7 +46,8 @@ export async function GET(req: NextRequest) {
       breakfast_availed, breakfast_availed_at,
       tshirt_size, tshirt_issued,
       bib_number,
-      events ( id, title, start_date, location )
+      events ( id, title, start_date, location ),
+      event_participants ( checked_in_at, tshirt_size, tshirt_issued, breakfast_availed, breakfast_availed_at, bib_number )
     `, { count: "exact" })
     .order(sort, { ascending: asc });
 
@@ -74,8 +75,36 @@ export async function GET(req: NextRequest) {
     total: count ?? 0, paid: 0, free: 0, pending: 0, revenue: 0,
   };
 
+  // Merge event_participants service columns into each registration row.
+  // The ops scanner writes check-in, tshirt, breakfast, and bib to
+  // event_participants — not event_registrations — so the registration-level
+  // columns are stale. Take the first participant's values when present.
+  type RawReg = Record<string, unknown> & {
+    event_participants?: Array<{
+      checked_in_at?: string | null;
+      tshirt_size?: string | null;
+      tshirt_issued?: boolean;
+      breakfast_availed?: boolean;
+      breakfast_availed_at?: string | null;
+      bib_number?: string | null;
+    }>;
+  };
+  const registrations = (data as RawReg[] ?? []).map(reg => {
+    const p = reg.event_participants?.[0];
+    return {
+      ...reg,
+      checked_in_at:      p?.checked_in_at      ?? reg.checked_in_at,
+      tshirt_size:        p?.tshirt_size         ?? reg.tshirt_size,
+      tshirt_issued:      p?.tshirt_issued       ?? reg.tshirt_issued,
+      breakfast_availed:  p?.breakfast_availed   ?? reg.breakfast_availed,
+      breakfast_availed_at: p?.breakfast_availed_at ?? reg.breakfast_availed_at,
+      bib_number:         p?.bib_number          ?? reg.bib_number,
+      event_participants: undefined,
+    };
+  });
+
   return NextResponse.json({
-    registrations: data ?? [],
+    registrations,
     summary,
     total:    count ?? 0,
     page,
