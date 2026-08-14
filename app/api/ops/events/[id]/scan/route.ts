@@ -10,6 +10,7 @@ interface RegInfo {
   payment_status: string;
   gender: string | null;
   tshirt_size: string | null;
+  custom_fields: Record<string, string> | null;
 }
 
 interface Participant {
@@ -70,7 +71,7 @@ const SELECT =
   "medal_issued, medal_issued_at, medal_issued_by, " +
   "bib_collected_at, bib_collected_by, " +
   "certificate_issued, certificate_issued_at, certificate_issued_by, status, " +
-  "event_registrations(registration_code, payment_status, gender, tshirt_size)";
+  "event_registrations(registration_code, payment_status, gender, tshirt_size, custom_fields)";
 
 // POST /api/ops/events/[id]/scan
 // Body: { service, qr_token, dry_run? }
@@ -255,7 +256,7 @@ export async function POST(
   // ── Dry-run: preview without DB update ─────────────────────────────────────
   if (dry_run) {
     // Service-specific validation (so the UI can show errors before the confirm click)
-    const effectiveTshirtSize = participant.tshirt_size ?? participant.event_registrations?.tshirt_size ?? null;
+    const effectiveTshirtSize = participant.tshirt_size ?? participant.event_registrations?.tshirt_size ?? participant.event_registrations?.custom_fields?.t_shirt_size ?? null;
     if (service === "tshirt" && !effectiveTshirtSize) {
       return NextResponse.json({
         valid: false,
@@ -333,7 +334,7 @@ function participantCard(p: Participant, name: string) {
     name,
     registration_code: p.event_registrations?.registration_code ?? null,
     distance_category: p.distance_category,
-    tshirt_size:       p.tshirt_size ?? p.event_registrations?.tshirt_size ?? null,
+    tshirt_size:       p.tshirt_size ?? p.event_registrations?.tshirt_size ?? p.event_registrations?.custom_fields?.t_shirt_size ?? null,
     bib_number:        p.bib_number,
     wave:              p.wave,
     gender:            p.event_registrations?.gender ?? null,
@@ -395,7 +396,7 @@ async function handleTshirt(
   db: DB, p: Participant, name: string,
   now: string, vol: string, role: string, eventId: string
 ): Promise<NextResponse> {
-  const size = p.tshirt_size ?? p.event_registrations?.tshirt_size ?? null;
+  const size = p.tshirt_size ?? p.event_registrations?.tshirt_size ?? p.event_registrations?.custom_fields?.t_shirt_size ?? null;
   if (!size) {
     return NextResponse.json({ error: "No T-shirt size recorded for this participant", valid: false }, { status: 409 });
   }
