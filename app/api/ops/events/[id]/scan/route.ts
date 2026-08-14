@@ -9,6 +9,7 @@ interface RegInfo {
   registration_code: string;
   payment_status: string;
   gender: string | null;
+  tshirt_size: string | null;
 }
 
 interface Participant {
@@ -69,7 +70,7 @@ const SELECT =
   "medal_issued, medal_issued_at, medal_issued_by, " +
   "bib_collected_at, bib_collected_by, " +
   "certificate_issued, certificate_issued_at, certificate_issued_by, status, " +
-  "event_registrations(registration_code, payment_status, gender)";
+  "event_registrations(registration_code, payment_status, gender, tshirt_size)";
 
 // POST /api/ops/events/[id]/scan
 // Body: { service, qr_token, dry_run? }
@@ -254,7 +255,8 @@ export async function POST(
   // ── Dry-run: preview without DB update ─────────────────────────────────────
   if (dry_run) {
     // Service-specific validation (so the UI can show errors before the confirm click)
-    if (service === "tshirt" && !participant.tshirt_size) {
+    const effectiveTshirtSize = participant.tshirt_size ?? participant.event_registrations?.tshirt_size ?? null;
+    if (service === "tshirt" && !effectiveTshirtSize) {
       return NextResponse.json({
         valid: false,
         code: "NO_TSHIRT_SIZE",
@@ -331,7 +333,7 @@ function participantCard(p: Participant, name: string) {
     name,
     registration_code: p.event_registrations?.registration_code ?? null,
     distance_category: p.distance_category,
-    tshirt_size:       p.tshirt_size,
+    tshirt_size:       p.tshirt_size ?? p.event_registrations?.tshirt_size ?? null,
     bib_number:        p.bib_number,
     wave:              p.wave,
     gender:            p.event_registrations?.gender ?? null,
@@ -393,7 +395,8 @@ async function handleTshirt(
   db: DB, p: Participant, name: string,
   now: string, vol: string, role: string, eventId: string
 ): Promise<NextResponse> {
-  if (!p.tshirt_size) {
+  const size = p.tshirt_size ?? p.event_registrations?.tshirt_size ?? null;
+  if (!size) {
     return NextResponse.json({ error: "No T-shirt size recorded for this participant", valid: false }, { status: 409 });
   }
   if (p.tshirt_issued) {
@@ -413,7 +416,7 @@ async function handleTshirt(
   await logAction(db, eventId, p.id, p.registration_id, "tshirt", "tshirt_issued", vol, role);
   return NextResponse.json({
     valid: true, already_done: false,
-    message: `✅ T-shirt (${p.tshirt_size}) issued to ${name}!`,
+    message: `✅ T-shirt (${size}) issued to ${name}!`,
     done_at: now, participant: participantCard(p, name),
   });
 }
