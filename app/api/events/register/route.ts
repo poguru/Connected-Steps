@@ -970,8 +970,8 @@ async function handleMultiParticipant(
     const finalCode = reg.registration_code;
 
     // Create participant rows with QR tokens
-    const participantRows = participants.map(p => {
-      const qr = signEventQR(regId + "_" + (participants.indexOf(p)), event_id as string);
+    const participantRows = participants.map((p, idx) => {
+      const qr = signEventQR(regId + "_" + idx, event_id as string);
       return {
         event_id:          event_id as string,
         registration_id:   regId,

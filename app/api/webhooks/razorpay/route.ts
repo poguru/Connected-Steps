@@ -5,6 +5,7 @@ import { handleEventQrEmail,
          handleInvoiceGenerate } from "@/lib/job-handlers";
 import { enqueueJob }           from "@/lib/job-queue";
 import { signEventQR }          from "@/lib/event-qr";
+import { sendEmail, eventRegistrationEmailHTML } from "@/lib/notify";
 import { activateMembership }   from "@/lib/membership-activate";
 import { sendItRunConfirmationEmail } from "@/lib/it-run-email";
 
@@ -327,14 +328,26 @@ async function handlePaymentCapturedForReg(
   // fallback and must mirror that work so the ops scan route sees them as valid.
   const { data: pendingParticipants } = await db
     .from("event_participants")
-    .select("id")
+    .select("id, first_name, last_name, email, distance_category")
     .eq("registration_id", reg.id)
     .eq("status", "pending_payment");
 
+  const ev = reg.events;
+  const invoicePayload = {
+    productType: "event" as const, userEmail: reg.user_email, userName: reg.user_name,
+    productName: ev?.title ?? "Event Registration", totalPaidRupees: reg.final_price ?? 0,
+    paymentId, orderId, registrationId: reg.id, eventId: reg.event_id,
+    eventDate: ev?.start_date, eventVenue: ev?.location,
+  };
+
   if (pendingParticipants && pendingParticipants.length > 0) {
     const signed = pendingParticipants.map(p => ({
-      id: p.id,
-      qr: signEventQR(p.id, reg.event_id),
+      id:                p.id,
+      first_name:        p.first_name as string,
+      last_name:         p.last_name  as string | null,
+      email:             p.email      as string | null,
+      distance_category: p.distance_category as string | null,
+      qr:                signEventQR(p.id, reg.event_id),
     }));
 
     await Promise.all(
@@ -345,30 +358,55 @@ async function handlePaymentCapturedForReg(
       )
     );
 
-    // Sync the first participant's QR token to event_registrations so
-    // handleEventQrEmail below reuses it. Without this, handleEventQrEmail
-    // generates a registration-code-based QR (its fallback) that does not match
-    // the UUID-based QR stored in event_participants, causing scan failures.
+    // Sync the first participant's QR token to event_registrations for the legacy
+    // check-in endpoint compatibility. The ops scan endpoint uses participant-level QRs.
     await db.from("event_registrations")
       .update({ qr_token: signed[0].qr })
       .eq("id", reg.id);
 
     console.log(`[razorpay-webhook] Activated ${pendingParticipants.length} participant(s) for registration ${reg.registration_code}`);
+
+    if (signed.length > 1) {
+      // Multi-participant: send one confirmation email per person, each with their own QR.
+      // Mirrors the verify-payment after() block for this case.
+      const subject = `Event Registration Confirmed – ${ev?.title ?? "Connected Steps Event"}`;
+      for (const p of signed) {
+        const pName         = [p.first_name, p.last_name].filter(Boolean).join(" ");
+        const recipientEmail = p.email?.trim() || reg.user_email;
+        await sendEmail(
+          recipientEmail, pName, subject,
+          eventRegistrationEmailHTML({
+            name:             pName,
+            eventTitle:       ev?.title ?? "Connected Steps Event",
+            startDate:        ev?.start_date ?? "",
+            startTime:        ev?.start_time ?? null,
+            location:         ev?.location ?? "",
+            registrationCode: reg.registration_code,
+            distanceCategory: p.distance_category ?? null,
+            qrToken:          p.qr,
+          }),
+          false, true,
+        ).catch(e => console.error(`[razorpay-webhook] Multi-participant email failed for ${reg.registration_code} participant ${p.id}:`, e));
+      }
+      await db.from("event_registrations").update({
+        confirmation_email_sent_at: new Date().toISOString(),
+        email_status:               "sent",
+        qr_generated_at:            new Date().toISOString(),
+      }).eq("id", reg.id);
+
+      await enqueueJob("invoice_generate", invoicePayload, { idempotencyKey: `invoice_generate:${paymentId}` });
+      await handleInvoiceGenerate(invoicePayload).catch(e => console.error(`[razorpay-webhook] Invoice failed for ${reg.registration_code}:`, e));
+      return;
+    }
   }
 
-  const ev = reg.events;
+  // Single-participant path: use the job-handler which handles QR generation + idempotency.
   const qrPayload = {
     registrationId: reg.id, registrationCode: reg.registration_code,
     eventId: reg.event_id, userEmail: reg.user_email, userName: reg.user_name,
     eventTitle: ev?.title ?? "Connected Steps Event", startDate: ev?.start_date ?? "",
     startTime: ev?.start_time ?? null, location: ev?.location ?? "",
     distanceCategory: reg.distance_category,
-  };
-  const invoicePayload = {
-    productType: "event" as const, userEmail: reg.user_email, userName: reg.user_name,
-    productName: ev?.title ?? "Event Registration", totalPaidRupees: reg.final_price ?? 0,
-    paymentId, orderId, registrationId: reg.id, eventId: reg.event_id,
-    eventDate: ev?.start_date, eventVenue: ev?.location,
   };
 
   await enqueueJob("event_qr_email",   qrPayload,      { idempotencyKey: `event_qr_email:${reg.id}`,     priority: 10 });
