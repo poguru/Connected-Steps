@@ -23,13 +23,17 @@ export async function POST(req: NextRequest) {
 
     const db = getSupabaseServer();
 
-    // Fetch pending registration
+    // Fetch pending registration.
+    // Look up by registration_code + event_id + pending status only.
+    // We do NOT filter by user_email here: when the account owner registers a
+    // friend, user_email = the friend's email but the authenticated email is
+    // the account owner's — filtering on user_email would block that legitimate
+    // flow. Security is already guaranteed above by the token ↔ email check.
     const { data: reg } = await db
       .from("event_registrations")
       .select("id, final_price, event_id, user_email, registration_code")
       .eq("registration_code", registration_code)
       .eq("event_id", event_id)
-      .eq("user_email", email.toLowerCase().trim())
       .eq("payment_status", "pending")
       .single();
 
