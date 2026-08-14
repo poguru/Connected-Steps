@@ -130,22 +130,50 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       payment_status:     paymentStatus,
       status:             regStatus,
       qr_token:           qrToken,
+      source:             "admin",
     })
-    .select("registration_code, qr_token")
+    .select("id, registration_code, qr_token")
     .single();
 
   if (regErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
+  const regId     = reg?.id                ?? "";
   const finalCode = reg?.registration_code ?? code;
   const finalQr   = reg?.qr_token          ?? qrToken;
+
+  // Create event_participants row so the ops scanner can find this registration.
+  // Without this row, QR scan returns "Participant not found" because the scanner
+  // queries event_participants, not event_registrations.
+  if (regId) {
+    const nameParts = name.trim().split(" ");
+    await db.from("event_participants").insert({
+      event_id:          id,
+      registration_id:   regId,
+      account_email:     email.toLowerCase().trim(),
+      first_name:        nameParts[0],
+      last_name:         nameParts.slice(1).join(" ") || null,
+      gender:            body.gender || null,
+      dob:               body.date_of_birth || null,
+      blood_group:       body.blood_group || null,
+      mobile:            body.phone || null,
+      email:             email.toLowerCase().trim(),
+      distance_category: chosenCategory,
+      qr_token:          finalQr,
+      status:            regStatus === "confirmed" ? "active" : "pending_payment",
+    }).then(({ error: pErr }) => {
+      if (pErr) console.error("[admin-register] event_participants insert error:", pErr.message);
+    });
+  }
 
   if (couponId) {
     const { redeemCoupon } = await import("@/lib/coupon-redeem");
     redeemCoupon(couponId, email.toLowerCase()).catch(console.error);
   }
 
-  // Send confirmation email if requested (default: true for confirmed registrations)
-  const shouldEmail = (body.send_email !== false) && regStatus === "confirmed" && finalQr;
+  // Email is opt-in for admin registrations — admin must explicitly pass send_email: true.
+  // The public registration flow always sends; admin-created registrations should not
+  // automatically email participants unless the admin consciously requests it.
+  const shouldEmail = (body.send_email === true) && regStatus === "confirmed" && finalQr;
   if (shouldEmail) {
     after(async () => {
       try {

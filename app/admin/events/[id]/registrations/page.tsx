@@ -121,7 +121,7 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
 
   // Admin registration modal
   const [regModal,   setRegModal]   = useState(false);
-  const [regForm,    setRegForm]    = useState({ name: "", email: "", phone: "", distance_category: "", payment_status: "free" as "paid"|"free"|"pending", send_email: true, bypass_capacity: false });
+  const [regForm,    setRegForm]    = useState({ name: "", email: "", phone: "", distance_category: "", payment_status: "free" as "paid"|"free"|"pending", send_email: false, bypass_capacity: false });
   const [regLoading, setRegLoading] = useState(false);
   const [regResult,  setRegResult]  = useState<{ success?: boolean; already?: boolean; registration_code?: string; error?: string } | null>(null);
   const [eventCats,  setEventCats]  = useState<string[]>([]);
@@ -461,7 +461,7 @@ export default function EventRegistrationsPage({ params }: { params: Promise<{ i
       setRegResult(data);
       if (res.ok && data.success) {
         await load();
-        setRegForm({ name: "", email: "", phone: "", distance_category: "", payment_status: "free", send_email: true, bypass_capacity: false });
+        setRegForm({ name: "", email: "", phone: "", distance_category: "", payment_status: "free", send_email: false, bypass_capacity: false });
       }
     } catch { setRegResult({ error: "Network error" }); }
     finally { setRegLoading(false); }
