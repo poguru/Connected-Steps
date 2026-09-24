@@ -38,7 +38,7 @@ export async function GET(
   const { data: participants } = await db
     .from("it_run_participants")
     .select(`
-      id, participant_type, first_name, last_name, gender, email, mobile,
+      id, participant_type, qr_token, first_name, last_name, gender, email, mobile,
       blood_group, company_name, tshirt_size,
       bib_number, wave, collection_counter, verification_status,
       it_run_bib_bookings ( id, status, it_run_bib_slots ( id, location_name, location_address, slot_date, start_time, end_time ) ),

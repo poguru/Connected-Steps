@@ -110,6 +110,13 @@ export default function ParticipantsPage() {
                       <div style={{ fontSize: 11, color: "#888", display: "flex", gap: 12, flexWrap: "wrap" }}>
                         <span>{p.email ?? p.mobile}</span>
                         {p.company_name && <span>{p.company_name}</span>}
+                        {p.participant_type && p.participant_type !== "solo" && (
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 4,
+                            color: p.participant_type === "child" ? "#a78bfa" : "#60a5fa",
+                            background: p.participant_type === "child" ? "rgba(167,139,250,0.1)" : "rgba(96,165,250,0.1)" }}>
+                            {p.participant_type.toUpperCase()}
+                          </span>
+                        )}
                         {p.tshirt_size && <span>T: {p.tshirt_size}</span>}
                         <span style={{ color: "#666" }}>{p.it_run_registrations?.registration_code}</span>
                       </div>

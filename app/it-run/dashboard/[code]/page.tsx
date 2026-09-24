@@ -26,7 +26,8 @@ interface DashboardData {
 }
 
 interface Participant {
-  id: string; participant_type: string; first_name: string; last_name: string;
+  id: string; participant_type: string; qr_token: string | null;
+  first_name: string; last_name: string;
   email: string | null; mobile: string; company_name: string | null;
   tshirt_size: string | null; bib_number: string | null; wave: string | null;
   verification_status: string;
@@ -319,11 +320,11 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* QR Code */}
-          {paid && (
+          {/* QR Code — solo only; for multi-participant registrations QR appears inside each participant card */}
+          {paid && reg.participant_count === 1 && (
             <div style={{ ...S.card, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
               <div style={{ fontSize: 11, color: ACCENT, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Your QR Code</div>
-              <QRDisplay code={reg.registration_code} token={reg.qr_token} />
+              <QRDisplay code={reg.registration_code} token={participants[0]?.qr_token ?? reg.qr_token} />
               <div style={{ fontSize: 12, color: "#666", textAlign: "center" }}>
                 Show this QR at BIB collection and race-day check-in
               </div>
@@ -402,6 +403,19 @@ export default function DashboardPage() {
                       </div>
                     ))}
                   </div>
+
+                  {/* Per-participant QR — shown for multi-participant registrations (duo, parent-child) */}
+                  {paid && reg.participant_count > 1 && (
+                    <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 16, marginTop: 4 }}>
+                      <div style={{ fontSize: 11, color: ACCENT, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 10 }}>
+                        {p.first_name}&apos;s QR Code
+                      </div>
+                      <QRDisplay code={reg.registration_code} token={p.qr_token ?? reg.qr_token} />
+                      <div style={{ fontSize: 11, color: "#555", textAlign: "center", marginTop: 6 }}>
+                        Show at BIB collection and race-day check-in
+                      </div>
+                    </div>
+                  )}
 
                   {/* BIB slot booking */}
                   {paid && !isCollected && bibSlots.length > 0 && (

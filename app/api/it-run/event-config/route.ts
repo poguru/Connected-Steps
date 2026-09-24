@@ -48,6 +48,11 @@ export async function GET() {
     return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
 
+  // T-shirt size options — defined here so the frontend never hardcodes them
+  const ADULT_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
+  // Child sizes match the DB constraint added in migration 20260924000004
+  const CHILD_SIZES = ["5-6Y", "7-8Y", "9-10Y", "11-12Y", "13-14Y"];
+
   const categories: ItRunCategory[] = (cats ?? []).map(c => {
     // Derive inclusions from boolean flags — UI reads string array, not individual flags
     const inclusions: string[] = [];
@@ -57,18 +62,20 @@ export async function GET() {
     if (c.includes_certificate) inclusions.push("Digital Certificate");
     inclusions.push("Race BIB");
 
-    // Derive participant labels from category_type — UI reads labels, not category_type
+    // Derive participant labels from category_type — UI reads labels, not category_type.
+    // tshirt_sizes per participant ensures the UI never shows wrong sizes to the wrong participant.
     const participant_labels: ItRunParticipantLabel[] =
       c.category_type === "solo" ? [
-        { role: "solo",      label: "You",              is_child: false },
+        { role: "solo",      label: "You",             is_child: false, tshirt_sizes: ADULT_SIZES },
       ] :
       c.category_type === "duo"  ? [
-        { role: "primary",   label: "Runner 1 (You)",   is_child: false },
-        { role: "secondary", label: "Runner 2",          is_child: false },
+        { role: "primary",   label: "Runner 1 (You)",  is_child: false, tshirt_sizes: ADULT_SIZES },
+        { role: "secondary", label: "Runner 2",         is_child: false, tshirt_sizes: ADULT_SIZES },
       ] :
+      /* kid — parent gets adult sizes, child gets age-appropriate child sizes */
       [
-        { role: "parent",    label: "Parent",            is_child: false },
-        { role: "child",     label: "Child (age ≤ 10)",  is_child: true  },
+        { role: "parent",    label: "Parent",           is_child: false, tshirt_sizes: ADULT_SIZES },
+        { role: "child",     label: "Child (age ≤ 10)", is_child: true,  tshirt_sizes: CHILD_SIZES },
       ];
 
     return {
@@ -80,6 +87,7 @@ export async function GET() {
       price_rupees:         c.price_rupees,
       description:          c.description ?? null,
       color:                c.color ?? "#e8620a",
+      is_timed:             !!c.includes_timing,
       inclusions,
       participant_count:    c.category_type === "solo" ? 1 : 2,
       participant_labels,

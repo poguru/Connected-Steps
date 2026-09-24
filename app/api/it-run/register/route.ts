@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     // Fetch category + event
     const { data: cat } = await db
       .from("it_run_categories")
-      .select("id,event_id,name,category_type,price_rupees,max_participants,current_participants,is_active")
+      .select("id,event_id,name,category_type,price_rupees,max_participants,is_active")
       .eq("id", categoryId)
       .single();
 
@@ -44,11 +44,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Expected ${expectedCount} participant(s) for ${cat.category_type} category` }, { status: 400 });
     }
 
-    // Check capacity
-    if (cat.max_participants !== null && cat.current_participants >= cat.max_participants) {
-      return NextResponse.json({ error: "This category is fully booked" }, { status: 409 });
-    }
-
     // Validate child age (for kid category)
     if (cat.category_type === "kid") {
       const child = participants.find(p => p.type === "child");
@@ -60,31 +55,63 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Calculate price
-    let basePrice    = cat.price_rupees;
-    let discountAmt  = 0;
+    const basePrice = cat.price_rupees;
+
+    // Atomically validate and claim one coupon use.
+    // The DB function acquires a FOR UPDATE lock on the coupon row so concurrent
+    // uses serialize — the 101st use of a 100-use coupon is impossible.
+    // Returns the discount amount in rupees, or NULL if the coupon is invalid,
+    // inactive, expired, exhausted, or the order is below the minimum amount.
+    let discountAmt    = 0;
+    let couponReserved = false;
 
     if (couponId) {
-      const { data: coupon } = await db
-        .from("it_run_coupons")
-        .select("id,discount_type,discount_value,max_uses,use_count,min_amount,expires_at,is_active")
-        .eq("id", couponId)
-        .eq("event_id", cat.event_id)
-        .single();
+      const { data: couponDiscount, error: couponErr } = await db.rpc("itr_use_coupon", {
+        p_coupon_id:  couponId,
+        p_event_id:   cat.event_id,
+        p_base_price: basePrice,
+      });
 
-      if (coupon && coupon.is_active && (!coupon.expires_at || new Date(coupon.expires_at) > new Date())) {
-        if (!coupon.max_uses || coupon.use_count < coupon.max_uses) {
-          if (!coupon.min_amount || basePrice >= coupon.min_amount) {
-            discountAmt = coupon.discount_type === "flat"
-              ? Math.min(coupon.discount_value, basePrice)
-              : Math.round(basePrice * coupon.discount_value / 100);
-          }
-        }
+      if (couponErr) {
+        console.error("[it-run/register] coupon RPC error:", couponErr.message);
+        return NextResponse.json({ error: "Coupon validation failed" }, { status: 500 });
       }
+
+      if (couponDiscount === null) {
+        return NextResponse.json({ error: "Coupon is invalid or no longer available" }, { status: 409 });
+      }
+
+      discountAmt    = couponDiscount as number;
+      couponReserved = true;
     }
 
     const finalPrice = Math.max(0, basePrice - discountAmt);
     const regCode    = generateRegistrationCode();
+
+    // Atomically reserve capacity.
+    // The DB function acquires a FOR UPDATE row lock on it_run_categories so
+    // two simultaneous requests for the final slot serialize here — only one
+    // can increment the counter past max_participants.
+    // It also expires stale pending registrations (> 15 min without payment)
+    // so abandoned attempts don't permanently consume capacity.
+    const { data: reserveStatus, error: reserveErr } = await db.rpc(
+      "itr_reserve_capacity",
+      { p_category_id: categoryId, p_increment: participants.length, p_payment_ttl_mins: 15 },
+    );
+
+    if (reserveErr) {
+      console.error("[it-run/register] capacity RPC error:", reserveErr.message);
+      if (couponReserved) void db.rpc("itr_release_coupon", { p_coupon_id: couponId });
+      return NextResponse.json({ error: "Capacity check failed" }, { status: 500 });
+    }
+    if (reserveStatus === "full") {
+      if (couponReserved) void db.rpc("itr_release_coupon", { p_coupon_id: couponId });
+      return NextResponse.json({ error: "This category is fully booked" }, { status: 409 });
+    }
+    if (reserveStatus === "unavailable") {
+      if (couponReserved) void db.rpc("itr_release_coupon", { p_coupon_id: couponId });
+      return NextResponse.json({ error: "Category not found or inactive" }, { status: 404 });
+    }
 
     // Insert registration
     const { data: reg, error: regErr } = await db
@@ -106,6 +133,8 @@ export async function POST(req: NextRequest) {
 
     if (regErr || !reg) {
       console.error("[it-run/register] reg insert error:", regErr?.message);
+      void db.rpc("itr_release_capacity", { p_category_id: categoryId, p_count: participants.length });
+      if (couponReserved) void db.rpc("itr_release_coupon", { p_coupon_id: couponId });
       return NextResponse.json({ error: "Failed to create registration" }, { status: 500 });
     }
 
@@ -139,46 +168,48 @@ export async function POST(req: NextRequest) {
 
     if (partErr || !parts) {
       console.error("[it-run/register] participant insert error:", partErr?.message);
-      // Rollback registration
       await db.from("it_run_registrations").delete().eq("id", reg.id);
+      void db.rpc("itr_release_capacity", { p_category_id: categoryId, p_count: participants.length });
+      if (couponReserved) void db.rpc("itr_release_coupon", { p_coupon_id: couponId });
       return NextResponse.json({ error: "Failed to create participant records" }, { status: 500 });
     }
 
-    // Generate QR token for primary participant
-    const primaryPartId = parts[0].id;
-    const qrToken = signItRunQR(regCode, primaryPartId);
+    // Generate a unique QR token per participant.
+    // Each token encodes (registrationCode:participantId) so scanning at check-in
+    // resolves the correct individual regardless of how many participants share
+    // this registration.
+    const participantQRs = parts.map(part => ({
+      id:       part.id,
+      qr_token: signItRunQR(regCode, part.id),
+    }));
 
+    await Promise.all(
+      participantQRs.map(({ id, qr_token }) =>
+        db.from("it_run_participants").update({ qr_token }).eq("id", id)
+      )
+    );
+
+    // Keep primary participant's token on the registration row for backward
+    // compatibility with existing dashboard, webhook, and email code.
     await db
       .from("it_run_registrations")
-      .update({ qr_token: qrToken })
+      .update({ qr_token: participantQRs[0].qr_token })
       .eq("id", reg.id);
 
-    // Record coupon use
+    // Record coupon use for audit trail.
+    // use_count was already incremented atomically by itr_use_coupon above.
     if (couponId && discountAmt > 0) {
-      await db
+      const { error: useErr } = await db
         .from("it_run_coupon_uses")
         .insert({
           coupon_id:       couponId,
           registration_id: reg.id,
           used_by_email:   participants[0]?.email?.toLowerCase()?.trim() ?? "",
-        })
-        .then(() =>
-          db.from("it_run_coupons")
-            .update({ use_count: (db as unknown as { rpc: (...a: unknown[]) => unknown }) && 0 })
-            .eq("id", couponId)
-        );
-      // Increment coupon use count (best-effort, non-blocking)
-      void db.from("it_run_coupons").select("use_count").eq("id", couponId).single()
-        .then(({ data }: { data: { use_count: number } | null }) => {
-          if (data) void db.from("it_run_coupons").update({ use_count: (data.use_count ?? 0) + 1 }).eq("id", couponId);
         });
+      if (useErr) {
+        console.error("[it-run/register] coupon_uses insert error:", useErr.message);
+      }
     }
-
-    // Increment category participant count
-    await db
-      .from("it_run_categories")
-      .update({ current_participants: cat.current_participants + participants.length })
-      .eq("id", categoryId);
 
     return NextResponse.json({
       registrationId:   reg.id,

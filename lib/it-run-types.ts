@@ -19,8 +19,9 @@ export interface ItRunEventMeta {
 
 export interface ItRunParticipantLabel {
   role: "solo" | "primary" | "secondary" | "parent" | "child";
-  label: string;   // human-readable: "You", "Runner 1", "Child (age ≤ 10)", etc.
+  label: string;          // human-readable: "You", "Runner 1", "Child (age ≤ 10)", etc.
   is_child: boolean;
+  tshirt_sizes: string[]; // sizes shown in the UI for this participant — adult or child
 }
 
 export interface ItRunCategory {
@@ -33,6 +34,7 @@ export interface ItRunCategory {
   description: string | null;
   color: string;
   // Derived server-side from includes_* booleans — frontend never reads individual flags
+  is_timed: boolean;       // true when chip timing is provided; drives the race-type badge
   inclusions: string[];
   // Derived server-side from category_type — frontend never implements category_type logic
   participant_count: number;

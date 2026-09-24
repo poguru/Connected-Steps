@@ -127,13 +127,46 @@ export async function POST(req: NextRequest) {
     await handlePaymentCaptured(payment);
   } else if (event === "payment.failed" && payment) {
     console.warn(`[razorpay-webhook] Payment failed — payment_id=${payment.id} order_id=${payment.order_id} error=${payment.error_description ?? "unknown"}`);
-    // Mark the registration's payment as failed so admin can see it
     const db2 = getSupabaseServer();
-    await db2
-      .from("event_registrations")
-      .update({ payment_status: "failed" })
-      .eq("razorpay_order_id", payment.order_id ?? "")
-      .eq("payment_status", "pending");
+
+    // IT Run registration: mark failed, release reserved capacity, release coupon.
+    if (payment.notes?.type === "it_run" || payment.notes?.it_run_reg_id) {
+      const { data: itReg } = await db2
+        .from("it_run_registrations")
+        .select("id, category_id, participant_count, payment_status, coupon_id, discount_amount")
+        .eq("razorpay_order_id", payment.order_id ?? "")
+        .maybeSingle<{
+          id: string; category_id: string; participant_count: number;
+          payment_status: string; coupon_id: string | null; discount_amount: number;
+        }>();
+
+      if (itReg && itReg.payment_status === "pending") {
+        await db2
+          .from("it_run_registrations")
+          .update({ payment_status: "failed" })
+          .eq("id", itReg.id)
+          .eq("payment_status", "pending"); // guard against concurrent state change
+        await db2.rpc("itr_release_capacity", {
+          p_category_id: itReg.category_id,
+          p_count:        itReg.participant_count,
+        });
+        if (itReg.coupon_id && itReg.discount_amount > 0) {
+          await db2.rpc("itr_release_coupon", { p_coupon_id: itReg.coupon_id });
+        }
+        console.log(
+          `[razorpay-webhook/it-run] Marked failed + released ${itReg.participant_count} slot(s)` +
+          (itReg.coupon_id ? ` + coupon ${itReg.coupon_id}` : "") +
+          ` for reg=${itReg.id}`,
+        );
+      }
+    } else {
+      // Main platform registration: mark failed so admin can see it
+      await db2
+        .from("event_registrations")
+        .update({ payment_status: "failed" })
+        .eq("razorpay_order_id", payment.order_id ?? "")
+        .eq("payment_status", "pending");
+    }
   } else if (event === "refund.created" && refund) {
     console.log(`[razorpay-webhook] Handling refund.created — refund_id=${refund.id} payment_id=${refund.payment_id}`);
     await handleRefundCreated(refund);

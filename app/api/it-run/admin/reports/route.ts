@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/it-run-auth";
 
-// GET /api/it-run/admin/reports?type=registrations|revenue|verification|bib|checkin
+// GET /api/it-run/admin/reports?type=registrations|participants|revenue|checkin|tshirt
 // Returns CSV data for the requested report type.
 export async function GET(req: NextRequest) {
   const session = requireRole(req, ["event_admin"]);
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
       .from("it_run_participants")
       .select(`
         first_name, last_name, gender, dob, email, mobile, blood_group,
-        company_name, employee_id, tshirt_size, bib_number, wave,
+        company_name, employee_id, participant_type, tshirt_size, bib_number, wave,
         verification_status, food_preference,
         it_run_registrations!inner ( registration_code, payment_status,
           it_run_categories ( name ) )
@@ -49,12 +49,13 @@ export async function GET(req: NextRequest) {
       .eq("event_id", event.id)
       .order("id");
 
-    csv  = "First Name,Last Name,Gender,DOB,Email,Mobile,Blood Group,Company,Employee ID,T-Shirt,BIB,Wave,Verification,Food,Category,Reg Code,Payment\n";
+    csv  = "First Name,Last Name,Gender,DOB,Email,Mobile,Blood Group,Company,Employee ID,Participant Type,T-Shirt,BIB,Wave,Verification,Food,Category,Reg Code,Payment\n";
     csv += (data ?? []).map((p: unknown) => {
       const part = p as {
         first_name: string; last_name: string; gender: string; dob: string | null;
         email: string | null; mobile: string; blood_group: string | null;
-        company_name: string | null; employee_id: string | null; tshirt_size: string | null;
+        company_name: string | null; employee_id: string | null;
+        participant_type: string; tshirt_size: string | null;
         bib_number: string | null; wave: string | null; verification_status: string;
         food_preference: string | null;
         it_run_registrations: { registration_code: string; payment_status: string; it_run_categories: { name: string } | null };
@@ -62,6 +63,7 @@ export async function GET(req: NextRequest) {
       return [
         part.first_name, part.last_name, part.gender, part.dob, part.email,
         part.mobile, part.blood_group, part.company_name, part.employee_id,
+        part.participant_type,
         part.tshirt_size, part.bib_number, part.wave, part.verification_status,
         part.food_preference,
         part.it_run_registrations?.it_run_categories?.name,
@@ -117,6 +119,40 @@ export async function GET(req: NextRequest) {
       ].map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",");
     }).join("\n");
     filename = `it-run-checkins-${new Date().toISOString().split("T")[0]}.csv`;
+  }
+
+  else if (type === "tshirt") {
+    // T-shirt summary grouped by category → participant_type → tshirt_size
+    const { data } = await db
+      .from("it_run_participants")
+      .select(`
+        participant_type, tshirt_size,
+        it_run_registrations!inner ( payment_status, it_run_categories ( name ) )
+      `)
+      .eq("event_id", event.id)
+      .eq("it_run_registrations.payment_status", "paid");
+
+    // Group and count
+    const counts: Record<string, number> = {};
+    for (const p of (data ?? []) as unknown as Array<{
+      participant_type: string; tshirt_size: string | null;
+      it_run_registrations: { it_run_categories: { name: string } | null };
+    }>) {
+      const cat  = p.it_run_registrations?.it_run_categories?.name ?? "Unknown";
+      const type2 = p.participant_type ?? "solo";
+      const size = p.tshirt_size ?? "Unknown";
+      const key  = `${cat}||${type2}||${size}`;
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+
+    csv  = "Category,Participant Type,T-Shirt Size,Count\n";
+    csv += Object.entries(counts)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, count]) => {
+        const [cat, ptype, size] = key.split("||");
+        return [cat, ptype, size, count].map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",");
+      }).join("\n");
+    filename = `it-run-tshirt-summary-${new Date().toISOString().split("T")[0]}.csv`;
   }
 
   return new NextResponse(csv, {

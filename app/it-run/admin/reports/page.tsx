@@ -31,6 +31,13 @@ const REPORTS = [
     fields:  "Reg Code, Category, Name, BIB, Check-in Time, Staff Notes",
     color:   "#f59e0b",
   },
+  {
+    type:    "tshirt",
+    title:   "T-Shirt Summary Report",
+    desc:    "Count of each t-shirt size required, split by category and participant type (adult vs child). Use this for t-shirt procurement and event-day kit packing.",
+    fields:  "Category, Participant Type (solo/parent/child), T-Shirt Size, Count",
+    color:   "#a78bfa",
+  },
 ];
 
 export default function ReportsPage() {
