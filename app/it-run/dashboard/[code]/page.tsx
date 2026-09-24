@@ -455,7 +455,7 @@ export default function DashboardPage() {
         </div>
 
         <div style={{ marginTop: 32, textAlign: "center", fontSize: 12, color: "#555" }}>
-          Registration Code: {reg.registration_code} &nbsp;|&nbsp; Event: The IT Run Sprint-2 &nbsp;|&nbsp; August 17, 2026
+          Registration Code: {reg.registration_code} &nbsp;|&nbsp; Event: The IT Run Sprint-2 &nbsp;|&nbsp; {reg.it_run_events?.event_date ? new Date(reg.it_run_events.event_date + "T12:00:00Z").toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : ""}
         </div>
       </div>
     </div>

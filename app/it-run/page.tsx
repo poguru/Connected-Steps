@@ -18,9 +18,6 @@ interface Category {
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 
-const EVENT_DATE = new Date("2026-08-17T06:00:00+05:30");
-const REG_CLOSE  = new Date("2026-08-10T23:59:59+05:30");
-
 const CATEGORIES: Category[] = [
   {
     slug: "10k-timed", name: "10K Timed Run", distance: "10 KM", price: 799,
@@ -58,11 +55,11 @@ const FAQS = [
   { q: "Who can participate in The IT Run Sprint-2?", a: "Any professional working in the IT/tech industry can register. You will need to upload your company ID for verification. Students from tech colleges are also welcome for the Fun Run category." },
   { q: "What documents do I need to upload?", a: "A valid company ID or employee card showing your company name. A selfie with your ID works too. Our team verifies all documents within 24 hours of registration." },
   { q: "Can I run if I am not physically fit?", a: "Absolutely! The 5K Fun Run and 1.5K Run with Kid are designed for all fitness levels. Start walking, start running - the community spirit is what matters." },
-  { q: "When will I receive my race BIB?", a: "Race BIBs are collected at designated collection counters on August 14-16, 2026. You can book your preferred time slot from your participant dashboard after payment confirmation." },
+  { q: "When will I receive my race BIB?", a: "Race BIBs are collected at designated collection counters on February 4-6, 2027. You can book your preferred time slot from your participant dashboard after payment confirmation." },
   { q: "Is parking available at the venue?", a: "Yes, parking is available at Hitec City. We recommend arriving early. Public transport and ride-sharing options are also convenient to the venue." },
-  { q: "What is the refund policy?", a: "Registrations are non-refundable. However, transfers to another participant are allowed until August 8, 2026. Requests must be emailed to info@connectedsteps.in with the new participant's details." },
+  { q: "What is the refund policy?", a: "Registrations are non-refundable. However, transfers to another participant are allowed until January 31, 2027. Requests must be emailed to info@connectedsteps.in with the new participant's details." },
   { q: "Will there be water stations and medical support?", a: "Yes. Water stations are set up every 2.5 KM on the 10K route and every 2 KM on the 5K route. Qualified medical support including first-aid teams and an ambulance will be on standby." },
-  { q: "Can I upgrade my category after registration?", a: "Category upgrades (e.g. 5K to 10K) are allowed until August 5, 2026 by paying the price difference. Email us at info@connectedsteps.in to request an upgrade." },
+  { q: "Can I upgrade my category after registration?", a: "Category upgrades (e.g. 5K to 10K) are allowed until January 28, 2027 by paying the price difference. Email us at info@connectedsteps.in to request an upgrade." },
 ];
 
 const SCHEDULE = [
@@ -88,8 +85,9 @@ const WHY_ITEMS = [
 
 // ── Countdown timer ────────────────────────────────────────────────────────────
 
-function useCountdown(target: Date): TimeLeft {
+function useCountdown(target: Date | null): TimeLeft {
   const calc = (): TimeLeft => {
+    if (!target) return { days: 0, hours: 0, minutes: 0, seconds: 0 };
     const diff = Math.max(0, target.getTime() - Date.now());
     return {
       days:    Math.floor(diff / 86400000),
@@ -187,8 +185,15 @@ const S = {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function ItRunLandingPage() {
-  const countdown     = useCountdown(EVENT_DATE);
-  const regCountdown  = useCountdown(REG_CLOSE);
+  // Event config loaded from DB via /api/it-run/categories — never hardcoded
+  const [eventDate,   setEventDate]   = useState<Date | null>(null);
+  const [regClose,    setRegClose]    = useState<Date | null>(null);
+  const [venueName,   setVenueName]   = useState("Hitec City, Hyderabad");
+  const [eventLabel,  setEventLabel]  = useState("February 7, 2027");
+  const [regCloseLabel, setRegCloseLabel] = useState<string>("–");
+
+  const countdown    = useCountdown(eventDate);
+  const regCountdown = useCountdown(regClose);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [navScrolled, setNavScrolled] = useState(false);
   const heroRef = useRef<HTMLDivElement>(null);
@@ -199,7 +204,29 @@ export default function ItRunLandingPage() {
     return () => window.removeEventListener("scroll", h);
   }, []);
 
-  const regClosed = Date.now() > REG_CLOSE.getTime();
+  useEffect(() => {
+    fetch("/api/it-run/categories")
+      .then(r => r.json())
+      .then(({ event }: { event?: { event_date?: string; registration_closes_at?: string; venue_name?: string | null; city?: string | null } }) => {
+        if (!event) return;
+        if (event.event_date) {
+          const d = new Date(event.event_date + "T06:00:00+05:30");
+          setEventDate(d);
+          setEventLabel(d.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }));
+        }
+        if (event.registration_closes_at) {
+          const rc = new Date(event.registration_closes_at);
+          setRegClose(rc);
+          setRegCloseLabel(rc.toLocaleDateString("en-IN", { day: "numeric", month: "short" }));
+        }
+        if (event.venue_name) {
+          setVenueName(event.venue_name + (event.city ? ", " + event.city : ""));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const regClosed = regClose ? Date.now() > regClose.getTime() : false;
 
   return (
     <div style={S.page}>
@@ -253,7 +280,7 @@ export default function ItRunLandingPage() {
           <p style={{ fontSize: "clamp(14px,2vw,18px)", color: "#999", marginBottom: 32, lineHeight: 1.6 }}>
             Your Code Compiles. Now Run It.
             <br />
-            <span style={{ color: "#666", fontSize: 14 }}>August 17, 2026 &nbsp;|&nbsp; Hitec City, Hyderabad</span>
+            <span style={{ color: "#666", fontSize: 14 }}>{eventLabel} &nbsp;|&nbsp; {venueName}</span>
           </p>
 
           {/* Countdown */}
@@ -284,7 +311,7 @@ export default function ItRunLandingPage() {
 
           {/* Quick stats */}
           <div style={{ display: "flex", gap: "clamp(24px,4vw,48px)", justifyContent: "center", marginTop: 48, flexWrap: "wrap" }}>
-            {[["5", "Race Categories"], ["10 KM", "Longest Race"], ["Aug 10", "Reg Closes"]].map(([v, l]) => (
+            {[["5", "Race Categories"], ["10 KM", "Longest Race"], [regCloseLabel, "Reg Closes"]].map(([v, l]) => (
               <div key={l} style={{ textAlign: "center" }}>
                 <div style={{ fontSize: "clamp(20px,3vw,28px)", fontWeight: 900, color: "#e8620a" }}>{v}</div>
                 <div style={{ fontSize: 11, color: "#666", textTransform: "uppercase", letterSpacing: "0.1em", marginTop: 2 }}>{l}</div>

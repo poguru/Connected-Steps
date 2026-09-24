@@ -106,7 +106,7 @@ async function sendConfirmationEmail(
   const primaryEmail = reg.lead_email;
   const primaryName  = `${parts[0].first_name} ${parts[0].last_name}`;
 
-  const html = buildConfirmEmail(primaryName, reg.registration_code, cat?.name ?? "IT Run Sprint-2", ev?.event_date ?? "2026-08-17", ev?.venue_name ?? "Hitec City", dashUrl);
+  const html = buildConfirmEmail(primaryName, reg.registration_code, cat?.name ?? "IT Run Sprint-2", ev?.event_date ?? "2027-02-07", ev?.venue_name ?? "Hitec City, Hyderabad", dashUrl);
 
   const { sendEmail } = await import("@/lib/notify");
   await sendEmail(
@@ -168,7 +168,7 @@ function buildConfirmEmail(name: string, code: string, category: string, date: s
             <strong style="color:#ccc;">Next steps:</strong><br/>
             1. Book your BIB collection slot from your dashboard<br/>
             2. Carry original company ID for physical verification if not yet verified<br/>
-            3. Report at the venue by 5:30 AM on August 17, 2026
+            3. Report at the venue by 5:30 AM on ${dateFormatted}
           </p>
         </div>
 
