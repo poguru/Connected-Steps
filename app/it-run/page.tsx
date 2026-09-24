@@ -20,41 +20,41 @@ interface Category {
 
 const CATEGORIES: Category[] = [
   {
-    slug: "10k-timed", name: "10K Timed Run", distance: "10 KM", price: 799,
-    type: "solo", badge: "FLAGSHIP", color: "#e8620a", bgGradient: "linear-gradient(135deg,rgba(232,98,10,0.15),rgba(232,98,10,0.05))",
-    includes: ["Chip Timing", "Finisher Medal", "Race BIB", "Dry-fit T-Shirt", "Digital Certificate"],
-    highlights: ["Competitive", "Chip Timed", "Medal"],
+    slug: "parent-child-duo", name: "Parent & Child Duo", distance: "1.5 KM", price: 999,
+    type: "kid", badge: "FAMILY", color: "#ec4899", bgGradient: "linear-gradient(135deg,rgba(236,72,153,0.15),rgba(236,72,153,0.05))",
+    includes: ["2x Race BIBs", "2x Dry-fit T-Shirts", "Parent + Child Medals", "Memories for Life"],
+    highlights: ["Kids age 10 or under", "Parent + Child", "Fun Track"],
   },
   {
-    slug: "5k-timed", name: "5K Timed Run", distance: "5 KM", price: 599,
-    type: "solo", badge: "POPULAR", color: "#f97316", bgGradient: "linear-gradient(135deg,rgba(249,115,22,0.15),rgba(249,115,22,0.05))",
-    includes: ["Chip Timing", "Finisher Medal", "Race BIB", "Dry-fit T-Shirt", "Digital Certificate"],
-    highlights: ["Competitive", "Chip Timed", "Medal"],
-  },
-  {
-    slug: "5k-fun-run", name: "5K Fun Run", distance: "5 KM", price: 399,
+    slug: "5k-fun-run", name: "5K Fun Run", distance: "5 KM", price: 649,
     type: "solo", badge: "BEGINNER", color: "#10b981", bgGradient: "linear-gradient(135deg,rgba(16,185,129,0.15),rgba(16,185,129,0.05))",
     includes: ["Race BIB", "Dry-fit T-Shirt", "Digital Certificate", "Participation Medal"],
     highlights: ["No Pressure", "Community", "Fun"],
   },
   {
-    slug: "5k-duo", name: "5K Duo Challenge", distance: "5 KM", price: 999,
+    slug: "5k-timed", name: "5K Timed Run", distance: "5 KM", price: 799,
+    type: "solo", badge: "POPULAR", color: "#f97316", bgGradient: "linear-gradient(135deg,rgba(249,115,22,0.15),rgba(249,115,22,0.05))",
+    includes: ["Chip Timing", "Finisher Medal", "Race BIB", "Dry-fit T-Shirt", "Digital Certificate"],
+    highlights: ["Competitive", "Chip Timed", "Medal"],
+  },
+  {
+    slug: "5k-duo", name: "5K Duo Challenge", distance: "5 KM", price: 1399,
     type: "duo", badge: "FOR 2", color: "#6366f1", bgGradient: "linear-gradient(135deg,rgba(99,102,241,0.15),rgba(99,102,241,0.05))",
     includes: ["2x Race BIBs", "2x Dry-fit T-Shirts", "2x Certificates", "Team Recognition"],
     highlights: ["2 Runners", "Team Spirit", "Work Buddy"],
   },
   {
-    slug: "1-5k-kid", name: "1.5K Run with Kid", distance: "1.5 KM", price: 299,
-    type: "kid", badge: "FAMILY", color: "#ec4899", bgGradient: "linear-gradient(135deg,rgba(236,72,153,0.15),rgba(236,72,153,0.05))",
-    includes: ["2x Race BIBs", "2x T-Shirts", "Parent + Child Medals", "Memories for Life"],
-    highlights: ["Kids age 10 or under", "Parent + Child", "Fun Track"],
+    slug: "10k-timed", name: "10K Timed Run", distance: "10 KM", price: 999,
+    type: "solo", badge: "FLAGSHIP", color: "#e8620a", bgGradient: "linear-gradient(135deg,rgba(232,98,10,0.15),rgba(232,98,10,0.05))",
+    includes: ["Chip Timing", "Finisher Medal", "Race BIB", "Dry-fit T-Shirt", "Digital Certificate"],
+    highlights: ["Competitive", "Chip Timed", "Medal"],
   },
 ];
 
 const FAQS = [
   { q: "Who can participate in The IT Run Sprint-2?", a: "Any professional working in the IT/tech industry can register. You will need to upload your company ID for verification. Students from tech colleges are also welcome for the Fun Run category." },
   { q: "What documents do I need to upload?", a: "A valid company ID or employee card showing your company name. A selfie with your ID works too. Our team verifies all documents within 24 hours of registration." },
-  { q: "Can I run if I am not physically fit?", a: "Absolutely! The 5K Fun Run and 1.5K Run with Kid are designed for all fitness levels. Start walking, start running - the community spirit is what matters." },
+  { q: "Can I run if I am not physically fit?", a: "Absolutely! The 5K Fun Run and Parent & Child Duo are designed for all fitness levels. Start walking, start running - the community spirit is what matters." },
   { q: "When will I receive my race BIB?", a: "Race BIBs are collected at designated collection counters on February 4-6, 2027. You can book your preferred time slot from your participant dashboard after payment confirmation." },
   { q: "Is parking available at the venue?", a: "Yes, parking is available at Hitec City. We recommend arriving early. Public transport and ride-sharing options are also convenient to the venue." },
   { q: "What is the refund policy?", a: "Registrations are non-refundable. However, transfers to another participant are allowed until January 31, 2027. Requests must be emailed to info@connectedsteps.in with the new participant's details." },
@@ -68,7 +68,7 @@ const SCHEDULE = [
   { time: "06:00 AM", event: "10K Flag Off", desc: "10K Timed Run begins - Wave A" },
   { time: "06:05 AM", event: "10K Wave B",   desc: "10K Timed Run - Wave B" },
   { time: "06:30 AM", event: "5K Flag Off",  desc: "5K Timed Run + 5K Fun Run begin" },
-  { time: "06:35 AM", event: "Duo & Kid Run", desc: "5K Duo Challenge + 1.5K Run with Kid" },
+  { time: "06:35 AM", event: "Duo & Family",  desc: "5K Duo Challenge + Parent & Child Duo" },
   { time: "08:00 AM", event: "10K Cutoff",   desc: "10K route closes" },
   { time: "08:30 AM", event: "Award Ceremony", desc: "Top finishers award ceremony + group photos" },
   { time: "09:30 AM", event: "Event Close",  desc: "Official event wrap-up" },
@@ -196,6 +196,7 @@ export default function ItRunLandingPage() {
   const regCountdown = useCountdown(regClose);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [navScrolled, setNavScrolled] = useState(false);
+  const [liveCategories, setLiveCategories] = useState<Category[]>(CATEGORIES);
   const heroRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -207,20 +208,27 @@ export default function ItRunLandingPage() {
   useEffect(() => {
     fetch("/api/it-run/categories")
       .then(r => r.json())
-      .then(({ event }: { event?: { event_date?: string; registration_closes_at?: string; venue_name?: string | null; city?: string | null } }) => {
-        if (!event) return;
-        if (event.event_date) {
-          const d = new Date(event.event_date + "T06:00:00+05:30");
-          setEventDate(d);
-          setEventLabel(d.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }));
+      .then(({ data, event }: { data?: { slug: string; price_rupees: number }[]; event?: { event_date?: string; registration_closes_at?: string; venue_name?: string | null; city?: string | null } }) => {
+        if (event) {
+          if (event.event_date) {
+            const d = new Date(event.event_date + "T06:00:00+05:30");
+            setEventDate(d);
+            setEventLabel(d.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }));
+          }
+          if (event.registration_closes_at) {
+            const rc = new Date(event.registration_closes_at);
+            setRegClose(rc);
+            setRegCloseLabel(rc.toLocaleDateString("en-IN", { day: "numeric", month: "short" }));
+          }
+          if (event.venue_name) {
+            setVenueName(event.venue_name + (event.city ? ", " + event.city : ""));
+          }
         }
-        if (event.registration_closes_at) {
-          const rc = new Date(event.registration_closes_at);
-          setRegClose(rc);
-          setRegCloseLabel(rc.toLocaleDateString("en-IN", { day: "numeric", month: "short" }));
-        }
-        if (event.venue_name) {
-          setVenueName(event.venue_name + (event.city ? ", " + event.city : ""));
+        if (Array.isArray(data) && data.length > 0) {
+          setLiveCategories(prev => prev.map(cat => {
+            const live = data.find(d => d.slug === cat.slug);
+            return live ? { ...cat, price: live.price_rupees } : cat;
+          }));
         }
       })
       .catch(() => {});
@@ -374,7 +382,7 @@ export default function ItRunLandingPage() {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 16 }}>
-          {CATEGORIES.map((cat) => (
+          {liveCategories.map((cat) => (
             <div
               key={cat.slug}
               style={{
