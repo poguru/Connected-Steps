@@ -31,16 +31,28 @@ export async function POST(req: NextRequest) {
     // Fetch registration
     const { data: reg } = await db
       .from("it_run_registrations")
-      .select("id,registration_code,lead_email,final_price,payment_status,razorpay_payment_id,it_run_categories(name),it_run_events(title,event_date,venue_name)")
+      .select("id,registration_code,lead_email,final_price,payment_status,razorpay_payment_id,razorpay_order_id,it_run_categories(name),it_run_events(title,event_date,venue_name)")
       .eq("id", registrationId)
       .single<{
         id: string; registration_code: string; lead_email: string; final_price: number;
         payment_status: string; razorpay_payment_id: string | null;
+        razorpay_order_id: string | null;
         it_run_categories: { name: string } | null;
         it_run_events: { title: string; event_date: string; venue_name: string } | null;
       }>();
 
     if (!reg) return NextResponse.json({ error: "Registration not found" }, { status: 404 });
+
+    // Validate that the orderId in this request matches what we stored for this registration.
+    // Prevents IDOR: an attacker can't confirm a different registration using a valid
+    // (orderId, paymentId, signature) tuple obtained from their own payment.
+    if (reg.razorpay_order_id && reg.razorpay_order_id !== orderId) {
+      console.error(
+        `[it-run/payment/verify] orderId mismatch reg=${reg.registration_code}` +
+        ` stored=${reg.razorpay_order_id} received=${orderId}`,
+      );
+      return NextResponse.json({ error: "Order ID mismatch" }, { status: 400 });
+    }
 
     // Idempotency check
     if (reg.payment_status === "paid") {
@@ -51,20 +63,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, already: true });
     }
 
-    // Confirm payment
-    const { error: updateErr } = await db
+    // Confirm payment — only transitions pending / payment_attempted / failed → paid.
+    // Using .select("id") lets us detect when a concurrent confirm (webhook) already
+    // updated this row, so we don't send a duplicate confirmation email.
+    const { data: updated, error: updateErr } = await db
       .from("it_run_registrations")
       .update({
-        payment_status:       "paid",
-        razorpay_payment_id:  paymentId,
-        razorpay_order_id:    orderId,
+        payment_status:      "paid",
+        razorpay_payment_id: paymentId,
+        razorpay_order_id:   orderId,
       })
       .eq("id", registrationId)
-      .in("payment_status", ["pending", "failed"]);
+      .in("payment_status", ["pending", "payment_attempted", "failed"])
+      .select("id");
 
     if (updateErr) {
       console.error("[it-run/payment/verify] update error:", updateErr.message);
       return NextResponse.json({ error: "Failed to confirm payment" }, { status: 500 });
+    }
+
+    if (!updated?.length) {
+      // A concurrent webhook already confirmed this payment — return ok without re-sending email
+      console.log(`[it-run/payment/verify] 0 rows updated for ${reg.registration_code} — confirmed elsewhere`);
+      return NextResponse.json({ ok: true });
     }
 
     console.log(`[it-run/payment/verify] Registration ${reg.registration_code} confirmed via client verify — payment ${paymentId}`);

@@ -140,24 +140,28 @@ export async function POST(req: NextRequest) {
           payment_status: string; coupon_id: string | null; discount_amount: number;
         }>();
 
-      if (itReg && itReg.payment_status === "pending") {
-        await db2
+      if (itReg && ["pending", "payment_attempted"].includes(itReg.payment_status)) {
+        const { data: failedRows } = await db2
           .from("it_run_registrations")
           .update({ payment_status: "failed" })
           .eq("id", itReg.id)
-          .eq("payment_status", "pending"); // guard against concurrent state change
-        await db2.rpc("itr_release_capacity", {
-          p_category_id: itReg.category_id,
-          p_count:        itReg.participant_count,
-        });
-        if (itReg.coupon_id && itReg.discount_amount > 0) {
-          await db2.rpc("itr_release_coupon", { p_coupon_id: itReg.coupon_id });
+          .in("payment_status", ["pending", "payment_attempted"]) // guard concurrent change
+          .select("id");
+
+        if (failedRows?.length) {
+          await db2.rpc("itr_release_capacity", {
+            p_category_id: itReg.category_id,
+            p_count:       itReg.participant_count,
+          });
+          if (itReg.coupon_id && itReg.discount_amount > 0) {
+            await db2.rpc("itr_release_coupon", { p_coupon_id: itReg.coupon_id });
+          }
+          console.log(
+            `[razorpay-webhook/it-run] Marked failed + released ${itReg.participant_count} slot(s)` +
+            (itReg.coupon_id ? ` + coupon ${itReg.coupon_id}` : "") +
+            ` for reg=${itReg.id}`,
+          );
         }
-        console.log(
-          `[razorpay-webhook/it-run] Marked failed + released ${itReg.participant_count} slot(s)` +
-          (itReg.coupon_id ? ` + coupon ${itReg.coupon_id}` : "") +
-          ` for reg=${itReg.id}`,
-        );
       }
     } else {
       // Main platform registration: mark failed so admin can see it
@@ -302,15 +306,23 @@ async function handleItRunPaymentCaptured(
     return;
   }
 
-  const { error } = await db
+  // .select("id") lets us detect a 0-row update (client verify already confirmed it)
+  // so we don't send a duplicate confirmation email.
+  const { data: updated, error } = await db
     .from("it_run_registrations")
     .update({ payment_status: "paid", razorpay_payment_id: paymentId, razorpay_order_id: orderId })
     .eq("id", reg.id)
-    .in("payment_status", ["pending", "failed"]);
+    .in("payment_status", ["pending", "payment_attempted", "failed"])
+    .select("id");
 
   if (error) {
     if (error.code === "23505") { console.log(`${label} Duplicate payment_id — already handled`); return; }
     console.error(`${label} DB update failed:`, error.message);
+    return;
+  }
+
+  if (!updated?.length) {
+    console.log(`${label} 0 rows updated — confirmed by client verify, skipping email`);
     return;
   }
 
