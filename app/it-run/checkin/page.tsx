@@ -181,38 +181,62 @@ export default function CheckinPage() {
                 )}
               </div>
 
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 24 }}>
-                <Badge color={result.it_run_registrations?.payment_status === "paid" ? GREEN : "#f59e0b"}>
-                  {result.it_run_registrations?.payment_status === "paid" ? "Paid" : result.it_run_registrations?.payment_status ?? "Unknown"}
-                </Badge>
-                {result.it_run_checkins.length > 0 && (
-                  <Badge color="#6366f1">Already Checked In</Badge>
-                )}
-              </div>
+              {(() => {
+                const payStatus  = result.it_run_registrations?.payment_status ?? "";
+                const isPaid     = payStatus === "paid" || payStatus === "free";
+                const statusLabel: Record<string, string> = {
+                  paid: "Paid", free: "Confirmed", pending: "Payment Pending",
+                  payment_attempted: "Payment In Progress", failed: "Payment Failed", expired: "Expired",
+                };
+                const statusColor = isPaid ? GREEN : "#f59e0b";
+                return (
+                  <>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 24 }}>
+                      <Badge color={statusColor}>
+                        {statusLabel[payStatus] ?? payStatus}
+                      </Badge>
+                      {result.it_run_checkins.length > 0 && (
+                        <Badge color="#6366f1">Already Checked In</Badge>
+                      )}
+                    </div>
 
-              {/* Already checked in warning */}
-              {result.it_run_checkins.length > 0 && (
-                <div style={{ padding: "10px 14px", background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 10, fontSize: 13, color: "#818cf8", marginBottom: 16 }}>
-                  Already checked in at {new Date(result.it_run_checkins[0].checked_in_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
-                </div>
-              )}
+                    {/* Already checked in warning */}
+                    {result.it_run_checkins.length > 0 && (
+                      <div style={{ padding: "10px 14px", background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 10, fontSize: 13, color: "#818cf8", marginBottom: 16 }}>
+                        Already checked in at {new Date(result.it_run_checkins[0].checked_in_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                    )}
 
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                {result.it_run_checkins.length === 0 ? (
-                  <button onClick={checkIn} disabled={checking}
-                    style={{ padding: "14px 28px", background: checking ? "rgba(255,255,255,0.1)" : GREEN, border: "none", borderRadius: 10, color: "#fff", fontSize: 15, fontWeight: 800, cursor: checking ? "not-allowed" : "pointer", fontFamily: "inherit", letterSpacing: "-0.01em" }}>
-                    {checking ? "Recording..." : "Check In"}
-                  </button>
-                ) : (
-                  <button disabled style={{ padding: "14px 28px", background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 10, color: "#818cf8", fontSize: 15, fontWeight: 800, cursor: "not-allowed", fontFamily: "inherit" }}>
-                    Already Checked In
-                  </button>
-                )}
-                <button onClick={reset}
-                  style={{ padding: "14px 20px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, color: "#888", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                  Clear
-                </button>
-              </div>
+                    {/* Unpaid registration warning */}
+                    {!isPaid && (
+                      <div style={{ padding: "10px 14px", background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: 10, fontSize: 13, color: "#fbbf24", marginBottom: 16 }}>
+                        Registration not confirmed — payment has not been completed.
+                      </div>
+                    )}
+
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      {result.it_run_checkins.length > 0 ? (
+                        <button disabled style={{ padding: "14px 28px", background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 10, color: "#818cf8", fontSize: 15, fontWeight: 800, cursor: "not-allowed", fontFamily: "inherit" }}>
+                          Already Checked In
+                        </button>
+                      ) : isPaid ? (
+                        <button onClick={checkIn} disabled={checking}
+                          style={{ padding: "14px 28px", background: checking ? "rgba(255,255,255,0.1)" : GREEN, border: "none", borderRadius: 10, color: "#fff", fontSize: 15, fontWeight: 800, cursor: checking ? "not-allowed" : "pointer", fontFamily: "inherit", letterSpacing: "-0.01em" }}>
+                          {checking ? "Recording..." : "Check In"}
+                        </button>
+                      ) : (
+                        <button disabled style={{ padding: "14px 28px", background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 10, color: "#f59e0b", fontSize: 15, fontWeight: 800, cursor: "not-allowed", fontFamily: "inherit" }}>
+                          Cannot Check In — Unpaid
+                        </button>
+                      )}
+                      <button onClick={reset}
+                        style={{ padding: "14px 20px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, color: "#888", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                        Clear
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         )}

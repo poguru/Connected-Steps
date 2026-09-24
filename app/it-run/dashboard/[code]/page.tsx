@@ -58,10 +58,12 @@ const ACCENT = "#e8620a";
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; color: string; bg: string }> = {
-    paid:              { label: "Payment Confirmed", color: "#10b981", bg: "rgba(16,185,129,0.1)" },
-    free:              { label: "Registration Confirmed", color: "#10b981", bg: "rgba(16,185,129,0.1)" },
-    pending:           { label: "Payment Pending", color: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
-    failed:            { label: "Payment Failed", color: "#ef4444", bg: "rgba(239,68,68,0.1)" },
+    paid:               { label: "Payment Confirmed", color: "#10b981", bg: "rgba(16,185,129,0.1)" },
+    free:               { label: "Registration Confirmed", color: "#10b981", bg: "rgba(16,185,129,0.1)" },
+    pending:            { label: "Payment Pending", color: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
+    payment_attempted:  { label: "Payment In Progress", color: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
+    failed:             { label: "Payment Failed", color: "#ef4444", bg: "rgba(239,68,68,0.1)" },
+    expired:            { label: "Registration Expired", color: "#ef4444", bg: "rgba(239,68,68,0.1)" },
     verified:          { label: "Verified", color: "#10b981", bg: "rgba(16,185,129,0.1)" },
     rejected:          { label: "Rejected", color: "#ef4444", bg: "rgba(239,68,68,0.1)" },
     need_clarification:{ label: "Clarification Needed", color: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
@@ -76,14 +78,35 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // ── QR Code display ────────────────────────────────────────────────────────────
+// Generates QR codes entirely client-side using the 'qrcode' package.
+// No external service dependency — works offline / on race day without internet.
 
 function QRDisplay({ code, token }: { code: string; token: string | null }) {
   const qrData = token ?? code;
-  const qrUrl  = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qrData)}&size=200x200&bgcolor=0a0a0a&color=ffffff&margin=10`;
+  const [svg, setSvg] = useState<string>("");
+
+  useEffect(() => {
+    let cancelled = false;
+    import("qrcode").then(mod =>
+      mod.toString(qrData, {
+        type:   "svg",
+        margin: 2,
+        color:  { dark: "#ffffff", light: "#0a0a0a" },
+      })
+    ).then(s => { if (!cancelled) setSvg(s); })
+     .catch(() => {});
+    return () => { cancelled = true; };
+  }, [qrData]);
+
   return (
     <div style={{ textAlign: "center" }}>
-      <div style={{ display: "inline-block", background: "#0a0a0a", border: "2px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: 12 }}>
-        <img src={qrUrl} alt="QR Code" width={180} height={180} style={{ display: "block", borderRadius: 4 }} />
+      <div style={{ display: "inline-block", background: "#0a0a0a", border: "2px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: 12, width: 204, height: 204 }}>
+        {svg ? (
+          // eslint-disable-next-line react/no-danger
+          <div dangerouslySetInnerHTML={{ __html: svg }} style={{ width: 180, height: 180 }} />
+        ) : (
+          <div style={{ width: 180, height: 180, background: "rgba(255,255,255,0.03)", borderRadius: 4 }} />
+        )}
       </div>
       <div style={{ fontSize: 12, color: "#888", marginTop: 8 }}>Scan at BIB collection + race day</div>
     </div>
