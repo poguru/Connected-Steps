@@ -193,7 +193,11 @@ export async function POST(req: NextRequest) {
       first_name:     firstName,
       last_name:      lastName,
       email:          emailNorm,
-      phone:          phone10,
+      // phone10 is null when no mobile is provided. Use "" as fallback so the
+      // insert succeeds even if the users.phone NOT NULL migration hasn't been
+      // applied to production yet. The migration (20260813000001) should be run
+      // to allow true NULLs; this is a belt-and-suspenders guard.
+      phone:          phone10 ?? "",
       password:       tempHash,
       email_verified: true,
       phone_verified: false,
@@ -228,7 +232,7 @@ export async function POST(req: NextRequest) {
           );
         }
       }
-      console.error("[complete-event-verify] insert error:", insertErr);
+      console.error("[complete-event-verify] insert error code=%s msg=%s", insertErr.code, insertErr.message);
       return NextResponse.json({ error: "Account creation failed. Please try again." }, { status: 500 });
     }
 
