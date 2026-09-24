@@ -92,6 +92,14 @@ const BTN_GHOST: React.CSSProperties   = {
   border: "1px solid rgba(255,255,255,0.13)",
 };
 
+const BTN_EDIT: React.CSSProperties = {
+  padding: "5px 12px", borderRadius: 7, fontWeight: 600, fontSize: 11,
+  cursor: "pointer", border: "1px solid rgba(255,255,255,0.1)",
+  background: "transparent", color: "#666",
+  fontFamily: "inherit", letterSpacing: "0.05em", textTransform: "uppercase" as const,
+  transition: "all 0.15s", flexShrink: 0,
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Razorpay loader
 // ─────────────────────────────────────────────────────────────────────────────
@@ -678,7 +686,7 @@ function StepCategory({
 function StepParticipants({
   category, participantSubIdx,
   participants, errors, onChange, submitError,
-  onBack, onNext,
+  onBack, onNext, returnToReview,
 }: {
   category: ItRunCategory;
   participantSubIdx: number;
@@ -688,6 +696,7 @@ function StepParticipants({
   submitError: string;
   onBack: () => void;
   onNext: () => void;
+  returnToReview?: boolean;
 }) {
   const pl    = category.participant_labels[participantSubIdx];
   const total = category.participant_count;
@@ -748,9 +757,11 @@ function StepParticipants({
       <div style={{ display: "flex", gap: 10, marginTop: 24, flexWrap: "wrap" as const }}>
         <button onClick={onBack} style={BTN_GHOST}>← Back</button>
         <button onClick={onNext} style={{ ...BTN_PRIMARY, flex: 1, justifyContent: "center" }}>
-          {isLast
-            ? "Continue to Verification →"
-            : `Next: ${category.participant_labels[participantSubIdx + 1]?.label ?? "Participant " + (participantSubIdx + 2)} →`}
+          {returnToReview
+            ? "Save & Return to Review →"
+            : isLast
+              ? "Continue to Verification →"
+              : `Next: ${category.participant_labels[participantSubIdx + 1]?.label ?? "Participant " + (participantSubIdx + 2)} →`}
         </button>
       </div>
     </div>
@@ -762,7 +773,7 @@ function StepParticipants({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function StepCompany({
-  category, participants, uploading, onChange, onUpload, onBack, onNext,
+  category, participants, uploading, onChange, onUpload, onBack, onNext, returnToReview,
 }: {
   category: ItRunCategory;
   participants: Participant[];
@@ -771,6 +782,7 @@ function StepCompany({
   onUpload: (idx: number, file: File) => void;
   onBack: () => void;
   onNext: () => void;
+  returnToReview?: boolean;
 }) {
   const nonChildIdxs = participants
     .map((_, idx) => idx)
@@ -873,7 +885,7 @@ function StepCompany({
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
         <button onClick={onBack} style={BTN_GHOST}>← Back</button>
         <button onClick={onNext} style={{ ...BTN_PRIMARY, flex: 1, justifyContent: "center" }}>
-          Review Registration →
+          {returnToReview ? "Save & Return to Review →" : "Review Registration →"}
         </button>
       </div>
     </div>
@@ -884,14 +896,60 @@ function StepCompany({
 // Step 4 — Review
 // ─────────────────────────────────────────────────────────────────────────────
 
+function ReviewSectionHeader({
+  label, onEdit, editLabel = "Edit",
+}: { label: string; onEdit: () => void; editLabel?: string }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      marginBottom: 14,
+    }}>
+      <div style={{
+        fontSize: 10, color: ACCENT, fontWeight: 700,
+        textTransform: "uppercase" as const, letterSpacing: "0.1em",
+      }}>
+        {label}
+      </div>
+      <button
+        onClick={onEdit}
+        style={BTN_EDIT}
+        onMouseEnter={e => {
+          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.25)";
+          (e.currentTarget as HTMLButtonElement).style.color = "#ccc";
+        }}
+        onMouseLeave={e => {
+          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.1)";
+          (e.currentTarget as HTMLButtonElement).style.color = "#666";
+        }}
+      >
+        {editLabel}
+      </button>
+    </div>
+  );
+}
+
 function StepReview({
-  category, participants, onBack, onNext,
+  category, participants, coupon, basePrice, discount, finalPrice,
+  onBack, onNext,
+  onEditParticipant, onEditVerification, onEditCategory, onEditCoupon,
 }: {
   category: ItRunCategory;
   participants: Participant[];
+  coupon: CouponData | null;
+  basePrice: number;
+  discount: number;
+  finalPrice: number;
   onBack: () => void;
   onNext: () => void;
+  onEditParticipant: (idx: number) => void;
+  onEditVerification: () => void;
+  onEditCategory: () => void;
+  onEditCoupon: () => void;
 }) {
+  const nonChildIdxs = participants
+    .map((_, i) => i)
+    .filter(i => !(category.participant_labels[i]?.is_child ?? false));
+
   return (
     <div>
       <ProgressStepper step={4} />
@@ -899,69 +957,147 @@ function StepReview({
         Review Your Registration
       </h2>
       <p style={{ fontSize: 13, color: "#555", marginBottom: 20 }}>
-        Verify all details before proceeding. You cannot edit after payment.
+        Everything look right? You can edit any section below before paying.
       </p>
 
-      {/* Category */}
+      {/* ── Category ── */}
       <div style={{ ...CARD_BASE, padding: 18, marginBottom: 10 }}>
-        <div style={{ fontSize: 10, color: ACCENT, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 10 }}>Category</div>
+        <ReviewSectionHeader label="Category" onEdit={onEditCategory} editLabel="Change" />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>{category.name}</div>
-            <div style={{ fontSize: 12, color: "#555", marginTop: 2 }}>
-              {category.distance_km < 2 ? "1.5 KM" : `${category.distance_km} KM`}
-              {category.is_timed ? " · Timed" : " · Non-Timed"}
-              {category.participant_count > 1 && ` · ${category.participant_count} participants`}
+            <div style={{ fontSize: 12, color: "#555", marginTop: 3, display: "flex", gap: 8, flexWrap: "wrap" as const }}>
+              <span>{category.distance_km < 2 ? "1.5 KM" : `${category.distance_km} KM`}</span>
+              <span style={{ color: "#333" }}>·</span>
+              <span>{category.is_timed ? "Timed" : "Non-Timed"}</span>
+              {category.participant_count > 1 && (
+                <>
+                  <span style={{ color: "#333" }}>·</span>
+                  <span>{category.participant_labels.map(l => l.label).join(" + ")}</span>
+                </>
+              )}
             </div>
           </div>
-          <div style={{ fontSize: 20, fontWeight: 900, color: category.color }}>
+          <div style={{ fontSize: 20, fontWeight: 900, color: category.color, flexShrink: 0 }}>
             ₹{category.price_rupees.toLocaleString("en-IN")}
           </div>
         </div>
       </div>
 
-      {/* Per-participant cards */}
+      {/* ── Per-participant cards ── */}
       {participants.map((p, idx) => {
-        const pl = category.participant_labels[idx];
+        const pl    = category.participant_labels[idx];
+        const label = pl?.label ?? `Participant ${idx + 1}`;
+        const fields: string[][] = [
+          ["Name",    `${p.firstName} ${p.lastName}`],
+          ["Gender",  p.gender === "prefer_not" ? "Prefer not to say" : p.gender],
+          ["DOB",     p.dob],
+          ["Mobile",  p.mobile],
+          ["Blood",   p.bloodGroup],
+          ["T-Shirt", p.tshirtSize],
+          ...(pl?.is_child ? [] : [
+            ["Email",      p.email],
+            ["Company",    p.companyName],
+            ["Emergency",  p.emergencyName ? `${p.emergencyName} · ${p.emergencyPhone}` : ""],
+          ]),
+        ];
+
         return (
           <div key={idx} style={{ ...CARD_BASE, padding: 18, marginBottom: 10 }}>
-            <div style={{ fontSize: 10, color: ACCENT, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 12 }}>
-              {pl?.label ?? `Participant ${idx + 1}`}
-              {pl?.is_child && (
-                <span style={{ marginLeft: 8, color: "#a78bfa", fontWeight: 400 }}>Child</span>
-              )}
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: "8px 16px" }}>
-              {([
-                ["Name",    `${p.firstName} ${p.lastName}`],
-                ["Gender",  p.gender],
-                ["DOB",     p.dob],
-                ["Mobile",  p.mobile],
-                ["Blood",   p.bloodGroup],
-                ["T-Shirt", p.tshirtSize],
-                ...(!(pl?.is_child) ? [
-                  ["Email",   p.email],
-                  ["Company", p.companyName],
-                  ["Emergency", p.emergencyName ? `${p.emergencyName} · ${p.emergencyPhone}` : ""],
-                ] : []),
-              ] as string[][]).filter(([, v]) => v?.trim()).map(([label, value]) => (
-                <div key={label}>
-                  <div style={{ fontSize: 9, color: "#3a3a3a", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>{label}</div>
-                  <div style={{ fontSize: 12, color: "#bbb", marginTop: 2 }}>{value}</div>
+            <ReviewSectionHeader
+              label={label + (pl?.is_child ? " (Child)" : "")}
+              onEdit={() => onEditParticipant(idx)}
+            />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: "10px 16px" }}>
+              {fields.filter(([, v]) => v?.trim()).map(([lbl, val]) => (
+                <div key={lbl}>
+                  <div style={{ fontSize: 9, color: "#3a3a3a", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 2 }}>
+                    {lbl}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#bbb" }}>{val}</div>
                 </div>
               ))}
             </div>
-            {!(pl?.is_child) && p.companyIdUrl && p.companyIdUrl !== "error" && (
-              <div style={{ fontSize: 11, color: "#10b981", marginTop: 10 }}>✓ Company ID uploaded</div>
-            )}
           </div>
         );
       })}
 
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const, marginTop: 8 }}>
+      {/* ── Company Verification ── */}
+      {nonChildIdxs.length > 0 && (
+        <div style={{ ...CARD_BASE, padding: 18, marginBottom: 10 }}>
+          <ReviewSectionHeader label="Company Verification" onEdit={onEditVerification} />
+          <div style={{ display: "flex", flexDirection: "column" as const, gap: 10 }}>
+            {nonChildIdxs.map(idx => {
+              const p     = participants[idx];
+              const label = category.participant_labels[idx]?.label ?? `Participant ${idx + 1}`;
+              const ok    = p.companyIdUrl && p.companyIdUrl !== "error";
+              return (
+                <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{
+                    width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+                    background: ok ? "#10b981" : "#444",
+                  }} />
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontSize: 12, color: "#bbb" }}>{label}</span>
+                    <span style={{ fontSize: 11, color: "#444", marginLeft: 8 }}>
+                      {p.companyName || "No company"}
+                    </span>
+                  </div>
+                  <span style={{
+                    fontSize: 10, fontWeight: 600,
+                    color:      ok ? "#10b981" : "#555",
+                    background: ok ? "rgba(16,185,129,0.07)" : "rgba(255,255,255,0.03)",
+                    padding: "2px 8px", borderRadius: 5,
+                  }}>
+                    {ok ? "ID Uploaded" : "Bring on day"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Order Summary ── */}
+      <div style={{ ...CARD_BASE, padding: 18, marginBottom: 24 }}>
+        <ReviewSectionHeader label="Order Summary" onEdit={onEditCoupon} editLabel={coupon ? "Edit Coupon" : "Add Coupon"} />
+
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#888", marginBottom: 8 }}>
+          <span>{category.name}</span>
+          <span>₹{basePrice.toLocaleString("en-IN")}</span>
+        </div>
+
+        {coupon && (
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#10b981", marginBottom: 8 }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{
+                fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", padding: "1px 6px",
+                background: "rgba(16,185,129,0.1)", borderRadius: 4, color: "#10b981",
+              }}>
+                {coupon.code}
+              </span>
+              {coupon.label}
+            </span>
+            <span>−₹{discount.toLocaleString("en-IN")}</span>
+          </div>
+        )}
+
+        <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "10px 0 12px" }} />
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 13, color: "#555" }}>
+            Total{coupon ? " (after discount)" : ""}
+          </span>
+          <span style={{ fontSize: 22, fontWeight: 900, color: ACCENT }}>
+            ₹{finalPrice.toLocaleString("en-IN")}
+          </span>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
         <button onClick={onBack} style={BTN_GHOST}>← Back</button>
         <button onClick={onNext} style={{ ...BTN_PRIMARY, flex: 1, justifyContent: "center" }}>
-          Proceed to Coupon →
+          Confirm & Proceed →
         </button>
       </div>
     </div>
@@ -977,7 +1113,7 @@ function StepCoupon({
   basePrice, discount, finalPrice,
   submitting, submitError,
   onCodeChange, onValidate, onClearCoupon,
-  onBack, onSubmit,
+  onBack, onSubmit, returnToReview, onSaveAndReturn,
 }: {
   category: ItRunCategory;
   couponEnabled: boolean;
@@ -995,6 +1131,8 @@ function StepCoupon({
   onClearCoupon: () => void;
   onBack: () => void;
   onSubmit: () => void;
+  returnToReview?: boolean;
+  onSaveAndReturn?: () => void;
 }) {
   return (
     <div>
@@ -1093,17 +1231,25 @@ function StepCoupon({
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
-        <button onClick={onBack} style={BTN_GHOST}>← Back</button>
-        <button onClick={onSubmit} disabled={submitting}
-          style={{ ...BTN_PRIMARY, flex: 1, justifyContent: "center", opacity: submitting ? 0.6 : 1 }}>
-          {submitting
-            ? "Processing…"
-            : finalPrice === 0
-              ? "Complete Registration (Free)"
-              : `Proceed to Payment · ₹${finalPrice.toLocaleString("en-IN")}`}
-        </button>
-      </div>
+      {returnToReview ? (
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
+          <button onClick={onSaveAndReturn} style={{ ...BTN_PRIMARY, flex: 1, justifyContent: "center" }}>
+            Save & Return to Review →
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
+          <button onClick={onBack} style={BTN_GHOST}>← Back</button>
+          <button onClick={onSubmit} disabled={submitting}
+            style={{ ...BTN_PRIMARY, flex: 1, justifyContent: "center", opacity: submitting ? 0.6 : 1 }}>
+            {submitting
+              ? "Processing…"
+              : finalPrice === 0
+                ? "Complete Registration (Free)"
+                : `Proceed to Payment · ₹${finalPrice.toLocaleString("en-IN")}`}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1259,6 +1405,9 @@ function RegisterPageContent() {
   const [coupon,        setCoupon]        = useState<CouponData | null>(null);
   const [couponError,   setCouponError]   = useState("");
   const [couponLoading, setCouponLoading] = useState(false);
+
+  // Edit-from-review: when true, step 2/3/5 return to step 4 after saving
+  const [returnToReview, setReturnToReview] = useState(false);
 
   // Submission
   const [submitting,  setSubmitting]  = useState(false);
@@ -1423,12 +1572,41 @@ function RegisterPageContent() {
   function handleParticipantNext() {
     setSubmitError("");
     if (!validateParticipant(participantSubIdx)) return;
+    if (returnToReview) {
+      setReturnToReview(false);
+      setStep(4);
+      return;
+    }
     const lastIdx = (selectedCat?.participant_count ?? 1) - 1;
     if (participantSubIdx < lastIdx) {
       setParticipantSubIdx(i => i + 1);
     } else {
       setStep(3);
     }
+  }
+
+  // ── Edit-from-review handlers ──────────────────────────────────────────────
+
+  function editParticipant(idx: number) {
+    setParticipantSubIdx(idx);
+    setReturnToReview(true);
+    setStep(2);
+  }
+
+  function editVerification() {
+    setReturnToReview(true);
+    setStep(3);
+  }
+
+  function editCategory() {
+    // Category change resets participants — don't set returnToReview
+    setReturnToReview(false);
+    setStep(1);
+  }
+
+  function editCoupon() {
+    setReturnToReview(true);
+    setStep(5);
   }
 
   // ── Coupon validation ──────────────────────────────────────────────────────
@@ -1620,6 +1798,7 @@ function RegisterPageContent() {
             submitError={submitError}
             onBack={handleParticipantBack}
             onNext={handleParticipantNext}
+            returnToReview={returnToReview}
           />
         )}
 
@@ -1631,11 +1810,16 @@ function RegisterPageContent() {
             onChange={updateParticipant}
             onUpload={uploadCompanyId}
             onBack={() => {
-              // Go back to last participant
-              setParticipantSubIdx((selectedCat.participant_count - 1));
-              setStep(2);
+              if (returnToReview) {
+                setReturnToReview(false);
+                setStep(4);
+              } else {
+                setParticipantSubIdx(selectedCat.participant_count - 1);
+                setStep(2);
+              }
             }}
-            onNext={() => setStep(4)}
+            onNext={() => { setReturnToReview(false); setStep(4); }}
+            returnToReview={returnToReview}
           />
         )}
 
@@ -1643,8 +1827,16 @@ function RegisterPageContent() {
           <StepReview
             category={selectedCat}
             participants={participants}
+            coupon={coupon}
+            basePrice={basePrice}
+            discount={discount}
+            finalPrice={finalPrice}
             onBack={() => setStep(3)}
             onNext={() => setStep(5)}
+            onEditParticipant={editParticipant}
+            onEditVerification={editVerification}
+            onEditCategory={editCategory}
+            onEditCoupon={editCoupon}
           />
         )}
 
@@ -1666,6 +1858,8 @@ function RegisterPageContent() {
             onClearCoupon={() => { setCoupon(null); setCouponCode(""); }}
             onBack={() => setStep(4)}
             onSubmit={submitRegistration}
+            returnToReview={returnToReview}
+            onSaveAndReturn={() => { setReturnToReview(false); setStep(4); }}
           />
         )}
 
