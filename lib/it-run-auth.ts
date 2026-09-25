@@ -6,6 +6,7 @@ import { NextRequest } from "next/server";
 export const PORTAL_SESSION_COOKIE = "it_run_portal_session";
 
 export const PORTAL_ROLES = [
+  "super_admin",
   "event_admin",
   "verification_team",
   "bib_collection",
@@ -17,6 +18,7 @@ export type PortalRole = typeof PORTAL_ROLES[number];
 
 // Role display names
 export const ROLE_LABELS: Record<PortalRole, string> = {
+  super_admin:       "Super Admin",
   event_admin:       "Event Admin",
   verification_team: "Verification Team",
   bib_collection:    "BIB Collection",
@@ -24,13 +26,14 @@ export const ROLE_LABELS: Record<PortalRole, string> = {
   support_desk:      "Support Desk",
 };
 
-// Pages each role can access (whitelist)
+// Pages each role can access (whitelist); super_admin bypasses this entirely
 export const ROLE_PERMISSIONS: Record<PortalRole, string[]> = {
-  event_admin:       ["dashboard","registrations","participants","verification","bibs","bib-slots","checkins","coupons","reports","broadcasts","settings"],
+  super_admin:       ["dashboard","registrations","participants","verification","bibs","bib-slots","checkins","coupons","reports","broadcasts","settings","staff","audit-logs","tshirt"],
+  event_admin:       ["dashboard","registrations","participants","verification","bibs","bib-slots","checkins","coupons","reports","broadcasts","settings","staff","audit-logs","tshirt"],
   verification_team: ["verification","participants"],
-  bib_collection:    ["bib-collection","bibs"],
-  checkin_team:      ["checkin"],
-  support_desk:      ["participants","registrations"],
+  bib_collection:    ["bibs","participants"],
+  checkin_team:      ["checkins","participants"],
+  support_desk:      ["participants","registrations","tshirt"],
 };
 
 // TTL: 8 hours for admin, 12 hours for field teams
@@ -103,6 +106,8 @@ export function requireRole(
 ): PortalSession | null {
   const session = getPortalSession(req);
   if (!session) return null;
+  // super_admin bypasses all role restrictions
+  if (session.role === "super_admin") return session;
   if (!allowedRoles.includes(session.role)) return null;
   return session;
 }
@@ -115,6 +120,15 @@ export function isPortalUser(req: NextRequest): PortalSession | null {
 // Shorthand: event_admin only
 export function isEventAdmin(req: NextRequest): PortalSession | null {
   return requireRole(req, ["event_admin"]);
+}
+
+// Extract client IP from request headers (safe: only reads metadata, never logged to user)
+export function getClientIp(req: NextRequest): string {
+  return (
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    req.headers.get("x-real-ip") ??
+    "unknown"
+  );
 }
 
 // ── Password hashing (simple but secure for server-side) ─────────────────────

@@ -125,8 +125,8 @@ export async function POST(req: NextRequest) {
     // capture is delayed or disabled.
     console.log(`[razorpay-webhook] Handling payment.authorized — payment_id=${payment.id} (UPI/pre-capture)`);
     await handlePaymentCaptured(payment);
-  } else if (event === "payment.failed" && payment) {
-    console.warn(`[razorpay-webhook] Payment failed — payment_id=${payment.id} order_id=${payment.order_id} error=${payment.error_description ?? "unknown"}`);
+  } else if ((event === "payment.failed" || event === "payment.cancelled") && payment) {
+    console.warn(`[razorpay-webhook] Payment ${event} — payment_id=${payment.id} order_id=${payment.order_id} error=${payment.error_description ?? "unknown"}`);
     const db2 = getSupabaseServer();
 
     // IT Run registration: mark failed, release reserved capacity, release coupon.

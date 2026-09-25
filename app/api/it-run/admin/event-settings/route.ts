@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { requireRole } from "@/lib/it-run-auth";
+import { requireRole, getClientIp } from "@/lib/it-run-auth";
 
 // Fields the admin is never allowed to change
 const IMMUTABLE = new Set(["id", "slug", "created_at"]);
@@ -108,6 +108,7 @@ export async function PATCH(req: NextRequest) {
     action:      "update_event",
     entity_type: "event",
     entity_id:   "sprint-2",
+    ip:          getClientIp(req),
     detail: {
       updated_fields: Object.keys(editable),
       old_values:     oldValues,

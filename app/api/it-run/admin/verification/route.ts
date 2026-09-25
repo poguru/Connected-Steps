@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { requireRole } from "@/lib/it-run-auth";
+import { requireRole, getClientIp } from "@/lib/it-run-auth";
 
 // GET /api/it-run/admin/verification?status=pending&page=0&limit=50
 export async function GET(req: NextRequest) {
@@ -53,11 +53,16 @@ export async function PATCH(req: NextRequest) {
 
     const db = getSupabaseServer();
 
-    // Update participant verification status
-    await db
+    // Update participant verification status — check for DB errors before logging
+    const { error: updErr } = await db
       .from("it_run_participants")
       .update({ verification_status: status })
       .eq("id", participantId);
+
+    if (updErr) {
+      console.error("[it-run/verification] participant update failed:", updErr.message);
+      return NextResponse.json({ error: "Failed to update verification status" }, { status: 500 });
+    }
 
     // Log the verification action
     await db
@@ -92,8 +97,22 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
+    // Audit log
+    db.from("it_run_audit_logs").insert({
+      actor_email: session.email,
+      actor_role:  session.role,
+      action:      `verification_${status}`,
+      entity_type: "participant",
+      entity_id:   participantId,
+      ip:          getClientIp(req),
+      detail: {
+        status,
+        notes: notes ?? null,
+      },
+    }).then(() => {}, () => {});
+
     return NextResponse.json({ ok: true });
-  } catch (e: unknown) {
+  } catch {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

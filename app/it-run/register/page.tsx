@@ -1446,8 +1446,14 @@ function RegisterPageContent() {
   useEffect(() => {
     if (step > 1 && selectedCat) {
       try {
+        // Strip File objects before serialising — they cannot survive JSON round-trips.
+        // companyIdUrl (the uploaded URL string) is preserved; companyIdFile is not needed
+        // after upload completes and is always re-initialized to null on restore.
+        const draftParticipants = participants.map(p => ({ ...p, companyIdFile: null }));
         localStorage.setItem("it_run_draft_v3", JSON.stringify({
-          step, participantSubIdx, selectedCatId: selectedCat.id, participants, couponCode,
+          step, participantSubIdx, selectedCatId: selectedCat.id,
+          participants: draftParticipants, couponCode,
+          savedAt: Date.now(),
         }));
       } catch { /* ignore */ }
     }
@@ -1462,15 +1468,27 @@ function RegisterPageContent() {
       const d = JSON.parse(raw) as {
         step: number; participantSubIdx: number;
         selectedCatId: string; participants: Participant[]; couponCode: string;
+        savedAt?: number;
       };
       if (!d.step || !d.selectedCatId) return;
+      // Discard drafts older than 4 hours — long enough to survive accidental refreshes
+      // but short enough that stale participant data doesn't resurface unexpectedly.
+      const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
+      if (d.savedAt && Date.now() - d.savedAt > FOUR_HOURS_MS) {
+        localStorage.removeItem("it_run_draft_v3");
+        return;
+      }
       const cat = config.categories.find(c => c.id === d.selectedCatId);
       if (!cat || cat.is_soldout) return;
       setSelectedCat(cat);
-      setParticipants(d.participants ?? [emptyParticipant()]);
+      // companyIdFile cannot be serialized; always restore as null (companyIdUrl is preserved)
+      const restoredParticipants = (d.participants ?? [emptyParticipant()]).map(
+        (p: Participant) => ({ ...p, companyIdFile: null }),
+      );
+      setParticipants(restoredParticipants);
       setCouponCode(d.couponCode ?? "");
       setParticipantSubIdx(0);
-      setStep(Math.min(d.step, 2)); // restore up to participant step
+      setStep(Math.min(d.step, 2)); // restore up to participant step only
     } catch { /* ignore */ }
   }, [config]);
 

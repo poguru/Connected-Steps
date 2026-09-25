@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { requireRole } from "@/lib/it-run-auth";
+import { requireRole, getClientIp } from "@/lib/it-run-auth";
 import { sendItRunConfirmationEmail } from "@/lib/it-run-email";
 
 // GET /api/it-run/admin/notifications
@@ -94,6 +94,7 @@ export async function POST(req: NextRequest) {
     action:      force ? "force_resend_email" : "resend_email",
     entity_type: "registration",
     entity_id:   reg.registration_code,
+    ip:          getClientIp(req),
     detail:      { lead_email: reg.lead_email },
   }).then(() => {}, () => {});
 

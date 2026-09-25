@@ -1,0 +1,11 @@
+﻿fixtures/create-auth-state.ts(40,41): error TS18047: 'text' is possibly 'null'.
+specs/community/community.spec.ts(7,25): error TS2445: Property 'page' is protected and only accessible within class 'BasePage' and its subclasses.
+specs/dashboard/dashboard.spec.ts(39,27): error TS2445: Property 'page' is protected and only accessible within class 'BasePage' and its subclasses.
+specs/membership/membership.spec.ts(45,26): error TS2445: Property 'page' is protected and only accessible within class 'BasePage' and its subclasses.
+specs/membership/membership.spec.ts(46,26): error TS2445: Property 'page' is protected and only accessible within class 'BasePage' and its subclasses.
+specs/membership/membership.spec.ts(50,24): error TS2445: Property 'page' is protected and only accessible within class 'BasePage' and its subclasses.
+specs/membership/membership.spec.ts(63,14): error TS2339: Property 'NEXT_PUBLIC_RAZORPAY_KEY_ID' does not exist on type '{ readonly BASE_URL: string; readonly TEST_EMAIL: string; readonly TEST_PASSWORD: string; readonly TEST_EMAIL_2: string; readonly ADMIN_PASSWORD: string; readonly SUPABASE_URL: string; readonly SUPABASE_KEY: string; readonly CRON_SECRET: string; readonly RAZORPAY_KEY: string; }'.
+specs/membership/membership.spec.ts(76,14): error TS2339: Property 'NEXT_PUBLIC_RAZORPAY_KEY_ID' does not exist on type '{ readonly BASE_URL: string; readonly TEST_EMAIL: string; readonly TEST_PASSWORD: string; readonly TEST_EMAIL_2: string; readonly ADMIN_PASSWORD: string; readonly SUPABASE_URL: string; readonly SUPABASE_KEY: string; readonly CRON_SECRET: string; readonly RAZORPAY_KEY: string; }'.
+specs/membership/membership.spec.ts(98,7): error TS2820: Type '"percentage"' is not assignable to type '"fixed" | "percent"'. Did you mean '"percent"'?
+specs/sessions/registration.spec.ts(10,44): error TS2445: Property 'page' is protected and only accessible within class 'BasePage' and its subclasses.
+specs/sessions/registration.spec.ts(11,44): error TS2445: Property 'page' is protected and only accessible within class 'BasePage' and its subclasses.

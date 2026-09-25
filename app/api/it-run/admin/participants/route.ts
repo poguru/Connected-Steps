@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { requireRole } from "@/lib/it-run-auth";
+import { requireRole, getClientIp } from "@/lib/it-run-auth";
 
 // Fields that cannot be changed via the admin API
 const IMMUTABLE = new Set([
@@ -74,10 +74,12 @@ export async function GET(req: NextRequest) {
 
 // PATCH /api/it-run/admin/participants
 // Admin can edit participant personal/contact/company info.
+// verification_team: may only update verification_status.
+// support_desk: cannot update verification_status.
 // BIB number, wave, and collection_counter are managed by the BIB workflow.
 // All edits are audit-logged with old and new values.
 export async function PATCH(req: NextRequest) {
-  const session = requireRole(req, ["event_admin", "support_desk"]);
+  const session = requireRole(req, ["event_admin", "support_desk", "verification_team"]);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json() as Record<string, unknown>;
@@ -95,6 +97,19 @@ export async function PATCH(req: NextRequest) {
 
   if (!Object.keys(editable).length) {
     return NextResponse.json({ error: "No editable fields provided" }, { status: 400 });
+  }
+
+  // verification_team may only update verification_status
+  if (session.role === "verification_team") {
+    const forbidden = Object.keys(editable).filter(k => k !== "verification_status");
+    if (forbidden.length > 0) {
+      return NextResponse.json({ error: "Verification team may only update verification_status" }, { status: 403 });
+    }
+  }
+
+  // support_desk cannot update verification_status
+  if (session.role === "support_desk" && "verification_status" in editable) {
+    return NextResponse.json({ error: "Support desk cannot change verification status" }, { status: 403 });
   }
 
   const db = getSupabaseServer();
@@ -125,6 +140,7 @@ export async function PATCH(req: NextRequest) {
     action:      "edit_participant",
     entity_type: "participant",
     entity_id:   id,
+    ip:          getClientIp(req),
     detail: {
       participant_name: `${current.first_name} ${current.last_name}`,
       updated_fields:   Object.keys(editable),

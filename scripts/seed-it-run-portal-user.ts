@@ -26,7 +26,7 @@ if (fs.existsSync(envPath)) {
   }
 }
 
-const VALID_ROLES = ["event_admin", "verification_team", "bib_collection", "checkin_team", "support_desk"] as const;
+const VALID_ROLES = ["super_admin", "event_admin", "verification_team", "bib_collection", "checkin_team", "support_desk"] as const;
 type PortalRole = typeof VALID_ROLES[number];
 
 function getArg(flag: string): string {
@@ -58,14 +58,15 @@ async function main() {
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const adminSecret = process.env.ADMIN_SECRET;
+  // Must match SECRET() in lib/it-run-auth.ts: `it_run:${COACH_TOKEN_SECRET ?? ADMIN_PASSWORD}`
+  const tokenSecret = process.env.COACH_TOKEN_SECRET ?? process.env.ADMIN_PASSWORD;
 
-  if (!supabaseUrl || !serviceKey || !adminSecret) {
-    console.error("Missing required env vars: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ADMIN_SECRET");
+  if (!supabaseUrl || !serviceKey || !tokenSecret) {
+    console.error("Missing required env vars: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and COACH_TOKEN_SECRET (or ADMIN_PASSWORD)");
     process.exit(1);
   }
 
-  const passwordHash = hashPassword(password, adminSecret);
+  const passwordHash = hashPassword(password, `it_run:${tokenSecret}`);
 
   const { createClient } = await import("@supabase/supabase-js");
   const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });

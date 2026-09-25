@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { requireRole } from "@/lib/it-run-auth";
+import { requireRole, getClientIp } from "@/lib/it-run-auth";
 
 // GET /api/it-run/admin/coupons
 export async function GET(req: NextRequest) {
@@ -59,6 +59,23 @@ export async function POST(req: NextRequest) {
     if (error.code === "23505") return NextResponse.json({ error: "Coupon code already exists" }, { status: 409 });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  db.from("it_run_audit_logs").insert({
+    actor_email: session.email,
+    actor_role:  session.role,
+    action:      "create_coupon",
+    entity_type: "coupon",
+    entity_id:   (data as { id?: string })?.id ?? body.code.toUpperCase().trim(),
+    ip:          getClientIp(req),
+    detail: {
+      code:           body.code.toUpperCase().trim(),
+      discount_type:  body.discount_type,
+      discount_value: body.discount_value,
+      max_uses:       body.max_uses ?? null,
+      expires_at:     body.expires_at ?? null,
+    },
+  }).then(() => {}, () => {});
+
   return NextResponse.json({ data }, { status: 201 });
 }
 
@@ -79,5 +96,19 @@ export async function PATCH(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  db.from("it_run_audit_logs").insert({
+    actor_email: session.email,
+    actor_role:  session.role,
+    action:      is_active ? "activate_coupon" : "deactivate_coupon",
+    entity_type: "coupon",
+    entity_id:   id,
+    ip:          getClientIp(req),
+    detail: {
+      code:      (data as { code?: string })?.code ?? null,
+      is_active,
+    },
+  }).then(() => {}, () => {});
+
   return NextResponse.json({ data });
 }

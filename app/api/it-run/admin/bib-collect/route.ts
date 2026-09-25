@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { requireRole } from "@/lib/it-run-auth";
+import { requireRole, getClientIp } from "@/lib/it-run-auth";
 
 // POST /api/it-run/admin/bib-collect
 // Body: { participantId, counter_name? }
@@ -19,7 +19,16 @@ export async function POST(req: NextRequest) {
 
   const db = getSupabaseServer();
 
-  // Verify participant exists and registration is confirmed
+  // Resolve current event — all mutations are scoped to this event so a
+  // participant from a previous or future event cannot be marked as BIB collected.
+  const { data: event } = await db
+    .from("it_run_events")
+    .select("id")
+    .eq("slug", "sprint-2")
+    .single<{ id: string }>();
+  if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
+
+  // Verify participant exists, belongs to THIS event, and registration is confirmed
   const { data: part } = await db
     .from("it_run_participants")
     .select(`
@@ -27,6 +36,7 @@ export async function POST(req: NextRequest) {
       it_run_registrations!inner ( payment_status, registration_status )
     `)
     .eq("id", participantId)
+    .eq("event_id", event.id)
     .single<{
       id: string; first_name: string; last_name: string; bib_number: string | null;
       it_run_registrations: { payment_status: string; registration_status: string };
@@ -67,6 +77,7 @@ export async function POST(req: NextRequest) {
     action:      "bib_collected",
     entity_type: "participant",
     entity_id:   participantId,
+    ip:          getClientIp(req),
     detail: {
       participant_name: `${part.first_name} ${part.last_name}`,
       bib_number:       part.bib_number,

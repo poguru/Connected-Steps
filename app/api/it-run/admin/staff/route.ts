@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { requireRole, hashPassword, PORTAL_ROLES } from "@/lib/it-run-auth";
+import { requireRole, hashPassword, PORTAL_ROLES, getClientIp } from "@/lib/it-run-auth";
 import type { PortalRole } from "@/lib/it-run-auth";
 
 // GET /api/it-run/admin/staff
 export async function GET(req: NextRequest) {
-  const session = requireRole(req, ["event_admin"]);
+  const session = requireRole(req, ["event_admin", "super_admin"]);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const db = getSupabaseServer();
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
 
 // POST /api/it-run/admin/staff — create portal user
 export async function POST(req: NextRequest) {
-  const session = requireRole(req, ["event_admin"]);
+  const session = requireRole(req, ["event_admin", "super_admin"]);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { email, name, role, password } = await req.json() as {
@@ -32,6 +32,10 @@ export async function POST(req: NextRequest) {
   }
   if (!(PORTAL_ROLES as readonly string[]).includes(role)) {
     return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+  }
+  // Only super_admin can create another super_admin account
+  if (role === "super_admin" && session.role !== "super_admin") {
+    return NextResponse.json({ error: "Only super_admin can create super_admin accounts" }, { status: 403 });
   }
   if (password.length < 8) {
     return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
@@ -59,6 +63,7 @@ export async function POST(req: NextRequest) {
     action:      "create_staff",
     entity_type: "staff",
     entity_id:   email.toLowerCase().trim(),
+    ip:          getClientIp(req),
     detail:      { name, role },
   }).then(() => {}, () => {});
 
@@ -68,7 +73,7 @@ export async function POST(req: NextRequest) {
 // PATCH /api/it-run/admin/staff — update portal user
 // Body: { id, name?, role?, is_active?, password? }
 export async function PATCH(req: NextRequest) {
-  const session = requireRole(req, ["event_admin"]);
+  const session = requireRole(req, ["event_admin", "super_admin"]);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id, name, role, is_active, password } = await req.json() as {
@@ -83,12 +88,20 @@ export async function PATCH(req: NextRequest) {
   // Safety: admin cannot deactivate their own account
   const { data: target } = await db
     .from("it_run_portal_users")
-    .select("email")
+    .select("email, role")
     .eq("id", id)
-    .single<{ email: string }>();
+    .single<{ email: string; role: string }>();
 
   if (target?.email.toLowerCase() === session.email.toLowerCase() && is_active === false) {
     return NextResponse.json({ error: "Cannot deactivate your own account" }, { status: 400 });
+  }
+
+  // Only super_admin can modify a super_admin account or assign super_admin role
+  if (target?.role === "super_admin" && session.role !== "super_admin") {
+    return NextResponse.json({ error: "Only super_admin can modify super_admin accounts" }, { status: 403 });
+  }
+  if (role === "super_admin" && session.role !== "super_admin") {
+    return NextResponse.json({ error: "Only super_admin can assign super_admin role" }, { status: 403 });
   }
 
   const updates: Record<string, unknown> = {};
@@ -125,6 +138,7 @@ export async function PATCH(req: NextRequest) {
     action,
     entity_type: "staff",
     entity_id:   id,
+    ip:          getClientIp(req),
     detail:      { updated_fields: Object.keys(updates).filter(k => k !== "password_hash") },
   }).then(() => {}, () => {});
 

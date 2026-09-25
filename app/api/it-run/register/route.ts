@@ -10,6 +10,84 @@ interface ParticipantInput {
   tshirtSize: string; medicalConditions: string; foodPreference: string;
 }
 
+// Server-authoritative size lists (mirrors event-config/route.ts — keep in sync)
+const ADULT_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
+const CHILD_SIZES = ["5-6Y", "7-8Y", "9-10Y", "11-12Y", "13-14Y"];
+
+type ParticipantMeta = { is_child: boolean; tshirt_sizes: string[] };
+
+function deriveParticipantMeta(
+  categoryType: "solo" | "duo" | "kid",
+  count: number,
+): ParticipantMeta[] {
+  if (categoryType === "kid") {
+    return [
+      { is_child: false, tshirt_sizes: ADULT_SIZES }, // index 0 = parent
+      { is_child: true,  tshirt_sizes: CHILD_SIZES  }, // index 1 = child
+    ];
+  }
+  return Array.from({ length: count }, () => ({
+    is_child: false, tshirt_sizes: ADULT_SIZES,
+  }));
+}
+
+const EMAIL_RE   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MOBILE_RE  = /^\d{10}$/;
+
+function validateParticipants(
+  participants: ParticipantInput[],
+  meta: ParticipantMeta[],
+): string | null {
+  for (let i = 0; i < participants.length; i++) {
+    const p   = participants[i];
+    const m   = meta[i];
+    const pfx = participants.length === 1 ? "Participant" : `Participant ${i + 1}`;
+
+    if (!p.firstName?.trim())  return `${pfx}: first name is required`;
+    if (!p.lastName?.trim())   return `${pfx}: last name is required`;
+    if (!p.gender)             return `${pfx}: gender is required`;
+    if (!p.bloodGroup)         return `${pfx}: blood group is required`;
+    if (!p.tshirtSize)         return `${pfx}: t-shirt size is required`;
+    if (!m.tshirt_sizes.includes(p.tshirtSize)) {
+      return `${pfx}: invalid t-shirt size "${p.tshirtSize}"`;
+    }
+    if (!p.mobile?.trim() || !MOBILE_RE.test(p.mobile.trim())) {
+      return `${pfx}: valid 10-digit mobile number is required`;
+    }
+
+    // DOB — required for everyone; must be a valid past date
+    if (!p.dob) return `${pfx}: date of birth is required`;
+    const dobMs = new Date(p.dob).getTime();
+    if (isNaN(dobMs))       return `${pfx}: invalid date of birth`;
+    if (dobMs >= Date.now()) return `${pfx}: date of birth must be in the past`;
+
+    // Child age rule — use server-authoritative meta, not client-supplied p.type
+    if (m.is_child) {
+      const ageYears = (Date.now() - dobMs) / (365.25 * 86400000);
+      if (ageYears > 11) {
+        return "Child participant must be 10 years or younger";
+      }
+    }
+
+    // Adult-only required fields
+    if (!m.is_child) {
+      if (!p.email?.trim() || !EMAIL_RE.test(p.email.trim())) {
+        return `${pfx}: valid email address is required`;
+      }
+      if (!p.emergencyName?.trim()) {
+        return `${pfx}: emergency contact name is required`;
+      }
+      if (!p.emergencyPhone?.trim() || !MOBILE_RE.test(p.emergencyPhone.trim())) {
+        return `${pfx}: valid 10-digit emergency contact phone is required`;
+      }
+      if (!p.companyName?.trim()) {
+        return `${pfx}: company name is required`;
+      }
+    }
+  }
+  return null; // all valid
+}
+
 // POST /api/it-run/register
 // Creates a new registration + participant records.
 // Payment is handled separately via /api/it-run/payment/create-order.
@@ -32,27 +110,35 @@ export async function POST(req: NextRequest) {
       .from("it_run_categories")
       .select("id,event_id,name,category_type,price_rupees,max_participants,is_active")
       .eq("id", categoryId)
-      .single();
+      .single<{
+        id: string; event_id: string; name: string;
+        category_type: "solo" | "duo" | "kid";
+        price_rupees: number; max_participants: number | null; is_active: boolean;
+      }>();
 
     if (!cat || !cat.is_active) {
       return NextResponse.json({ error: "Category not found or inactive" }, { status: 404 });
     }
 
-    // Validate participant count
+    // Validate participant count against server-authoritative category type
     const expectedCount = cat.category_type === "solo" ? 1 : 2;
     if (participants.length !== expectedCount) {
-      return NextResponse.json({ error: `Expected ${expectedCount} participant(s) for ${cat.category_type} category` }, { status: 400 });
+      return NextResponse.json(
+        { error: `Expected ${expectedCount} participant(s) for ${cat.category_type} category` },
+        { status: 400 },
+      );
     }
 
-    // Validate child age (for kid category)
-    if (cat.category_type === "kid") {
-      const child = participants.find(p => p.type === "child");
-      if (child?.dob) {
-        const ageDays = (Date.now() - new Date(child.dob).getTime()) / 86400000;
-        if (ageDays > 11 * 365) {
-          return NextResponse.json({ error: "Child participant must be 10 years or younger" }, { status: 400 });
-        }
-      }
+    // Derive per-participant metadata (child/adult, valid t-shirt sizes) server-side.
+    // This ensures validation rules match what the event-config API advertises,
+    // without trusting any client-supplied type or role field.
+    const participantMeta = deriveParticipantMeta(cat.category_type, participants.length);
+
+    // Server-side participant field validation.
+    // The client-side form is defence-in-depth only; the server is the authority.
+    const validationError = validateParticipants(participants, participantMeta);
+    if (validationError) {
+      return NextResponse.json({ error: validationError }, { status: 400 });
     }
 
     const basePrice = cat.price_rupees;
@@ -139,7 +225,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Insert participants
-    const partInserts = participants.map(p => ({
+    const partInserts = participants.map((p, idx) => ({
       registration_id:    reg.id,
       event_id:           cat.event_id,
       participant_type:   p.type,
@@ -158,7 +244,13 @@ export async function POST(req: NextRequest) {
       tshirt_size:        p.tshirtSize || null,
       medical_conditions: p.medicalConditions?.trim() || null,
       food_preference:    p.foodPreference || null,
-      verification_status: p.companyIdUrl ? "pending" : "need_clarification",
+      // Child participants use server-authoritative is_child meta, not client p.type,
+      // to set verification_status correctly.
+      verification_status: p.companyIdUrl
+        ? "pending"
+        : participantMeta[idx]?.is_child
+          ? "need_clarification"  // children don't have company IDs
+          : "need_clarification",
     }));
 
     const { data: parts, error: partErr } = await db
@@ -174,20 +266,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to create participant records" }, { status: 500 });
     }
 
-    // Generate a unique QR token per participant.
+    // Generate a unique QR token per participant and persist it.
     // Each token encodes (registrationCode:participantId) so scanning at check-in
     // resolves the correct individual regardless of how many participants share
     // this registration.
+    // IMPORTANT: we inspect each update result — a silently-failed QR write would
+    // produce a broken QR code in the confirmation email.
     const participantQRs = parts.map(part => ({
       id:       part.id,
       qr_token: signItRunQR(regCode, part.id),
     }));
 
-    await Promise.all(
+    const qrResults = await Promise.all(
       participantQRs.map(({ id, qr_token }) =>
         db.from("it_run_participants").update({ qr_token }).eq("id", id)
       )
     );
+
+    const qrFailed = qrResults.filter(r => r.error);
+    if (qrFailed.length > 0) {
+      console.error(
+        "[it-run/register] QR token update failed:",
+        qrFailed.map(r => r.error?.message).join(", "),
+      );
+      // Roll back: delete the registration (cascade removes participants) and release reserved slot/coupon
+      await db.from("it_run_registrations").delete().eq("id", reg.id);
+      void db.rpc("itr_release_capacity", { p_category_id: categoryId, p_count: participants.length });
+      if (couponReserved) void db.rpc("itr_release_coupon", { p_coupon_id: couponId });
+      return NextResponse.json(
+        { error: "Failed to generate QR codes, please try again" },
+        { status: 500 },
+      );
+    }
 
     // Keep primary participant's token on the registration row for backward
     // compatibility with existing dashboard, webhook, and email code.

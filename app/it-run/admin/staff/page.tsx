@@ -6,11 +6,12 @@ const ACCENT = "#e8620a";
 const GREEN  = "#10b981";
 
 const ROLES = [
-  { value: "event_admin",       label: "Event Admin" },
-  { value: "verification_team", label: "Verification Team" },
-  { value: "bib_collection",    label: "BIB Collection" },
-  { value: "checkin_team",      label: "Check-in Team" },
-  { value: "support_desk",      label: "Support Desk" },
+  { value: "super_admin",       label: "Super Admin",       superOnly: true },
+  { value: "event_admin",       label: "Event Admin",       superOnly: false },
+  { value: "verification_team", label: "Verification Team", superOnly: false },
+  { value: "bib_collection",    label: "BIB Collection",    superOnly: false },
+  { value: "checkin_team",      label: "Check-in Team",     superOnly: false },
+  { value: "support_desk",      label: "Support Desk",      superOnly: false },
 ];
 
 type StaffUser = {
@@ -21,8 +22,8 @@ type StaffUser = {
 type ModalMode = "create" | "edit";
 
 const ROLE_COLOR: Record<string, string> = {
-  event_admin: ACCENT, verification_team: "#6366f1", bib_collection: "#f59e0b",
-  checkin_team: GREEN, support_desk: "#60a5fa",
+  super_admin: "#ef4444", event_admin: ACCENT, verification_team: "#6366f1",
+  bib_collection: "#f59e0b", checkin_team: GREEN, support_desk: "#60a5fa",
 };
 
 export default function StaffPage() {
@@ -33,6 +34,7 @@ export default function StaffPage() {
   const [form,    setForm]    = useState({ email: "", name: "", role: "support_desk", password: "", is_active: true });
   const [saving,  setSaving]  = useState(false);
   const [msg,     setMsg]     = useState<{ text: string; ok: boolean } | null>(null);
+  const [myRole,  setMyRole]  = useState<string>("");
 
   function load() {
     setLoading(true);
@@ -43,7 +45,13 @@ export default function StaffPage() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    fetch("/api/it-run/portal/auth")
+      .then(r => r.json())
+      .then(d => setMyRole(d.role ?? ""))
+      .catch(() => {});
+  }, []);
 
   function openCreate() {
     setEditing(null);
@@ -169,7 +177,7 @@ export default function StaffPage() {
                 <label style={{ display: "block", fontSize: 11, color: "#888", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Role</label>
                 <select value={form.role} onChange={e => upd("role", e.target.value)}
                   style={{ width: "100%", padding: "10px 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, color: "#fff", fontSize: 14, fontFamily: "inherit", outline: "none" }}>
-                  {ROLES.map(r => <option key={r.value} value={r.value} style={{ background: "#1a1a1a" }}>{r.label}</option>)}
+                  {ROLES.filter(r => !r.superOnly || myRole === "super_admin").map(r => <option key={r.value} value={r.value} style={{ background: "#1a1a1a" }}>{r.label}</option>)}
                 </select>
               </div>
               <F label={modal === "create" ? "Password (min 8 chars)" : "New Password (leave blank to keep)"} type="password" value={form.password} onChange={v => upd("password", v)} required={modal === "create"} />

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { requireRole } from "@/lib/it-run-auth";
+import { requireRole, getClientIp } from "@/lib/it-run-auth";
 
 // POST /api/it-run/admin/tshirt-issue
 // Body: { participantId, counter_name?, confirm? }
@@ -67,10 +67,10 @@ export async function POST(req: NextRequest) {
   }
 
   if (existing && confirm) {
-    // Override: only event_admin can do this
-    if (session.role !== "event_admin") {
+    // Override: only event_admin or super_admin can do this
+    if (session.role !== "event_admin" && session.role !== "super_admin") {
       return NextResponse.json({
-        error: "Only event_admin can override a t-shirt issuance",
+        error: "Only event_admin or super_admin can override a t-shirt issuance",
       }, { status: 403 });
     }
 
@@ -95,6 +95,7 @@ export async function POST(req: NextRequest) {
       action:      "tshirt_override_issued",
       entity_type: "participant",
       entity_id:   participantId,
+      ip:          getClientIp(req),
       detail: {
         participant_name: `${part.first_name} ${part.last_name}`,
         tshirt_size:      part.tshirt_size,
@@ -140,6 +141,7 @@ export async function POST(req: NextRequest) {
     action:      "tshirt_issued",
     entity_type: "participant",
     entity_id:   participantId,
+    ip:          getClientIp(req),
     detail: {
       participant_name: `${part.first_name} ${part.last_name}`,
       tshirt_size:      part.tshirt_size,

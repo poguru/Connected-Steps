@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { requireRole } from "@/lib/it-run-auth";
+import { requireRole, getClientIp } from "@/lib/it-run-auth";
 
 // These fields determine registration logic and public URL routing.
 // Changing them would break existing registrations or deep links.
@@ -120,6 +120,7 @@ export async function PATCH(req: NextRequest) {
     action:      "update_category",
     entity_type: "category",
     entity_id:   id,
+    ip:          getClientIp(req),
     detail: {
       name:           updated?.name,
       updated_fields: Object.keys(editable),

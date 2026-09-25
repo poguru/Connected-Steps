@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { requireRole } from "@/lib/it-run-auth";
+import { requireRole, getClientIp } from "@/lib/it-run-auth";
 
 // Fields that can never be changed via the admin API
 const IMMUTABLE_REG = new Set([
@@ -100,10 +100,11 @@ export async function GET(req: NextRequest) {
 }
 
 // PATCH /api/it-run/admin/registrations
-// Allowed changes: registration_status (cancel), admin_notes.
+// Allowed changes: registration_status (cancel/active), admin_notes, cancelled_reason.
+// support_desk may only update admin_notes.
 // Cancelling a paid registration requires confirm:true.
 export async function PATCH(req: NextRequest) {
-  const session = requireRole(req, ["event_admin"]);
+  const session = requireRole(req, ["event_admin", "support_desk"]);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json() as Record<string, unknown>;
@@ -135,6 +136,14 @@ export async function PATCH(req: NextRequest) {
 
   if (!Object.keys(editable).length) {
     return NextResponse.json({ error: "No editable fields provided" }, { status: 400 });
+  }
+
+  // support_desk may only update admin_notes
+  if (session.role === "support_desk") {
+    const forbidden = Object.keys(editable).filter(k => k !== "admin_notes");
+    if (forbidden.length > 0) {
+      return NextResponse.json({ error: "Support desk may only update admin_notes" }, { status: 403 });
+    }
   }
 
   // Guard: cancelling a paid registration requires explicit confirmation
@@ -186,6 +195,7 @@ export async function PATCH(req: NextRequest) {
     action:      editable.registration_status === "cancelled" ? "cancel_registration" : "update_registration",
     entity_type: "registration",
     entity_id:   current.registration_code,
+    ip:          getClientIp(req),
     detail: {
       updated_fields: Object.keys(editable),
       old_values:     oldValues,
