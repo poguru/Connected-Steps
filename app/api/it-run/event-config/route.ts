@@ -74,8 +74,8 @@ export async function GET() {
       ] :
       /* kid — parent gets adult sizes, child gets age-appropriate child sizes */
       [
-        { role: "parent",    label: "Parent",           is_child: false, tshirt_sizes: ADULT_SIZES },
-        { role: "child",     label: "Child (age ≤ 10)", is_child: true,  tshirt_sizes: CHILD_SIZES },
+        { role: "parent",    label: "Parent / Guardian", is_child: false, tshirt_sizes: ADULT_SIZES },
+        { role: "child",     label: "Child",              is_child: true,  tshirt_sizes: CHILD_SIZES },
       ];
 
     return {

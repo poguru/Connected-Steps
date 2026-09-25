@@ -120,6 +120,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Category not found or inactive" }, { status: 404 });
     }
 
+    // Check registration window
+    const { data: evStatus } = await db
+      .from("it_run_events")
+      .select("registration_closes_at")
+      .eq("id", cat.event_id)
+      .single<{ registration_closes_at: string | null }>();
+
+    if (evStatus?.registration_closes_at && new Date(evStatus.registration_closes_at) < new Date()) {
+      return NextResponse.json({ error: "Registration for this event is now closed" }, { status: 409 });
+    }
+
     // Validate participant count against server-authoritative category type
     const expectedCount = cat.category_type === "solo" ? 1 : 2;
     if (participants.length !== expectedCount) {

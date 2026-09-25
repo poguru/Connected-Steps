@@ -733,6 +733,7 @@ function StepParticipants({
         roleLabel={
           total === 1 ? "Your personal details — printed on BIB and certificate" :
           pl?.is_child ? "Child participant (age ≤ 10) — child sizes shown" :
+          category.category_type === "kid" ? "Parent / Guardian — confirmation email goes here" :
           participantSubIdx === 0 ? "Lead registrant — confirmation email goes here" :
           "Second participant — BIB and certificate details"
         }

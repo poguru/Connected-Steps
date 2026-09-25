@@ -217,7 +217,7 @@ export function buildConfirmEmail(args: ConfirmEmailArgs): string {
     <p style="margin:0 0 6px;font-size:16px;color:#ccc;">Hi <strong style="color:#fff;">${primaryName}</strong>,</p>
     <p style="margin:0;font-size:14px;color:#777;line-height:1.7;">
       You are officially registered for The IT Run Sprint-2.
-      We are excited to run with you on February 7, 2027!
+      We are excited to run with you on ${dateFormatted}!
     </p>
   </td></tr>
 
