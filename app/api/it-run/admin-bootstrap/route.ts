@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
       password:     string;
     };
 
-    const expectedKey = process.env.RAZORPAY_WEBHOOK_SECRET;
+    const expectedKey = process.env.COACH_TOKEN_SECRET ?? process.env.ADMIN_PASSWORD;
     if (!expectedKey || bootstrapKey !== expectedKey) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
