@@ -16,8 +16,10 @@ export async function POST(req: NextRequest) {
       password:     string;
     };
 
-    const expectedKey = process.env.COACH_TOKEN_SECRET ?? process.env.ADMIN_PASSWORD;
-    if (!expectedKey || bootstrapKey !== expectedKey) {
+    // One-time token — hardcoded so no env var lookup needed.
+    // Delete this file immediately after creating the admin account.
+    const expectedKey = "CS-BOOTSTRAP-7x9mK2pQ4nR8vT3w";
+    if (bootstrapKey !== expectedKey) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     if (!email || !name || !password) {
