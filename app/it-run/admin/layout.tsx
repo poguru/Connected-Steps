@@ -58,7 +58,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     href === "/it-run/admin" ? pathname === href : pathname.startsWith(href);
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#080808", color: "#fff", fontFamily: "'Inter',system-ui,sans-serif" }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: "#080808", color: "#fff", fontFamily: "'Inter',system-ui,sans-serif", overflowX: "hidden" }}>
 
       {/* Sidebar overlay (mobile) */}
       {sideOpen && (
@@ -67,7 +67,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       )}
 
       {/* Sidebar */}
-      <aside style={{
+      <aside id="itr-sidebar" style={{
         position:   "fixed", top: 0, left: sideOpen ? 0 : "-260px",
         bottom: 0, width: 240,
         background: "#0d0d0d", borderRight: "1px solid rgba(255,255,255,0.06)",
@@ -116,7 +116,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Main content */}
-      <div style={{ flex: 1, marginLeft: 0, display: "flex", flexDirection: "column" }}>
+      <div id="itr-main" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         {/* Top bar */}
         <header style={{ height: 56, background: "rgba(8,8,8,0.97)", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, position: "sticky", top: 0, zIndex: 97, backdropFilter: "blur(20px)" }}>
           <button onClick={() => setSideOpen(true)}
@@ -137,7 +137,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </main>
       </div>
 
-      <style>{`@media(min-width:900px){aside{left:0!important}main{padding-left:clamp(1rem,3vw,2rem)}div[style*="margin-left"]{margin-left:240px}}`}</style>
+      <style>{`
+        @media(min-width:900px){
+          #itr-sidebar { left: 0 !important; }
+          #itr-main    { margin-left: 240px; }
+        }
+      `}</style>
     </div>
   );
 }
