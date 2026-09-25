@@ -25,7 +25,7 @@ type PRow = {
     payment_status: string; registration_status: string; category_id: string;
     it_run_categories: { id: string; name: string; color: string } | null;
   };
-  it_run_bib_collections: { id: string; collected_at: string }[];
+  it_run_tshirt_issuances: { id: string; issued_at: string }[];
 };
 
 // GET /api/it-run/admin/tshirt
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
         payment_status, registration_status, category_id,
         it_run_categories ( id, name, color )
       ),
-      it_run_bib_collections ( id, collected_at )
+      it_run_tshirt_issuances ( id, issued_at )
     `)
     .eq("it_run_registrations.event_id", event.id)
     .in("it_run_registrations.payment_status", ["paid", "free"])
@@ -101,8 +101,8 @@ export async function GET(req: NextRequest) {
   if (group === "child") filtered = filtered.filter(p => sizeGroup(p.tshirt_size) === "child");
 
   // Apply issued filter
-  if (issued === "yes") filtered = filtered.filter(p => p.it_run_bib_collections.length > 0);
-  if (issued === "no")  filtered = filtered.filter(p => p.it_run_bib_collections.length === 0 && p.tshirt_size !== null);
+  if (issued === "yes") filtered = filtered.filter(p => p.it_run_tshirt_issuances.length > 0);
+  if (issued === "no")  filtered = filtered.filter(p => p.it_run_tshirt_issuances.length === 0 && p.tshirt_size !== null);
 
   // Apply search
   if (search) {
@@ -135,8 +135,8 @@ export async function GET(req: NextRequest) {
     }
     return true;
   }).length;
-  const totalIssued    = forSummary.filter(p => p.it_run_bib_collections.length > 0).length;
-  const totalNotIssued = forSummary.filter(p => p.it_run_bib_collections.length === 0).length;
+  const totalIssued    = forSummary.filter(p => p.it_run_tshirt_issuances.length > 0).length;
+  const totalNotIssued = forSummary.filter(p => p.it_run_tshirt_issuances.length === 0).length;
 
   // ── Size breakdown ───────────────────────────────────────────────────────────
   const adultMap = Object.fromEntries(ADULT_SIZES.map(s => [s, { required: 0, issued: 0, not_issued: 0 }]));
@@ -148,7 +148,7 @@ export async function GET(req: NextRequest) {
     const map = grp === "child" ? childMap : adultMap;
     if (!map[sz]) continue;
     map[sz].required++;
-    if (p.it_run_bib_collections.length > 0) map[sz].issued++;
+    if (p.it_run_tshirt_issuances.length > 0) map[sz].issued++;
     else map[sz].not_issued++;
   }
 
@@ -165,11 +165,11 @@ export async function GET(req: NextRequest) {
     const csvRows = filtered
       .filter(p => p.tshirt_size !== null)
       .map(p => {
-        const bc      = p.it_run_bib_collections[0] ?? null;
+        const ti      = p.it_run_tshirt_issuances[0] ?? null;
         const cat     = p.it_run_registrations.it_run_categories?.name ?? "";
         const grp     = sizeGroup(p.tshirt_size);
-        const issuedVal = bc ? "Yes" : "No";
-        const issuedAt  = bc ? new Date(bc.collected_at).toLocaleString("en-IN") : "";
+        const issuedVal = ti ? "Yes" : "No";
+        const issuedAt  = ti ? new Date(ti.issued_at).toLocaleString("en-IN") : "";
         const name = `${p.first_name} ${p.last_name}`.replace(/,/g, " ");
         return [
           p.it_run_registrations.registration_code,
@@ -217,8 +217,8 @@ export async function GET(req: NextRequest) {
     lead_email:      p.it_run_registrations.lead_email,
     category:        p.it_run_registrations.it_run_categories?.name ?? "",
     category_color:  p.it_run_registrations.it_run_categories?.color ?? "#888",
-    issued:          p.it_run_bib_collections.length > 0,
-    issued_at:       p.it_run_bib_collections[0]?.collected_at ?? null,
+    issued:          p.it_run_tshirt_issuances.length > 0,
+    issued_at:       p.it_run_tshirt_issuances[0]?.issued_at ?? null,
   }));
 
   return NextResponse.json({
