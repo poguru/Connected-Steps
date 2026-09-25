@@ -48,14 +48,14 @@ export async function sendItRunConfirmationEmail(
       id, registration_code, lead_email, final_price,
       confirmation_email_sent_at,
       it_run_categories ( name ),
-      it_run_events ( title, event_date, venue_name )
+      it_run_events ( title, event_date, venue_name, report_time )
     `)
     .eq("id", registrationId)
     .single<{
       id: string; registration_code: string; lead_email: string;
       final_price: number; confirmation_email_sent_at: string | null;
       it_run_categories: { name: string } | null;
-      it_run_events: { title: string; event_date: string; venue_name: string } | null;
+      it_run_events: { title: string; event_date: string; venue_name: string; report_time: string | null } | null;
     }>();
 
   if (!reg) {
@@ -100,9 +100,10 @@ export async function sendItRunConfirmationEmail(
   const html = buildConfirmEmail({
     primaryName,
     code:         reg.registration_code,
-    category:     cat?.name    ?? "IT Run Sprint-2",
+    category:     cat?.name       ?? "IT Run Sprint-2",
     date:         ev?.event_date  ?? "2027-02-07",
     venue:        ev?.venue_name  ?? "Hitec City, Hyderabad",
+    reportTime:   ev?.report_time ?? "5:30 AM",
     finalPrice:   reg.final_price,
     dashUrl,
     participants: parts.map(p => ({
@@ -140,13 +141,14 @@ interface ConfirmEmailArgs {
   category:     string;
   date:         string;
   venue:        string;
+  reportTime:   string;
   finalPrice:   number;
   dashUrl:      string;
   participants: ParticipantData[];
 }
 
 export function buildConfirmEmail(args: ConfirmEmailArgs): string {
-  const { primaryName, code, category, date, venue, finalPrice, dashUrl, participants } = args;
+  const { primaryName, code, category, date, venue, reportTime, finalPrice, dashUrl, participants } = args;
 
   const dateFormatted = new Date(date + "T12:00:00Z").toLocaleDateString("en-IN", {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
@@ -306,7 +308,7 @@ export function buildConfirmEmail(args: ConfirmEmailArgs): string {
             ["1", "Book your BIB collection slot from your Participant Dashboard."],
             ["2", "Carry original company / employee ID for physical verification at BIB collection."],
             ["3", "Save or screenshot your race-day QR code for offline access."],
-            ["4", "Report at the venue by <strong style=\"color:#ccc;\">5:30 AM</strong> on " + dateFormatted + "."],
+            ["4", "Report at the venue by <strong style=\"color:#ccc;\">" + reportTime + "</strong> on " + dateFormatted + "."],
           ].map(([n, text]) => `
           <tr>
             <td style="vertical-align:top;padding:0 12px 10px 0;">

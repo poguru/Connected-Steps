@@ -20,7 +20,7 @@ export async function GET() {
   const { data: event, error: evErr } = await db
     .from("it_run_events")
     .select(
-      "id,slug,title,subtitle,tagline,event_date,report_time,flag_off_time,venue_name,venue_address,city,registration_closes_at,status"
+      "id,slug,title,subtitle,tagline,event_date,report_time,flag_off_time,venue_name,venue_address,city,registration_opens_at,registration_closes_at,status"
     )
     .eq("slug", "sprint-2")
     .single<{
@@ -28,7 +28,7 @@ export async function GET() {
       tagline: string | null; event_date: string; report_time: string | null;
       flag_off_time: string | null; venue_name: string | null;
       venue_address: string | null; city: string | null;
-      registration_closes_at: string; status: string;
+      registration_opens_at: string | null; registration_closes_at: string; status: string;
     }>();
 
   if (evErr || !event) {
@@ -145,7 +145,7 @@ export async function GET() {
       venue_name:             event.venue_name     ?? "",
       venue_address:          event.venue_address  ?? "",
       city:                   event.city           ?? "",
-      registration_opens_at:  null,
+      registration_opens_at:  event.registration_opens_at ?? null,
       registration_closes_at: event.registration_closes_at,
       status:                 event.status,
     },
