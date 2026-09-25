@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
     entity_type: "registration",
     entity_id:   reg.registration_code,
     detail:      { lead_email: reg.lead_email },
-  }).then(() => {}).catch(() => {});
+  }).then(() => {}, () => {});
 
   return NextResponse.json({ ok: true });
 }

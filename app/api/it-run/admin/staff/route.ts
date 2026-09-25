@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     entity_type: "staff",
     entity_id:   email.toLowerCase().trim(),
     detail:      { name, role },
-  }).then(() => {}).catch(() => {});
+  }).then(() => {}, () => {});
 
   return NextResponse.json({ ok: true });
 }
@@ -126,7 +126,7 @@ export async function PATCH(req: NextRequest) {
     entity_type: "staff",
     entity_id:   id,
     detail:      { updated_fields: Object.keys(updates).filter(k => k !== "password_hash") },
-  }).then(() => {}).catch(() => {});
+  }).then(() => {}, () => {});
 
   return NextResponse.json({ ok: true });
 }

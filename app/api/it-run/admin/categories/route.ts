@@ -65,7 +65,7 @@ export async function PATCH(req: NextRequest) {
     entity_type: "category",
     entity_id:   id,
     detail:      { name: cat?.name, updated_fields: Object.keys(editable) },
-  }).then(() => {}).catch(() => {});
+  }).then(() => {}, () => {});
 
   return NextResponse.json({ ok: true });
 }

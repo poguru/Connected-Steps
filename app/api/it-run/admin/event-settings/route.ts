@@ -52,7 +52,7 @@ export async function PATCH(req: NextRequest) {
     entity_type: "event",
     entity_id:   "sprint-2",
     detail:      { updated_fields: Object.keys(editable) },
-  }).then(() => {}).catch(() => {});
+  }).then(() => {}, () => {});
 
   return NextResponse.json({ ok: true });
 }
