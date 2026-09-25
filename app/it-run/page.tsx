@@ -189,8 +189,18 @@ export default function ItRunLandingPage() {
   const [eventDate,   setEventDate]   = useState<Date | null>(null);
   const [regClose,    setRegClose]    = useState<Date | null>(null);
   const [venueName,   setVenueName]   = useState("Hitec City, Hyderabad");
+  const [venueAddress, setVenueAddress] = useState("Hitech City Road, HITEC City\nHyderabad, Telangana 500081");
+  const [mapsUrl,     setMapsUrl]     = useState("https://maps.google.com/?q=HITEC+City+Hyderabad");
   const [eventLabel,  setEventLabel]  = useState("February 7, 2027");
   const [regCloseLabel, setRegCloseLabel] = useState<string>("–");
+  const [description,   setDescription]   = useState<string>("");
+  const [heroContent,   setHeroContent]   = useState<string>("Your Code Compiles. Now Run It.");
+  const [highlights,    setHighlights]    = useState<string[]>([]);
+  const [instructions,  setInstructions]  = useState<string>("");
+  const [contactEmail,  setContactEmail]  = useState("info@connectedsteps.in");
+  const [contactPhone,  setContactPhone]  = useState("+91 97036 20570");
+  const [bibInfo,       setBibInfo]       = useState<string>("");
+  const [raceDayInfo,   setRaceDayInfo]   = useState<string>("");
 
   const countdown    = useCountdown(eventDate);
   const regCountdown = useCountdown(regClose);
@@ -208,7 +218,18 @@ export default function ItRunLandingPage() {
   useEffect(() => {
     fetch("/api/it-run/categories")
       .then(r => r.json())
-      .then(({ data, event }: { data?: { slug: string; price_rupees: number }[]; event?: { event_date?: string; registration_closes_at?: string; venue_name?: string | null; city?: string | null } }) => {
+      .then(({ data, event }: {
+        data?: { slug: string; price_rupees: number }[];
+        event?: {
+          event_date?: string; registration_closes_at?: string;
+          venue_name?: string | null; venue_address?: string | null;
+          city?: string | null; maps_url?: string | null;
+          description?: string | null; hero_content?: string | null;
+          event_highlights?: string[] | null; important_instructions?: string | null;
+          contact_email?: string | null; contact_phone?: string | null;
+          bib_collection_info?: string | null; race_day_info?: string | null;
+        };
+      }) => {
         if (event) {
           if (event.event_date) {
             const d = new Date(event.event_date + "T06:00:00+05:30");
@@ -220,9 +241,17 @@ export default function ItRunLandingPage() {
             setRegClose(rc);
             setRegCloseLabel(rc.toLocaleDateString("en-IN", { day: "numeric", month: "short" }));
           }
-          if (event.venue_name) {
-            setVenueName(event.venue_name + (event.city ? ", " + event.city : ""));
-          }
+          if (event.venue_name) setVenueName(event.venue_name + (event.city ? ", " + event.city : ""));
+          if (event.venue_address) setVenueAddress(event.venue_address);
+          if (event.maps_url)     setMapsUrl(event.maps_url);
+          if (event.description)  setDescription(event.description);
+          if (event.hero_content) setHeroContent(event.hero_content);
+          if (event.event_highlights?.length) setHighlights(event.event_highlights);
+          if (event.important_instructions)   setInstructions(event.important_instructions);
+          if (event.contact_email)            setContactEmail(event.contact_email);
+          if (event.contact_phone)            setContactPhone(event.contact_phone);
+          if (event.bib_collection_info)      setBibInfo(event.bib_collection_info);
+          if (event.race_day_info)            setRaceDayInfo(event.race_day_info);
         }
         if (Array.isArray(data) && data.length > 0) {
           setLiveCategories(prev => prev.map(cat => {
@@ -286,7 +315,7 @@ export default function ItRunLandingPage() {
           </h2>
 
           <p style={{ fontSize: "clamp(14px,2vw,18px)", color: "#999", marginBottom: 32, lineHeight: 1.6 }}>
-            Your Code Compiles. Now Run It.
+            {heroContent}
             <br />
             <span style={{ color: "#666", fontSize: 14 }}>{eventLabel} &nbsp;|&nbsp; {venueName}</span>
           </p>
@@ -355,12 +384,28 @@ export default function ItRunLandingPage() {
           <div>
             <div style={S.tag}>About</div>
             <h2 style={{ ...S.h2, marginTop: 16 }}>India's Premier Tech Community Run</h2>
-            <p style={{ ...S.sub, marginBottom: 20 }}>
-              The IT Run Sprint-2 is Hyderabad's most exciting running event exclusively for the technology community. Born from the belief that the best engineers maintain both mental and physical fitness, this event brings together coders, designers, product managers, and tech leaders for a morning of running, networking, and celebration.
-            </p>
-            <p style={S.sub}>
-              Following the incredible success of Sprint-1 with 800+ participants from 120+ companies, Sprint-2 is bigger, better and bolder. Join the movement - run for your health, run for your career, run for your community.
-            </p>
+            {description ? (
+              <p style={{ ...S.sub, marginBottom: 20, whiteSpace: "pre-line" }}>{description}</p>
+            ) : (
+              <>
+                <p style={{ ...S.sub, marginBottom: 20 }}>
+                  The IT Run Sprint-2 is Hyderabad's most exciting running event exclusively for the technology community. Born from the belief that the best engineers maintain both mental and physical fitness, this event brings together coders, designers, product managers, and tech leaders for a morning of running, networking, and celebration.
+                </p>
+                <p style={S.sub}>
+                  Following the incredible success of Sprint-1 with 800+ participants from 120+ companies, Sprint-2 is bigger, better and bolder. Join the movement - run for your health, run for your career, run for your community.
+                </p>
+              </>
+            )}
+            {highlights.length > 0 && (
+              <ul style={{ listStyle: "none", padding: 0, margin: "20px 0 0", display: "flex", flexDirection: "column", gap: 8 }}>
+                {highlights.map((h, i) => (
+                  <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 14, color: "#ccc" }}>
+                    <span style={{ color: "#e8620a", flexShrink: 0, fontSize: 16, lineHeight: "1.3" }}>›</span>
+                    {h}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             {[["800+", "Participants in Sprint-1"], ["120+", "Companies Represented"], ["5", "Race Categories"], ["3", "Award Tiers"]].map(([n, l]) => (
@@ -484,11 +529,11 @@ export default function ItRunLandingPage() {
           {/* Venue */}
           <div style={S.card}>
             <div style={{ fontSize: 11, color: "#e8620a", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 12, fontWeight: 700 }}>Venue</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: "#fff", marginBottom: 8 }}>Hitec City Marathon Point</div>
-            <div style={{ fontSize: 14, color: "#888", lineHeight: 1.7 }}>
-              Hitech City Road, HITEC City<br />Hyderabad, Telangana 500081
+            <div style={{ fontSize: 20, fontWeight: 700, color: "#fff", marginBottom: 8 }}>{venueName}</div>
+            <div style={{ fontSize: 14, color: "#888", lineHeight: 1.7, whiteSpace: "pre-line" }}>
+              {venueAddress}
             </div>
-            <a href="https://maps.google.com/?q=HITEC+City+Hyderabad" target="_blank" rel="noreferrer"
+            <a href={mapsUrl} target="_blank" rel="noreferrer"
               style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 12, color: "#e8620a", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
               <Icon name="map" size={14} color="#e8620a" />
               View on Maps
@@ -526,7 +571,12 @@ export default function ItRunLandingPage() {
         <div style={{ marginBottom: 40 }}>
           <div style={S.tag}>Event Day</div>
           <h2 style={{ ...S.h2, marginTop: 16 }}>Race Day Schedule</h2>
-          <p style={S.sub}>August 17, 2026 - Hitec City, Hyderabad</p>
+          <p style={S.sub}>{eventLabel} · {venueName}</p>
+          {raceDayInfo && (
+            <div style={{ marginTop: 16, padding: "14px 18px", background: "rgba(232,98,10,0.06)", border: "1px solid rgba(232,98,10,0.15)", borderRadius: 10, fontSize: 14, color: "#ccc", lineHeight: 1.7, whiteSpace: "pre-line", maxWidth: 620 }}>
+              {raceDayInfo}
+            </div>
+          )}
         </div>
         <div style={{ position: "relative" }}>
           <div style={{ position: "absolute", left: "clamp(48px,8vw,60px)", top: 0, bottom: 0, width: 2, background: "rgba(255,255,255,0.06)" }} />
@@ -580,6 +630,32 @@ export default function ItRunLandingPage() {
           ))}
         </div>
       </section>
+
+      {/* ── BIB Collection ── */}
+      {bibInfo && (
+        <section style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+          <div style={{ marginBottom: 32 }}>
+            <div style={S.tag}>BIB Collection</div>
+            <h2 style={{ ...S.h2, marginTop: 16 }}>Collect Your Race BIB</h2>
+          </div>
+          <div style={{ maxWidth: 720, padding: "20px 24px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, fontSize: 14, color: "#ccc", lineHeight: 1.8, whiteSpace: "pre-line" }}>
+            {bibInfo}
+          </div>
+        </section>
+      )}
+
+      {/* ── Important Instructions ── */}
+      {instructions && (
+        <section style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+          <div style={{ marginBottom: 32 }}>
+            <div style={S.tag}>Instructions</div>
+            <h2 style={{ ...S.h2, marginTop: 16 }}>Important Information</h2>
+          </div>
+          <div style={{ maxWidth: 720, padding: "20px 24px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, fontSize: 14, color: "#ccc", lineHeight: 1.8, whiteSpace: "pre-line" }}>
+            {instructions}
+          </div>
+        </section>
+      )}
 
       {/* ── FAQs ── */}
       <section id="faq" style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
@@ -637,8 +713,8 @@ export default function ItRunLandingPage() {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 16, maxWidth: 700, margin: "0 auto" }}>
           {[
-            { icon: "mail",  label: "Email", value: "info@connectedsteps.in", href: "mailto:info@connectedsteps.in" },
-            { icon: "phone", label: "Phone", value: "+91 97036 20570",         href: "tel:+919703620570" },
+            { icon: "mail",  label: "Email", value: contactEmail, href: `mailto:${contactEmail}` },
+            { icon: "phone", label: "Phone", value: contactPhone, href: `tel:${contactPhone.replace(/[^+\d]/g, "")}` },
           ].map(c => (
             <a key={c.label} href={c.href} style={{ ...S.card, textDecoration: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, textAlign: "center", transition: "border-color 0.2s" }}
               onMouseEnter={e => (e.currentTarget.style.borderColor = "rgba(232,98,10,0.3)")}
