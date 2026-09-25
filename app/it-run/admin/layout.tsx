@@ -7,15 +7,29 @@ import { usePathname, useRouter } from "next/navigation";
 const ACCENT = "#e8620a";
 
 const NAV_ITEMS = [
-  { href: "/it-run/admin",               label: "Dashboard",     icon: "&#9632;",  roles: ["event_admin","support_desk"] },
-  { href: "/it-run/admin/registrations", label: "Registrations", icon: "&#9679;",  roles: ["event_admin","support_desk"] },
-  { href: "/it-run/admin/participants",  label: "Participants",  icon: "&#128100;", roles: ["event_admin","support_desk","verification_team"] },
-  { href: "/it-run/admin/verification",  label: "Verification",  icon: "&#9745;",  roles: ["event_admin","verification_team"] },
-  { href: "/it-run/admin/bibs",          label: "BIB Allocation",icon: "&#127987;", roles: ["event_admin","bib_collection"] },
-  { href: "/it-run/admin/bib-slots",     label: "BIB Slots",     icon: "&#128197;", roles: ["event_admin"] },
-  { href: "/it-run/admin/checkins",      label: "Check-ins",     icon: "&#10003;", roles: ["event_admin","checkin_team"] },
-  { href: "/it-run/admin/coupons",       label: "Coupons",       icon: "&#127315;", roles: ["event_admin"] },
-  { href: "/it-run/admin/reports",       label: "Reports",       icon: "&#128202;", roles: ["event_admin"] },
+  // ── Overview ──────────────────────────────────────────────────────────
+  { href: "/it-run/admin",                label: "Dashboard",          icon: "&#9632;",  roles: ["event_admin","support_desk"] },
+  // ── Event configuration ───────────────────────────────────────────────
+  { href: "/it-run/admin/settings",       label: "Event Settings",     icon: "&#9881;",  roles: ["event_admin"] },
+  { href: "/it-run/admin/categories",     label: "Categories / Pricing", icon: "&#9776;", roles: ["event_admin"] },
+  // ── Registrations ──────────────────────────────────────────────────────
+  { href: "/it-run/admin/registrations",  label: "Registrations",      icon: "&#9679;",  roles: ["event_admin","support_desk"] },
+  { href: "/it-run/admin/participants",   label: "Participants",        icon: "&#128100;",roles: ["event_admin","support_desk","verification_team"] },
+  { href: "/it-run/admin/coupons",        label: "Coupons",             icon: "&#127315;",roles: ["event_admin"] },
+  // ── Verification & BIB ────────────────────────────────────────────────
+  { href: "/it-run/admin/verification",   label: "Company Verification",icon: "&#9745;",  roles: ["event_admin","verification_team"] },
+  { href: "/it-run/admin/tshirt",         label: "T-Shirt Reports",     icon: "&#128085;",roles: ["event_admin","support_desk"] },
+  { href: "/it-run/admin/bib-slots",      label: "BIB Slots",           icon: "&#128197;",roles: ["event_admin"] },
+  { href: "/it-run/admin/bibs",           label: "BIB Allocation",      icon: "&#127987;",roles: ["event_admin","bib_collection"] },
+  // ── Payments & Comms ──────────────────────────────────────────────────
+  { href: "/it-run/admin/payments",       label: "Payments",            icon: "&#128179;",roles: ["event_admin","support_desk"] },
+  { href: "/it-run/admin/notifications",  label: "Email / Notifications",icon: "&#9993;", roles: ["event_admin"] },
+  // ── Race day ──────────────────────────────────────────────────────────
+  { href: "/it-run/admin/checkins",       label: "QR / Check-in",       icon: "&#10003;", roles: ["event_admin","checkin_team"] },
+  // ── Admin ─────────────────────────────────────────────────────────────
+  { href: "/it-run/admin/staff",          label: "Staff Management",    icon: "&#128119;",roles: ["event_admin"] },
+  { href: "/it-run/admin/reports",        label: "Reports",             icon: "&#128202;",roles: ["event_admin"] },
+  { href: "/it-run/admin/audit-logs",     label: "Audit Logs",          icon: "&#128196;",roles: ["event_admin"] },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
