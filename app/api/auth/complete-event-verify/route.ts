@@ -193,18 +193,20 @@ export async function POST(req: NextRequest) {
       first_name:     firstName,
       last_name:      lastName,
       email:          emailNorm,
-      // phone10 is null when no mobile is provided. Use "" as fallback so the
-      // insert succeeds even if the users.phone NOT NULL migration hasn't been
-      // applied to production yet. The migration (20260813000001) should be run
-      // to allow true NULLs; this is a belt-and-suspenders guard.
-      phone:          phone10 ?? "",
+      // Use null (not "") when no mobile is provided.
+      // PostgreSQL UNIQUE constraints treat NULL as distinct — multiple phone-less
+      // accounts can coexist. "" caused a UNIQUE violation for every user after
+      // the first. Requires migration 20260813000001 (DROP NOT NULL on phone).
+      phone:          phone10 ?? null,
       password:       tempHash,
       email_verified: true,
       phone_verified: false,
     });
 
     if (insertErr) {
-      // Race: another request created the same account between our check and insert
+      // 23505 = unique_violation — two possible causes:
+      //   (a) email race: another request created the same account concurrently
+      //   (b) phone collision: phone10 is non-null and another account holds it
       if (insertErr.code === "23505") {
         const { data: raceUser } = await db
           .from("users")
@@ -212,6 +214,7 @@ export async function POST(req: NextRequest) {
           .eq("email", emailNorm)
           .maybeSingle();
         if (raceUser) {
+          // Case (a): concurrent request already created the account — return session
           const userToken = signUserToken(raceUser.email);
           return makeSession(
             NextResponse.json({
@@ -231,8 +234,21 @@ export async function POST(req: NextRequest) {
             userToken,
           );
         }
+        // Case (b): UNIQUE violation on a non-email column (phone race)
+        console.error("[complete-event-verify] 23505 but user not found by email — phone race or schema issue. detail=%s", insertErr.details);
+        return NextResponse.json(
+          { error: "This mobile number is already linked to another account. Please use a different number or sign in." },
+          { status: 409 },
+        );
       }
-      console.error("[complete-event-verify] insert error code=%s msg=%s", insertErr.code, insertErr.message);
+
+      // 23502 = NOT NULL violation — migration 20260813000001 not yet applied
+      if (insertErr.code === "23502") {
+        console.error("[complete-event-verify] NOT NULL violation — run migration 20260813000001 to make phone nullable. detail=%s", insertErr.details);
+        return NextResponse.json({ error: "Account creation failed. Please try again." }, { status: 500 });
+      }
+
+      console.error("[complete-event-verify] insert error code=%s msg=%s detail=%s", insertErr.code, insertErr.message, insertErr.details);
       return NextResponse.json({ error: "Account creation failed. Please try again." }, { status: 500 });
     }
 
