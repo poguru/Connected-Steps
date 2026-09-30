@@ -35,7 +35,10 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetch("/api/it-run/admin/dashboard")
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error("not ok");
+        return r.json();
+      })
       .then(d => setData(d))
       .catch(() => {})
       .finally(() => setLoading(false));
