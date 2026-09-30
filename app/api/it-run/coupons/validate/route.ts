@@ -34,10 +34,10 @@ export async function POST(req: NextRequest) {
 
     if (!cat) return NextResponse.json({ error: "Category not found" }, { status: 404 });
 
-    // Find coupon
+    // Find coupon (include new columns added in migration 20261001000002)
     const { data: coupon } = await db
       .from("it_run_coupons")
-      .select("id,code,description,discount_type,discount_value,max_uses,use_count,min_amount,expires_at,is_active")
+      .select("id,code,description,discount_type,discount_value,max_uses,use_count,min_amount,valid_from,expires_at,is_active,applicable_category_ids")
       .eq("event_id", cat.event_id)
       .ilike("code", code.trim())
       .single();
@@ -46,8 +46,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid or inactive coupon code" }, { status: 400 });
     }
 
+    if (coupon.valid_from && new Date(coupon.valid_from) > new Date()) {
+      return NextResponse.json({ error: "This coupon is not yet valid" }, { status: 400 });
+    }
+
     if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
       return NextResponse.json({ error: "This coupon has expired" }, { status: 400 });
+    }
+
+    // Enforce category restriction server-side
+    if (Array.isArray(coupon.applicable_category_ids) && coupon.applicable_category_ids.length > 0) {
+      if (!coupon.applicable_category_ids.includes(categoryId)) {
+        return NextResponse.json({ error: "This coupon is not valid for the selected category" }, { status: 400 });
+      }
     }
 
     if (coupon.max_uses && coupon.use_count >= coupon.max_uses) {
