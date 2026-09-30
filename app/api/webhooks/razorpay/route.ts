@@ -7,7 +7,7 @@ import { enqueueJob }           from "@/lib/job-queue";
 import { signEventQR }          from "@/lib/event-qr";
 import { sendEmail, eventRegistrationEmailHTML } from "@/lib/notify";
 import { activateMembership }   from "@/lib/membership-activate";
-import { sendItRunConfirmationEmail, sendItRunBibInviteEmail } from "@/lib/it-run-email";
+import { sendItRunConfirmationEmail } from "@/lib/it-run-email";
 
 // POST /api/webhooks/razorpay
 //
@@ -331,8 +331,6 @@ async function handleItRunPaymentCaptured(
   sendItRunConfirmationEmail(reg.id, reg.registration_code, reg.lead_email, reg.qr_token ?? "")
     .catch(e => console.error(`${label} Confirmation email failed:`, e));
 
-  sendItRunBibInviteEmail(reg.id, reg.lead_email)
-    .catch(e => console.error(`${label} BIB invite email failed:`, e));
 }
 
 type RegRow = {
