@@ -10,6 +10,7 @@ type Category = {
   distance_km: number | null; price_rupees: number;
   early_bird_price: number | null; early_bird_ends_at: string | null;
   max_participants: number | null; current_participants: number;
+  live_registered_count: number;
   is_active: boolean; sort_order: number; color: string;
   description: string | null;
   includes_bib: boolean; includes_timing: boolean; includes_medal: boolean;
@@ -206,7 +207,7 @@ export default function CategoriesPage() {
               field: f, label: "Maximum Capacity",
               oldVal: details?.old == null ? "Unlimited" : String(details.old),
               newVal: details?.new == null ? "Unlimited" : String(details.new),
-              note:   `Current registrations: ${editing.current_participants}. New capacity must be ≥ this.`,
+              note:   `Active registrations: ${editing.live_registered_count}. New capacity must be ≥ this.`,
             };
           }
           return { field: f, label: f, oldVal: String(details?.old ?? ""), newVal: String(details?.new ?? "") };
@@ -221,8 +222,10 @@ export default function CategoriesPage() {
         return;
       }
 
-      // Update local state
-      setCats(prev => prev.map(c => c.id === editing.id ? { ...c, ...form } as unknown as Category : c));
+      // Update local state — preserve live_registered_count (server-computed, not in form)
+      setCats(prev => prev.map(c => c.id === editing.id
+        ? { ...c, ...form, live_registered_count: c.live_registered_count } as unknown as Category
+        : c));
       setEditing(null);
       setConfirmFields(null);
       setMsg({ text: `"${editing.name}" updated`, ok: true, catId: editing.id });
@@ -280,7 +283,7 @@ export default function CategoriesPage() {
         {/* Category cards */}
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {cats.map(cat => {
-            const fill = pct(cat.current_participants, cat.max_participants);
+            const fill = pct(cat.live_registered_count, cat.max_participants);
             const fillColor = fill === null ? GREEN : fill > 90 ? "#ef4444" : fill > 70 ? "#f59e0b" : GREEN;
             return (
               <div key={cat.id} style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${cat.is_active ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.04)"}`, borderRadius: 14, overflow: "hidden", opacity: cat.is_active ? 1 : 0.6 }}>
@@ -314,7 +317,7 @@ export default function CategoriesPage() {
                           </span>
                         )}
                         <span style={{ fontSize: 13, color: "#888" }}>
-                          <strong style={{ color: fill !== null && fill > 90 ? "#ef4444" : "#ccc" }}>{cat.current_participants}</strong>
+                          <strong style={{ color: fill !== null && fill > 90 ? "#ef4444" : "#ccc" }}>{cat.live_registered_count}</strong>
                           {cat.max_participants ? <span style={{ color: "#555" }}>/{cat.max_participants}</span> : <span style={{ color: "#555" }}> registered (no limit)</span>}
                         </span>
                         {cat.distance_km && (
@@ -419,7 +422,7 @@ export default function CategoriesPage() {
                 <ModalSection title="Pricing">
                   <div style={{ padding: "10px 12px", background: "rgba(232,98,10,0.06)", border: "1px solid rgba(232,98,10,0.2)", borderRadius: 8, fontSize: 12, color: "#888", lineHeight: 1.5 }}>
                     Price changes apply to new registrations only.
-                    All <strong style={{ color: "#ccc" }}>{editing.current_participants}</strong> existing paid registration{editing.current_participants !== 1 ? "s" : ""} keep their original price.
+                    All <strong style={{ color: "#ccc" }}>{editing.live_registered_count}</strong> existing paid registration{editing.live_registered_count !== 1 ? "s" : ""} keep their original price.
                   </div>
                   <TwoCol>
                     <FInput label="Price (₹)"            name="price_rupees"    value={Number(f.price_rupees ?? 0)}    type="number" onChange={upd} />
@@ -432,11 +435,11 @@ export default function CategoriesPage() {
                 <ModalSection title="Capacity">
                   <TwoCol>
                     <FInput label="Maximum Participants" name="max_participants"   value={String(f.max_participants ?? "")} type="number" onChange={upd} hint="Leave empty for no limit" />
-                    <FInput label="Current Registrations" name="current_participants" value={String(editing.current_participants)} readOnly hint="Auto-updated by system" />
+                    <FInput label="Active Registrations" name="live_registered_count" value={String(editing.live_registered_count)} readOnly hint="Live count from registrations table" />
                   </TwoCol>
-                  {editing.current_participants > 0 && (
+                  {editing.live_registered_count > 0 && (
                     <div style={{ fontSize: 11, color: "#666" }}>
-                      Capacity cannot be reduced below {editing.current_participants} (current registrations).
+                      Capacity cannot be reduced below {editing.live_registered_count} (active registrations).
                     </div>
                   )}
                 </ModalSection>

@@ -4,7 +4,8 @@ import { requireRole, getClientIp } from "@/lib/it-run-auth";
 
 // These fields determine registration logic and public URL routing.
 // Changing them would break existing registrations or deep links.
-const IMMUTABLE = new Set(["id", "event_id", "slug", "category_type"]);
+// live_registered_count is server-computed — never written to DB.
+const IMMUTABLE = new Set(["id", "event_id", "slug", "category_type", "live_registered_count"]);
 
 // Changing these affects live registrations or capacity — require confirm:true
 const CRITICAL = new Set(["price_rupees", "max_participants"]);
@@ -36,7 +37,26 @@ export async function GET(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ categories });
+  // Count actual active registrations per category (not the stale current_participants counter,
+  // which is never decremented when an admin cancels a registration).
+  const { data: regRows } = await db
+    .from("it_run_registrations")
+    .select("category_id")
+    .eq("event_id", event.id)
+    .eq("registration_status", "active")
+    .in("payment_status", ["paid", "free", "pending"]);
+
+  const liveCountMap: Record<string, number> = {};
+  for (const r of (regRows ?? [])) {
+    liveCountMap[r.category_id] = (liveCountMap[r.category_id] ?? 0) + 1;
+  }
+
+  const categoriesWithCount = (categories ?? []).map(c => ({
+    ...c,
+    live_registered_count: liveCountMap[c.id] ?? 0,
+  }));
+
+  return NextResponse.json({ categories: categoriesWithCount });
 }
 
 // PATCH /api/it-run/admin/categories
@@ -76,13 +96,20 @@ export async function PATCH(req: NextRequest) {
 
   if (!current) return NextResponse.json({ error: "Category not found" }, { status: 404 });
 
-  // Validate: capacity cannot be reduced below current registrations
+  // Validate: capacity cannot be reduced below actual active registrations
+  // (use live count from registrations table — current_participants is stale for admin-cancelled regs)
   if ("max_participants" in editable && editable.max_participants !== null) {
     const newCap = Number(editable.max_participants);
-    const curReg = Number(current.current_participants ?? 0);
+    const { count: liveCount } = await db
+      .from("it_run_registrations")
+      .select("id", { count: "exact", head: true })
+      .eq("category_id", id)
+      .eq("registration_status", "active")
+      .in("payment_status", ["paid", "free", "pending"]);
+    const curReg = liveCount ?? 0;
     if (newCap < curReg) {
       return NextResponse.json(
-        { error: `Cannot reduce capacity to ${newCap} — ${curReg} registrations already exist for this category.` },
+        { error: `Cannot reduce capacity to ${newCap} — ${curReg} active registrations already exist for this category.` },
         { status: 400 },
       );
     }
