@@ -1,3 +1,4 @@
+import { randomBytes }        from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail }         from "@/lib/notify";
 import { APP_URL }           from "@/lib/config";
@@ -145,6 +146,231 @@ interface ConfirmEmailArgs {
   finalPrice:   number;
   dashUrl:      string;
   participants: ParticipantData[];
+}
+
+// ── BIB Booking Invitation Email (Email 2) ────────────────────────────────────
+//
+// Sent after payment confirmation with a unique token that gates the public
+// BIB collection booking page. Idempotency mirrors sendItRunConfirmationEmail:
+// only the first call that wins the bib_invite_sent_at IS NULL race proceeds.
+//
+// Called by: /api/it-run/payment/verify
+//            /api/webhooks/razorpay  handleItRunPaymentCaptured
+//            /api/it-run/register    (free registrations)
+export async function sendItRunBibInviteEmail(
+  registrationId: string,
+  leadEmail:       string,
+): Promise<void> {
+  const label = `[it-run-email/bib-invite] reg=${registrationId}`;
+  const db    = getSupabaseServer();
+
+  const { data: reg } = await db
+    .from("it_run_registrations")
+    .select(`
+      id, registration_code, lead_email, participant_count,
+      bib_invite_token, bib_invite_sent_at,
+      it_run_categories ( name ),
+      it_run_events ( title, event_date, venue_name )
+    `)
+    .eq("id", registrationId)
+    .single<{
+      id: string; registration_code: string; lead_email: string;
+      participant_count: number;
+      bib_invite_token: string | null; bib_invite_sent_at: string | null;
+      it_run_categories: { name: string } | null;
+      it_run_events: { title: string; event_date: string; venue_name: string } | null;
+    }>();
+
+  if (!reg) { console.warn(`${label} Registration not found`); return; }
+  if (reg.bib_invite_sent_at) { console.log(`${label} Already sent — skipping`); return; }
+
+  // ── Ensure bib_invite_token exists ──────────────────────────────────────────
+  let token = reg.bib_invite_token;
+  if (!token) {
+    const candidate = randomBytes(24).toString("hex"); // 192-bit, not guessable
+    const { data: tokenSet } = await db
+      .from("it_run_registrations")
+      .update({ bib_invite_token: candidate })
+      .eq("id", registrationId)
+      .is("bib_invite_token", null)
+      .select("bib_invite_token");
+
+    if (tokenSet?.length) {
+      token = (tokenSet[0] as { bib_invite_token: string }).bib_invite_token;
+    } else {
+      // A concurrent call already set a token — fetch it
+      const { data: fetched } = await db
+        .from("it_run_registrations")
+        .select("bib_invite_token")
+        .eq("id", registrationId)
+        .single<{ bib_invite_token: string | null }>();
+      token = fetched?.bib_invite_token ?? null;
+    }
+  }
+
+  if (!token) { console.error(`${label} Could not obtain bib_invite_token`); return; }
+
+  // ── Atomic idempotency claim ─────────────────────────────────────────────────
+  const { data: claimed } = await db
+    .from("it_run_registrations")
+    .update({ bib_invite_sent_at: new Date().toISOString() })
+    .eq("id", registrationId)
+    .is("bib_invite_sent_at", null)
+    .select("id");
+
+  if (!claimed?.length) { console.log(`${label} Claimed by concurrent call — skipping`); return; }
+
+  // ── Build + send ─────────────────────────────────────────────────────────────
+  const bookUrl = `${APP_URL}/events/it-run-sprint-2/bib-collection/${token}`;
+  const isDuo   = (reg.participant_count ?? 1) > 1;
+
+  const html = buildBibInviteEmail({
+    code:     reg.registration_code,
+    category: reg.it_run_categories?.name ?? "IT Run Sprint-2",
+    date:     reg.it_run_events?.event_date ?? "2027-02-07",
+    venue:    reg.it_run_events?.venue_name ?? "Hitec City, Hyderabad",
+    bookUrl,
+    isDuo,
+  });
+
+  const recipient = leadEmail || reg.lead_email;
+  await sendEmail(
+    recipient,
+    reg.registration_code,
+    `Book Your BIB Collection Slot — IT Run Sprint-2 (${reg.registration_code})`,
+    html,
+    false,
+    true,
+  );
+
+  console.log(`${label} BIB invite email sent to ${recipient}`);
+}
+
+interface BibInviteEmailArgs {
+  code:     string;
+  category: string;
+  date:     string;
+  venue:    string;
+  bookUrl:  string;
+  isDuo:    boolean;
+}
+
+function buildBibInviteEmail({ code, category, date, venue, bookUrl, isDuo }: BibInviteEmailArgs): string {
+  const dateFormatted = new Date(date + "T12:00:00Z").toLocaleDateString("en-IN", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric",
+  });
+
+  const duoNote = isDuo
+    ? `<p style="margin:0 0 16px;font-size:13px;color:#888;line-height:1.7;">
+         This link covers all participants in your registration.
+         Each participant will need to book their own time slot on the page.
+       </p>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Book Your BIB Collection Slot — The IT Run Sprint-2</title>
+</head>
+<body style="margin:0;padding:0;background:#f0f0f1;font-family:'Helvetica Neue',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f0f1;padding:32px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#0a0a0a;border-radius:14px;overflow:hidden;">
+
+  <tr><td style="height:5px;background:linear-gradient(90deg,#e8620a,#ff8c42);"></td></tr>
+
+  <tr><td style="padding:28px 40px 20px;text-align:center;">
+    <div style="font-size:11px;color:#e8620a;letter-spacing:0.18em;text-transform:uppercase;margin-bottom:6px;">Connected Steps</div>
+    <div style="font-size:24px;font-weight:900;color:#fff;letter-spacing:-0.02em;">BIB Collection Booking</div>
+    <div style="font-size:13px;color:#888;margin-top:6px;">The IT Run Sprint-2 &middot; ${dateFormatted}</div>
+  </td></tr>
+
+  <tr><td style="padding:0 40px 20px;">
+    <p style="margin:0 0 12px;font-size:15px;color:#ccc;line-height:1.7;">
+      Your registration is confirmed. Now it&rsquo;s time to <strong style="color:#fff;">book your BIB collection slot</strong>
+      at a time and location that works for you.
+    </p>
+    ${duoNote}
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#141414;border:1px solid #262626;border-radius:10px;overflow:hidden;margin-bottom:20px;">
+      <tr>
+        <td style="padding:14px 24px;border-right:1px solid #222;width:50%;">
+          <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">Registration Code</div>
+          <div style="font-size:16px;font-weight:900;color:#fff;letter-spacing:0.08em;">${code}</div>
+        </td>
+        <td style="padding:14px 24px;width:50%;">
+          <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">Category</div>
+          <div style="font-size:14px;font-weight:700;color:#fff;">${category}</div>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+
+  <tr><td style="padding:0 40px 28px;text-align:center;">
+    <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+      <tr><td style="background:#e8620a;border-radius:8px;">
+        <a href="${bookUrl}" style="display:block;padding:16px 40px;font-size:16px;font-weight:700;color:#fff;text-decoration:none;letter-spacing:-0.01em;">
+          Book BIB Collection Slot &rarr;
+        </a>
+      </td></tr>
+    </table>
+    <p style="margin:12px 0 0;font-size:11px;color:#444;line-height:1.6;">
+      This link is personal to your registration.<br/>
+      <a href="${bookUrl}" style="color:#666;word-break:break-all;">${bookUrl}</a>
+    </p>
+  </td></tr>
+
+  <tr><td style="padding:0 40px 24px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#111;border:1px solid #1e2a1e;border-radius:10px;overflow:hidden;">
+      <tr><td style="padding:14px 20px;border-bottom:1px solid #1a2a1a;">
+        <div style="font-size:11px;color:#10b981;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;">Collection Locations</div>
+      </td></tr>
+      <tr><td style="padding:14px 20px;">
+        <table cellpadding="0" cellspacing="0" style="font-size:13px;color:#888;line-height:1.9;width:100%;">
+          <tr><td style="padding-bottom:6px;">&#128205; <strong style="color:#ccc;">Connected Steps Studio, Miyapur</strong></td><td style="text-align:right;color:#666;white-space:nowrap;">Feb 4 &amp; 5, 2027</td></tr>
+          <tr><td>&#128205; <strong style="color:#ccc;">Hitec City Collection Counter</strong></td><td style="text-align:right;color:#666;white-space:nowrap;">Feb 6, 2027</td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <tr><td style="padding:0 40px 24px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#141414;border:1px solid #262626;border-radius:10px;overflow:hidden;">
+      <tr><td style="padding:14px 20px;border-bottom:1px solid #222;">
+        <div style="font-size:11px;color:#e8620a;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;">What to bring at BIB collection</div>
+      </td></tr>
+      <tr><td style="padding:14px 20px;">
+        <table cellpadding="0" cellspacing="0" style="font-size:13px;color:#888;line-height:2;width:100%;">
+          <tr><td>&#10003;&nbsp; <strong style="color:#ccc;">Original company / employee ID card</strong> for physical verification</td></tr>
+          <tr><td>&#10003;&nbsp; Race-day QR code (from your confirmation email or participant dashboard)</td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <tr><td style="padding:0 40px 28px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#141414;border:1px solid #262626;border-radius:10px;overflow:hidden;">
+      <tr><td style="padding:14px 20px;">
+        <div style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">Need help?</div>
+        <div style="font-size:13px;color:#888;line-height:1.8;">
+          Email: <a href="mailto:info@connectedsteps.in" style="color:#e8620a;text-decoration:none;">info@connectedsteps.in</a><br/>
+          <span style="font-size:12px;color:#555;">Include your registration code <strong style="color:#666;">${code}</strong> in all queries.</span>
+        </div>
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <tr><td style="padding:16px 40px;border-top:1px solid #1a1a1a;text-align:center;">
+    <p style="margin:0 0 4px;font-size:12px;color:#444;font-weight:700;">Connected Steps</p>
+    <p style="margin:0;font-size:11px;color:#333;">${venue} &nbsp;&middot;&nbsp; connectedsteps.in</p>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
 }
 
 export function buildConfirmEmail(args: ConfirmEmailArgs): string {
