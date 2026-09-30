@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
       .select("id,category_id,participant_count,payment_status,registration_status,final_price,discount_amount,coupon_id,created_at")
       .eq("event_id", eventId),
     db.from("it_run_participants")
-      .select("id,gender,participant_type,verification_status")
+      .select("id,registration_id,gender,participant_type,verification_status")
       .eq("event_id", eventId),
     db.from("it_run_categories")
       .select("id,name,price_rupees,max_participants,color,is_active,category_type")
@@ -84,6 +84,10 @@ export async function GET(req: NextRequest) {
   // ── 7. BIBs and check-ins (event-scoped via participant join) ─────────────
   // it_run_bib_collections and it_run_checkins don't have event_id;
   // must scope through participant IDs belonging to this event.
+  // Use ALL participant IDs for scoping (to find any existing collections/checkins),
+  // but only confirmed participants for display stats (gender, BIB total).
+  const confirmedRegIds = new Set(confirmedRegs.map(r => r.id));
+  const confirmedParts  = parts.filter(p => confirmedRegIds.has(p.registration_id));
   const partIds = parts.map(p => p.id);
 
   let bibsCollected = 0;
@@ -124,11 +128,11 @@ export async function GET(req: NextRequest) {
     maxParticipants: c.max_participants,
   }));
 
-  // ── 9. Gender breakdown (from actual participant records) ─────────────────
+  // ── 9. Gender breakdown (confirmed participants only — matches totalParticipants) ──
   const genderBreakdown = {
-    male:           parts.filter(p => p.gender === "male").length,
-    female:         parts.filter(p => p.gender === "female").length,
-    other:          parts.filter(p => p.gender === "other" || p.gender === "prefer_not").length,
+    male:   confirmedParts.filter(p => p.gender === "male").length,
+    female: confirmedParts.filter(p => p.gender === "female").length,
+    other:  confirmedParts.filter(p => p.gender === "other" || p.gender === "prefer_not").length,
   };
 
   // ── 10. Daily registrations chart (IST dates) ─────────────────────────────
@@ -190,7 +194,7 @@ export async function GET(req: NextRequest) {
       couponDiscount:      couponDiscountSum,
       // Event day
       bibsCollected,
-      bibsTotal: parts.length,
+      bibsTotal: totalParticipants,
       checkedIn,
       checkInTotal: totalParticipants,
     },

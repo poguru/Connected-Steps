@@ -53,7 +53,27 @@ export async function GET(req: NextRequest) {
     participantRegIds = (matchParts ?? []).map(p => p.registration_id as string);
   }
 
-  // Step 2: Build registration query
+  // Step 2: Separate count query — avoids PostgREST count: "exact" failure on
+  // 3-level deep nested joins (registrations → participants → bib_collections/checkins).
+  let countQ = db
+    .from("it_run_registrations")
+    .select("id", { count: "exact", head: true })
+    .eq("event_id", event.id);
+  if (paymentStatus) countQ = countQ.eq("payment_status", paymentStatus);
+  if (regStatus)     countQ = countQ.eq("registration_status", regStatus);
+  if (categoryId)    countQ = countQ.eq("category_id", categoryId);
+  if (search) {
+    const orParts: string[] = [
+      `registration_code.ilike.%${search}%`,
+      `lead_email.ilike.%${search}%`,
+    ];
+    if (participantRegIds && participantRegIds.length > 0) {
+      orParts.push(`id.in.(${participantRegIds.join(",")})`);
+    }
+    countQ = countQ.or(orParts.join(","));
+  }
+
+  // Step 3: Data query — nested joins without count: "exact" to avoid PostgREST limitation
   let q = db
     .from("it_run_registrations")
     .select(`
@@ -72,12 +92,12 @@ export async function GET(req: NextRequest) {
         it_run_bib_collections ( id, collected_at, counter_name ),
         it_run_checkins ( id, checked_in_at )
       )
-    `, { count: "exact" })
+    `)
     .eq("event_id", event.id);
 
-  if (paymentStatus)  q = q.eq("payment_status", paymentStatus);
-  if (regStatus)      q = q.eq("registration_status", regStatus);
-  if (categoryId)     q = q.eq("category_id", categoryId);
+  if (paymentStatus) q = q.eq("payment_status", paymentStatus);
+  if (regStatus)     q = q.eq("registration_status", regStatus);
+  if (categoryId)    q = q.eq("category_id", categoryId);
 
   if (search) {
     const orParts: string[] = [
@@ -90,11 +110,15 @@ export async function GET(req: NextRequest) {
     q = q.or(orParts.join(","));
   }
 
-  const { data, count, error } = await q
-    .order("created_at", { ascending: false })
-    .range(page * limit, page * limit + limit - 1);
+  const [{ count }, { data, error }] = await Promise.all([
+    countQ,
+    q.order("created_at", { ascending: false }).range(page * limit, page * limit + limit - 1),
+  ]);
 
-  if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
+  if (error) {
+    console.error("[it-run/admin/registrations] data query error:", error.message);
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
+  }
 
   return NextResponse.json({ data, total: count ?? 0, page, limit });
 }

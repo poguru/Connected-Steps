@@ -397,6 +397,8 @@ export default function RegistrationsPage() {
   const [regStatus, setRegStatus] = useState("");
   const [catFilter, setCatFilter] = useState("");
 
+  const [loadError,    setLoadError]    = useState(false);
+
   // Cancel modal state
   const [cancelReg,    setCancelReg]    = useState<Registration | null>(null);
   const [cancelReason, setCancelReason] = useState("");
@@ -419,9 +421,12 @@ export default function RegistrationsPage() {
     if (catFilter) params.set("category_id", catFilter);
     if (search)    params.set("search", search);
     fetch(`/api/it-run/admin/registrations?${params}`)
-      .then(r => r.json())
-      .then(d => { setRegs(d.data ?? []); setTotal(d.total ?? 0); })
-      .catch(() => {})
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(d => { setRegs(d.data ?? []); setTotal(d.total ?? 0); setLoadError(false); })
+      .catch(err => { console.error("[registrations] load error:", err); setLoadError(true); })
       .finally(() => setLoading(false));
   }, [page, payStatus, regStatus, catFilter, search]);
 
@@ -532,6 +537,14 @@ export default function RegistrationsPage() {
             border: `1px solid ${msg.ok ? "rgba(16,185,129,0.3)" : "rgba(239,68,68,0.3)"}`,
             color: msg.ok ? GREEN : "#f87171" }}>
             {msg.text}
+          </div>
+        )}
+
+        {loadError && (
+          <div style={{ marginBottom: 14, padding: "12px 16px", borderRadius: 10, fontSize: 13,
+            background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171" }}>
+            Failed to load registrations. Check the browser console for details.{" "}
+            <button onClick={load} style={{ background: "none", border: "none", color: ACCENT, cursor: "pointer", fontFamily: "inherit", fontSize: 13, padding: 0, textDecoration: "underline" }}>Retry</button>
           </div>
         )}
 
