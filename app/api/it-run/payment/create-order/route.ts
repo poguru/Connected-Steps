@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { getRazorpaySDK as getRazorpay } from "@/lib/razorpay-client";
+import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
 
 // POST /api/it-run/payment/create-order
 // Body: { registrationId }
 export async function POST(req: NextRequest) {
   try {
+    const ip = getClientIp(req);
+    const rl = await checkAndRecordEndpointLimit(`itr:payment-order:${ip}`, 5, 60_000);
+    if (rl.limited) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait a moment before trying again." },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+      );
+    }
+
     const { registrationId } = await req.json() as { registrationId: string };
     if (!registrationId) return NextResponse.json({ error: "registrationId required" }, { status: 400 });
 

@@ -165,6 +165,44 @@ export async function recordFailureCustom(key: string, windowMs: number): Promis
 }
 
 /**
+ * Endpoint rate limiter — counts ALL requests (not just failures).
+ *
+ * Uses Upstash Redis → in-process fallback. Does NOT write to Supabase so
+ * there is no extra DB round-trip on every public API call.
+ *
+ * When Upstash Redis is configured the counter is shared across all serverless
+ * instances (distributed). Without it each instance tracks its own count —
+ * slightly lenient but acceptable for short windows.
+ *
+ * Usage:
+ *   const rl = await checkAndRecordEndpointLimit(`itr:register:${ip}`, 5, 60_000);
+ *   if (rl.limited) return 429 with Retry-After header
+ *
+ * Returns { limited, retryAfter } where:
+ *   limited    — true if this request is over quota and must be rejected
+ *   retryAfter — window length in seconds (use as Retry-After header value)
+ */
+export async function checkAndRecordEndpointLimit(
+  key:      string,
+  maxReqs:  number,
+  windowMs: number,
+): Promise<{ limited: boolean; retryAfter: number }> {
+  const ttlSeconds = Math.ceil(windowMs / 1000);
+
+  // 1. Upstash Redis — authoritative across all instances when configured
+  const redisCount = await redisIncr(`ep:${key}`, ttlSeconds);
+  if (redisCount !== null) {
+    return { limited: redisCount > maxReqs, retryAfter: ttlSeconds };
+  }
+
+  // 2. In-process Map fallback — per-instance, resets on cold start.
+  //    Acceptable for short windows: a cold start gives a brief amnesty on one
+  //    instance, not a bypass on all of them.
+  const count = fbRecord(key, windowMs);
+  return { limited: count > maxReqs, retryAfter: ttlSeconds };
+}
+
+/**
  * Clears all rate-limit entries whose key starts with the given prefix.
  * Clears both the Supabase table and the in-process fallback cache.
  * Used by the test-utils reset endpoint.

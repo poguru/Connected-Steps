@@ -20,7 +20,7 @@ interface Category {
 
 const CATEGORIES: Category[] = [
   {
-    slug: "parent-child-duo", name: "Parent & Child Duo", distance: "1.5 KM", price: 999,
+    slug: "2k-kid", name: "2K Parent & Child Duo", distance: "2 KM", price: 999,
     type: "kid", badge: "FAMILY", color: "#ec4899", bgGradient: "linear-gradient(135deg,rgba(236,72,153,0.15),rgba(236,72,153,0.05))",
     includes: ["2x Race BIBs", "2x Dry-fit T-Shirts", "Parent + Child Medals", "Memories for Life"],
     highlights: ["Kids age 10 or under", "Parent + Child", "Fun Track"],
@@ -28,7 +28,7 @@ const CATEGORIES: Category[] = [
   {
     slug: "5k-fun-run", name: "5K Fun Run", distance: "5 KM", price: 649,
     type: "solo", badge: "BEGINNER", color: "#10b981", bgGradient: "linear-gradient(135deg,rgba(16,185,129,0.15),rgba(16,185,129,0.05))",
-    includes: ["Race BIB", "Dry-fit T-Shirt", "Digital Certificate", "Participation Medal"],
+    includes: ["Race BIB", "Dry-fit T-Shirt", "Digital Certificate"],
     highlights: ["No Pressure", "Community", "Fun"],
   },
   {
@@ -733,7 +733,7 @@ export default function ItRunLandingPage() {
       {!regClosed && (
         <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 99, padding: "12px 16px", background: "rgba(8,8,8,0.96)", backdropFilter: "blur(20px)", borderTop: "1px solid rgba(255,255,255,0.08)", display: "none" }} className="mobile-sticky-cta">
           <Link href="/it-run/register" style={{ ...S.cta, width: "100%", justifyContent: "center", borderRadius: 12, padding: "15px" }}>
-            Register Now - From Rs. 299
+            Register Now - From Rs. 649
           </Link>
         </div>
       )}

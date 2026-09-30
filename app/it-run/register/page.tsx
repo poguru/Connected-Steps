@@ -312,7 +312,7 @@ function ParticipantForm({
 
       <div style={{ display: "grid", gridTemplateColumns: isChild ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 14 }}>
         {!isChild && (
-          <Field label="Email" error={errors.email} required>
+          <Field label="Email" error={errors.email} required hint="Your QR code and confirmation will be sent here — double-check before continuing">
             <input style={inp("email", !!errors.email)} type="email" value={data.email}
               onChange={e => onChange("email", e.target.value)}
               placeholder="your@email.com" autoComplete="email" />
@@ -1415,6 +1415,10 @@ function RegisterPageContent() {
   const [submitError, setSubmitError] = useState("");
   const [regCode,     setRegCode]     = useState("");
   const [regId,       setRegId]       = useState("");
+  // When payment step is restored from a draft after page refresh, we use the
+  // price that was returned by the register API (already committed to the DB)
+  // rather than re-deriving it, in case the coupon state didn't survive.
+  const [finalPriceOverride, setFinalPriceOverride] = useState<number | null>(null);
   const [paymentDone, setPaymentDone] = useState(false);
 
   // Upload
@@ -1423,7 +1427,7 @@ function RegisterPageContent() {
   // Price
   const basePrice  = selectedCat?.price_rupees ?? 0;
   const discount   = coupon?.discount ?? 0;
-  const finalPrice = Math.max(0, basePrice - discount);
+  const finalPrice = finalPriceOverride ?? Math.max(0, basePrice - discount);
 
   // ── Load event config ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -1454,11 +1458,16 @@ function RegisterPageContent() {
         localStorage.setItem("it_run_draft_v3", JSON.stringify({
           step, participantSubIdx, selectedCatId: selectedCat.id,
           participants: draftParticipants, couponCode,
+          // Persist regId/regCode/finalPrice so a refresh on the payment step (step 6)
+          // can resume the existing registration instead of creating a duplicate.
+          regId:      regId      || undefined,
+          regCode:    regCode    || undefined,
+          finalPrice: regId      ? finalPrice : undefined,
           savedAt: Date.now(),
         }));
       } catch { /* ignore */ }
     }
-  }, [step, participantSubIdx, selectedCat, participants, couponCode]);
+  }, [step, participantSubIdx, selectedCat, participants, couponCode, regId, regCode]);
 
   // ── Draft restore ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1469,6 +1478,7 @@ function RegisterPageContent() {
       const d = JSON.parse(raw) as {
         step: number; participantSubIdx: number;
         selectedCatId: string; participants: Participant[]; couponCode: string;
+        regId?: string; regCode?: string; finalPrice?: number;
         savedAt?: number;
       };
       if (!d.step || !d.selectedCatId) return;
@@ -1489,7 +1499,18 @@ function RegisterPageContent() {
       setParticipants(restoredParticipants);
       setCouponCode(d.couponCode ?? "");
       setParticipantSubIdx(0);
-      setStep(Math.min(d.step, 2)); // restore up to participant step only
+
+      // If a registration was already created (regId persisted), restore up to the
+      // payment step so the user can resume without creating a duplicate registration.
+      // If no regId, cap at step 2 to avoid skipping server-side validation steps.
+      if (d.regId && d.regCode && d.step >= 6) {
+        setRegId(d.regId);
+        setRegCode(d.regCode);
+        if (d.finalPrice !== undefined) setFinalPriceOverride(d.finalPrice);
+        setStep(6);
+      } else {
+        setStep(Math.min(d.step, 2));
+      }
     } catch { /* ignore */ }
   }, [config]);
 

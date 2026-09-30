@@ -460,6 +460,66 @@ async function handlePaymentCapturedForReg(
   await handleInvoiceGenerate(invoicePayload).catch(e => console.error(`[razorpay-webhook] Invoice failed for ${reg.registration_code}:`, e));
 }
 
+// ── IT Run: cancel registration triggered by an external Razorpay refund ──────
+async function handleItRunRefund(
+  paymentId: string,
+  refundId:  string,
+  refundAmountPaise: number,
+): Promise<void> {
+  const db    = getSupabaseServer();
+  const label = `[razorpay-webhook/it-run-refund]`;
+
+  const { data: itReg } = await db
+    .from("it_run_registrations")
+    .select("id, registration_code, category_id, participant_count, coupon_id, discount_amount, registration_status, payment_status")
+    .eq("razorpay_payment_id", paymentId)
+    .maybeSingle<{
+      id:                  string;
+      registration_code:   string;
+      category_id:         string;
+      participant_count:   number;
+      coupon_id:           string | null;
+      discount_amount:     number;
+      registration_status: string;
+      payment_status:      string;
+    }>();
+
+  if (!itReg) {
+    console.log(`${label} No IT Run registration found for payment_id=${paymentId} — skipping`);
+    return;
+  }
+
+  if (itReg.registration_status === "cancelled") {
+    console.log(`${label} IT Run registration ${itReg.registration_code} already cancelled — skipping`);
+    return;
+  }
+
+  // payment_status stays 'paid' (the payment was captured); registration_status
+  // moves to 'cancelled' to mark the slot as freed and QR as invalid.
+  const { data: updatedRows } = await db
+    .from("it_run_registrations")
+    .update({ registration_status: "cancelled" })
+    .eq("id", itReg.id)
+    .neq("registration_status", "cancelled") // optimistic guard
+    .select("id");
+
+  if (!updatedRows?.length) {
+    console.log(`${label} IT Run registration ${itReg.registration_code} update skipped — already cancelled`);
+    return;
+  }
+
+  // Release capacity slot(s)
+  await db.rpc("itr_release_capacity", {
+    p_category_id: itReg.category_id,
+    p_count:       itReg.participant_count,
+  });
+
+  console.log(
+    `${label} ✅ IT Run registration ${itReg.registration_code} cancelled due to external refund` +
+    ` — refund_id=${refundId}, released ${itReg.participant_count} slot(s)`,
+  );
+}
+
 // ── H18: Handle external Razorpay refunds ────────────────────────────────────
 // When a refund is issued from the Razorpay dashboard or API (without going
 // through our cancellation flow), this handler auto-cancels the registration
@@ -484,8 +544,8 @@ async function handleRefundCreated(refund: RzpRefundEntity): Promise<void> {
     }>();
 
   if (!reg) {
-    // Could be a membership or IT Run payment — just log and return
-    console.log(`${label} No event registration found for payment_id=${paymentId} — may be membership/it-run, skipping`);
+    // Not a main-platform registration — check IT Run registrations
+    await handleItRunRefund(paymentId, refundId, refundAmountPaise);
     return;
   }
 

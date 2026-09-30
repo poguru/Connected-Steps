@@ -8,6 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "test": "jest",
+    "test:itr": "playwright test --config=tests/it-run/playwright.config.ts",
+    "test:itr:smoke": "playwright test --config=tests/it-run/playwright.config.ts --project=smoke --grep @smoke",
+    "test:itr:api": "playwright test --config=tests/it-run/playwright.config.ts --project=api",
+    "test:itr:security": "playwright test --config=tests/it-run/playwright.config.ts --project=security",
+    "test:itr:concurrency": "playwright test --config=tests/it-run/playwright.config.ts --project=concurrency",
     "cap:sync": "npx cap sync",
     "cap:android": "npx cap open android",
     "cap:ios": "npx cap open ios"

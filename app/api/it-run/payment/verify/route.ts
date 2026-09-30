@@ -2,11 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyPaymentSignature } from "@/lib/razorpay-security";
 import { sendItRunConfirmationEmail } from "@/lib/it-run-email";
+import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
+
 // POST /api/it-run/payment/verify
 // Called by the client after Razorpay checkout success.
 // Verifies signature and confirms the registration.
 export async function POST(req: NextRequest) {
   try {
+    const ip = getClientIp(req);
+    const rl = await checkAndRecordEndpointLimit(`itr:payment-verify:${ip}`, 5, 60_000);
+    if (rl.limited) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait a moment before trying again." },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+      );
+    }
+
     const { registrationId, paymentId, orderId, signature } = await req.json() as {
       registrationId: string; paymentId: string;
       orderId: string; signature: string;

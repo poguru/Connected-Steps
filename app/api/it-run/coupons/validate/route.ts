@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
 
 // POST /api/it-run/coupons/validate
 // Body: { code, categoryId, amount }
 export async function POST(req: NextRequest) {
   try {
+    const ip = getClientIp(req);
+    const rl = await checkAndRecordEndpointLimit(`itr:coupon:${ip}`, 10, 60_000);
+    if (rl.limited) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait a moment before trying again." },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+      );
+    }
+
     const { code, categoryId, amount } = await req.json() as {
       code: string; categoryId: string; amount: number;
     };

@@ -26,6 +26,8 @@ const NAV_ITEMS = [
   { href: "/it-run/admin/notifications",  label: "Email / Notifications",icon: "&#9993;", roles: ["super_admin","event_admin"] },
   // ── Race day ──────────────────────────────────────────────────────────
   { href: "/it-run/admin/checkins",       label: "QR / Check-in",       icon: "&#10003;", roles: ["super_admin","event_admin","checkin_team"] },
+  // ── Post-Event ────────────────────────────────────────────────────────
+  { href: "/it-run/admin/feedback",       label: "Feedback",            icon: "&#9733;",  roles: ["super_admin","event_admin"] },
   // ── Admin ─────────────────────────────────────────────────────────────
   { href: "/it-run/admin/staff",          label: "Staff Management",    icon: "&#128119;",roles: ["super_admin","event_admin"] },
   { href: "/it-run/admin/reports",        label: "Reports",             icon: "&#128202;",roles: ["super_admin","event_admin"] },

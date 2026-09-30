@@ -80,18 +80,21 @@ export async function POST(req: NextRequest) {
     // Verify participant exists, belongs to THIS event, and registration is confirmed
     const { data: part } = await db
       .from("it_run_participants")
-      .select("id,first_name,last_name,bib_number,it_run_registrations!inner(payment_status)")
+      .select("id,first_name,last_name,bib_number,it_run_registrations!inner(payment_status,registration_status)")
       .eq("id", participantId)
       .eq("event_id", event.id)
       .single<{
         id: string; first_name: string; last_name: string;
         bib_number: string | null;
-        it_run_registrations: { payment_status: string };
+        it_run_registrations: { payment_status: string; registration_status: string };
       }>();
 
     if (!part) return NextResponse.json({ error: "Participant not found" }, { status: 404 });
     if (!["paid","free"].includes(part.it_run_registrations.payment_status)) {
       return NextResponse.json({ error: "Registration not confirmed" }, { status: 400 });
+    }
+    if (part.it_run_registrations.registration_status === "cancelled") {
+      return NextResponse.json({ error: "This registration has been cancelled" }, { status: 400 });
     }
 
     const { error: insErr } = await db

@@ -79,29 +79,44 @@ export async function POST(req: NextRequest) {
       5: { start: 5001, wave: "C" },
     };
 
-    // Get existing max BIBs per category
+    // Fetch all currently-assigned BIBs for this event in a single query and
+    // parse them to integers immediately.  Doing the range check and max-find
+    // in JavaScript with Number comparison is numerically exact regardless of
+    // string length — unlike PostgreSQL text comparison where "999" > "1001".
+    const { data: existingBibRows } = await db
+      .from("it_run_participants")
+      .select("bib_number")
+      .eq("event_id", event.id)
+      .not("bib_number", "is", null);
+
+    const existingBibs: number[] = (existingBibRows ?? [])
+      .map(r => parseInt(r.bib_number ?? "", 10))
+      .filter(n => Number.isFinite(n));
+
+    // Pre-compute the highest assigned BIB per category range using numeric
+    // comparison.  Each range occupies a non-overlapping 999-slot band so a
+    // BIB can belong to at most one range.
     const bibCounters: Record<number, number> = {};
+    for (const n of existingBibs) {
+      for (const sordKey in RANGES) {
+        const sord  = Number(sordKey);
+        const range = RANGES[sord];
+        if (n >= range.start && n < range.start + 999) {
+          if (bibCounters[sord] === undefined || n > bibCounters[sord]) {
+            bibCounters[sord] = n;
+          }
+        }
+      }
+    }
 
     for (const part of parts) {
-      const cat    = (part.it_run_registrations as unknown as { it_run_categories: { slug: string; sort_order: number } }).it_run_categories;
-      const sord   = cat?.sort_order ?? 3;
-      const range  = RANGES[sord] ?? { start: 9001, wave: "D" };
+      const cat   = (part.it_run_registrations as unknown as { it_run_categories: { slug: string; sort_order: number } }).it_run_categories;
+      const sord  = cat?.sort_order ?? 3;
+      const range = RANGES[sord] ?? { start: 9001, wave: "D" };
 
-      if (!bibCounters[sord]) {
-        // Find the max bib already assigned in this range
-        const { data: maxRow } = await db
-          .from("it_run_participants")
-          .select("bib_number")
-          .eq("event_id", event.id)
-          .gte("bib_number", String(range.start))
-          .lt("bib_number", String(range.start + 999))
-          .order("bib_number", { ascending: false })
-          .limit(1)
-          .single();
-
-        bibCounters[sord] = maxRow?.bib_number
-          ? parseInt(maxRow.bib_number, 10)
-          : range.start - 1;
+      // First participant in this range for this run — seed the counter.
+      if (bibCounters[sord] === undefined) {
+        bibCounters[sord] = range.start - 1;
       }
 
       bibCounters[sord]++;

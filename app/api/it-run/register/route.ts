@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { generateRegistrationCode, signItRunQR } from "@/lib/it-run-auth";
+import { sendItRunConfirmationEmail } from "@/lib/it-run-email";
+import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
 
 interface ParticipantInput {
   type: string; firstName: string; lastName: string;
@@ -37,6 +39,7 @@ const MOBILE_RE  = /^\d{10}$/;
 function validateParticipants(
   participants: ParticipantInput[],
   meta: ParticipantMeta[],
+  eventDateMs: number,
 ): string | null {
   for (let i = 0; i < participants.length; i++) {
     const p   = participants[i];
@@ -61,11 +64,12 @@ function validateParticipants(
     if (isNaN(dobMs))       return `${pfx}: invalid date of birth`;
     if (dobMs >= Date.now()) return `${pfx}: date of birth must be in the past`;
 
-    // Child age rule — use server-authoritative meta, not client-supplied p.type
+    // Child age rule: age is calculated on the event date, not today.
+    // A child who turns 11 before the event day is ineligible even if they are 10 today.
     if (m.is_child) {
-      const ageYears = (Date.now() - dobMs) / (365.25 * 86400000);
-      if (ageYears > 11) {
-        return "Child participant must be 10 years or younger";
+      const ageOnEventDay = (eventDateMs - dobMs) / (365.25 * 86400000);
+      if (ageOnEventDay >= 11) {
+        return "Child participant must be 10 years or younger on the event date";
       }
     }
 
@@ -93,6 +97,15 @@ function validateParticipants(
 // Payment is handled separately via /api/it-run/payment/create-order.
 export async function POST(req: NextRequest) {
   try {
+    const ip = getClientIp(req);
+    const rl = await checkAndRecordEndpointLimit(`itr:register:${ip}`, 5, 60_000);
+    if (rl.limited) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait a moment before trying again." },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+      );
+    }
+
     const { categoryId, couponId, participants } = await req.json() as {
       categoryId:   string;
       couponId:     string | null;
@@ -120,12 +133,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Category not found or inactive" }, { status: 404 });
     }
 
-    // Check registration window
+    // Check registration window; also fetch event_date for child age validation
     const { data: evStatus } = await db
       .from("it_run_events")
-      .select("registration_closes_at")
+      .select("registration_closes_at,event_date")
       .eq("id", cat.event_id)
-      .single<{ registration_closes_at: string | null }>();
+      .single<{ registration_closes_at: string | null; event_date: string }>();
 
     if (evStatus?.registration_closes_at && new Date(evStatus.registration_closes_at) < new Date()) {
       return NextResponse.json({ error: "Registration for this event is now closed" }, { status: 409 });
@@ -145,9 +158,13 @@ export async function POST(req: NextRequest) {
     // without trusting any client-supplied type or role field.
     const participantMeta = deriveParticipantMeta(cat.category_type, participants.length);
 
+    // Use event date for child age calculation so the rule "10 years or younger on event day"
+    // is enforced correctly regardless of when the registration happens.
+    const eventDateMs = evStatus?.event_date ? new Date(evStatus.event_date).getTime() : Date.now();
+
     // Server-side participant field validation.
     // The client-side form is defence-in-depth only; the server is the authority.
-    const validationError = validateParticipants(participants, participantMeta);
+    const validationError = validateParticipants(participants, participantMeta, eventDateMs);
     if (validationError) {
       return NextResponse.json({ error: validationError }, { status: 400 });
     }
@@ -255,12 +272,13 @@ export async function POST(req: NextRequest) {
       tshirt_size:        p.tshirtSize || null,
       medical_conditions: p.medicalConditions?.trim() || null,
       food_preference:    p.foodPreference || null,
-      // Child participants use server-authoritative is_child meta, not client p.type,
-      // to set verification_status correctly.
-      verification_status: p.companyIdUrl
-        ? "pending"
-        : participantMeta[idx]?.is_child
-          ? "need_clarification"  // children don't have company IDs
+      // Child participants are exempt from company verification — mark as verified
+      // so they never appear in the pending-verification admin queue.
+      // Adults without an uploaded ID need manual follow-up → need_clarification.
+      verification_status: participantMeta[idx]?.is_child
+        ? "verified"
+        : p.companyIdUrl
+          ? "pending"
           : "need_clarification",
     }));
 
@@ -330,6 +348,18 @@ export async function POST(req: NextRequest) {
       if (useErr) {
         console.error("[it-run/register] coupon_uses insert error:", useErr.message);
       }
+    }
+
+    // Free registrations (finalPrice === 0 via 100% coupon) never enter the
+    // payment flow, so neither /payment/verify nor the Razorpay webhook will run.
+    // Trigger the confirmation email here instead — same fire-and-forget pattern
+    // used by the paid path in /payment/verify.
+    // sendItRunConfirmationEmail is idempotent: its atomic
+    //   UPDATE ... WHERE confirmation_email_sent_at IS NULL
+    // guard means only the first call sends; retries are silently skipped.
+    if (finalPrice === 0) {
+      sendItRunConfirmationEmail(reg.id, regCode, "", "")
+        .catch(e => console.error("[it-run/register] free-reg confirmation email error:", e));
     }
 
     return NextResponse.json({
