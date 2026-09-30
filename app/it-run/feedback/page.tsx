@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
 const ACCENT = "#e8620a";
@@ -113,7 +113,7 @@ function NpsSelector({ value, onChange }: { value: number | null; onChange: (n: 
 
 type Step = "code" | "form" | "submitted" | "already" | "gate" | "error";
 
-export default function ItRunFeedbackPage() {
+function ItRunFeedbackPageInner() {
   const searchParams = useSearchParams();
 
   const [step,        setStep]        = useState<Step>("code");
@@ -472,5 +472,13 @@ export default function ItRunFeedbackPage() {
         Your feedback is confidential. Your name is not shown publicly.
       </p>
     </form>
+  );
+}
+
+export default function ItRunFeedbackPage() {
+  return (
+    <Suspense>
+      <ItRunFeedbackPageInner />
+    </Suspense>
   );
 }
