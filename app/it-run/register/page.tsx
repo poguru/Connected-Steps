@@ -23,6 +23,21 @@ type ParticipantErrors = Partial<Record<keyof Participant, string>>;
 
 interface CouponData { id: string; code: string; discount: number; label: string }
 
+interface DraftRecord {
+  version?:          number;
+  eventSlug?:        string;
+  step:              number;
+  participantSubIdx: number;
+  selectedCatId:     string;
+  participants:      Participant[];
+  couponCode:        string;
+  regId?:            string;
+  regCode?:          string;
+  finalPrice?:       number;
+  savedAt:           number;
+  expiresAt?:        number;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
@@ -36,6 +51,29 @@ const FLOW_STEPS = [
   { id: 5, label: "Coupon"       },
   { id: 6, label: "Payment"      },
 ];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Draft helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DRAFT_KEY    = "it_run_draft_v4:sprint-2"; // event-scoped; v4 adds eventSlug + version
+const DRAFT_KEY_V3 = "it_run_draft_v3";          // legacy — read-only for migration
+const DRAFT_TTL_MS = 4 * 60 * 60 * 1000;        // 4 hours (unchanged)
+
+function stepLabel(s: number): string {
+  const labels: Record<number, string> = {
+    1: "Category", 2: "Participant Details", 3: "Company Verification",
+    4: "Review", 5: "Coupon", 6: "Payment",
+  };
+  return labels[s] ?? "Registration";
+}
+
+function timeAgo(ms: number): string {
+  const d = Date.now() - ms;
+  if (d < 60_000)  return "just now";
+  if (d < 3_600_000) return `${Math.floor(d / 60_000)} min ago`;
+  return `${Math.floor(d / 3_600_000)}h ago`;
+}
 
 const BLOOD_GROUPS = ["A+","A-","B+","B-","AB+","AB-","O+","O-"];
 const TSHIRT_SIZES = ["XS","S","M","L","XL","XXL","3XL"]; // adult fallback only
@@ -1424,6 +1462,12 @@ function RegisterPageContent() {
   // Upload
   const [uploading, setUploading] = useState<number[]>([]);
 
+  // Draft resume — holds a found draft until the user chooses Continue or Start New
+  const [draftToResume, setDraftToResume] = useState<DraftRecord | null>(null);
+  // Offline / save status indicator
+  const [isOffline,  setIsOffline]  = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"saved" | "offline" | "">("");
+
   // Price
   const basePrice  = selectedCat?.price_rupees ?? 0;
   const discount   = coupon?.discount ?? 0;
@@ -1438,87 +1482,108 @@ function RegisterPageContent() {
   }, []);
 
   // ── Pre-select category from URL ───────────────────────────────────────────
+  // Skip if a v4 or v3 draft exists — the resume banner will handle restoration.
   useEffect(() => {
     const slug = searchParams.get("category");
-    if (slug && config?.categories.length) {
-      const cat = config.categories.find(c => c.slug === slug);
-      if (cat && !cat.is_soldout) selectCategory(cat);
-    }
+    if (!slug || !config?.categories.length) return;
+    try {
+      if (localStorage.getItem(DRAFT_KEY) || localStorage.getItem(DRAFT_KEY_V3)) return;
+    } catch { /* storage unavailable — proceed with URL pre-select */ }
+    const cat = config.categories.find(c => c.slug === slug);
+    if (cat && !cat.is_soldout) selectCategory(cat);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, config]);
 
-  // ── Draft auto-save (key v3 — step numbering changed from v2) ─────────────
+  // ── Draft auto-save (v4 — event-scoped key, added version + eventSlug) ──────
   useEffect(() => {
     if (step > 1 && selectedCat) {
       try {
-        // Strip File objects before serialising — they cannot survive JSON round-trips.
-        // companyIdUrl (the uploaded URL string) is preserved; companyIdFile is not needed
-        // after upload completes and is always re-initialized to null on restore.
         const draftParticipants = participants.map(p => ({ ...p, companyIdFile: null }));
-        localStorage.setItem("it_run_draft_v3", JSON.stringify({
+        const now = Date.now();
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({
+          version:  4,
+          eventSlug: "sprint-2",
           step, participantSubIdx, selectedCatId: selectedCat.id,
           participants: draftParticipants, couponCode,
-          // Persist regId/regCode/finalPrice so a refresh on the payment step (step 6)
-          // can resume the existing registration instead of creating a duplicate.
-          regId:      regId      || undefined,
-          regCode:    regCode    || undefined,
-          finalPrice: regId      ? finalPrice : undefined,
-          savedAt: Date.now(),
-        }));
-      } catch { /* ignore */ }
+          regId:      regId   || undefined,
+          regCode:    regCode || undefined,
+          finalPrice: regId   ? finalPrice : undefined,
+          savedAt:    now,
+          expiresAt:  now + DRAFT_TTL_MS,
+        } satisfies DraftRecord));
+        setSaveStatus(isOffline ? "offline" : "saved");
+      } catch {
+        setSaveStatus("");
+      }
     }
-  }, [step, participantSubIdx, selectedCat, participants, couponCode, regId, regCode]);
+  }, [step, participantSubIdx, selectedCat, participants, couponCode, regId, regCode, isOffline, finalPrice]);
 
-  // ── Draft restore ──────────────────────────────────────────────────────────
+  // ── Draft restore — sets draftToResume so the user sees a resume banner ──────
+  // The banner then calls applyDraft() or discardDraft() based on the user's choice.
   useEffect(() => {
     if (!config) return;
     try {
-      const raw = localStorage.getItem("it_run_draft_v3");
+      // Prefer v4 key; fall back to v3 for backward compat (treated as v3 migration)
+      const raw4 = localStorage.getItem(DRAFT_KEY);
+      const raw3 = localStorage.getItem(DRAFT_KEY_V3);
+      const raw  = raw4 ?? raw3;
       if (!raw) return;
-      const d = JSON.parse(raw) as {
-        step: number; participantSubIdx: number;
-        selectedCatId: string; participants: Participant[]; couponCode: string;
-        regId?: string; regCode?: string; finalPrice?: number;
-        savedAt?: number;
-      };
+
+      const d = JSON.parse(raw) as DraftRecord;
       if (!d.step || !d.selectedCatId) return;
-      // Discard drafts older than 4 hours — long enough to survive accidental refreshes
-      // but short enough that stale participant data doesn't resurface unexpectedly.
-      const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
-      if (d.savedAt && Date.now() - d.savedAt > FOUR_HOURS_MS) {
-        localStorage.removeItem("it_run_draft_v3");
+
+      // Discard if expired
+      if (d.savedAt && Date.now() - d.savedAt > DRAFT_TTL_MS) {
+        try { localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(DRAFT_KEY_V3); } catch {}
         return;
       }
+
+      // Discard if category no longer exists or is sold out
       const cat = config.categories.find(c => c.id === d.selectedCatId);
       if (!cat || cat.is_soldout) return;
-      setSelectedCat(cat);
-      // companyIdFile cannot be serialized; always restore as null (companyIdUrl is preserved)
-      const restoredParticipants = (d.participants ?? [emptyParticipant()]).map(
-        (p: Participant) => ({ ...p, companyIdFile: null }),
-      );
-      setParticipants(restoredParticipants);
-      setCouponCode(d.couponCode ?? "");
-      setParticipantSubIdx(0);
 
-      // If a registration was already created (regId persisted), restore up to the
-      // payment step so the user can resume without creating a duplicate registration.
-      // If no regId, cap at step 2 to avoid skipping server-side validation steps.
-      if (d.regId && d.regCode && d.step >= 6) {
-        setRegId(d.regId);
-        setRegCode(d.regCode);
-        if (d.finalPrice !== undefined) setFinalPriceOverride(d.finalPrice);
-        setStep(6);
-      } else {
-        setStep(Math.min(d.step, 2));
-      }
-    } catch { /* ignore */ }
+      // Store the draft — user will decide via the resume banner
+      setDraftToResume(d);
+    } catch { /* corrupted draft — ignore */ }
   }, [config]);
 
   // ── Clear draft on success ─────────────────────────────────────────────────
   useEffect(() => {
     if (step === 7) {
-      try { localStorage.removeItem("it_run_draft_v3"); } catch { /* ignore */ }
+      try {
+        localStorage.removeItem(DRAFT_KEY);
+        localStorage.removeItem(DRAFT_KEY_V3); // also clear legacy key
+      } catch { /* ignore */ }
     }
+  }, [step]);
+
+  // ── Offline detection ──────────────────────────────────────────────────────
+  useEffect(() => {
+    setIsOffline(!navigator.onLine);
+    const goOnline  = () => { setIsOffline(false); setSaveStatus("saved"); };
+    const goOffline = () => { setIsOffline(true);  setSaveStatus("offline"); };
+    window.addEventListener("online",  goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online",  goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, []);
+
+  // ── Cross-tab protection: discard draft changes from another tab if they are
+  //    older than what this tab has already saved ──────────────────────────────
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== DRAFT_KEY || !e.newValue) return;
+      try {
+        const incoming = JSON.parse(e.newValue) as DraftRecord;
+        // If this tab has a newer in-progress save, ignore the older write from the other tab.
+        // The useEffect[step,…] will overwrite localStorage on the next state change anyway.
+        if (step > 1 && incoming.savedAt && incoming.savedAt < Date.now() - 500) return;
+      } catch {}
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, [step]);
 
   // ── Category selection ─────────────────────────────────────────────────────
@@ -1529,6 +1594,49 @@ function RegisterPageContent() {
     setPErrors(Array.from({ length: cat.participant_count }, () => ({})));
     setParticipantSubIdx(0);
     setStep(2);
+  }
+
+  // ── Apply a saved draft (user clicked "Continue Registration") ─────────────
+  function applyDraft(d: DraftRecord) {
+    if (!config) return;
+    const cat = config.categories.find(c => c.id === d.selectedCatId);
+    if (!cat) return;
+
+    setSelectedCat(cat);
+    setParticipants(
+      (d.participants ?? [emptyParticipant()]).map(p => ({ ...p, companyIdFile: null }))
+    );
+    setPErrors(Array.from({ length: d.participants?.length ?? 1 }, () => ({})));
+    setParticipantSubIdx(0);
+    setCouponCode(d.couponCode ?? "");
+    setCoupon(null); // coupon must be revalidated — only the code text is restored
+
+    if (d.regId && d.regCode && d.step >= 6) {
+      // Registration was already created; go straight to payment step
+      setRegId(d.regId);
+      setRegCode(d.regCode);
+      if (d.finalPrice !== undefined) setFinalPriceOverride(d.finalPrice);
+      setStep(6);
+    } else {
+      // Restore to the saved step (2–5); never skip back to step 1 or forward to 6+
+      setStep(Math.min(Math.max(d.step, 2), 5));
+    }
+
+    // Migrate from v3: write to v4 key immediately
+    if (!localStorage.getItem(DRAFT_KEY)) {
+      try { localStorage.removeItem(DRAFT_KEY_V3); } catch {}
+    }
+
+    setDraftToResume(null);
+  }
+
+  // ── Discard a saved draft (user clicked "Start New Registration") ──────────
+  function discardDraft() {
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+      localStorage.removeItem(DRAFT_KEY_V3);
+    } catch {}
+    setDraftToResume(null);
   }
 
   // ── Participant field update ───────────────────────────────────────────────
@@ -1676,6 +1784,20 @@ function RegisterPageContent() {
     if (!selectedCat) return;
     setSubmitting(true);
     setSubmitError("");
+
+    // Save draft explicitly BEFORE the API call so all entered data is preserved
+    // if the network drops mid-request. The useEffect save is async; this is synchronous.
+    try {
+      const now = Date.now();
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        version: 4, eventSlug: "sprint-2",
+        step, participantSubIdx, selectedCatId: selectedCat.id,
+        participants: participants.map(p => ({ ...p, companyIdFile: null })),
+        couponCode,
+        savedAt: now, expiresAt: now + DRAFT_TTL_MS,
+      } satisfies DraftRecord));
+    } catch {}
+
     try {
       const res  = await fetch("/api/it-run/register", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -1709,7 +1831,7 @@ function RegisterPageContent() {
       if (data.finalPrice === 0) { setStep(7); return; }
       setStep(6);
     } catch {
-      setSubmitError("Network error. Please try again.");
+      setSubmitError("Network error. Your information is saved — check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -1799,12 +1921,30 @@ function RegisterPageContent() {
             <div style={{ fontSize: 10, color: "#444" }}>Registration</div>
           </div>
         </Link>
-        {step < 7 && (
-          <Link href="/it-run" style={{ fontSize: 12, color: "#3a3a3a", textDecoration: "none" }}>
-            Cancel
-          </Link>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {step > 1 && step < 7 && saveStatus && (
+            <span style={{ fontSize: 11, color: saveStatus === "offline" ? "#f59e0b" : "#3a3a3a" }}>
+              {saveStatus === "offline" ? "Offline — saved locally" : "Saved"}
+            </span>
+          )}
+          {step < 7 && (
+            <Link href="/it-run" style={{ fontSize: 12, color: "#3a3a3a", textDecoration: "none" }}>
+              Cancel
+            </Link>
+          )}
+        </div>
       </nav>
+
+      {/* Offline banner */}
+      {isOffline && step < 7 && (
+        <div style={{
+          position: "fixed", top: 52, left: 0, right: 0, zIndex: 99,
+          background: "rgba(245,158,11,0.08)", borderBottom: "1px solid rgba(245,158,11,0.18)",
+          padding: "8px clamp(1rem,4vw,2rem)", fontSize: 13, color: "#f59e0b", textAlign: "center" as const,
+        }}>
+          You&rsquo;re offline. Your registration details are saved on this device and will be restored when you reconnect.
+        </div>
+      )}
 
       {/* Registration closed banner */}
       {regClosed && step === 1 && (
@@ -1823,6 +1963,61 @@ function RegisterPageContent() {
         padding: `calc(52px + clamp(1.5rem,5vw,2.5rem)) clamp(1rem,5vw,2rem) ${step >= 2 && step <= 6 && selectedCat ? "80px" : "clamp(1.5rem,5vw,2.5rem)"}`,
         minHeight: "100vh",
       }}>
+
+        {step === 1 && draftToResume && config && (() => {
+          const cat = config.categories.find(c => c.id === draftToResume.selectedCatId);
+          return (
+            <div style={{
+              ...CARD_BASE,
+              borderColor: "rgba(232,98,10,0.3)",
+              background: "rgba(232,98,10,0.05)",
+              padding: "20px 24px", marginBottom: 24,
+            }}>
+              <div style={{ fontSize: 11, color: ACCENT, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>
+                Registration in Progress
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
+                You have an incomplete IT Run Sprint-2 registration
+              </div>
+              {cat && (
+                <div style={{ fontSize: 13, color: "#aaa", marginBottom: 4 }}>
+                  Category: <strong style={{ color: "#fff" }}>{cat.name}</strong>
+                </div>
+              )}
+              <div style={{ fontSize: 13, color: "#aaa", marginBottom: 4 }}>
+                You were on: <strong style={{ color: "#fff" }}>{stepLabel(draftToResume.step)}</strong>
+              </div>
+              <div style={{ fontSize: 12, color: "#555", marginBottom: 20 }}>
+                Last saved: {timeAgo(draftToResume.savedAt)}
+              </div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button
+                  onClick={() => applyDraft(draftToResume)}
+                  style={{
+                    padding: "11px 22px", background: ACCENT, border: "none",
+                    borderRadius: 10, color: "#fff", fontSize: 14, fontWeight: 700,
+                    cursor: "pointer", fontFamily: "inherit",
+                  }}>
+                  Continue Registration
+                </button>
+                <button
+                  onClick={() => {
+                    if (confirm("Start a new registration? Your saved progress will be lost.")) {
+                      discardDraft();
+                    }
+                  }}
+                  style={{
+                    padding: "11px 22px", background: "transparent",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    borderRadius: 10, color: "#888", fontSize: 14,
+                    cursor: "pointer", fontFamily: "inherit",
+                  }}>
+                  Start New Registration
+                </button>
+              </div>
+            </div>
+          );
+        })()}
 
         {step === 1 && (
           <StepCategory config={config} loading={configLoading} onSelect={selectCategory} />
