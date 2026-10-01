@@ -1532,8 +1532,9 @@ function RegisterPageContent() {
       const d = JSON.parse(raw) as DraftRecord;
       if (!d.step || !d.selectedCatId) return;
 
-      // Discard if expired
-      if (d.savedAt && Date.now() - d.savedAt > DRAFT_TTL_MS) {
+      // Discard if expired (prefer expiresAt if present, else fall back to savedAt + TTL)
+      const expiry = d.expiresAt ?? (d.savedAt ? d.savedAt + DRAFT_TTL_MS : 0);
+      if (expiry && Date.now() > expiry) {
         try { localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(DRAFT_KEY_V3); } catch {}
         return;
       }
@@ -1593,6 +1594,7 @@ function RegisterPageContent() {
     setParticipants(Array.from({ length: cat.participant_count }, emptyParticipant));
     setPErrors(Array.from({ length: cat.participant_count }, () => ({})));
     setParticipantSubIdx(0);
+    setDraftToResume(null); // clear resume banner when user picks a new category
     setStep(2);
   }
 
@@ -1960,7 +1962,7 @@ function RegisterPageContent() {
       {/* Main content */}
       <div style={{
         maxWidth: 640, margin: "0 auto",
-        padding: `calc(52px + clamp(1.5rem,5vw,2.5rem)) clamp(1rem,5vw,2rem) ${step >= 2 && step <= 6 && selectedCat ? "80px" : "clamp(1.5rem,5vw,2.5rem)"}`,
+        padding: `calc(52px + ${isOffline && step < 7 ? "36px + " : ""}clamp(1.5rem,5vw,2.5rem)) clamp(1rem,5vw,2rem) ${step >= 2 && step <= 6 && selectedCat ? "80px" : "clamp(1.5rem,5vw,2.5rem)"}`,
         minHeight: "100vh",
       }}>
 
