@@ -17,13 +17,14 @@ export async function GET(req: NextRequest) {
   const session = requireRole(req, ["event_admin", "support_desk"]);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const sp              = req.nextUrl.searchParams;
-  const page            = Math.max(0, parseInt(sp.get("page")  ?? "0", 10));
-  const limit           = Math.min(100, Math.max(10, parseInt(sp.get("limit") ?? "30", 10)));
-  const paymentStatus   = sp.get("payment_status") ?? "";
-  const regStatus       = sp.get("registration_status") ?? "";
-  const categoryId      = sp.get("category_id") ?? "";
-  const search          = sp.get("search")?.trim() ?? "";
+  const sp                = req.nextUrl.searchParams;
+  const page              = Math.max(0, parseInt(sp.get("page")  ?? "0", 10));
+  const limit             = Math.min(100, Math.max(10, parseInt(sp.get("limit") ?? "30", 10)));
+  const paymentStatus     = sp.get("payment_status") ?? "";
+  const regStatus         = sp.get("registration_status") ?? "";
+  const categoryId        = sp.get("category_id") ?? "";
+  const search            = sp.get("search")?.trim() ?? "";
+  const verificationStatus = sp.get("verification_status") ?? "";
 
   const db = getSupabaseServer();
 
@@ -35,11 +36,13 @@ export async function GET(req: NextRequest) {
 
   if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
-  // Step 1: If search term is provided, find matching registration IDs via participants
-  // (covers: participant name, mobile, company_name, employee_id)
+  // Step 1a: If search term is provided, find matching registration IDs via participants
+  // (covers: participant name, mobile, company_name, employee_id, bib_number)
+  // Step 1b: If verification_status filter provided, find matching registration IDs via participants
+  // Both are ANDed at the registration level via separate IN clauses on the main query.
   let participantRegIds: string[] | null = null;
   if (search) {
-    const { data: matchParts } = await db
+    let partsQ = db
       .from("it_run_participants")
       .select("registration_id")
       .eq("event_id", event.id)
@@ -49,8 +52,28 @@ export async function GET(req: NextRequest) {
         `mobile.ilike.%${search}%`,
         `company_name.ilike.%${search}%`,
         `employee_id.ilike.%${search}%`,
+        `bib_number.ilike.%${search}%`,
       ].join(","));
+    // AND with verification filter if both are active
+    if (verificationStatus) partsQ = partsQ.eq("verification_status", verificationStatus);
+    const { data: matchParts } = await partsQ;
     participantRegIds = (matchParts ?? []).map(p => p.registration_id as string);
+  }
+
+  // Verification-only filter: find all regIDs where any participant has that status
+  let verificationRegIds: string[] | null = null;
+  if (verificationStatus && !search) {
+    const { data: verParts } = await db
+      .from("it_run_participants")
+      .select("registration_id")
+      .eq("event_id", event.id)
+      .eq("verification_status", verificationStatus);
+    verificationRegIds = [...new Set((verParts ?? []).map(p => p.registration_id as string))];
+  }
+
+  // Early-exit: verification filter with no matching participants → empty result
+  if (verificationRegIds !== null && verificationRegIds.length === 0) {
+    return NextResponse.json({ data: [], total: 0, page, limit });
   }
 
   // Step 2: Separate count query — avoids PostgREST count: "exact" failure on
@@ -59,9 +82,10 @@ export async function GET(req: NextRequest) {
     .from("it_run_registrations")
     .select("id", { count: "exact", head: true })
     .eq("event_id", event.id);
-  if (paymentStatus) countQ = countQ.eq("payment_status", paymentStatus);
-  if (regStatus)     countQ = countQ.eq("registration_status", regStatus);
-  if (categoryId)    countQ = countQ.eq("category_id", categoryId);
+  if (paymentStatus)      countQ = countQ.eq("payment_status", paymentStatus);
+  if (regStatus)          countQ = countQ.eq("registration_status", regStatus);
+  if (categoryId)         countQ = countQ.eq("category_id", categoryId);
+  if (verificationRegIds) countQ = countQ.in("id", verificationRegIds);
   if (search) {
     const orParts: string[] = [
       `registration_code.ilike.%${search}%`,
@@ -95,9 +119,10 @@ export async function GET(req: NextRequest) {
     `)
     .eq("event_id", event.id);
 
-  if (paymentStatus) q = q.eq("payment_status", paymentStatus);
-  if (regStatus)     q = q.eq("registration_status", regStatus);
-  if (categoryId)    q = q.eq("category_id", categoryId);
+  if (paymentStatus)      q = q.eq("payment_status", paymentStatus);
+  if (regStatus)          q = q.eq("registration_status", regStatus);
+  if (categoryId)         q = q.eq("category_id", categoryId);
+  if (verificationRegIds) q = q.in("id", verificationRegIds);
 
   if (search) {
     const orParts: string[] = [

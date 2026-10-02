@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -13,8 +13,7 @@ const NAV_ITEMS = [
   { href: "/it-run/admin/settings",       label: "Event Settings",     icon: "&#9881;",  roles: ["super_admin","event_admin"] },
   { href: "/it-run/admin/categories",     label: "Categories / Pricing", icon: "&#9776;", roles: ["super_admin","event_admin"] },
   // ── Registrations ──────────────────────────────────────────────────────
-  { href: "/it-run/admin/registrations",  label: "Registrations",      icon: "&#9679;",  roles: ["super_admin","event_admin","support_desk"] },
-  { href: "/it-run/admin/participants",   label: "Participants",        icon: "&#128100;",roles: ["super_admin","event_admin","support_desk","verification_team","bib_collection","checkin_team"] },
+  { href: "/it-run/admin/registrations",  label: "Registrations",      icon: "&#9679;",  roles: ["super_admin","event_admin","support_desk","verification_team","bib_collection","checkin_team"] },
   { href: "/it-run/admin/coupons",        label: "Coupons",             icon: "&#127315;",roles: ["super_admin","event_admin"] },
   // ── Verification & BIB ────────────────────────────────────────────────
   { href: "/it-run/admin/verification",   label: "Company Verification",icon: "&#9745;",  roles: ["super_admin","event_admin","verification_team"] },

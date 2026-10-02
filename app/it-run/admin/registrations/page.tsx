@@ -396,6 +396,7 @@ export default function RegistrationsPage() {
   const [payStatus, setPayStatus] = useState("");
   const [regStatus, setRegStatus] = useState("");
   const [catFilter, setCatFilter] = useState("");
+  const [verFilter, setVerFilter] = useState("");
 
   const [loadError,    setLoadError]    = useState(false);
 
@@ -419,6 +420,7 @@ export default function RegistrationsPage() {
     if (payStatus) params.set("payment_status", payStatus);
     if (regStatus) params.set("registration_status", regStatus);
     if (catFilter) params.set("category_id", catFilter);
+    if (verFilter) params.set("verification_status", verFilter);
     if (search)    params.set("search", search);
     fetch(`/api/it-run/admin/registrations?${params}`)
       .then(r => {
@@ -428,7 +430,7 @@ export default function RegistrationsPage() {
       .then(d => { setRegs(d.data ?? []); setTotal(d.total ?? 0); setLoadError(false); })
       .catch(err => { console.error("[registrations] load error:", err); setLoadError(true); })
       .finally(() => setLoading(false));
-  }, [page, payStatus, regStatus, catFilter, search]);
+  }, [page, payStatus, regStatus, catFilter, verFilter, search]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -552,7 +554,7 @@ export default function RegistrationsPage() {
         <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
           <input
             style={{ ...INPUT, flex: 2, minWidth: 200 }}
-            placeholder="Search: code, email, name, mobile, company, employee ID…"
+            placeholder="Search: code, email, name, mobile, company, employee ID, BIB…"
             value={search}
             onChange={e => handleSearchInput(e.target.value)}
           />
@@ -572,7 +574,14 @@ export default function RegistrationsPage() {
             <option value="">All Categories</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          <a href="/api/it-run/admin/reports?type=registrations" download
+          <select style={INPUT} value={verFilter} onChange={e => { setVerFilter(e.target.value); setPage(0); }}>
+            <option value="">All Verification</option>
+            <option value="pending">Pending</option>
+            <option value="verified">Verified</option>
+            <option value="rejected">Rejected</option>
+            <option value="need_clarification">Needs Clarification</option>
+          </select>
+          <a href={`/api/it-run/admin/reports?type=registrations${payStatus ? `&payment_status=${payStatus}` : ""}${regStatus ? `&registration_status=${regStatus}` : ""}${catFilter ? `&category_id=${catFilter}` : ""}`} download
             style={{ padding: "9px 14px", background: "rgba(232,98,10,0.1)", border: "1px solid rgba(232,98,10,0.3)", borderRadius: 8, color: ACCENT, fontSize: 13, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" }}>
             Export CSV
           </a>

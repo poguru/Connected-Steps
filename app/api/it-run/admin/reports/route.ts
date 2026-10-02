@@ -4,11 +4,13 @@ import { requireRole } from "@/lib/it-run-auth";
 
 // GET /api/it-run/admin/reports?type=registrations|participants|revenue|checkin|tshirt
 // Returns CSV data for the requested report type.
+// Supports optional filters: payment_status, registration_status, category_id
 export async function GET(req: NextRequest) {
-  const session = requireRole(req, ["event_admin"]);
+  const session = requireRole(req, ["event_admin", "support_desk"]);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const type = req.nextUrl.searchParams.get("type") ?? "registrations";
+  const sp   = req.nextUrl.searchParams;
+  const type = sp.get("type") ?? "registrations";
   const db   = getSupabaseServer();
 
   const { data: event } = await db.from("it_run_events").select("id").eq("slug", "sprint-2").single();
@@ -18,19 +20,30 @@ export async function GET(req: NextRequest) {
   let filename = `it-run-${type}-${new Date().toISOString().split("T")[0]}.csv`;
 
   if (type === "registrations") {
-    const { data } = await db
+    let q = db
       .from("it_run_registrations")
-      .select("registration_code,lead_email,participant_count,final_price,payment_status,created_at,it_run_categories(name)")
+      .select("registration_code,lead_email,participant_count,base_price,discount_amount,final_price,payment_status,registration_status,created_at,it_run_categories(name),it_run_coupons(code)")
       .eq("event_id", event.id)
       .order("created_at", { ascending: false });
+    const payFilter = sp.get("payment_status");
+    const regFilter = sp.get("registration_status");
+    const catFilter = sp.get("category_id");
+    if (payFilter) q = q.eq("payment_status", payFilter);
+    if (regFilter) q = q.eq("registration_status", regFilter);
+    if (catFilter) q = q.eq("category_id", catFilter);
+    const { data } = await q;
 
-    csv  = "Registration Code,Lead Email,Participant Count,Amount Paid,Payment Status,Category,Registered At\n";
+    csv  = "Registration Code,Lead Email,Participant Count,Base Price,Discount,Final Price,Payment Status,Reg Status,Coupon,Category,Registered At\n";
     csv += (data ?? []).map(r => [
       r.registration_code,
       r.lead_email,
       r.participant_count,
+      r.base_price,
+      r.discount_amount,
       r.final_price,
       r.payment_status,
+      r.registration_status,
+      (r.it_run_coupons as unknown as { code: string } | null)?.code ?? "",
       (r.it_run_categories as unknown as { name: string } | null)?.name ?? "",
       r.created_at,
     ].map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
