@@ -69,7 +69,15 @@ export async function GET(req: NextRequest) {
     .range(page * limit, (page + 1) * limit - 1);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data, total: count ?? 0 });
+
+  // Normalize PostgREST null nested arrays to prevent .length crashes in the UI
+  const normalized = (data ?? []).map((p: Record<string, unknown>) => ({
+    ...p,
+    it_run_bib_collections: (p.it_run_bib_collections as unknown[] | null) ?? [],
+    it_run_checkins:        (p.it_run_checkins        as unknown[] | null) ?? [],
+  }));
+
+  return NextResponse.json({ data: normalized, total: count ?? 0 });
 }
 
 // PATCH /api/it-run/admin/participants

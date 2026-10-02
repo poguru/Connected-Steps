@@ -120,7 +120,26 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
 
-  return NextResponse.json({ data, total: count ?? 0, page, limit });
+  // Normalize PostgREST null nested arrays — same fix as dashboard API.
+  // PostgREST returns null (not []) for empty to-many nested relations.
+  const normalized = (data ?? []).map((reg: unknown) => {
+    const r = reg as Record<string, unknown>;
+    return {
+      ...r,
+      it_run_participants: ((r.it_run_participants as unknown[] | null) ?? []).map(
+      (p: unknown) => {
+        const pr = p as Record<string, unknown>;
+        return {
+          ...pr,
+          it_run_bib_collections: (pr.it_run_bib_collections as unknown[] | null) ?? [],
+          it_run_checkins:        (pr.it_run_checkins        as unknown[] | null) ?? [],
+        };
+      }
+    ),
+    };
+  });
+
+  return NextResponse.json({ data: normalized, total: count ?? 0, page, limit });
 }
 
 // PATCH /api/it-run/admin/registrations
