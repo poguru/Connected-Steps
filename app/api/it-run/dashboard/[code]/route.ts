@@ -56,5 +56,16 @@ export async function GET(
     .order("slot_date")
     .order("start_time");
 
-  return NextResponse.json({ reg, participants: participants ?? [], bibSlots: bibSlots ?? [] });
+  // Normalize nested to-many relations: PostgREST returns null (not []) when
+  // a participant has no related bib bookings / collections / check-ins.
+  // The dashboard UI accesses .length on these arrays, so null crashes with
+  // "Cannot read properties of null (reading 'length')".
+  const normalizedParticipants = (participants ?? []).map(p => ({
+    ...p,
+    it_run_bib_bookings:    (p.it_run_bib_bookings    as unknown[] | null) ?? [],
+    it_run_bib_collections: (p.it_run_bib_collections as unknown[] | null) ?? [],
+    it_run_checkins:        (p.it_run_checkins        as unknown[] | null) ?? [],
+  }));
+
+  return NextResponse.json({ reg, participants: normalizedParticipants, bibSlots: bibSlots ?? [] });
 }

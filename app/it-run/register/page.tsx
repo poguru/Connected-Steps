@@ -1851,12 +1851,19 @@ function RegisterPageContent() {
     const e: ParticipantErrors = {};
     let valid = true;
 
-    if (!p.firstName.trim())  { e.firstName = "Required"; valid = false; }
-    if (!p.lastName.trim())   { e.lastName  = "Required"; valid = false; }
+    // Name: allow letters, spaces, hyphens, apostrophes, dots, accented/Unicode chars;
+    // reject empty or symbol-only strings (e.g. "---", "!!!")
+    const nameRe = /[\p{L}]/u;
+    if (!p.firstName.trim() || !nameRe.test(p.firstName)) {
+      e.firstName = "Enter a valid first name"; valid = false;
+    }
+    if (!p.lastName.trim() || !nameRe.test(p.lastName)) {
+      e.lastName = "Enter a valid last name"; valid = false;
+    }
     if (!p.gender)            { e.gender    = "Required"; valid = false; }
     if (!p.dob)               { e.dob       = "Required"; valid = false; }
-    if (!p.mobile || !/^\d{10}$/.test(p.mobile)) {
-      e.mobile = "10-digit mobile required"; valid = false;
+    if (!p.mobile || !/^\d{10}$/.test(p.mobile.replace(/\D/g, "").slice(-10))) {
+      e.mobile = "Enter a valid 10-digit Indian mobile number"; valid = false;
     }
     if (!p.bloodGroup)  { e.bloodGroup  = "Required"; valid = false; }
     if (!p.tshirtSize)  { e.tshirtSize  = "Required"; valid = false; }
@@ -1867,12 +1874,19 @@ function RegisterPageContent() {
       }
       if (!p.emergencyName.trim())  { e.emergencyName  = "Required"; valid = false; }
       if (!p.emergencyPhone.trim()) { e.emergencyPhone = "Required"; valid = false; }
-      if (!p.companyName.trim())    { e.companyName    = "Required"; valid = false; }
+      if (!p.companyName.trim() || !nameRe.test(p.companyName)) {
+        e.companyName = "Enter a valid company name"; valid = false;
+      }
     }
 
     if (child && p.dob) {
-      const ageYears = (Date.now() - new Date(p.dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-      if (ageYears > 10.99) { e.dob = "Child must be 10 years or younger"; valid = false; }
+      // Use event date (IST 00:00) for age calculation — matches server-side logic.
+      // A child who turns 11 before the event is ineligible even if 10 today.
+      const eventMs = config
+        ? new Date(config.event.event_date + "T00:00:00+05:30").getTime()
+        : Date.now();
+      const ageYears = (eventMs - new Date(p.dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+      if (ageYears >= 11) { e.dob = "Child must be 10 years or younger on the event date"; valid = false; }
     }
 
     setPErrors(prev => { const c = [...prev]; c[idx] = e; return c; });

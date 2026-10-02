@@ -364,9 +364,12 @@ export default function DashboardPage() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 16 }}>
             {participants.map((p) => {
               const hasBib      = !!p.bib_number;
-              const isCollected = p.it_run_bib_collections.length > 0;
-              const isCheckedIn = p.it_run_checkins.length > 0;
-              const booking     = p.it_run_bib_bookings[0] ?? null;
+              const bibCols     = p.it_run_bib_collections ?? [];
+              const checkins    = p.it_run_checkins ?? [];
+              const bibBookings = p.it_run_bib_bookings ?? [];
+              const isCollected = bibCols.length > 0;
+              const isCheckedIn = checkins.length > 0;
+              const booking     = bibBookings[0] ?? null;
 
               return (
                 <div key={p.id} style={S.card}>
@@ -453,17 +456,17 @@ export default function DashboardPage() {
                     </div>
                   )}
 
-                  {isCollected && (
+                  {isCollected && bibCols[0] && (
                     <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12, marginTop: 4 }}>
                       <div style={{ fontSize: 12, color: "#10b981", fontWeight: 600 }}>
-                        BIB Collected on {new Date(p.it_run_bib_collections[0].collected_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                        BIB Collected on {new Date(bibCols[0].collected_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
                       </div>
                     </div>
                   )}
 
-                  {isCheckedIn && (
+                  {isCheckedIn && checkins[0] && (
                     <div style={{ marginTop: 8, fontSize: 12, color: "#60a5fa" }}>
-                      Checked in at {new Date(p.it_run_checkins[0].checked_in_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                      Checked in at {new Date(checkins[0].checked_in_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
                     </div>
                   )}
                 </div>

@@ -38,7 +38,7 @@ export async function GET() {
   const { data: cats, error: catErr } = await db
     .from("it_run_categories")
     .select(
-      "id,slug,name,distance_km,category_type,price_rupees,description,color,includes_timing,includes_medal,includes_tshirt,includes_certificate,max_participants,current_participants"
+      "id,slug,name,distance_km,category_type,price_rupees,description,color,includes_timing,includes_medal,includes_tshirt,includes_certificate,max_participants"
     )
     .eq("event_id", event.id)
     .eq("is_active", true)
@@ -46,6 +46,22 @@ export async function GET() {
 
   if (catErr) {
     return NextResponse.json({ error: "Database error" }, { status: 500 });
+  }
+
+  // Count ACTIVE + PAID/FREE/PENDING registrations per category.
+  // The current_participants column on categories is a stale counter (never
+  // decremented on cancellation), so we compute live counts from registrations.
+  const { data: regRows } = await db
+    .from("it_run_registrations")
+    .select("category_id, participant_count")
+    .eq("event_id", event.id)
+    .eq("registration_status", "active")
+    .in("payment_status", ["paid", "free", "pending"]);
+
+  // Count participants (not registrations) per category, for accurate soldout check
+  const livePartMap: Record<string, number> = {};
+  for (const r of (regRows ?? [])) {
+    livePartMap[r.category_id] = (livePartMap[r.category_id] ?? 0) + (r.participant_count ?? 1);
   }
 
   // T-shirt size options — defined here so the frontend never hardcodes them
@@ -92,9 +108,9 @@ export async function GET() {
       participant_count:    c.category_type === "solo" ? 1 : 2,
       participant_labels,
       max_participants:     c.max_participants ?? null,
-      current_participants: c.current_participants ?? 0,
+      current_participants: livePartMap[c.id] ?? 0,
       is_soldout:           c.max_participants != null &&
-                            (c.current_participants ?? 0) >= c.max_participants,
+                            (livePartMap[c.id] ?? 0) >= c.max_participants,
     };
   });
 
