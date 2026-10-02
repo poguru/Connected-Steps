@@ -115,8 +115,9 @@ function QRDisplay({ code, token }: { code: string; token: string | null }) {
 
 // ── BIB Slot Booking ──────────────────────────────────────────────────────────
 
-function BibSlotBooker({ participantId, slots, existingBooking, onBooked }: {
+function BibSlotBooker({ participantId, registrationCode, slots, existingBooking, onBooked }: {
   participantId: string;
+  registrationCode: string;
   slots: BibSlot[];
   existingBooking: { id: string; status: string; it_run_bib_slots: BibSlot | null } | null;
   onBooked: () => void;
@@ -147,7 +148,7 @@ function BibSlotBooker({ participantId, slots, existingBooking, onBooked }: {
       const res  = await fetch("/api/it-run/bib-booking", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ participantId, slotId: selected }),
+        body:    JSON.stringify({ participantId, slotId: selected, registrationCode }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Booking failed"); return; }
@@ -449,6 +450,7 @@ export default function DashboardPage() {
                       <div style={{ fontSize: 12, color: "#fff", fontWeight: 700, marginBottom: 12 }}>BIB Collection Slot</div>
                       <BibSlotBooker
                         participantId={p.id}
+                        registrationCode={reg.registration_code}
                         slots={bibSlots}
                         existingBooking={booking}
                         onBooked={load}

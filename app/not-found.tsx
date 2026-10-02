@@ -33,6 +33,7 @@ export default function NotFound() {
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", justifyContent: "center", marginBottom: "3rem" }}>
           {[
             { label: "Home",         href: "/" },
+            { label: "IT Run",       href: "/it-run" },
             { label: "Dashboard",    href: "/dashboard" },
             { label: "Leaderboard",  href: "/leaderboard" },
             { label: "Achievements", href: "/achievements" },

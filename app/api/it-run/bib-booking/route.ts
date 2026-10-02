@@ -6,7 +6,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 // Uses atomic SQL function to prevent overbooking.
 export async function POST(req: NextRequest) {
   try {
-    const { participantId, slotId } = await req.json() as { participantId: string; slotId: string };
+    const { participantId, slotId, registrationCode } = await req.json() as { participantId: string; slotId: string; registrationCode?: string };
     if (!participantId || !slotId) return NextResponse.json({ error: "participantId and slotId required" }, { status: 400 });
 
     const db = getSupabaseServer();
@@ -22,12 +22,17 @@ export async function POST(req: NextRequest) {
 
     const { data: reg } = await db
       .from("it_run_registrations")
-      .select("payment_status")
+      .select("payment_status, registration_code")
       .eq("id", part.registration_id)
       .single();
 
     if (!reg || !["paid","free"].includes(reg.payment_status)) {
       return NextResponse.json({ error: "Registration not confirmed" }, { status: 400 });
+    }
+
+    // Ownership check: registrationCode must match if provided (prevents IDOR)
+    if (registrationCode && reg.registration_code !== registrationCode) {
+      return NextResponse.json({ error: "Participant not found" }, { status: 404 });
     }
 
     // Atomic booking via RPC
