@@ -38,6 +38,14 @@ interface DraftRecord {
   expiresAt?:        number;
 }
 
+interface ProfileAutoFill {
+  firstName: string; lastName: string;
+  mobile: string; dob: string; gender: string;
+  bloodGroup: string; emergencyName: string; emergencyPhone: string;
+  companyName: string; employeeId: string; tshirtSize: string;
+  foodPreference: string; medicalConditions: string;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1468,6 +1476,26 @@ function RegisterPageContent() {
   const [isOffline,  setIsOffline]  = useState(false);
   const [saveStatus, setSaveStatus] = useState<"saved" | "offline" | "">("");
 
+  // ── Email verification gate ──────────────────────────────────────────────────
+  const [sessionChecked,  setSessionChecked]  = useState(false);
+  const [emailVerified,   setEmailVerified]   = useState(false);
+  const [verifiedEmail,   setVerifiedEmail]   = useState("");
+  const [isReturningUser, setIsReturningUser] = useState(false);
+  const [profileData,     setProfileData]     = useState<ProfileAutoFill | null>(null);
+  const [profileApplied,  setProfileApplied]  = useState(false);
+  // OTP sub-states
+  const [gateEmail,    setGateEmail]    = useState("");
+  const [otpSent,      setOtpSent]      = useState(false);
+  const [otpInput,     setOtpInput]     = useState("");
+  const [needsName,    setNeedsName]    = useState(false);
+  const [nameFirst,    setNameFirst]    = useState("");
+  const [nameLast,     setNameLast]     = useState("");
+  const [otpError,     setOtpError]     = useState("");
+  const [sendingOtp,   setSendingOtp]   = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [resendAt,     setResendAt]     = useState(0);
+  const [resendSecs,   setResendSecs]   = useState(0);
+
   // Price
   const basePrice  = selectedCat?.price_rupees ?? 0;
   const discount   = coupon?.discount ?? 0;
@@ -1586,6 +1614,143 @@ function RegisterPageContent() {
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, [step]);
+
+  // ── Session check on mount — skip email gate if already authenticated ─────────
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then(r => r.ok ? r.json() : null)
+      .then((d: { email?: string; firstName?: string } | null) => {
+        if (d?.email) {
+          const em = d.email.toLowerCase();
+          setVerifiedEmail(em);
+          setEmailVerified(true);
+          setIsReturningUser(true);
+          fetch("/api/it-run/profile")
+            .then(r => r.ok ? r.json() : null)
+            .then((p: ProfileAutoFill | null) => { if (p) setProfileData(p); })
+            .catch(() => {});
+        }
+      })
+      .catch(() => {})
+      .finally(() => setSessionChecked(true));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Resend OTP countdown ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!resendAt) return;
+    const tick = () => {
+      const s = Math.max(0, Math.ceil((resendAt - Date.now()) / 1000));
+      setResendSecs(s);
+      if (s === 0) clearInterval(id);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [resendAt]);
+
+  // ── Auto-fill participant form when entering step 2 ───────────────────────────
+  useEffect(() => {
+    if (step !== 2 || !profileData || profileApplied) return;
+    setProfileApplied(true);
+    setParticipants(prev => {
+      const copy = [...prev];
+      const p = { ...copy[0] };
+      if (!p.firstName)       p.firstName       = profileData.firstName;
+      if (!p.lastName)        p.lastName        = profileData.lastName;
+      if (!p.mobile)          p.mobile          = profileData.mobile;
+      if (!p.dob)             p.dob             = profileData.dob;
+      if (!p.gender)          p.gender          = profileData.gender;
+      if (!p.bloodGroup)      p.bloodGroup      = profileData.bloodGroup;
+      if (!p.emergencyName)   p.emergencyName   = profileData.emergencyName;
+      if (!p.emergencyPhone)  p.emergencyPhone  = profileData.emergencyPhone;
+      if (!p.companyName)     p.companyName     = profileData.companyName;
+      if (!p.employeeId)      p.employeeId      = profileData.employeeId;
+      if (!p.tshirtSize)      p.tshirtSize      = profileData.tshirtSize;
+      if (!p.foodPreference || p.foodPreference === "veg") {
+        if (profileData.foodPreference) p.foodPreference = profileData.foodPreference;
+      }
+      if (!p.medicalConditions) p.medicalConditions = profileData.medicalConditions;
+      copy[0] = p;
+      return copy;
+    });
+  }, [step, profileData, profileApplied]);
+
+  // Reset profileApplied when category changes so new category auto-fills properly
+  useEffect(() => { setProfileApplied(false); }, [selectedCat]);
+
+  // ── OTP email gate helpers ────────────────────────────────────────────────────
+
+  function maskEmail(email: string): string {
+    const [local, domain] = email.split("@");
+    if (!local || !domain) return email;
+    const visible = local.slice(0, 2);
+    return `${visible}${"*".repeat(Math.max(2, local.length - 2))}@${domain}`;
+  }
+
+  async function sendOtp() {
+    const em = gateEmail.trim().toLowerCase();
+    if (!em || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) {
+      setOtpError("Please enter a valid email address");
+      return;
+    }
+    setSendingOtp(true);
+    setOtpError("");
+    try {
+      const res = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "email", value: em, purpose: "event_register" }),
+      });
+      const d = await res.json();
+      if (!res.ok) { setOtpError(d.error ?? "Failed to send code"); return; }
+      setOtpSent(true);
+      setOtpInput("");
+      setNeedsName(false);
+      setResendAt(Date.now() + 60_000);
+    } catch {
+      setOtpError("Network error. Please try again.");
+    } finally {
+      setSendingOtp(false);
+    }
+  }
+
+  async function verifyOtp(extraName?: string) {
+    const em   = gateEmail.trim().toLowerCase();
+    const code = otpInput.trim();
+    if (code.length !== 6) { setOtpError("Enter the 6-digit code"); return; }
+    setVerifyingOtp(true);
+    setOtpError("");
+    try {
+      const body: Record<string, string> = { email: em, code };
+      if (extraName) body.name = extraName;
+      const res = await fetch("/api/auth/complete-event-verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const d = await res.json();
+      if (!res.ok) { setOtpError(d.error ?? "Verification failed"); return; }
+
+      if (d.needs_profile) {
+        // New user — collect name before account creation
+        setNeedsName(true);
+        return;
+      }
+
+      // Authenticated (new or existing) — fetch auto-fill, enter flow
+      setVerifiedEmail(em);
+      setEmailVerified(true);
+      setIsReturningUser(!!d.user?.firstName && !extraName);
+      fetch("/api/it-run/profile")
+        .then(r => r.ok ? r.json() : null)
+        .then((p: ProfileAutoFill | null) => { if (p) setProfileData(p); })
+        .catch(() => {});
+    } catch {
+      setOtpError("Network error. Please try again.");
+    } finally {
+      setVerifyingOtp(false);
+    }
+  }
 
   // ── Category selection ─────────────────────────────────────────────────────
 
@@ -1959,7 +2124,199 @@ function RegisterPageContent() {
         </div>
       )}
 
+      {/* Loading gate */}
+      {!sessionChecked && (
+        <div style={{ maxWidth: 640, margin: "0 auto", padding: "calc(52px + 2rem) clamp(1rem,5vw,2rem)", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ textAlign: "center" as const }}>
+            <div style={{ width: 32, height: 32, border: "3px solid rgba(255,255,255,0.08)", borderTopColor: ACCENT, borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
+            <div style={{ fontSize: 14, color: "#555" }}>Loading…</div>
+          </div>
+        </div>
+      )}
+
+      {/* Email gate */}
+      {sessionChecked && !emailVerified && (
+        <div style={{ maxWidth: 480, margin: "0 auto", padding: `calc(52px + clamp(2rem,6vw,3rem)) clamp(1rem,5vw,2rem) clamp(2rem,6vw,3rem)`, minHeight: "100vh" }}>
+
+          {/* Email input */}
+          {!otpSent && (
+            <div>
+              <div style={{ marginBottom: 32, textAlign: "center" as const }}>
+                <div style={{ fontSize: 11, color: ACCENT, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 12 }}>
+                  Email Verification
+                </div>
+                <h1 style={{ fontSize: "clamp(1.4rem,4vw,1.8rem)", fontWeight: 800, color: "#fff", margin: "0 0 10px" }}>
+                  Verify your email to register
+                </h1>
+                <p style={{ fontSize: 14, color: "#888", margin: 0, lineHeight: 1.6 }}>
+                  Enter your email to receive a one-time code. Existing accounts will have their details pre-filled.
+                </p>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column" as const, gap: 12 }}>
+                <input
+                  type="email"
+                  placeholder="your@email.com"
+                  value={gateEmail}
+                  onChange={e => { setGateEmail(e.target.value); setOtpError(""); }}
+                  onKeyDown={e => { if (e.key === "Enter") void sendOtp(); }}
+                  autoFocus
+                  style={{
+                    width: "100%", padding: "14px 16px", background: "rgba(255,255,255,0.04)",
+                    border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12,
+                    color: "#fff", fontSize: 16, fontFamily: "inherit", outline: "none",
+                    boxSizing: "border-box" as const,
+                  }}
+                />
+                {otpError && <div style={{ fontSize: 13, color: "#f87171" }}>{otpError}</div>}
+                <button
+                  onClick={() => void sendOtp()}
+                  disabled={sendingOtp}
+                  style={{
+                    padding: "14px 24px", background: sendingOtp ? "rgba(232,98,10,0.5)" : ACCENT,
+                    border: "none", borderRadius: 12, color: "#fff", fontSize: 15, fontWeight: 700,
+                    cursor: sendingOtp ? "not-allowed" : "pointer", fontFamily: "inherit",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  }}>
+                  {sendingOtp && <div style={{ width: 16, height: 16, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />}
+                  {sendingOtp ? "Sending…" : "Send Verification Code"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* OTP input */}
+          {otpSent && !needsName && (
+            <div>
+              <div style={{ marginBottom: 32, textAlign: "center" as const }}>
+                <div style={{ fontSize: 11, color: ACCENT, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 12 }}>
+                  Check Your Inbox
+                </div>
+                <h1 style={{ fontSize: "clamp(1.4rem,4vw,1.8rem)", fontWeight: 800, color: "#fff", margin: "0 0 10px" }}>
+                  Enter the 6-digit code
+                </h1>
+                <p style={{ fontSize: 14, color: "#888", margin: 0, lineHeight: 1.6 }}>
+                  Sent to <strong style={{ color: "#ccc" }}>{maskEmail(gateEmail)}</strong>. Check your spam folder if you don&apos;t see it.
+                </p>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column" as const, gap: 12 }}>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="123456"
+                  maxLength={6}
+                  value={otpInput}
+                  onChange={e => { setOtpInput(e.target.value.replace(/\D/g, "")); setOtpError(""); }}
+                  onKeyDown={e => { if (e.key === "Enter") void verifyOtp(); }}
+                  autoFocus
+                  style={{
+                    width: "100%", padding: "14px 16px", background: "rgba(255,255,255,0.04)",
+                    border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12,
+                    color: "#fff", fontSize: 24, fontWeight: 700, textAlign: "center" as const,
+                    letterSpacing: "0.3em", fontFamily: "monospace", outline: "none",
+                    boxSizing: "border-box" as const,
+                  }}
+                />
+                {otpError && <div style={{ fontSize: 13, color: "#f87171" }}>{otpError}</div>}
+                <button
+                  onClick={() => void verifyOtp()}
+                  disabled={verifyingOtp || otpInput.length !== 6}
+                  style={{
+                    padding: "14px 24px",
+                    background: (verifyingOtp || otpInput.length !== 6) ? "rgba(232,98,10,0.4)" : ACCENT,
+                    border: "none", borderRadius: 12, color: "#fff", fontSize: 15, fontWeight: 700,
+                    cursor: (verifyingOtp || otpInput.length !== 6) ? "not-allowed" : "pointer",
+                    fontFamily: "inherit",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  }}>
+                  {verifyingOtp && <div style={{ width: 16, height: 16, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />}
+                  {verifyingOtp ? "Verifying…" : "Verify & Continue"}
+                </button>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" as const, gap: 8 }}>
+                  {resendSecs > 0 ? (
+                    <span style={{ fontSize: 13, color: "#555" }}>Resend in {resendSecs}s</span>
+                  ) : (
+                    <button
+                      onClick={() => void sendOtp()}
+                      style={{ fontSize: 13, color: ACCENT, background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+                      Resend code
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { setOtpSent(false); setOtpInput(""); setOtpError(""); }}
+                    style={{ fontSize: 13, color: "#555", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+                    Change email
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Name collection for new accounts */}
+          {needsName && (
+            <div>
+              <div style={{ marginBottom: 32, textAlign: "center" as const }}>
+                <div style={{ fontSize: 11, color: ACCENT, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 12 }}>
+                  One More Step
+                </div>
+                <h1 style={{ fontSize: "clamp(1.4rem,4vw,1.8rem)", fontWeight: 800, color: "#fff", margin: "0 0 10px" }}>
+                  Tell us your name
+                </h1>
+                <p style={{ fontSize: 14, color: "#888", margin: 0, lineHeight: 1.6 }}>
+                  Your Connected Steps account will be created with the details below.
+                </p>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column" as const, gap: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <input
+                    type="text"
+                    placeholder="First name"
+                    value={nameFirst}
+                    onChange={e => { setNameFirst(e.target.value); setOtpError(""); }}
+                    style={{
+                      padding: "14px 16px", background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12,
+                      color: "#fff", fontSize: 15, fontFamily: "inherit", outline: "none",
+                      boxSizing: "border-box" as const,
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Last name"
+                    value={nameLast}
+                    onChange={e => { setNameLast(e.target.value); setOtpError(""); }}
+                    style={{
+                      padding: "14px 16px", background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12,
+                      color: "#fff", fontSize: 15, fontFamily: "inherit", outline: "none",
+                      boxSizing: "border-box" as const,
+                    }}
+                  />
+                </div>
+                {otpError && <div style={{ fontSize: 13, color: "#f87171" }}>{otpError}</div>}
+                <button
+                  onClick={() => {
+                    const fn = nameFirst.trim(), ln = nameLast.trim();
+                    if (!fn || !ln) { setOtpError("Please enter your first and last name"); return; }
+                    void verifyOtp(`${fn} ${ln}`);
+                  }}
+                  disabled={verifyingOtp}
+                  style={{
+                    padding: "14px 24px", background: verifyingOtp ? "rgba(232,98,10,0.5)" : ACCENT,
+                    border: "none", borderRadius: 12, color: "#fff", fontSize: 15, fontWeight: 700,
+                    cursor: verifyingOtp ? "not-allowed" : "pointer", fontFamily: "inherit",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  }}>
+                  {verifyingOtp && <div style={{ width: 16, height: 16, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />}
+                  {verifyingOtp ? "Creating account…" : "Create Account & Continue"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Main content */}
+      {sessionChecked && emailVerified && (
       <div style={{
         maxWidth: 640, margin: "0 auto",
         padding: `calc(52px + ${isOffline && step < 7 ? "36px + " : ""}clamp(1.5rem,5vw,2.5rem)) clamp(1rem,5vw,2rem) ${step >= 2 && step <= 6 && selectedCat ? "80px" : "clamp(1.5rem,5vw,2.5rem)"}`,
@@ -2021,8 +2378,36 @@ function RegisterPageContent() {
           );
         })()}
 
+        {step === 1 && emailVerified && isReturningUser && (
+          <div style={{
+            ...CARD_BASE,
+            borderColor: "rgba(74,222,128,0.2)",
+            background: "rgba(74,222,128,0.04)",
+            padding: "16px 20px", marginBottom: 24,
+          }}>
+            <div style={{ fontSize: 11, color: "#4ade80", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 6 }}>
+              Welcome back
+            </div>
+            <div style={{ fontSize: 14, color: "#aaa", lineHeight: 1.5 }}>
+              Signed in as <strong style={{ color: "#fff" }}>{verifiedEmail}</strong>.{" "}
+              Your details from a previous registration will be pre-filled.
+            </div>
+          </div>
+        )}
+
         {step === 1 && (
           <StepCategory config={config} loading={configLoading} onSelect={selectCategory} />
+        )}
+
+        {step === 2 && selectedCat && profileApplied && profileData && (
+          <div style={{
+            background: "rgba(74,222,128,0.05)",
+            border: "1px solid rgba(74,222,128,0.15)",
+            borderRadius: 12, padding: "12px 16px", marginBottom: 16,
+            fontSize: 13, color: "#4ade80",
+          }}>
+            Some fields have been pre-filled from your Connected Steps account.
+          </div>
         )}
 
         {step === 2 && selectedCat && (
@@ -2114,6 +2499,7 @@ function RegisterPageContent() {
           <StepSuccess regCode={regCode} paymentDone={paymentDone} eventTitle={eventTitle} />
         )}
       </div>
+      )}
 
       {/* Sticky price bar */}
       {step >= 2 && step <= 6 && selectedCat && (

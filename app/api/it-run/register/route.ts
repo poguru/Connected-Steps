@@ -3,6 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { generateRegistrationCode, signItRunQR } from "@/lib/it-run-auth";
 import { sendItRunConfirmationEmail } from "@/lib/it-run-email";
 import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
+import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 
 interface ParticipantInput {
   type: string; firstName: string; lastName: string;
@@ -228,19 +229,23 @@ export async function POST(req: NextRequest) {
     }
 
     // Insert registration
+    // Resolve the CS account linked to this registration (if user completed email verification)
+    const linkedUserEmail = verifyUserToken(req.cookies.get(USER_SESSION_COOKIE)?.value ?? "") ?? null;
+
     const { data: reg, error: regErr } = await db
       .from("it_run_registrations")
       .insert({
-        event_id:         cat.event_id,
-        category_id:      categoryId,
+        event_id:          cat.event_id,
+        category_id:       categoryId,
         registration_code: regCode,
-        lead_email:       participants[0]?.email?.toLowerCase()?.trim() ?? "",
+        lead_email:        participants[0]?.email?.toLowerCase()?.trim() ?? "",
         participant_count: participants.length,
-        base_price:       basePrice,
-        discount_amount:  discountAmt,
-        final_price:      finalPrice,
-        coupon_id:        couponId ?? null,
-        payment_status:   finalPrice === 0 ? "free" : "pending",
+        base_price:        basePrice,
+        discount_amount:   discountAmt,
+        final_price:       finalPrice,
+        coupon_id:         couponId ?? null,
+        payment_status:    finalPrice === 0 ? "free" : "pending",
+        linked_user_email: linkedUserEmail,
       })
       .select("id")
       .single();
