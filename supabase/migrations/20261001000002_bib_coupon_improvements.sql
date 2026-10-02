@@ -21,6 +21,12 @@ ALTER TABLE public.it_run_coupons
 --   - valid_from validation
 --   - applicable_category_ids validation
 -- All existing callers that omit p_category_id continue to work unchanged.
+--
+-- IMPORTANT: Must drop the old 3-param signature first. PostgreSQL treats
+-- functions with different parameter lists as SEPARATE overloads, so
+-- CREATE OR REPLACE here would create a second version, making all calls
+-- with 3 args ambiguous and causing a runtime error.
+DROP FUNCTION IF EXISTS public.itr_use_coupon(UUID, UUID, INTEGER);
 
 CREATE OR REPLACE FUNCTION public.itr_use_coupon(
   p_coupon_id   UUID,
