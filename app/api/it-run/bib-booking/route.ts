@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 // POST /api/it-run/bib-booking
-// Body: { participantId, slotId }
+// Body: { participantId, slotId, registrationCode }
+// registrationCode is REQUIRED — it is the ownership proof that ties this request
+// to the caller's registration. Without it, any caller knowing a participantId
+// (which is discoverable via the public dashboard API) could book any participant's slot.
 // Uses atomic SQL function to prevent overbooking.
 export async function POST(req: NextRequest) {
   try {
     const { participantId, slotId, registrationCode } = await req.json() as { participantId: string; slotId: string; registrationCode?: string };
     if (!participantId || !slotId) return NextResponse.json({ error: "participantId and slotId required" }, { status: 400 });
+    if (!registrationCode) return NextResponse.json({ error: "registrationCode required" }, { status: 400 });
 
     const db = getSupabaseServer();
 

@@ -17,8 +17,8 @@ export async function GET(
     .from("it_run_registrations")
     .select(`
       id, registration_code, lead_email, participant_count,
-      base_price, discount_amount, final_price, payment_status,
-      coupon_id, created_at, qr_token,
+      base_price, discount_amount, final_price, payment_status, registration_status,
+      cancelled_reason, cancelled_at, coupon_id, created_at, qr_token,
       it_run_categories ( id, slug, name, distance_km, category_type, color, includes_timing, includes_medal ),
       it_run_events ( id, title, event_date, report_time, flag_off_time, venue_name, venue_address, city )
     `)
@@ -26,8 +26,9 @@ export async function GET(
     .single<{
       id: string; registration_code: string; lead_email: string;
       participant_count: number; base_price: number; discount_amount: number;
-      final_price: number; payment_status: string; coupon_id: string | null;
-      created_at: string; qr_token: string | null;
+      final_price: number; payment_status: string; registration_status: string;
+      cancelled_reason: string | null; cancelled_at: string | null;
+      coupon_id: string | null; created_at: string; qr_token: string | null;
       it_run_categories: { id: string; slug: string; name: string; distance_km: number; category_type: string; color: string; includes_timing: boolean; includes_medal: boolean } | null;
       it_run_events: { id: string; title: string; event_date: string; report_time: string | null; flag_off_time: string | null; venue_name: string | null; venue_address: string | null; city: string | null } | null;
     }>();
