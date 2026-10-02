@@ -17,8 +17,13 @@ export async function GET(
     return new NextResponse("Invalid token", { status: 400 });
   }
 
+  let decoded: string;
+  try { decoded = decodeURIComponent(token); } catch {
+    return new NextResponse("Invalid token encoding", { status: 400 });
+  }
+
   try {
-    const png = await QRCode.toBuffer(decodeURIComponent(token), {
+    const png = await QRCode.toBuffer(decoded, {
       type:   "png",
       width:  200,
       margin: 2,

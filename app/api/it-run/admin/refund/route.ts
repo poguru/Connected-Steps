@@ -56,8 +56,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No Razorpay payment ID on record — cannot initiate refund" }, { status: 422 });
   }
 
-  // Create Razorpay refund (full refund by default; partial if amount_paise provided)
-  let rzpRefund: { id: string; amount: number } | null = null;
+  // ── Step 1: Atomically cancel the registration (optimistic lock) ─────────────
+  // This prevents a double-refund race: if two admin requests arrive simultaneously
+  // both check "not cancelled" (non-atomically), then BOTH call Razorpay. By cancelling
+  // first with a guard, only the request that wins the DB race proceeds to Razorpay.
+  const { data: cancelledRows } = await db
+    .from("it_run_registrations")
+    .update({ registration_status: "cancelled" })
+    .eq("id", reg.id)
+    .eq("payment_status", "paid")
+    .neq("registration_status", "cancelled")
+    .select("id");
+
+  if (!cancelledRows?.length) {
+    return NextResponse.json(
+      { error: "Registration is already cancelled or its state changed — no refund issued" },
+      { status: 409 },
+    );
+  }
+
+  // ── Step 2: Create Razorpay refund ───────────────────────────────────────────
+  // Registration is now cancelled (locked). If Razorpay fails we restore the status.
+  let rzpRefund: { id: string; amount: number };
   try {
     rzpRefund = await createRefund(reg.razorpay_payment_id, {
       amount: amount_paise,
@@ -66,31 +86,22 @@ export async function POST(req: NextRequest) {
     });
   } catch (e) {
     console.error("[it-run/admin/refund] Razorpay createRefund failed:", e);
-    return NextResponse.json({ error: "Razorpay refund failed — no changes made" }, { status: 502 });
+    // Restore registration status — the admin can retry
+    await db
+      .from("it_run_registrations")
+      .update({ registration_status: "active" })
+      .eq("id", reg.id);
+    return NextResponse.json({ error: "Razorpay refund failed — registration status restored" }, { status: 502 });
   }
 
-  // Cancel registration (idempotent guard: neq cancelled)
-  const { data: updatedRows } = await db
-    .from("it_run_registrations")
-    .update({ registration_status: "cancelled" })
-    .eq("id", reg.id)
-    .neq("registration_status", "cancelled")
-    .select("id");
+  // ── Step 3: Release capacity and coupon ──────────────────────────────────────
+  await db.rpc("itr_release_capacity", {
+    p_category_id: reg.category_id,
+    p_count:       reg.participant_count,
+  });
 
-  if (!updatedRows?.length) {
-    // Already cancelled concurrently — refund was still issued, so log and return success
-    console.warn(`[it-run/admin/refund] ${reg.registration_code} was already cancelled when we tried to cancel — refund ${rzpRefund.id} already issued`);
-  } else {
-    // Release capacity
-    await db.rpc("itr_release_capacity", {
-      p_category_id: reg.category_id,
-      p_count:       reg.participant_count,
-    });
-
-    // Release coupon if one was used
-    if (reg.coupon_id && reg.discount_amount > 0) {
-      await db.rpc("itr_release_coupon", { p_coupon_id: reg.coupon_id });
-    }
+  if (reg.coupon_id && reg.discount_amount > 0) {
+    await db.rpc("itr_release_coupon", { p_coupon_id: reg.coupon_id });
   }
 
   console.log(
