@@ -2,17 +2,7 @@ import { randomBytes }        from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail }         from "@/lib/notify";
 import { APP_URL }           from "@/lib/config";
-
-// QR image rendered by an external service — email clients cannot run JS,
-// so we can't use the qrcode npm package here.
-// The token encodes no PII (only regCode:participantId + HMAC).
-function qrImageUrl(token: string): string {
-  return (
-    `https://api.qrserver.com/v1/create-qr-code/` +
-    `?data=${encodeURIComponent(token)}&size=160x160` +
-    `&color=000000&bgcolor=ffffff&margin=8&format=png`
-  );
-}
+import QRCode                from "qrcode";
 
 const PARTICIPANT_TYPE_LABEL: Record<string, string> = {
   solo:      "",
@@ -98,6 +88,21 @@ export async function sendItRunConfirmationEmail(
   const cat         = reg.it_run_categories;
   const primaryName = `${parts[0].first_name} ${parts[0].last_name}`;
 
+  // Pre-generate QR data URIs inline (no external image service dependency).
+  // Each QR encodes the participant's signed token. Data URIs work offline
+  // and are immune to any third-party outage.
+  const qrDataUris = await Promise.all(
+    parts.map(p =>
+      QRCode.toDataURL(p.qr_token ?? reg.registration_code, {
+        type:   "image/png",
+        width:  180,
+        margin: 2,
+        color:  { dark: "#000000", light: "#ffffff" },
+        errorCorrectionLevel: "M",
+      }).catch(() => "")  // never let a QR failure block the email
+    )
+  );
+
   const html = buildConfirmEmail({
     primaryName,
     code:         reg.registration_code,
@@ -107,11 +112,11 @@ export async function sendItRunConfirmationEmail(
     reportTime:   ev?.report_time ?? "5:30 AM",
     finalPrice:   reg.final_price,
     dashUrl,
-    participants: parts.map(p => ({
-      name:          `${p.first_name} ${p.last_name}`,
-      typeLabel:     PARTICIPANT_TYPE_LABEL[p.participant_type] ?? "",
-      tshirtSize:    p.tshirt_size ?? null,
-      qrToken:       p.qr_token   ?? reg.registration_code,
+    participants: parts.map((p, i) => ({
+      name:       `${p.first_name} ${p.last_name}`,
+      typeLabel:  PARTICIPANT_TYPE_LABEL[p.participant_type] ?? "",
+      tshirtSize: p.tshirt_size ?? null,
+      qrDataUri:  qrDataUris[i] ?? "",
     })),
   });
 
@@ -133,7 +138,7 @@ interface ParticipantData {
   name:       string;
   typeLabel:  string;
   tshirtSize: string | null;
-  qrToken:    string;
+  qrDataUri:  string;  // inline base64 PNG — no external dependency
 }
 
 interface ConfirmEmailArgs {
@@ -405,7 +410,7 @@ export function buildConfirmEmail(args: ConfirmEmailArgs): string {
             </td>
             <td style="vertical-align:top;text-align:right;width:180px;">
               <div style="display:inline-block;background:#fff;padding:6px;border-radius:6px;">
-                <img src="${qrImageUrl(p.qrToken)}" width="120" height="120" alt="QR for ${p.name}" style="display:block;" />
+                <img src="${p.qrDataUri}" width="120" height="120" alt="QR for ${p.name}" style="display:block;" />
               </div>
               <div style="font-size:10px;color:#666;margin-top:4px;">Race-day QR</div>
             </td>

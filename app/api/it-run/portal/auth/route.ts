@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { signPortalSession, verifyPassword, verifyPortalSession, PORTAL_SESSION_COOKIE, type PortalRole } from "@/lib/it-run-auth";
+import { signPortalSession, verifyPassword, verifyPortalSession, PORTAL_SESSION_COOKIE, getClientIp, type PortalRole } from "@/lib/it-run-auth";
+import { checkAndRecordEndpointLimit } from "@/lib/rate-limit";
 
 // POST /api/it-run/portal/auth  — login
 // DELETE /api/it-run/portal/auth — logout
 export async function POST(req: NextRequest) {
+  // Brute-force protection: 5 attempts per IP per 5 minutes
+  const ip      = getClientIp(req);
+  const limited = await checkAndRecordEndpointLimit(`itr:portal-auth:${ip}`, 5, 300_000);
+  if (limited) {
+    return NextResponse.json({ error: "Too many login attempts. Please wait 5 minutes." }, { status: 429 });
+  }
+
   try {
     const { email, password } = await req.json() as { email: string; password: string };
     if (!email || !password) return NextResponse.json({ error: "Email and password required" }, { status: 400 });

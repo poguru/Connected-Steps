@@ -293,10 +293,11 @@ function ParticipantCard({ p, idx, onEdit }: {
 
 // ── Registration detail ────────────────────────────────────────────────────────
 
-function RegistrationDetail({ reg, onParticipantSave, onCancel, onNotesSave }: {
+function RegistrationDetail({ reg, onParticipantSave, onCancel, onRefund, onNotesSave }: {
   reg: Registration;
   onParticipantSave: (id: string, fields: Record<string, unknown>) => Promise<{ ok: boolean; error?: string }>;
   onCancel: (reg: Registration) => void;
+  onRefund: (reg: Registration) => void;
   onNotesSave: (regId: string, notes: string) => Promise<void>;
 }) {
   const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
@@ -367,10 +368,18 @@ function RegistrationDetail({ reg, onParticipantSave, onCancel, onNotesSave }: {
 
       {/* Actions */}
       {!isCancelled ? (
-        <button onClick={() => onCancel(reg)}
-          style={{ padding: "7px 16px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 8, color: "#f87171", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-          Cancel Registration
-        </button>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button onClick={() => onCancel(reg)}
+            style={{ padding: "7px 16px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 8, color: "#f87171", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            Cancel Registration
+          </button>
+          {reg.payment_status === "paid" && reg.final_price > 0 && (
+            <button onClick={() => onRefund(reg)}
+              style={{ padding: "7px 16px", background: "rgba(251,146,60,0.08)", border: "1px solid rgba(251,146,60,0.3)", borderRadius: 8, color: "#fb923c", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+              Refund ₹{reg.final_price.toLocaleString("en-IN")}
+            </button>
+          )}
+        </div>
       ) : (
         <div style={{ fontSize: 12, color: "#555", fontStyle: "italic" }}>
           This registration is cancelled. To reactivate, contact a system administrator.
@@ -404,6 +413,11 @@ export default function RegistrationsPage() {
   const [cancelReg,    setCancelReg]    = useState<Registration | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelling,   setCancelling]   = useState(false);
+
+  // Refund modal state
+  const [refundReg,    setRefundReg]    = useState<Registration | null>(null);
+  const [refundReason, setRefundReason] = useState("");
+  const [refunding,    setRefunding]    = useState(false);
 
   const LIMIT = 30;
 
@@ -495,6 +509,33 @@ export default function RegistrationsPage() {
     }
   }
 
+  function openRefundModal(reg: Registration) {
+    setRefundReg(reg);
+    setRefundReason("");
+  }
+
+  async function confirmRefund() {
+    if (!refundReg || !refundReason.trim()) return;
+    setRefunding(true);
+    const res = await fetch("/api/it-run/admin/refund", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ registration_id: refundReg.id, reason: refundReason.trim() }),
+    });
+    const d = await res.json();
+    setRefunding(false);
+    if (res.ok) {
+      setRegs(prev => prev.map(r => r.id === refundReg.id
+        ? { ...r, registration_status: "cancelled", cancelled_at: new Date().toISOString(), cancelled_reason: `Refunded: ${refundReason.trim()}` }
+        : r
+      ));
+      setMsg({ text: `Refund issued for ${refundReg.registration_code} — ${d.refund_id}`, ok: true });
+      setRefundReg(null);
+    } else {
+      setMsg({ text: d.error ?? "Refund failed", ok: false });
+    }
+  }
+
   async function saveNotes(regId: string, notes: string) {
     await fetch("/api/it-run/admin/registrations", {
       method: "PATCH",
@@ -522,6 +563,36 @@ export default function RegistrationsPage() {
           onClose={() => setCancelReg(null)}
           saving={cancelling}
         />
+      )}
+
+      {/* Refund modal */}
+      {refundReg && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "0 16px" }}>
+          <div style={{ background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: "28px 24px", maxWidth: 440, width: "100%" }}>
+            <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: "#fff" }}>Issue Refund</h3>
+            <p style={{ margin: "0 0 16px", fontSize: 13, color: "#aaa", lineHeight: 1.5 }}>
+              Registration <span style={{ color: ACCENT, fontFamily: "monospace" }}>{refundReg.registration_code}</span><br />
+              Amount: <strong style={{ color: "#10b981" }}>₹{refundReg.final_price.toLocaleString("en-IN")}</strong>
+            </p>
+            <div style={{ background: "rgba(251,146,60,0.08)", border: "1px solid rgba(251,146,60,0.3)", borderRadius: 10, padding: "10px 14px", fontSize: 12, color: "#fb923c", marginBottom: 16, lineHeight: 1.6 }}>
+              ⚠ This will issue a full Razorpay refund and cancel the registration. This action cannot be undone.
+            </div>
+            <label style={{ display: "block", fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6 }}>Refund Reason *</label>
+            <textarea value={refundReason} rows={2} onChange={e => setRefundReason(e.target.value)}
+              placeholder="e.g. Participant injury, duplicate payment, event postponed…"
+              style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical", marginBottom: 20 }} />
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button onClick={() => setRefundReg(null)} disabled={refunding}
+                style={{ padding: "8px 18px", background: "transparent", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, color: "#aaa", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                Cancel
+              </button>
+              <button onClick={confirmRefund} disabled={refunding || !refundReason.trim()}
+                style={{ padding: "8px 18px", background: refundReason.trim() ? "rgba(251,146,60,0.15)" : "rgba(255,255,255,0.04)", border: `1px solid ${refundReason.trim() ? "rgba(251,146,60,0.4)" : "rgba(255,255,255,0.08)"}`, borderRadius: 8, color: refundReason.trim() ? "#fb923c" : "#555", fontSize: 13, fontWeight: 600, cursor: refundReason.trim() && !refunding ? "pointer" : "not-allowed", fontFamily: "inherit" }}>
+                {refunding ? "Processing…" : "Confirm Refund"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div style={{ maxWidth: 1000 }}>
@@ -636,6 +707,7 @@ export default function RegistrationsPage() {
                       reg={reg}
                       onParticipantSave={saveParticipant}
                       onCancel={openCancelModal}
+                      onRefund={openRefundModal}
                       onNotesSave={saveNotes}
                     />
                   )}

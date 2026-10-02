@@ -47,6 +47,18 @@ function SECRET(): string {
   return `it_run:${s}`;
 }
 
+// QR tokens use a DEDICATED secret independent of the admin portal password.
+// This means changing the admin password does NOT invalidate existing QR codes.
+// Set IT_RUN_QR_SECRET in environment. Falls back to the portal secret for
+// deployments that haven't yet added the new env var.
+function QR_SECRET(): string {
+  const dedicated = process.env.IT_RUN_QR_SECRET;
+  if (dedicated) return `it_run_qr:${dedicated}`;
+  // Fallback: same as portal secret — backward compatible with QRs signed before
+  // IT_RUN_QR_SECRET was introduced. Remove this fallback after all existing QRs expire.
+  return SECRET();
+}
+
 // Token format: base64url(email:role:exp).hmac
 // Completely separate namespace from CS admin sessions via the 'it_run:' prefix.
 export function signPortalSession(email: string, role: PortalRole): string {
@@ -157,9 +169,10 @@ export function verifyPassword(password: string, stored: string): boolean {
 
 // Token encodes only registrationCode + participantId — no PII.
 // Format: base64url(regCode:participantId).hmac
+// Uses QR_SECRET() which is independent of the portal admin password.
 export function signItRunQR(registrationCode: string, participantId: string): string {
   const payload = `${registrationCode}:${participantId}`;
-  const hmac    = crypto.createHmac("sha256", SECRET()).update(payload).digest("hex");
+  const hmac    = crypto.createHmac("sha256", QR_SECRET()).update(payload).digest("hex");
   return `${Buffer.from(payload).toString("base64url")}.${hmac}`;
 }
 
@@ -170,24 +183,29 @@ export function verifyItRunQR(token: string): { registrationCode: string; partic
   const payloadB64 = token.slice(0, dot);
   const hmac       = token.slice(dot + 1);
 
-  try {
-    const payload  = Buffer.from(payloadB64, "base64url").toString("utf8");
-    const expected = crypto.createHmac("sha256", SECRET()).update(payload).digest("hex");
+  // Try QR_SECRET() first (new tokens), then SECRET() for backward compatibility
+  // with tokens signed before IT_RUN_QR_SECRET was introduced.
+  for (const secret of [QR_SECRET(), SECRET()]) {
+    try {
+      const payload  = Buffer.from(payloadB64, "base64url").toString("utf8");
+      const expected = crypto.createHmac("sha256", secret).update(payload).digest("hex");
 
-    if (expected.length !== hmac.length) return null;
-    if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(hmac))) return null;
+      if (expected.length !== hmac.length) continue;
+      if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(hmac))) continue;
 
-    const colon = payload.indexOf(":");
-    if (colon < 1) return null;
+      const colon = payload.indexOf(":");
+      if (colon < 1) continue;
 
-    const registrationCode = payload.slice(0, colon);
-    const participantId    = payload.slice(colon + 1);
+      const registrationCode = payload.slice(0, colon);
+      const participantId    = payload.slice(colon + 1);
 
-    if (!registrationCode || !participantId) return null;
-    return { registrationCode, participantId };
-  } catch {
-    return null;
+      if (!registrationCode || !participantId) continue;
+      return { registrationCode, participantId };
+    } catch {
+      continue;
+    }
   }
+  return null;
 }
 
 // ── Registration code generator ───────────────────────────────────────────────

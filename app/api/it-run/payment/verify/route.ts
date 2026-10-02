@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyPaymentSignature } from "@/lib/razorpay-security";
-import { sendItRunConfirmationEmail } from "@/lib/it-run-email";
+import { sendItRunConfirmationEmail, sendItRunBibInviteEmail } from "@/lib/it-run-email";
 import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
 
 // POST /api/it-run/payment/verify
@@ -101,6 +101,10 @@ export async function POST(req: NextRequest) {
     // Send confirmation email with per-participant QR codes (fire-and-forget)
     sendItRunConfirmationEmail(reg.id, reg.registration_code, reg.lead_email, "")
       .catch(e => console.error("[it-run/payment/verify] confirmation email error:", e));
+
+    // Send BIB collection invite if bib_invite_token is set (fire-and-forget)
+    sendItRunBibInviteEmail(reg.id, reg.lead_email)
+      .catch(e => console.error("[it-run/payment/verify] bib invite email error:", e));
 
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {

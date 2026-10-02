@@ -7,7 +7,7 @@ import { enqueueJob }           from "@/lib/job-queue";
 import { signEventQR }          from "@/lib/event-qr";
 import { sendEmail, eventRegistrationEmailHTML } from "@/lib/notify";
 import { activateMembership }   from "@/lib/membership-activate";
-import { sendItRunConfirmationEmail } from "@/lib/it-run-email";
+import { sendItRunConfirmationEmail, sendItRunBibInviteEmail } from "@/lib/it-run-email";
 
 // POST /api/webhooks/razorpay
 //
@@ -331,6 +331,9 @@ async function handleItRunPaymentCaptured(
   sendItRunConfirmationEmail(reg.id, reg.registration_code, reg.lead_email, reg.qr_token ?? "")
     .catch(e => console.error(`${label} Confirmation email failed:`, e));
 
+  sendItRunBibInviteEmail(reg.id, reg.lead_email)
+    .catch(e => console.error(`${label} BIB invite email failed:`, e));
+
 }
 
 type RegRow = {
@@ -515,9 +518,15 @@ async function handleItRunRefund(
     p_count:       itReg.participant_count,
   });
 
+  // Release coupon usage if one was applied (was missing — bug fix)
+  if (itReg.coupon_id && itReg.discount_amount > 0) {
+    await db.rpc("itr_release_coupon", { p_coupon_id: itReg.coupon_id });
+  }
+
   console.log(
     `${label} ✅ IT Run registration ${itReg.registration_code} cancelled due to external refund` +
-    ` — refund_id=${refundId}, released ${itReg.participant_count} slot(s)`,
+    ` — refund_id=${refundId}, released ${itReg.participant_count} slot(s)` +
+    (itReg.coupon_id ? ` + coupon ${itReg.coupon_id}` : ""),
   );
 }
 

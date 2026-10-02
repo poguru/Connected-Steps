@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { generateRegistrationCode, signItRunQR } from "@/lib/it-run-auth";
-import { sendItRunConfirmationEmail } from "@/lib/it-run-email";
+import { sendItRunConfirmationEmail, sendItRunBibInviteEmail } from "@/lib/it-run-email";
 import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 
@@ -365,6 +365,8 @@ export async function POST(req: NextRequest) {
     if (finalPrice === 0) {
       sendItRunConfirmationEmail(reg.id, regCode, "", "")
         .catch(e => console.error("[it-run/register] free-reg confirmation email error:", e));
+      sendItRunBibInviteEmail(reg.id, participants[0]?.email?.toLowerCase()?.trim() ?? "")
+        .catch(e => console.error("[it-run/register] free-reg bib invite email error:", e));
     }
 
     return NextResponse.json({
