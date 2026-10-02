@@ -502,7 +502,7 @@ function PriceBar({
       position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 90,
       background: "rgba(8,8,8,0.97)", backdropFilter: "blur(20px)",
       borderTop: "1px solid rgba(255,255,255,0.06)",
-      padding: "12px clamp(1rem,4vw,2rem)",
+      padding: `12px clamp(1rem,4vw,2rem) calc(12px + env(safe-area-inset-bottom, 0px))`,
       display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
