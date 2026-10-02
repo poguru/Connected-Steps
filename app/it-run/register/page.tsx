@@ -1479,8 +1479,9 @@ function RegisterPageContent() {
   // ── Email verification gate ──────────────────────────────────────────────────
   const [sessionChecked,  setSessionChecked]  = useState(false);
   const [emailVerified,   setEmailVerified]   = useState(false);
-  const [verifiedEmail,   setVerifiedEmail]   = useState("");
-  const [isReturningUser, setIsReturningUser] = useState(false);
+  const [verifiedEmail,     setVerifiedEmail]     = useState("");
+  const [verifiedFirstName, setVerifiedFirstName] = useState("");
+  const [isReturningUser,   setIsReturningUser]   = useState(false);
   const [profileData,     setProfileData]     = useState<ProfileAutoFill | null>(null);
   const [profileApplied,  setProfileApplied]  = useState(false);
   // OTP sub-states
@@ -1490,6 +1491,7 @@ function RegisterPageContent() {
   const [needsName,    setNeedsName]    = useState(false);
   const [nameFirst,    setNameFirst]    = useState("");
   const [nameLast,     setNameLast]     = useState("");
+  const [nameMobile,   setNameMobile]   = useState("");
   const [otpError,     setOtpError]     = useState("");
   const [sendingOtp,   setSendingOtp]   = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
@@ -1623,6 +1625,7 @@ function RegisterPageContent() {
         if (d?.email) {
           const em = d.email.toLowerCase();
           setVerifiedEmail(em);
+          setVerifiedFirstName(d.firstName ?? "");
           setEmailVerified(true);
           setIsReturningUser(true);
           fetch("/api/it-run/profile")
@@ -1714,7 +1717,7 @@ function RegisterPageContent() {
     }
   }
 
-  async function verifyOtp(extraName?: string) {
+  async function verifyOtp(extraName?: string, extraMobile?: string) {
     const em   = gateEmail.trim().toLowerCase();
     const code = otpInput.trim();
     if (code.length !== 6) { setOtpError("Enter the 6-digit code"); return; }
@@ -1722,7 +1725,8 @@ function RegisterPageContent() {
     setOtpError("");
     try {
       const body: Record<string, string> = { email: em, code };
-      if (extraName) body.name = extraName;
+      if (extraName)   body.name   = extraName;
+      if (extraMobile) body.mobile = extraMobile;
       const res = await fetch("/api/auth/complete-event-verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1739,6 +1743,7 @@ function RegisterPageContent() {
 
       // Authenticated (new or existing) — fetch auto-fill, enter flow
       setVerifiedEmail(em);
+      setVerifiedFirstName(d.user?.firstName ?? "");
       setEmailVerified(true);
       setIsReturningUser(!!d.user?.firstName && !extraName);
       fetch("/api/it-run/profile")
@@ -2292,12 +2297,24 @@ function RegisterPageContent() {
                     }}
                   />
                 </div>
+                <input
+                  type="tel"
+                  placeholder="Mobile number (optional)"
+                  value={nameMobile}
+                  onChange={e => { setNameMobile(e.target.value); setOtpError(""); }}
+                  style={{
+                    padding: "14px 16px", background: "rgba(255,255,255,0.04)",
+                    border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12,
+                    color: "#fff", fontSize: 15, fontFamily: "inherit", outline: "none",
+                    boxSizing: "border-box" as const, width: "100%",
+                  }}
+                />
                 {otpError && <div style={{ fontSize: 13, color: "#f87171" }}>{otpError}</div>}
                 <button
                   onClick={() => {
                     const fn = nameFirst.trim(), ln = nameLast.trim();
                     if (!fn || !ln) { setOtpError("Please enter your first and last name"); return; }
-                    void verifyOtp(`${fn} ${ln}`);
+                    void verifyOtp(`${fn} ${ln}`, nameMobile.trim() || undefined);
                   }}
                   disabled={verifyingOtp}
                   style={{
@@ -2385,12 +2402,12 @@ function RegisterPageContent() {
             background: "rgba(74,222,128,0.04)",
             padding: "16px 20px", marginBottom: 24,
           }}>
-            <div style={{ fontSize: 11, color: "#4ade80", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 6 }}>
-              Welcome back
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#4ade80", marginBottom: 4 }}>
+              Welcome back{verifiedFirstName ? `, ${verifiedFirstName}` : ""}!
             </div>
-            <div style={{ fontSize: 14, color: "#aaa", lineHeight: 1.5 }}>
-              Signed in as <strong style={{ color: "#fff" }}>{verifiedEmail}</strong>.{" "}
-              Your details from a previous registration will be pre-filled.
+            <div style={{ fontSize: 13, color: "#aaa", lineHeight: 1.5 }}>
+              Signed in as <strong style={{ color: "#888" }}>{verifiedEmail}</strong>.{" "}
+              Your details will be pre-filled.
             </div>
           </div>
         )}
