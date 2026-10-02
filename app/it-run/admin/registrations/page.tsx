@@ -7,7 +7,7 @@ const GREEN  = "#10b981";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type BibCollection = { id: string; collected_at: string | null; counter_name: string | null };
+type BibCollection = { id: string; collected_at: string | null; counter_number: string | null };
 type Checkin       = { id: string; checked_in_at: string };
 
 type Participant = {
@@ -266,7 +266,7 @@ function ParticipantCard({ p, idx, onEdit }: {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: "10px 16px", marginBottom: 14 }}>
             <KV label="BIB Number" value={p.bib_number ?? "Not assigned"} mono />
             <KV label="Wave"       value={p.wave} />
-            <KV label="BIB Collected" value={collected ? `${p.it_run_bib_collections[0]?.counter_name ?? "Yes"} · ${new Date(p.it_run_bib_collections[0]?.collected_at ?? "").toLocaleDateString("en-IN")}` : "No"} />
+            <KV label="BIB Collected" value={collected ? `${p.it_run_bib_collections[0]?.counter_number ?? "Yes"} · ${new Date(p.it_run_bib_collections[0]?.collected_at ?? "").toLocaleDateString("en-IN")}` : "No"} />
             <KV label="Checked In" value={checkedIn ? new Date(p.it_run_checkins[0].checked_in_at).toLocaleString("en-IN") : "No"} />
           </div>
 

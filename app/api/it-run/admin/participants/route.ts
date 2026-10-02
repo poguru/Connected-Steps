@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
         it_run_categories(name, color),
         event_id
       ),
-      it_run_bib_collections(id, collected_at, counter_name),
+      it_run_bib_collections(id),
       it_run_checkins(id, checked_in_at)
     `, { count: "exact" })
     .eq("it_run_registrations.event_id", event.id);

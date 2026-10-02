@@ -89,7 +89,7 @@ export async function GET(req: NextRequest) {
         company_name, employee_id, company_id_url,
         tshirt_size, medical_conditions, food_preference,
         bib_number, wave, collection_counter, verification_status,
-        it_run_bib_collections ( id, collected_at, counter_name ),
+        it_run_bib_collections ( id, collected_at, counter_number ),
         it_run_checkins ( id, checked_in_at )
       )
     `)
