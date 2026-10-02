@@ -33,9 +33,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Upload failed" }, { status: 500 });
     }
 
-    const { data: { publicUrl } } = db.storage.from(BUCKET).getPublicUrl(upload.path);
-
-    return NextResponse.json({ url: publicUrl });
+    // Return the storage PATH (not a public URL). The bucket is private;
+    // getPublicUrl() would generate a URL that returns 400 for private buckets.
+    // The path is resolved to a short-lived signed URL server-side at view time
+    // (see /api/it-run/admin/company-id-url).
+    return NextResponse.json({ url: upload.path });
   } catch (e: unknown) {
     console.error("[it-run/upload] error:", e);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
