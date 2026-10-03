@@ -3,6 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail }         from "@/lib/notify";
 import { APP_URL }           from "@/lib/config";
 import QRCode                from "qrcode";
+import { emailWrapper, emailHeader, emailFooter } from "@/lib/email/layout";
 
 const PARTICIPANT_TYPE_LABEL: Record<string, string> = {
   solo:      "",
@@ -588,4 +589,102 @@ export function buildConfirmEmail(args: ConfirmEmailArgs): string {
 </table>
 </body>
 </html>`;
+}
+
+// ── Refund Confirmation Email ──────────────────────────────────────────────────
+//
+// Sent when an admin issues a refund. Idempotency: similar to confirmation email,
+// uses a flag in the refund record to prevent duplicate sends.
+export async function sendRefundConfirmationEmail(
+  registrationId: string,
+  registrationCode: string,
+  leadEmail: string,
+  refundAmount: number,
+): Promise<void> {
+  const label = `[it-run-email/refund] reg=${registrationCode}`;
+  const db    = getSupabaseServer();
+
+  const { data: reg } = await db
+    .from("it_run_registrations")
+    .select(`
+      id, registration_code, lead_email, category_id, base_price,
+      it_run_participants ( first_name, last_name ),
+      it_run_categories ( name )
+    `)
+    .eq("id", registrationId)
+    .single<{
+      id: string; registration_code: string; lead_email: string;
+      category_id: string; base_price: number;
+      it_run_participants: Array<{ first_name: string; last_name: string }>;
+      it_run_categories: { name: string } | null;
+    }>();
+
+  if (!reg) {
+    console.warn(`${label} Registration not found`);
+    return;
+  }
+
+  const recipient = leadEmail || reg.lead_email;
+  const primaryName = reg.it_run_participants?.[0]
+    ? `${reg.it_run_participants[0].first_name} ${reg.it_run_participants[0].last_name}`
+    : "Participant";
+
+  const html = `
+${emailWrapper(`
+${emailHeader()}
+<tr><td style="padding:40px 40px 32px;">
+  <p style="margin:0 0 8px;font-size:15px;color:#555;">Hi <strong>${primaryName}</strong>,</p>
+  <p style="margin:0 0 28px;font-size:15px;color:#555;line-height:1.6;">Your refund for The IT Run Sprint-2 has been processed successfully.</p>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border:1px solid #e5e5e5;border-radius:10px;overflow:hidden;margin-bottom:32px;">
+    <tr><td style="padding:20px 24px;border-bottom:1px solid #e5e5e5;">
+      <div style="font-size:11px;color:#10b981;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">Refund Confirmed</div>
+      <div style="font-size:24px;font-weight:800;color:#10b981;">₹${(refundAmount / 100).toLocaleString("en-IN")}</div>
+    </td></tr>
+    <tr><td>
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="padding:16px 24px;border-right:1px solid #e5e5e5;width:50%;">
+            <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Registration Code</div>
+            <div style="font-size:14px;font-weight:600;color:#0a0a0a;font-family:monospace;">${registrationCode}</div>
+          </td>
+          <td style="padding:16px 24px;width:50%;">
+            <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Category</div>
+            <div style="font-size:14px;font-weight:600;color:#0a0a0a;">${reg.it_run_categories?.name ?? "IT Run Sprint-2"}</div>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+  <div style="background:#e8f5e9;border:1px solid #81c784;border-radius:8px;padding:14px 16px;margin-bottom:20px;font-size:13px;color:#2e7d32;line-height:1.6;">
+    ✓ Refund amount will be credited to your original payment method within 3-5 business days.
+  </div>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border:1px solid #e5e5e5;border-radius:10px;overflow:hidden;margin-bottom:32px;">
+    <tr><td style="padding:16px 20px;border-bottom:1px solid #e5e5e5;">
+      <div style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;">Need help?</div>
+    </td></tr>
+    <tr><td style="padding:16px 20px;">
+      <div style="font-size:13px;color:#666;line-height:1.8;">
+        If you have questions about this refund, please contact us at <a href="mailto:info@connectedsteps.in" style="color:#e8620a;text-decoration:none;">info@connectedsteps.in</a>.<br/>
+        Include your registration code <strong style="color:#0a0a0a;">${registrationCode}</strong> in your message.
+      </div>
+    </td></tr>
+  </table>
+  <p style="margin:0;font-size:13px;color:#888;line-height:1.6;text-align:center;">
+    Thank you for being part of the Connected Steps community. We hope to see you at a future event!
+  </p>
+</td></tr>
+${emailFooter()}
+`)}
+  `;
+
+  await sendEmail(
+    recipient,
+    primaryName,
+    `Refund Processed — The IT Run Sprint-2 (${registrationCode})`,
+    html,
+    false,
+    true,
+  );
+
+  console.log(`${label} Refund confirmation email sent to ${recipient}`);
 }

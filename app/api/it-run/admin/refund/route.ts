@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireRole, getClientIp } from "@/lib/it-run-auth";
 import { createRefund } from "@/lib/razorpay-client";
+import { sendRefundConfirmationEmail } from "@/lib/it-run-email";
 
 // POST /api/it-run/admin/refund
 // Production-grade refund with complete audit trail, idempotency, and reconciliation.
@@ -73,7 +74,8 @@ export async function POST(req: NextRequest) {
 
   // Compute refund amount: if not provided, refund the full final_price
   const refundAmount = amount_paise ?? reg.final_price;
-  const refundableAmount = await db.rpc("itr_refundable_amount", { p_registration_id: reg.id });
+  const { data: refundableAmountResult } = await db.rpc("itr_refundable_amount", { p_registration_id: reg.id });
+  const refundableAmount = (refundableAmountResult as number) ?? 0;
 
   if (refundAmount > refundableAmount) {
     return NextResponse.json(
@@ -212,6 +214,13 @@ export async function POST(req: NextRequest) {
       reason,
     },
   });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Step 8: Send confirmation email (non-blocking)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  sendRefundConfirmationEmail(reg.id, reg.registration_code, reg.lead_email, refundAmount)
+    .catch(err => console.error(`[it-run/admin/refund] Email send failed: ${err}`));
 
   console.log(
     `[it-run/admin/refund] ✅ ${reg.registration_code} refunded ₹${refundAmount/100} (Razorpay: ${rzpRefund.id})`,
