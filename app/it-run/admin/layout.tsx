@@ -25,6 +25,7 @@ const NAV_ITEMS = [
   { href: "/it-run/admin/refund-reconciliation", label: "Refunds",       icon: "&#128190;",roles: ["super_admin","event_admin"] },
   { href: "/it-run/admin/notifications",  label: "Email / Notifications",icon: "&#9993;", roles: ["super_admin","event_admin"] },
   // ── Race day ──────────────────────────────────────────────────────────
+  { href: "/it-run/admin/bib-collection", label: "BIB Collection Ops",   icon: "&#128197;",roles: ["super_admin","event_admin"] },
   { href: "/it-run/admin/checkins",       label: "QR / Check-in",       icon: "&#10003;", roles: ["super_admin","event_admin","checkin_team"] },
   // ── Post-Event ────────────────────────────────────────────────────────
   { href: "/it-run/admin/feedback",       label: "Feedback",            icon: "&#9733;",  roles: ["super_admin","event_admin"] },
