@@ -42,7 +42,16 @@ CREATE INDEX IF NOT EXISTS idx_refunds_razorpay_id ON it_run_refunds(razorpay_re
 ALTER TABLE it_run_registrations
   DROP CONSTRAINT IF EXISTS it_run_registrations_payment_status_check,
   ADD CONSTRAINT it_run_registrations_payment_status_check
-    CHECK (payment_status IN ('pending','paid','failed','free','refunded','partially_refunded'));
+    CHECK (payment_status IN (
+      'pending',
+      'payment_attempted',
+      'paid',
+      'failed',
+      'free',
+      'expired',
+      'refunded',
+      'partially_refunded'
+    ));
 
 -- ── RLS Policies ───────────────────────────────────────────────────────────
 
