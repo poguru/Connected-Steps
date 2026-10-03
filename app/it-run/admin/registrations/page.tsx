@@ -218,8 +218,8 @@ function ParticipantCard({ p, idx, onEdit }: {
   p: Participant; idx: number; onEdit: (p: Participant) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const collected = p.it_run_bib_collections.length > 0;
-  const checkedIn = p.it_run_checkins.length > 0;
+  const collected = (p.it_run_bib_collections ?? []).length > 0;
+  const checkedIn = (p.it_run_checkins ?? []).length > 0;
   const vc = VER_COLOR[p.verification_status] ?? "#888";
 
   return (

@@ -371,13 +371,13 @@ function AllocationTab() {
   }
 
   const unallocatedCount = data.filter(p => !p.bib_number).length;
-  const collectedCount   = data.filter(p => p.it_run_bib_collections.length > 0).length;
+  const collectedCount   = data.filter(p => (p.it_run_bib_collections ?? []).length > 0).length;
   const lc               = search.toLowerCase();
 
   const filtered = data
     .filter(p =>
       filter === "unallocated" ? !p.bib_number :
-      filter === "collected"   ? p.it_run_bib_collections.length > 0 :
+      filter === "collected"   ? (p.it_run_bib_collections ?? []).length > 0 :
       true
     )
     .filter(p =>
@@ -432,7 +432,7 @@ function AllocationTab() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 8 }}>
           {filtered.map(p => {
             const cat        = p.it_run_registrations?.it_run_categories;
-            const isCollected = p.it_run_bib_collections.length > 0;
+            const isCollected = (p.it_run_bib_collections ?? []).length > 0;
             return (
               <div key={p.id} style={CARD}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>

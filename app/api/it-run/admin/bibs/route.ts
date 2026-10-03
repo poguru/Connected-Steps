@@ -30,7 +30,14 @@ export async function GET(req: NextRequest) {
   const { data, error } = await q.order("id");
   if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
-  return NextResponse.json({ data });
+  // Normalize: PostgREST returns null for empty to-many relations.
+  // Frontend expects [] consistently. Map null → [] for it_run_bib_collections.
+  const normalizedData = (data ?? []).map((p: any) => ({
+    ...p,
+    it_run_bib_collections: (p.it_run_bib_collections as unknown[] | null) ?? [],
+  }));
+
+  return NextResponse.json({ data: normalizedData });
 }
 
 // POST /api/it-run/admin/bibs — bulk auto-allocate BIBs

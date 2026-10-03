@@ -85,9 +85,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Participant not found" }, { status: 404 });
   }
 
+  // Normalize: PostgREST returns null for empty to-many relations. Frontend expects [].
+  const normalized = {
+    ...participant,
+    it_run_bib_collections:   ((participant.it_run_bib_collections as unknown[] | null) ?? []),
+    it_run_tshirt_issuances:  ((participant.it_run_tshirt_issuances as unknown[] | null) ?? []),
+    it_run_checkins:          ((participant.it_run_checkins as unknown[] | null) ?? []),
+  };
+
   // Reject unconfirmed registrations at scan time
-  const payStatus = (participant.it_run_registrations as unknown as { payment_status: string }).payment_status;
-  const regStatus = (participant.it_run_registrations as unknown as { registration_status: string }).registration_status;
+  const payStatus = (normalized.it_run_registrations as unknown as { payment_status: string }).payment_status;
+  const regStatus = (normalized.it_run_registrations as unknown as { registration_status: string }).registration_status;
 
   if (!["paid", "free"].includes(payStatus)) {
     return NextResponse.json({
@@ -102,5 +110,5 @@ export async function GET(req: NextRequest) {
     }, { status: 400 });
   }
 
-  return NextResponse.json({ participant });
+  return NextResponse.json({ participant: normalized });
 }

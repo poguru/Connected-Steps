@@ -1,0 +1,5672 @@
+{
+  "config": {
+    "configFile": "C:\\Users\\conne\\Desktop\\connected-steps\\tests\\it-run\\playwright.config.ts",
+    "rootDir": "C:/Users/conne/Desktop/connected-steps/tests/it-run",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {},
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/conne/Desktop/connected-steps/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "api",
+        "name": "api",
+        "testDir": "C:/Users/conne/Desktop/connected-steps/tests/it-run",
+        "testIgnore": [],
+        "testMatch": [
+          "**/api/**/*.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "C:/Users/conne/Desktop/connected-steps/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "security",
+        "name": "security",
+        "testDir": "C:/Users/conne/Desktop/connected-steps/tests/it-run",
+        "testIgnore": [],
+        "testMatch": [
+          "**/security/**/*.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "C:/Users/conne/Desktop/connected-steps/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "concurrency",
+        "name": "concurrency",
+        "testDir": "C:/Users/conne/Desktop/connected-steps/tests/it-run",
+        "testIgnore": [],
+        "testMatch": [
+          "**/concurrency/**/*.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "C:/Users/conne/Desktop/connected-steps/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "smoke",
+        "name": "smoke",
+        "testDir": "C:/Users/conne/Desktop/connected-steps/tests/it-run",
+        "testIgnore": [],
+        "testMatch": [
+          "**/smoke/**/*.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "C:/Users/conne/Desktop/connected-steps/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "smoke-mobile",
+        "name": "smoke-mobile",
+        "testDir": "C:/Users/conne/Desktop/connected-steps/tests/it-run",
+        "testIgnore": [],
+        "testMatch": [
+          "**/smoke/**/*.spec.ts"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "open": "never",
+          "outputFolder": "../../playwright-report/it-run"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "../../playwright-report/it-run/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.60.0",
+    "workers": 4,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "api\\admin\\auth.spec.ts",
+      "file": "api/admin/auth.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@admin @smoke valid admin login returns role and name",
+          "ok": true,
+          "tags": [
+            "admin",
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "197857dc80e091b5b75f-e20ef4b459d662f3fa74",
+          "file": "api/admin/auth.spec.ts",
+          "line": 14,
+          "column": 5
+        },
+        {
+          "title": "@admin wrong password returns 401",
+          "ok": true,
+          "tags": [
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "197857dc80e091b5b75f-b5fc8b371ab386986fa6",
+          "file": "api/admin/auth.spec.ts",
+          "line": 37,
+          "column": 5
+        },
+        {
+          "title": "@admin unknown email returns 401",
+          "ok": true,
+          "tags": [
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "197857dc80e091b5b75f-3748c56dc106cccbd3d5",
+          "file": "api/admin/auth.spec.ts",
+          "line": 45,
+          "column": 5
+        },
+        {
+          "title": "@admin missing email returns 4xx",
+          "ok": true,
+          "tags": [
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "197857dc80e091b5b75f-dc3af423b2379db6dda1",
+          "file": "api/admin/auth.spec.ts",
+          "line": 52,
+          "column": 5
+        },
+        {
+          "title": "@admin missing password returns 4xx",
+          "ok": true,
+          "tags": [
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "197857dc80e091b5b75f-7d70f8090da0acb94c1d",
+          "file": "api/admin/auth.spec.ts",
+          "line": 60,
+          "column": 5
+        },
+        {
+          "title": "@admin GET session without cookie returns 401",
+          "ok": true,
+          "tags": [
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "197857dc80e091b5b75f-9593d2512ff7b1f780eb",
+          "file": "api/admin/auth.spec.ts",
+          "line": 70,
+          "column": 5
+        },
+        {
+          "title": "@admin GET session with invalid cookie returns 401",
+          "ok": true,
+          "tags": [
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "197857dc80e091b5b75f-c8a89e3a68c2f140f9d5",
+          "file": "api/admin/auth.spec.ts",
+          "line": 75,
+          "column": 5
+        },
+        {
+          "title": "@admin GET session with tampered cookie returns 401",
+          "ok": true,
+          "tags": [
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "197857dc80e091b5b75f-2a37c638d85e9552bb6f",
+          "file": "api/admin/auth.spec.ts",
+          "line": 82,
+          "column": 5
+        },
+        {
+          "title": "@admin DELETE (logout) clears session cookie",
+          "ok": true,
+          "tags": [
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "197857dc80e091b5b75f-2d0d920be20748e850a8",
+          "file": "api/admin/auth.spec.ts",
+          "line": 93,
+          "column": 5
+        },
+        {
+          "title": "@admin dashboard returns 401 without session",
+          "ok": true,
+          "tags": [
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "197857dc80e091b5b75f-081809310cb90599dcc0",
+          "file": "api/admin/auth.spec.ts",
+          "line": 104,
+          "column": 5
+        },
+        {
+          "title": "@admin registrations returns 401 without session",
+          "ok": true,
+          "tags": [
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "197857dc80e091b5b75f-d2685f745a165ec9ad17",
+          "file": "api/admin/auth.spec.ts",
+          "line": 109,
+          "column": 5
+        },
+        {
+          "title": "@admin participants returns 401 without session",
+          "ok": true,
+          "tags": [
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "197857dc80e091b5b75f-bac350f0e9f9db483164",
+          "file": "api/admin/auth.spec.ts",
+          "line": 114,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "api\\bib\\bib.spec.ts",
+      "file": "api/bib/bib.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@bib @security unauthenticated BIB allocation returns 401",
+          "ok": true,
+          "tags": [
+            "bib",
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "78ee3de63b622324525f-f9be49fbd78c090349b6",
+          "file": "api/bib/bib.spec.ts",
+          "line": 42,
+          "column": 8
+        },
+        {
+          "title": "@bib BIB allocated to 10k-timed falls in correct numeric range",
+          "ok": true,
+          "tags": [
+            "bib"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "78ee3de63b622324525f-0d59ea368eaab65fef77",
+          "file": "api/bib/bib.spec.ts",
+          "line": 50,
+          "column": 10
+        },
+        {
+          "title": "@bib BIB allocated to 5k-timed falls in correct numeric range",
+          "ok": true,
+          "tags": [
+            "bib"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "78ee3de63b622324525f-a541dd2c8b7b05426ff2",
+          "file": "api/bib/bib.spec.ts",
+          "line": 50,
+          "column": 10
+        },
+        {
+          "title": "@bib BIB allocated to 5k-fun-run falls in correct numeric range",
+          "ok": true,
+          "tags": [
+            "bib"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "78ee3de63b622324525f-fc7b13c30e08be54fdad",
+          "file": "api/bib/bib.spec.ts",
+          "line": 50,
+          "column": 10
+        },
+        {
+          "title": "@bib duo registration — both participants receive BIBs in 5K duo range",
+          "ok": true,
+          "tags": [
+            "bib"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "78ee3de63b622324525f-298b473f5206492e161c",
+          "file": "api/bib/bib.spec.ts",
+          "line": 82,
+          "column": 8
+        },
+        {
+          "title": "@bib no duplicate BIB numbers after bulk allocation across 10 registrations",
+          "ok": true,
+          "tags": [
+            "bib"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "78ee3de63b622324525f-7f68bd7515cb25f9c8d7",
+          "file": "api/bib/bib.spec.ts",
+          "line": 120,
+          "column": 8
+        },
+        {
+          "title": "@bib already-allocated participant is not re-allocated",
+          "ok": true,
+          "tags": [
+            "bib"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "78ee3de63b622324525f-778c1ddbb48cdf2fc2be",
+          "file": "api/bib/bib.spec.ts",
+          "line": 169,
+          "column": 8
+        }
+      ]
+    },
+    {
+      "title": "api\\checkin\\checkin.spec.ts",
+      "file": "api/checkin/checkin.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@checkin @security unauthenticated GET /checkin returns 401",
+          "ok": true,
+          "tags": [
+            "checkin",
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2c918941a3df201e2454-2aeff392a8a0d7af8483",
+          "file": "api/checkin/checkin.spec.ts",
+          "line": 41,
+          "column": 8
+        },
+        {
+          "title": "@checkin @security unauthenticated POST /checkin returns 401",
+          "ok": true,
+          "tags": [
+            "checkin",
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2c918941a3df201e2454-7f1559b041d2563a2316",
+          "file": "api/checkin/checkin.spec.ts",
+          "line": 46,
+          "column": 8
+        },
+        {
+          "title": "@checkin @security unauthenticated GET /admin/scan returns 401",
+          "ok": true,
+          "tags": [
+            "checkin",
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2c918941a3df201e2454-61173b5077612f04c934",
+          "file": "api/checkin/checkin.spec.ts",
+          "line": 53,
+          "column": 8
+        },
+        {
+          "title": "@checkin @smoke paid participant can be checked in via participant ID",
+          "ok": true,
+          "tags": [
+            "checkin",
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2c918941a3df201e2454-a558af75767bf79de422",
+          "file": "api/checkin/checkin.spec.ts",
+          "line": 60,
+          "column": 8
+        },
+        {
+          "title": "@checkin duplicate check-in returns 409 with already=true",
+          "ok": true,
+          "tags": [
+            "checkin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2c918941a3df201e2454-03f78fb313a6ff11984d",
+          "file": "api/checkin/checkin.spec.ts",
+          "line": 86,
+          "column": 8
+        },
+        {
+          "title": "@checkin @security cancelled registration cannot be checked in",
+          "ok": true,
+          "tags": [
+            "checkin",
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2c918941a3df201e2454-6c6eeee7c5426e5efbbd",
+          "file": "api/checkin/checkin.spec.ts",
+          "line": 110,
+          "column": 8
+        },
+        {
+          "title": "@checkin unpaid registration cannot be checked in",
+          "ok": true,
+          "tags": [
+            "checkin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2c918941a3df201e2454-fca64a335a3314efa401",
+          "file": "api/checkin/checkin.spec.ts",
+          "line": 132,
+          "column": 8
+        },
+        {
+          "title": "@checkin free registration CAN be checked in",
+          "ok": true,
+          "tags": [
+            "checkin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2c918941a3df201e2454-747bd7a66261e76cf84a",
+          "file": "api/checkin/checkin.spec.ts",
+          "line": 147,
+          "column": 8
+        },
+        {
+          "title": "@checkin invalid participantId returns 4xx",
+          "ok": true,
+          "tags": [
+            "checkin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2c918941a3df201e2454-24501bf1a29fc8c5b002",
+          "file": "api/checkin/checkin.spec.ts",
+          "line": 162,
+          "column": 8
+        },
+        {
+          "title": "@checkin admin scan by BIB number returns participant data",
+          "ok": true,
+          "tags": [
+            "checkin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2c918941a3df201e2454-7da13f1733cba609a9bd",
+          "file": "api/checkin/checkin.spec.ts",
+          "line": 173,
+          "column": 8
+        }
+      ]
+    },
+    {
+      "title": "api\\coupon\\coupon.spec.ts",
+      "file": "api/coupon/coupon.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@coupon @smoke valid percent coupon returns correct discount",
+          "ok": true,
+          "tags": [
+            "coupon",
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5abedd13bfe89bbc5ede-5c936c21dc03e9459cb6",
+          "file": "api/coupon/coupon.spec.ts",
+          "line": 35,
+          "column": 5
+        },
+        {
+          "title": "@coupon valid flat coupon returns correct discount",
+          "ok": true,
+          "tags": [
+            "coupon"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5abedd13bfe89bbc5ede-c8fc95408f7781666252",
+          "file": "api/coupon/coupon.spec.ts",
+          "line": 52,
+          "column": 5
+        },
+        {
+          "title": "@coupon @smoke 100% percent coupon returns discount equal to full price",
+          "ok": true,
+          "tags": [
+            "coupon",
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5abedd13bfe89bbc5ede-52b00fa03db480406835",
+          "file": "api/coupon/coupon.spec.ts",
+          "line": 68,
+          "column": 5
+        },
+        {
+          "title": "@coupon wrong code returns 400",
+          "ok": true,
+          "tags": [
+            "coupon"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5abedd13bfe89bbc5ede-b34d5fdb07bb1a1bad5d",
+          "file": "api/coupon/coupon.spec.ts",
+          "line": 84,
+          "column": 5
+        },
+        {
+          "title": "@coupon empty code returns 400",
+          "ok": true,
+          "tags": [
+            "coupon"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5abedd13bfe89bbc5ede-8423397b56d89c65d696",
+          "file": "api/coupon/coupon.spec.ts",
+          "line": 92,
+          "column": 5
+        },
+        {
+          "title": "@coupon inactive coupon returns 400",
+          "ok": true,
+          "tags": [
+            "coupon"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5abedd13bfe89bbc5ede-8dcaee5166f849ce2f6f",
+          "file": "api/coupon/coupon.spec.ts",
+          "line": 102,
+          "column": 5
+        },
+        {
+          "title": "@coupon expired coupon returns 400",
+          "ok": true,
+          "tags": [
+            "coupon"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5abedd13bfe89bbc5ede-9398d552f4be69257674",
+          "file": "api/coupon/coupon.spec.ts",
+          "line": 115,
+          "column": 5
+        },
+        {
+          "title": "@coupon exhausted coupon (use_count >= max_uses) returns 400",
+          "ok": true,
+          "tags": [
+            "coupon"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5abedd13bfe89bbc5ede-81f7e59faa2563c627c1",
+          "file": "api/coupon/coupon.spec.ts",
+          "line": 131,
+          "column": 5
+        },
+        {
+          "title": "@coupon min_amount not met returns 400",
+          "ok": true,
+          "tags": [
+            "coupon"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5abedd13bfe89bbc5ede-dd0220cf76dacf0b237c",
+          "file": "api/coupon/coupon.spec.ts",
+          "line": 145,
+          "column": 5
+        },
+        {
+          "title": "@coupon coupon with 1 remaining use is accepted at validate step",
+          "ok": true,
+          "tags": [
+            "coupon"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5abedd13bfe89bbc5ede-edf1eab23f52877bb89f",
+          "file": "api/coupon/coupon.spec.ts",
+          "line": 160,
+          "column": 5
+        },
+        {
+          "title": "@coupon coupon code is case-insensitive (validate accepts lowercase)",
+          "ok": true,
+          "tags": [
+            "coupon"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5abedd13bfe89bbc5ede-c248e429da0c7f3365ae",
+          "file": "api/coupon/coupon.spec.ts",
+          "line": 176,
+          "column": 5
+        },
+        {
+          "title": "@coupon missing categoryId returns 4xx",
+          "ok": true,
+          "tags": [
+            "coupon"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5abedd13bfe89bbc5ede-a8dbd446168cc5e335b2",
+          "file": "api/coupon/coupon.spec.ts",
+          "line": 191,
+          "column": 5
+        },
+        {
+          "title": "@coupon invalid categoryId (fake UUID) returns 404",
+          "ok": true,
+          "tags": [
+            "coupon"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "5abedd13bfe89bbc5ede-73d2f235c27fe6efe4c6",
+          "file": "api/coupon/coupon.spec.ts",
+          "line": 198,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "api\\feedback\\admin.spec.ts",
+      "file": "api/feedback/admin.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@feedback @admin list blocked without admin session",
+          "ok": true,
+          "tags": [
+            "feedback",
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "10c6df97558f46f003b5-a7a5e64393c3e68e7e21",
+          "file": "api/feedback/admin.spec.ts",
+          "line": 30,
+          "column": 5
+        },
+        {
+          "title": "@feedback @admin summary blocked without admin session",
+          "ok": true,
+          "tags": [
+            "feedback",
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "10c6df97558f46f003b5-661b555d4866377a2d9c",
+          "file": "api/feedback/admin.spec.ts",
+          "line": 35,
+          "column": 5
+        },
+        {
+          "title": "@feedback @admin export blocked without admin session",
+          "ok": true,
+          "tags": [
+            "feedback",
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "10c6df97558f46f003b5-523a661423b0cdfd2ed2",
+          "file": "api/feedback/admin.spec.ts",
+          "line": 40,
+          "column": 5
+        },
+        {
+          "title": "@feedback @admin PATCH blocked without admin session",
+          "ok": true,
+          "tags": [
+            "feedback",
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "10c6df97558f46f003b5-799b4b46211d48e82e7c",
+          "file": "api/feedback/admin.spec.ts",
+          "line": 45,
+          "column": 5
+        },
+        {
+          "title": "@feedback @admin list returns paginated response",
+          "ok": true,
+          "tags": [
+            "feedback",
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "10c6df97558f46f003b5-81009b317fffcbe46078",
+          "file": "api/feedback/admin.spec.ts",
+          "line": 54,
+          "column": 5
+        },
+        {
+          "title": "@feedback @admin list requires event_id param",
+          "ok": true,
+          "tags": [
+            "feedback",
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "10c6df97558f46f003b5-17b1a07eddece55063a5",
+          "file": "api/feedback/admin.spec.ts",
+          "line": 65,
+          "column": 5
+        },
+        {
+          "title": "@feedback @admin list with invalid event_id returns 404",
+          "ok": true,
+          "tags": [
+            "feedback",
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "10c6df97558f46f003b5-01857f41b58127a44cef",
+          "file": "api/feedback/admin.spec.ts",
+          "line": 71,
+          "column": 5
+        },
+        {
+          "title": "@feedback @admin list per_page capped at 200",
+          "ok": true,
+          "tags": [
+            "feedback",
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "10c6df97558f46f003b5-f17aca5e2aae8d779bfe",
+          "file": "api/feedback/admin.spec.ts",
+          "line": 77,
+          "column": 5
+        },
+        {
+          "title": "@feedback @admin summary returns expected shape",
+          "ok": true,
+          "tags": [
+            "feedback",
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "10c6df97558f46f003b5-e7236b2a3cef0e7eab39",
+          "file": "api/feedback/admin.spec.ts",
+          "line": 87,
+          "column": 5
+        },
+        {
+          "title": "@feedback @admin summary requires event_id",
+          "ok": true,
+          "tags": [
+            "feedback",
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "10c6df97558f46f003b5-1d9bc1d015f967db238a",
+          "file": "api/feedback/admin.spec.ts",
+          "line": 97,
+          "column": 5
+        },
+        {
+          "title": "@feedback @admin export returns CSV content-type",
+          "ok": true,
+          "tags": [
+            "feedback",
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "10c6df97558f46f003b5-633db3481299d9175402",
+          "file": "api/feedback/admin.spec.ts",
+          "line": 105,
+          "column": 5
+        },
+        {
+          "title": "@feedback @admin export has content-disposition attachment header",
+          "ok": true,
+          "tags": [
+            "feedback",
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "10c6df97558f46f003b5-20930d8ccf61f3b12fc4",
+          "file": "api/feedback/admin.spec.ts",
+          "line": 113,
+          "column": 5
+        },
+        {
+          "title": "@feedback @admin export requires event_id",
+          "ok": true,
+          "tags": [
+            "feedback",
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "10c6df97558f46f003b5-9e40cf71e6952a20c481",
+          "file": "api/feedback/admin.spec.ts",
+          "line": 121,
+          "column": 5
+        },
+        {
+          "title": "@feedback @admin PATCH rejects missing id",
+          "ok": true,
+          "tags": [
+            "feedback",
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "10c6df97558f46f003b5-ee60b5c07b67e46c8376",
+          "file": "api/feedback/admin.spec.ts",
+          "line": 129,
+          "column": 5
+        },
+        {
+          "title": "@feedback @admin PATCH rejects invalid issue_status",
+          "ok": true,
+          "tags": [
+            "feedback",
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "10c6df97558f46f003b5-bc30f4ad882cc6108f1a",
+          "file": "api/feedback/admin.spec.ts",
+          "line": 135,
+          "column": 5
+        },
+        {
+          "title": "@feedback @admin PATCH rejects invalid issue_priority",
+          "ok": true,
+          "tags": [
+            "feedback",
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "10c6df97558f46f003b5-bf199fb52f373600ca9f",
+          "file": "api/feedback/admin.spec.ts",
+          "line": 144,
+          "column": 5
+        },
+        {
+          "title": "@feedback @admin PATCH returns 404 for non-existent feedback id",
+          "ok": true,
+          "tags": [
+            "feedback",
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "10c6df97558f46f003b5-67513fc30f0ab5f1aeed",
+          "file": "api/feedback/admin.spec.ts",
+          "line": 153,
+          "column": 5
+        },
+        {
+          "title": "@feedback @admin PATCH rejects no fields to update",
+          "ok": true,
+          "tags": [
+            "feedback",
+            "admin"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "10c6df97558f46f003b5-92d60e32ef6d1fb4ca4d",
+          "file": "api/feedback/admin.spec.ts",
+          "line": 162,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "api\\feedback\\submit.spec.ts",
+      "file": "api/feedback/submit.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@feedback rejects missing registration_code",
+          "ok": true,
+          "tags": [
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d314e8d2ed407e224093-3681b869b2f1ad3452b9",
+          "file": "api/feedback/submit.spec.ts",
+          "line": 20,
+          "column": 5
+        },
+        {
+          "title": "@feedback rejects missing overall_rating",
+          "ok": true,
+          "tags": [
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d314e8d2ed407e224093-f5e95effe00b7bc0ed20",
+          "file": "api/feedback/submit.spec.ts",
+          "line": 29,
+          "column": 5
+        },
+        {
+          "title": "@feedback rejects overall_rating = 0",
+          "ok": true,
+          "tags": [
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d314e8d2ed407e224093-9b9d76be5add69002391",
+          "file": "api/feedback/submit.spec.ts",
+          "line": 38,
+          "column": 5
+        },
+        {
+          "title": "@feedback rejects overall_rating = 6",
+          "ok": true,
+          "tags": [
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d314e8d2ed407e224093-ae4f6ded5ee15f4fe4c5",
+          "file": "api/feedback/submit.spec.ts",
+          "line": 45,
+          "column": 5
+        },
+        {
+          "title": "@feedback rejects non-integer overall_rating",
+          "ok": true,
+          "tags": [
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d314e8d2ed407e224093-fb40e772c24256867502",
+          "file": "api/feedback/submit.spec.ts",
+          "line": 52,
+          "column": 5
+        },
+        {
+          "title": "@feedback rejects invalid nps_score = -1",
+          "ok": true,
+          "tags": [
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d314e8d2ed407e224093-e3e3494a08e3d7da2584",
+          "file": "api/feedback/submit.spec.ts",
+          "line": 59,
+          "column": 5
+        },
+        {
+          "title": "@feedback rejects invalid nps_score = 11",
+          "ok": true,
+          "tags": [
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d314e8d2ed407e224093-dea7e6f1d19c9c0cd8d4",
+          "file": "api/feedback/submit.spec.ts",
+          "line": 66,
+          "column": 5
+        },
+        {
+          "title": "@feedback rejects invalid improvement area",
+          "ok": true,
+          "tags": [
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d314e8d2ed407e224093-246e5e614a5c8389d40a",
+          "file": "api/feedback/submit.spec.ts",
+          "line": 73,
+          "column": 5
+        },
+        {
+          "title": "@feedback rejects improvement_areas as non-array",
+          "ok": true,
+          "tags": [
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d314e8d2ed407e224093-7af1660281f421396729",
+          "file": "api/feedback/submit.spec.ts",
+          "line": 84,
+          "column": 5
+        },
+        {
+          "title": "@feedback rejects invalid JSON body",
+          "ok": true,
+          "tags": [
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d314e8d2ed407e224093-ae56c628ba82d7bea937",
+          "file": "api/feedback/submit.spec.ts",
+          "line": 95,
+          "column": 5
+        },
+        {
+          "title": "@feedback rejects oversized comment (>2001 chars)",
+          "ok": true,
+          "tags": [
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d314e8d2ed407e224093-5a9b355702a738ce4863",
+          "file": "api/feedback/submit.spec.ts",
+          "line": 103,
+          "column": 5
+        },
+        {
+          "title": "@feedback rejects unknown registration code",
+          "ok": true,
+          "tags": [
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d314e8d2ed407e224093-96067aa1d0d080ba874a",
+          "file": "api/feedback/submit.spec.ts",
+          "line": 120,
+          "column": 5
+        },
+        {
+          "title": "@feedback rejects empty string registration code",
+          "ok": true,
+          "tags": [
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d314e8d2ed407e224093-9e3c827e717cfe087fe3",
+          "file": "api/feedback/submit.spec.ts",
+          "line": 128,
+          "column": 5
+        },
+        {
+          "title": "@feedback GET without code returns 400",
+          "ok": true,
+          "tags": [
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d314e8d2ed407e224093-c7f9d67034b017a2bf5b",
+          "file": "api/feedback/submit.spec.ts",
+          "line": 137,
+          "column": 5
+        },
+        {
+          "title": "@feedback GET with unknown code returns 400 or 404",
+          "ok": true,
+          "tags": [
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d314e8d2ed407e224093-bdc41d61315daac8f73c",
+          "file": "api/feedback/submit.spec.ts",
+          "line": 142,
+          "column": 5
+        },
+        {
+          "title": "@feedback rejects organisation_rating = 6",
+          "ok": true,
+          "tags": [
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d314e8d2ed407e224093-e57fa8d62dcc5eba373c",
+          "file": "api/feedback/submit.spec.ts",
+          "line": 150,
+          "column": 5
+        },
+        {
+          "title": "@feedback rejects route_rating = 0",
+          "ok": true,
+          "tags": [
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d314e8d2ed407e224093-f9c8cc65f4427dfe48f9",
+          "file": "api/feedback/submit.spec.ts",
+          "line": 158,
+          "column": 5
+        },
+        {
+          "title": "@feedback rate limiting kicks in after 3 rapid requests from same IP",
+          "ok": true,
+          "tags": [
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "d314e8d2ed407e224093-1c684e7dd6553de3495e",
+          "file": "api/feedback/submit.spec.ts",
+          "line": 168,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "api\\payment\\create-order.spec.ts",
+      "file": "api/payment/create-order.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@payment @smoke create-order returns orderId + amount for pending registration",
+          "ok": true,
+          "tags": [
+            "payment",
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f1c82089b6e32b2b3071-83bb09e41e6364287b6e",
+          "file": "api/payment/create-order.spec.ts",
+          "line": 24,
+          "column": 5
+        },
+        {
+          "title": "@payment create-order returns 4xx for non-existent registration",
+          "ok": true,
+          "tags": [
+            "payment"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f1c82089b6e32b2b3071-489b9292d7fa55a67eb4",
+          "file": "api/payment/create-order.spec.ts",
+          "line": 56,
+          "column": 5
+        },
+        {
+          "title": "@payment create-order returns error for already-paid registration",
+          "ok": true,
+          "tags": [
+            "payment"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f1c82089b6e32b2b3071-8be6f8e4d3fb9fb18bf3",
+          "file": "api/payment/create-order.spec.ts",
+          "line": 64,
+          "column": 5
+        },
+        {
+          "title": "@payment create-order returns error for expired registration",
+          "ok": true,
+          "tags": [
+            "payment"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f1c82089b6e32b2b3071-95cbf4b6e4593e680096",
+          "file": "api/payment/create-order.spec.ts",
+          "line": 77,
+          "column": 5
+        },
+        {
+          "title": "@payment create-order returns error for free registration",
+          "ok": true,
+          "tags": [
+            "payment"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f1c82089b6e32b2b3071-69f8583ba500423f933b",
+          "file": "api/payment/create-order.spec.ts",
+          "line": 89,
+          "column": 5
+        },
+        {
+          "title": "@payment create-order rejects missing registrationId",
+          "ok": true,
+          "tags": [
+            "payment"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f1c82089b6e32b2b3071-7d36a7820fd2bc9c029f",
+          "file": "api/payment/create-order.spec.ts",
+          "line": 102,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "api\\payment\\verify.spec.ts",
+      "file": "api/payment/verify.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@payment verify rejects invalid signature",
+          "ok": true,
+          "tags": [
+            "payment"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "3793a1152f9a5e6dfea0-93beb37eb4810ceda956",
+          "file": "api/payment/verify.spec.ts",
+          "line": 32,
+          "column": 5
+        },
+        {
+          "title": "@payment @security verify rejects orderId mismatch (IDOR attempt)",
+          "ok": true,
+          "tags": [
+            "payment",
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "3793a1152f9a5e6dfea0-7c18dfa8c077fd506730",
+          "file": "api/payment/verify.spec.ts",
+          "line": 55,
+          "column": 5
+        },
+        {
+          "title": "@payment verify rejects missing registrationId",
+          "ok": true,
+          "tags": [
+            "payment"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "3793a1152f9a5e6dfea0-e84ef3b4033714b4a71d",
+          "file": "api/payment/verify.spec.ts",
+          "line": 86,
+          "column": 5
+        },
+        {
+          "title": "@payment verify rejects missing paymentId",
+          "ok": true,
+          "tags": [
+            "payment"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "3793a1152f9a5e6dfea0-fb67c5b274b5e08bf9e0",
+          "file": "api/payment/verify.spec.ts",
+          "line": 93,
+          "column": 5
+        },
+        {
+          "title": "@payment verify is idempotent for already-paid registration",
+          "ok": true,
+          "tags": [
+            "payment"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "3793a1152f9a5e6dfea0-d0407068864ea93eb322",
+          "file": "api/payment/verify.spec.ts",
+          "line": 107,
+          "column": 5
+        },
+        {
+          "title": "@payment verify returns 404 for unknown registrationId",
+          "ok": true,
+          "tags": [
+            "payment"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "3793a1152f9a5e6dfea0-075a84358db8286b70fd",
+          "file": "api/payment/verify.spec.ts",
+          "line": 139,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "api\\payment\\webhook.spec.ts",
+      "file": "api/payment/webhook.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@webhook rejects missing signature header",
+          "ok": true,
+          "tags": [
+            "webhook"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "be26900ff35a875d91a9-fa9b1a89a3ed8693bf29",
+          "file": "api/payment/webhook.spec.ts",
+          "line": 36,
+          "column": 5
+        },
+        {
+          "title": "@webhook rejects invalid signature",
+          "ok": true,
+          "tags": [
+            "webhook"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "be26900ff35a875d91a9-39ca7c15f22b74826baf",
+          "file": "api/payment/webhook.spec.ts",
+          "line": 49,
+          "column": 5
+        },
+        {
+          "title": "@webhook rejects stale timestamp (>5 min old)",
+          "ok": true,
+          "tags": [
+            "webhook"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "be26900ff35a875d91a9-3b43de42dc7e57209d3e",
+          "file": "api/payment/webhook.spec.ts",
+          "line": 63,
+          "column": 5
+        },
+        {
+          "title": "@webhook rejects missing timestamp header",
+          "ok": true,
+          "tags": [
+            "webhook"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "be26900ff35a875d91a9-7d7d55ce8737523ff2a8",
+          "file": "api/payment/webhook.spec.ts",
+          "line": 79,
+          "column": 5
+        },
+        {
+          "title": "@webhook rejects malformed JSON body",
+          "ok": true,
+          "tags": [
+            "webhook"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "be26900ff35a875d91a9-437f3271cdd15683d230",
+          "file": "api/payment/webhook.spec.ts",
+          "line": 93,
+          "column": 5
+        },
+        {
+          "title": "@webhook @smoke payment.captured updates registration to paid",
+          "ok": true,
+          "tags": [
+            "webhook",
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "be26900ff35a875d91a9-fdc4912f2f4f1253e816",
+          "file": "api/payment/webhook.spec.ts",
+          "line": 116,
+          "column": 5
+        },
+        {
+          "title": "@webhook idempotency — duplicate payment.captured does not error",
+          "ok": true,
+          "tags": [
+            "webhook"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "be26900ff35a875d91a9-35b845006f4febd735bb",
+          "file": "api/payment/webhook.spec.ts",
+          "line": 145,
+          "column": 5
+        },
+        {
+          "title": "@webhook refund.created sets registration_status=cancelled",
+          "ok": true,
+          "tags": [
+            "webhook"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "be26900ff35a875d91a9-8a92b810deb31909f56b",
+          "file": "api/payment/webhook.spec.ts",
+          "line": 181,
+          "column": 5
+        },
+        {
+          "title": "@webhook payment.captured for unknown order ID returns 200 (graceful skip)",
+          "ok": true,
+          "tags": [
+            "webhook"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "be26900ff35a875d91a9-20ee55a06dee1ba6baa7",
+          "file": "api/payment/webhook.spec.ts",
+          "line": 214,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "api\\registration\\duo.spec.ts",
+      "file": "api/registration/duo.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@registration @smoke valid duo registration creates 2 participants with unique QRs",
+          "ok": true,
+          "tags": [
+            "registration",
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "bbabaf2dfd17eab3ce96-e3ddfb4015dc4e92f8b6",
+          "file": "api/registration/duo.spec.ts",
+          "line": 21,
+          "column": 5
+        },
+        {
+          "title": "@registration duo rejects 1 participant",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "bbabaf2dfd17eab3ce96-dfd6ee99a6e4eab0e074",
+          "file": "api/registration/duo.spec.ts",
+          "line": 51,
+          "column": 5
+        },
+        {
+          "title": "@registration duo rejects 3 participants",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "bbabaf2dfd17eab3ce96-39b1e6319986c1bf46af",
+          "file": "api/registration/duo.spec.ts",
+          "line": 59,
+          "column": 5
+        },
+        {
+          "title": "@registration duo rejects missing email on participant 2",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "bbabaf2dfd17eab3ce96-be03a2a9dd68dcd6ade9",
+          "file": "api/registration/duo.spec.ts",
+          "line": 71,
+          "column": 5
+        },
+        {
+          "title": "@registration duo rejects invalid tshirt size on participant 2",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "bbabaf2dfd17eab3ce96-fca932adf49862fed9e8",
+          "file": "api/registration/duo.spec.ts",
+          "line": 81,
+          "column": 5
+        },
+        {
+          "title": "@registration duo rejects child t-shirt size on participant 2 (adult)",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "bbabaf2dfd17eab3ce96-d740c58e337a7f14a58a",
+          "file": "api/registration/duo.spec.ts",
+          "line": 91,
+          "column": 5
+        },
+        {
+          "title": "@registration duo rejects missing emergency contact on participant 2",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "bbabaf2dfd17eab3ce96-5d5d62ca1ec245808cd1",
+          "file": "api/registration/duo.spec.ts",
+          "line": 101,
+          "column": 5
+        },
+        {
+          "title": "@registration duo allows same email for both participants (not restricted)",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "bbabaf2dfd17eab3ce96-0f6b3904aef0c96894f1",
+          "file": "api/registration/duo.spec.ts",
+          "line": 113,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "api\\registration\\free.spec.ts",
+      "file": "api/registration/free.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@registration @smoke 100% coupon produces finalPrice=0 and payment_status=free",
+          "ok": true,
+          "tags": [
+            "registration",
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "fd90bc167d36948076d8-fdc934539afdcfdd9825",
+          "file": "api/registration/free.spec.ts",
+          "line": 44,
+          "column": 5
+        },
+        {
+          "title": "@registration free registration does NOT require payment to be active",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "fd90bc167d36948076d8-456f35c2c6306145a780",
+          "file": "api/registration/free.spec.ts",
+          "line": 72,
+          "column": 5
+        },
+        {
+          "title": "@registration free registration increments coupon use_count by 1",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "fd90bc167d36948076d8-0bc3cd69247ea8206a31",
+          "file": "api/registration/free.spec.ts",
+          "line": 89,
+          "column": 5
+        },
+        {
+          "title": "@registration free registration — create-order returns error (already free)",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "fd90bc167d36948076d8-afe512e986512046759f",
+          "file": "api/registration/free.spec.ts",
+          "line": 107,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "api\\registration\\kid.spec.ts",
+      "file": "api/registration/kid.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@registration @smoke valid parent + child (age 10 exactly on event date)",
+          "ok": true,
+          "tags": [
+            "registration",
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "9616fa70879f232f16d7-1e9bacc2b1cfe486deff",
+          "file": "api/registration/kid.spec.ts",
+          "line": 33,
+          "column": 5
+        },
+        {
+          "title": "@registration valid child — age 9 years 364 days on event date (just under limit)",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "9616fa70879f232f16d7-307be51056d3275566f6",
+          "file": "api/registration/kid.spec.ts",
+          "line": 61,
+          "column": 5
+        },
+        {
+          "title": "@registration valid child — age 6 on event date",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "9616fa70879f232f16d7-01c00712b2d313d53b6f",
+          "file": "api/registration/kid.spec.ts",
+          "line": 72,
+          "column": 5
+        },
+        {
+          "title": "@registration valid child — age 5 on event date",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "9616fa70879f232f16d7-a50c1f5608b89a3b1492",
+          "file": "api/registration/kid.spec.ts",
+          "line": 83,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects child who turns 11 exactly on event date",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "9616fa70879f232f16d7-471ff09420b695a96239",
+          "file": "api/registration/kid.spec.ts",
+          "line": 96,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects child already 11 years old on event date",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "9616fa70879f232f16d7-c0b2ae965e4dd5480f21",
+          "file": "api/registration/kid.spec.ts",
+          "line": 107,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects child age 12 on event date",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "9616fa70879f232f16d7-bae601f00eb113162137",
+          "file": "api/registration/kid.spec.ts",
+          "line": 117,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects future DOB for child",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "9616fa70879f232f16d7-f2bdbe000a93ff7beac8",
+          "file": "api/registration/kid.spec.ts",
+          "line": 129,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects adult T-shirt size for child participant",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "9616fa70879f232f16d7-74060ee6aa3a1e408012",
+          "file": "api/registration/kid.spec.ts",
+          "line": 139,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects child T-shirt size for parent (adult)",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "9616fa70879f232f16d7-d83cea6b40cb754e26cc",
+          "file": "api/registration/kid.spec.ts",
+          "line": 149,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects adult DOB submitted as child position (would make child ~35 yrs)",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "9616fa70879f232f16d7-b8d3652b56bd3bfb6d9d",
+          "file": "api/registration/kid.spec.ts",
+          "line": 159,
+          "column": 5
+        },
+        {
+          "title": "@registration kid category rejects 1 participant",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "9616fa70879f232f16d7-759520cfd9292b268dbf",
+          "file": "api/registration/kid.spec.ts",
+          "line": 172,
+          "column": 5
+        },
+        {
+          "title": "@registration kid category rejects 3 participants",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "9616fa70879f232f16d7-0b3674ee9cad24f06827",
+          "file": "api/registration/kid.spec.ts",
+          "line": 180,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "api\\registration\\multi-registration.spec.ts",
+      "file": "api/registration/multi-registration.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@registration same email can register multiple times for same category",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "51cdd5ee61a37291e457-f63e4ed81af886426572",
+          "file": "api/registration/multi-registration.spec.ts",
+          "line": 20,
+          "column": 5
+        },
+        {
+          "title": "@registration same email can register for different categories",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "51cdd5ee61a37291e457-641202a93e1ecef23e45",
+          "file": "api/registration/multi-registration.spec.ts",
+          "line": 48,
+          "column": 5
+        },
+        {
+          "title": "@registration different participants can register with the same lead email (friend registration)",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "51cdd5ee61a37291e457-e48c241e6dc158100eb6",
+          "file": "api/registration/multi-registration.spec.ts",
+          "line": 73,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "api\\registration\\solo.spec.ts",
+      "file": "api/registration/solo.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@smoke @registration valid solo registration — 10k-timed",
+          "ok": true,
+          "tags": [
+            "smoke",
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1242c6569d42f1254e9f-a24ae152a532c332a650",
+          "file": "api/registration/solo.spec.ts",
+          "line": 27,
+          "column": 7
+        },
+        {
+          "title": "@smoke @registration valid solo registration — 5k-timed",
+          "ok": true,
+          "tags": [
+            "smoke",
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1242c6569d42f1254e9f-3d453df9145cd0a9b269",
+          "file": "api/registration/solo.spec.ts",
+          "line": 27,
+          "column": 7
+        },
+        {
+          "title": "@smoke @registration valid solo registration — 5k-fun-run",
+          "ok": true,
+          "tags": [
+            "smoke",
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1242c6569d42f1254e9f-90dcb78da424340a975a",
+          "file": "api/registration/solo.spec.ts",
+          "line": 27,
+          "column": 7
+        },
+        {
+          "title": "@registration solo category rejects 0 participants",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1242c6569d42f1254e9f-ef46be373656d230b92a",
+          "file": "api/registration/solo.spec.ts",
+          "line": 56,
+          "column": 5
+        },
+        {
+          "title": "@registration solo category rejects 2 participants",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1242c6569d42f1254e9f-dbd31da51a5f4c1e31de",
+          "file": "api/registration/solo.spec.ts",
+          "line": 64,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects inactive category",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1242c6569d42f1254e9f-d8265585791c93ac9869",
+          "file": "api/registration/solo.spec.ts",
+          "line": 73,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects missing categoryId",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1242c6569d42f1254e9f-4e81287b687927c5c984",
+          "file": "api/registration/solo.spec.ts",
+          "line": 81,
+          "column": 5
+        },
+        {
+          "title": "@registration category prices match expected Sprint-2 pricing",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1242c6569d42f1254e9f-92f5fb431f82d3a2337e",
+          "file": "api/registration/solo.spec.ts",
+          "line": 90,
+          "column": 5
+        },
+        {
+          "title": "@registration @qr each registration gets a unique QR token",
+          "ok": true,
+          "tags": [
+            "registration",
+            "qr"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "1242c6569d42f1254e9f-fd276042633661ea5819",
+          "file": "api/registration/solo.spec.ts",
+          "line": 107,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "api\\registration\\validation.spec.ts",
+      "file": "api/registration/validation.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@registration rejects missing firstName",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-e3b1805dcc8337c8a5a9",
+          "file": "api/registration/validation.spec.ts",
+          "line": 26,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects empty firstName",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-a39392d03f1825ae0d49",
+          "file": "api/registration/validation.spec.ts",
+          "line": 32,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects whitespace-only firstName",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-c4102878b66e8c3c1465",
+          "file": "api/registration/validation.spec.ts",
+          "line": 38,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects empty lastName",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-dd2346b6a7c73214374b",
+          "file": "api/registration/validation.spec.ts",
+          "line": 44,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects missing email",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-643f1ed0fd3f13b884a7",
+          "file": "api/registration/validation.spec.ts",
+          "line": 52,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects invalid email — no @",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-94a6236ad6078782fe55",
+          "file": "api/registration/validation.spec.ts",
+          "line": 58,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects invalid email — no domain",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-4a7b95239cca55a9dd39",
+          "file": "api/registration/validation.spec.ts",
+          "line": 64,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects invalid email — spaces",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-7d59467bfa722675d0df",
+          "file": "api/registration/validation.spec.ts",
+          "line": 70,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects mobile — 9 digits",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-0189b7d20360f00581d8",
+          "file": "api/registration/validation.spec.ts",
+          "line": 78,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects mobile — 11 digits",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-075e84a9fb2348fa1b09",
+          "file": "api/registration/validation.spec.ts",
+          "line": 84,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects mobile — letters",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-b440ed2f994ac7f395eb",
+          "file": "api/registration/validation.spec.ts",
+          "line": 90,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects empty mobile",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-b8b0a279a4d4072dff63",
+          "file": "api/registration/validation.spec.ts",
+          "line": 96,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects missing DOB",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-8c69250ea5d2d7d161c1",
+          "file": "api/registration/validation.spec.ts",
+          "line": 104,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects future DOB for adult",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-6e27ebca4f1ca17980e6",
+          "file": "api/registration/validation.spec.ts",
+          "line": 110,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects non-date DOB string",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-e64afe20e33251ce4e97",
+          "file": "api/registration/validation.spec.ts",
+          "line": 116,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects invalid adult t-shirt size",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-d73f49bdd607aae3cafc",
+          "file": "api/registration/validation.spec.ts",
+          "line": 124,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects empty t-shirt size",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-2b0f1345734b7b190176",
+          "file": "api/registration/validation.spec.ts",
+          "line": 130,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects child t-shirt size on adult participant",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-02fd0acaf7ca3254d3b6",
+          "file": "api/registration/validation.spec.ts",
+          "line": 136,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects missing company name for adult",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-c93ffb19b6b298932446",
+          "file": "api/registration/validation.spec.ts",
+          "line": 144,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects missing emergency contact name",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-15fe5e67a1e22f0efb01",
+          "file": "api/registration/validation.spec.ts",
+          "line": 150,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects missing emergency phone",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-94763b0858d52efd2e88",
+          "file": "api/registration/validation.spec.ts",
+          "line": 156,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects invalid emergency phone — not 10 digits",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-b01947faaf35e0a32fb5",
+          "file": "api/registration/validation.spec.ts",
+          "line": 162,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects missing gender",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-ce886a7f5afce266eea1",
+          "file": "api/registration/validation.spec.ts",
+          "line": 170,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects missing blood group",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-9b03f2a09740dd0fb8ee",
+          "file": "api/registration/validation.spec.ts",
+          "line": 176,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects completely empty body",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-2bc42e2bd67ad5b44089",
+          "file": "api/registration/validation.spec.ts",
+          "line": 184,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects null participants",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-6450dbdcf8c3d8918edd",
+          "file": "api/registration/validation.spec.ts",
+          "line": 189,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects non-array participants",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-0e5681fa9cfea91ade98",
+          "file": "api/registration/validation.spec.ts",
+          "line": 197,
+          "column": 5
+        },
+        {
+          "title": "@registration accepts Unicode first name",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-63da8a0b3e4e57ee76dd",
+          "file": "api/registration/validation.spec.ts",
+          "line": 207,
+          "column": 5
+        },
+        {
+          "title": "@registration rejects extremely long email (>200 chars)",
+          "ok": true,
+          "tags": [
+            "registration"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "api",
+              "projectName": "api",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8b2e1415b03967eeea61-835e3318bcec5036f4fe",
+          "file": "api/registration/validation.spec.ts",
+          "line": 217,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "security\\feedback-idor.spec.ts",
+      "file": "security/feedback-idor.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@security @feedback IDOR: reg code from one event cannot submit feedback for another",
+          "ok": true,
+          "tags": [
+            "security",
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8df3dbe2c70a49a15632-946239e33d031acb202c",
+          "file": "security/feedback-idor.spec.ts",
+          "line": 29,
+          "column": 5
+        },
+        {
+          "title": "@security @feedback IDOR: admin cannot view feedback for nonexistent event",
+          "ok": true,
+          "tags": [
+            "security",
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8df3dbe2c70a49a15632-a4931b1ee649427e46c5",
+          "file": "security/feedback-idor.spec.ts",
+          "line": 45,
+          "column": 5
+        },
+        {
+          "title": "@security @feedback IDOR: admin summary for nonexistent event returns 404",
+          "ok": true,
+          "tags": [
+            "security",
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8df3dbe2c70a49a15632-206c21b6a852a6b2dc1f",
+          "file": "security/feedback-idor.spec.ts",
+          "line": 51,
+          "column": 5
+        },
+        {
+          "title": "@security @feedback unauthenticated request to admin list returns 401",
+          "ok": true,
+          "tags": [
+            "security",
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8df3dbe2c70a49a15632-6be3f8871cbec2c75129",
+          "file": "security/feedback-idor.spec.ts",
+          "line": 59,
+          "column": 5
+        },
+        {
+          "title": "@security @feedback unauthenticated request to admin summary returns 401",
+          "ok": true,
+          "tags": [
+            "security",
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8df3dbe2c70a49a15632-9160e668a72723afacfc",
+          "file": "security/feedback-idor.spec.ts",
+          "line": 64,
+          "column": 5
+        },
+        {
+          "title": "@security @feedback unauthenticated PATCH to admin feedback returns 401",
+          "ok": true,
+          "tags": [
+            "security",
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8df3dbe2c70a49a15632-ce0d79b36059206333dd",
+          "file": "security/feedback-idor.spec.ts",
+          "line": 69,
+          "column": 5
+        },
+        {
+          "title": "@security @feedback forged admin cookie rejected",
+          "ok": true,
+          "tags": [
+            "security",
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8df3dbe2c70a49a15632-2c800a4abdfb7af4a89b",
+          "file": "security/feedback-idor.spec.ts",
+          "line": 78,
+          "column": 5
+        },
+        {
+          "title": "@security @feedback fabricated role header ignored",
+          "ok": true,
+          "tags": [
+            "security",
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8df3dbe2c70a49a15632-fa25bd31e883b886d56a",
+          "file": "security/feedback-idor.spec.ts",
+          "line": 85,
+          "column": 5
+        },
+        {
+          "title": "@security @feedback SQL injection in registration_code returns 400/404",
+          "ok": true,
+          "tags": [
+            "security",
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8df3dbe2c70a49a15632-4763e7e0b1b9a2a7813e",
+          "file": "security/feedback-idor.spec.ts",
+          "line": 97,
+          "column": 5
+        },
+        {
+          "title": "@security @feedback SQL injection in admin search param does not crash",
+          "ok": true,
+          "tags": [
+            "security",
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8df3dbe2c70a49a15632-c8de4562e0717aa7162a",
+          "file": "security/feedback-idor.spec.ts",
+          "line": 112,
+          "column": 5
+        },
+        {
+          "title": "@security @feedback XSS in comment is sanitized server-side",
+          "ok": true,
+          "tags": [
+            "security",
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8df3dbe2c70a49a15632-d04e3cb11f889e707592",
+          "file": "security/feedback-idor.spec.ts",
+          "line": 124,
+          "column": 5
+        },
+        {
+          "title": "@security @feedback empty POST body returns 400",
+          "ok": true,
+          "tags": [
+            "security",
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8df3dbe2c70a49a15632-a6f6c21429c0ad2cdcb3",
+          "file": "security/feedback-idor.spec.ts",
+          "line": 139,
+          "column": 5
+        },
+        {
+          "title": "@security @feedback null registration_code returns 400",
+          "ok": true,
+          "tags": [
+            "security",
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8df3dbe2c70a49a15632-1d28ad9dc9e3ff225eac",
+          "file": "security/feedback-idor.spec.ts",
+          "line": 144,
+          "column": 5
+        },
+        {
+          "title": "@security @feedback array as registration_code returns 400",
+          "ok": true,
+          "tags": [
+            "security",
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8df3dbe2c70a49a15632-ab7e3800334de783a49c",
+          "file": "security/feedback-idor.spec.ts",
+          "line": 151,
+          "column": 5
+        },
+        {
+          "title": "@security @feedback object injection in improvement_areas rejected",
+          "ok": true,
+          "tags": [
+            "security",
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8df3dbe2c70a49a15632-4e2de9e8dff926ab242f",
+          "file": "security/feedback-idor.spec.ts",
+          "line": 158,
+          "column": 5
+        },
+        {
+          "title": "@security @feedback comment >2000 chars is truncated not rejected",
+          "ok": true,
+          "tags": [
+            "security",
+            "feedback"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "8df3dbe2c70a49a15632-4a27bd5699c53ea02424",
+          "file": "security/feedback-idor.spec.ts",
+          "line": 171,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "security\\idor.spec.ts",
+      "file": "security/idor.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@security dashboard only accessible by correct registration code",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "4fb50b62cf6e87fbd4f8-228befab5107098c6a4b",
+          "file": "security/idor.spec.ts",
+          "line": 25,
+          "column": 5
+        },
+        {
+          "title": "@security dashboard cannot be accessed via another registration's code",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "4fb50b62cf6e87fbd4f8-da30d0c70ee93bb3cfc4",
+          "file": "security/idor.spec.ts",
+          "line": 41,
+          "column": 5
+        },
+        {
+          "title": "@security payment order cannot be created for another user's registration by guessing ID",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "4fb50b62cf6e87fbd4f8-407ca723e7342104f88a",
+          "file": "security/idor.spec.ts",
+          "line": 59,
+          "column": 5
+        },
+        {
+          "title": "@security dashboard returns 404 for sequential/guessable codes",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "4fb50b62cf6e87fbd4f8-1ae8ccc7757a9cffbf05",
+          "file": "security/idor.spec.ts",
+          "line": 76,
+          "column": 5
+        },
+        {
+          "title": "@security PATCH admin/registrations without admin session returns 401",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "4fb50b62cf6e87fbd4f8-2b0c11473b7c3c7e4c12",
+          "file": "security/idor.spec.ts",
+          "line": 91,
+          "column": 5
+        },
+        {
+          "title": "@security PATCH admin/participants without admin session returns 401",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "4fb50b62cf6e87fbd4f8-e49a6d1308f7073d69ab",
+          "file": "security/idor.spec.ts",
+          "line": 98,
+          "column": 5
+        },
+        {
+          "title": "@security POST admin/bibs (BIB allocation) without admin session returns 401",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "4fb50b62cf6e87fbd4f8-709cfa27bec4bd9927cd",
+          "file": "security/idor.spec.ts",
+          "line": 105,
+          "column": 5
+        },
+        {
+          "title": "@security POST admin/coupons (coupon create) without admin session returns 401",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "4fb50b62cf6e87fbd4f8-b2478b0b9761833965a2",
+          "file": "security/idor.spec.ts",
+          "line": 110,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "security\\injection.spec.ts",
+      "file": "security/injection.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@security SQL injection in firstName is safely handled: ' OR '1'='1",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "49b72e7df54cdbfe2288-1ad942322d70252bb228",
+          "file": "security/injection.spec.ts",
+          "line": 31,
+          "column": 7
+        },
+        {
+          "title": "@security SQL injection in firstName is safely handled: '; DROP TABLE it_run_registrat",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "49b72e7df54cdbfe2288-1e8a62bec6e1f3d5608c",
+          "file": "security/injection.spec.ts",
+          "line": 31,
+          "column": 7
+        },
+        {
+          "title": "@security SQL injection in firstName is safely handled: \" OR \"\"=\"",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "49b72e7df54cdbfe2288-a6fd8d54054522374fa2",
+          "file": "security/injection.spec.ts",
+          "line": 31,
+          "column": 7
+        },
+        {
+          "title": "@security SQL injection in firstName is safely handled: 1; SELECT * FROM it_run_portal",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "49b72e7df54cdbfe2288-52ab3c3e3a13a7c81f02",
+          "file": "security/injection.spec.ts",
+          "line": 31,
+          "column": 7
+        },
+        {
+          "title": "@security XSS in companyName is safely handled: <script>alert(1)</script>",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "49b72e7df54cdbfe2288-9493d32da0194a8d0828",
+          "file": "security/injection.spec.ts",
+          "line": 56,
+          "column": 7
+        },
+        {
+          "title": "@security XSS in companyName is safely handled: <img src=x onerror=\"alert(1)\">",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "49b72e7df54cdbfe2288-89692b4632b1635e0283",
+          "file": "security/injection.spec.ts",
+          "line": 56,
+          "column": 7
+        },
+        {
+          "title": "@security XSS in companyName is safely handled: javascript:alert(document.cook",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "49b72e7df54cdbfe2288-0d6d02e081371854f998",
+          "file": "security/injection.spec.ts",
+          "line": 56,
+          "column": 7
+        },
+        {
+          "title": "@security XSS in companyName is safely handled: \"><svg onload=alert(1)>",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "49b72e7df54cdbfe2288-ef749a92a2569e696431",
+          "file": "security/injection.spec.ts",
+          "line": 56,
+          "column": 7
+        },
+        {
+          "title": "@security oversized payload (1MB+ body) is rejected safely",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "49b72e7df54cdbfe2288-da940f2db85d9e7aeb41",
+          "file": "security/injection.spec.ts",
+          "line": 71,
+          "column": 5
+        },
+        {
+          "title": "@security oversized payload in coupon validate is rejected safely",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "49b72e7df54cdbfe2288-0cbda89f3c0d0ae2e093",
+          "file": "security/injection.spec.ts",
+          "line": 80,
+          "column": 5
+        },
+        {
+          "title": "@security extra fields in registration payload are ignored safely",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "49b72e7df54cdbfe2288-00319ca714f99ab052c7",
+          "file": "security/injection.spec.ts",
+          "line": 90,
+          "column": 5
+        },
+        {
+          "title": "@security malformed JSON body is rejected with 4xx",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "49b72e7df54cdbfe2288-836a77bce311135283d6",
+          "file": "security/injection.spec.ts",
+          "line": 113,
+          "column": 5
+        },
+        {
+          "title": "@security SQL injection in coupon code is handled safely",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "49b72e7df54cdbfe2288-4da45bd179a6378c678d",
+          "file": "security/injection.spec.ts",
+          "line": 124,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "security\\rate-limit.spec.ts",
+      "file": "security/rate-limit.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@security @slow register endpoint rate-limits at 5+1 requests per minute",
+          "ok": true,
+          "tags": [
+            "security",
+            "slow"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "569e738576511a018825-59092ccf5003a5b413b4",
+          "file": "security/rate-limit.spec.ts",
+          "line": 32,
+          "column": 5
+        },
+        {
+          "title": "@security register 429 response includes Retry-After header",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "569e738576511a018825-dcda382d987e171af4c9",
+          "file": "security/rate-limit.spec.ts",
+          "line": 58,
+          "column": 5
+        },
+        {
+          "title": "@security coupon validate rate-limits at 10+1 requests per minute",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "569e738576511a018825-0d6b6a6b9185033f7098",
+          "file": "security/rate-limit.spec.ts",
+          "line": 87,
+          "column": 5
+        },
+        {
+          "title": "@security FINDING GAP-01: upload/company-id has no rate limiting (document finding)",
+          "ok": true,
+          "tags": [
+            "security"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "security",
+              "projectName": "security",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "569e738576511a018825-2d1121248db3704c8fb8",
+          "file": "security/rate-limit.spec.ts",
+          "line": 105,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "concurrency\\capacity.spec.ts",
+      "file": "concurrency/capacity.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@concurrency exactly SLOTS_TO_TEST succeed when capacity is tight",
+          "ok": true,
+          "tags": [
+            "concurrency"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "concurrency",
+              "projectName": "concurrency",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "ca3b614f39408326acea-f95d3f25a5f13572df89",
+          "file": "concurrency/capacity.spec.ts",
+          "line": 63,
+          "column": 5
+        },
+        {
+          "title": "@concurrency category current_participants does not exceed max_participants",
+          "ok": true,
+          "tags": [
+            "concurrency"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "concurrency",
+              "projectName": "concurrency",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "ca3b614f39408326acea-687c4a8de6b0a7014b26",
+          "file": "concurrency/capacity.spec.ts",
+          "line": 108,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "concurrency\\coupon.spec.ts",
+      "file": "concurrency/coupon.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@concurrency coupon use_count never exceeds max_uses under concurrent load",
+          "ok": true,
+          "tags": [
+            "concurrency"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "concurrency",
+              "projectName": "concurrency",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "0b2a3c9076d35a910b4c-d2ea1f5bc4412c121dd6",
+          "file": "concurrency/coupon.spec.ts",
+          "line": 45,
+          "column": 5
+        },
+        {
+          "title": "@concurrency coupon use_count matches DB registration count",
+          "ok": true,
+          "tags": [
+            "concurrency"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "concurrency",
+              "projectName": "concurrency",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "0b2a3c9076d35a910b4c-7ce3d2850a13ae00fb3e",
+          "file": "concurrency/coupon.spec.ts",
+          "line": 95,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "concurrency\\webhook-idempotency.spec.ts",
+      "file": "concurrency/webhook-idempotency.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@concurrency @webhook 5 concurrent identical payment.captured webhooks result in exactly 1 state change",
+          "ok": true,
+          "tags": [
+            "concurrency",
+            "webhook"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "concurrency",
+              "projectName": "concurrency",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "ae5a3b882218a11b4bd6-aca1872a84e6ee53c6f4",
+          "file": "concurrency/webhook-idempotency.spec.ts",
+          "line": 34,
+          "column": 5
+        },
+        {
+          "title": "@concurrency @webhook duplicate webhook for unknown order does not cause 500",
+          "ok": true,
+          "tags": [
+            "concurrency",
+            "webhook"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "concurrency",
+              "projectName": "concurrency",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "ae5a3b882218a11b4bd6-373692b301624cacb21b",
+          "file": "concurrency/webhook-idempotency.spec.ts",
+          "line": 71,
+          "column": 5
+        },
+        {
+          "title": "@concurrency duplicate check-in attempts result in exactly 1 check-in record",
+          "ok": true,
+          "tags": [
+            "concurrency"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "concurrency",
+              "projectName": "concurrency",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "ae5a3b882218a11b4bd6-c2d939425c02c8d14ba0",
+          "file": "concurrency/webhook-idempotency.spec.ts",
+          "line": 86,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "smoke\\smoke.spec.ts",
+      "file": "smoke/smoke.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@smoke event-config returns 5 active categories",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke",
+              "projectName": "smoke",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-ebf978974ee69c360e2b",
+          "file": "smoke/smoke.spec.ts",
+          "line": 34,
+          "column": 5
+        },
+        {
+          "title": "@smoke event-config event date is 2027-02-07",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke",
+              "projectName": "smoke",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-990adc0b4085d6f9bfb4",
+          "file": "smoke/smoke.spec.ts",
+          "line": 41,
+          "column": 5
+        },
+        {
+          "title": "@smoke categories endpoint returns event info and categories",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke",
+              "projectName": "smoke",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-ceaf4b734b22a53ea8fb",
+          "file": "smoke/smoke.spec.ts",
+          "line": 47,
+          "column": 5
+        },
+        {
+          "title": "@smoke all 5 Sprint-2 categories exist with correct prices",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke",
+              "projectName": "smoke",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-fd4b5505d202b7aeaaab",
+          "file": "smoke/smoke.spec.ts",
+          "line": 57,
+          "column": 5
+        },
+        {
+          "title": "@smoke 5K Fun Run registration succeeds end-to-end",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke",
+              "projectName": "smoke",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-11b996c0b7bad857a7d8",
+          "file": "smoke/smoke.spec.ts",
+          "line": 74,
+          "column": 5
+        },
+        {
+          "title": "@smoke 10K Timed Run registration succeeds",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke",
+              "projectName": "smoke",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-4052e52255e1103b862a",
+          "file": "smoke/smoke.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "@smoke 5K Duo registration creates 2 participants",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke",
+              "projectName": "smoke",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-e15ab6419c28048ca8d5",
+          "file": "smoke/smoke.spec.ts",
+          "line": 106,
+          "column": 5
+        },
+        {
+          "title": "@smoke Parent + Child registration creates 2 participants with correct t-shirt sizing",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke",
+              "projectName": "smoke",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-f8a0bf09737c566be2da",
+          "file": "smoke/smoke.spec.ts",
+          "line": 119,
+          "column": 5
+        },
+        {
+          "title": "@smoke registration code format is ITRUN2-{8 chars}",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke",
+              "projectName": "smoke",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-e8d59415b8b1890edf72",
+          "file": "smoke/smoke.spec.ts",
+          "line": 137,
+          "column": 5
+        },
+        {
+          "title": "@smoke dashboard accessible via registration code",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke",
+              "projectName": "smoke",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-ef8d195b63f57f83048d",
+          "file": "smoke/smoke.spec.ts",
+          "line": 149,
+          "column": 5
+        },
+        {
+          "title": "@smoke admin dashboard rejects unauthenticated requests",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke",
+              "projectName": "smoke",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-a8e082c058c9fbf99311",
+          "file": "smoke/smoke.spec.ts",
+          "line": 164,
+          "column": 5
+        },
+        {
+          "title": "@smoke check-in endpoint rejects unauthenticated requests",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke",
+              "projectName": "smoke",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-8151b316aaea3a88dea7",
+          "file": "smoke/smoke.spec.ts",
+          "line": 169,
+          "column": 5
+        },
+        {
+          "title": "@smoke webhook rejects requests without signature",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke",
+              "projectName": "smoke",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-9b4bb9990f0f0bb9fa94",
+          "file": "smoke/smoke.spec.ts",
+          "line": 178,
+          "column": 5
+        },
+        {
+          "title": "@smoke invalid category ID returns 404",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke",
+              "projectName": "smoke",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-cd1b341dce57e162a824",
+          "file": "smoke/smoke.spec.ts",
+          "line": 189,
+          "column": 5
+        },
+        {
+          "title": "@smoke event-config returns 5 active categories",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke-mobile",
+              "projectName": "smoke-mobile",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-c76ae6fe8cd435d7ae6d",
+          "file": "smoke/smoke.spec.ts",
+          "line": 34,
+          "column": 5
+        },
+        {
+          "title": "@smoke event-config event date is 2027-02-07",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke-mobile",
+              "projectName": "smoke-mobile",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-12608708cf792a29e915",
+          "file": "smoke/smoke.spec.ts",
+          "line": 41,
+          "column": 5
+        },
+        {
+          "title": "@smoke categories endpoint returns event info and categories",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke-mobile",
+              "projectName": "smoke-mobile",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-f6f6fc26d3e2855a849d",
+          "file": "smoke/smoke.spec.ts",
+          "line": 47,
+          "column": 5
+        },
+        {
+          "title": "@smoke all 5 Sprint-2 categories exist with correct prices",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke-mobile",
+              "projectName": "smoke-mobile",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-673722db1d62063e0afe",
+          "file": "smoke/smoke.spec.ts",
+          "line": 57,
+          "column": 5
+        },
+        {
+          "title": "@smoke 5K Fun Run registration succeeds end-to-end",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke-mobile",
+              "projectName": "smoke-mobile",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-07271556f4998a00909c",
+          "file": "smoke/smoke.spec.ts",
+          "line": 74,
+          "column": 5
+        },
+        {
+          "title": "@smoke 10K Timed Run registration succeeds",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke-mobile",
+              "projectName": "smoke-mobile",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-5bec301d90fcd8438c77",
+          "file": "smoke/smoke.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "@smoke 5K Duo registration creates 2 participants",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke-mobile",
+              "projectName": "smoke-mobile",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-070de8faf52ff99a1512",
+          "file": "smoke/smoke.spec.ts",
+          "line": 106,
+          "column": 5
+        },
+        {
+          "title": "@smoke Parent + Child registration creates 2 participants with correct t-shirt sizing",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke-mobile",
+              "projectName": "smoke-mobile",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-5d0309b6b415e19e0cb4",
+          "file": "smoke/smoke.spec.ts",
+          "line": 119,
+          "column": 5
+        },
+        {
+          "title": "@smoke registration code format is ITRUN2-{8 chars}",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke-mobile",
+              "projectName": "smoke-mobile",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-805f5e4afbcf82b283a6",
+          "file": "smoke/smoke.spec.ts",
+          "line": 137,
+          "column": 5
+        },
+        {
+          "title": "@smoke dashboard accessible via registration code",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke-mobile",
+              "projectName": "smoke-mobile",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-c432728d5056c038ed16",
+          "file": "smoke/smoke.spec.ts",
+          "line": 149,
+          "column": 5
+        },
+        {
+          "title": "@smoke admin dashboard rejects unauthenticated requests",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke-mobile",
+              "projectName": "smoke-mobile",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-1f259a2fcdac91f51205",
+          "file": "smoke/smoke.spec.ts",
+          "line": 164,
+          "column": 5
+        },
+        {
+          "title": "@smoke check-in endpoint rejects unauthenticated requests",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke-mobile",
+              "projectName": "smoke-mobile",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-b548f0ec3f1ce97c2878",
+          "file": "smoke/smoke.spec.ts",
+          "line": 169,
+          "column": 5
+        },
+        {
+          "title": "@smoke webhook rejects requests without signature",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke-mobile",
+              "projectName": "smoke-mobile",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-be960d91e23b0d99c250",
+          "file": "smoke/smoke.spec.ts",
+          "line": 178,
+          "column": 5
+        },
+        {
+          "title": "@smoke invalid category ID returns 404",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke-mobile",
+              "projectName": "smoke-mobile",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f2f9e57ccde56fbee371-81b83430996259aba201",
+          "file": "smoke/smoke.spec.ts",
+          "line": 189,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-30T07:15:53.474Z",
+    "duration": 169.24299999999994,
+    "expected": 0,
+    "skipped": 241,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

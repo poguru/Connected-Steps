@@ -189,8 +189,8 @@ export default function ParticipantsPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {data.map(p => {
               const cat       = p.it_run_registrations?.it_run_categories;
-              const collected = p.it_run_bib_collections.length > 0;
-              const checkedIn = p.it_run_checkins.length > 0;
+              const collected = (p.it_run_bib_collections ?? []).length > 0;
+              const checkedIn = (p.it_run_checkins ?? []).length > 0;
               return (
                 <div key={p.id} style={CARD}>
                   <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 12, alignItems: "center" }}>
