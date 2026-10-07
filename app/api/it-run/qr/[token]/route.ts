@@ -19,10 +19,10 @@ export const dynamic = "force-dynamic"; // Always regenerate for security
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { token: string } }
+  { params }: { params: Promise<{ token: string }> }
 ) {
   try {
-    const { token } = params;
+    const { token } = await params;
 
     if (!token || typeof token !== "string" || token.length < 10) {
       console.warn("[it-run-qr] Invalid token");
