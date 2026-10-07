@@ -109,12 +109,6 @@ export async function GET(req: NextRequest) {
 
   // â"€â"€ Fetch user photos â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   const emails = entries.map(e => e.user_email);
-  const { data: users } = await db
-    .from("users")
-    .select("email, photo")
-    .in("email", emails);
-  const photoMap: Record<string, string | null> = {};
-  for (const u of users ?? []) photoMap[u.email] = u.photo ?? null;
 
   // â"€â"€ Build cache rows (email stored as _raw_email, never sent to clients) â"€â"€
   const toCache: LbCacheRow[] = entries.map(e => ({
@@ -132,7 +126,7 @@ export async function GET(req: NextRequest) {
     week_points:     weekMap[e.user_email] ?? (e.week_points ?? 0),
     prev_month_rank: e.prev_month_rank ?? null,
     updated_at:      e.updated_at ?? null,
-    photo:           photoMap[e.user_email] ?? null,
+    photo:           null,
   }));
 
   // Store in cache (fire-and-forget â€" never blocks the response)

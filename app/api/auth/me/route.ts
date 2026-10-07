@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   const db = getSupabaseServer();
   const { data: user } = await db
     .from("users")
-    .select("first_name, last_name, email, phone, goal, location, photo, role, is_active")
+    .select("first_name, last_name, email, phone, goal, location, role, is_active")
     .eq("email", email)
     .maybeSingle();
 
@@ -40,7 +40,6 @@ export async function GET(req: NextRequest) {
     phone:     user.phone,
     goal:      user.goal,
     location:  user.location,
-    photo:     user.photo ?? null,
     role:      user.role ?? "user",
   });
 }
