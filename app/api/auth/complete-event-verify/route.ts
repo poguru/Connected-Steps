@@ -104,23 +104,41 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Look up user ──────────────────────────────────────────────────────────
-    // CRITICAL: Look up user by normalized (lowercase) email using ILIKE for case-insensitive matching
-    // Some legacy accounts may have mixed-case emails in database
-    const { data: user, error: userError } = await db
+    // CRITICAL: Look up user by normalized (lowercase) email
+    // Try both exact match (.eq) and case-insensitive (.ilike) to handle all scenarios
+    console.log(`[complete-event-verify] looking up user: emailNorm="${emailNorm}"`);
+
+    let { data: user, error: userError } = await db
       .from("users")
       .select("id, first_name, last_name, email, phone, goal, location, photo, role, is_active, email_verified")
-      .ilike("email", emailNorm)
+      .eq("email", emailNorm)
       .maybeSingle();
+
+    // If exact match fails, try case-insensitive lookup
+    if (!user && !userError) {
+      console.log(`[complete-event-verify] exact match failed, trying ilike: "${emailNorm}"`);
+      const result = await db
+        .from("users")
+        .select("id, first_name, last_name, email, phone, goal, location, photo, role, is_active, email_verified")
+        .ilike("email", emailNorm)
+        .maybeSingle();
+      user = result.data;
+      userError = result.error;
+    }
 
     if (userError) {
       console.error("[complete-event-verify] user lookup error:", userError.message, userError.code);
       // If lookup fails, still allow account creation (don't block the flow)
       console.log(`[complete-event-verify] treating as new user due to lookup error: ${emailNorm}`);
+    } else if (user) {
+      console.log(`[complete-event-verify] existing user found: email=${emailNorm}, stored_email=${user.email}, user_id=${user.id}`);
+    } else {
+      console.log(`[complete-event-verify] no user found for: ${emailNorm}`);
     }
 
     if (user) {
       // ── Existing user: create session ─────────────────────────────────────
-      console.log(`[complete-event-verify] existing user found: email=${emailNorm}, user_id=${user.id}`);
+      console.log(`[complete-event-verify] authenticating existing user: ${user.id}`);
 
       if (user.is_active === false) {
         console.log(`[complete-event-verify] account deactivated: ${emailNorm}`);
