@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
 
     const { data: exactUser, error: exactError } = await db
       .from("users")
-      .select("id, first_name, last_name, email, phone, goal, location, photo, role, is_active, email_verified")
+      .select("id, first_name, last_name, email, phone, goal, location, role, is_active, email_verified")
       .eq("email", emailNorm)
       .maybeSingle();
 
@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
       console.log(`[complete-event-verify] exact match failed, trying ilike: "${emailNorm}"`);
       const { data: ilikeUser, error: ilikeError } = await db
         .from("users")
-        .select("id, first_name, last_name, email, phone, goal, location, photo, role, is_active, email_verified")
+        .select("id, first_name, last_name, email, phone, goal, location, role, is_active, email_verified")
         .ilike("email", emailNorm)
         .maybeSingle();
 
@@ -234,7 +234,6 @@ export async function POST(req: NextRequest) {
             phone:     user.phone,
             goal:      user.goal      ?? null,
             location:  user.location  ?? null,
-            photo:     user.photo     ?? null,
             role:      user.role      ?? "user",
           },
         }),
@@ -341,7 +340,7 @@ export async function POST(req: NextRequest) {
       if (insertErr.code === "23505") {
         const { data: raceUser } = await db
           .from("users")
-          .select("id, first_name, last_name, email, phone, goal, location, photo, role")
+          .select("id, first_name, last_name, email, phone, goal, location, role")
           .eq("email", emailNorm)
           .maybeSingle();
         if (raceUser) {
@@ -358,7 +357,6 @@ export async function POST(req: NextRequest) {
                 phone:     raceUser.phone,
                 goal:      raceUser.goal     ?? null,
                 location:  raceUser.location ?? null,
-                photo:     raceUser.photo    ?? null,
                 role:      raceUser.role     ?? "user",
               },
             }),
@@ -402,7 +400,6 @@ export async function POST(req: NextRequest) {
           phone:    phone10,
           goal:     null,
           location: null,
-          photo:    null,
           role:     "user",
         },
       }),
