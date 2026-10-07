@@ -65,14 +65,20 @@ export async function POST(req: NextRequest) {
     const db = getSupabaseServer();
 
     // ── Look up OTP ───────────────────────────────────────────────────────────
-    const { data: otp } = await db
+    const { data: otp, error: otpError } = await db
       .from("otp_verifications")
       .select("id, code, expires_at, verified, identifier")
       .eq("identifier", emailNorm)
       .eq("type", "email")
       .order("created_at", { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
+
+    if (otpError) {
+      console.error("[complete-event-verify] OTP lookup error:", otpError);
+      await recordFailure(rateLimitKey);
+      return NextResponse.json({ error: "OTP lookup failed. Please request a new one." }, { status: 400 });
+    }
 
     if (!otp) {
       await recordFailure(rateLimitKey);
@@ -108,19 +114,28 @@ export async function POST(req: NextRequest) {
     // Try both exact match (.eq) and case-insensitive (.ilike) to handle all scenarios
     console.log(`[complete-event-verify] LOOKUP START - emailNorm="${emailNorm}", otp.identifier="${otp.identifier}"`);
 
-    // Exact match lookup
+    // Exact match lookup - try minimal SELECT first to diagnose
+    console.log(`[complete-event-verify] attempting exact match lookup for email="${emailNorm}"`);
+
     const { data: exactUser, error: exactError } = await db
       .from("users")
       .select("id, first_name, last_name, email, phone, goal, location, photo, role, is_active, email_verified")
       .eq("email", emailNorm)
       .maybeSingle();
 
-    console.log(`[complete-event-verify] exact lookup (emailNorm="${emailNorm}"): found=${!!exactUser}, error=${exactError?.code || "none"}`);
+    console.log(`[complete-event-verify] exact lookup result: found=${!!exactUser}, error_code=${exactError?.code}, error_msg=${exactError?.message}`);
     if (exactError) {
-      console.error(`[complete-event-verify] exact lookup error details:`, exactError);
+      console.error(`[complete-event-verify] exact lookup error:`, {
+        code: exactError.code,
+        message: exactError.message,
+        details: exactError.details,
+        hint: exactError.hint,
+      });
     }
     if (exactUser) {
-      console.log(`[complete-event-verify] ✓ exact match found: id=${exactUser.id}, stored_email=${exactUser.email}`);
+      console.log(`[complete-event-verify] ✓ exact match FOUND: id=${exactUser.id}, email="${exactUser.email}"`);
+    } else {
+      console.log(`[complete-event-verify] exact match returned null (no error)`);
     }
 
     // Case-insensitive fallback
