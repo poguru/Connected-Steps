@@ -32,7 +32,7 @@ export async function GET(
     // Generate QR code from the token
     // The token itself encodes the participant identity (signed)
     const qrPng = await QRCode.toBuffer(token, {
-      type: "image/png",
+      type: "png",
       width: 200,
       margin: 2,
       color: { dark: "#000000", light: "#ffffff" },
