@@ -233,7 +233,19 @@ export async function POST(req: NextRequest) {
 
     if (!name) {
       // OTP verified — ask the client to collect name (mobile is optional)
-      return NextResponse.json({ needs_profile: true });
+      // TEMPORARY DIAGNOSTIC: include debug info in response during investigation
+      const diagnostic = {
+        emailNorm,
+        lookupAttempted: true,
+        userFound: !!user,
+        exactMatchTried: true,
+        ilikeMatchTried: !exactUser && !exactError,
+      };
+      console.log(`[complete-event-verify] RETURNING needs_profile with diagnostic:`, diagnostic);
+      return NextResponse.json({
+        needs_profile: true,
+        _diagnostic: process.env.NODE_ENV === "development" ? diagnostic : undefined,
+      });
     }
 
     let phone10: string | null = null;
