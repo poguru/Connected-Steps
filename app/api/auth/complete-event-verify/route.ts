@@ -106,24 +106,45 @@ export async function POST(req: NextRequest) {
     // ── Look up user ──────────────────────────────────────────────────────────
     // CRITICAL: Look up user by normalized (lowercase) email
     // Try both exact match (.eq) and case-insensitive (.ilike) to handle all scenarios
-    console.log(`[complete-event-verify] looking up user: emailNorm="${emailNorm}"`);
+    console.log(`[complete-event-verify] LOOKUP START - emailNorm="${emailNorm}", otp.identifier="${otp.identifier}"`);
 
-    let { data: user, error: userError } = await db
+    // Exact match lookup
+    const { data: exactUser, error: exactError } = await db
       .from("users")
       .select("id, first_name, last_name, email, phone, goal, location, photo, role, is_active, email_verified")
       .eq("email", emailNorm)
       .maybeSingle();
 
-    // If exact match fails, try case-insensitive lookup
+    console.log(`[complete-event-verify] exact lookup (emailNorm="${emailNorm}"): found=${!!exactUser}, error=${exactError?.code || "none"}`);
+    if (exactError) {
+      console.error(`[complete-event-verify] exact lookup error details:`, exactError);
+    }
+    if (exactUser) {
+      console.log(`[complete-event-verify] ✓ exact match found: id=${exactUser.id}, stored_email=${exactUser.email}`);
+    }
+
+    // Case-insensitive fallback
+    let user = exactUser;
+    let userError = exactError;
+
     if (!user && !userError) {
       console.log(`[complete-event-verify] exact match failed, trying ilike: "${emailNorm}"`);
-      const result = await db
+      const { data: ilikeUser, error: ilikeError } = await db
         .from("users")
         .select("id, first_name, last_name, email, phone, goal, location, photo, role, is_active, email_verified")
         .ilike("email", emailNorm)
         .maybeSingle();
-      user = result.data;
-      userError = result.error;
+
+      console.log(`[complete-event-verify] ilike lookup (emailNorm="${emailNorm}"): found=${!!ilikeUser}, error=${ilikeError?.code || "none"}`);
+      if (ilikeError) {
+        console.error(`[complete-event-verify] ilike lookup error details:`, ilikeError);
+      }
+      if (ilikeUser) {
+        console.log(`[complete-event-verify] ✓ ilike match found: id=${ilikeUser.id}, stored_email=${ilikeUser.email}`);
+      }
+
+      user = ilikeUser;
+      userError = ilikeError;
     }
 
     if (userError) {
@@ -131,20 +152,45 @@ export async function POST(req: NextRequest) {
       // If lookup fails, still allow account creation (don't block the flow)
       console.log(`[complete-event-verify] treating as new user due to lookup error: ${emailNorm}`);
     } else if (user) {
-      console.log(`[complete-event-verify] existing user found: email=${emailNorm}, stored_email=${user.email}, user_id=${user.id}`);
+      console.log(`[complete-event-verify] ✅ existing user found: email=${emailNorm}, stored_email=${user.email}, user_id=${user.id}`);
     } else {
       console.log(`[complete-event-verify] ❌ NO USER FOUND for email: ${emailNorm}`);
+
       // Diagnostic: search for users with similar email pattern to understand database state
-      const { data: allMatches } = await db
+      console.log(`[complete-event-verify] DIAGNOSTIC: Searching for similar emails...`);
+      const { data: allMatches, error: diagError } = await db
         .from("users")
         .select("id, email, first_name, last_name")
         .ilike("email", `%${emailNorm.split("@")[0]}%`)
-        .limit(3);
+        .limit(5);
+
+      if (diagError) {
+        console.error(`[complete-event-verify] diagnostic query error:`, diagError);
+      }
+
       if (allMatches && allMatches.length > 0) {
-        console.log(`[complete-event-verify] Found ${allMatches.length} similar users in DB:`);
-        allMatches.forEach(m => console.log(`  - ${m.first_name} ${m.last_name}: ${m.email}`));
+        console.log(`[complete-event-verify] DIAGNOSTIC: Found ${allMatches.length} similar users in DB with username "${emailNorm.split("@")[0]}":`);
+        allMatches.forEach(m => {
+          console.log(`  - ${m.first_name} ${m.last_name}: email="${m.email}" (matches search? ${m.email.toLowerCase() === emailNorm})`);
+        });
       } else {
-        console.log(`[complete-event-verify] No users with username pattern: ${emailNorm.split("@")[0]}`);
+        console.log(`[complete-event-verify] DIAGNOSTIC: No users found with username pattern: ${emailNorm.split("@")[0]}`);
+      }
+
+      // Also try fetching by exact email domain to see all users with that domain
+      const emailDomain = emailNorm.split("@")[1];
+      console.log(`[complete-event-verify] DIAGNOSTIC: Searching for any users with domain "${emailDomain}"...`);
+      const { data: domainMatches } = await db
+        .from("users")
+        .select("id, email, first_name, last_name")
+        .ilike("email", `%@${emailDomain}`)
+        .limit(5);
+
+      if (domainMatches && domainMatches.length > 0) {
+        console.log(`[complete-event-verify] DIAGNOSTIC: Found ${domainMatches.length} users with domain "${emailDomain}":`);
+        domainMatches.forEach(m => {
+          console.log(`  - ${m.first_name} ${m.last_name}: email="${m.email}" (matches ${emailNorm}? ${m.email.toLowerCase() === emailNorm})`);
+        });
       }
     }
 
