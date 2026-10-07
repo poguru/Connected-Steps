@@ -730,23 +730,28 @@ function StepCategory({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function StepParticipants({
-  category, participantSubIdx,
+  category, participantSubIdx, setParticipantSubIdx,
   participants, errors, onChange, submitError,
-  onBack, onNext, returnToReview,
+  onBack, onNext, onAddParticipant, onRemoveParticipant, returnToReview, validateParticipant,
 }: {
   category: ItRunCategory;
   participantSubIdx: number;
+  setParticipantSubIdx: (idx: number) => void;
   participants: Participant[];
   errors: ParticipantErrors[];
   onChange: (idx: number, field: keyof Participant, val: string | File | null) => void;
   submitError: string;
   onBack: () => void;
   onNext: () => void;
+  onAddParticipant?: () => void;
+  onRemoveParticipant?: (idx: number) => void;
   returnToReview?: boolean;
+  validateParticipant?: (idx: number) => boolean;
 }) {
   const pl    = category.participant_labels[participantSubIdx];
-  const total = category.participant_count;
+  const total = participants.length;
   const isLast = participantSubIdx === total - 1;
+  const allowMultiParticipant = category.category_type === "solo";
 
   return (
     <div>
@@ -773,6 +778,89 @@ function StepParticipants({
           ₹{category.price_rupees.toLocaleString("en-IN")}
         </span>
       </div>
+
+      {/* ── Participant navigation tabs (Phase 3: multi-participant) ── */}
+      {total > 1 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const,
+            paddingBottom: 12, borderBottom: "1px solid rgba(255,255,255,0.05)",
+          }}>
+            {participants.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => {
+                  if (!validateParticipant || validateParticipant(participantSubIdx)) {
+                    setParticipantSubIdx(idx);
+                  }
+                }}
+                style={{
+                  padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                  cursor: "pointer", border: "1px solid rgba(255,255,255,0.1)",
+                  background: idx === participantSubIdx ? ACCENT : "transparent",
+                  color: idx === participantSubIdx ? "#000" : "#888",
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  if (idx !== participantSubIdx) {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.2)";
+                    (e.currentTarget as HTMLButtonElement).style.color = "#aaa";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (idx !== participantSubIdx) {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.1)";
+                    (e.currentTarget as HTMLButtonElement).style.color = "#888";
+                  }
+                }}
+              >
+                {category.participant_labels[idx]?.label ?? `Participant ${idx + 1}`}
+                {idx > 0 && (
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveParticipant?.(idx);
+                    }}
+                    style={{
+                      marginLeft: 6, cursor: "pointer", fontWeight: 700,
+                      opacity: 0.6, transition: "opacity 0.15s",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.opacity = "1";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.opacity = "0.6";
+                    }}
+                  >
+                    ✕
+                  </span>
+                )}
+              </button>
+            ))}
+            {allowMultiParticipant && (
+              <button
+                onClick={onAddParticipant}
+                style={{
+                  padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                  cursor: "pointer", border: "1px dashed rgba(232,98,10,0.4)",
+                  background: "transparent", color: ACCENT,
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(232,98,10,0.6)";
+                  (e.currentTarget as HTMLButtonElement).style.background = "rgba(232,98,10,0.08)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(232,98,10,0.4)";
+                  (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                }}
+              >
+                + Add Participant
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <ParticipantForm
         participantLabel={pl?.label ?? `Participant ${participantSubIdx + 1}`}
@@ -1911,11 +1999,42 @@ function RegisterPageContent() {
       setStep(4);
       return;
     }
-    const lastIdx = (selectedCat?.participant_count ?? 1) - 1;
+    // Use actual participants array length instead of category.participant_count
+    // This allows SOLO categories to have N participants
+    const lastIdx = participants.length - 1;
     if (participantSubIdx < lastIdx) {
       setParticipantSubIdx(i => i + 1);
     } else {
       setStep(3);
+    }
+  }
+
+  // ── Multi-participant management (Phase 3) ──────────────────────────────────
+
+  function addParticipant() {
+    if (!selectedCat) return;
+    // Only allow adding participants for SOLO categories
+    if (selectedCat.category_type !== "solo") {
+      setSubmitError("Cannot add participants to this category type");
+      return;
+    }
+    // Validate current participant before adding more
+    if (!validateParticipant(participantSubIdx)) return;
+    // Add new empty participant
+    setParticipants(p => [...p, emptyParticipant()]);
+    setPErrors(e => [...e, {}]);
+    // Auto-focus the new participant
+    setParticipantSubIdx(participants.length);
+  }
+
+  function removeParticipant(idx: number) {
+    // Never remove first participant
+    if (idx === 0) return;
+    setParticipants(p => p.filter((_, i) => i !== idx));
+    setPErrors(e => e.filter((_, i) => i !== idx));
+    // If we're viewing the removed participant, go back to previous
+    if (participantSubIdx >= idx) {
+      setParticipantSubIdx(Math.max(0, participantSubIdx - 1));
     }
   }
 
@@ -2445,13 +2564,17 @@ function RegisterPageContent() {
           <StepParticipants
             category={selectedCat}
             participantSubIdx={participantSubIdx}
+            setParticipantSubIdx={setParticipantSubIdx}
             participants={participants}
             errors={pErrors}
             onChange={updateParticipant}
             submitError={submitError}
             onBack={handleParticipantBack}
             onNext={handleParticipantNext}
+            onAddParticipant={addParticipant}
+            onRemoveParticipant={removeParticipant}
             returnToReview={returnToReview}
+            validateParticipant={validateParticipant}
           />
         )}
 
