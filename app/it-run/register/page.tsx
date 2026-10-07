@@ -757,6 +757,41 @@ function StepParticipants({
     <div>
       <ProgressStepper step={2} participantSubIdx={participantSubIdx} participantCount={total} />
 
+      {/* Who are you registering? — Multi-participant prompt */}
+      {participantSubIdx === 0 && (
+        <div style={{
+          marginBottom: 20,
+          padding: "14px 16px",
+          background: "rgba(232,98,10,0.08)",
+          border: "1px solid rgba(232,98,10,0.3)",
+          borderRadius: 10,
+        }}>
+          <div style={{ fontSize: 12, color: "#888", marginBottom: 8, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            Register Multiple Participants
+          </div>
+          <div style={{ fontSize: 14, color: "#ccc", marginBottom: 12, lineHeight: 1.6 }}>
+            Register yourself, or add friends, family, or teammates. Each person gets their own QR, BIB, and race-day details.
+          </div>
+          {total === 1 && allowMultiParticipant && (
+            <button
+              onClick={onAddParticipant}
+              style={{
+                padding: "8px 14px",
+                background: "rgba(232,98,10,0.2)",
+                border: "1px solid rgba(232,98,10,0.5)",
+                borderRadius: 6,
+                color: "#e8620a",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              + Add Another Participant
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Category mini-reminder */}
       <div style={{
         display: "flex", alignItems: "center", gap: 10,
