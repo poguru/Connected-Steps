@@ -751,7 +751,7 @@ function StepParticipants({
   const pl    = category.participant_labels[participantSubIdx];
   const total = participants.length;
   const isLast = participantSubIdx === total - 1;
-  const allowMultiParticipant = category.category_type === "solo";
+  const allowMultiParticipant = ["solo", "duo", "kid"].includes(category.category_type);
 
   return (
     <div>
@@ -2013,8 +2013,8 @@ function RegisterPageContent() {
 
   function addParticipant() {
     if (!selectedCat) return;
-    // Only allow adding participants for SOLO categories
-    if (selectedCat.category_type !== "solo") {
+    // Allow adding participants for SOLO, DUO, and KID categories
+    if (!["solo", "duo", "kid"].includes(selectedCat.category_type)) {
       setSubmitError("Cannot add participants to this category type");
       return;
     }

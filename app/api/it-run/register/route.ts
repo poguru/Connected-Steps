@@ -146,11 +146,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate participant count against server-authoritative category type
-    // SOLO categories can have N participants (multi-participant registration)
-    // DUO and KID categories are fixed at exactly 2 participants
-    const isMultiParticipantAllowed = cat.category_type === "solo";
+    // SOLO, DUO, and KID categories all support N participants (multi-participant registration)
+    const isMultiParticipantAllowed = ["solo", "duo", "kid"].includes(cat.category_type);
     const minParticipants = 1;
-    const maxParticipants = isMultiParticipantAllowed ? 999 : 2; // Practical limit for 999
+    const maxParticipants = isMultiParticipantAllowed ? 999 : 1; // Practical limit for 999
 
     if (participants.length < minParticipants || participants.length > maxParticipants) {
       const categoryName = cat.category_type === "solo" ? "SOLO" : cat.category_type === "duo" ? "DUO" : "KID";
