@@ -74,8 +74,17 @@ export async function POST(req: NextRequest) {
 
   // Compute refund amount: if not provided, refund the full final_price
   const refundAmount = amount_paise ?? reg.final_price;
-  const { data: refundableAmountResult } = await db.rpc("itr_refundable_amount", { p_registration_id: reg.id });
-  const refundableAmount = (refundableAmountResult as number) ?? 0;
+  const { data: refundableAmountResult, error: rpcErr } = await db.rpc("itr_refundable_amount", { p_registration_id: reg.id });
+
+  if (rpcErr) {
+    console.error("[refund] RPC error:", rpcErr.message);
+    return NextResponse.json({ error: "Failed to calculate refundable amount" }, { status: 500 });
+  }
+
+  // RPC returns a single numeric value
+  const refundableAmount = typeof refundableAmountResult === 'number'
+    ? refundableAmountResult
+    : (refundableAmountResult as any)?.refundable_amount ?? 0;
 
   if (refundAmount > refundableAmount) {
     return NextResponse.json(
