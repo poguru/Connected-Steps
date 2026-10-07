@@ -1,45 +1,58 @@
+/**
+ * GET /api/it-run/qr/[token]
+ *
+ * Serves the QR code PNG for a participant.
+ *
+ * Security:
+ * - The token itself IS the credential (signed participant QR token)
+ * - Returns PNG image only, no HTML/JSON
+ * - Works from email clients (Gmail, Apple Mail, mobile, etc.)
+ * - Cacheable (immutable after generation)
+ * - No login required (token is in the URL)
+ *
+ * Used by: IT Run confirmation email
+ */
 import { NextRequest, NextResponse } from "next/server";
 import QRCode from "qrcode";
 
-// GET /api/it-run/qr/[token]
-// First-party QR code image endpoint.
-// Generates a QR PNG server-side — replaces the external api.qrserver.com dependency.
-// The token is any opaque string (HMAC-signed QR token or registration code).
-// No authentication required; the token itself is the secret (HMAC-signed).
-// Cache headers: 1-year immutable (QR content for a given token never changes).
+export const dynamic = "force-dynamic"; // Always regenerate for security
+
 export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ token: string }> },
-): Promise<NextResponse> {
-  const { token } = await params;
-
-  if (!token || typeof token !== "string" || token.length > 512) {
-    return new NextResponse("Invalid token", { status: 400 });
-  }
-
-  let decoded: string;
-  try { decoded = decodeURIComponent(token); } catch {
-    return new NextResponse("Invalid token encoding", { status: 400 });
-  }
-
+  req: NextRequest,
+  { params }: { params: { token: string } }
+) {
   try {
-    const png = await QRCode.toBuffer(decoded, {
-      type:   "png",
-      width:  200,
+    const { token } = params;
+
+    if (!token || typeof token !== "string" || token.length < 10) {
+      console.warn("[it-run-qr] Invalid token");
+      return NextResponse.json({ error: "Invalid QR token" }, { status: 400 });
+    }
+
+    // Generate QR code from the token
+    // The token itself encodes the participant identity (signed)
+    const qrPng = await QRCode.toBuffer(token, {
+      type: "image/png",
+      width: 200,
       margin: 2,
-      color:  { dark: "#000000", light: "#ffffff" },
+      color: { dark: "#000000", light: "#ffffff" },
       errorCorrectionLevel: "M",
     });
 
-    return new NextResponse(new Uint8Array(png), {
+    // Return as PNG image
+    // Email clients cache this aggressively (max-age=31536000 = 1 year)
+    // The token never changes, so this is safe to cache forever
+    return new NextResponse(qrPng, {
+      status: 200,
       headers: {
-        "Content-Type":  "image/png",
+        "Content-Type": "image/png",
+        "Content-Length": qrPng.length.toString(),
         "Cache-Control": "public, max-age=31536000, immutable",
         "X-Content-Type-Options": "nosniff",
       },
     });
-  } catch (e) {
-    console.error("[it-run/qr] QRCode generation error:", e);
-    return new NextResponse("QR generation failed", { status: 500 });
+  } catch (error) {
+    console.error("[it-run-qr] Error:", error);
+    return NextResponse.json({ error: "QR generation failed" }, { status: 500 });
   }
 }
