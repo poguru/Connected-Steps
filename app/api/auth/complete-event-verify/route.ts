@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     // ── Look up OTP ───────────────────────────────────────────────────────────
     const { data: otp } = await db
       .from("otp_verifications")
-      .select("id, code, expires_at, verified")
+      .select("id, code, expires_at, verified, identifier")
       .eq("identifier", emailNorm)
       .eq("type", "email")
       .order("created_at", { ascending: false })
