@@ -133,7 +133,19 @@ export async function POST(req: NextRequest) {
     } else if (user) {
       console.log(`[complete-event-verify] existing user found: email=${emailNorm}, stored_email=${user.email}, user_id=${user.id}`);
     } else {
-      console.log(`[complete-event-verify] no user found for: ${emailNorm}`);
+      console.log(`[complete-event-verify] ❌ NO USER FOUND for email: ${emailNorm}`);
+      // Diagnostic: search for users with similar email pattern to understand database state
+      const { data: allMatches } = await db
+        .from("users")
+        .select("id, email, first_name, last_name")
+        .ilike("email", `%${emailNorm.split("@")[0]}%`)
+        .limit(3);
+      if (allMatches && allMatches.length > 0) {
+        console.log(`[complete-event-verify] Found ${allMatches.length} similar users in DB:`);
+        allMatches.forEach(m => console.log(`  - ${m.first_name} ${m.last_name}: ${m.email}`));
+      } else {
+        console.log(`[complete-event-verify] No users with username pattern: ${emailNorm.split("@")[0]}`);
+      }
     }
 
     if (user) {
