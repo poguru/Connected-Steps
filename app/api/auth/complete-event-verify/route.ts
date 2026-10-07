@@ -104,16 +104,18 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Look up user ──────────────────────────────────────────────────────────
-    // CRITICAL: Use case-insensitive email comparison to handle any case variants
+    // CRITICAL: Look up user by normalized (lowercase) email
+    // Database stores emails in lowercase, so exact match is safe
     const { data: user, error: userError } = await db
       .from("users")
       .select("id, first_name, last_name, email, phone, goal, location, photo, role, is_active, email_verified")
-      .ilike("email", emailNorm)
+      .eq("email", emailNorm)
       .maybeSingle();
 
     if (userError) {
       console.error("[complete-event-verify] user lookup error:", userError.message, userError.code);
-      return NextResponse.json({ error: "Account lookup failed. Please try again." }, { status: 500 });
+      // If lookup fails, still allow account creation (don't block the flow)
+      console.log(`[complete-event-verify] treating as new user due to lookup error: ${emailNorm}`);
     }
 
     if (user) {

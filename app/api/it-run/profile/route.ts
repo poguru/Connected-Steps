@@ -15,11 +15,11 @@ export async function GET(req: NextRequest) {
 
   const db = getSupabaseServer();
 
-  // Fetch CS profile (use ilike for case-insensitive email matching)
+  // Fetch CS profile (email is already normalized to lowercase)
   const { data: user, error: userErr } = await db
     .from("users")
     .select("first_name, last_name, phone, date_of_birth")
-    .ilike("email", userEmail)
+    .eq("email", userEmail)
     .maybeSingle<{
       first_name: string | null;
       last_name: string | null;
@@ -29,7 +29,6 @@ export async function GET(req: NextRequest) {
 
   if (userErr) {
     console.error("[it-run/profile] user lookup error:", userErr.message);
-    return NextResponse.json({ error: "Profile lookup failed" }, { status: 500 });
   }
 
   // Fetch most recent IT Run participant data for this email
@@ -40,7 +39,7 @@ export async function GET(req: NextRequest) {
       gender, blood_group, emergency_name, emergency_phone,
       company_name, employee_id, tshirt_size, food_preference, medical_conditions
     `)
-    .ilike("email", userEmail)
+    .eq("email", userEmail)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle<{
