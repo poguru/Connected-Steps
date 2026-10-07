@@ -146,10 +146,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate participant count against server-authoritative category type
-    const expectedCount = cat.category_type === "solo" ? 1 : 2;
-    if (participants.length !== expectedCount) {
+    // SOLO categories can have N participants (multi-participant registration)
+    // DUO and KID categories are fixed at exactly 2 participants
+    const isMultiParticipantAllowed = cat.category_type === "solo";
+    const minParticipants = 1;
+    const maxParticipants = isMultiParticipantAllowed ? 999 : 2; // Practical limit for 999
+
+    if (participants.length < minParticipants || participants.length > maxParticipants) {
+      const categoryName = cat.category_type === "solo" ? "SOLO" : cat.category_type === "duo" ? "DUO" : "KID";
       return NextResponse.json(
-        { error: `Expected ${expectedCount} participant(s) for ${cat.category_type} category` },
+        { error: `${categoryName} category requires ${minParticipants}-${maxParticipants} participant(s), got ${participants.length}` },
         { status: 400 },
       );
     }
