@@ -2397,10 +2397,10 @@ function RegisterPageContent() {
                   One More Step
                 </div>
                 <h1 style={{ fontSize: "clamp(1.4rem,4vw,1.8rem)", fontWeight: 800, color: "#fff", margin: "0 0 10px" }}>
-                  Tell us your name
+                  Complete your details
                 </h1>
                 <p style={{ fontSize: 14, color: "#888", margin: 0, lineHeight: 1.6 }}>
-                  Your Connected Steps account will be created with the details below.
+                  We'll use this to confirm your registration.
                 </p>
               </div>
               <div style={{ display: "flex", flexDirection: "column" as const, gap: 12 }}>
@@ -2457,7 +2457,7 @@ function RegisterPageContent() {
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                   }}>
                   {verifyingOtp && <div style={{ width: 16, height: 16, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />}
-                  {verifyingOtp ? "Creating account…" : "Create Account & Continue"}
+                  {verifyingOtp ? "Verifying…" : "Continue to Registration"}
                 </button>
               </div>
             </div>

@@ -104,12 +104,12 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Look up user ──────────────────────────────────────────────────────────
-    // CRITICAL: Look up user by normalized (lowercase) email
-    // Database stores emails in lowercase, so exact match is safe
+    // CRITICAL: Look up user by normalized (lowercase) email using ILIKE for case-insensitive matching
+    // Some legacy accounts may have mixed-case emails in database
     const { data: user, error: userError } = await db
       .from("users")
       .select("id, first_name, last_name, email, phone, goal, location, photo, role, is_active, email_verified")
-      .eq("email", emailNorm)
+      .ilike("email", emailNorm)
       .maybeSingle();
 
     if (userError) {
