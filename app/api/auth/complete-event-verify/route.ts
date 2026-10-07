@@ -104,21 +104,31 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Look up user ──────────────────────────────────────────────────────────
-    const { data: user } = await db
+    // CRITICAL: Use case-insensitive email comparison to handle any case variants
+    const { data: user, error: userError } = await db
       .from("users")
-      .select("id, first_name, last_name, email, phone, goal, location, photo, role, is_active")
-      .eq("email", emailNorm)
+      .select("id, first_name, last_name, email, phone, goal, location, photo, role, is_active, email_verified")
+      .ilike("email", emailNorm)
       .maybeSingle();
+
+    if (userError) {
+      console.error("[complete-event-verify] user lookup error:", userError.message, userError.code);
+      return NextResponse.json({ error: "Account lookup failed. Please try again." }, { status: 500 });
+    }
 
     if (user) {
       // ── Existing user: create session ─────────────────────────────────────
+      console.log(`[complete-event-verify] existing user found: email=${emailNorm}, user_id=${user.id}`);
+
       if (user.is_active === false) {
+        console.log(`[complete-event-verify] account deactivated: ${emailNorm}`);
         return NextResponse.json(
           { error: "Your account has been deactivated. Please contact support." },
           { status: 403 },
         );
       }
 
+      // Return authenticated session with user profile
       const userToken = signUserToken(user.email);
       const res = makeSession(
         NextResponse.json({
@@ -141,6 +151,8 @@ export async function POST(req: NextRequest) {
     }
 
     // ── New user ──────────────────────────────────────────────────────────────
+    console.log(`[complete-event-verify] no user found by email=${emailNorm}, needs_profile=${!name}`);
+
     if (!name) {
       // OTP verified — ask the client to collect name (mobile is optional)
       return NextResponse.json({ needs_profile: true });
@@ -162,16 +174,30 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Check mobile not already linked
-      const { data: existingPhone } = await db
+      // Check mobile not already linked — SAFETY CHECK to detect if account exists
+      const { data: existingPhone, error: phoneError } = await db
         .from("users")
-        .select("id")
+        .select("id, email, first_name, last_name")
         .eq("phone", normalized)
         .maybeSingle();
 
+      if (phoneError) {
+        console.error("[complete-event-verify] phone lookup error:", phoneError.message, phoneError.code);
+        return NextResponse.json({ error: "Account lookup failed. Please try again." }, { status: 500 });
+      }
+
       if (existingPhone) {
+        // CRITICAL: Account exists by phone but not found by email
+        // This indicates either:
+        // 1. Different email than what's stored (user changed email externally?)
+        // 2. Email normalization mismatch
+        // 3. Account created with phone-only, now trying to verify with email
+        console.error(
+          `[complete-event-verify] IDENTITY CONFLICT: email=${emailNorm} not found, but phone=${normalized} belongs to user_id=${existingPhone.id} email=${existingPhone.email}. This indicates email mismatch or multiple accounts.`
+        );
+
         return NextResponse.json(
-          { error: "This mobile number is linked to another account. Please use a different number or sign in." },
+          { error: "This mobile number is already linked to a different account. Please use a different number or sign in to your existing account." },
           { status: 409 },
         );
       }

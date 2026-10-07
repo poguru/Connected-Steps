@@ -15,11 +15,11 @@ export async function GET(req: NextRequest) {
 
   const db = getSupabaseServer();
 
-  // Fetch CS profile
-  const { data: user } = await db
+  // Fetch CS profile (use ilike for case-insensitive email matching)
+  const { data: user, error: userErr } = await db
     .from("users")
     .select("first_name, last_name, phone, date_of_birth")
-    .eq("email", userEmail)
+    .ilike("email", userEmail)
     .maybeSingle<{
       first_name: string | null;
       last_name: string | null;
@@ -27,15 +27,20 @@ export async function GET(req: NextRequest) {
       date_of_birth: string | null;
     }>();
 
+  if (userErr) {
+    console.error("[it-run/profile] user lookup error:", userErr.message);
+    return NextResponse.json({ error: "Profile lookup failed" }, { status: 500 });
+  }
+
   // Fetch most recent IT Run participant data for this email
   // (blood group, emergency contacts, company, t-shirt, etc.)
-  const { data: lastPart } = await db
+  const { data: lastPart, error: partErr } = await db
     .from("it_run_participants")
     .select(`
       gender, blood_group, emergency_name, emergency_phone,
       company_name, employee_id, tshirt_size, food_preference, medical_conditions
     `)
-    .eq("email", userEmail)
+    .ilike("email", userEmail)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle<{
@@ -45,6 +50,10 @@ export async function GET(req: NextRequest) {
       tshirt_size: string | null; food_preference: string | null;
       medical_conditions: string | null;
     }>();
+
+  if (partErr) {
+    console.error("[it-run/profile] participant lookup error:", partErr.message);
+  }
 
   return NextResponse.json({
     firstName:        user?.first_name       ?? "",
