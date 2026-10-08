@@ -38,17 +38,7 @@ function deriveParticipantMeta(
 const EMAIL_RE   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MOBILE_RE  = /^\d{10}$/;
 
-// Normalize Indian phone numbers to 10-digit format
-function normalizePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.endsWith("91") && digits.length === 12) {
-    return digits.slice(2); // +91 prefix
-  }
-  if (digits.length === 10) {
-    return digits; // Already 10 digits
-  }
-  return digits.slice(-10); // Take last 10 digits
-}
+// normalizePhone imported from @/lib/phone-utils
 
 function validateParticipants(
   participants: ParticipantInput[],
