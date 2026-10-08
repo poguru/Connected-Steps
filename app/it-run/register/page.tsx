@@ -2001,8 +2001,26 @@ function RegisterPageContent() {
     if (!p.lastName.trim() || !nameRe.test(p.lastName)) {
       e.lastName = "Enter a valid last name"; valid = false;
     }
+
+    // BIB Name — mandatory for all participants
+    if (!p.bibName.trim() || p.bibName.trim().length === 0) {
+      e.bibName = "BIB name is required"; valid = false;
+    } else if (p.bibName.length > 30) {
+      e.bibName = "BIB name must be 30 characters or less"; valid = false;
+    }
+
     if (!p.gender)            { e.gender    = "Required"; valid = false; }
+
+    // DOB — mandatory and must be valid
     if (!p.dob)               { e.dob       = "Required"; valid = false; }
+    else {
+      // Validate DOB is not in the future
+      const dobDate = new Date(p.dob);
+      if (dobDate > new Date()) {
+        e.dob = "Date of birth cannot be in the future"; valid = false;
+      }
+    }
+
     if (!p.mobile || !/^\d{10}$/.test(p.mobile.replace(/\D/g, "").slice(-10))) {
       e.mobile = "Enter a valid 10-digit Indian mobile number"; valid = false;
     }
@@ -2015,19 +2033,42 @@ function RegisterPageContent() {
       }
       if (!p.emergencyName.trim())  { e.emergencyName  = "Required"; valid = false; }
       if (!p.emergencyPhone.trim()) { e.emergencyPhone = "Required"; valid = false; }
+
+      // Emergency phone must be different from participant mobile
+      if (p.emergencyPhone.trim() && p.mobile) {
+        const emergencyNorm = p.emergencyPhone.replace(/\D/g, "").slice(-10);
+        const mobileNorm    = p.mobile.replace(/\D/g, "").slice(-10);
+        if (emergencyNorm === mobileNorm) {
+          e.emergencyPhone = "Emergency contact number must be different from your mobile number"; valid = false;
+        }
+      }
+
       if (!p.companyName.trim() || !nameRe.test(p.companyName)) {
         e.companyName = "Enter a valid company name"; valid = false;
       }
     }
 
-    if (child && p.dob) {
-      // Use event date (IST 00:00) for age calculation — matches server-side logic.
-      // A child who turns 11 before the event is ineligible even if 10 today.
+    // Age validation — check against event date
+    if (p.dob) {
       const eventMs = config
         ? new Date(config.event.event_date + "T00:00:00+05:30").getTime()
         : Date.now();
-      const ageYears = (eventMs - new Date(p.dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-      if (ageYears >= 11) { e.dob = "Child must be 10 years or younger on the event date"; valid = false; }
+      const dobMs = new Date(p.dob).getTime();
+      const ageYears = (eventMs - dobMs) / (1000 * 60 * 60 * 24 * 365.25);
+
+      if (child) {
+        // Child must be 10 or younger on event date
+        if (ageYears >= 11) {
+          e.dob = "Child must be 10 years or younger on the event date";
+          valid = false;
+        }
+      } else {
+        // Normal participants must be 18+ on event date
+        if (ageYears < 18) {
+          e.dob = "Participant must be at least 18 years old on the event date";
+          valid = false;
+        }
+      }
     }
 
     setPErrors(prev => { const c = [...prev]; c[idx] = e; return c; });
