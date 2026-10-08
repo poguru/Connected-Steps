@@ -297,22 +297,20 @@ export default function ItRunLandingPage() {
             <span>Exclusive for IT Professionals</span>
           </div>
 
-          <h1 style={{
-            fontSize: "clamp(52px,10vw,100px)", fontWeight: 900,
-            lineHeight: 0.9, margin: "0 0 8px",
-            background: "linear-gradient(180deg,#fff 40%,rgba(255,255,255,0.7))",
-            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-            letterSpacing: "-0.03em",
-          }}>
-            THE IT RUN
-          </h1>
-          <h2 style={{
-            fontSize: "clamp(28px,6vw,60px)", fontWeight: 900,
-            color: "#e8620a", margin: "0 0 24px",
-            letterSpacing: "-0.02em", lineHeight: 1,
-          }}>
-            SPRINT-2
-          </h2>
+          <Image
+            src="/events/it-run-sprint-2/IT Run Sprint-2 Logo.jpeg"
+            alt="The IT Run Sprint-2"
+            width={600}
+            height={300}
+            style={{
+              width: "100%",
+              height: "auto",
+              maxWidth: "clamp(240px,90vw,600px)",
+              margin: "0 0 24px",
+              objectFit: "contain",
+            }}
+            priority
+          />
 
           <p style={{ fontSize: "clamp(14px,2vw,18px)", color: "#999", marginBottom: 32, lineHeight: 1.6 }}>
             {heroContent}
