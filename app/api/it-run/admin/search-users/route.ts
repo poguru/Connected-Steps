@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { verifyItRunAdmin } from "@/lib/it-run-admin-auth";
 
 // GET /api/it-run/admin/search-users?email=...
 // Searches for Connected Steps users by email
+// Admin access only (requires it_run_portal_users role=admin)
 export async function GET(req: NextRequest) {
+  // Verify admin authorization
+  const adminEmail = await verifyItRunAdmin(req);
+  if (!adminEmail) {
+    return NextResponse.json(
+      { error: "Unauthorized - Admin access required" },
+      { status: 403 }
+    );
+  }
+
   const email = req.nextUrl.searchParams.get("email");
 
   if (!email || email.trim().length === 0) {

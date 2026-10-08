@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { verifyItRunAdmin, logAdminAction } from "@/lib/it-run-admin-auth";
 
 interface LinkRequest {
   registration_id: string;
@@ -8,10 +9,16 @@ interface LinkRequest {
 
 // POST /api/it-run/admin/link-registration
 // Links an orphaned registration to a Connected Steps user
-// Admin access only
+// Admin access only (requires it_run_portal_users role=admin)
 export async function POST(req: NextRequest) {
-  // TODO: Add admin authorization check
-  // For now, this endpoint is open - should be protected in production
+  // Verify admin authorization
+  const adminEmail = await verifyItRunAdmin(req);
+  if (!adminEmail) {
+    return NextResponse.json(
+      { error: "Unauthorized - Admin access required" },
+      { status: 403 }
+    );
+  }
 
   const { registration_id, user_email } = await req.json() as LinkRequest;
 
@@ -74,9 +81,16 @@ export async function POST(req: NextRequest) {
   }
 
   // Log the linking action (audit trail)
-  // TODO: Create audit_log table and record this action
-  console.info(
-    `[admin/link-registration] Registration ${registration_id} linked to ${user_email}`
+  await logAdminAction(
+    "link_registration",
+    adminEmail,
+    "registration",
+    registration_id,
+    {
+      user_email,
+      prev_linked_user_email: null,
+      new_linked_user_email: user_email.toLowerCase(),
+    }
   );
 
   return NextResponse.json({

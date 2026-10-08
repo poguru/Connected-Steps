@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { verifyItRunAdmin } from "@/lib/it-run-admin-auth";
 
 // GET /api/it-run/admin/orphaned-registrations
 // Returns registrations without linked_user_email (unlinked registrations)
-// Admin access only
+// Admin access only (requires it_run_portal_users role=admin)
 export async function GET(req: NextRequest) {
-  // TODO: Add admin authorization check
-  // For now, this endpoint is open - should be protected in production
+  // Verify admin authorization
+  const adminEmail = await verifyItRunAdmin(req);
+  if (!adminEmail) {
+    return NextResponse.json(
+      { error: "Unauthorized - Admin access required" },
+      { status: 403 }
+    );
+  }
 
   const db = getSupabaseServer();
 
