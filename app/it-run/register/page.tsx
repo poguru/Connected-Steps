@@ -2166,6 +2166,7 @@ function RegisterPageContent() {
             type:              selectedCat.participant_labels[idx]?.role ?? "solo",
             firstName:         p.firstName,
             lastName:          p.lastName,
+            bibName:           p.bibName,
             gender:            p.gender,
             dob:               p.dob,
             email:             p.email,
