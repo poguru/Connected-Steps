@@ -4,6 +4,7 @@ import { generateRegistrationCode, signItRunQR } from "@/lib/it-run-auth";
 import { sendItRunConfirmationEmail, sendItRunBibInviteEmail } from "@/lib/it-run-email";
 import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
+import { normalizePhone, isValidIndianPhone, phonesAreEqual } from "@/lib/phone-utils";
 
 interface ParticipantInput {
   type: string; firstName: string; lastName: string; bibName: string;
@@ -79,8 +80,11 @@ function validateParticipants(
     if (!m.tshirt_sizes.includes(p.tshirtSize)) {
       return `${pfx}: invalid t-shirt size "${p.tshirtSize}"`;
     }
-    if (!p.mobile?.trim() || !MOBILE_RE.test(p.mobile.trim())) {
-      return `${pfx}: valid 10-digit mobile number is required`;
+    if (!p.mobile?.trim()) {
+      return `${pfx}: mobile number is required`;
+    }
+    if (!isValidIndianPhone(p.mobile.trim())) {
+      return `${pfx}: valid 10-digit Indian mobile number is required`;
     }
 
     // DOB — required for everyone; must be a valid past date
@@ -118,9 +122,7 @@ function validateParticipants(
       }
 
       // Emergency phone must be different from participant mobile
-      const normalizedMobile = normalizePhone(p.mobile.trim());
-      const normalizedEmergency = normalizePhone(p.emergencyPhone.trim());
-      if (normalizedMobile === normalizedEmergency) {
+      if (phonesAreEqual(p.mobile.trim(), p.emergencyPhone.trim())) {
         return `${pfx}: emergency contact number must be different from your mobile number`;
       }
 
@@ -312,10 +314,10 @@ export async function POST(req: NextRequest) {
       gender:             p.gender,
       dob:                p.dob || null,
       email:              p.email?.toLowerCase()?.trim() || null,
-      mobile:             p.mobile.trim(),
+      mobile:             normalizePhone(p.mobile.trim()),
       blood_group:        p.bloodGroup || null,
       emergency_name:     p.emergencyName?.trim() || null,
-      emergency_phone:    p.emergencyPhone?.trim() || null,
+      emergency_phone:    normalizePhone(p.emergencyPhone?.trim() || null),
       company_name:       p.companyName?.trim() || null,
       employee_id:        p.employeeId?.trim() || null,
       company_id_url:     p.companyIdUrl || null,
