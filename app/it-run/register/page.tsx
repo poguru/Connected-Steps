@@ -5,6 +5,14 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import type { ItRunEventConfig, ItRunCategory } from "@/lib/it-run-types";
+import {
+  EventRegistrationHeader,
+  CompactEventHeader,
+  EventProgressIndicator,
+  EventRegistrationShell,
+  EventWatermark,
+  EventSuccessScreen,
+} from "@/app/it-run/components/EventBranding";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -2255,20 +2263,23 @@ function RegisterPageContent() {
 
   return (
     <div style={{ background: BG, color: "#fff", fontFamily: "'Inter',system-ui,sans-serif", minHeight: "100vh" }}>
+      <EventWatermark />
 
       {/* Nav */}
       <nav style={{
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
         background: "rgba(8,8,8,0.97)", backdropFilter: "blur(20px)",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        borderBottom: "1px solid rgba(232, 98, 10, 0.15)",
         height: 52, display: "flex", alignItems: "center",
         padding: "0 clamp(1rem,4vw,2rem)", justifyContent: "space-between",
       }}>
         <Link href="/it-run" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
-          <Image src="/logo.png" alt="" width={22} height={22} style={{ borderRadius: "50%" }} />
+          <div style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Image src="/it-run-sprint2-logo.svg" alt="The IT Run Sprint-2" width={28} height={28} style={{ objectFit: "contain" }} />
+          </div>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>{eventTitle}</div>
-            <div style={{ fontSize: 10, color: "#444" }}>Registration</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>THE IT RUN</div>
+            <div style={{ fontSize: 9, color: "#e8620a", fontWeight: 600 }}>SPIRIT-2</div>
           </div>
         </Link>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -2591,7 +2602,20 @@ function RegisterPageContent() {
         )}
 
         {step === 1 && (
-          <StepCategory config={config} loading={configLoading} onSelect={selectCategory} />
+          <>
+            <EventRegistrationHeader event={config?.event ?? null} />
+            <StepCategory config={config} loading={configLoading} onSelect={selectCategory} />
+          </>
+        )}
+
+        {step === 2 && selectedCat && (
+          <>
+            <CompactEventHeader
+              step={2}
+              stepLabel="Participants"
+              participantName={participants[participantSubIdx]?.firstName || "Participant"}
+            />
+          </>
         )}
 
         {step === 2 && selectedCat && profileApplied && profileData && (
@@ -2624,7 +2648,13 @@ function RegisterPageContent() {
         )}
 
         {step === 3 && selectedCat && (
-          <StepCompany
+          <>
+            <CompactEventHeader
+              step={3}
+              stepLabel="Company Verification"
+              participantName={participants[participantSubIdx]?.firstName || "Participant"}
+            />
+            <StepCompany
             category={selectedCat}
             participants={participants}
             uploading={uploading}
@@ -2641,11 +2671,14 @@ function RegisterPageContent() {
             }}
             onNext={() => { setReturnToReview(false); setStep(4); }}
             returnToReview={returnToReview}
-          />
+            />
+          </>
         )}
 
         {step === 4 && selectedCat && (
-          <StepReview
+          <>
+            <CompactEventHeader step={4} stepLabel="Review" />
+            <StepReview
             category={selectedCat}
             participants={participants}
             coupon={coupon}
@@ -2658,11 +2691,14 @@ function RegisterPageContent() {
             onEditVerification={editVerification}
             onEditCategory={editCategory}
             onEditCoupon={editCoupon}
-          />
+            />
+          </>
         )}
 
         {step === 5 && selectedCat && (
-          <StepCoupon
+          <>
+            <CompactEventHeader step={5} stepLabel="Coupon" />
+            <StepCoupon
             category={selectedCat}
             couponEnabled={config?.registration.coupon_enabled ?? false}
             couponCode={couponCode}
@@ -2681,21 +2717,30 @@ function RegisterPageContent() {
             onSubmit={submitRegistration}
             returnToReview={returnToReview}
             onSaveAndReturn={() => { setReturnToReview(false); setStep(4); }}
-          />
+            />
+          </>
         )}
 
         {step === 6 && selectedCat && (
-          <StepPayment
+          <>
+            <CompactEventHeader step={6} stepLabel="Payment" />
+            <StepPayment
             regCode={regCode}
             finalPrice={finalPrice}
             submitting={submitting}
             submitError={submitError}
             onPay={initiatePayment}
-          />
+            />
+          </>
         )}
 
         {step === 7 && (
-          <StepSuccess regCode={regCode} paymentDone={paymentDone} eventTitle={eventTitle} />
+          <EventSuccessScreen
+            registrationCode={regCode}
+            category={selectedCat?.name ?? "The IT Run Sprint-2"}
+            participants={participants.map(p => `${p.firstName} ${p.lastName}`.trim())}
+            finalPrice={finalPrice}
+          />
         )}
       </div>
       )}
