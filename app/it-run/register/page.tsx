@@ -11,7 +11,7 @@ import type { ItRunEventConfig, ItRunCategory } from "@/lib/it-run-types";
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface Participant {
-  firstName: string; lastName: string; gender: string;
+  firstName: string; lastName: string; bibName: string; gender: string;
   dob: string; email: string; mobile: string;
   bloodGroup: string; emergencyName: string; emergencyPhone: string;
   companyName: string; employeeId: string;
@@ -39,7 +39,7 @@ interface DraftRecord {
 }
 
 interface ProfileAutoFill {
-  firstName: string; lastName: string;
+  firstName: string; lastName: string; bibName?: string;
   mobile: string; dob: string; gender: string;
   bloodGroup: string; emergencyName: string; emergencyPhone: string;
   companyName: string; employeeId: string; tshirtSize: string;
@@ -88,7 +88,7 @@ const TSHIRT_SIZES = ["XS","S","M","L","XL","XXL","3XL"]; // adult fallback only
 const FOOD_PREFS   = ["veg","non-veg","vegan"];
 
 const emptyParticipant = (): Participant => ({
-  firstName: "", lastName: "", gender: "", dob: "", email: "", mobile: "",
+  firstName: "", lastName: "", bibName: "", gender: "", dob: "", email: "", mobile: "",
   bloodGroup: "", emergencyName: "", emergencyPhone: "",
   companyName: "", employeeId: "", companyIdFile: null, companyIdUrl: "",
   tshirtSize: "", medicalConditions: "", foodPreference: "veg",
@@ -332,6 +332,15 @@ function ParticipantForm({
           <input style={inp("lastName", !!errors.lastName)} value={data.lastName}
             onChange={e => onChange("lastName", e.target.value)}
             placeholder="Last name" autoComplete="family-name" />
+        </Field>
+      </div>
+
+      <div style={{ marginBottom: 14 }}>
+        <Field label="BIB Name" error={errors.bibName} required
+          hint="This name will be printed on your race BIB.">
+          <input style={inp("bibName", !!errors.bibName)} value={data.bibName}
+            onChange={e => onChange("bibName", e.target.value.toUpperCase())}
+            placeholder="Name for BIB (e.g., PAVAN or P.KALYAN)" />
         </Field>
       </div>
 
@@ -1783,6 +1792,7 @@ function RegisterPageContent() {
       const p = { ...copy[0] };
       if (!p.firstName)       p.firstName       = profileData.firstName;
       if (!p.lastName)        p.lastName        = profileData.lastName;
+      if (!p.bibName)         p.bibName         = profileData.bibName || profileData.firstName;
       if (!p.mobile)          p.mobile          = profileData.mobile;
       if (!p.dob)             p.dob             = profileData.dob;
       if (!p.gender)          p.gender          = profileData.gender;

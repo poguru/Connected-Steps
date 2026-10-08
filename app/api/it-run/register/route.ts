@@ -6,7 +6,7 @@ import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 
 interface ParticipantInput {
-  type: string; firstName: string; lastName: string;
+  type: string; firstName: string; lastName: string; bibName: string;
   gender: string; dob: string; email: string; mobile: string;
   bloodGroup: string; emergencyName: string; emergencyPhone: string;
   companyName: string; employeeId: string; companyIdUrl: string;
@@ -37,6 +37,18 @@ function deriveParticipantMeta(
 const EMAIL_RE   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MOBILE_RE  = /^\d{10}$/;
 
+// Normalize Indian phone numbers to 10-digit format
+function normalizePhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.endsWith("91") && digits.length === 12) {
+    return digits.slice(2); // +91 prefix
+  }
+  if (digits.length === 10) {
+    return digits; // Already 10 digits
+  }
+  return digits.slice(-10); // Take last 10 digits
+}
+
 function validateParticipants(
   participants: ParticipantInput[],
   meta: ParticipantMeta[],
@@ -49,6 +61,18 @@ function validateParticipants(
 
     if (!p.firstName?.trim())  return `${pfx}: first name is required`;
     if (!p.lastName?.trim())   return `${pfx}: last name is required`;
+    if (!p.bibName?.trim())    return `${pfx}: BIB name is required`;
+
+    // BIB name validation: max reasonable length (printer constraint)
+    if (p.bibName.trim().length > 50) {
+      return `${pfx}: BIB name cannot exceed 50 characters`;
+    }
+
+    // BIB name must not contain only whitespace or malicious content
+    if (!/^[\w\s\-']+$/i.test(p.bibName.trim())) {
+      return `${pfx}: BIB name contains invalid characters`;
+    }
+
     if (!p.gender)             return `${pfx}: gender is required`;
     if (!p.bloodGroup)         return `${pfx}: blood group is required`;
     if (!p.tshirtSize)         return `${pfx}: t-shirt size is required`;
@@ -65,12 +89,19 @@ function validateParticipants(
     if (isNaN(dobMs))       return `${pfx}: invalid date of birth`;
     if (dobMs >= Date.now()) return `${pfx}: date of birth must be in the past`;
 
-    // Child age rule: age is calculated on the event date, not today.
-    // A child who turns 11 before the event day is ineligible even if they are 10 today.
+    // Age validation based on participant type
     if (m.is_child) {
+      // Child age rule: age is calculated on the event date, not today.
+      // A child who turns 11 before the event day is ineligible even if they are 10 today.
       const ageOnEventDay = (eventDateMs - dobMs) / (365.25 * 86400000);
       if (ageOnEventDay >= 11) {
         return "Child participant must be 10 years or younger on the event date";
+      }
+    } else {
+      // Adult rule: must be at least 18 years old on event date
+      const ageOnEventDay = (eventDateMs - dobMs) / (365.25 * 86400000);
+      if (ageOnEventDay < 18) {
+        return `${pfx}: you must be at least 18 years old on the event date`;
       }
     }
 
@@ -85,6 +116,14 @@ function validateParticipants(
       if (!p.emergencyPhone?.trim() || !MOBILE_RE.test(p.emergencyPhone.trim())) {
         return `${pfx}: valid 10-digit emergency contact phone is required`;
       }
+
+      // Emergency phone must be different from participant mobile
+      const normalizedMobile = normalizePhone(p.mobile.trim());
+      const normalizedEmergency = normalizePhone(p.emergencyPhone.trim());
+      if (normalizedMobile === normalizedEmergency) {
+        return `${pfx}: emergency contact number must be different from your mobile number`;
+      }
+
       if (!p.companyName?.trim()) {
         return `${pfx}: company name is required`;
       }
@@ -269,6 +308,7 @@ export async function POST(req: NextRequest) {
       participant_type:   p.type,
       first_name:         p.firstName.trim(),
       last_name:          p.lastName.trim(),
+      bib_name:           p.bibName.trim().toUpperCase(),
       gender:             p.gender,
       dob:                p.dob || null,
       email:              p.email?.toLowerCase()?.trim() || null,
