@@ -155,16 +155,134 @@ export function EventRegistrationHeader({
           )}
         </div>
 
-        {/* Sponsors Section (Placeholder for future) */}
+        {/* Sponsors Section */}
         {/*
-          TODO: Add sponsor logos here when available
-          Structure:
-          - Title Sponsors
-          - Associate Sponsors
-          - Supporting Partners
-          - Category-specific partners (Hydration, T-Shirt, Timing, etc.)
+          Sponsors are stored in: /public/events/it-run-sprint-2/sponsors/
+
+          To add sponsors:
+          1. Save logo files to that directory (png, jpg, webp)
+          2. Update the sponsorsConfig in EventSponsors below
+          3. That's it - no code changes needed!
+
+          Supported tiers:
+          - title: Primary sponsors (largest logos)
+          - associate: Associate sponsors (medium logos)
+          - supporting: Supporting partners (smaller logos)
+          - hydration/tshirt/timing/etc: Category-specific partners
         */}
+        <EventSponsors eventName="it-run-sprint-2" />
       </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EventSponsors — Load sponsor logos from event directory
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface SponsorConfig {
+  tier: "title" | "associate" | "supporting" | string;
+  logos: Array<{ filename: string; name?: string; url?: string }>;
+}
+
+export function EventSponsors({ eventName }: { eventName: string }) {
+  // TODO: Update this config when adding sponsors
+  // Sponsors will be loaded from: /public/events/{eventName}/sponsors/{filename}
+  const sponsorConfig: SponsorConfig[] = [
+    // Example config (uncomment and update when adding sponsors):
+    // {
+    //   tier: "title",
+    //   logos: [
+    //     { filename: "title-sponsor-1.png", name: "Sponsor Name", url: "https://sponsor.com" }
+    //   ]
+    // },
+    // {
+    //   tier: "associate",
+    //   logos: [
+    //     { filename: "associate-sponsor-1.png", name: "Associate Name" },
+    //     { filename: "associate-sponsor-2.png", name: "Associate Name 2" }
+    //   ]
+    // },
+    // {
+    //   tier: "hydration",
+    //   logos: [
+    //     { filename: "hydration-partner.png", name: "Hydration Partner" }
+    //   ]
+    // }
+  ];
+
+  if (!sponsorConfig.length) {
+    return null; // No sponsors configured yet
+  }
+
+  return (
+    <div style={{ marginTop: 32, paddingTop: 32, borderTop: `1px solid rgba(255,255,255,0.08)` }}>
+      {sponsorConfig.map((tier) => (
+        <div key={tier.tier} style={{ marginBottom: 28 }}>
+          <div
+            style={{
+              fontSize: 11,
+              color: "rgba(255, 255, 255, 0.4)",
+              textTransform: "uppercase",
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              marginBottom: 16,
+            }}
+          >
+            {tier.tier === "title"
+              ? "Title Sponsor"
+              : tier.tier === "associate"
+                ? "Associate Sponsors"
+                : tier.tier === "supporting"
+                  ? "Supporting Partners"
+                  : tier.tier.charAt(0).toUpperCase() + tier.tier.slice(1) + " Partner"}
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 24,
+              alignItems: "center",
+            }}
+          >
+            {tier.logos.map((logo, idx) => (
+              <a
+                key={idx}
+                href={logo.url || "#"}
+                target={logo.url ? "_blank" : undefined}
+                rel={logo.url ? "noopener noreferrer" : undefined}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  height: tier.tier === "title" ? 80 : tier.tier === "associate" ? 60 : 50,
+                  opacity: 0.9,
+                  transition: "opacity 0.2s",
+                  textDecoration: "none",
+                  cursor: logo.url ? "pointer" : "default",
+                }}
+                onMouseEnter={(e) => {
+                  if (logo.url) e.currentTarget.style.opacity = "1";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.opacity = "0.9";
+                }}
+              >
+                <img
+                  src={`/events/${eventName}/sponsors/${logo.filename}`}
+                  alt={logo.name || "Sponsor"}
+                  title={logo.name}
+                  style={{
+                    maxHeight: tier.tier === "title" ? 80 : tier.tier === "associate" ? 60 : 50,
+                    maxWidth: 200,
+                    objectFit: "contain",
+                  }}
+                />
+              </a>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
