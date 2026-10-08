@@ -332,13 +332,11 @@ export function EventRegistrationSummary({
   participantCount,
   price,
   onContinue,
-  showOnDesktopOnly = false,
 }: {
   categoryName: string;
   participantCount: number;
   price: number;
   onContinue?: () => void;
-  showOnDesktopOnly?: boolean;
 }) {
   return (
     <div
@@ -352,14 +350,10 @@ export function EventRegistrationSummary({
         backdropFilter: "blur(20px)",
         borderTop: `1px solid ${EVENT_ORANGE}20`,
         padding: `12px clamp(1rem, 4vw, 2rem) calc(12px + env(safe-area-inset-bottom, 0px))`,
-        display: showOnDesktopOnly ? "none" : "flex",
+        display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         gap: 12,
-
-        "@media (min-width: 768px)": showOnDesktopOnly
-          ? { display: "flex" }
-          : undefined,
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
