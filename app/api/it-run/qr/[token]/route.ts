@@ -42,7 +42,7 @@ export async function GET(
     // Return as PNG image
     // Email clients cache this aggressively (max-age=31536000 = 1 year)
     // The token never changes, so this is safe to cache forever
-    return new NextResponse(qrPng, {
+    return new NextResponse(qrPng as BodyInit, {
       status: 200,
       headers: {
         "Content-Type": "image/png",
