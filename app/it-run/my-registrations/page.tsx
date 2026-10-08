@@ -200,11 +200,24 @@ export default function MyRegistrationsPage() {
                 const parts   = reg.it_run_participants;
 
                 return (
-                  <div key={reg.id} style={{
+                  <Link key={reg.id} href={`/it-run/registrations/${reg.id}`} style={{
                     background: "rgba(255,255,255,0.03)",
                     border: "1px solid rgba(255,255,255,0.08)",
                     borderRadius: 16, padding: "20px 22px",
-                  }}>
+                    textDecoration: "none",
+                    color: "inherit",
+                    display: "block",
+                    transition: "all 0.2s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = `rgba(232,98,10,0.3)`;
+                    e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
+                    e.currentTarget.style.background = "rgba(255,255,255,0.03)";
+                  }}
+                  >
                     {/* Header row */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
                       <div>
@@ -283,7 +296,7 @@ export default function MyRegistrationsPage() {
                         <span>&#8377;{reg.final_price.toLocaleString("en-IN")}</span>
                       )}
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>

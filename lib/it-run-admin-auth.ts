@@ -34,6 +34,9 @@ export async function verifyItRunAdmin(req: NextRequest): Promise<string | null>
 
 /**
  * Audit Log - Records admin actions for compliance
+ *
+ * NOTE: Requires migration 20261008000003 to be applied
+ * If table doesn't exist, logs to console as fallback
  */
 export async function logAdminAction(
   action: string,
@@ -54,8 +57,16 @@ export async function logAdminAction(
       timestamp: new Date().toISOString(),
     });
   } catch (e) {
-    // Log error but don't fail the operation
-    console.error("[it-run-admin-auth] Failed to log audit action:", e);
+    // Fallback: log to console if table doesn't exist
+    console.warn("[it-run-admin-auth] Audit log to DB failed, using console fallback:", {
+      action,
+      admin_email,
+      resource_type,
+      resource_id,
+      details,
+      timestamp: new Date().toISOString(),
+      error: (e as Error).message,
+    });
   }
 }
 
