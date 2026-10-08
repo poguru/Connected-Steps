@@ -576,30 +576,48 @@ export default function ItRunLandingPage() {
             </div>
           )}
         </div>
-        <div style={{ position: "relative" }}>
-          <div style={{ position: "absolute", left: "clamp(48px,8vw,60px)", top: 0, bottom: 0, width: 2, background: "rgba(255,255,255,0.06)" }} />
-          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-            {SCHEDULE.map((item, i) => (
-              <div key={i} style={{ display: "flex", gap: 20, paddingLeft: "clamp(96px,16vw,120px)", paddingBottom: 24, position: "relative" }}>
+        {/* 3-Column Grid Layout: TIME | TIMELINE | CONTENT */}
+        <div style={{ display: "grid", gridTemplateColumns: "80px 40px 1fr", gap: "16px 16px", alignItems: "start" }}>
+          {SCHEDULE.map((item, i) => (
+            <>
+              {/* Column 1: TIME (right-aligned, no-wrap) */}
+              <div style={{ textAlign: "right", paddingTop: 4 }}>
+                <span style={{ fontSize: 12, color: "#e8620a", fontWeight: 700, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", display: "block" }}>{item.time}</span>
+              </div>
+
+              {/* Column 2: TIMELINE MARKER (centered) */}
+              <div style={{ display: "flex", justifyContent: "center", paddingTop: 2, position: "relative" }}>
+                {/* Vertical line connecting markers */}
+                {i !== SCHEDULE.length - 1 && (
+                  <div style={{
+                    position: "absolute",
+                    top: 22,
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    width: 2,
+                    height: "calc(100% - 8px)",
+                    background: "rgba(255,255,255,0.06)",
+                  }} />
+                )}
+                {/* Circular marker */}
                 <div style={{
-                  position: "absolute",
-                  left: "clamp(40px,7vw,52px)",
-                  top: 2, width: 18, height: 18,
+                  width: 18,
+                  height: 18,
                   background: i === 0 ? "#e8620a" : "rgba(255,255,255,0.08)",
                   border: `2px solid ${i === 0 ? "#e8620a" : "rgba(255,255,255,0.15)"}`,
                   borderRadius: "50%",
-                  zIndex: 1,
+                  zIndex: 2,
+                  position: "relative",
                 }} />
-                <div style={{ position: "absolute", left: 0, top: 0, width: "clamp(80px,12vw,100px)", textAlign: "right" }}>
-                  <span style={{ fontSize: 12, color: "#e8620a", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{item.time}</span>
-                </div>
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 2 }}>{item.event}</div>
-                  <div style={{ fontSize: 13, color: "#888" }}>{item.desc}</div>
-                </div>
               </div>
-            ))}
-          </div>
+
+              {/* Column 3: EVENT CONTENT */}
+              <div style={{ paddingTop: 2, paddingBottom: i === SCHEDULE.length - 1 ? 0 : 20 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 4, wordWrap: "break-word" }}>{item.event}</div>
+                <div style={{ fontSize: 13, color: "#888", lineHeight: 1.5, wordWrap: "break-word" }}>{item.desc}</div>
+              </div>
+            </>
+          ))}
         </div>
       </section>
 
