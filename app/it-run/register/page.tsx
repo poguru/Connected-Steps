@@ -2603,7 +2603,10 @@ function RegisterPageContent() {
 
         {step === 1 && (
           <>
-            <EventRegistrationHeader event={config?.event ?? null} />
+            <EventRegistrationHeader
+              event={config?.event ?? null}
+              eventLogoUrl="/events/it-run-sprint-2/IT Run Sprint-2 Logo.jpeg"
+            />
             <StepCategory config={config} loading={configLoading} onSelect={selectCategory} />
           </>
         )}

@@ -17,8 +17,10 @@ const TEXT_LIGHT = "#ffffff";
 
 export function EventRegistrationHeader({
   event,
+  eventLogoUrl,
 }: {
   event: ItRunEventMeta | null;
+  eventLogoUrl?: string; // Reusable: pass event logo URL
 }) {
   const eventDate = event?.event_date
     ? new Date(event.event_date + "T12:00:00Z").toLocaleDateString("en-IN", {
@@ -45,7 +47,38 @@ export function EventRegistrationHeader({
           padding: "0 clamp(1rem, 4vw, 2rem)",
         }}
       >
-        {/* Logo + Event Name */}
+        {/* Connected Steps Organizer Badge */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 24,
+          }}
+        >
+          <img
+            src="/logo.png"
+            alt="Connected Steps"
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: "50%",
+            }}
+          />
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: "rgba(255, 255, 255, 0.5)",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+            }}
+          >
+            Hosted by Connected Steps
+          </span>
+        </div>
+
+        {/* Event Logo + Name */}
         <div
           style={{
             display: "flex",
@@ -55,23 +88,25 @@ export function EventRegistrationHeader({
             flexWrap: "wrap",
           }}
         >
-          <div
-            style={{
-              width: "clamp(80px, 12vw, 140px)",
-              height: "auto",
-              flexShrink: 0,
-            }}
-          >
-            <img
-              src="/events/it-run-sprint-2/IT Run Sprint-2 Logo.jpeg"
-              alt="The IT Run Sprint-2"
+          {eventLogoUrl && (
+            <div
               style={{
-                width: "100%",
+                width: "clamp(80px, 12vw, 140px)",
                 height: "auto",
-                display: "block",
+                flexShrink: 0,
               }}
-            />
-          </div>
+            >
+              <img
+                src={eventLogoUrl}
+                alt={event?.title ?? "Event"}
+                style={{
+                  width: "100%",
+                  height: "auto",
+                  display: "block",
+                }}
+              />
+            </div>
+          )}
 
           <div>
             <h1
@@ -99,7 +134,7 @@ export function EventRegistrationHeader({
             gap: 8,
             fontSize: 14,
             color: "rgba(255, 255, 255, 0.65)",
-            marginLeft: "clamp(80px, 12vw, 140px)",
+            marginLeft: eventLogoUrl ? "clamp(80px, 12vw, 140px)" : 0,
           }}
         >
           {event?.venue_name && (
@@ -119,6 +154,16 @@ export function EventRegistrationHeader({
             </div>
           )}
         </div>
+
+        {/* Sponsors Section (Placeholder for future) */}
+        {/*
+          TODO: Add sponsor logos here when available
+          Structure:
+          - Title Sponsors
+          - Associate Sponsors
+          - Supporting Partners
+          - Category-specific partners (Hydration, T-Shirt, Timing, etc.)
+        */}
       </div>
     </div>
   );
