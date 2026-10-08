@@ -32,20 +32,34 @@ export async function GET(req: NextRequest) {
   }
 
   // Fetch other Connected Steps event registrations
-  const { data: otherRegs, error: otherErr } = await db
-    .from("registrations")
-    .select(`
-      id, event_id, event_status, payment_status, created_at,
-      users ( email ),
-      events (
-        id, title, event_type, start_date, end_date,
-        location, cover_image,
-        distance_categories ( category )
-      )
-    `)
-    .eq("user_id", userEmail) // Assuming user_id or email linkage exists
-    .order("created_at", { ascending: false })
-    .limit(100);
+  // First get the user's UUID from email
+  const { data: user, error: userErr } = await db
+    .from("users")
+    .select("id")
+    .eq("email", userEmail)
+    .single();
+
+  let otherRegs: any[] = [];
+  let otherErr: any = null;
+
+  if (user && !userErr) {
+    const result = await db
+      .from("registrations")
+      .select(`
+        id, event_id, event_status, payment_status, created_at,
+        events (
+          id, title, event_type, start_date, end_date,
+          location, cover_image
+        )
+      `)
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    otherRegs = result.data || [];
+    otherErr = result.error;
+  } else {
+    otherErr = userErr;
+  }
 
   if (otherErr) {
     console.error("[me/events] Other events query error:", otherErr.message);
