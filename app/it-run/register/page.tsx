@@ -2275,7 +2275,7 @@ function RegisterPageContent() {
       }}>
         <Link href="/it-run" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
           <div style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Image src="/it-run-sprint2-logo.svg" alt="The IT Run Sprint-2" width={28} height={28} style={{ objectFit: "contain" }} />
+            <Image src="/events/it-run-sprint-2/IT Run Sprint-2 Logo.jpeg" alt="The IT Run Sprint-2" width={28} height={28} style={{ objectFit: "contain" }} />
           </div>
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>THE IT RUN</div>
