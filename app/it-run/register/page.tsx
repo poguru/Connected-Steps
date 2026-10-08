@@ -240,6 +240,88 @@ function ProgressStepper({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Field Validation Helper — validates single field in real-time
+// ─────────────────────────────────────────────────────────────────────────────
+
+function validateField(
+  field: keyof Participant,
+  value: string,
+  participant: Participant,
+  isChild: boolean,
+  eventDateMs: number,
+): string | undefined {
+  const nameRe = /[\p{L}]/u;
+
+  switch (field) {
+    case "firstName":
+      if (!value.trim() || !nameRe.test(value)) return "Enter a valid first name";
+      break;
+    case "lastName":
+      if (!value.trim() || !nameRe.test(value)) return "Enter a valid last name";
+      break;
+    case "bibName":
+      if (!value.trim()) return "BIB name is required";
+      if (value.length > 30) return "BIB name must be 30 characters or less";
+      break;
+    case "gender":
+      if (!value) return "Gender is required";
+      break;
+    case "dob":
+      if (!value) return "Date of birth is required";
+      else {
+        const dobDate = new Date(value);
+        if (dobDate > new Date()) return "Date of birth cannot be in the future";
+        const dobMs = dobDate.getTime();
+        const ageYears = (eventDateMs - dobMs) / (1000 * 60 * 60 * 24 * 365.25);
+        if (isChild && ageYears >= 11) return "Child must be 10 years or younger on the event date";
+        if (!isChild && ageYears < 18) return "Participant must be at least 18 years old on the event date";
+      }
+      break;
+    case "email":
+      if (!isChild && (!value || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))) {
+        return "Valid email required";
+      }
+      break;
+    case "mobile":
+      if (!value || !/^\d{10}$/.test(value.replace(/\D/g, "").slice(-10))) {
+        return "Enter a valid 10-digit mobile number";
+      }
+      break;
+    case "bloodGroup":
+      if (!value) return "Blood group is required";
+      break;
+    case "tshirtSize":
+      if (!value) return "T-shirt size is required";
+      break;
+    case "emergencyName":
+      if (!isChild && !value.trim()) return "Emergency contact name is required";
+      break;
+    case "emergencyPhone":
+      if (!isChild) {
+        if (!value.trim()) return "Emergency contact phone is required";
+        if (!/^\d{10}$/.test(value.replace(/\D/g, "").slice(-10))) {
+          return "Enter a valid 10-digit phone number";
+        }
+        if (participant.mobile) {
+          const emergencyNorm = value.replace(/\D/g, "").slice(-10);
+          const mobileNorm = participant.mobile.replace(/\D/g, "").slice(-10);
+          if (emergencyNorm === mobileNorm) {
+            return "Emergency contact number must be different from your mobile number";
+          }
+        }
+      }
+      break;
+    case "companyName":
+      if (!isChild && (!value.trim() || !nameRe.test(value))) {
+        return "Enter a valid company name";
+      }
+      break;
+  }
+
+  return undefined;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Field — labeled form control wrapper
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -297,9 +379,20 @@ function ParticipantForm({
   indexOfTotal: string; // e.g. "1 of 2"
 }) {
   const [showOptional, setShowOptional] = useState(false);
+  const [touched, setTouched] = useState<Set<keyof Participant>>(new Set());
+  const eventDateMs = typeof window !== "undefined" ? new Date().getTime() : Date.now();
 
   const inp = (field: keyof Participant, hasErr: boolean) =>
     hasErr ? INPUT_ERR : INPUT_S;
+
+  const handleFieldBlur = (field: keyof Participant) => {
+    setTouched(prev => new Set([...prev, field]));
+  };
+
+  const getFieldError = (field: keyof Participant): string | undefined => {
+    if (!touched.has(field)) return undefined;
+    return validateField(field, data[field] as string, data, isChild, eventDateMs) || errors[field];
+  };
 
   return (
     <div>
@@ -331,31 +424,35 @@ function ParticipantForm({
       <SectionHeader label={isChild ? "About the Child" : "About You"} />
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
-        <Field label="First Name" error={errors.firstName} required>
-          <input style={inp("firstName", !!errors.firstName)} value={data.firstName}
+        <Field label="First Name" error={getFieldError("firstName")} required>
+          <input style={inp("firstName", !!getFieldError("firstName"))} value={data.firstName}
             onChange={e => onChange("firstName", e.target.value)}
+            onBlur={() => handleFieldBlur("firstName")}
             placeholder="First name" autoComplete="given-name" />
         </Field>
-        <Field label="Last Name" error={errors.lastName} required>
-          <input style={inp("lastName", !!errors.lastName)} value={data.lastName}
+        <Field label="Last Name" error={getFieldError("lastName")} required>
+          <input style={inp("lastName", !!getFieldError("lastName"))} value={data.lastName}
             onChange={e => onChange("lastName", e.target.value)}
+            onBlur={() => handleFieldBlur("lastName")}
             placeholder="Last name" autoComplete="family-name" />
         </Field>
       </div>
 
       <div style={{ marginBottom: 14 }}>
-        <Field label="BIB Name" error={errors.bibName} required
+        <Field label="BIB Name" error={getFieldError("bibName")} required
           hint="This name will be printed on your race BIB.">
-          <input style={inp("bibName", !!errors.bibName)} value={data.bibName}
+          <input style={inp("bibName", !!getFieldError("bibName"))} value={data.bibName}
             onChange={e => onChange("bibName", e.target.value.toUpperCase())}
+            onBlur={() => handleFieldBlur("bibName")}
             placeholder="Name for BIB (e.g., PAVAN or P.KALYAN)" />
         </Field>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
-        <Field label="Gender" error={errors.gender} required>
-          <select style={inp("gender", !!errors.gender)} value={data.gender}
-            onChange={e => onChange("gender", e.target.value)}>
+        <Field label="Gender" error={getFieldError("gender")} required>
+          <select style={inp("gender", !!getFieldError("gender"))} value={data.gender}
+            onChange={e => onChange("gender", e.target.value)}
+            onBlur={() => handleFieldBlur("gender")}>
             <option value="">Select</option>
             <option value="male">Male</option>
             <option value="female">Female</option>
@@ -363,10 +460,11 @@ function ParticipantForm({
             <option value="prefer_not">Prefer not to say</option>
           </select>
         </Field>
-        <Field label="Date of Birth" error={errors.dob} required
+        <Field label="Date of Birth" error={getFieldError("dob")} required
           hint={isChild ? "Must be 10 years or younger" : undefined}>
-          <input style={inp("dob", !!errors.dob)} type="date" value={data.dob}
-            onChange={e => onChange("dob", e.target.value)} />
+          <input style={inp("dob", !!getFieldError("dob"))} type="date" value={data.dob}
+            onChange={e => onChange("dob", e.target.value)}
+            onBlur={() => handleFieldBlur("dob")} />
         </Field>
       </div>
 
@@ -375,15 +473,17 @@ function ParticipantForm({
 
       <div style={{ display: "grid", gridTemplateColumns: isChild ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 14 }}>
         {!isChild && (
-          <Field label="Email" error={errors.email} required hint="Your QR code and confirmation will be sent here — double-check before continuing">
-            <input style={inp("email", !!errors.email)} type="email" value={data.email}
+          <Field label="Email" error={getFieldError("email")} required hint="Your QR code and confirmation will be sent here — double-check before continuing">
+            <input style={inp("email", !!getFieldError("email"))} type="email" value={data.email}
               onChange={e => onChange("email", e.target.value)}
+              onBlur={() => handleFieldBlur("email")}
               placeholder="your@email.com" autoComplete="email" />
           </Field>
         )}
-        <Field label="Mobile" error={errors.mobile} required hint="10-digit Indian number">
-          <input style={inp("mobile", !!errors.mobile)} type="tel" value={data.mobile}
+        <Field label="Mobile" error={getFieldError("mobile")} required hint="10-digit Indian number">
+          <input style={inp("mobile", !!getFieldError("mobile"))} type="tel" value={data.mobile}
             onChange={e => onChange("mobile", e.target.value.replace(/\D/g, "").slice(0, 10))}
+            onBlur={() => handleFieldBlur("mobile")}
             placeholder="9XXXXXXXXX" inputMode="numeric" autoComplete="tel-national" />
         </Field>
       </div>
@@ -392,17 +492,19 @@ function ParticipantForm({
       <SectionHeader label="Race Details" />
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
-        <Field label="Blood Group" error={errors.bloodGroup} required>
-          <select style={inp("bloodGroup", !!errors.bloodGroup)} value={data.bloodGroup}
-            onChange={e => onChange("bloodGroup", e.target.value)}>
+        <Field label="Blood Group" error={getFieldError("bloodGroup")} required>
+          <select style={inp("bloodGroup", !!getFieldError("bloodGroup"))} value={data.bloodGroup}
+            onChange={e => onChange("bloodGroup", e.target.value)}
+            onBlur={() => handleFieldBlur("bloodGroup")}>
             <option value="">Select</option>
             {BLOOD_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
           </select>
         </Field>
-        <Field label="T-Shirt Size" error={errors.tshirtSize} required
+        <Field label="T-Shirt Size" error={getFieldError("tshirtSize")} required
           hint={isChild ? "Child sizes (age-appropriate)" : undefined}>
-          <select style={inp("tshirtSize", !!errors.tshirtSize)} value={data.tshirtSize}
-            onChange={e => onChange("tshirtSize", e.target.value)}>
+          <select style={inp("tshirtSize", !!getFieldError("tshirtSize"))} value={data.tshirtSize}
+            onChange={e => onChange("tshirtSize", e.target.value)}
+            onBlur={() => handleFieldBlur("tshirtSize")}>
             <option value="">Select size</option>
             {tshirtSizes.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
@@ -414,24 +516,27 @@ function ParticipantForm({
         <>
           <SectionHeader label="Emergency Contact" />
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
-            <Field label="Contact Name" error={errors.emergencyName} required>
-              <input style={inp("emergencyName", !!errors.emergencyName)} value={data.emergencyName}
+            <Field label="Contact Name" error={getFieldError("emergencyName")} required>
+              <input style={inp("emergencyName", !!getFieldError("emergencyName"))} value={data.emergencyName}
                 onChange={e => onChange("emergencyName", e.target.value)}
+                onBlur={() => handleFieldBlur("emergencyName")}
                 placeholder="Person to call" />
             </Field>
-            <Field label="Contact Phone" error={errors.emergencyPhone} required>
-              <input style={inp("emergencyPhone", !!errors.emergencyPhone)} type="tel"
+            <Field label="Contact Phone" error={getFieldError("emergencyPhone")} required>
+              <input style={inp("emergencyPhone", !!getFieldError("emergencyPhone"))} type="tel"
                 value={data.emergencyPhone}
                 onChange={e => onChange("emergencyPhone", e.target.value.replace(/\D/g, "").slice(0, 10))}
+                onBlur={() => handleFieldBlur("emergencyPhone")}
                 placeholder="Emergency number" inputMode="numeric" />
             </Field>
           </div>
 
           <SectionHeader label="Company" />
           <div style={{ marginBottom: 14 }}>
-            <Field label="Company Name" error={errors.companyName} required>
-              <input style={inp("companyName", !!errors.companyName)} value={data.companyName}
+            <Field label="Company Name" error={getFieldError("companyName")} required>
+              <input style={inp("companyName", !!getFieldError("companyName"))} value={data.companyName}
                 onChange={e => onChange("companyName", e.target.value)}
+                onBlur={() => handleFieldBlur("companyName")}
                 placeholder="Your employer or company" autoComplete="organization" />
             </Field>
           </div>
