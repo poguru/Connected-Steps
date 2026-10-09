@@ -25,7 +25,7 @@ const FAQS = [
   { q: "Can I run if I am not physically fit?", a: "Absolutely! The 5K Fun Run and Parent & Child Duo are designed for all fitness levels. Start walking, start running - the community spirit is what matters." },
   { q: "When will I receive my race BIB?", a: "Race BIBs are collected at designated collection counters on February 4-6, 2027. You can book your preferred time slot from your participant dashboard after payment confirmation." },
   { q: "Is parking available at the venue?", a: "Yes, parking is available at Hitec City. We recommend arriving early. Public transport and ride-sharing options are also convenient to the venue." },
-  { q: "What is the refund policy?", a: "Registrations are non-refundable. However, transfers to another participant are allowed until January 31, 2027. Requests must be emailed to info@connectedsteps.in with the new participant's details." },
+  { q: "What is the refund policy?", a: "Registrations are non-refundable, except the price difference when you move to a lower-priced category. Transfers to another participant are allowed until January 31, 2027. Requests must be emailed to info@connectedsteps.in with the new participant's details." },
   { q: "Will there be water stations and medical support?", a: "Yes. Water stations are set up every 2.5 KM on the 10K route and every 2 KM on the 5K route. Qualified medical support including first-aid teams and an ambulance will be on standby." },
   { q: "Can I upgrade my category after registration?", a: "Category upgrades (e.g. 5K to 10K) are allowed until January 28, 2027 by paying the price difference. Email us at info@connectedsteps.in to request an upgrade." },
 ];
@@ -247,6 +247,7 @@ export default function ItRunLandingPage() {
           <a href="#categories" style={{ color: "#888", fontSize: 13, textDecoration: "none", padding: "0 8px", display: "none" }}>Categories</a>
           <a href="#schedule"   style={{ color: "#888", fontSize: 13, textDecoration: "none", padding: "0 12px" }}>Schedule</a>
           <a href="#faq"        style={{ color: "#888", fontSize: 13, textDecoration: "none", padding: "0 12px" }}>FAQ</a>
+          <Link href="/it-run/my-registrations" style={{ color: "#ccc", fontSize: 13, textDecoration: "none", padding: "0 12px", fontWeight: 600 }}>My Registrations</Link>
           <Link href="/it-run/register" style={{ ...S.cta, padding: "10px 20px", fontSize: 13 }}>Register</Link>
         </div>
       </nav>
@@ -267,7 +268,7 @@ export default function ItRunLandingPage() {
           </div>
 
           <Image
-            src="/events/it-run-sprint-2/IT Run Sprint-2 Logo.jpeg"
+            src="/events/it-run-sprint-2/IT Run Sprint-2 Logo.png"
             alt="The IT Run Sprint-2"
             width={600}
             height={300}
@@ -312,6 +313,10 @@ export default function ItRunLandingPage() {
             )}
             <a href="#categories" style={S.ghost}>View Categories</a>
           </div>
+          <p style={{ fontSize: 13, color: "#888", marginTop: 16, marginBottom: 0 }}>
+            Already registered?{" "}
+            <Link href="/it-run/my-registrations" style={{ color: "#e8620a", fontWeight: 700, textDecoration: "underline" }}>Sign in to view or manage your registration</Link>
+          </p>
 
           {/* Quick stats */}
           <div style={{ display: "flex", gap: "clamp(24px,4vw,48px)", justifyContent: "center", marginTop: 48, flexWrap: "wrap" }}>
@@ -666,7 +671,7 @@ export default function ItRunLandingPage() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 24 }}>
             <div>
               <div style={{ fontSize: 12, color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Refund Policy</div>
-              <div style={{ fontSize: 14, color: "#888", lineHeight: 1.7 }}>Registrations are non-refundable. Transfers to another participant are allowed until August 8, 2026. Email info@connectedsteps.in to request a transfer.</div>
+              <div style={{ fontSize: 14, color: "#888", lineHeight: 1.7 }}>Registrations are non-refundable, except the price difference when you move to a lower-priced category. Transfers to another participant are allowed until January 31, 2027. Email info@connectedsteps.in to request a transfer.</div>
             </div>
             <div>
               <div style={{ fontSize: 12, color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Event Cancellation</div>
@@ -674,7 +679,7 @@ export default function ItRunLandingPage() {
             </div>
             <div>
               <div style={{ fontSize: 12, color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Category Transfer</div>
-              <div style={{ fontSize: 14, color: "#888", lineHeight: 1.7 }}>Category upgrades are allowed until August 5, 2026 by paying the price difference. No downgrades permitted.</div>
+              <div style={{ fontSize: 14, color: "#888", lineHeight: 1.7 }}>Category upgrades are allowed until January 28, 2027 by paying the price difference. Downgrades are allowed, and the price difference is refunded after review.</div>
             </div>
           </div>
         </div>

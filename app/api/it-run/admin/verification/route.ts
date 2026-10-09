@@ -140,15 +140,15 @@ export async function PATCH(req: NextRequest) {
         subject = `Company ID Verified - ${event.title}`;
         htmlBody = buildCompanyVerificationApprovedEmail(part.first_name, {
           eventTitle: event.title,
-          eventDate: "August 15-16, 2026",
+          eventDate: "February 7, 2027",
         });
       } else if (status === "rejected") {
         subject = "Company ID Verification - Action Required (The IT Run Sprint-2)";
         htmlBody = buildCompanyVerificationRejectionEmail(part.first_name, decision.reason!, decision.explanation, {
           eventTitle: event.title,
           bibLocations: [
-            { name: "Main BIB Counter", address: "HITEC City, Hyderabad", date: "Aug 15, 10 AM - 6 PM" },
-            { name: "Secondary Counter", address: "Tech Park, Hyderabad", date: "Aug 16, 10 AM - 4 PM" },
+            { name: "Main BIB Counter", address: "HITEC City, Hyderabad", date: "Feb 4, 2027, 10 AM - 6 PM" },
+            { name: "Secondary Counter", address: "Tech Park, Hyderabad", date: "Feb 5, 2027, 10 AM - 4 PM" },
           ],
           correctionUrl: correctionUrl ?? "",
         });

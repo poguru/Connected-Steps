@@ -321,7 +321,7 @@ export function CompactEventHeader({
         }}
       >
         <img
-          src="/events/it-run-sprint-2/IT Run Sprint-2 Logo.jpeg"
+          src="/events/it-run-sprint-2/IT Run Sprint-2 Logo.png"
           alt="The IT Run Sprint-2"
           style={{
             width: "100%",
@@ -469,7 +469,7 @@ export function EventRegistrationShell({
         >
           <div style={{ width: 120, height: "auto", margin: "0 auto" }}>
             <img
-              src="/events/it-run-sprint-2/IT Run Sprint-2 Logo.jpeg"
+              src="/events/it-run-sprint-2/IT Run Sprint-2 Logo.png"
               alt="The IT Run Sprint-2"
               style={{
                 width: "100%",
@@ -529,7 +529,7 @@ export function EventRegistrationSummary({
           }}
         >
           <img
-            src="/events/it-run-sprint-2/IT Run Sprint-2 Logo.jpeg"
+            src="/events/it-run-sprint-2/IT Run Sprint-2 Logo.png"
             alt="The IT Run Sprint-2"
             style={{
               width: "100%",
@@ -623,7 +623,7 @@ export function EventWatermark() {
       aria-hidden="true"
     >
       <img
-        src="/events/it-run-sprint-2/IT Run Sprint-2 Logo.jpeg"
+        src="/events/it-run-sprint-2/IT Run Sprint-2 Logo.png"
         alt=""
         style={{
           width: "100%",
@@ -671,7 +671,7 @@ export function EventSuccessScreen({
         }}
       >
         <img
-          src="/events/it-run-sprint-2/IT Run Sprint-2 Logo.jpeg"
+          src="/events/it-run-sprint-2/IT Run Sprint-2 Logo.png"
           alt="The IT Run Sprint-2"
           style={{
             width: "100%",
