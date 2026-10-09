@@ -9,6 +9,7 @@ process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
 jest.mock("@/lib/supabase-server", () => ({ getSupabaseServer: jest.fn() }));
 jest.mock("@/lib/admin-auth", () => ({ verifyUserToken: jest.fn(), USER_SESSION_COOKIE: "cs_user_session" }));
 jest.mock("@/lib/razorpay-security", () => ({ verifyPaymentSignature: jest.fn() }));
+jest.mock("@/lib/notify", () => ({ sendEmail: jest.fn().mockResolvedValue({ ok: true }) }));
 jest.mock("@/lib/razorpay-client", () => ({ getPayment: jest.fn() }));
 
 import { NextRequest } from "next/server";

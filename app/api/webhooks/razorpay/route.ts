@@ -115,7 +115,18 @@ export async function POST(req: NextRequest) {
   //   We handle BOTH so either dashboard setting works.
   // refund.created — fires when a refund is issued (from dashboard or API).
   //   We auto-cancel the registration and free the slot so it can be re-sold.
-  if (event === "payment.captured" && payment) {
+  // Upgrade payment for a category change: applied by its own guarded handler (idempotent with the participant's verify call)
+  if (event === "payment.captured" && payment && payment.notes?.type === "it_run_category_change") {
+    const changeId = payment.notes?.it_run_change_id;
+    if (changeId && payment.order_id) {
+      const { getSupabaseServer } = await import("@/lib/supabase-server");
+      const { applyPaidCategoryChange } = await import("@/lib/it-run-category-change");
+      const result = await applyPaidCategoryChange(getSupabaseServer(), {
+        changeId, orderId: payment.order_id, paymentId: payment.id, amountPaise: payment.amount, actor: "razorpay-webhook",
+      });
+      console.log(`[razorpay-webhook] category change ${changeId}: ${result.kind}`);
+    }
+  } else if (event === "payment.captured" && payment) {
     console.log(`[razorpay-webhook] Handling payment.captured — payment_id=${payment.id}`);
     await handlePaymentCaptured(payment);
   } else if (event === "payment.authorized" && payment) {

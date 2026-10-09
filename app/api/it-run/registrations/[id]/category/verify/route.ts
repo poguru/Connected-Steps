@@ -3,6 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 import { verifyPaymentSignature } from "@/lib/razorpay-security";
 import { getPayment } from "@/lib/razorpay-client";
+import { applyPaidCategoryChange } from "@/lib/it-run-category-change";
 
 // POST /api/it-run/registrations/[id]/category/verify
 // Body: { changeId, orderId, paymentId, signature }
@@ -69,49 +70,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "We are still confirming your payment. Please wait a moment and refresh.", code: "PAYMENT_PENDING" }, { status: 409 });
   }
 
-  // Apply: move the registration only if it is still on the original category
-  const { data: moved } = await db
-    .from("it_run_registrations")
-    .update({ category_id: change.to_category_id })
-    .eq("id", reg.id)
-    .eq("category_id", change.from_category_id)
-    .select("id")
-    .maybeSingle<{ id: string }>();
-  if (!moved) {
-    // The payment was taken but the move could not be applied. Keep the seat and flag for admin review.
-    console.error(`[it-run/category] payment ${paymentId} captured but registration ${reg.registration_code} did not move`);
-    await db.from("it_run_audit_logs").insert({
-      actor_email: email.toLowerCase(), actor_role: "participant", action: "category_change_needs_review",
-      entity_type: "registration", entity_id: reg.id,
-      detail: { change_id: change.id, payment_id: paymentId, amount_paise: change.amount_paise },
-    }).then(() => {}, () => {});
-    return NextResponse.json({ error: `Your payment was received, but the category change needs a manual check. Email info@connectedsteps.in with your payment ID.`, code: "NEEDS_REVIEW" }, { status: 409 });
+  const result = await applyPaidCategoryChange(db, {
+    changeId: change.id, orderId, paymentId, amountPaise: payment.amount, actor: email.toLowerCase(),
+  });
+  if (result.kind === "already_applied") return NextResponse.json({ ok: true, alreadyApplied: true });
+  if (result.kind === "applied") return NextResponse.json({ ok: true, registrationCode: result.registrationCode });
+  if (result.kind === "needs_review") {
+    return NextResponse.json({ error: "Your payment was received, but the category change needs a manual check. Email info@connectedsteps.in with your payment ID.", code: "NEEDS_REVIEW" }, { status: 409 });
   }
-
-  // Mark paid (only once), then free the old seat exactly once
-  const { data: marked } = await db
-    .from("it_run_category_changes")
-    .update({ status: "paid", razorpay_payment_id: paymentId, completed_at: new Date().toISOString() })
-    .eq("id", change.id)
-    .eq("status", "pending")
-    .select("id")
-    .maybeSingle<{ id: string }>();
-  if (marked) {
-    await db.rpc("itr_release_capacity", { p_category_id: change.from_category_id, p_count: reg.participant_count });
-  }
-
-  await db.from("it_run_audit_logs").insert({
-    actor_email: email.toLowerCase(), actor_role: "participant", action: "category_changed",
-    entity_type: "registration", entity_id: reg.id,
-    detail: {
-      registration_code: reg.registration_code,
-      from_category_id: change.from_category_id,
-      to_category_id: change.to_category_id,
-      amount_paise: change.amount_paise,
-      payment_id: paymentId,
-      payment_change: "paid_difference",
-    },
-  }).then(() => {}, () => {});
-
-  return NextResponse.json({ ok: true, registrationCode: reg.registration_code });
+  return NextResponse.json({ error: "This category change could not be applied. Email info@connectedsteps.in with your payment ID.", code: "CHANGE_CLOSED" }, { status: 409 });
 }

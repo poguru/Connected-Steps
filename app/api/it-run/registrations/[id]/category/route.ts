@@ -4,6 +4,7 @@ import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 import { getClientIp } from "@/lib/rate-limit";
 import { requiredParticipantCount, type CategoryType } from "@/lib/it-run-category-rules";
 import { getRazorpaySDK } from "@/lib/razorpay-client";
+import { sendCategoryChangeEmail } from "@/lib/it-run-category-change";
 
 // Participant category change for an existing registration.
 //
@@ -171,6 +172,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Free the seats in the old category exactly once, after the move succeeded
   await db.rpc("itr_release_capacity", { p_category_id: reg.category_id, p_count: reg.participant_count });
 
+  await sendCategoryChangeEmail(db, reg.id, target.id);
+
   await db.from("it_run_audit_logs").insert({
     event_id: reg.event_id,
     actor_email: email.toLowerCase(),
@@ -259,7 +262,8 @@ async function startUpgrade(
       amount: amountPaise,
       currency: "INR",
       receipt: `itrcat_${reg.registration_code}_${Date.now()}`,
-      notes: { it_run_reg_id: reg.id, it_run_reg_code: reg.registration_code, it_run_change_id: change.id, type: "it_run_category_change" },
+      // Not it_run_reg_id / type "it_run": the registration webhooks must not treat this as a registration payment
+      notes: { type: "it_run_category_change", it_run_change_id: change.id, it_run_reg_code: reg.registration_code },
     });
     orderId = order.id;
   } catch (e) {

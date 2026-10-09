@@ -11,6 +11,7 @@ process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
 jest.mock("@/lib/supabase-server", () => ({ getSupabaseServer: jest.fn() }));
 jest.mock("@/lib/admin-auth", () => ({ verifyUserToken: jest.fn(), USER_SESSION_COOKIE: "cs_user_session" }));
 jest.mock("@/lib/rate-limit", () => ({ getClientIp: () => "203.0.113.11" }));
+jest.mock("@/lib/notify", () => ({ sendEmail: jest.fn().mockResolvedValue({ ok: true }) }));
 jest.mock("@/lib/razorpay-client", () => ({
   getRazorpaySDK: () => ({ orders: { create: jest.fn().mockResolvedValue({ id: "order_test_1" }) } }),
 }));
