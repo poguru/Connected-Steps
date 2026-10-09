@@ -9,6 +9,7 @@ import { isValidEmail, parseCalendarDate, todayInIST, validateDateOfBirth } from
 import { decideUrlCategory, startsNewRegistration } from "@/lib/it-run-category-selection";
 import { idChoiceError, isStoredDocumentPath } from "@/lib/it-run-id-verification";
 import { IssueReportButton } from "@/components/ui/BugReportFab";
+import { checkPersonName, checkBibName, bibNameHint } from "@/lib/it-run-name-validation";
 import {
   EventRegistrationHeader,
   CompactEventHeader,
@@ -295,7 +296,7 @@ function SectionHeader({ label }: { label: string }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ParticipantForm({
-  participantLabel, roleLabel, data, onChange, errors, isChild, tshirtSizes, indexOfTotal,
+  participantLabel, roleLabel, data, onChange, errors, isChild, tshirtSizes, indexOfTotal, onNameBlur,
 }: {
   participantLabel: string;
   roleLabel: string;
@@ -305,6 +306,7 @@ function ParticipantForm({
   isChild: boolean;
   tshirtSizes: string[];
   indexOfTotal: string; // e.g. "1 of 2"
+  onNameBlur?: (field: "firstName" | "lastName" | "bibName" | "emergencyName") => void;
 }) {
   const [showOptional, setShowOptional] = useState(false);
 
@@ -343,21 +345,21 @@ function ParticipantForm({
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
         <Field label="First Name" error={errors.firstName} required>
           <input style={inp("firstName", !!errors.firstName)} value={data.firstName}
-            onChange={e => onChange("firstName", e.target.value)}
+            onChange={e => onChange("firstName", e.target.value)} onBlur={() => onNameBlur?.("firstName")}
             placeholder="First name" autoComplete="given-name" />
         </Field>
         <Field label="Last Name" error={errors.lastName} required>
           <input style={inp("lastName", !!errors.lastName)} value={data.lastName}
-            onChange={e => onChange("lastName", e.target.value)}
+            onChange={e => onChange("lastName", e.target.value)} onBlur={() => onNameBlur?.("lastName")}
             placeholder="Last name" autoComplete="family-name" />
         </Field>
       </div>
 
       <div style={{ marginBottom: 14 }}>
         <Field label="BIB Name" error={errors.bibName} required
-          hint="This name will be printed on your race BIB.">
+          hint={bibNameHint(data.bibName).tone === "ok" ? bibNameHint(data.bibName).text : "This name will be printed on your race BIB. Letters, spaces, hyphens and apostrophes only."}>
           <input style={inp("bibName", !!errors.bibName)} value={data.bibName}
-            onChange={e => onChange("bibName", e.target.value.toUpperCase())}
+            onChange={e => onChange("bibName", e.target.value.toUpperCase())} onBlur={() => onNameBlur?.("bibName")}
             placeholder="Name for BIB (e.g., PAVAN or P.KALYAN)" />
         </Field>
       </div>
@@ -426,7 +428,7 @@ function ParticipantForm({
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
             <Field label="Contact Name" error={errors.emergencyName} required>
               <input style={inp("emergencyName", !!errors.emergencyName)} value={data.emergencyName}
-                onChange={e => onChange("emergencyName", e.target.value)}
+                onChange={e => onChange("emergencyName", e.target.value)} onBlur={() => onNameBlur?.("emergencyName")}
                 placeholder="Person to call" />
             </Field>
             <Field label="Contact Phone" error={errors.emergencyPhone} required>
@@ -760,7 +762,7 @@ function StepCategory({
 function StepParticipants({
   category, participantSubIdx, setParticipantSubIdx,
   participants, errors, onChange, submitError,
-  onBack, onNext, onAddParticipant, onRemoveParticipant, returnToReview, validateParticipant,
+  onBack, onNext, onAddParticipant, onRemoveParticipant, returnToReview, validateParticipant, validateNameField,
 }: {
   category: ItRunCategory;
   participantSubIdx: number;
@@ -770,6 +772,7 @@ function StepParticipants({
   onChange: (idx: number, field: keyof Participant, val: string | File | null) => void;
   submitError: string;
   onBack: () => void;
+  validateNameField: (idx: number, field: "firstName" | "lastName" | "bibName" | "emergencyName") => void;
   onNext: () => void;
   onAddParticipant?: () => void;
   onRemoveParticipant?: (idx: number) => void;
@@ -936,6 +939,7 @@ function StepParticipants({
         }
         data={participants[participantSubIdx]}
         onChange={(field, val) => onChange(participantSubIdx, field, val)}
+        onNameBlur={field => validateNameField(participantSubIdx, field)}
         errors={errors[participantSubIdx] ?? {}}
         isChild={pl?.is_child ?? false}
         tshirtSizes={pl?.tshirt_sizes ?? TSHIRT_SIZES}
@@ -2234,13 +2238,13 @@ function RegisterPageContent() {
 
     // Name: allow letters, spaces, hyphens, apostrophes, dots, accented/Unicode chars;
     // reject empty or symbol-only strings (e.g. "---", "!!!")
-    const nameRe = /[\p{L}]/u;
-    if (!p.firstName.trim() || !nameRe.test(p.firstName)) {
-      e.firstName = "Enter a valid first name"; valid = false;
-    }
-    if (!p.lastName.trim() || !nameRe.test(p.lastName)) {
-      e.lastName = "Enter a valid last name"; valid = false;
-    }
+    // Shared name policy (same rules the API enforces). Invalid names stop the participant here.
+    const first = checkPersonName(p.firstName, "first name");
+    if (!first.ok) { e.firstName = first.message; valid = false; }
+    const last = checkPersonName(p.lastName, "last name");
+    if (!last.ok) { e.lastName = last.message; valid = false; }
+    const bib = checkBibName(p.bibName);
+    if (!bib.ok) { e.bibName = bib.message; valid = false; }
     if (!p.gender)            { e.gender    = "Required"; valid = false; }
     // Date of birth: same rules as the server (strict calendar date, not in the future,
     // age on the event date). The server re-checks every participant before registering.
@@ -2267,9 +2271,12 @@ function RegisterPageContent() {
     }
 
     if (!child) {
-      if (!p.emergencyName.trim())  { e.emergencyName  = "Required"; valid = false; }
+      const emergency = checkPersonName(p.emergencyName, "emergency contact name");
+      if (!emergency.ok) { e.emergencyName = emergency.message; valid = false; }
       if (!p.emergencyPhone.trim()) { e.emergencyPhone = "Required"; valid = false; }
-      if (!p.companyName.trim() || !nameRe.test(p.companyName)) {
+      // Company names are not person names: they keep their own rule (must contain a letter)
+      const companyHasLetter = /[\p{L}]/u;
+      if (!p.companyName.trim() || !companyHasLetter.test(p.companyName)) {
         e.companyName = "Enter a valid company name"; valid = false;
       }
     }
@@ -2287,6 +2294,22 @@ function RegisterPageContent() {
     } else {
       setStep(1);
     }
+  }
+
+  // Blur check for one name field. Shows the field's message as soon as the participant leaves it.
+  function validateNameField(idx: number, field: "firstName" | "lastName" | "bibName" | "emergencyName") {
+    const p = participants[idx];
+    if (!p) return;
+    const result =
+      field === "bibName" ? checkBibName(p.bibName) :
+      checkPersonName(p[field], field === "firstName" ? "first name" : field === "lastName" ? "last name" : "emergency contact name");
+    setPErrors(prev => {
+      const next = [...prev];
+      const current: Record<string, string | undefined> = { ...(next[idx] ?? {}) };
+      if (result.ok) delete current[field]; else current[field] = result.message;
+      next[idx] = current as ParticipantErrors;
+      return next;
+    });
   }
 
   // Company step: every adult must choose Upload ID or Continue Without ID. Neither blocks registration.
@@ -2982,6 +3005,7 @@ function RegisterPageContent() {
             submitError={submitError}
             onBack={handleParticipantBack}
             onNext={handleParticipantNext}
+            validateNameField={validateNameField}
             onAddParticipant={addParticipant}
             onRemoveParticipant={removeParticipant}
             returnToReview={returnToReview}

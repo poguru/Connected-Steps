@@ -1,3 +1,4 @@
+import { checkPersonName, checkBibName, normalizeName } from "@/lib/it-run-name-validation";
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireRole, getClientIp } from "@/lib/it-run-auth";
@@ -105,6 +106,27 @@ export async function PATCH(req: NextRequest) {
 
   if (!Object.keys(editable).length) {
     return NextResponse.json({ error: "No editable fields provided" }, { status: 400 });
+  }
+
+  // Name fields follow the same policy as registration. Invalid names are refused, never saved.
+  const nameFields: Array<[string, string, "person" | "bib"]> = [
+    ["first_name", "first name", "person"],
+    ["last_name", "last name", "person"],
+    ["emergency_name", "emergency contact name", "person"],
+    ["bib_name", "BIB name", "bib"],
+  ];
+  for (const [column, label, kind] of nameFields) {
+    if (!(column in editable)) continue;
+    // An emergency contact may be cleared (children do not need one); any name that is set must be valid
+    if (column === "emergency_name" && (editable[column] === null || editable[column] === "")) {
+      editable[column] = null;
+      continue;
+    }
+    const result = kind === "bib" ? checkBibName(editable[column]) : checkPersonName(editable[column], label);
+    if (!result.ok) {
+      return NextResponse.json({ error: result.message, field: column }, { status: 400 });
+    }
+    editable[column] = kind === "bib" ? normalizeName(result.value).toUpperCase() : result.value;
   }
 
   // verification_team may only update verification_status

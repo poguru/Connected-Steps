@@ -8,6 +8,7 @@ import { buildDashboardUrl } from "@/lib/it-run-dashboard-link";
 import { hashDraftToken, isWellFormedDraftToken } from "@/lib/it-run-drafts";
 import { requiredParticipantCount, categoryTypeLabel } from "@/lib/it-run-category-rules";
 import { initialVerificationStatus, isStoredDocumentPath } from "@/lib/it-run-id-verification";
+import { checkPersonName, checkBibName, normalizeName } from "@/lib/it-run-name-validation";
 import {
   isValidEmail, parseCalendarDate, todayInIST, validateDateOfBirth, type CalendarDate,
 } from "@/lib/it-run-validation";
@@ -73,20 +74,14 @@ function validateParticipants(
     const pfx = participants.length === 1 ? "Participant" : `Participant ${i + 1}`;
     const err = (field: ParticipantFieldError["field"], message: string): ParticipantFieldError =>
       ({ message: `${pfx}: ${message}`, field, participantIndex: i });
+    // Names: one shared policy (letters in any script, spaces, hyphen, apostrophe). Invalid names never persist.
+    const first = checkPersonName(p.firstName, "first name");
+    if (!first.ok) return err("firstName", first.message);
+    const last = checkPersonName(p.lastName, "last name");
+    if (!last.ok) return err("lastName", last.message);
+    const bib = checkBibName(p.bibName);
+    if (!bib.ok) return err("bibName", bib.message);
 
-    if (!p.firstName?.trim())  return err("firstName", "first name is required");
-    if (!p.lastName?.trim())   return err("lastName", "last name is required");
-    if (!p.bibName?.trim())    return err("bibName", "BIB name is required");
-
-    // BIB name validation: max reasonable length (printer constraint)
-    if (p.bibName.trim().length > 50) {
-      return err("bibName", "BIB name cannot exceed 50 characters");
-    }
-
-    // BIB name must not contain only whitespace or malicious content
-    if (!/^[\w\s\-']+$/i.test(p.bibName.trim())) {
-      return err("bibName", "BIB name contains invalid characters");
-    }
 
     if (!p.gender)             return err("gender", "gender is required");
     if (!p.bloodGroup)         return err("bloodGroup", "blood group is required");
@@ -118,9 +113,8 @@ function validateParticipants(
 
     // Adult-only required fields
     if (!m.is_child) {
-      if (!p.emergencyName?.trim()) {
-        return err("emergencyName", "emergency contact name is required");
-      }
+      const emergency = checkPersonName(p.emergencyName, "emergency contact name");
+      if (!emergency.ok) return err("emergencyName", emergency.message);
       if (!p.emergencyPhone?.trim() || !MOBILE_RE.test(p.emergencyPhone.trim())) {
         return err("emergencyPhone", "valid 10-digit emergency contact phone is required");
       }
@@ -317,15 +311,15 @@ export async function POST(req: NextRequest) {
       registration_id:    reg.id,
       event_id:           cat.event_id,
       participant_type:   p.type,
-      first_name:         p.firstName.trim(),
-      last_name:          p.lastName.trim(),
-      bib_name:           p.bibName.trim().toUpperCase(),
+      first_name:         normalizeName(p.firstName),
+      last_name:          normalizeName(p.lastName),
+      bib_name:           normalizeName(p.bibName).toUpperCase(),
       gender:             p.gender,
       dob:                p.dob || null,
       email:              p.email?.toLowerCase()?.trim() || null,
       mobile:             p.mobile.trim(),
       blood_group:        p.bloodGroup || null,
-      emergency_name:     p.emergencyName?.trim() || null,
+      emergency_name:     p.emergencyName ? normalizeName(p.emergencyName) || null : null,
       emergency_phone:    p.emergencyPhone?.trim() || null,
       company_name:       p.companyName?.trim() || null,
       employee_id:        p.employeeId?.trim() || null,
@@ -563,15 +557,15 @@ export async function PATCH(req: NextRequest) {
       .from("it_run_participants")
       .update({
         participant_type:   p.type,
-        first_name:         p.firstName.trim(),
-        last_name:          p.lastName.trim(),
-        bib_name:           p.bibName.trim().toUpperCase(),
+        first_name:         normalizeName(p.firstName),
+        last_name:          normalizeName(p.lastName),
+        bib_name:           normalizeName(p.bibName).toUpperCase(),
         gender:             p.gender,
         dob:                p.dob || null,
         email:              p.email?.toLowerCase()?.trim() || null,
         mobile:             p.mobile.trim(),
         blood_group:        p.bloodGroup || null,
-        emergency_name:     p.emergencyName?.trim() || null,
+        emergency_name:     p.emergencyName ? normalizeName(p.emergencyName) || null : null,
         emergency_phone:    p.emergencyPhone?.trim() || null,
         company_name:       p.companyName?.trim() || null,
         employee_id:        p.employeeId?.trim() || null,
