@@ -416,8 +416,6 @@ export default function RegistrationsPage() {
 
   // Refund modal state
   const [refundReg,    setRefundReg]    = useState<Registration | null>(null);
-  const [refundReason, setRefundReason] = useState("");
-  const [refunding,    setRefunding]    = useState(false);
 
   const LIMIT = 30;
 
@@ -511,29 +509,13 @@ export default function RegistrationsPage() {
 
   function openRefundModal(reg: Registration) {
     setRefundReg(reg);
-    setRefundReason("");
   }
 
-  async function confirmRefund() {
-    if (!refundReg || !refundReason.trim()) return;
-    setRefunding(true);
-    const res = await fetch("/api/it-run/admin/refund", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ registration_id: refundReg.id, reason: refundReason.trim() }),
-    });
-    const d = await res.json();
-    setRefunding(false);
-    if (res.ok) {
-      setRegs(prev => prev.map(r => r.id === refundReg.id
-        ? { ...r, registration_status: "cancelled", cancelled_at: new Date().toISOString(), cancelled_reason: `Refunded: ${refundReason.trim()}` }
-        : r
-      ));
-      setMsg({ text: `Refund issued for ${refundReg.registration_code} — ${d.refund_id}`, ok: true });
-      setRefundReg(null);
-    } else {
-      setMsg({ text: d.error ?? "Refund failed", ok: false });
-    }
+  // Refunds are never issued from this page. They run from the Refund Requests queue, after a
+  // participant request has been approved and an admin has confirmed execution.
+  function goToRefundQueue() {
+    if (!refundReg) return;
+    window.location.href = `/it-run/admin/refund-requests?registration=${encodeURIComponent(refundReg.registration_code)}`;
   }
 
   async function saveNotes(regId: string, notes: string) {
@@ -574,21 +556,17 @@ export default function RegistrationsPage() {
               Registration <span style={{ color: ACCENT, fontFamily: "monospace" }}>{refundReg.registration_code}</span><br />
               Amount: <strong style={{ color: "#10b981" }}>₹{refundReg.final_price.toLocaleString("en-IN")}</strong>
             </p>
-            <div style={{ background: "rgba(251,146,60,0.08)", border: "1px solid rgba(251,146,60,0.3)", borderRadius: 10, padding: "10px 14px", fontSize: 12, color: "#fb923c", marginBottom: 16, lineHeight: 1.6 }}>
-              ⚠ This will issue a full Razorpay refund and cancel the registration. This action cannot be undone.
+            <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px 14px", fontSize: 12, color: "#aaa", marginBottom: 20, lineHeight: 1.6 }}>
+              Refunds are reviewed and executed from the Refund Requests queue. A refund is only issued after a participant request is approved and an admin confirms the payment-gateway action.
             </div>
-            <label style={{ display: "block", fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6 }}>Refund Reason *</label>
-            <textarea value={refundReason} rows={2} onChange={e => setRefundReason(e.target.value)}
-              placeholder="e.g. Participant injury, duplicate payment, event postponed…"
-              style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical", marginBottom: 20 }} />
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button onClick={() => setRefundReg(null)} disabled={refunding}
+              <button onClick={() => setRefundReg(null)}
                 style={{ padding: "8px 18px", background: "transparent", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, color: "#aaa", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
-                Cancel
+                Close
               </button>
-              <button onClick={confirmRefund} disabled={refunding || !refundReason.trim()}
-                style={{ padding: "8px 18px", background: refundReason.trim() ? "rgba(251,146,60,0.15)" : "rgba(255,255,255,0.04)", border: `1px solid ${refundReason.trim() ? "rgba(251,146,60,0.4)" : "rgba(255,255,255,0.08)"}`, borderRadius: 8, color: refundReason.trim() ? "#fb923c" : "#555", fontSize: 13, fontWeight: 600, cursor: refundReason.trim() && !refunding ? "pointer" : "not-allowed", fontFamily: "inherit" }}>
-                {refunding ? "Processing…" : "Confirm Refund"}
+              <button onClick={goToRefundQueue}
+                style={{ padding: "8px 18px", background: "rgba(251,146,60,0.15)", border: "1px solid rgba(251,146,60,0.4)", borderRadius: 8, color: "#fb923c", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                Open Refund Queue
               </button>
             </div>
           </div>

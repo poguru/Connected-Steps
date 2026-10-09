@@ -1,6 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  REJECTION_REASON_LABELS,
+  VerificationReason,
+  validateReviewDecision,
+} from "@/lib/it-run-verification";
 
 interface Participant {
   id: string; first_name: string; last_name: string;
@@ -346,6 +351,8 @@ export default function VerificationPage() {
   const [page,     setPage]     = useState(0);
   const [loading,  setLoading]  = useState(false);
   const [notes,    setNotes]    = useState<Record<string, string>>({});
+  const [reasons,  setReasons]  = useState<Record<string, VerificationReason | "">>({});
+  const [rowError, setRowError] = useState<Record<string, string>>({});
   const [updating, setUpdating] = useState<string | null>(null);
   const [viewer,   setViewer]   = useState<CompanyIdMeta | null>(null);
 
@@ -363,15 +370,35 @@ export default function VerificationPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  async function updateStatus(id: string, status: string) {
+  async function updateStatus(id: string, status: "verified" | "rejected" | "need_clarification") {
+    const reason      = reasons[id] || undefined;
+    const explanation = notes[id] ?? "";
+
+    // Client-side mirror of the server rules, so the admin sees the problem before a request is sent
+    const check = validateReviewDecision({ status, reason, adminExplanation: explanation });
+    if (!check.ok) {
+      setRowError(prev => ({ ...prev, [id]: check.error }));
+      return;
+    }
+
+    setRowError(prev => ({ ...prev, [id]: "" }));
     setUpdating(id);
     try {
-      await fetch("/api/it-run/admin/verification", {
+      const res = await fetch("/api/it-run/admin/verification", {
         method:  "PATCH",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ participantId: id, status, notes: notes[id] ?? "" }),
+        body:    JSON.stringify({ participantId: id, status, reason, adminExplanation: explanation }),
       });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({})) as { error?: string };
+        setRowError(prev => ({ ...prev, [id]: d.error ?? "Update failed. Please try again." }));
+        return;
+      }
+      setReasons(prev => ({ ...prev, [id]: "" }));
+      setNotes(prev => ({ ...prev, [id]: "" }));
       await load();
+    } catch {
+      setRowError(prev => ({ ...prev, [id]: "Network error. Please try again." }));
     } finally {
       setUpdating(null);
     }
@@ -477,9 +504,28 @@ export default function VerificationPage() {
                       ))}
                     </div>
 
-                    {/* Notes */}
+                    {/* Reason (required for Reject / Clarification; shown to the participant via template) */}
+                    <select
+                      value={reasons[p.id] ?? ""}
+                      onChange={e => setReasons(prev => ({ ...prev, [p.id]: e.target.value as VerificationReason | "" }))}
+                      aria-label="Reason for rejection or clarification"
+                      style={{
+                        width: "100%", padding: "8px 12px", marginBottom: 8,
+                        background: "#161616", border: "1px solid rgba(255,255,255,0.1)",
+                        borderRadius: 8, color: "#fff", fontSize: 12, fontFamily: "inherit",
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      <option value="">Select a reason (required to reject or request clarification)</option>
+                      {(Object.keys(REJECTION_REASON_LABELS) as VerificationReason[]).map(code => (
+                        <option key={code} value={code}>{REJECTION_REASON_LABELS[code]}</option>
+                      ))}
+                    </select>
+
+                    {/* Explanation (required for "custom"; optional otherwise; max 1000 chars) */}
                     <textarea
-                      placeholder="Notes / reason for action (optional)"
+                      placeholder="Explanation for the participant (required for the custom reason, optional otherwise)"
+                      maxLength={1000}
                       value={notes[p.id] ?? ""}
                       onChange={e => setNotes(prev => ({ ...prev, [p.id]: e.target.value }))}
                       style={{
@@ -522,6 +568,11 @@ export default function VerificationPage() {
                         </button>
                       )}
                     </div>
+                    {rowError[p.id] && (
+                      <div role="alert" style={{ fontSize: 12, color: "#f87171", marginTop: 8 }}>
+                        {rowError[p.id]}
+                      </div>
+                    )}
                   </div>
 
                   {/* Right: Company ID thumbnail */}

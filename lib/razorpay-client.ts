@@ -183,10 +183,22 @@ export async function createRefund(
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Razorpay refund API ${res.status}: ${text}`);
+    throw new RazorpayApiError(res.status, `Razorpay refund API ${res.status}: ${text}`);
   }
 
   return res.json() as Promise<RzpRefund>;
+}
+
+/**
+ * Thrown when Razorpay answers with a non-2xx status. A 4xx response means the refund
+ * was definitely not created. Network errors (no response) are NOT this class, and
+ * they are ambiguous: the refund may or may not exist on Razorpay's side.
+ */
+export class RazorpayApiError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+    this.name = "RazorpayApiError";
+  }
 }
 
 // ── Search ────────────────────────────────────────────────────────────────────

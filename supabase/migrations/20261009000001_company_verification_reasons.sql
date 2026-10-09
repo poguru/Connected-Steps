@@ -30,7 +30,9 @@ ALTER TABLE public.it_run_company_verifications
     ));
 
 -- Ensure admin_explanation doesn't exceed 1000 characters
+-- DROP first so the migration can be re-run after a partial apply (ADD CONSTRAINT has no IF NOT EXISTS)
 ALTER TABLE public.it_run_company_verifications
+  DROP CONSTRAINT IF EXISTS admin_explanation_length,
   ADD CONSTRAINT admin_explanation_length
     CHECK (admin_explanation IS NULL OR char_length(admin_explanation) <= 1000);
 

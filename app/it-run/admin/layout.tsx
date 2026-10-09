@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { href: "/it-run/admin/bibs",           label: "BIB Allocation",      icon: "&#127987;",roles: ["super_admin","event_admin","bib_collection"] },
   // ── Payments & Comms ──────────────────────────────────────────────────
   { href: "/it-run/admin/payments",       label: "Payments",            icon: "&#128179;",roles: ["super_admin","event_admin","support_desk"] },
+  { href: "/it-run/admin/refund-requests",  label: "Refund Requests", icon: "&#128203;",roles: ["super_admin","event_admin"] },
   { href: "/it-run/admin/refund-reconciliation", label: "Refunds",       icon: "&#128190;",roles: ["super_admin","event_admin"] },
   { href: "/it-run/admin/notifications",  label: "Email / Notifications",icon: "&#9993;", roles: ["super_admin","event_admin"] },
   // ── Race day ──────────────────────────────────────────────────────────
