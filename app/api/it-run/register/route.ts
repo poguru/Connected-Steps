@@ -5,6 +5,7 @@ import { sendItRunConfirmationEmail, sendItRunBibInviteEmail } from "@/lib/it-ru
 import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 import { normalizePhone, isValidIndianPhone, phonesAreEqual } from "@/lib/phone-utils";
+import { isValidName, normalizeName } from "@/lib/name-validation";
 
 interface ParticipantInput {
   type: string; firstName: string; lastName: string; bibName: string;
@@ -50,8 +51,13 @@ function validateParticipants(
     const m   = meta[i];
     const pfx = participants.length === 1 ? "Participant" : `Participant ${i + 1}`;
 
-    if (!p.firstName?.trim())  return `${pfx}: first name is required`;
-    if (!p.lastName?.trim())   return `${pfx}: last name is required`;
+    // Validate first and last names using shared utility
+    if (!isValidName(p.firstName?.trim())) {
+      return `${pfx}: enter a valid first name (letters, hyphens, and apostrophes only)`;
+    }
+    if (!isValidName(p.lastName?.trim())) {
+      return `${pfx}: enter a valid last name (letters, hyphens, and apostrophes only)`;
+    }
     if (!p.bibName?.trim())    return `${pfx}: BIB name is required`;
 
     // BIB name validation: max reasonable length (printer constraint)
@@ -298,15 +304,15 @@ export async function POST(req: NextRequest) {
       registration_id:    reg.id,
       event_id:           cat.event_id,
       participant_type:   p.type,
-      first_name:         p.firstName.trim(),
-      last_name:          p.lastName.trim(),
+      first_name:         normalizeName(p.firstName),
+      last_name:          normalizeName(p.lastName),
       bib_name:           p.bibName.trim().toUpperCase(),
       gender:             p.gender,
       dob:                p.dob || null,
       email:              p.email?.toLowerCase()?.trim() || null,
       mobile:             normalizePhone(p.mobile.trim()),
       blood_group:        p.bloodGroup || null,
-      emergency_name:     p.emergencyName?.trim() || null,
+      emergency_name:     normalizeName(p.emergencyName) || null,
       emergency_phone:    normalizePhone(p.emergencyPhone?.trim() || null),
       company_name:       p.companyName?.trim() || null,
       employee_id:        p.employeeId?.trim() || null,

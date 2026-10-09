@@ -13,6 +13,7 @@ import {
   EventWatermark,
   EventSuccessScreen,
 } from "@/app/it-run/components/EventBranding";
+import { validateName, normalizeName, isValidName, getNameError } from "@/lib/name-validation";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -250,15 +251,11 @@ function validateField(
   isChild: boolean,
   eventDateMs: number,
 ): string | undefined {
-  const nameRe = /[\p{L}]/u;
-
   switch (field) {
     case "firstName":
-      if (!value.trim() || !nameRe.test(value)) return "Enter a valid first name";
-      break;
+      return getNameError(value) || undefined;
     case "lastName":
-      if (!value.trim() || !nameRe.test(value)) return "Enter a valid last name";
-      break;
+      return getNameError(value) || undefined;
     case "bibName":
       if (!value.trim()) return "BIB name is required";
       if (value.length > 30) return "BIB name must be 30 characters or less";
@@ -312,8 +309,8 @@ function validateField(
       }
       break;
     case "companyName":
-      if (!isChild && (!value.trim() || !nameRe.test(value))) {
-        return "Enter a valid company name";
+      if (!isChild && !value.trim()) {
+        return "Company name is required";
       }
       break;
   }
@@ -2060,8 +2057,14 @@ function RegisterPageContent() {
   // ── Participant field update ───────────────────────────────────────────────
 
   function updateParticipant(idx: number, field: keyof Participant, val: string | File | null) {
+    // Normalize name fields (trim and normalize internal spaces)
+    let normalizedVal: string | File | null = val;
+    if ((field === "firstName" || field === "lastName") && typeof val === "string") {
+      normalizedVal = normalizeName(val);
+    }
+
     setParticipants(prev => {
-      const copy = [...prev]; copy[idx] = { ...copy[idx], [field]: val }; return copy;
+      const copy = [...prev]; copy[idx] = { ...copy[idx], [field]: normalizedVal }; return copy;
     });
     // Clear the error for this field as the user edits
     setPErrors(prev => {
@@ -2097,14 +2100,14 @@ function RegisterPageContent() {
     const e: ParticipantErrors = {};
     let valid = true;
 
-    // Name: allow letters, spaces, hyphens, apostrophes, dots, accented/Unicode chars;
-    // reject empty or symbol-only strings (e.g. "---", "!!!")
-    const nameRe = /[\p{L}]/u;
-    if (!p.firstName.trim() || !nameRe.test(p.firstName)) {
-      e.firstName = "Enter a valid first name"; valid = false;
+    // Name validation using shared utility
+    const firstNameErr = getNameError(p.firstName);
+    if (firstNameErr) {
+      e.firstName = firstNameErr; valid = false;
     }
-    if (!p.lastName.trim() || !nameRe.test(p.lastName)) {
-      e.lastName = "Enter a valid last name"; valid = false;
+    const lastNameErr = getNameError(p.lastName);
+    if (lastNameErr) {
+      e.lastName = lastNameErr; valid = false;
     }
 
     // BIB Name — mandatory for all participants
@@ -2148,8 +2151,8 @@ function RegisterPageContent() {
         }
       }
 
-      if (!p.companyName.trim() || !nameRe.test(p.companyName)) {
-        e.companyName = "Enter a valid company name"; valid = false;
+      if (!p.companyName.trim()) {
+        e.companyName = "Company name is required"; valid = false;
       }
     }
 
