@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
+import { errorHomeDestination, errorHomeLabel } from "@/lib/error-navigation";
 
 export default function Error({
   error,
@@ -9,6 +11,8 @@ export default function Error({
   error: Error & { digest?: string };
   unstable_retry: () => void;
 }) {
+  const pathname = usePathname();
+
   useEffect(() => {
     console.error("[CS Error Boundary]", error.name, error.message, error.stack);
   }, [error]);
@@ -101,7 +105,7 @@ export default function Error({
           Retry
         </button>
         <button
-          onClick={() => (window.location.href = "/")}
+          onClick={() => (window.location.href = errorHomeDestination(pathname))}
           style={{
             padding: "10px 28px",
             background: "transparent",
@@ -114,7 +118,7 @@ export default function Error({
             width: "100%",
           }}
         >
-          Go home
+          {errorHomeLabel(pathname)}
         </button>
       </div>
     </div>

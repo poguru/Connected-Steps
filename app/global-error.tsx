@@ -1,5 +1,7 @@
 "use client";
 
+import { errorHomeDestination } from "@/lib/error-navigation";
+
 export default function GlobalError({
   error,
   unstable_retry,
@@ -84,7 +86,7 @@ export default function GlobalError({
             Retry
           </button>
           <button
-            onClick={() => (window.location.href = "/")}
+            onClick={() => (window.location.href = errorHomeDestination(window.location.pathname))}
             style={{
               padding: "10px 28px",
               background: "transparent",
