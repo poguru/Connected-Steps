@@ -1,6 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { finalizeRefundProcessed, markRefundFailed } from "@/lib/it-run-refunds";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+// Matches a local refund row by Razorpay refund ID, falling back to the local refund ID we
+// sent in the refund notes (covers a webhook that arrives before the Razorpay ID was saved).
+async function findLocalRefund(
+  db: SupabaseClient,
+  razorpayRefundId: string,
+  localRefundId: string | undefined,
+): Promise<{ id: string } | null> {
+  const { data: byRzp } = await db
+    .from("it_run_refunds")
+    .select("id")
+    .eq("razorpay_refund_id", razorpayRefundId)
+    .maybeSingle<{ id: string }>();
+  if (byRzp) return byRzp;
+  if (!localRefundId) return null;
+  const { data: byLocal } = await db
+    .from("it_run_refunds")
+    .select("id")
+    .eq("id", localRefundId)
+    .maybeSingle<{ id: string }>();
+  return byLocal;
+}
 
 // POST /api/it-run/webhook/razorpay
 // Webhook to reconcile Razorpay events: payments, refunds, etc.
@@ -40,58 +64,38 @@ export async function POST(req: NextRequest) {
 
   switch (event.event) {
     case "refund.processed": {
-      // Razorpay confirmed refund was successful
-      const refundId = event.payload?.refund?.entity?.id;
+      // Razorpay confirmed the refund. Finalization is idempotent: duplicate deliveries are no-ops.
+      const entity = event.payload?.refund?.entity;
+      const refundId: string | undefined = entity?.id;
+      const localRefundId: string | undefined = entity?.notes?.refund_record;
       if (!refundId) {
         console.warn("[razorpay-webhook] refund.processed missing refund ID");
         return NextResponse.json({ ok: true });
       }
 
-      const { data: refundRecord } = await db
-        .from("it_run_refunds")
-        .select("id, registration_id")
-        .eq("razorpay_refund_id", refundId)
-        .maybeSingle<{ id: string; registration_id: string }>();
-
-      if (refundRecord) {
-        await db
-          .from("it_run_refunds")
-          .update({
-            status: "processed",
-            processed_at: new Date().toISOString(),
-          })
-          .eq("id", refundRecord.id);
-
-        // Ensure registration is cancelled
-        await db
-          .from("it_run_registrations")
-          .update({
-            registration_status: "cancelled",
-            payment_status: "refunded",
-          })
-          .eq("id", refundRecord.registration_id)
-          .eq("registration_status", "active");
-
-        console.log(`[razorpay-webhook] ✅ Refund ${refundId} processed`);
+      const localRecord = await findLocalRefund(db, refundId, localRefundId);
+      if (localRecord) {
+        const finalized = await finalizeRefundProcessed(db, localRecord.id, refundId, "razorpay-webhook");
+        console.log(`[razorpay-webhook] Refund ${refundId} processed (finalized=${finalized})`);
+      } else {
+        console.warn(`[razorpay-webhook] refund.processed for unknown refund ${refundId}`);
       }
       break;
     }
 
     case "refund.failed": {
-      // Razorpay refund failed
-      const refundId = event.payload?.refund?.entity?.id;
-      const failureReason = event.payload?.refund?.entity?.reason_code;
+      // Razorpay refund failed. The request stays approved so an admin can retry.
+      const entity = event.payload?.refund?.entity;
+      const refundId: string | undefined = entity?.id;
+      const localRefundId: string | undefined = entity?.notes?.refund_record;
+      const failureReason: string = entity?.error_description || entity?.reason_code || "Razorpay refund failed";
 
       if (refundId) {
-        await db
-          .from("it_run_refunds")
-          .update({
-            status: "failed",
-            failure_reason: failureReason || "Razorpay refund failed",
-          })
-          .eq("razorpay_refund_id", refundId);
-
-        console.log(`[razorpay-webhook] ❌ Refund ${refundId} failed: ${failureReason}`);
+        const localRecord = await findLocalRefund(db, refundId, localRefundId);
+        if (localRecord) {
+          await markRefundFailed(db, localRecord.id, failureReason, "razorpay-webhook");
+        }
+        console.log(`[razorpay-webhook] Refund ${refundId} failed: ${failureReason}`);
       }
       break;
     }

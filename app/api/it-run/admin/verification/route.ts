@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireRole, getClientIp } from "@/lib/it-run-auth";
+import {
+  validateReviewDecision,
+  buildCompanyVerificationRejectionEmail,
+  buildCompanyVerificationApprovedEmail,
+  buildCompanyVerificationClarificationEmail,
+} from "@/lib/it-run-verification";
 
 // GET /api/it-run/admin/verification?status=pending&page=0&limit=50
 export async function GET(req: NextRequest) {
@@ -37,23 +43,53 @@ export async function GET(req: NextRequest) {
 }
 
 // PATCH /api/it-run/admin/verification
-// Body: { participantId, status, notes }
+// Body: { participantId, status, reason?, adminExplanation? }
+// reason is mandatory for rejected / need_clarification (see validateReviewDecision).
+// Internal reason codes are stored and audited; participants only receive the templated text.
 export async function PATCH(req: NextRequest) {
   const session = requireRole(req, ["event_admin", "verification_team"]);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  let body: {
+    participantId?: string;
+    status?: string;
+    reason?: unknown;
+    adminExplanation?: unknown;
+  };
   try {
-    const { participantId, status, notes } = await req.json() as {
-      participantId: string;
-      status: "verified" | "rejected" | "need_clarification";
-      notes?: string;
-    };
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
 
-    if (!participantId || !status) return NextResponse.json({ error: "participantId and status required" }, { status: 400 });
+  const { participantId, status } = body;
+  if (!participantId || !status) {
+    return NextResponse.json({ error: "participantId and status required" }, { status: 400 });
+  }
 
+  const decision = validateReviewDecision({
+    status,
+    reason: body.reason,
+    adminExplanation: body.adminExplanation,
+  });
+  if (!decision.ok) {
+    return NextResponse.json({ error: decision.error }, { status: 400 });
+  }
+
+  try {
     const db = getSupabaseServer();
 
-    // Update participant verification status — check for DB errors before logging
+    const { data: event } = await db.from("it_run_events").select("id, title, slug").eq("slug", "sprint-2").single();
+    if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
+
+    const { data: part } = await db
+      .from("it_run_participants")
+      .select("email, first_name")
+      .eq("id", participantId)
+      .eq("event_id", event.id)
+      .maybeSingle<{ email: string | null; first_name: string }>();
+    if (!part) return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+
     const { error: updErr } = await db
       .from("it_run_participants")
       .update({ verification_status: status })
@@ -64,41 +100,57 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Failed to update verification status" }, { status: 500 });
     }
 
-    // Log the verification action
-    await db
+    const { error: logErr } = await db
       .from("it_run_company_verifications")
       .insert({
         participant_id: participantId,
         status,
+        verification_reason: decision.reason,
+        admin_explanation: decision.explanation,
         reviewer_email: session.email,
-        reviewed_at:    new Date().toISOString(),
-        notes:          notes ?? null,
+        reviewed_at: new Date().toISOString(),
       });
-
-    // Notify participant by email if rejected or needs clarification
-    if (status === "rejected" || status === "need_clarification") {
-      const { data: part } = await db
-        .from("it_run_participants")
-        .select("email,first_name")
-        .eq("id", participantId)
-        .single();
-
-      if (part?.email) {
-        const { sendEmail } = await import("@/lib/notify");
-        const subject = status === "rejected"
-          ? "Company ID Verification - Action Required (The IT Run Sprint-2)"
-          : "Company ID - Clarification Needed (The IT Run Sprint-2)";
-        const body = status === "rejected"
-          ? `Hi ${part.first_name}, your company ID could not be verified. Please carry your original company ID to the BIB collection counter for physical verification. ${notes ? `Note from team: ${notes}` : ""}`
-          : `Hi ${part.first_name}, we need clarification on your company ID. ${notes ? `Details: ${notes}` : "Please contact info@connectedsteps.in for assistance."}`;
-
-        await sendEmail(part.email, part.first_name, subject, `<p>${body}</p>`, false, true)
-          .catch(e => console.error("[it-run/verification] email error:", e));
-      }
+    if (logErr) {
+      console.error("[it-run/verification] verification log insert failed:", logErr.message);
     }
 
-    // Audit log
-    db.from("it_run_audit_logs").insert({
+    if (part.email) {
+      const { sendEmail } = await import("@/lib/notify");
+      const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in"}/it-run/my-registrations`;
+
+      let subject = "";
+      let htmlBody = "";
+
+      if (status === "verified") {
+        subject = `Company ID Verified - ${event.title}`;
+        htmlBody = buildCompanyVerificationApprovedEmail(part.first_name, {
+          eventTitle: event.title,
+          eventDate: "August 15-16, 2026",
+        });
+      } else if (status === "rejected") {
+        subject = "Company ID Verification - Action Required (The IT Run Sprint-2)";
+        htmlBody = buildCompanyVerificationRejectionEmail(part.first_name, decision.reason!, decision.explanation, {
+          eventTitle: event.title,
+          bibLocations: [
+            { name: "Main BIB Counter", address: "HITEC City, Hyderabad", date: "Aug 15, 10 AM - 6 PM" },
+            { name: "Secondary Counter", address: "Tech Park, Hyderabad", date: "Aug 16, 10 AM - 4 PM" },
+          ],
+          dashboardUrl,
+        });
+      } else {
+        subject = "Company ID - Clarification Needed (The IT Run Sprint-2)";
+        htmlBody = buildCompanyVerificationClarificationEmail(
+          part.first_name,
+          decision.explanation ?? "We need additional information to complete your company ID verification.",
+          { eventTitle: event.title, dashboardUrl },
+        );
+      }
+
+      await sendEmail(part.email, part.first_name, subject, htmlBody, false, true)
+        .catch(e => console.error("[it-run/verification] email error:", e));
+    }
+
+    await db.from("it_run_audit_logs").insert({
       actor_email: session.email,
       actor_role:  session.role,
       action:      `verification_${status}`,
@@ -107,7 +159,8 @@ export async function PATCH(req: NextRequest) {
       ip:          getClientIp(req),
       detail: {
         status,
-        notes: notes ?? null,
+        reason: decision.reason,
+        admin_explanation: decision.explanation,
       },
     }).then(() => {}, () => {});
 

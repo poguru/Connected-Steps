@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import RefundRequestPanel from "./RefundRequestPanel";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -289,6 +290,8 @@ export default function MyRegistrationsPage() {
             </div>
           </div>
         )}
+
+        <RefundRequestPanel registrations={registrations} />
       </div>
 
       <style>{`
