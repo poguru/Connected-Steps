@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import RefundRequestPanel from "./RefundRequestPanel";
+import CategoryChangeButton from "./CategoryChangeButton";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -212,6 +213,7 @@ export default function MyRegistrationsPage() {
                         View dashboard &rarr;
                       </Link>
                     </div>
+                    <CategoryChangeButton registrationId={reg.id} />
                     {/* Header row */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
                       <div>

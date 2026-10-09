@@ -60,7 +60,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   return NextResponse.json({
     request: {
       ...request,
-      refundable: computeRefundableBreakdown(reg?.final_price ?? 0, refunds),
+      refundable: computeRefundableBreakdown((reg?.final_price ?? 0) * 100, refunds),
     },
     audit: {
       requestDecisions: requestAudit.data ?? [],

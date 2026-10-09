@@ -75,7 +75,8 @@ export async function finalizeRefundProcessed(
   if (regErr || !reg) throw new Error(`Registration not found for refund ${refundId}`);
 
   const totalRefunded = await getRefundedAmountPaise(db, reg.id);
-  const fullyRefunded = totalRefunded >= reg.final_price;
+  // Refund rows are paise; the registration stores rupees
+  const fullyRefunded = totalRefunded >= reg.final_price * 100;
 
   const regUpdate: Record<string, unknown> = {
     payment_status: fullyRefunded ? "refunded" : "partially_refunded",

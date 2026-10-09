@@ -99,7 +99,8 @@ export async function POST(req: NextRequest) {
     console.error("[it-run/admin/refund] refunded-amount lookup failed:", e);
     return NextResponse.json({ error: "Failed to calculate refundable amount" }, { status: 500 });
   }
-  const remaining = reg.final_price - refunded;
+  // Refund amounts are paise; registrations store rupees
+  const remaining = reg.final_price * 100 - refunded;
   if (remaining <= 0) {
     return NextResponse.json({ error: "Payment is already fully refunded" }, { status: 422 });
   }

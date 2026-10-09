@@ -107,7 +107,7 @@ const REG = {
   registration_code: "ITR-0001",
   razorpay_order_id: "order_1",
   razorpay_payment_id: "pay_1",
-  final_price: 100000,
+  final_price: 1000, // rupees, as stored on the registration (refund amounts are paise)
   payment_status: "paid",
   registration_status: "active",
   lead_email: "lead@example.com",

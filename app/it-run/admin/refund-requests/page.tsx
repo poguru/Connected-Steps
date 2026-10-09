@@ -360,7 +360,7 @@ export default function RefundRequestsPage() {
           reg.it_run_participants.map(p => `${p.first_name} ${p.last_name}`).join("; "),
           reg.lead_email,
           reg.it_run_participants.map(p => p.mobile).join("; "),
-          (reg.final_price / 100).toFixed(2),
+          reg.final_price.toFixed(2),
           (r.refundable.remainingPaise / 100).toFixed(2),
           r.status,
           refund?.label ?? "",
@@ -478,7 +478,7 @@ export default function RefundRequestsPage() {
 
             {/* Amounts and contact */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: "6px 16px", fontSize: 12, marginBottom: 10 }}>
-              <div><span style={{ color: "#666" }}>Paid (booking)</span><br />{inr(reg.final_price)}</div>
+              <div><span style={{ color: "#666" }}>Paid (booking)</span><br />{inr(reg.final_price * 100)}</div>
               <div><span style={{ color: "#666" }}>Refundable now</span><br /><strong style={{ color: remaining > 0 ? "#fff" : "#888" }}>{inr(remaining)}</strong></div>
               <div><span style={{ color: "#666" }}>Email</span><br />{reg.lead_email}</div>
               <div><span style={{ color: "#666" }}>Mobile</span><br />{reg.it_run_participants.map(p => p.mobile).join(", ") || "-"}</div>
@@ -515,7 +515,7 @@ export default function RefundRequestsPage() {
                       <strong style={{ color: "#fff" }}>Booking payment (one payment for {detail.request.it_run_registrations.participant_count} participant{detail.request.it_run_registrations.participant_count === 1 ? "" : "s"}).</strong>
                       <div>Refunds apply to the whole booking, not to individual participants. Refunding once refunds the full booking, so do not refund the same payment again from another request.</div>
                       <div style={{ marginTop: 6 }}>
-                        Price {inr(detail.request.it_run_registrations.base_price)} · discount {inr(detail.request.it_run_registrations.discount_amount)} · paid {inr(detail.request.refundable.finalPricePaise)} · refunded {inr(detail.request.refundable.refundedPaise)} · in flight {inr(detail.request.refundable.inFlightPaise)} · remaining {inr(detail.request.refundable.remainingPaise)}
+                        Price {inr(detail.request.it_run_registrations.base_price * 100)} · discount {inr(detail.request.it_run_registrations.discount_amount * 100)} · paid {inr(detail.request.refundable.finalPricePaise)} · refunded {inr(detail.request.refundable.refundedPaise)} · in flight {inr(detail.request.refundable.inFlightPaise)} · remaining {inr(detail.request.refundable.remainingPaise)}
                       </div>
                       <div style={{ fontFamily: "monospace", marginTop: 4, wordBreak: "break-all" }}>
                         Payment {reg.razorpay_payment_id ?? "-"} · Order {reg.razorpay_order_id ?? "-"}

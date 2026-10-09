@@ -102,7 +102,7 @@ export async function GET(req: NextRequest) {
   };
   const requests = ((data ?? []) as unknown as ListRow[]).map(r => {
     const reg = r.it_run_registrations;
-    const breakdown = computeRefundableBreakdown(reg.final_price, reg.it_run_refunds ?? []);
+    const breakdown = computeRefundableBreakdown(reg.final_price * 100, reg.it_run_refunds ?? []);
     return { ...r, refundable: breakdown };
   });
 
