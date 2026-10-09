@@ -4,6 +4,8 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 // GET /api/it-run/categories
 // Returns active categories and full event content for the IT Run Sprint-2 event.
 // All fields are admin-editable — frontends must not hardcode them.
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const db = getSupabaseServer();
 

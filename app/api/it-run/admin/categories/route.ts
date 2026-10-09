@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireRole, getClientIp } from "@/lib/it-run-auth";
 
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
     .eq("event_id", event.id)
     .order("sort_order");
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Could not load categories. Please try again." }, { status: 500 });
 
   // Count actual active registrations per category (not the stale current_participants counter,
   // which is never decremented when an admin cancels a registration).
@@ -79,6 +80,23 @@ export async function PATCH(req: NextRequest) {
   const editable: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(rest)) {
     if (!IMMUTABLE.has(k)) editable[k] = typeof v === "string" ? sanitize(v) : v;
+  }
+
+  // Numeric fields: validate here so bad input is refused, not stored
+  if ("distance_km" in editable) {
+    const raw = editable.distance_km;
+    const n = raw === null || raw === "" ? null : Number(raw);
+    if (n !== null && (!Number.isFinite(n) || n <= 0 || n > 100)) {
+      return NextResponse.json({ error: "Distance must be between 0 and 100 km." }, { status: 400 });
+    }
+    editable.distance_km = n;
+  }
+  if ("price_rupees" in editable) {
+    const n = Number(editable.price_rupees);
+    if (!Number.isInteger(n) || n < 0 || n > 100000) {
+      return NextResponse.json({ error: "Price must be a whole number of rupees between 0 and 100000." }, { status: 400 });
+    }
+    editable.price_rupees = n;
   }
 
   if (!Object.keys(editable).length) {
@@ -138,7 +156,11 @@ export async function PATCH(req: NextRequest) {
     .select("id, name, event_id")
     .single<{ id: string; name: string; event_id: string }>();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Could not save the category. Please try again." }, { status: 500 });
+
+  // Public pages are static shells that fetch categories; refresh their cached HTML as well
+  revalidatePath("/it-run");
+  revalidatePath("/it-run/register");
 
   db.from("it_run_audit_logs").insert({
     event_id:    updated?.event_id ?? null,

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { categoryCard, type ApiCategory } from "@/lib/it-run-category-view";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -17,39 +18,6 @@ interface Category {
 }
 
 // ── Data ──────────────────────────────────────────────────────────────────────
-
-const CATEGORIES: Category[] = [
-  {
-    slug: "2k-kid", name: "2K Parent & Child Duo", distance: "2 KM", price: 999,
-    type: "kid", badge: "FAMILY", color: "#ec4899", bgGradient: "linear-gradient(135deg,rgba(236,72,153,0.15),rgba(236,72,153,0.05))",
-    includes: ["2x Race BIBs", "2x Dry-fit T-Shirts", "Parent + Child Medals", "Memories for Life"],
-    highlights: ["Kids age 10 or under", "Parent + Child", "Fun Track"],
-  },
-  {
-    slug: "5k-fun-run", name: "5K Fun Run", distance: "5 KM", price: 649,
-    type: "solo", badge: "BEGINNER", color: "#10b981", bgGradient: "linear-gradient(135deg,rgba(16,185,129,0.15),rgba(16,185,129,0.05))",
-    includes: ["Race BIB", "Dry-fit T-Shirt", "Digital Certificate"],
-    highlights: ["No Pressure", "Community", "Fun"],
-  },
-  {
-    slug: "5k-timed", name: "5K Timed Run", distance: "5 KM", price: 799,
-    type: "solo", badge: "POPULAR", color: "#f97316", bgGradient: "linear-gradient(135deg,rgba(249,115,22,0.15),rgba(249,115,22,0.05))",
-    includes: ["Chip Timing", "Finisher Medal", "Race BIB", "Dry-fit T-Shirt", "Digital Certificate"],
-    highlights: ["Competitive", "Chip Timed", "Medal"],
-  },
-  {
-    slug: "5k-duo", name: "5K Duo Challenge", distance: "5 KM", price: 1399,
-    type: "duo", badge: "FOR 2", color: "#6366f1", bgGradient: "linear-gradient(135deg,rgba(99,102,241,0.15),rgba(99,102,241,0.05))",
-    includes: ["2x Race BIBs", "2x Dry-fit T-Shirts", "2x Certificates", "Team Recognition"],
-    highlights: ["2 Runners", "Team Spirit", "Work Buddy"],
-  },
-  {
-    slug: "10k-timed", name: "10K Timed Run", distance: "10 KM", price: 999,
-    type: "solo", badge: "FLAGSHIP", color: "#e8620a", bgGradient: "linear-gradient(135deg,rgba(232,98,10,0.15),rgba(232,98,10,0.05))",
-    includes: ["Chip Timing", "Finisher Medal", "Race BIB", "Dry-fit T-Shirt", "Digital Certificate"],
-    highlights: ["Competitive", "Chip Timed", "Medal"],
-  },
-];
 
 const FAQS = [
   { q: "Who can participate in The IT Run Sprint-2?", a: "Any professional working in the IT/tech industry can register. You will need to upload your company ID for verification. Students from tech colleges are also welcome for the Fun Run category." },
@@ -206,7 +174,8 @@ export default function ItRunLandingPage() {
   const regCountdown = useCountdown(regClose);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [navScrolled, setNavScrolled] = useState(false);
-  const [liveCategories, setLiveCategories] = useState<Category[]>(CATEGORIES);
+  const [liveCategories, setLiveCategories] = useState<Category[]>([]);
+  const [categoriesStatus, setCategoriesStatus] = useState<"loading" | "ready" | "error">("loading");
   const heroRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -219,7 +188,7 @@ export default function ItRunLandingPage() {
     fetch("/api/it-run/categories")
       .then(r => r.json())
       .then(({ data, event }: {
-        data?: { slug: string; price_rupees: number }[];
+        data?: ApiCategory[];
         event?: {
           event_date?: string; registration_closes_at?: string;
           venue_name?: string | null; venue_address?: string | null;
@@ -253,14 +222,14 @@ export default function ItRunLandingPage() {
           if (event.bib_collection_info)      setBibInfo(event.bib_collection_info);
           if (event.race_day_info)            setRaceDayInfo(event.race_day_info);
         }
-        if (Array.isArray(data) && data.length > 0) {
-          setLiveCategories(prev => prev.map(cat => {
-            const live = data.find(d => d.slug === cat.slug);
-            return live ? { ...cat, price: live.price_rupees } : cat;
-          }));
+        if (Array.isArray(data)) {
+          setLiveCategories(data.map(categoryCard));
+          setCategoriesStatus("ready");
+        } else {
+          setCategoriesStatus("error");
         }
       })
-      .catch(() => {});
+      .catch(() => setCategoriesStatus("error"));
   }, []);
 
   const regClosed = regClose ? Date.now() > regClose.getTime() : false;
@@ -346,7 +315,7 @@ export default function ItRunLandingPage() {
 
           {/* Quick stats */}
           <div style={{ display: "flex", gap: "clamp(24px,4vw,48px)", justifyContent: "center", marginTop: 48, flexWrap: "wrap" }}>
-            {[["5", "Race Categories"], ["10 KM", "Longest Race"], [regCloseLabel, "Reg Closes"]].map(([v, l]) => (
+            {[[String(liveCategories.length || "–"), "Race Categories"], [liveCategories.length ? `${Math.max(...liveCategories.map(c => parseFloat(c.distance)))} KM` : "–", "Longest Race"], [regCloseLabel, "Reg Closes"]].map(([v, l]) => (
               <div key={l} style={{ textAlign: "center" }}>
                 <div style={{ fontSize: "clamp(20px,3vw,28px)", fontWeight: 900, color: "#e8620a" }}>{v}</div>
                 <div style={{ fontSize: 11, color: "#666", textTransform: "uppercase", letterSpacing: "0.1em", marginTop: 2 }}>{l}</div>
@@ -406,7 +375,7 @@ export default function ItRunLandingPage() {
             )}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            {[["800+", "Participants in Sprint-1"], ["120+", "Companies Represented"], ["5", "Race Categories"], ["3", "Award Tiers"]].map(([n, l]) => (
+            {[["800+", "Participants in Sprint-1"], ["120+", "Companies Represented"], [String(liveCategories.length || "–"), "Race Categories"], ["3", "Award Tiers"]].map(([n, l]) => (
               <div key={l} style={{ ...S.card, textAlign: "center" }}>
                 <div style={{ fontSize: "clamp(28px,4vw,40px)", fontWeight: 900, color: "#e8620a" }}>{n}</div>
                 <div style={{ fontSize: 12, color: "#888", marginTop: 4, lineHeight: 1.4 }}>{l}</div>
@@ -424,6 +393,15 @@ export default function ItRunLandingPage() {
           <p style={S.sub}>Five carefully designed categories to match every fitness level. From hardcore 10K runners to first-timers and families.</p>
         </div>
 
+        {categoriesStatus === "loading" && <p style={{ color: "#888", fontSize: 14 }}>Loading categories…</p>}
+        {categoriesStatus === "error" && (
+          <p role="alert" style={{ color: "#f87171", fontSize: 14 }}>
+            Categories are temporarily unavailable. Please refresh the page.
+          </p>
+        )}
+        {categoriesStatus === "ready" && liveCategories.length === 0 && (
+          <p style={{ color: "#888", fontSize: 14 }}>Categories will be announced soon.</p>
+        )}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 16 }}>
           {liveCategories.map((cat) => (
             <div

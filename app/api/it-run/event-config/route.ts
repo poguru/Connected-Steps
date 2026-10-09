@@ -14,6 +14,8 @@ import type {
 //
 // Fields marked "→ DB" are populated from a server-side config object below.
 // They will be moved to an admin-configurable DB table in a future migration.
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const db = getSupabaseServer();
 

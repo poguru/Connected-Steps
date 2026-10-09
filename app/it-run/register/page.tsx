@@ -648,7 +648,7 @@ function StepCategory({
               fontSize: "clamp(22px,3.5vw,26px)", fontWeight: 900, color: cat.color,
               minWidth: 60, lineHeight: 1, flexShrink: 0,
             }}>
-              {cat.distance_km < 2 ? "1.5" : cat.distance_km}
+              {cat.distance_km}
               <span style={{ fontSize: 11, fontWeight: 700, marginLeft: 2 }}>KM</span>
             </div>
 
@@ -827,7 +827,7 @@ function StepParticipants({
         <span style={{ fontSize: 12, color: "#888", flex: 1 }}>
           {category.name}
           <span style={{ color: "#555", marginLeft: 6 }}>
-            {category.distance_km < 2 ? "1.5" : category.distance_km} KM
+            {category.distance_km} KM
             {category.is_timed ? " · Timed" : " · Non-Timed"}
           </span>
         </span>
@@ -1159,7 +1159,7 @@ function StepReview({
           <div>
             <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>{category.name}</div>
             <div style={{ fontSize: 12, color: "#555", marginTop: 3, display: "flex", gap: 8, flexWrap: "wrap" as const }}>
-              <span>{category.distance_km < 2 ? "1.5 KM" : `${category.distance_km} KM`}</span>
+              <span>{`${category.distance_km} KM`}</span>
               <span style={{ color: "#333" }}>·</span>
               <span>{category.is_timed ? "Timed" : "Non-Timed"}</span>
               {category.participant_count > 1 && (
