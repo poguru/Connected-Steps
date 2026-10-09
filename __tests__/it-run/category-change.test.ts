@@ -11,6 +11,9 @@ process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
 jest.mock("@/lib/supabase-server", () => ({ getSupabaseServer: jest.fn() }));
 jest.mock("@/lib/admin-auth", () => ({ verifyUserToken: jest.fn(), USER_SESSION_COOKIE: "cs_user_session" }));
 jest.mock("@/lib/rate-limit", () => ({ getClientIp: () => "203.0.113.11" }));
+jest.mock("@/lib/razorpay-client", () => ({
+  getRazorpaySDK: () => ({ orders: { create: jest.fn().mockResolvedValue({ id: "order_test_1" }) } }),
+}));
 
 import { NextRequest } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
@@ -26,6 +29,7 @@ const EVENT = "eeeeeeee-5555-4555-8555-555555555555";
 const TEN_K = "cat-10k";
 const FIVE_K = "cat-5k";      // same price as 10K in this test (also solo)
 const PREMIUM = "cat-premium"; // more expensive
+const BASIC = "cat-basic";     // cheaper (downgrade)
 
 function reg(over: Record<string, unknown> = {}) {
   return {
@@ -39,6 +43,7 @@ const CATS = [
   { id: TEN_K, slug: "10k-timed", name: "10K Timed Run", category_type: "solo", price_rupees: 799, distance_km: 10, is_active: true, max_participants: null, current_participants: 3 },
   { id: FIVE_K, slug: "5k-timed", name: "5K Timed Run", category_type: "solo", price_rupees: 799, distance_km: 5, is_active: true, max_participants: 100, current_participants: 10 },
   { id: PREMIUM, slug: "premium", name: "Premium", category_type: "solo", price_rupees: 1299, distance_km: 21, is_active: true, max_participants: null, current_participants: 0 },
+  { id: BASIC, slug: "basic", name: "Basic", category_type: "solo", price_rupees: 499, distance_km: 3, is_active: true, max_participants: null, current_participants: 0 },
 ];
 
 function fakeDb(opts: { reg?: any; reserve?: string; moveSucceeds?: boolean } = {}) {
@@ -53,10 +58,12 @@ function fakeDb(opts: { reg?: any; reserve?: string; moveSucceeds?: boolean } = 
       b.in = () => b;
       b.returns = () => b;
       b.update = (p: unknown) => { b.op = "update"; updates.push({ table, payload: p, filters: b.filters }); return b; };
-      b.insert = () => Promise.resolve({ data: null, error: null });
+      b.insert = () => { b.op = "insert"; return b; };
+      b.lt = () => b;
       b.maybeSingle = () => Promise.resolve(run());
       b.then = (res: (v: any) => unknown, rej?: (e: unknown) => unknown) => Promise.resolve(run()).then(res, rej);
       function run(): any {
+        if (table === "it_run_category_changes") return { data: b.op === "insert" ? { id: "chg1" } : [], error: null };
         if (table === "it_run_registrations") {
           if (b.op === "update") {
             const ok = opts.moveSucceeds !== false;
@@ -137,7 +144,8 @@ describe("options", () => {
     mockDb.mockReturnValue(fakeDb());
     const body = await (await GET(req("GET"), params)).json();
     expect(body.options.find((o: any) => o.id === FIVE_K)).toMatchObject({ change: "same", allowed: true });
-    expect(body.options.find((o: any) => o.id === PREMIUM)).toMatchObject({ change: "upgrade", allowed: false });
+    expect(body.options.find((o: any) => o.id === PREMIUM)).toMatchObject({ change: "upgrade", allowed: true });
+    expect(body.options.find((o: any) => o.id === BASIC)).toMatchObject({ change: "downgrade", allowed: false });
   });
 
   it("blocks changes on unpaid registrations and discounted ones", async () => {
@@ -152,14 +160,27 @@ describe("options", () => {
 });
 
 describe("POST refusals happen before any write", () => {
-  it("refuses an upgrade with a price change and touches no capacity", async () => {
+  it("refuses a downgrade with a price change and touches no capacity", async () => {
     const db = fakeDb();
     mockDb.mockReturnValue(db);
-    const res = await POST(req("POST", { categoryId: PREMIUM }), params);
+    const res = await POST(req("POST", { categoryId: BASIC }), params);
     expect(res.status).toBe(409);
     expect((await res.json()).code).toBe("PRICE_CHANGE_NOT_SUPPORTED");
     expect(db.rpcs).toEqual([]);
     expect(db.updates).toEqual([]);
+  });
+
+  it("an upgrade holds the seat and asks for the exact difference, without moving the registration yet", async () => {
+    const db = fakeDb();
+    mockDb.mockReturnValue(db);
+    const res = await POST(req("POST", { categoryId: PREMIUM }), params);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json).toMatchObject({ kind: "payment", changeId: "chg1", orderId: "order_test_1", amount: (1299 - 799) * 100 });
+    expect(db.rpcs.filter(r => r.name === "itr_reserve_capacity").map(r => r.args.p_category_id)).toEqual([PREMIUM]);
+    // The registration keeps its original category until the payment is verified
+    expect(db.updates.some(u => u.table === "it_run_registrations")).toBe(false);
   });
 
   it("refuses the same category", async () => {

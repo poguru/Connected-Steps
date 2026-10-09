@@ -3,6 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 import { getClientIp } from "@/lib/rate-limit";
 import { requiredParticipantCount, type CategoryType } from "@/lib/it-run-category-rules";
+import { getRazorpaySDK } from "@/lib/razorpay-client";
 
 // Participant category change for an existing registration.
 //
@@ -85,10 +86,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       let note: string | null = null;
       if (blocked) note = blocked;
       else if (full) note = "This category is full.";
-      else if (change !== "same") note = `Online ${change}s are not available yet. Email ${SUPPORT} to request one.`;
+      else if (change === "upgrade") note = `Pay the difference of ₹${c.price_rupees - (current?.price_rupees ?? 0)} to switch.`;
+      else if (change === "downgrade") note = `Downgrades are not available online yet. Email ${SUPPORT} to request one.`;
       return {
         id: c.id, name: c.name, distanceKm: c.distance_km, priceRupees: c.price_rupees,
-        change, availability: availability(c), allowed: !blocked && !full && change === "same", note,
+        change, availability: availability(c), allowed: !blocked && !full && change !== "downgrade", note,
       };
     });
 
@@ -131,14 +133,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
   if (!current) return NextResponse.json({ error: "We couldn't load your current category.", code: "SERVER_ERROR" }, { status: 500 });
 
-  // Prices are the server's, never the client's. Only the same-price change is applied here.
-  if (target.price_rupees !== current.price_rupees) {
+  // Prices are the server's, never the client's.
+  if (target.price_rupees < current.price_rupees) {
     return NextResponse.json({
-      error: target.price_rupees > current.price_rupees
-        ? `Upgrades that need a payment difference are not available online yet. Email ${SUPPORT}.`
-        : `Downgrade refunds are not available online yet. Email ${SUPPORT}.`,
+      error: `Downgrade refunds are not available online yet. Email ${SUPPORT}.`,
       code: "PRICE_CHANGE_NOT_SUPPORTED",
     }, { status: 409 });
+  }
+  if (target.price_rupees > current.price_rupees) {
+    return startUpgrade(req, reg, email, current, target);
   }
 
   // Reserve the seats in the target category first (row-locked in the database)
@@ -189,5 +192,93 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     ok: true,
     registrationCode: reg.registration_code,
     category: { id: target.id, name: target.name, priceRupees: target.price_rupees, distanceKm: target.distance_km },
+  });
+}
+
+// Upgrade: holds the seat, creates a Razorpay order for the exact difference, records the attempt.
+// The registration keeps its original category until the payment is verified (see ./verify).
+const HOLD_MINUTES = 20;
+
+async function startUpgrade(
+  req: NextRequest, reg: Reg, email: string,
+  current: { id: string; price_rupees: number }, target: Cat,
+): Promise<NextResponse> {
+  const db = getSupabaseServer();
+  const amountPaise = (target.price_rupees - current.price_rupees) * 100;
+  if (amountPaise <= 0) {
+    return NextResponse.json({ error: "This change does not need a payment.", code: "NO_PAYMENT_NEEDED" }, { status: 400 });
+  }
+
+  // Release holds that were never paid. A stale hold would block seats for everyone else.
+  const { data: stale } = await db
+    .from("it_run_category_changes")
+    .select("id, to_category_id")
+    .eq("registration_id", reg.id)
+    .eq("status", "pending")
+    .lt("expires_at", new Date().toISOString());
+  for (const s of (stale ?? []) as Array<{ id: string; to_category_id: string }>) {
+    const { data: freed } = await db.from("it_run_category_changes")
+      .update({ status: "cancelled" }).eq("id", s.id).eq("status", "pending").select("id").maybeSingle();
+    if (freed) await db.rpc("itr_release_capacity", { p_category_id: s.to_category_id, p_count: reg.participant_count });
+  }
+
+  // Hold the seats (row-locked in the database)
+  const { data: reserved, error: resErr } = await db.rpc("itr_reserve_capacity", {
+    p_category_id: target.id, p_increment: reg.participant_count, p_payment_ttl_mins: HOLD_MINUTES,
+  });
+  if (resErr || reserved !== "confirmed") {
+    return NextResponse.json({ error: "That category is full now. Please choose another.", code: "CATEGORY_FULL" }, { status: 409 });
+  }
+
+  // One open change per registration (unique index). Insert before creating the order.
+  const expiresAt = new Date(Date.now() + HOLD_MINUTES * 60 * 1000).toISOString();
+  const { data: change, error: insErr } = await db
+    .from("it_run_category_changes")
+    .insert({
+      registration_id: reg.id,
+      from_category_id: current.id,
+      to_category_id: target.id,
+      amount_paise: amountPaise,
+      requested_by_email: email.toLowerCase(),
+      status: "pending",
+      expires_at: expiresAt,
+    })
+    .select("id")
+    .maybeSingle<{ id: string }>();
+  if (insErr || !change) {
+    await db.rpc("itr_release_capacity", { p_category_id: target.id, p_count: reg.participant_count });
+    if (insErr?.code === "23505") {
+      return NextResponse.json({ error: "A category change is already in progress for this registration.", code: "CHANGE_IN_PROGRESS" }, { status: 409 });
+    }
+    return NextResponse.json({ error: "We couldn't start the change. Please try again.", code: "SERVER_ERROR" }, { status: 500 });
+  }
+
+  let orderId: string;
+  try {
+    const order = await getRazorpaySDK().orders.create({
+      amount: amountPaise,
+      currency: "INR",
+      receipt: `itrcat_${reg.registration_code}_${Date.now()}`,
+      notes: { it_run_reg_id: reg.id, it_run_reg_code: reg.registration_code, it_run_change_id: change.id, type: "it_run_category_change" },
+    });
+    orderId = order.id;
+  } catch (e) {
+    console.error("[it-run/category] order creation failed:", (e as Error).name);
+    await db.from("it_run_category_changes").update({ status: "cancelled" }).eq("id", change.id);
+    await db.rpc("itr_release_capacity", { p_category_id: target.id, p_count: reg.participant_count });
+    return NextResponse.json({ error: "We couldn't start the payment. Please try again.", code: "PAYMENT_UNAVAILABLE" }, { status: 502 });
+  }
+
+  await db.from("it_run_category_changes").update({ razorpay_order_id: orderId }).eq("id", change.id);
+
+  return NextResponse.json({
+    kind: "payment",
+    changeId: change.id,
+    orderId,
+    amount: amountPaise,
+    currency: "INR",
+    key: process.env.RAZORPAY_KEY_ID,
+    toCategory: { id: target.id, name: target.name },
+    expiresAt,
   });
 }
