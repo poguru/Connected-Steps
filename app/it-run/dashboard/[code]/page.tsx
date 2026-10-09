@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { isDashboardPayload, classifyDashboardFailure, DASHBOARD_FAILURE_MESSAGES, type DashboardFailureKind } from "@/lib/it-run-dashboard";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -237,21 +238,41 @@ export default function DashboardPage() {
   const { code }               = useParams<{ code: string }>();
   const [data,    setData]     = useState<DashboardData | null>(null);
   const [loading, setLoading]  = useState(true);
-  const [error,   setError]    = useState("");
+  const [failure, setFailure]  = useState<DashboardFailureKind | null>(null);
+  const [attempt, setAttempt]  = useState(0);
 
-  function load() {
+  // Loads on mount and on every retry (attempt). State is only set after the await.
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/it-run/dashboard/${encodeURIComponent(code)}`, { cache: "no-store" });
+        let body: unknown = null;
+        try { body = await res.json(); } catch { body = null; }
+        if (!active) return;
+
+        if (!res.ok) {
+          setFailure(classifyDashboardFailure(res.status, body));
+        } else if (!isDashboardPayload(body)) {
+          // Required fields missing or malformed: report it, never render partial data
+          setFailure("INVALID_RESPONSE");
+        } else {
+          setData(body as unknown as DashboardData);
+        }
+      } catch {
+        if (active) setFailure("NETWORK");
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [code, attempt]);
+
+  function retry() {
     setLoading(true);
-    fetch(`/api/it-run/dashboard/${code}`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.error) setError(d.error);
-        else setData(d);
-      })
-      .catch(() => setError("Failed to load dashboard"))
-      .finally(() => setLoading(false));
+    setFailure(null);
+    setAttempt(a => a + 1);
   }
-
-  useEffect(() => { load(); }, [code]);
 
   if (loading) return (
     <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -262,11 +283,19 @@ export default function DashboardPage() {
     </div>
   );
 
-  if (error || !data) return (
-    <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ textAlign: "center" }}>
-        <div style={{ fontSize: 14, color: "#f87171", marginBottom: 16 }}>{error || "Registration not found"}</div>
-        <Link href="/it-run" style={{ color: ACCENT, textDecoration: "none", fontSize: 13 }}>Back to event page</Link>
+  if (failure || !data) return (
+    <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div role="alert" style={{ textAlign: "center", maxWidth: 420 }}>
+        <div style={{ fontSize: 15, color: "#f87171", marginBottom: 20, lineHeight: 1.6 }}>
+          {DASHBOARD_FAILURE_MESSAGES[failure ?? "NOT_FOUND"]}
+        </div>
+        <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+          {failure !== "NOT_FOUND" && (
+            <button onClick={retry} style={{ ...S.btn, background: ACCENT, color: "#fff" }}>Try again</button>
+          )}
+          <Link href="/auth" style={{ ...S.btn, background: "rgba(255,255,255,0.08)", color: "#fff", textDecoration: "none", display: "inline-block" }}>Sign in</Link>
+          <Link href="/it-run" style={{ ...S.btn, background: "transparent", border: `1px solid ${ACCENT}`, color: ACCENT, textDecoration: "none", display: "inline-block" }}>IT Run event page</Link>
+        </div>
       </div>
     </div>
   );
@@ -453,7 +482,7 @@ export default function DashboardPage() {
                         registrationCode={reg.registration_code}
                         slots={bibSlots}
                         existingBooking={booking}
-                        onBooked={load}
+                        onBooked={retry}
                       />
                     </div>
                   )}

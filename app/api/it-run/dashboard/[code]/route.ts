@@ -12,8 +12,8 @@ export async function GET(
 
   const db = getSupabaseServer();
 
-  // Fetch registration
-  const { data: reg } = await db
+  // Fetch registration. maybeSingle: zero rows = not found; a query error is a server failure (500), not a 404.
+  const { data: reg, error: regErr } = await db
     .from("it_run_registrations")
     .select(`
       id, registration_code, lead_email, participant_count,
@@ -23,7 +23,7 @@ export async function GET(
       it_run_events ( id, title, event_date, report_time, flag_off_time, venue_name, venue_address, city )
     `)
     .eq("registration_code", code)
-    .single<{
+    .maybeSingle<{
       id: string; registration_code: string; lead_email: string;
       participant_count: number; base_price: number; discount_amount: number;
       final_price: number; payment_status: string; registration_status: string;
@@ -33,10 +33,14 @@ export async function GET(
       it_run_events: { id: string; title: string; event_date: string; report_time: string | null; flag_off_time: string | null; venue_name: string | null; venue_address: string | null; city: string | null } | null;
     }>();
 
-  if (!reg) return NextResponse.json({ error: "Registration not found" }, { status: 404 });
+  if (regErr) {
+    console.error("[it-run/dashboard] registration query failed:", regErr.code ?? "unknown");
+    return NextResponse.json({ error: "We couldn't load your dashboard right now.", code: "SERVER_ERROR" }, { status: 500 });
+  }
+  if (!reg) return NextResponse.json({ error: "We couldn't find a registration associated with this link.", code: "NOT_FOUND" }, { status: 404 });
 
   // Fetch participants
-  const { data: participants } = await db
+  const { data: participants, error: participantsErr } = await db
     .from("it_run_participants")
     .select(`
       id, participant_type, qr_token, first_name, last_name, gender, email, mobile,
@@ -48,8 +52,13 @@ export async function GET(
     `)
     .eq("registration_id", reg.id);
 
+  if (participantsErr || !participants) {
+    console.error("[it-run/dashboard] participant query failed:", participantsErr?.code ?? "no rows array");
+    return NextResponse.json({ error: "We couldn't load your dashboard right now.", code: "SERVER_ERROR" }, { status: 500 });
+  }
+
   // Available BIB slots (for booking)
-  const { data: bibSlots } = await db
+  const { data: bibSlots, error: bibSlotsErr } = await db
     .from("it_run_bib_slots")
     .select("id,location_name,location_address,slot_date,start_time,end_time,capacity,booked_count")
     .eq("event_id", reg.it_run_events?.id ?? "")
@@ -57,16 +66,21 @@ export async function GET(
     .order("slot_date")
     .order("start_time");
 
+  if (bibSlotsErr || !bibSlots) {
+    console.error("[it-run/dashboard] bib slot query failed:", bibSlotsErr?.code ?? "no rows array");
+    return NextResponse.json({ error: "We couldn't load your dashboard right now.", code: "SERVER_ERROR" }, { status: 500 });
+  }
+
   // Normalize nested to-many relations: PostgREST returns null (not []) when
   // a participant has no related bib bookings / collections / check-ins.
   // The dashboard UI accesses .length on these arrays, so null crashes with
   // "Cannot read properties of null (reading 'length')".
-  const normalizedParticipants = (participants ?? []).map(p => ({
+  const normalizedParticipants = participants.map(p => ({
     ...p,
     it_run_bib_bookings:    (p.it_run_bib_bookings    as unknown[] | null) ?? [],
     it_run_bib_collections: (p.it_run_bib_collections as unknown[] | null) ?? [],
     it_run_checkins:        (p.it_run_checkins        as unknown[] | null) ?? [],
   }));
 
-  return NextResponse.json({ reg, participants: normalizedParticipants, bibSlots: bibSlots ?? [] });
+  return NextResponse.json({ reg, participants: normalizedParticipants, bibSlots });
 }
