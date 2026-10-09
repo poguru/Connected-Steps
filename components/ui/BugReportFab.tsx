@@ -1,6 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, DragEvent } from "react";
+import { usePathname } from "next/navigation";
+import { floatingReportHidden } from "@/lib/issue-report-placement";
+
+// Any control on the page can open the report form by dispatching this event. One form, one listener.
+export const OPEN_ISSUE_REPORT_EVENT = "cs-open-issue-report";
 
 const CATEGORIES = [
   { value: "bug",         label: "🐛 Bug" },
@@ -148,6 +153,17 @@ export default function BugReportFab() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // The registration wizard keeps its own report button inside its bottom bar (see IssueReportButton),
+  // so the floating control is hidden there. The form itself stays mounted for that button to open.
+  const pathname = usePathname();
+  const floatingHidden = floatingReportHidden(pathname);
+
+  useEffect(() => {
+    const open = () => setOpen(true);
+    window.addEventListener(OPEN_ISSUE_REPORT_EVENT, open);
+    return () => window.removeEventListener(OPEN_ISSUE_REPORT_EVENT, open);
+  }, []);
+
   const canSubmit = title.trim().length > 0
     && description.trim().length > 0
     && severity !== ""
@@ -285,7 +301,8 @@ export default function BugReportFab() {
 
   return (
     <>
-      {/* Floating trigger */}
+      {/* Floating trigger (hidden on the registration wizard; see IssueReportButton) */}
+      {!floatingHidden && (
       <button
         onClick={() => setOpen(true)}
         aria-label="Report an issue"
@@ -307,6 +324,7 @@ export default function BugReportFab() {
         <FlagIcon />
         Report an issue
       </button>
+      )}
 
       {/* Lightbox */}
       {lightbox && (
@@ -540,5 +558,28 @@ export default function BugReportFab() {
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * Compact flag button that opens the same report form. Sized for touch (40px) and placed by the
+ * caller inside its own layout, so it never sits on top of navigation controls.
+ */
+export function IssueReportButton() {
+  return (
+    <button
+      type="button"
+      onClick={() => window.dispatchEvent(new Event(OPEN_ISSUE_REPORT_EVENT))}
+      aria-label="Report an issue"
+      title="Report an issue"
+      style={{
+        width: 40, height: 40, minWidth: 40, borderRadius: 999, flexShrink: 0,
+        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)",
+        color: "#bbb", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 0,
+      }}
+    >
+      <FlagIcon />
+    </button>
   );
 }

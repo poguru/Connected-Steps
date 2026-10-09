@@ -8,6 +8,7 @@ import type { ItRunEventConfig, ItRunCategory } from "@/lib/it-run-types";
 import { isValidEmail, parseCalendarDate, todayInIST, validateDateOfBirth } from "@/lib/it-run-validation";
 import { decideUrlCategory, startsNewRegistration } from "@/lib/it-run-category-selection";
 import { idChoiceError, isStoredDocumentPath } from "@/lib/it-run-id-verification";
+import { IssueReportButton } from "@/components/ui/BugReportFab";
 import {
   EventRegistrationHeader,
   CompactEventHeader,
@@ -550,6 +551,7 @@ function PriceBar({
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+        <IssueReportButton />
         {couponApplied && (
           <span style={{
             fontSize: 10, color: "#10b981", background: "rgba(16,185,129,0.08)",
@@ -2938,6 +2940,9 @@ function RegisterPageContent() {
               event={config?.event ?? null}
               eventLogoUrl="/events/it-run-sprint-2/IT Run Sprint-2 Logo.jpeg"
             />
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+              <IssueReportButton />
+            </div>
             {categoryNotice && (
               <p role="alert" style={{ fontSize: 13, color: "#f87171", margin: "0 0 12px", lineHeight: 1.5 }}>{categoryNotice}</p>
             )}
@@ -3074,6 +3079,10 @@ function RegisterPageContent() {
         )}
 
         {step === 7 && (
+          <>
+          <div style={{ display: "flex", justifyContent: "flex-end", maxWidth: 600, margin: "16px auto 0", padding: "0 20px" }}>
+            <IssueReportButton />
+          </div>
           <EventSuccessScreen
             registrationCode={regCode}
             dashboardUrl={dashboardUrl || undefined}
@@ -3081,6 +3090,7 @@ function RegisterPageContent() {
             participants={participants.map(p => `${p.firstName} ${p.lastName}`.trim())}
             finalPrice={finalPrice}
           />
+          </>
         )}
       </div>
       )}
