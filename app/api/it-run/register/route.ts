@@ -6,6 +6,7 @@ import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 import { buildDashboardUrl } from "@/lib/it-run-dashboard-link";
 import { hashDraftToken, isWellFormedDraftToken } from "@/lib/it-run-drafts";
+import { bestEarlyBird, type EarlyBirdOffer } from "@/lib/it-run-early-bird";
 import { requiredParticipantCount, categoryTypeLabel } from "@/lib/it-run-category-rules";
 import { initialVerificationStatus, isStoredDocumentPath } from "@/lib/it-run-id-verification";
 import { checkPersonName, checkBibName, normalizeName } from "@/lib/it-run-name-validation";
@@ -229,7 +230,47 @@ export async function POST(req: NextRequest) {
     let discountAmt    = 0;
     let couponReserved = false;
 
-    if (couponId) {
+    // Early bird: an admin-configured offer for this category, valid now and with quota left.
+    // Only one of an early bird or a coupon applies. The offer is checked and its place is claimed here, on the server.
+    let earlyBirdOfferId: string | null = null;
+    {
+      const nowIso = new Date().toISOString();
+      const { data: ebOffers, error: ebErr } = await db
+        .from("it_run_early_bird_offers")
+        .select("id, category_id, name, discount_type, discount_value, starts_at, ends_at, status, redemption_limit, redemptions_used, min_payable_rupees")
+        .eq("category_id", categoryId)
+        .eq("status", "active")
+        .lte("starts_at", nowIso)
+        .gt("ends_at", nowIso);
+      if (ebErr) {
+        console.error("[it-run/register] early bird lookup failed:", ebErr.message);
+        return NextResponse.json({ error: "We couldn't check offers right now. Please try again." }, { status: 500 });
+      }
+      const applied = bestEarlyBird(basePrice, (ebOffers ?? []) as EarlyBirdOffer[], Date.now());
+      if (applied && couponId) {
+        return NextResponse.json({
+          error: "An early bird offer applies to this category, and it can't be combined with a discount code. Remove the code to continue.",
+          code: "EARLY_BIRD_NO_COUPON",
+        }, { status: 409 });
+      }
+      if (applied) {
+        const { data: claimed, error: claimErr } = await db.rpc("itr_early_bird_claim", { p_offer_id: applied.offer.id });
+        if (claimErr) {
+          console.error("[it-run/register] early bird claim failed:", claimErr.message);
+          return NextResponse.json({ error: "We couldn't apply the offer right now. Please try again." }, { status: 500 });
+        }
+        if (!claimed) {
+          return NextResponse.json({
+            error: "This early bird offer has just sold out or ended. Refresh the page to see the current price.",
+            code: "EARLY_BIRD_UNAVAILABLE",
+          }, { status: 409 });
+        }
+        earlyBirdOfferId = applied.offer.id;
+        discountAmt = applied.discount;
+      }
+    }
+
+    if (couponId && !earlyBirdOfferId) {
       const { data: couponDiscount, error: couponErr } = await db.rpc("itr_use_coupon", {
         p_coupon_id:  couponId,
         p_event_id:   cat.event_id,
@@ -266,14 +307,17 @@ export async function POST(req: NextRequest) {
     if (reserveErr) {
       console.error("[it-run/register] capacity RPC error:", reserveErr.message);
       if (couponReserved) void db.rpc("itr_release_coupon", { p_coupon_id: couponId });
+      if (earlyBirdOfferId) void db.rpc("itr_early_bird_release", { p_offer_id: earlyBirdOfferId });
       return NextResponse.json({ error: "Capacity check failed" }, { status: 500 });
     }
     if (reserveStatus === "full") {
       if (couponReserved) void db.rpc("itr_release_coupon", { p_coupon_id: couponId });
+      if (earlyBirdOfferId) void db.rpc("itr_early_bird_release", { p_offer_id: earlyBirdOfferId });
       return NextResponse.json({ error: "This category is fully booked" }, { status: 409 });
     }
     if (reserveStatus === "unavailable") {
       if (couponReserved) void db.rpc("itr_release_coupon", { p_coupon_id: couponId });
+      if (earlyBirdOfferId) void db.rpc("itr_early_bird_release", { p_offer_id: earlyBirdOfferId });
       return NextResponse.json({ error: "Category not found or inactive" }, { status: 404 });
     }
 
@@ -292,6 +336,7 @@ export async function POST(req: NextRequest) {
         base_price:        basePrice,
         discount_amount:   discountAmt,
         final_price:       finalPrice,
+        early_bird_offer_id: earlyBirdOfferId,
         coupon_id:         couponId ?? null,
         payment_status:    finalPrice === 0 ? "free" : "pending",
         linked_user_email: linkedUserEmail,
@@ -303,6 +348,7 @@ export async function POST(req: NextRequest) {
       console.error("[it-run/register] reg insert error:", regErr?.message);
       void db.rpc("itr_release_capacity", { p_category_id: categoryId, p_count: participants.length });
       if (couponReserved) void db.rpc("itr_release_coupon", { p_coupon_id: couponId });
+      if (earlyBirdOfferId) void db.rpc("itr_early_bird_release", { p_offer_id: earlyBirdOfferId });
       return NextResponse.json({ error: "Failed to create registration" }, { status: 500 });
     }
 
@@ -343,6 +389,7 @@ export async function POST(req: NextRequest) {
       await db.from("it_run_registrations").delete().eq("id", reg.id);
       void db.rpc("itr_release_capacity", { p_category_id: categoryId, p_count: participants.length });
       if (couponReserved) void db.rpc("itr_release_coupon", { p_coupon_id: couponId });
+      if (earlyBirdOfferId) void db.rpc("itr_early_bird_release", { p_offer_id: earlyBirdOfferId });
       return NextResponse.json({ error: "Failed to create participant records" }, { status: 500 });
     }
 
@@ -373,6 +420,7 @@ export async function POST(req: NextRequest) {
       await db.from("it_run_registrations").delete().eq("id", reg.id);
       void db.rpc("itr_release_capacity", { p_category_id: categoryId, p_count: participants.length });
       if (couponReserved) void db.rpc("itr_release_coupon", { p_coupon_id: couponId });
+      if (earlyBirdOfferId) void db.rpc("itr_early_bird_release", { p_offer_id: earlyBirdOfferId });
       return NextResponse.json(
         { error: "Failed to generate QR codes, please try again" },
         { status: 500 },

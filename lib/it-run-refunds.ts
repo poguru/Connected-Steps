@@ -65,12 +65,12 @@ export async function finalizeRefundProcessed(
 
   const { data: reg, error: regErr } = await db
     .from("it_run_registrations")
-    .select("id, final_price, registration_status, category_id, participant_count, coupon_id, registration_code")
+    .select("id, final_price, registration_status, category_id, participant_count, coupon_id, registration_code, early_bird_offer_id")
     .eq("id", transitioned.registration_id)
     .single<{
       id: string; final_price: number; registration_status: string;
       category_id: string; participant_count: number; coupon_id: string | null;
-      registration_code: string;
+      registration_code: string; early_bird_offer_id: string | null;
     }>();
   if (regErr || !reg) throw new Error(`Registration not found for refund ${refundId}`);
 
@@ -96,6 +96,9 @@ export async function finalizeRefundProcessed(
       p_category_id: reg.category_id,
       p_count: reg.participant_count,
     });
+    if (reg.early_bird_offer_id) {
+      await db.rpc("itr_early_bird_release", { p_offer_id: reg.early_bird_offer_id });
+    }
     if (reg.coupon_id) {
       await db.rpc("itr_release_coupon", { p_coupon_id: reg.coupon_id });
     }

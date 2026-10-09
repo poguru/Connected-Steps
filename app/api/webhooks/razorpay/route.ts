@@ -144,11 +144,11 @@ export async function POST(req: NextRequest) {
     if (payment.notes?.type === "it_run" || payment.notes?.it_run_reg_id) {
       const { data: itReg } = await db2
         .from("it_run_registrations")
-        .select("id, category_id, participant_count, payment_status, coupon_id, discount_amount")
+        .select("id, category_id, participant_count, payment_status, coupon_id, discount_amount, early_bird_offer_id")
         .eq("razorpay_order_id", payment.order_id ?? "")
         .maybeSingle<{
           id: string; category_id: string; participant_count: number;
-          payment_status: string; coupon_id: string | null; discount_amount: number;
+          payment_status: string; coupon_id: string | null; discount_amount: number; early_bird_offer_id: string | null;
         }>();
 
       if (itReg && ["pending", "payment_attempted"].includes(itReg.payment_status)) {
@@ -164,6 +164,7 @@ export async function POST(req: NextRequest) {
             p_category_id: itReg.category_id,
             p_count:       itReg.participant_count,
           });
+          if (itReg.early_bird_offer_id) await db2.rpc("itr_early_bird_release", { p_offer_id: itReg.early_bird_offer_id });
           if (itReg.coupon_id && itReg.discount_amount > 0) {
             await db2.rpc("itr_release_coupon", { p_coupon_id: itReg.coupon_id });
           }
@@ -486,7 +487,7 @@ async function handleItRunRefund(
 
   const { data: itReg } = await db
     .from("it_run_registrations")
-    .select("id, registration_code, category_id, participant_count, coupon_id, discount_amount, registration_status, payment_status")
+    .select("id, registration_code, category_id, participant_count, coupon_id, discount_amount, registration_status, payment_status, early_bird_offer_id")
     .eq("razorpay_payment_id", paymentId)
     .maybeSingle<{
       id:                  string;
@@ -494,6 +495,7 @@ async function handleItRunRefund(
       category_id:         string;
       participant_count:   number;
       coupon_id:           string | null;
+      early_bird_offer_id:  string | null;
       discount_amount:     number;
       registration_status: string;
       payment_status:      string;
@@ -530,6 +532,7 @@ async function handleItRunRefund(
   });
 
   // Release coupon usage if one was applied (was missing — bug fix)
+  if (itReg.early_bird_offer_id) await db.rpc("itr_early_bird_release", { p_offer_id: itReg.early_bird_offer_id });
   if (itReg.coupon_id && itReg.discount_amount > 0) {
     await db.rpc("itr_release_coupon", { p_coupon_id: itReg.coupon_id });
   }
