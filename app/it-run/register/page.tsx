@@ -42,6 +42,8 @@ interface DraftRecord {
   couponCode:        string;
   regId?:            string;
   regCode?:          string;
+  participantIds?:   string[];
+  regCouponCode?:    string | null;
   dashboardUrl?:     string;
   finalPrice?:       number;
   savedAt:           number;
@@ -1449,10 +1451,12 @@ function StepCoupon({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function StepPayment({
-  regCode, finalPrice, submitting, submitError, onPay,
+  regCode, finalPrice, submitting, submitError, onPay, onBackToEdit,
 }: {
   regCode: string; finalPrice: number;
   submitting: boolean; submitError: string; onPay: () => void;
+  /** Returns to the review step. The same registration and payment order are kept. */
+  onBackToEdit: () => void;
 }) {
   return (
     <div>
@@ -1483,6 +1487,12 @@ function StepPayment({
       <div style={{ ...CARD_BASE, padding: 14, marginBottom: 24, fontSize: 12, color: "#444", lineHeight: 1.7 }}>
         Your spot is reserved for <strong style={{ color: "#666" }}>15 minutes</strong>. Complete payment now to avoid losing it.
         We accept UPI, Cards, Net Banking, and Wallets.
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 12 }}>
+        <button onClick={onBackToEdit} disabled={submitting} style={{ ...BTN_GHOST, opacity: submitting ? 0.5 : 1 }}>
+          &larr; Back to Edit Details
+        </button>
       </div>
 
       <button
@@ -1605,6 +1615,10 @@ function RegisterPageContent() {
   const [regCode,     setRegCode]     = useState("");
   const [regId,       setRegId]       = useState("");
   const [dashboardUrl, setDashboardUrl] = useState("");
+  // Server IDs of this registration's participants, in form order. Needed to edit an existing registration.
+  const [participantIds, setParticipantIds] = useState<string[]>([]);
+  // Coupon used when the registration (and its payment order) was created. A payment order cannot change its price.
+  const [regCouponCode, setRegCouponCode] = useState<string | null>(null);
   // When payment step is restored from a draft after page refresh, we use the
   // price that was returned by the register API (already committed to the DB)
   // rather than re-deriving it, in case the coupon state didn't survive.
@@ -1687,6 +1701,8 @@ function RegisterPageContent() {
           participants: draftParticipants, couponCode,
           regId:      regId   || undefined,
           regCode:    regCode || undefined,
+          participantIds: participantIds.length ? participantIds : undefined,
+          regCouponCode,
           dashboardUrl: dashboardUrl || undefined,
           finalPrice: regId   ? finalPrice : undefined,
           savedAt:    now,
@@ -1697,7 +1713,7 @@ function RegisterPageContent() {
         setSaveStatus("");
       }
     }
-  }, [step, participantSubIdx, selectedCat, participants, couponCode, regId, regCode, dashboardUrl, isOffline, finalPrice]);
+  }, [step, participantSubIdx, selectedCat, participants, couponCode, regId, regCode, participantIds, regCouponCode, dashboardUrl, isOffline, finalPrice]);
 
   // ── Draft restore — sets draftToResume so the user sees a resume banner ──────
   // The banner then calls applyDraft() or discardDraft() based on the user's choice.
@@ -1934,6 +1950,8 @@ function RegisterPageContent() {
     setParticipantSubIdx(0);
     setCouponCode(d.couponCode ?? "");
     setCoupon(null); // coupon must be revalidated — only the code text is restored
+    setParticipantIds(d.participantIds ?? []);
+    setRegCouponCode(d.regCouponCode !== undefined ? d.regCouponCode : (d.couponCode ?? ""));
 
     if (d.regId && d.regCode && d.step >= 6) {
       // Registration was already created; go straight to payment step
@@ -2295,6 +2313,53 @@ function RegisterPageContent() {
     } catch {}
 
     try {
+      // A registration already exists (the participant came back to edit): update it, never create a second one
+      if (regId) {
+        if (participantIds.length !== participants.length) {
+          setSubmitError("We need to refresh your registration before saving these changes. Please reload the page and continue.");
+          return;
+        }
+        // The payment order's price is fixed. A different discount code would show a price that does not match the charge.
+        const norm = (s: string | null | undefined) => (s ?? "").trim().toUpperCase();
+        if (norm(couponCode) !== norm(regCouponCode)) {
+          setSubmitError("Your discount code can't be changed once the registration has been created. Start a new registration to use a different code.");
+          return;
+        }
+        const editRes = await fetch("/api/it-run/register", {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            registrationId:   regId,
+            registrationCode: regCode,
+            categoryId:       selectedCat.id,
+            participants: participants.map((p, idx) => ({
+              id:                participantIds[idx],
+              type:              selectedCat.participant_labels[idx]?.role ?? "solo",
+              firstName:         p.firstName,
+              lastName:          p.lastName,
+              bibName:           p.bibName,
+              gender:            p.gender,
+              dob:               p.dob,
+              email:             p.email,
+              mobile:            p.mobile,
+              bloodGroup:        p.bloodGroup,
+              emergencyName:     p.emergencyName,
+              emergencyPhone:    p.emergencyPhone,
+              companyName:       p.companyName,
+              employeeId:        p.employeeId,
+              companyIdUrl:      p.companyIdUrl,
+              tshirtSize:        p.tshirtSize,
+              medicalConditions: p.medicalConditions,
+              foodPreference:    p.foodPreference,
+            })),
+          }),
+        });
+        const editData = await editRes.json().catch(() => ({})) as { error?: string };
+        if (!editRes.ok) { setSubmitError(editData.error ?? "We couldn't save your changes. Please try again."); return; }
+        // Same registration and the same payment order, so go straight back to payment
+        setStep(6);
+        return;
+      }
+
       const res  = await fetch("/api/it-run/register", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2328,6 +2393,8 @@ function RegisterPageContent() {
       setRegCode(data.registrationCode);
       setDashboardUrl(data.dashboardUrl ?? "");
       setRegId(data.registrationId);
+      setParticipantIds(data.participantIds ?? []);
+      setRegCouponCode(couponCode ?? "");
       if (data.finalPrice === 0) { setStep(7); return; }
       setStep(6);
     } catch {
@@ -2892,6 +2959,7 @@ function RegisterPageContent() {
             submitting={submitting}
             submitError={submitError}
             onPay={initiatePayment}
+            onBackToEdit={() => { setSubmitError(""); setReturnToReview(true); setStep(4); }}
             />
           </>
         )}

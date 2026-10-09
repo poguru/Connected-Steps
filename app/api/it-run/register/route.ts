@@ -446,3 +446,169 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
+
+// PATCH /api/it-run/register
+// Edits the participant details of an EXISTING, unpaid registration (used when a participant goes back
+// from review or payment to correct something). It never creates a registration or an order, never
+// changes capacity or coupons, and never changes QR tokens or the registration code.
+//
+// Refused: confirmed payments, category changes, expired reservations, and any participant ID that
+// does not belong to this registration. Validation is identical to POST.
+// Body: { registrationId, registrationCode, categoryId, participants: [{ id, ...fields }] }
+export async function PATCH(req: NextRequest) {
+  const rl = await checkAndRecordEndpointLimit(`itr:edit:${getClientIp(req)}`, 20, 60_000);
+  if (rl.limited) {
+    return NextResponse.json(
+      { error: "Too many changes. Please wait a moment.", code: "RATE_LIMITED" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+    );
+  }
+
+  let body: {
+    registrationId?: string; registrationCode?: string; categoryId?: string;
+    participants?: Array<ParticipantInput & { id?: string }>;
+  };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request.", code: "INVALID_REQUEST" }, { status: 400 });
+  }
+  const { registrationId, registrationCode, categoryId, participants } = body;
+  if (!registrationId || !registrationCode || !categoryId || !Array.isArray(participants) || participants.length === 0) {
+    return NextResponse.json({ error: "Registration details are missing.", code: "INVALID_REQUEST" }, { status: 400 });
+  }
+
+  const db = getSupabaseServer();
+  // Both the ID and the code must match: the code is the second secret the browser holds
+  const { data: reg } = await db
+    .from("it_run_registrations")
+    .select("id, event_id, registration_code, category_id, payment_status, registration_status, participant_count")
+    .eq("id", registrationId)
+    .maybeSingle<{
+      id: string; event_id: string; registration_code: string; category_id: string;
+      payment_status: string; registration_status: string; participant_count: number;
+    }>();
+  if (!reg || reg.registration_code !== registrationCode) {
+    return NextResponse.json({ error: "We couldn't find this registration.", code: "NOT_FOUND" }, { status: 404 });
+  }
+  if (reg.registration_status !== "active") {
+    return NextResponse.json({ error: "This registration is no longer active.", code: "REGISTRATION_CLOSED" }, { status: 409 });
+  }
+  if (reg.payment_status === "paid" || reg.payment_status === "partially_refunded" || reg.payment_status === "refunded") {
+    return NextResponse.json({
+      error: "Your payment is already confirmed, so your details can't be changed here. To change them, email info@connectedsteps.in.",
+      code: "PAYMENT_CONFIRMED",
+    }, { status: 409 });
+  }
+  if (reg.payment_status === "expired") {
+    return NextResponse.json({
+      error: "Your reservation has expired. Please start a new registration.",
+      code: "RESERVATION_EXPIRED",
+    }, { status: 409 });
+  }
+  if (reg.category_id !== categoryId) {
+    return NextResponse.json({
+      error: "Your category can't be changed after registration has started. Email info@connectedsteps.in for help.",
+      code: "CATEGORY_LOCKED",
+    }, { status: 409 });
+  }
+  if (participants.length !== reg.participant_count) {
+    return NextResponse.json({ error: "The number of participants doesn't match this registration.", code: "PARTICIPANT_COUNT" }, { status: 400 });
+  }
+
+  const { data: cat } = await db
+    .from("it_run_categories")
+    .select("id, category_type")
+    .eq("id", reg.category_id)
+    .maybeSingle<{ id: string; category_type: "solo" | "duo" | "kid" }>();
+  const { data: ev } = await db
+    .from("it_run_events")
+    .select("event_date")
+    .eq("id", reg.event_id)
+    .maybeSingle<{ event_date: string }>();
+  const eventDate = parseCalendarDate(ev?.event_date);
+  if (!cat || !eventDate) {
+    return NextResponse.json({ error: "Registration is temporarily unavailable. Please try again later.", code: "SERVER_ERROR" }, { status: 503 });
+  }
+
+  // Same rules as registration. The server is the authority.
+  const meta = deriveParticipantMeta(cat.category_type, participants.length);
+  const fieldError = validateParticipants(participants, meta, eventDate, todayInIST());
+  if (fieldError) {
+    return NextResponse.json({ error: fieldError.message, field: fieldError.field, participant_index: fieldError.participantIndex }, { status: 400 });
+  }
+
+  // Every participant must be one of this registration's participants, each exactly once
+  const { data: existing, error: existingErr } = await db
+    .from("it_run_participants")
+    .select("id, company_id_url, verification_status")
+    .eq("registration_id", reg.id);
+  if (existingErr) {
+    return NextResponse.json({ error: "We couldn't save your changes. Please try again.", code: "SERVER_ERROR" }, { status: 500 });
+  }
+  const byId = new Map((existing ?? []).map(r => [r.id as string, r as { id: string; company_id_url: string | null; verification_status: string }]));
+  const seen = new Set<string>();
+  for (const p of participants) {
+    if (!p.id || !byId.has(p.id) || seen.has(p.id)) {
+      return NextResponse.json({ error: "These participant details don't match this registration. Reload and try again.", code: "PARTICIPANT_MISMATCH" }, { status: 400 });
+    }
+    seen.add(p.id);
+  }
+
+  const results = await Promise.all(participants.map((p, idx) => {
+    const current = byId.get(p.id as string)!;
+    const isChild = meta[idx]?.is_child ?? false;
+    const companyChanged = !!p.companyIdUrl && p.companyIdUrl !== current.company_id_url;
+    return db
+      .from("it_run_participants")
+      .update({
+        participant_type:   p.type,
+        first_name:         p.firstName.trim(),
+        last_name:          p.lastName.trim(),
+        bib_name:           p.bibName.trim().toUpperCase(),
+        gender:             p.gender,
+        dob:                p.dob || null,
+        email:              p.email?.toLowerCase()?.trim() || null,
+        mobile:             p.mobile.trim(),
+        blood_group:        p.bloodGroup || null,
+        emergency_name:     p.emergencyName?.trim() || null,
+        emergency_phone:    p.emergencyPhone?.trim() || null,
+        company_name:       p.companyName?.trim() || null,
+        employee_id:        p.employeeId?.trim() || null,
+        tshirt_size:        p.tshirtSize || null,
+        medical_conditions: p.medicalConditions?.trim() || null,
+        food_preference:    p.foodPreference || null,
+        // A new company ID document goes back into review. Children stay exempt.
+        ...(companyChanged ? {
+          company_id_url: p.companyIdUrl,
+          verification_status: isChild ? "verified" : "pending",
+        } : {}),
+      })
+      .eq("id", p.id as string)
+      .eq("registration_id", reg.id);
+  }));
+
+  const failed = results.filter(r => r.error);
+  if (failed.length > 0) {
+    console.error("[it-run/register] edit failed for", failed.length, "participant(s)");
+    return NextResponse.json({ error: "We couldn't save all of your changes. Please try again.", code: "SAVE_FAILED" }, { status: 500 });
+  }
+
+  // Keep the lead email in step with the first participant (it is used for confirmations)
+  const leadEmail = participants[0].email?.toLowerCase()?.trim();
+  if (leadEmail) {
+    await db.from("it_run_registrations").update({ lead_email: leadEmail }).eq("id", reg.id);
+  }
+
+  await db.from("it_run_audit_logs").insert({
+    actor_email: leadEmail || "participant",
+    actor_role: "participant",
+    action: "registration_edited",
+    entity_type: "registration",
+    entity_id: reg.id,
+    ip: getClientIp(req),
+    detail: { registration_code: reg.registration_code, participants: participants.length },
+  }).then(() => {}, () => {});
+
+  return NextResponse.json({ ok: true, registrationCode: reg.registration_code });
+}
