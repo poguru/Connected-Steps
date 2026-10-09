@@ -7,6 +7,7 @@ import Image from "next/image";
 import type { ItRunEventConfig, ItRunCategory } from "@/lib/it-run-types";
 import { isValidEmail, parseCalendarDate, todayInIST, validateDateOfBirth } from "@/lib/it-run-validation";
 import { decideUrlCategory, startsNewRegistration } from "@/lib/it-run-category-selection";
+import { idChoiceError, isStoredDocumentPath } from "@/lib/it-run-id-verification";
 import {
   EventRegistrationHeader,
   CompactEventHeader,
@@ -26,6 +27,8 @@ interface Participant {
   bloodGroup: string; emergencyName: string; emergencyPhone: string;
   companyName: string; employeeId: string;
   companyIdFile: File | null; companyIdUrl: string;
+  /** "upload" = the participant will upload an ID for faster BIB collection; "skip" = continue without an ID. */
+  idChoice?: "upload" | "skip";
   tshirtSize: string; medicalConditions: string; foodPreference: string;
 }
 
@@ -966,13 +969,14 @@ function StepParticipants({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function StepCompany({
-  category, participants, uploading, onChange, onUpload, onBack, onNext, returnToReview,
+  category, participants, uploading, onChange, onUpload, onBack, onNext, returnToReview, idError,
 }: {
   category: ItRunCategory;
   participants: Participant[];
   uploading: number[];
   onChange: (idx: number, field: keyof Participant, val: string | File | null) => void;
   onUpload: (idx: number, file: File) => void;
+  idError?: string;
   onBack: () => void;
   onNext: () => void;
   returnToReview?: boolean;
@@ -1015,65 +1019,115 @@ function StepCompany({
               {label} — {p.companyName || "Company not specified"}
             </div>
 
-            {uploaded ? (
-              <div style={{
-                display: "flex", alignItems: "center", gap: 12, padding: "12px 16px",
-                background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.18)",
-                borderRadius: 10,
-              }}>
-                <span style={{ color: "#10b981", fontSize: 18, flexShrink: 0 }}>✓</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, color: "#10b981", fontWeight: 600 }}>ID uploaded successfully</div>
-                  <button onClick={() => onChange(idx, "companyIdUrl", "")}
-                    style={{
-                      background: "none", border: "none", color: "#444", fontSize: 11,
-                      cursor: "pointer", padding: 0, marginTop: 2, fontFamily: "inherit",
+            {/* Two explicit choices. Neither blocks registration or payment. */}
+            {(() => {
+              const choice = p.idChoice ?? (uploaded ? "upload" : null);
+              const option = (active: boolean): React.CSSProperties => ({
+                flex: "1 1 220px", textAlign: "left" as const, padding: 14, borderRadius: 12, cursor: "pointer",
+                fontFamily: "inherit", color: "#fff",
+                background: active ? `${ACCENT}14` : "rgba(255,255,255,0.02)",
+                border: `1px solid ${active ? ACCENT : "rgba(255,255,255,0.1)"}`,
+              });
+              return (
+                <>
+                  <div role="radiogroup" aria-label={`Identity document choice for ${label}`}
+                    style={{ display: "flex", gap: 10, flexWrap: "wrap" as const, marginBottom: 12 }}>
+                    <button type="button" role="radio" aria-checked={choice === "upload"}
+                      onClick={() => onChange(idx, "idChoice", "upload")} style={option(choice === "upload")}>
+                      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+                        {choice === "upload" ? "✓ " : ""}Upload ID
+                      </div>
+                      <div style={{ fontSize: 12, color: "#999", lineHeight: 1.5 }}>
+                        Verify your identity in advance for a smoother BIB collection experience. Your document will be reviewed by the event admin.
+                      </div>
+                    </button>
+                    <button type="button" role="radio" aria-checked={choice === "skip"}
+                      onClick={() => {
+                        onChange(idx, "idChoice", "skip");
+                        onChange(idx, "companyIdUrl", "");
+                        onChange(idx, "companyIdFile", null);
+                      }}
+                      style={option(choice === "skip")}>
+                      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+                        {choice === "skip" ? "✓ " : ""}Continue Without ID
+                      </div>
+                      <div style={{ fontSize: 12, color: "#999", lineHeight: 1.5 }}>
+                        You can complete your registration without uploading an ID. Standard identity checks may apply during BIB collection.
+                      </div>
+                    </button>
+                  </div>
+
+                  {choice === "skip" && (
+                    <div style={{ fontSize: 12, color: "#888", lineHeight: 1.6, padding: "10px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8 }}>
+                      You are continuing without an ID. You will not get the fast-track BIB process. The standard identity check applies at collection.
+                    </div>
+                  )}
+
+                  {choice === "upload" && (uploaded ? (
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 12, padding: "12px 16px",
+                      background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.18)",
+                      borderRadius: 10,
                     }}>
-                    Upload a different file
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <label style={{
-                display: "flex", flexDirection: "column" as const, alignItems: "center",
-                padding: "28px 20px",
-                border: `2px dashed ${errored ? "rgba(248,113,113,0.4)" : "rgba(255,255,255,0.09)"}`,
-                borderRadius: 12, cursor: "pointer", gap: 6,
-                textAlign: "center" as const,
-                background: "rgba(255,255,255,0.015)", transition: "border-color 0.2s",
-              }}
-                onMouseEnter={e => (e.currentTarget.style.borderColor = `${ACCENT}50`)}
-                onMouseLeave={e => (e.currentTarget.style.borderColor = errored ? "rgba(248,113,113,0.4)" : "rgba(255,255,255,0.09)")}>
-                {uploading.includes(idx) ? (
-                  <div style={{ fontSize: 13, color: "#666" }}>Uploading…</div>
-                ) : (
-                  <>
-                    <div style={{ fontSize: 24, color: "#333" }}>↑</div>
-                    <div style={{ fontSize: 14, color: "#ccc", fontWeight: 600 }}>Tap to upload Company ID</div>
-                    <div style={{ fontSize: 11, color: "#444" }}>JPG, PNG or PDF · max 5 MB</div>
-                    {errored && (
-                      <div style={{ fontSize: 11, color: "#f87171", marginTop: 4 }}>Upload failed. Please try again.</div>
-                    )}
-                  </>
-                )}
-                <input type="file" accept="image/*,.pdf" style={{ display: "none" }}
-                  onChange={ev => {
-                    const file = ev.target.files?.[0];
-                    if (file) { onChange(idx, "companyIdFile", file); onUpload(idx, file); }
-                  }} />
-              </label>
-            )}
+                      <span style={{ color: "#10b981", fontSize: 18, flexShrink: 0 }}>✓</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, color: "#10b981", fontWeight: 600 }}>ID uploaded. Admin review is pending.</div>
+                        <button onClick={() => onChange(idx, "companyIdUrl", "")}
+                          style={{
+                            background: "none", border: "none", color: "#777", fontSize: 11,
+                            cursor: "pointer", padding: 0, marginTop: 2, fontFamily: "inherit",
+                          }}>
+                          Upload a different file
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label style={{
+                      display: "flex", flexDirection: "column" as const, alignItems: "center",
+                      padding: "28px 20px",
+                      border: `2px dashed ${errored ? "rgba(248,113,113,0.4)" : "rgba(255,255,255,0.09)"}`,
+                      borderRadius: 12, cursor: uploading.includes(idx) ? "wait" : "pointer", gap: 6,
+                      textAlign: "center" as const,
+                      background: "rgba(255,255,255,0.015)", transition: "border-color 0.2s",
+                    }}>
+                      {uploading.includes(idx) ? (
+                        <div style={{ fontSize: 13, color: "#999" }} role="status">Uploading… please keep this page open.</div>
+                      ) : (
+                        <>
+                          <div style={{ fontSize: 24, color: "#333" }}>↑</div>
+                          <div style={{ fontSize: 14, color: "#ccc", fontWeight: 600 }}>Choose your company ID file</div>
+                          <div style={{ fontSize: 11, color: "#666" }}>JPG, PNG, WEBP or PDF · max 5 MB</div>
+                          {errored && (
+                            <div role="alert" style={{ fontSize: 12, color: "#f87171", marginTop: 4 }}>Upload failed. Please try again, or choose Continue Without ID.</div>
+                          )}
+                        </>
+                      )}
+                      <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" style={{ display: "none" }}
+                        disabled={uploading.includes(idx)}
+                        onChange={ev => {
+                          const file = ev.target.files?.[0];
+                          if (file && !uploading.includes(idx)) { onChange(idx, "companyIdFile", file); onUpload(idx, file); }
+                          ev.target.value = "";
+                        }} />
+                    </label>
+                  ))}
+                </>
+              );
+            })()}
           </div>
         );
       })}
 
       <div style={{
         ...CARD_BASE, padding: 14, marginBottom: 24,
-        fontSize: 12, color: "#3a3a3a", lineHeight: 1.7,
+        fontSize: 12, color: "#777", lineHeight: 1.7,
       }}>
-        <strong style={{ color: "#555" }}>Skipping?</strong>{" "}
-        Bring your original company ID to the BIB collection counter on the day.
+        Either choice completes your registration. Identity checks happen at BIB collection in both cases.
       </div>
+
+      {idError && (
+        <div role="alert" style={{ fontSize: 13, color: "#f87171", marginBottom: 12, lineHeight: 1.5 }}>{idError}</div>
+      )}
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
         <button onClick={onBack} style={BTN_GHOST}>← Back</button>
@@ -1638,6 +1692,7 @@ function RegisterPageContent() {
   const [serverSavedAt, setServerSavedAt] = useState<number | null>(null);
   const savingRef = useRef(false);
   const [categoryNotice, setCategoryNotice] = useState("");
+  const [companyError, setCompanyError] = useState("");
   // Offline / save status indicator
   const [isOffline,  setIsOffline]  = useState(false);
   const [saveStatus, setSaveStatus] = useState<"saved" | "offline" | "">("");
@@ -2230,6 +2285,24 @@ function RegisterPageContent() {
     } else {
       setStep(1);
     }
+  }
+
+  // Company step: every adult must choose Upload ID or Continue Without ID. Neither blocks registration.
+  function handleCompanyNext() {
+    setCompanyError("");
+    for (let idx = 0; idx < participants.length; idx++) {
+      const isChild = selectedCat?.participant_labels[idx]?.is_child ?? false;
+      // A draft saved before this choice existed: an uploaded document means "upload"
+      const p = participants[idx];
+      const err = idChoiceError({ ...p, idChoice: p.idChoice ?? (isStoredDocumentPath(p.companyIdUrl) ? "upload" : undefined) }, isChild);
+      if (err) {
+        const label = selectedCat?.participant_labels[idx]?.label ?? `Participant ${idx + 1}`;
+        setCompanyError(`${label}: ${err}`);
+        return;
+      }
+    }
+    setReturnToReview(false);
+    setStep(4);
   }
 
   function handleParticipantNext() {
@@ -2933,7 +3006,8 @@ function RegisterPageContent() {
                 setStep(2);
               }
             }}
-            onNext={() => { setReturnToReview(false); setStep(4); }}
+            onNext={handleCompanyNext}
+            idError={companyError}
             returnToReview={returnToReview}
             />
           </>

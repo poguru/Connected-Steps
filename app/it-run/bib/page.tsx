@@ -103,7 +103,8 @@ export default function BibCollectionPage() {
 
   const vColor = result ? (
     result.verification_status === "verified" ? "#10b981" :
-    result.verification_status === "rejected" ? "#ef4444" : "#f59e0b"
+    result.verification_status === "rejected" ? "#ef4444" :
+    result.verification_status === "not_provided" ? "#888" : "#f59e0b"
   ) : "#888";
 
   return (
@@ -202,6 +203,7 @@ export default function BibCollectionPage() {
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 24 }}>
                 <Badge color={vColor}>
                   {result.verification_status === "verified" ? "ID Verified" :
+                   result.verification_status === "not_provided" ? "ID Not Provided" :
                    result.verification_status === "rejected" ? "ID Rejected" : "Pending Verification"}
                 </Badge>
                 <Badge color={result.it_run_registrations?.payment_status === "paid" ? "#10b981" : "#f59e0b"}>

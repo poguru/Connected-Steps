@@ -24,7 +24,9 @@ export async function GET(req: NextRequest) {
   const { data: event } = await db.from("it_run_events").select("id").eq("slug", "sprint-2").single();
   if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
-  const { data, count, error } = await db
+  // not_provided = no document on file (a choice, not a review).
+  // Every review status (pending, verified, rejected, need_clarification) has a document on file.
+  const base = db
     .from("it_run_participants")
     .select(`
       id, first_name, last_name, email, mobile,
@@ -33,8 +35,11 @@ export async function GET(req: NextRequest) {
         it_run_categories ( name ) )
     `, { count: "exact" })
     .eq("event_id", event.id)
-    .eq("verification_status", status)
-    .not("company_id_url", "is", null)
+    .eq("verification_status", status);
+  const scoped = status === "not_provided"
+    ? base.is("company_id_url", null)
+    : base.not("company_id_url", "is", null);
+  const { data, count, error } = await scoped
     .order("id")
     .range(page * limit, page * limit + limit - 1);
 
@@ -90,6 +95,13 @@ export async function PATCH(req: NextRequest) {
       .eq("event_id", event.id)
       .maybeSingle<{ email: string | null; first_name: string; company_id_url: string | null }>();
     if (!part) return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+    // A participant who continued without an ID has nothing to review. Never approve or reject them.
+    if (!part.company_id_url) {
+      return NextResponse.json({
+        error: "No ID document is on file for this participant, so there is nothing to review.",
+        code: "NO_DOCUMENT",
+      }, { status: 409 });
+    }
 
     const { error: updErr } = await db
       .from("it_run_participants")

@@ -36,6 +36,7 @@ const STATUS_OPTS = [
   { value: "verified",           label: "Verified",            color: "#10b981" },
   { value: "rejected",           label: "Rejected",            color: "#ef4444" },
   { value: "need_clarification", label: "Needs Clarification", color: "#6366f1" },
+  { value: "not_provided",       label: "No ID (not provided)", color: "#64748b" },
 ];
 
 // ── CompanyIdViewer ────────────────────────────────────────────────────────────
@@ -538,7 +539,12 @@ export default function VerificationPage() {
                       }}
                     />
 
-                    {/* Action buttons */}
+                    {/* Action buttons: nothing is decided for participants who provided no ID */}
+                    {tab === "not_provided" ? (
+                      <div style={{ fontSize: 12, color: "#888", marginTop: 10, lineHeight: 1.6 }}>
+                        No ID document was uploaded. Standard identity checks apply at BIB collection. Nothing to review.
+                      </div>
+                    ) : (
                     <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                       {tab !== "verified" && (
                         <button
@@ -568,6 +574,7 @@ export default function VerificationPage() {
                         </button>
                       )}
                     </div>
+                    )}
                     {rowError[p.id] && (
                       <div role="alert" style={{ fontSize: 12, color: "#f87171", marginTop: 8 }}>
                         {rowError[p.id]}

@@ -186,23 +186,23 @@ describe("PATCH /api/it-run/register: a valid edit", () => {
 
   it("re-enters review for a changed company ID document and keeps children exempt", async () => {
     const { db, calls } = fakeDb({
-      participants: [{ id: P1, company_id_url: "old.jpg", verification_status: "verified" }],
+      participants: [{ id: P1, company_id_url: "1760000000000-old1.jpg", verification_status: "verified" }],
     });
     mockDb.mockReturnValue(db);
 
-    await PATCH(req(body([adult({ companyIdUrl: "new.jpg" })])));
+    await PATCH(req(body([adult({ companyIdUrl: "1760000000000-new1.jpg" })])));
 
     const partUpdate = calls.find(c => c.table === "it_run_participants" && c.op === "update");
-    expect(partUpdate?.payload).toMatchObject({ company_id_url: "new.jpg", verification_status: "pending" });
+    expect(partUpdate?.payload).toMatchObject({ company_id_url: "1760000000000-new1.jpg", verification_status: "pending" });
   });
 
   it("leaves company verification alone when the document is unchanged", async () => {
     const { db, calls } = fakeDb({
-      participants: [{ id: P1, company_id_url: "same.jpg", verification_status: "verified" }],
+      participants: [{ id: P1, company_id_url: "1760000000000-same1.jpg", verification_status: "verified" }],
     });
     mockDb.mockReturnValue(db);
 
-    await PATCH(req(body([adult({ companyIdUrl: "same.jpg" })])));
+    await PATCH(req(body([adult({ companyIdUrl: "1760000000000-same1.jpg" })])));
 
     const partUpdate = calls.find(c => c.table === "it_run_participants" && c.op === "update");
     expect(partUpdate?.payload).not.toHaveProperty("verification_status");

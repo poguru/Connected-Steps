@@ -7,6 +7,7 @@ import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 import { buildDashboardUrl } from "@/lib/it-run-dashboard-link";
 import { hashDraftToken, isWellFormedDraftToken } from "@/lib/it-run-drafts";
 import { requiredParticipantCount, categoryTypeLabel } from "@/lib/it-run-category-rules";
+import { initialVerificationStatus, isStoredDocumentPath } from "@/lib/it-run-id-verification";
 import {
   isValidEmail, parseCalendarDate, todayInIST, validateDateOfBirth, type CalendarDate,
 } from "@/lib/it-run-validation";
@@ -56,7 +57,7 @@ function normalizePhone(phone: string): string {
 
 export interface ParticipantFieldError {
   message: string;
-  field: "firstName" | "lastName" | "bibName" | "gender" | "bloodGroup" | "tshirtSize" | "mobile" | "dob" | "email" | "emergencyName" | "emergencyPhone" | "companyName";
+  field: "firstName" | "lastName" | "bibName" | "gender" | "bloodGroup" | "tshirtSize" | "mobile" | "dob" | "email" | "emergencyName" | "emergencyPhone" | "companyName" | "companyIdUrl";
   participantIndex: number;
 }
 
@@ -95,6 +96,11 @@ function validateParticipants(
     }
     if (!p.mobile?.trim() || !MOBILE_RE.test(p.mobile.trim())) {
       return err("mobile", "valid 10-digit mobile number is required");
+    }
+
+    // A document reference must be one our upload produced; anything else is refused, never stored
+    if (p.companyIdUrl && !isStoredDocumentPath(p.companyIdUrl)) {
+      return err("companyIdUrl", "the ID document could not be verified. Please upload it again or choose Continue Without ID");
     }
 
     // Date of birth: strict calendar parse (no rollover), not in the future, and age-eligible
@@ -327,14 +333,10 @@ export async function POST(req: NextRequest) {
       tshirt_size:        p.tshirtSize || null,
       medical_conditions: p.medicalConditions?.trim() || null,
       food_preference:    p.foodPreference || null,
-      // Child participants are exempt from company verification — mark as verified
+      // Children are exempt from company verification and are recorded as verified.
       // so they never appear in the pending-verification admin queue.
-      // Adults without an uploaded ID need manual follow-up → need_clarification.
-      verification_status: participantMeta[idx]?.is_child
-        ? "verified"
-        : p.companyIdUrl
-          ? "pending"
-          : "need_clarification",
+      // Decided from the stored document, never from a client-supplied status. No ID = not_provided (not a failure).
+      verification_status: initialVerificationStatus(participantMeta[idx]?.is_child ?? false, p.companyIdUrl),
     }));
 
     const { data: parts, error: partErr } = await db
@@ -577,9 +579,12 @@ export async function PATCH(req: NextRequest) {
         medical_conditions: p.medicalConditions?.trim() || null,
         food_preference:    p.foodPreference || null,
         // A new company ID document goes back into review. Children stay exempt.
+        // No document on file and none given: the participant continues without an ID (not_provided).
         ...(companyChanged ? {
           company_id_url: p.companyIdUrl,
-          verification_status: isChild ? "verified" : "pending",
+          verification_status: initialVerificationStatus(isChild, p.companyIdUrl),
+        } : (!p.companyIdUrl && !current.company_id_url && !isChild) ? {
+          verification_status: "not_provided",
         } : {}),
       })
       .eq("id", p.id as string)

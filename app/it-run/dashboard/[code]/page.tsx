@@ -69,6 +69,7 @@ function StatusBadge({ status }: { status: string }) {
     rejected:          { label: "Rejected", color: "#ef4444", bg: "rgba(239,68,68,0.1)" },
     need_clarification:{ label: "Clarification Needed", color: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
     pending_verification:{ label: "Verification Pending", color: "#6366f1", bg: "rgba(99,102,241,0.1)" },
+    not_provided:       { label: "ID Not Provided", color: "#888", bg: "rgba(255,255,255,0.06)" },
   };
   const s = map[status] ?? { label: status, color: "#888", bg: "rgba(255,255,255,0.06)" };
   return (
