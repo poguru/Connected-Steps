@@ -201,6 +201,25 @@ export class RazorpayApiError extends Error {
   }
 }
 
+/**
+ * Lists refunds on a payment (server-side only). Used to reconcile refunds whose creation
+ * outcome was uncertain (network error or timeout): the refund may exist on Razorpay.
+ * Each refund's notes carry our local refund_record ID, so callers can match them.
+ */
+export async function listRefundsForPayment(paymentId: string): Promise<RzpRefund[]> {
+  const res = await fetch(`${RZP_BASE}/payments/${paymentId}/refunds?count=100`, {
+    method: "GET",
+    headers: { Authorization: auth() },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new RazorpayApiError(res.status, `Razorpay list refunds API ${res.status}: ${text}`);
+  }
+  const body = await res.json() as { items?: RzpRefund[] };
+  return body.items ?? [];
+}
+
 // ── Search ────────────────────────────────────────────────────────────────────
 
 /**

@@ -1,54 +1,112 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireRole, getClientIp } from "@/lib/it-run-auth";
+import { computeRefundableBreakdown } from "@/lib/it-run-refunds";
 
 // Admin review of participant refund requests.
 // Approving or rejecting a request NEVER moves money. Execution is a separate, explicitly
 // confirmed step on POST /api/it-run/admin/refund, which requires an approved request.
-// Roles: event_admin (super_admin bypasses via requireRole). verification_team and
-// volunteers cannot access this.
+// Roles: event_admin (super_admin bypasses via requireRole). Other roles cannot access this.
 
 const MIN_EXPLANATION = 10;
 const MAX_EXPLANATION = 1000;
+const REQUEST_STATUSES = ["requested", "approved", "rejected", "executed", "cancelled"] as const;
+const REFUND_STATUSES = ["pending", "processed", "failed"] as const;
 
-// GET /api/it-run/admin/refund-requests?status=requested|approved|rejected|executed|all
+// GET /api/it-run/admin/refund-requests
+//   status=all|requested|approved|rejected|executed|cancelled   (request status)
+//   refund=pending|processed|failed                              (refund status)
+//   category=<category id>
+//   q=<text>   matches registration code, lead email, participant name or mobile
+//   page=0&limit=25   (limit max 100)
 export async function GET(req: NextRequest) {
   const session = requireRole(req, ["event_admin"]);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const status = req.nextUrl.searchParams.get("status") ?? "requested";
-  const allowed = ["requested", "approved", "rejected", "executed", "cancelled", "all"];
-  if (!allowed.includes(status)) return NextResponse.json({ error: "Invalid status filter" }, { status: 400 });
+  const sp = req.nextUrl.searchParams;
+  const status = sp.get("status") ?? "requested";
+  const refund = sp.get("refund");
+  const category = sp.get("category");
+  const q = (sp.get("q") ?? "").trim();
+  const page = Math.max(0, parseInt(sp.get("page") ?? "0", 10) || 0);
+  const limit = Math.min(100, Math.max(1, parseInt(sp.get("limit") ?? "25", 10) || 25));
+
+  if (status !== "all" && !(REQUEST_STATUSES as readonly string[]).includes(status)) {
+    return NextResponse.json({ error: "Invalid status filter" }, { status: 400 });
+  }
+  if (refund && !(REFUND_STATUSES as readonly string[]).includes(refund)) {
+    return NextResponse.json({ error: "Invalid refund filter" }, { status: 400 });
+  }
+  if (q.length > 100) return NextResponse.json({ error: "Search text is too long" }, { status: 400 });
 
   const db = getSupabaseServer();
   const { data: event } = await db.from("it_run_events").select("id").eq("slug", "sprint-2").single();
   if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
-  let query = db
-    .from("it_run_refund_requests")
-    .select(`
+  // Free-text search: resolve matching registrations (code / email) and participants (name / mobile)
+  // to registration IDs, then filter the requests by those IDs.
+  let searchRegIds: string[] | null = null;
+  if (q) {
+    const term = `%${q.replace(/[%_,()]/g, " ")}%`;
+    const [{ data: regHits }, { data: partHits }] = await Promise.all([
+      db.from("it_run_registrations").select("id").eq("event_id", event.id)
+        .or(`registration_code.ilike.${term},lead_email.ilike.${term}`).limit(500),
+      db.from("it_run_participants").select("registration_id").eq("event_id", event.id)
+        .or(`first_name.ilike.${term},last_name.ilike.${term},mobile.ilike.${term}`).limit(500),
+    ]);
+    const ids = new Set<string>([
+      ...((regHits ?? []) as Array<{ id: string }>).map(r => r.id),
+      ...((partHits ?? []) as Array<{ registration_id: string }>).map(p => p.registration_id),
+    ]);
+    if (ids.size === 0) {
+      return NextResponse.json({ requests: [], total: 0, page, limit });
+    }
+    searchRegIds = [...ids];
+  }
+
+  const refundJoin = refund ? "!inner" : "";
+  const selectCols = `
       id, status, request_reason, requested_by_email, decision_explanation,
-      decided_by_email, decided_at, created_at, refund_id,
+      decided_by_email, decided_at, created_at, refund_id, registration_id,
       it_run_registrations!inner (
         id, registration_code, lead_email, final_price, payment_status, registration_status,
-        razorpay_payment_id,
-        it_run_participants ( first_name, last_name, company_name, verification_status )
+        razorpay_order_id, razorpay_payment_id, category_id,
+        it_run_categories ( id, name ),
+        it_run_participants ( id, participant_type, first_name, last_name, mobile, email, company_name, verification_status ),
+        it_run_refunds ( id, status, amount_paise, razorpay_refund_id, processed_at, failure_reason, created_at )
       ),
-      it_run_refunds ( id, status, amount_paise, razorpay_refund_id, processed_at, failure_reason )
-    `)
+      request_refund:it_run_refunds!refund_id${refundJoin} ( id, status, amount_paise, razorpay_refund_id, processed_at, failure_reason )
+    `;
+
+  let query = db
+    .from("it_run_refund_requests")
+    .select(selectCols, { count: "exact" })
     .eq("event_id", event.id)
     .order("created_at", { ascending: false })
-    .limit(200);
+    .range(page * limit, page * limit + limit - 1);
 
   if (status !== "all") query = query.eq("status", status);
+  if (refund) query = query.eq("request_refund.status", refund);
+  if (category) query = query.eq("it_run_registrations.category_id", category);
+  if (searchRegIds) query = query.in("registration_id", searchRegIds);
 
-  const { data, error } = await query;
+  const { data, count, error } = await query;
   if (error) {
     console.error("[it-run/admin/refund-requests] query error:", error.message);
     return NextResponse.json({ error: "Failed to load refund requests" }, { status: 500 });
   }
 
-  return NextResponse.json({ requests: data ?? [] });
+  // Refundable balance is computed from the registration's refund rows, not the single linked refund.
+  type ListRow = Record<string, unknown> & {
+    it_run_registrations: { final_price: number; it_run_refunds: Array<{ status: string; amount_paise: number }> };
+  };
+  const requests = ((data ?? []) as unknown as ListRow[]).map(r => {
+    const reg = r.it_run_registrations;
+    const breakdown = computeRefundableBreakdown(reg.final_price, reg.it_run_refunds ?? []);
+    return { ...r, refundable: breakdown };
+  });
+
+  return NextResponse.json({ requests, total: count ?? 0, page, limit });
 }
 
 // PATCH /api/it-run/admin/refund-requests

@@ -14,6 +14,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { listRefundsForPayment } from "@/lib/razorpay-client";
 
 type Db = SupabaseClient;
 
@@ -162,4 +163,96 @@ async function eventIdForRegistration(db: Db, registrationId: string): Promise<s
     .eq("id", registrationId)
     .single<{ event_id: string }>();
   return data?.event_id ?? "";
+}
+
+// ── Refundable balance ──────────────────────────────────────────────────────────
+
+export interface RefundableBreakdown {
+  /** Confirmed by Razorpay (status processed). */
+  refundedPaise: number;
+  /** Created but not yet confirmed (pending: processing or uncertain). */
+  inFlightPaise: number;
+  /** Original amount paid for the registration (booking-level payment). */
+  finalPricePaise: number;
+  /** Still refundable: final price minus processed and in-flight refunds. Never negative. */
+  remainingPaise: number;
+}
+
+/** Pure: the refundable balance of one booking-level payment, from its refund rows. */
+export function computeRefundableBreakdown(
+  finalPricePaise: number,
+  refunds: Array<{ status: string; amount_paise: number }>,
+): RefundableBreakdown {
+  const refundedPaise = refunds
+    .filter(r => r.status === "processed")
+    .reduce((sum, r) => sum + r.amount_paise, 0);
+  const inFlightPaise = refunds
+    .filter(r => r.status === "pending")
+    .reduce((sum, r) => sum + r.amount_paise, 0);
+  return {
+    refundedPaise,
+    inFlightPaise,
+    finalPricePaise,
+    remainingPaise: Math.max(0, finalPricePaise - refundedPaise - inFlightPaise),
+  };
+}
+
+// ── Reconciliation ──────────────────────────────────────────────────────────────
+
+export type ReconcileOutcome =
+  | { kind: "no_change"; reason: string }
+  | { kind: "finalized_processed"; refundId: string }
+  | { kind: "marked_failed"; refundId: string }
+  | { kind: "still_pending"; refundId: string; reason: string };
+
+/**
+ * Reconciles one pending refund against Razorpay's own record of it.
+ *  - Razorpay says processed  -> finalize (guarded; cancels only when fully refunded).
+ *  - Razorpay says failed     -> mark failed (the request stays approved, so retry is possible).
+ *  - Razorpay has no record   -> stays pending. It may still be in flight or the outcome is
+ *                                unknown, and marking it failed could allow a duplicate refund.
+ *  - Razorpay says pending    -> stays pending.
+ */
+export async function reconcileRefund(
+  db: Db,
+  refund: { id: string; status: string; razorpay_refund_id: string | null; razorpay_payment_id: string | null },
+  actor: string,
+): Promise<ReconcileOutcome> {
+  if (refund.status !== "pending") {
+    return { kind: "no_change", reason: `Refund is already ${refund.status}` };
+  }
+  if (!refund.razorpay_payment_id) {
+    return { kind: "still_pending", refundId: refund.id, reason: "No Razorpay payment ID on record; cannot check Razorpay" };
+  }
+
+  const rzpRefunds = await listRefundsForPayment(refund.razorpay_payment_id);
+  const match = rzpRefunds.find(r =>
+    (refund.razorpay_refund_id && r.id === refund.razorpay_refund_id) ||
+    r.notes?.refund_record === refund.id,
+  );
+
+  if (!match) {
+    return {
+      kind: "still_pending",
+      refundId: refund.id,
+      reason: "Razorpay has no refund for this attempt. It may still be in flight; re-check later. It was not marked failed, to prevent a duplicate refund.",
+    };
+  }
+
+  if (match.status === "processed") {
+    const finalized = await finalizeRefundProcessed(db, refund.id, match.id, actor);
+    return finalized
+      ? { kind: "finalized_processed", refundId: refund.id }
+      : { kind: "no_change", reason: "Refund was finalized by another process" };
+  }
+  if (match.status === "failed") {
+    const failed = await markRefundFailed(db, refund.id, "Razorpay reports the refund as failed", actor);
+    return failed
+      ? { kind: "marked_failed", refundId: refund.id }
+      : { kind: "no_change", reason: "Refund status changed by another process" };
+  }
+  if (!refund.razorpay_refund_id) {
+    await db.from("it_run_refunds").update({ razorpay_refund_id: match.id }).eq("id", refund.id);
+  }
+  return { kind: "still_pending", refundId: refund.id, reason: "Razorpay reports the refund as still pending" };
 }
