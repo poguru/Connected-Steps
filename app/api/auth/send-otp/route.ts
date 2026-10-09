@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail, sendWhatsAppOTP } from "@/lib/notify";
+import { isValidEmail } from "@/lib/it-run-validation";
 import {
   isRateLimited, recordFailure, getClientIp,
   isRateLimitedCustom, recordFailureCustom,
@@ -84,6 +85,11 @@ export async function POST(req: NextRequest) {
     const identifier = type === "email"
       ? (value as string).toLowerCase().trim()
       : (value as string).trim();
+
+    // Reject malformed addresses before any OTP is generated or sent
+    if (type === "email" && !isValidEmail(identifier)) {
+      return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
+    }
 
     // â"€â"€ General send-rate limit (shared across all purposes) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
     const sendKey = `send-otp:${ip}:${identifier}`;

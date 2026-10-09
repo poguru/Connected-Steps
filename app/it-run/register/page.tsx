@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import type { ItRunEventConfig, ItRunCategory } from "@/lib/it-run-types";
+import { isValidEmail, parseCalendarDate, todayInIST, validateDateOfBirth } from "@/lib/it-run-validation";
 import {
   EventRegistrationHeader,
   CompactEventHeader,
@@ -2002,17 +2003,31 @@ function RegisterPageContent() {
       e.lastName = "Enter a valid last name"; valid = false;
     }
     if (!p.gender)            { e.gender    = "Required"; valid = false; }
-    if (!p.dob)               { e.dob       = "Required"; valid = false; }
+    // Date of birth: same rules as the server (strict calendar date, not in the future,
+    // age on the event date). The server re-checks every participant before registering.
+    if (!config) {
+      e.dob = "Event details are still loading. Please try again."; valid = false;
+    } else {
+      const eventDate = parseCalendarDate(config.event.event_date);
+      const dobCheck  = eventDate
+        ? validateDateOfBirth(p.dob, { isChild: child, eventDate, today: todayInIST() })
+        : { ok: false as const, message: "Event date is unavailable. Please try again later." };
+      if (!dobCheck.ok) { e.dob = dobCheck.message; valid = false; }
+    }
     if (!p.mobile || !/^\d{10}$/.test(p.mobile.replace(/\D/g, "").slice(-10))) {
       e.mobile = "Enter a valid 10-digit Indian mobile number"; valid = false;
     }
     if (!p.bloodGroup)  { e.bloodGroup  = "Required"; valid = false; }
     if (!p.tshirtSize)  { e.tshirtSize  = "Required"; valid = false; }
 
+    // Email: required for adults; for a child it is optional but must be valid if given
+    if (!child && !p.email?.trim()) {
+      e.email = "Email address is required"; valid = false;
+    } else if (p.email?.trim() && !isValidEmail(p.email)) {
+      e.email = "Please enter a valid email address"; valid = false;
+    }
+
     if (!child) {
-      if (!p.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email)) {
-        e.email = "Valid email required"; valid = false;
-      }
       if (!p.emergencyName.trim())  { e.emergencyName  = "Required"; valid = false; }
       if (!p.emergencyPhone.trim()) { e.emergencyPhone = "Required"; valid = false; }
       if (!p.companyName.trim() || !nameRe.test(p.companyName)) {
@@ -2020,15 +2035,6 @@ function RegisterPageContent() {
       }
     }
 
-    if (child && p.dob) {
-      // Use event date (IST 00:00) for age calculation — matches server-side logic.
-      // A child who turns 11 before the event is ineligible even if 10 today.
-      const eventMs = config
-        ? new Date(config.event.event_date + "T00:00:00+05:30").getTime()
-        : Date.now();
-      const ageYears = (eventMs - new Date(p.dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-      if (ageYears >= 11) { e.dob = "Child must be 10 years or younger on the event date"; valid = false; }
-    }
 
     setPErrors(prev => { const c = [...prev]; c[idx] = e; return c; });
     return valid;

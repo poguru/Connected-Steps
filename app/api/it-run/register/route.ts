@@ -4,6 +4,9 @@ import { generateRegistrationCode, signItRunQR } from "@/lib/it-run-auth";
 import { sendItRunConfirmationEmail, sendItRunBibInviteEmail } from "@/lib/it-run-email";
 import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
+import {
+  isValidEmail, parseCalendarDate, todayInIST, validateDateOfBirth, type CalendarDate,
+} from "@/lib/it-run-validation";
 
 interface ParticipantInput {
   type: string; firstName: string; lastName: string; bibName: string;
@@ -34,7 +37,6 @@ function deriveParticipantMeta(
   }));
 }
 
-const EMAIL_RE   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MOBILE_RE  = /^\d{10}$/;
 
 // Normalize Indian phone numbers to 10-digit format
@@ -49,83 +51,80 @@ function normalizePhone(phone: string): string {
   return digits.slice(-10); // Take last 10 digits
 }
 
+export interface ParticipantFieldError {
+  message: string;
+  field: "firstName" | "lastName" | "bibName" | "gender" | "bloodGroup" | "tshirtSize" | "mobile" | "dob" | "email" | "emergencyName" | "emergencyPhone" | "companyName";
+  participantIndex: number;
+}
+
 function validateParticipants(
   participants: ParticipantInput[],
   meta: ParticipantMeta[],
-  eventDateMs: number,
-): string | null {
+  eventDate: CalendarDate,
+  today: CalendarDate,
+): ParticipantFieldError | null {
   for (let i = 0; i < participants.length; i++) {
     const p   = participants[i];
     const m   = meta[i];
     const pfx = participants.length === 1 ? "Participant" : `Participant ${i + 1}`;
+    const err = (field: ParticipantFieldError["field"], message: string): ParticipantFieldError =>
+      ({ message: `${pfx}: ${message}`, field, participantIndex: i });
 
-    if (!p.firstName?.trim())  return `${pfx}: first name is required`;
-    if (!p.lastName?.trim())   return `${pfx}: last name is required`;
-    if (!p.bibName?.trim())    return `${pfx}: BIB name is required`;
+    if (!p.firstName?.trim())  return err("firstName", "first name is required");
+    if (!p.lastName?.trim())   return err("lastName", "last name is required");
+    if (!p.bibName?.trim())    return err("bibName", "BIB name is required");
 
     // BIB name validation: max reasonable length (printer constraint)
     if (p.bibName.trim().length > 50) {
-      return `${pfx}: BIB name cannot exceed 50 characters`;
+      return err("bibName", "BIB name cannot exceed 50 characters");
     }
 
     // BIB name must not contain only whitespace or malicious content
     if (!/^[\w\s\-']+$/i.test(p.bibName.trim())) {
-      return `${pfx}: BIB name contains invalid characters`;
+      return err("bibName", "BIB name contains invalid characters");
     }
 
-    if (!p.gender)             return `${pfx}: gender is required`;
-    if (!p.bloodGroup)         return `${pfx}: blood group is required`;
-    if (!p.tshirtSize)         return `${pfx}: t-shirt size is required`;
+    if (!p.gender)             return err("gender", "gender is required");
+    if (!p.bloodGroup)         return err("bloodGroup", "blood group is required");
+    if (!p.tshirtSize)         return err("tshirtSize", "t-shirt size is required");
     if (!m.tshirt_sizes.includes(p.tshirtSize)) {
-      return `${pfx}: invalid t-shirt size "${p.tshirtSize}"`;
+      return err("tshirtSize", `invalid t-shirt size "${p.tshirtSize}"`);
     }
     if (!p.mobile?.trim() || !MOBILE_RE.test(p.mobile.trim())) {
-      return `${pfx}: valid 10-digit mobile number is required`;
+      return err("mobile", "valid 10-digit mobile number is required");
     }
 
-    // DOB — required for everyone; must be a valid past date
-    if (!p.dob) return `${pfx}: date of birth is required`;
-    const dobMs = new Date(p.dob).getTime();
-    if (isNaN(dobMs))       return `${pfx}: invalid date of birth`;
-    if (dobMs >= Date.now()) return `${pfx}: date of birth must be in the past`;
+    // Date of birth: strict calendar parse (no rollover), not in the future, and age-eligible
+    // on the event date. Adults must be 18+; the kid-category child must be 10 or younger.
+    const dobResult = validateDateOfBirth(p.dob, { isChild: m.is_child, eventDate, today });
+    if (!dobResult.ok) return err("dob", dobResult.message);
 
-    // Age validation based on participant type
-    if (m.is_child) {
-      // Child age rule: age is calculated on the event date, not today.
-      // A child who turns 11 before the event day is ineligible even if they are 10 today.
-      const ageOnEventDay = (eventDateMs - dobMs) / (365.25 * 86400000);
-      if (ageOnEventDay >= 11) {
-        return "Child participant must be 10 years or younger on the event date";
-      }
-    } else {
-      // Adult rule: must be at least 18 years old on event date
-      const ageOnEventDay = (eventDateMs - dobMs) / (365.25 * 86400000);
-      if (ageOnEventDay < 18) {
-        return `${pfx}: you must be at least 18 years old on the event date`;
-      }
+    // Email: required for adults; when a child provides one, it must still be valid.
+    if (!m.is_child) {
+      if (!p.email?.trim()) return err("email", "email address is required");
+    }
+    if (p.email?.trim() && !isValidEmail(p.email)) {
+      return err("email", "please enter a valid email address");
     }
 
     // Adult-only required fields
     if (!m.is_child) {
-      if (!p.email?.trim() || !EMAIL_RE.test(p.email.trim())) {
-        return `${pfx}: valid email address is required`;
-      }
       if (!p.emergencyName?.trim()) {
-        return `${pfx}: emergency contact name is required`;
+        return err("emergencyName", "emergency contact name is required");
       }
       if (!p.emergencyPhone?.trim() || !MOBILE_RE.test(p.emergencyPhone.trim())) {
-        return `${pfx}: valid 10-digit emergency contact phone is required`;
+        return err("emergencyPhone", "valid 10-digit emergency contact phone is required");
       }
 
       // Emergency phone must be different from participant mobile
       const normalizedMobile = normalizePhone(p.mobile.trim());
       const normalizedEmergency = normalizePhone(p.emergencyPhone.trim());
       if (normalizedMobile === normalizedEmergency) {
-        return `${pfx}: emergency contact number must be different from your mobile number`;
+        return err("emergencyPhone", "emergency contact number must be different from your mobile number");
       }
 
       if (!p.companyName?.trim()) {
-        return `${pfx}: company name is required`;
+        return err("companyName", "company name is required");
       }
     }
   }
@@ -203,15 +202,22 @@ export async function POST(req: NextRequest) {
     // without trusting any client-supplied type or role field.
     const participantMeta = deriveParticipantMeta(cat.category_type, participants.length);
 
-    // Use event date for child age calculation so the rule "10 years or younger on event day"
-    // is enforced correctly regardless of when the registration happens.
-    const eventDateMs = evStatus?.event_date ? new Date(evStatus.event_date).getTime() : Date.now();
+    // Age reference date = the event's calendar date (YYYY-MM-DD from the database), so ages are
+    // calendar-based and independent of the server's timezone. Missing event date is a server error.
+    const eventDate = parseCalendarDate(evStatus?.event_date);
+    if (!eventDate) {
+      console.error("[it-run/register] event has no valid event_date; cannot evaluate age eligibility");
+      return NextResponse.json({ error: "Registration is temporarily unavailable. Please try again later." }, { status: 503 });
+    }
 
-    // Server-side participant field validation.
-    // The client-side form is defence-in-depth only; the server is the authority.
-    const validationError = validateParticipants(participants, participantMeta, eventDateMs);
+    // Server-side participant field validation (authoritative).
+    // The client-side form is defence-in-depth only.
+    const validationError = validateParticipants(participants, participantMeta, eventDate, todayInIST());
     if (validationError) {
-      return NextResponse.json({ error: validationError }, { status: 400 });
+      return NextResponse.json(
+        { error: validationError.message, field: validationError.field, participant_index: validationError.participantIndex },
+        { status: 400 },
+      );
     }
 
     const basePrice = cat.price_rupees;
