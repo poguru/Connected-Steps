@@ -1548,10 +1548,11 @@ function StepCoupon({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function StepPayment({
-  regCode, finalPrice, submitting, submitError, onPay,
+  regCode, finalPrice, submitting, submitError, onPay, paymentCancelled, onEditDetails,
 }: {
   regCode: string; finalPrice: number;
   submitting: boolean; submitError: string; onPay: () => void;
+  paymentCancelled: boolean; onEditDetails?: () => void;
 }) {
   return (
     <div>
@@ -1578,6 +1579,22 @@ function StepPayment({
           </div>
         </div>
       </div>
+
+      {paymentCancelled && (
+        <div style={{ ...CARD_BASE, padding: 14, marginBottom: 24, background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.2)" }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#86efac", marginBottom: 8 }}>Payment Cancelled</div>
+          <p style={{ fontSize: 12, color: "#666", lineHeight: 1.6, margin: 0, marginBottom: 12 }}>
+            Your registration details are saved. You can review or modify them anytime before retrying payment.
+          </p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              onClick={onEditDetails}
+              style={{ ...BTN_GHOST, fontSize: 12, padding: "8px 12px" }}>
+              Review Details
+            </button>
+          </div>
+        </div>
+      )}
 
       <div style={{ ...CARD_BASE, padding: 14, marginBottom: 24, fontSize: 12, color: "#444", lineHeight: 1.7 }}>
         Your spot is reserved for <strong style={{ color: "#666" }}>15 minutes</strong>. Complete payment now to avoid losing it.
@@ -1708,6 +1725,7 @@ function RegisterPageContent() {
   // rather than re-deriving it, in case the coupon state didn't survive.
   const [finalPriceOverride, setFinalPriceOverride] = useState<number | null>(null);
   const [paymentDone, setPaymentDone] = useState(false);
+  const [paymentCancelled, setPaymentCancelled] = useState(false);
 
   // Upload
   const [uploading, setUploading] = useState<number[]>([]);
@@ -1827,6 +1845,13 @@ function RegisterPageContent() {
         localStorage.removeItem(DRAFT_KEY);
         localStorage.removeItem(DRAFT_KEY_V3); // also clear legacy key
       } catch { /* ignore */ }
+    }
+  }, [step]);
+
+  // ── Reset payment cancellation state when navigating away from payment step ─
+  useEffect(() => {
+    if (step !== 6) {
+      setPaymentCancelled(false);
     }
   }, [step]);
 
@@ -2350,6 +2375,7 @@ function RegisterPageContent() {
   async function initiatePayment() {
     setSubmitting(true);
     setSubmitError("");
+    setPaymentCancelled(false);
     try {
       await loadRazorpay();
       const res  = await fetch("/api/it-run/payment/create-order", {
@@ -2357,7 +2383,7 @@ function RegisterPageContent() {
         body: JSON.stringify({ registrationId: regId }),
       });
       const data = await res.json();
-      if (!res.ok) { setSubmitError(data.error ?? "Could not create payment"); return; }
+      if (!res.ok) { setSubmitError(data.error ?? "Could not create payment"); setSubmitting(false); return; }
 
       const rz = new window.Razorpay({
         key:         data.key,
@@ -2376,7 +2402,13 @@ function RegisterPageContent() {
         handler: async (response: Record<string, string>) => {
           await verifyPayment(response.razorpay_payment_id, response.razorpay_order_id, response.razorpay_signature);
         },
-        modal: { ondismiss: () => { setSubmitting(false); } },
+        modal: {
+          ondismiss: () => {
+            setSubmitting(false);
+            setPaymentCancelled(true);
+            setSubmitError("");
+          },
+        },
       });
       rz.open();
     } catch {
@@ -2883,6 +2915,8 @@ function RegisterPageContent() {
             submitting={submitting}
             submitError={submitError}
             onPay={initiatePayment}
+            paymentCancelled={paymentCancelled}
+            onEditDetails={() => setStep(4)}
             />
           </>
         )}
