@@ -191,7 +191,7 @@ describe("validateDateOfBirth: general", () => {
   });
 });
 
-describe("validateDateOfBirth: kid category child (10 or younger on the event date)", () => {
+describe("validateDateOfBirth: kid category child (5 to 10 on the event date)", () => {
   it("accepts a child exactly 10 on the event date", () => {
     expect(child("2016-08-17").ok).toBe(true);
   });
@@ -207,6 +207,16 @@ describe("validateDateOfBirth: kid category child (10 or younger on the event da
       expect(r.code).toBe("child_out_of_range");
       expect(r.message).toBe("Please check the age eligibility requirements for this category.");
     }
+  });
+
+  it("accepts a child exactly 5 on the event date", () => {
+    expect(child("2021-08-17").ok).toBe(true);
+  });
+
+  it("rejects a child who is 4 on the event date (turns 5 the day after)", () => {
+    const r = child("2021-08-18");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("child_out_of_range");
   });
 
   it("rejects a child born after the event date", () => {

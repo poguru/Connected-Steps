@@ -95,7 +95,7 @@ function validateParticipants(
     }
 
     // Date of birth: strict calendar parse (no rollover), not in the future, and age-eligible
-    // on the event date. Adults must be 18+; the kid-category child must be 10 or younger.
+    // on the event date. Adults must be 18+; the kid-category child must be 5 to 10.
     const dobResult = validateDateOfBirth(p.dob, { isChild: m.is_child, eventDate, today });
     if (!dobResult.ok) return err("dob", dobResult.message);
 

@@ -6,7 +6,7 @@
  *
  * Age rules (from the existing event configuration in code, not invented here):
  *   - Adult participants (solo, duo, and the parent of a kid category): at least 18 on the event date.
- *   - Child participants (kid category only): 10 or younger on the event date.
+ *   - Child participants (kid category only): 5 to 10 years old on the event date.
  *     The category has no configured minimum child age, so none is enforced.
  *   - Ages are calendar-based: age = event year - birth year, minus one if the birthday has
  *     not yet occurred on the reference date. A Feb 29 birthday counts as Mar 1 in non-leap years.
@@ -68,6 +68,8 @@ export const DOB_MIN_DATE: CalendarDate = { year: 1900, month: 1, day: 1 };
 
 /** Adults must be at least this old on the event date. */
 export const ADULT_MIN_AGE = 18;
+/** Children must be at least this old on the event date (kid category). */
+export const CHILD_MIN_AGE = 5;
 /** Children must be at most this old on the event date (kid category). */
 export const CHILD_MAX_AGE = 10;
 
@@ -169,8 +171,8 @@ export function validateDateOfBirth(
 
   const ageOnEventDate = calendarAge(dob, opts.eventDate);
   if (opts.isChild) {
-    // Negative age: born after the event date, so not eligible for it either
-    if (ageOnEventDate < 0 || ageOnEventDate > CHILD_MAX_AGE) return fail("child_out_of_range");
+    // Below the minimum also covers children born after the event date (negative age)
+    if (ageOnEventDate < CHILD_MIN_AGE || ageOnEventDate > CHILD_MAX_AGE) return fail("child_out_of_range");
   } else if (ageOnEventDate < ADULT_MIN_AGE) {
     return fail("adult_too_young");
   }
