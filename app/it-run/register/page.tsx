@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { ItRunEventConfig, ItRunCategory } from "@/lib/it-run-types";
 import { isValidEmail, parseCalendarDate, todayInIST, validateDateOfBirth } from "@/lib/it-run-validation";
+import { decideUrlCategory, startsNewRegistration } from "@/lib/it-run-category-selection";
 import {
   EventRegistrationHeader,
   CompactEventHeader,
@@ -1636,6 +1637,7 @@ function RegisterPageContent() {
   const [serverSaveError, setServerSaveError] = useState("");
   const [serverSavedAt, setServerSavedAt] = useState<number | null>(null);
   const savingRef = useRef(false);
+  const [categoryNotice, setCategoryNotice] = useState("");
   // Offline / save status indicator
   const [isOffline,  setIsOffline]  = useState(false);
   const [saveStatus, setSaveStatus] = useState<"saved" | "offline" | "">("");
@@ -1678,13 +1680,25 @@ function RegisterPageContent() {
   // ── Pre-select category from URL ───────────────────────────────────────────
   // Skip if a v4 or v3 draft exists — the resume banner will handle restoration.
   useEffect(() => {
-    const slug = searchParams.get("category");
-    if (!slug || !config?.categories.length) return;
+    if (!config) return;
+    // The category the participant asked for always opens. A saved draft for a different category
+    // never blocks it, and an invalid link never falls back to another category.
+    let draftCategoryId: string | null = null;
     try {
-      if (localStorage.getItem(DRAFT_KEY) || localStorage.getItem(DRAFT_KEY_V3)) return;
-    } catch { /* storage unavailable — proceed with URL pre-select */ }
-    const cat = config.categories.find(c => c.slug === slug);
-    if (cat && !cat.is_soldout) selectCategory(cat);
+      const raw = localStorage.getItem(DRAFT_KEY) ?? localStorage.getItem(DRAFT_KEY_V3);
+      draftCategoryId = raw ? (JSON.parse(raw) as { selectedCatId?: string }).selectedCatId ?? null : null;
+    } catch { /* unreadable draft: treat as none */ }
+
+    const decision = decideUrlCategory(searchParams.get("category"), config.categories, draftCategoryId);
+    if (decision.kind === "select") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- URL-driven selection: the link is the source of truth
+      setCategoryNotice("");
+      selectCategory(decision.category);
+    } else if (decision.kind === "error") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- invalid link: show the reason on the category step
+      setCategoryNotice(decision.message);
+    }
+    // "keep-draft": the resume banner restores the saved draft. "none": the category list is shown.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, config]);
 
@@ -1928,11 +1942,29 @@ function RegisterPageContent() {
   // ── Category selection ─────────────────────────────────────────────────────
 
   function selectCategory(cat: ItRunCategory) {
+    // A different category is a different registration: drop anything tied to the previous one
+    // (draft token, registration, payment order, coupon) so nothing leaks into it. The previous
+    // draft stays open on the server; it is not changed.
+    if (startsNewRegistration(selectedCat?.id, cat.id)) {
+      setRegId("");
+      setRegCode("");
+      setDashboardUrl("");
+      setParticipantIds([]);
+      setRegCouponCode(null);
+      setServerDraft(null);
+      setServerSave("idle");
+      setServerSavedAt(null);
+      setServerSaveError("");
+      setCoupon(null);
+      setCouponCode("");
+      try { localStorage.removeItem(DRAFT_TOKEN_KEY); } catch {}
+    }
     setSelectedCat(cat);
     setParticipants(Array.from({ length: cat.participant_count }, emptyParticipant));
     setPErrors(Array.from({ length: cat.participant_count }, () => ({})));
     setParticipantSubIdx(0);
     setDraftToResume(null); // clear resume banner when user picks a new category
+    setCategoryNotice("");
     setStep(2);
   }
 
@@ -2833,6 +2865,9 @@ function RegisterPageContent() {
               event={config?.event ?? null}
               eventLogoUrl="/events/it-run-sprint-2/IT Run Sprint-2 Logo.jpeg"
             />
+            {categoryNotice && (
+              <p role="alert" style={{ fontSize: 13, color: "#f87171", margin: "0 0 12px", lineHeight: 1.5 }}>{categoryNotice}</p>
+            )}
             <StepCategory config={config} loading={configLoading} onSelect={selectCategory} />
           </>
         )}

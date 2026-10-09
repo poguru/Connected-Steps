@@ -6,6 +6,7 @@ import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 import { buildDashboardUrl } from "@/lib/it-run-dashboard-link";
 import { hashDraftToken, isWellFormedDraftToken } from "@/lib/it-run-drafts";
+import { requiredParticipantCount, categoryTypeLabel } from "@/lib/it-run-category-rules";
 import {
   isValidEmail, parseCalendarDate, todayInIST, validateDateOfBirth, type CalendarDate,
 } from "@/lib/it-run-validation";
@@ -186,16 +187,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Registration for this event is now closed" }, { status: 409 });
     }
 
-    // Validate participant count against server-authoritative category type
-    // SOLO, DUO, and KID categories all support N participants (multi-participant registration)
-    const isMultiParticipantAllowed = ["solo", "duo", "kid"].includes(cat.category_type);
-    const minParticipants = 1;
-    const maxParticipants = isMultiParticipantAllowed ? 999 : 1; // Practical limit for 999
-
-    if (participants.length < minParticipants || participants.length > maxParticipants) {
-      const categoryName = cat.category_type === "solo" ? "SOLO" : cat.category_type === "duo" ? "DUO" : "KID";
+    // The exact participant count comes from the category type (same rule the form uses).
+    const requiredCount = requiredParticipantCount(cat.category_type);
+    if (participants.length !== requiredCount) {
       return NextResponse.json(
-        { error: `${categoryName} category requires ${minParticipants}-${maxParticipants} participant(s), got ${participants.length}` },
+        { error: `${categoryTypeLabel(cat.category_type)} needs exactly ${requiredCount} participant${requiredCount === 1 ? "" : "s"}. You entered ${participants.length}.`, code: "PARTICIPANT_COUNT" },
         { status: 400 },
       );
     }
@@ -431,6 +427,8 @@ export async function POST(req: NextRequest) {
         .update({ status: "converted", registration_id: reg.id })
         .eq("token_hash", hashDraftToken(draftToken))
         .eq("status", "open")
+        // Only close the draft for the category this registration was made for
+        .eq("state->>selectedCatId", categoryId)
         .then(() => {}, e => console.error("[it-run/register] draft conversion failed:", (e as Error).name));
     }
 

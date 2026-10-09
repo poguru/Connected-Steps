@@ -1,3 +1,4 @@
+import { requiredParticipantCount } from "@/lib/it-run-category-rules";
 import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import type {
@@ -107,7 +108,7 @@ export async function GET() {
       color:                c.color ?? "#e8620a",
       is_timed:             !!c.includes_timing,
       inclusions,
-      participant_count:    c.category_type === "solo" ? 1 : 2,
+      participant_count:    requiredParticipantCount(c.category_type),
       participant_labels,
       max_participants:     c.max_participants ?? null,
       current_participants: livePartMap[c.id] ?? 0,

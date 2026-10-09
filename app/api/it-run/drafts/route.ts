@@ -134,6 +134,14 @@ export async function POST(req: NextRequest) {
   if (new Date(row.expires_at).getTime() <= now) {
     return NextResponse.json({ error: "This draft has expired. Start a new registration.", code: "DRAFT_EXPIRED" }, { status: 410 });
   }
+  // A draft belongs to the category it was started for. Saving another category into it would mix two registrations.
+  const savedCategory = (row.state as { selectedCatId?: unknown }).selectedCatId;
+  if (typeof savedCategory === "string" && savedCategory !== state.selectedCatId) {
+    return NextResponse.json({
+      error: "This saved registration is for a different category. Start a new registration to choose this category.",
+      code: "DRAFT_CATEGORY_MISMATCH",
+    }, { status: 409 });
+  }
   if (row.version !== expectedVersion) {
     // Another tab or device saved a newer version. Never overwrite it.
     return NextResponse.json({
