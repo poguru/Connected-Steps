@@ -47,6 +47,14 @@ function SECRET(): string {
   return `it_run:${s}`;
 }
 
+/**
+ * 32-byte key for encrypting scoped action tokens (e.g. company ID resubmission links).
+ * Derived from the same server secret, with a purpose label so keys are never shared across purposes.
+ */
+export function itRunActionKey(purpose: string): Buffer {
+  return crypto.createHash("sha256").update(`${SECRET()}:action:${purpose}`).digest();
+}
+
 // QR tokens use a DEDICATED secret independent of the admin portal password.
 // This means changing the admin password does NOT invalidate existing QR codes.
 // Set IT_RUN_QR_SECRET in environment. Falls back to the portal secret for

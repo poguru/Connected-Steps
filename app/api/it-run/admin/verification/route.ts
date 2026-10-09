@@ -7,6 +7,7 @@ import {
   buildCompanyVerificationApprovedEmail,
   buildCompanyVerificationClarificationEmail,
 } from "@/lib/it-run-verification";
+import { buildCompanyIdCorrectionUrl } from "@/lib/it-run-company-id-link";
 
 // GET /api/it-run/admin/verification?status=pending&page=0&limit=50
 export async function GET(req: NextRequest) {
@@ -84,10 +85,10 @@ export async function PATCH(req: NextRequest) {
 
     const { data: part } = await db
       .from("it_run_participants")
-      .select("email, first_name")
+      .select("email, first_name, company_id_url")
       .eq("id", participantId)
       .eq("event_id", event.id)
-      .maybeSingle<{ email: string | null; first_name: string }>();
+      .maybeSingle<{ email: string | null; first_name: string; company_id_url: string | null }>();
     if (!part) return NextResponse.json({ error: "Participant not found" }, { status: 404 });
 
     const { error: updErr } = await db
@@ -114,9 +115,11 @@ export async function PATCH(req: NextRequest) {
       console.error("[it-run/verification] verification log insert failed:", logErr.message);
     }
 
-    if (part.email) {
+    // Correction link is bound to the document currently on file. No document = no correction link to send.
+    const correctionUrl = part.company_id_url ? buildCompanyIdCorrectionUrl(participantId, part.company_id_url) : null;
+
+    if (part.email && (status === "verified" || correctionUrl)) {
       const { sendEmail } = await import("@/lib/notify");
-      const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.connectedsteps.in"}/it-run/my-registrations`;
 
       let subject = "";
       let htmlBody = "";
@@ -135,14 +138,14 @@ export async function PATCH(req: NextRequest) {
             { name: "Main BIB Counter", address: "HITEC City, Hyderabad", date: "Aug 15, 10 AM - 6 PM" },
             { name: "Secondary Counter", address: "Tech Park, Hyderabad", date: "Aug 16, 10 AM - 4 PM" },
           ],
-          dashboardUrl,
+          correctionUrl: correctionUrl ?? "",
         });
       } else {
         subject = "Company ID - Clarification Needed (The IT Run Sprint-2)";
         htmlBody = buildCompanyVerificationClarificationEmail(
           part.first_name,
           decision.explanation ?? "We need additional information to complete your company ID verification.",
-          { eventTitle: event.title, dashboardUrl },
+          { eventTitle: event.title, correctionUrl: correctionUrl ?? "" },
         );
       }
 

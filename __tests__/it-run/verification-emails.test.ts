@@ -11,7 +11,7 @@ import {
   REJECTION_REASON_LABELS,
 } from "@/lib/it-run-verification";
 
-const DASHBOARD = "https://www.connectedsteps.in/it-run/my-registrations";
+const CORRECTION = "https://www.connectedsteps.in/it-run/company-id?t=TOKEN-FOR-TEST";
 const BIB_LOCATIONS = [
   { name: "Main BIB Counter", address: "HITEC City, Hyderabad", date: "Aug 15, 10 AM - 6 PM" },
   { name: "Secondary Counter", address: "Tech Park, Hyderabad", date: "Aug 16, 10 AM - 4 PM" },
@@ -21,7 +21,7 @@ function rejection(reason: Parameters<typeof buildCompanyVerificationRejectionEm
   return buildCompanyVerificationRejectionEmail("Asha", reason, custom, {
     eventTitle: "The IT Run Sprint-2",
     bibLocations: BIB_LOCATIONS,
-    dashboardUrl: DASHBOARD,
+    correctionUrl: CORRECTION,
   });
 }
 
@@ -79,7 +79,7 @@ describe("rejection email", () => {
     const unreadable = rejection("unreadable_id");
     expect(unreadable).not.toContain("original company ID");
     expect(unreadable).not.toContain("HITEC City, Hyderabad");
-    expect(unreadable).toContain(DASHBOARD);
+    expect(unreadable).toContain(CORRECTION);
   });
 
   it("includes the event name, support contact, and refund-request explanation", () => {
@@ -106,10 +106,10 @@ describe("clarification and approval emails", () => {
   it("clarification email shows the admin text and a dashboard link", () => {
     const html = buildCompanyVerificationClarificationEmail("Ravi", "Please send the back side of the ID.", {
       eventTitle: "The IT Run Sprint-2",
-      dashboardUrl: DASHBOARD,
+      correctionUrl: CORRECTION,
     });
     expect(html).toContain("Please send the back side of the ID.");
-    expect(html).toContain(DASHBOARD);
+    expect(html).toContain(CORRECTION);
     expect(html).not.toContain("INVALID ID");
   });
 

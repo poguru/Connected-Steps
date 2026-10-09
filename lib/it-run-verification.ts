@@ -154,6 +154,22 @@ ${footerHtml()}
  * The "next steps" block depends on the reason: physical verification instructions
  * (and BIB locations) are only shown when the reason is physical_verification_required.
  */
+/**
+ * "Correct and Resubmit Company ID" button, with the full link printed underneath for email
+ * clients that do not render buttons. The URL is built by buildCompanyIdCorrectionUrl (signed token).
+ */
+function correctionCtaHtml(url: string, color: string, textColor = "#fff"): string {
+  const safe = escapeHtml(url);
+  return `
+  <div style="margin:24px 0;text-align:center;">
+    <a href="${safe}" style="display:inline-block;background:${color};color:${textColor};text-decoration:none;font-weight:700;font-size:14px;padding:14px 26px;border-radius:8px;">Correct and Resubmit Company ID</a>
+    <p style="color:#888;font-size:12px;line-height:1.6;margin:14px 0 0;text-align:left;">
+      If the button does not open, copy this link into your browser:<br/>
+      <a href="${safe}" style="color:#e8620a;word-break:break-all;">${safe}</a>
+    </p>
+  </div>`;
+}
+
 export function buildCompanyVerificationRejectionEmail(
   participantName: string,
   reason: VerificationReason,
@@ -161,7 +177,7 @@ export function buildCompanyVerificationRejectionEmail(
   eventDetails: {
     eventTitle: string;
     bibLocations: Array<{ name: string; address: string; date: string }>;
-    dashboardUrl: string;
+    correctionUrl: string;
   },
 ): string {
   const reasonText = escapeHtml(getRejectionReasonText(reason, customExplanation));
@@ -191,10 +207,9 @@ export function buildCompanyVerificationRejectionEmail(
     nextStepsHtml = `
   <div style="margin-bottom:20px;">
     <div style="font-size:11px;color:#888;text-transform:uppercase;margin-bottom:12px;font-weight:600;">Next Steps</div>
-    <p style="color:#ccc;font-size:13px;line-height:1.7;margin:0 0 16px;">
-      Please sign in to your registration dashboard and upload a corrected company ID. Make sure the full document and your employee ID are clearly readable.
+    <p style="color:#ccc;font-size:13px;line-height:1.7;margin:0 0 4px;">
+      Use the button below to upload a corrected company ID. Make sure the full document and your employee ID are clearly readable. You do not need to register again, and your other details stay as they are.
     </p>
-    <a href="${escapeHtml(eventDetails.dashboardUrl)}" style="display:inline-block;background:#e8620a;color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:12px 20px;border-radius:8px;">Open my registration</a>
   </div>`;
   }
 
@@ -207,6 +222,7 @@ export function buildCompanyVerificationRejectionEmail(
   </div>
 
   ${nextStepsHtml}
+  ${correctionCtaHtml(eventDetails.correctionUrl, "#e8620a")}
   ${REFUND_NOTICE_HTML}
 
   <p style="color:#888;font-size:12px;margin:0;line-height:1.6;">
@@ -256,21 +272,21 @@ export function buildCompanyVerificationClarificationEmail(
   clarificationDetails: string,
   eventDetails: {
     eventTitle: string;
-    dashboardUrl: string;
+    correctionUrl: string;
   },
 ): string {
   return `${wrapperOpen("#f59e0b", "Company ID - Clarification Needed", eventDetails.eventTitle)}
   <p style="color:#ccc;font-size:14px;margin:0 0 16px;">Hi <strong style="color:#fff;">${escapeHtml(participantName)}</strong>,</p>
 
   <div style="background:#1a1a1a;border-radius:8px;border-left:3px solid #f59e0b;padding:16px;margin-bottom:20px;">
-    <div style="font-size:12px;color:#f59e0b;font-weight:600;margin-bottom:8px;">Additional Information Needed</div>
+    <div style="font-size:12px;color:#f59e0b;font-weight:600;margin-bottom:8px;">Verification Result: Clarification needed</div>
     <p style="color:#ccc;font-size:13px;margin:0;line-height:1.6;">${escapeHtml(clarificationDetails)}</p>
   </div>
 
-  <p style="color:#ccc;font-size:13px;line-height:1.6;margin:0 0 16px;">
-    Reply to this email or open your registration dashboard to respond.
+  <p style="color:#ccc;font-size:13px;line-height:1.6;margin:0 0 4px;">
+    To resolve this, use the button below to upload the corrected or clarified company ID. You do not need to register again.
   </p>
-  <a href="${escapeHtml(eventDetails.dashboardUrl)}" style="display:inline-block;background:#f59e0b;color:#0a0a0a;text-decoration:none;font-weight:700;font-size:13px;padding:12px 20px;border-radius:8px;margin-bottom:20px;">Open my registration</a>
+  ${correctionCtaHtml(eventDetails.correctionUrl, "#f59e0b", "#0a0a0a")}
 
   <p style="color:#888;font-size:12px;margin:0;line-height:1.6;">
     Questions? Contact <a href="mailto:${SUPPORT_EMAIL}" style="color:#e8620a;text-decoration:none;">${SUPPORT_EMAIL}</a>
