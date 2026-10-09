@@ -4,7 +4,9 @@ import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
 
 // ── Shared helper: resolve registration from token ────────────────────────────
 async function resolveToken(db: ReturnType<typeof getSupabaseServer>, token: string) {
-  const { data: reg } = await db
+  if (!token || token.length === 0) return null;
+
+  const { data: reg, error } = await db
     .from("it_run_registrations")
     .select(`
       id, registration_code, lead_email, participant_count,
@@ -19,6 +21,10 @@ async function resolveToken(db: ReturnType<typeof getSupabaseServer>, token: str
       it_run_categories: { id: string; name: string; category_type: string } | null;
       it_run_events: { title: string; event_date: string; venue_name: string } | null;
     }>();
+
+  if (error) {
+    console.error(`[bib-collection/token] Database error looking up token: ${error.message}`);
+  }
 
   return reg;
 }
@@ -36,7 +42,13 @@ export async function GET(
   const db  = getSupabaseServer();
   const reg = await resolveToken(db, token);
 
-  if (!reg) return NextResponse.json({ error: "Invalid or expired link" }, { status: 404 });
+  if (!reg) {
+    // Log for debugging — helps identify if token lookup is failing
+    console.warn(`[bib-collection/token] GET: Token lookup failed for token: ${token.substring(0, 8)}...`);
+    return NextResponse.json({ error: "Invalid or expired link" }, { status: 404 });
+  }
+
+  console.log(`[bib-collection/token] GET: Successfully loaded registration ${reg.registration_code} with token ${token.substring(0, 8)}...`);
 
   if (!["paid", "free"].includes(reg.payment_status)) {
     return NextResponse.json({ error: "Registration not yet confirmed" }, { status: 403 });
@@ -144,7 +156,12 @@ export async function POST(
     const db  = getSupabaseServer();
     const reg = await resolveToken(db, token);
 
-    if (!reg) return NextResponse.json({ error: "Invalid or expired link" }, { status: 404 });
+    if (!reg) {
+      console.warn(`[bib-collection/token] POST: Token lookup failed for token: ${token.substring(0, 8)}... (participantId: ${participantId})`);
+      return NextResponse.json({ error: "Invalid or expired link" }, { status: 404 });
+    }
+
+    console.log(`[bib-collection/token] POST: Booking slot for participant ${participantId} in registration ${reg.registration_code}`);
 
     if (!["paid", "free"].includes(reg.payment_status)) {
       return NextResponse.json({ error: "Registration not yet confirmed" }, { status: 403 });

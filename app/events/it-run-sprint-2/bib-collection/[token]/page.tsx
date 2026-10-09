@@ -83,7 +83,13 @@ function groupByDate(slots: BibSlot[]): { date: string; slots: BibSlot[] }[] {
 
 export default function BibCollectionPage() {
   const params = useParams();
-  const token  = typeof params?.token === "string" ? params.token : "";
+  const rawToken = params?.token;
+  // Ensure token is a non-empty string; log for debugging if not
+  const token = typeof rawToken === "string" && rawToken.length > 0 ? rawToken : "";
+
+  if (typeof rawToken === "string" && rawToken !== token) {
+    console.warn("[BibCollectionPage] Token extraction issue:", { rawToken, token });
+  }
 
   const [data,          setData]          = useState<PageData | null>(null);
   const [error,         setError]         = useState<string | null>(null);
@@ -95,15 +101,40 @@ export default function BibCollectionPage() {
   const [bookingSlot,   setBookingSlot]   = useState<string | null>(null);
   const [bookingError,  setBookingError]  = useState<string | null>(null);
 
-  // Fetch registration data
-  const fetchData = useCallback(async () => {
+  // Fetch registration data with retry logic
+  const fetchData = useCallback(async (attempt = 0) => {
     if (!token) { setError("Missing booking link token"); setLoading(false); return; }
     try {
-      const res  = await fetch(`/api/events/it-run-sprint-2/bib-collection/${token}`);
+      const res  = await fetch(`/api/events/it-run-sprint-2/bib-collection/${encodeURIComponent(token)}`);
       const json = await res.json() as { error?: string } & Partial<PageData>;
-      if (!res.ok) { setError(json.error ?? "Invalid or expired link"); setLoading(false); return; }
+
+      if (!res.ok) {
+        // Retry on transient errors (5xx), but not on client errors (4xx)
+        if (res.status >= 500 && attempt < 3) {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+          setTimeout(() => { void fetchData(attempt + 1); }, delay);
+          return;
+        }
+
+        // Provide specific error messages for different failure modes
+        let errorMsg = json.error ?? "Invalid or expired link";
+        if (res.status === 403) errorMsg = "Registration not yet confirmed. Please complete payment first.";
+        if (res.status === 410) errorMsg = "This registration has been cancelled.";
+
+        setError(errorMsg);
+        setLoading(false);
+        return;
+      }
+
       setData(json as PageData);
+      setError(null); // Clear any previous errors
     } catch {
+      // Retry on network errors
+      if (attempt < 3) {
+        const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+        setTimeout(() => { void fetchData(attempt + 1); }, delay);
+        return;
+      }
       setError("Failed to load. Please check your connection and try again.");
     } finally {
       setLoading(false);
@@ -116,7 +147,7 @@ export default function BibCollectionPage() {
     setBookingSlot(slotId);
     setBookingError(null);
     try {
-      const res  = await fetch(`/api/events/it-run-sprint-2/bib-collection/${token}`, {
+      const res  = await fetch(`/api/events/it-run-sprint-2/bib-collection/${encodeURIComponent(token)}`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ participantId, slotId }),
@@ -126,7 +157,10 @@ export default function BibCollectionPage() {
         slot?: { id: string; location_name: string; location_address: string | null; slot_date: string; start_time: string; end_time: string };
       };
 
-      if (!res.ok) { setBookingError(json.error ?? "Booking failed"); return; }
+      if (!res.ok) {
+        setBookingError(json.error ?? "Booking failed");
+        return;
+      }
 
       // Update local state: set participant's current_booking + refresh slot counts
       setData(prev => {
@@ -147,7 +181,12 @@ export default function BibCollectionPage() {
       });
 
       setSelecting(null);
-    } catch {
+
+      // Refetch data after booking to ensure consistency (handles any race conditions)
+      // Small delay to ensure server-side state is consistent
+      setTimeout(() => { void fetchData(0); }, 500);
+    } catch (err) {
+      console.error("Booking error:", err);
       setBookingError("Network error — please try again.");
     } finally {
       setBookingSlot(null);

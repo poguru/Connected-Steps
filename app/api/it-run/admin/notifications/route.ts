@@ -124,8 +124,10 @@ export async function POST(req: NextRequest) {
 
   if (body.action === "bib_invite") {
     if (force) {
+      // Only reset the "sent" flag, not the token itself. The token remains valid.
+      // sendItRunBibInviteEmail will regenerate a new token if needed, but won't invalidate the old one.
       await db.from("it_run_registrations")
-        .update({ bib_invite_sent_at: null, bib_invite_token: null })
+        .update({ bib_invite_sent_at: null })
         .eq("id", registrationId);
     }
     await sendItRunBibInviteEmail(reg.id, reg.lead_email);
