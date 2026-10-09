@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -77,6 +77,7 @@ const FLOW_STEPS = [
 const DRAFT_KEY    = "it_run_draft_v4:sprint-2"; // event-scoped; v4 adds eventSlug + version
 const DRAFT_KEY_V3 = "it_run_draft_v3";          // legacy — read-only for migration
 const DRAFT_TTL_MS = 4 * 60 * 60 * 1000;        // 4 hours (unchanged)
+const DRAFT_TOKEN_KEY = "it_run_draft_token:sprint-2"; // browser copy of the server draft token (the server holds only its hash)
 
 function stepLabel(s: number): string {
   const labels: Record<number, string> = {
@@ -1615,6 +1616,12 @@ function RegisterPageContent() {
 
   // Draft resume — holds a found draft until the user chooses Continue or Start New
   const [draftToResume, setDraftToResume] = useState<DraftRecord | null>(null);
+  // Server draft: "saved" only when the server confirms. The version stops a stale tab overwriting newer progress.
+  const [serverDraft, setServerDraft] = useState<{ token: string; version: number; savedAt: number } | null>(null);
+  const [serverSave, setServerSave] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [serverSaveError, setServerSaveError] = useState("");
+  const [serverSavedAt, setServerSavedAt] = useState<number | null>(null);
+  const savingRef = useRef(false);
   // Offline / save status indicator
   const [isOffline,  setIsOffline]  = useState(false);
   const [saveStatus, setSaveStatus] = useState<"saved" | "offline" | "">("");
@@ -1950,12 +1957,133 @@ function RegisterPageContent() {
 
   // ── Discard a saved draft (user clicked "Start New Registration") ──────────
   function discardDraft() {
+    const token = serverDraft?.token ?? (() => { try { return localStorage.getItem(DRAFT_TOKEN_KEY) ?? ""; } catch { return ""; } })();
     try {
       localStorage.removeItem(DRAFT_KEY);
       localStorage.removeItem(DRAFT_KEY_V3);
+      localStorage.removeItem(DRAFT_TOKEN_KEY);
     } catch {}
+    // Close the server draft too, so "Start New Registration" cannot be undone by a later resume
+    void fetch("/api/it-run/drafts/discard", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(token ? { token } : {}),
+    }).catch(() => {});
+    setServerDraft(null);
     setDraftToResume(null);
   }
+
+  // ── Save progress to the server ────────────────────────────────────────────
+  // Shows "Saved" only after the server confirms. One request at a time. Stale versions are refused.
+  async function saveProgress(): Promise<void> {
+    if (!selectedCat || savingRef.current) return;
+    savingRef.current = true;
+    setServerSave("saving");
+    setServerSaveError("");
+    try {
+      const body: Record<string, unknown> = {
+        draft: {
+          step,
+          participantSubIdx,
+          selectedCatId: selectedCat.id,
+          couponCode,
+          participants: participants.map(p => ({ ...p, companyIdFile: null })),
+        },
+      };
+      if (serverDraft) {
+        body.token = serverDraft.token;
+        body.expectedVersion = serverDraft.version;
+      }
+      const res = await fetch("/api/it-run/drafts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const d = await res.json().catch(() => ({})) as {
+        token?: string; version?: number; savedAt?: string; error?: string; code?: string;
+      };
+
+      if (!res.ok || typeof d.version !== "number" || !d.savedAt) {
+        if (d.code === "DRAFT_CONVERTED" || d.code === "DRAFT_EXPIRED" || d.code === "DRAFT_NOT_FOUND") {
+          // The saved draft is closed. Forget it so a new save starts a fresh draft.
+          try { localStorage.removeItem(DRAFT_TOKEN_KEY); } catch {}
+          setServerDraft(null);
+        }
+        setServerSave("error");
+        setServerSaveError(d.error ?? "We couldn't save your progress. Please try again.");
+        return;
+      }
+
+      const token = d.token ?? serverDraft?.token;
+      if (!token) throw new Error("No draft token returned");
+      try { localStorage.setItem(DRAFT_TOKEN_KEY, token); } catch {}
+      const savedAtMs = new Date(d.savedAt).getTime();
+      setServerDraft({ token, version: d.version, savedAt: savedAtMs });
+      setServerSavedAt(savedAtMs);
+      setServerSave("saved");
+    } catch {
+      setServerSave("error");
+      setServerSaveError("No connection. Your progress is still on this device. Tap Retry when you're back online.");
+    } finally {
+      savingRef.current = false;
+    }
+  }
+
+  // ── Resume from the server draft ───────────────────────────────────────────
+  // A saved draft in the browser token, or the signed-in account's latest draft, is offered via the
+  // same resume banner. The server version is the truth. Local storage is only a cache.
+  useEffect(() => {
+    if (!config) return;
+    let active = true;
+    void (async () => {
+      let token = "";
+      try { token = localStorage.getItem(DRAFT_TOKEN_KEY) ?? ""; } catch {}
+
+      type Found = { token: string; draft: Record<string, unknown>; version: number; savedAt: string; expiresAt: string };
+      let found: Found | null = null;
+
+      try {
+        if (token) {
+          const res = await fetch(`/api/it-run/drafts?t=${encodeURIComponent(token)}`, { cache: "no-store" });
+          if (res.ok) {
+            const d = await res.json() as Omit<Found, "token">;
+            found = { token, ...d };
+          } else if (res.status === 404 || res.status === 409 || res.status === 410 || res.status === 400) {
+            // Closed, expired, or unknown: forget the browser copy
+            try { localStorage.removeItem(DRAFT_TOKEN_KEY); } catch {}
+          } else {
+            return; // server error: keep the local draft and do not guess
+          }
+        }
+        if (!found) {
+          const res = await fetch("/api/it-run/drafts/mine", { cache: "no-store" });
+          if (res.ok) {
+            const d = await res.json() as { token?: string; draft: Record<string, unknown> | null; version?: number; savedAt?: string; expiresAt?: string };
+            if (d.draft && d.token && typeof d.version === "number" && d.savedAt) {
+              found = { token: d.token, draft: d.draft, version: d.version, savedAt: d.savedAt, expiresAt: d.expiresAt ?? d.savedAt };
+            }
+          }
+        }
+      } catch {
+        return; // offline: the local draft (if any) still resumes below
+      }
+
+      if (!active || !found) return;
+      const d = found.draft as unknown as DraftRecord;
+      const cat = config.categories.find(c => c.id === d.selectedCatId);
+      // Revalidate on resume: category must still exist and not be sold out
+      if (!cat || cat.is_soldout) return;
+
+      try { localStorage.setItem(DRAFT_TOKEN_KEY, found.token); } catch {}
+      setServerDraft({ token: found.token, version: found.version, savedAt: new Date(found.savedAt).getTime() });
+      setServerSavedAt(new Date(found.savedAt).getTime());
+      setDraftToResume({
+        ...d,
+        savedAt: new Date(found.savedAt).getTime(),
+        expiresAt: new Date(found.expiresAt).getTime(),
+      });
+    })();
+    return () => { active = false; };
+  }, [config]);
 
   // ── Participant field update ───────────────────────────────────────────────
 
@@ -2172,6 +2300,8 @@ function RegisterPageContent() {
         body: JSON.stringify({
           categoryId:   selectedCat.id,
           couponId:     coupon?.id ?? null,
+          // Lets the server close this draft once the registration exists (never changes the registration)
+          draftToken:   serverDraft?.token ?? (() => { try { return localStorage.getItem(DRAFT_TOKEN_KEY); } catch { return null; } })(),
           participants: participants.map((p, idx) => ({
             type:              selectedCat.participant_labels[idx]?.role ?? "solo",
             firstName:         p.firstName,
@@ -2295,10 +2425,27 @@ function RegisterPageContent() {
           </div>
         </Link>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {step > 1 && step < 7 && saveStatus && (
-            <span style={{ fontSize: 11, color: saveStatus === "offline" ? "#f59e0b" : "#3a3a3a" }}>
-              {saveStatus === "offline" ? "Offline — saved locally" : "Saved"}
+          {step > 1 && step < 7 && (
+            <span role="status" aria-live="polite" style={{ fontSize: 11, color: serverSave === "error" ? "#f87171" : "#8a8a8a", maxWidth: 220, textAlign: "right" }}>
+              {serverSave === "saving" && "Saving…"}
+              {serverSave === "saved" && serverSavedAt && `Saved at ${new Date(serverSavedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`}
+              {serverSave === "error" && (serverSaveError || "Not saved.")}
+              {serverSave === "idle" && (saveStatus === "offline" ? "Offline: kept on this device only" : "Not saved to server yet")}
             </span>
+          )}
+          {step > 1 && step < 7 && (
+            <button
+              onClick={() => void saveProgress()}
+              disabled={serverSave === "saving"}
+              style={{
+                fontSize: 12, fontWeight: 700, padding: "7px 12px", borderRadius: 8, fontFamily: "inherit",
+                background: serverSave === "saving" ? "rgba(232,98,10,0.08)" : "rgba(232,98,10,0.15)",
+                border: "1px solid rgba(232,98,10,0.4)", color: "#e8620a",
+                cursor: serverSave === "saving" ? "wait" : "pointer", whiteSpace: "nowrap",
+              }}
+            >
+              {serverSave === "error" ? "Retry save" : "Save progress"}
+            </button>
           )}
           {step < 7 && (
             <Link href="/it-run" style={{ fontSize: 12, color: "#3a3a3a", textDecoration: "none" }}>

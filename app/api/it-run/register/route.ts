@@ -5,6 +5,7 @@ import { sendItRunConfirmationEmail, sendItRunBibInviteEmail } from "@/lib/it-ru
 import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 import { buildDashboardUrl } from "@/lib/it-run-dashboard-link";
+import { hashDraftToken, isWellFormedDraftToken } from "@/lib/it-run-drafts";
 import {
   isValidEmail, parseCalendarDate, todayInIST, validateDateOfBirth, type CalendarDate,
 } from "@/lib/it-run-validation";
@@ -146,10 +147,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { categoryId, couponId, participants } = await req.json() as {
+    const { categoryId, couponId, participants, draftToken } = await req.json() as {
       categoryId:   string;
       couponId:     string | null;
       participants: ParticipantInput[];
+      draftToken?:  string | null;
     };
 
     if (!categoryId || !Array.isArray(participants) || participants.length === 0) {
@@ -419,6 +421,17 @@ export async function POST(req: NextRequest) {
         .catch(e => console.error("[it-run/register] free-reg confirmation email error:", e));
       sendItRunBibInviteEmail(reg.id, participants[0]?.email?.toLowerCase()?.trim() ?? "")
         .catch(e => console.error("[it-run/register] free-reg bib invite email error:", e));
+    }
+
+    // Mark the draft this registration came from as converted, so it can't be saved over afterwards.
+    // Best effort: the registration already exists; an unmarked draft only costs a stale resume prompt.
+    if (isWellFormedDraftToken(draftToken)) {
+      await db
+        .from("it_run_drafts")
+        .update({ status: "converted", registration_id: reg.id })
+        .eq("token_hash", hashDraftToken(draftToken))
+        .eq("status", "open")
+        .then(() => {}, e => console.error("[it-run/register] draft conversion failed:", (e as Error).name));
     }
 
     return NextResponse.json({
