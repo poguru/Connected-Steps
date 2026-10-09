@@ -1,3 +1,4 @@
+import { buildDashboardUrl } from "@/lib/it-run-dashboard-link";
 import { randomBytes }        from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail }         from "@/lib/notify";
@@ -83,7 +84,7 @@ export async function sendItRunConfirmationEmail(
   }
 
   const appUrl      = APP_URL;
-  const dashUrl     = `${appUrl}/it-run/dashboard/${reg.registration_code}`;
+  const dashUrl     = buildDashboardUrl(reg.registration_code);
   const ev          = reg.it_run_events;
   const cat         = reg.it_run_categories;
   const primaryName = `${parts[0].first_name} ${parts[0].last_name}`;

@@ -206,6 +206,12 @@ export default function MyRegistrationsPage() {
                     border: "1px solid rgba(255,255,255,0.08)",
                     borderRadius: 16, padding: "20px 22px",
                   }}>
+                    {/* Signed-in owner opens the dashboard by code; the API checks ownership */}
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+                      <Link href={`/it-run/dashboard/${reg.registration_code}`} style={{ fontSize: 13, color: ACCENT, fontWeight: 700, textDecoration: "none" }}>
+                        View dashboard &rarr;
+                      </Link>
+                    </div>
                     {/* Header row */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
                       <div>

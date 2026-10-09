@@ -4,6 +4,7 @@ import { generateRegistrationCode, signItRunQR } from "@/lib/it-run-auth";
 import { sendItRunConfirmationEmail, sendItRunBibInviteEmail } from "@/lib/it-run-email";
 import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
+import { buildDashboardUrl } from "@/lib/it-run-dashboard-link";
 import {
   isValidEmail, parseCalendarDate, todayInIST, validateDateOfBirth, type CalendarDate,
 } from "@/lib/it-run-validation";
@@ -423,6 +424,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       registrationId:   reg.id,
       registrationCode: regCode,
+      dashboardUrl:     buildDashboardUrl(regCode),
       finalPrice,
       participantIds: parts.map(p => p.id),
     });

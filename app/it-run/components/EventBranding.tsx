@@ -644,11 +644,14 @@ export function EventSuccessScreen({
   category,
   participants,
   finalPrice,
+  dashboardUrl,
 }: {
   registrationCode: string;
   category: string;
   participants: string[];
   finalPrice: number;
+  /** Signed dashboard link from the register API. Omitted when unavailable (the email still has one). */
+  dashboardUrl?: string;
 }) {
   return (
     <div
@@ -690,6 +693,25 @@ export function EventSuccessScreen({
       >
         Registration Confirmed! 🎉
       </h1>
+
+      {dashboardUrl && (
+        <a
+          href={dashboardUrl}
+          style={{
+            display: "inline-block",
+            margin: "0 0 24px",
+            padding: "12px 24px",
+            borderRadius: 10,
+            background: "#e8620a",
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: 14,
+            textDecoration: "none",
+          }}
+        >
+          View my registration dashboard
+        </a>
+      )}
 
       <p
         style={{

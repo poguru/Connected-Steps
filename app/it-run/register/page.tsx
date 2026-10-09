@@ -42,6 +42,7 @@ interface DraftRecord {
   couponCode:        string;
   regId?:            string;
   regCode?:          string;
+  dashboardUrl?:     string;
   finalPrice?:       number;
   savedAt:           number;
   expiresAt?:        number;
@@ -1602,6 +1603,7 @@ function RegisterPageContent() {
   const [submitError, setSubmitError] = useState("");
   const [regCode,     setRegCode]     = useState("");
   const [regId,       setRegId]       = useState("");
+  const [dashboardUrl, setDashboardUrl] = useState("");
   // When payment step is restored from a draft after page refresh, we use the
   // price that was returned by the register API (already committed to the DB)
   // rather than re-deriving it, in case the coupon state didn't survive.
@@ -1678,6 +1680,7 @@ function RegisterPageContent() {
           participants: draftParticipants, couponCode,
           regId:      regId   || undefined,
           regCode:    regCode || undefined,
+          dashboardUrl: dashboardUrl || undefined,
           finalPrice: regId   ? finalPrice : undefined,
           savedAt:    now,
           expiresAt:  now + DRAFT_TTL_MS,
@@ -1687,7 +1690,7 @@ function RegisterPageContent() {
         setSaveStatus("");
       }
     }
-  }, [step, participantSubIdx, selectedCat, participants, couponCode, regId, regCode, isOffline, finalPrice]);
+  }, [step, participantSubIdx, selectedCat, participants, couponCode, regId, regCode, dashboardUrl, isOffline, finalPrice]);
 
   // ── Draft restore — sets draftToResume so the user sees a resume banner ──────
   // The banner then calls applyDraft() or discardDraft() based on the user's choice.
@@ -1929,6 +1932,7 @@ function RegisterPageContent() {
       // Registration was already created; go straight to payment step
       setRegId(d.regId);
       setRegCode(d.regCode);
+      setDashboardUrl(d.dashboardUrl ?? "");
       if (d.finalPrice !== undefined) setFinalPriceOverride(d.finalPrice);
       setStep(6);
     } else {
@@ -2192,6 +2196,7 @@ function RegisterPageContent() {
       const data = await res.json();
       if (!res.ok) { setSubmitError(data.error ?? "Registration failed"); return; }
       setRegCode(data.registrationCode);
+      setDashboardUrl(data.dashboardUrl ?? "");
       setRegId(data.registrationId);
       if (data.finalPrice === 0) { setStep(7); return; }
       setStep(6);
@@ -2747,6 +2752,7 @@ function RegisterPageContent() {
         {step === 7 && (
           <EventSuccessScreen
             registrationCode={regCode}
+            dashboardUrl={dashboardUrl || undefined}
             category={selectedCat?.name ?? "The IT Run Sprint-2"}
             participants={participants.map(p => `${p.firstName} ${p.lastName}`.trim())}
             finalPrice={finalPrice}

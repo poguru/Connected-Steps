@@ -290,10 +290,19 @@ export default function DashboardPage() {
           {DASHBOARD_FAILURE_MESSAGES[failure ?? "NOT_FOUND"]}
         </div>
         <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-          {failure !== "NOT_FOUND" && (
+          {(failure === "SERVER_ERROR" || failure === "NETWORK" || failure === "INVALID_RESPONSE") && (
             <button onClick={retry} style={{ ...S.btn, background: ACCENT, color: "#fff" }}>Try again</button>
           )}
-          <Link href="/auth" style={{ ...S.btn, background: "rgba(255,255,255,0.08)", color: "#fff", textDecoration: "none", display: "inline-block" }}>Sign in</Link>
+          <Link
+            href="/auth"
+            style={{
+              ...S.btn,
+              background: failure === "AUTH_REQUIRED" || failure === "EXPIRED_LINK" || failure === "INVALID_LINK" ? ACCENT : "rgba(255,255,255,0.08)",
+              color: "#fff", textDecoration: "none", display: "inline-block",
+            }}
+          >
+            Sign in
+          </Link>
           <Link href="/it-run" style={{ ...S.btn, background: "transparent", border: `1px solid ${ACCENT}`, color: ACCENT, textDecoration: "none", display: "inline-block" }}>IT Run event page</Link>
         </div>
       </div>

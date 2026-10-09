@@ -10,9 +10,11 @@
 process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
 
 jest.mock("@/lib/supabase-server", () => ({ getSupabaseServer: jest.fn() }));
+jest.mock("@/lib/admin-auth", () => ({ verifyUserToken: jest.fn(), USER_SESSION_COOKIE: "cs_user_session" }));
 
 import { NextRequest } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { verifyUserToken } from "@/lib/admin-auth";
 import { GET } from "@/app/api/it-run/dashboard/[code]/route";
 import {
   isDashboardPayload,
@@ -47,6 +49,7 @@ const REG = {
   id: "reg-1",
   registration_code: "ITR-0001",
   lead_email: "lead@example.com",
+  linked_user_email: "owner@example.com",
   participant_count: 2,
   base_price: 100000,
   discount_amount: 0,
@@ -68,10 +71,16 @@ const PARTICIPANT_NULLS = {
 };
 
 function call(code: string) {
-  return GET(new NextRequest(`http://t/api/it-run/dashboard/${code}`), { params: Promise.resolve({ code }) });
+  return GET(
+    new NextRequest(`http://t/api/it-run/dashboard/${code}`, { headers: { cookie: "cs_user_session=session" } }),
+    { params: Promise.resolve({ code }) },
+  );
 }
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  (verifyUserToken as jest.Mock).mockReturnValue("owner@example.com");
+});
 
 describe("isDashboardPayload", () => {
   const valid = {
