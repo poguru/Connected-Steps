@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import RefundRequestPanel from "./RefundRequestPanel";
 import CategoryChangeButton from "./CategoryChangeButton";
+import AddIdControl from "./AddIdControl";
 import { CUTOFF_CLOSED_MESSAGE } from "@/lib/it-run-participant-cutoff";
 import {
   parseMyRegistrations,
@@ -404,6 +405,14 @@ export default function MyRegistrationsPage() {
                         ))}
                       </div>
                     )}
+
+                    {/* Adults who continued without an ID can add one (the server checks ownership and the participant) */}
+                    {reg.participants
+                      .filter(p => p.verification_status === "not_provided")
+                      .map(p => (
+                        <AddIdControl key={p.id} participantId={p.id}
+                          participantName={`${p.first_name} ${p.last_name}`.trim()} onAdded={refresh} />
+                      ))}
 
                     {/* Category change: options and prices come from the server */}
                     {reg.actions.canChangeCategory && (

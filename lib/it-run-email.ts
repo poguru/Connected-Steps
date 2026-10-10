@@ -76,7 +76,7 @@ export async function sendItRunConfirmationEmail(
   // ── Fetch all participants ───────────────────────────────────────────────
   const { data: parts } = await db
     .from("it_run_participants")
-    .select("id, first_name, last_name, participant_type, tshirt_size, qr_token")
+    .select("id, first_name, last_name, participant_type, tshirt_size, qr_token, verification_status, id_document_type")
     .eq("registration_id", reg.id)
     .order("created_at");
 
@@ -125,6 +125,7 @@ export async function sendItRunConfirmationEmail(
       typeLabel:  PARTICIPANT_TYPE_LABEL[p.participant_type] ?? "",
       tshirtSize: p.tshirt_size ?? null,
       qrUrl:      `${appUrl}/api/it-run/qr/${p.qr_token ?? reg.registration_code}`,
+      idNote:     idStatusNote(p.verification_status, p.id_document_type),
     })),
   });
 
@@ -184,6 +185,32 @@ interface ParticipantData {
   typeLabel:  string;
   tshirtSize: string | null;
   qrUrl:      string;  // HTTPS URL to /api/it-run/qr/{token}
+  /** What the participant's ID status means for them. Empty when there is nothing to say (children). */
+  idNote?:    string;
+}
+
+/**
+ * The ID line in a registration email. The registration is confirmed whatever the ID status is; the ID review is a
+ * separate step and never changes the place. Kept as text so it reads the same in every email.
+ */
+export function idStatusNote(verificationStatus: string | null, documentType: string | null): string {
+  const kind = documentType === "government" ? "government-issued ID" : "company ID";
+  switch (verificationStatus) {
+    case "not_provided":
+      return "No ID uploaded. Your registration is confirmed. You can add an ID later from My Registrations for a faster BIB collection.";
+    case "pending":
+      return `Your ${kind} has been received and is awaiting review. Your registration is confirmed and your place is not affected.`;
+    case "need_clarification":
+      return `Your ${kind} needs a correction. Check your email for the request, or upload a replacement from My Registrations.`;
+    case "rejected":
+      return `Your ${kind} could not be verified. Check your email for the reason and how to upload a replacement.`;
+    case "verified":
+      return documentType === "government"
+        ? "Your government-issued ID has been reviewed, and your identity and age verification is complete."
+        : "Your company ID has been verified.";
+    default:
+      return "";
+  }
 }
 
 export interface ConfirmEmailDiscount {
@@ -469,6 +496,9 @@ export function buildConfirmEmail(args: ConfirmEmailArgs): string {
     const tshirt = p.tshirtSize
       ? `<div style="font-size:12px;color:#888;margin-top:4px;">T-Shirt: <strong style="color:#ccc;">${p.tshirtSize}</strong></div>`
       : "";
+    const idLine = p.idNote
+      ? `<div style="font-size:12px;color:#aaa;margin-top:6px;line-height:1.5;">ID: ${escapeHtml(p.idNote)}</div>`
+      : "";
 
     return `
     <tr>
@@ -479,6 +509,7 @@ export function buildConfirmEmail(args: ConfirmEmailArgs): string {
               ${label}
               <div style="font-size:15px;font-weight:700;color:#fff;">${p.name}</div>
               ${tshirt}
+              ${idLine}
             </td>
             <td style="vertical-align:top;text-align:right;width:180px;">
               <div style="display:inline-block;background:#fff;padding:6px;border-radius:6px;">

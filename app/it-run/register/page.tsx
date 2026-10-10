@@ -35,6 +35,8 @@ interface Participant {
   companyIdFile: File | null; companyIdUrl: string;
   /** "upload" = the participant will upload an ID for faster BIB collection; "skip" = continue without an ID. */
   idChoice?: "upload" | "skip";
+  /** When an ID is uploaded: a company ID (default) or a government-issued ID */
+  idDocType?: "company" | "government";
   tshirtSize: string; medicalConditions: string; foodPreference: string;
 }
 
@@ -1086,6 +1088,29 @@ function StepCompany({
                   {choice === "skip" && (
                     <div style={{ fontSize: 12, color: "#888", lineHeight: 1.6, padding: "10px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8 }}>
                       You are continuing without an ID. You will not get the fast-track BIB process. The standard identity check applies at collection.
+                    </div>
+                  )}
+
+                  {choice === "upload" && (
+                    <div role="radiogroup" aria-label={`Type of ID for ${label}`}
+                      style={{ display: "flex", gap: 8, flexWrap: "wrap" as const, marginBottom: 12 }}>
+                      {([
+                        { value: "company" as const,    text: "Company ID" },
+                        { value: "government" as const, text: "Government-issued photo ID" },
+                      ]).map(opt => {
+                        const active = (p.idDocType ?? "company") === opt.value;
+                        return (
+                          <button key={opt.value} type="button" role="radio" aria-checked={active}
+                            onClick={() => onChange(idx, "idDocType", opt.value)}
+                            style={{
+                              padding: "8px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 600,
+                              color: "#fff", background: active ? `${ACCENT}14` : "rgba(255,255,255,0.02)",
+                              border: `1px solid ${active ? ACCENT : "rgba(255,255,255,0.1)"}`,
+                            }}>
+                            {active ? "✓ " : ""}{opt.text}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
 
@@ -2574,6 +2599,7 @@ function RegisterPageContent() {
               companyName:       p.companyName,
               employeeId:        p.employeeId,
               companyIdUrl:      p.companyIdUrl,
+              idDocumentType:    p.idDocType ?? "company",
               tshirtSize:        p.tshirtSize,
               medicalConditions: p.medicalConditions,
               foodPreference:    p.foodPreference,
@@ -2609,6 +2635,7 @@ function RegisterPageContent() {
             companyName:       p.companyName,
             employeeId:        p.employeeId,
             companyIdUrl:      p.companyIdUrl,
+            idDocumentType:    p.idDocType ?? "company",
             tshirtSize:        p.tshirtSize,
             medicalConditions: p.medicalConditions,
             foodPreference:    p.foodPreference,
