@@ -124,11 +124,15 @@ export async function GET(
   // a participant has no related bib bookings / collections / check-ins.
   // The dashboard UI accesses .length on these arrays, so null crashes with
   // "Cannot read properties of null (reading 'length')".
+  // Bookings, collections and check-ins each have a UNIQUE(participant_id). PostgREST returns a single
+  // object (not a list) for an embed over a unique key, and null when there is none. Normalize all three
+  // shapes to a list so the page's contract (arrays) holds for every participant.
+  const toList = (v: unknown): unknown[] => (Array.isArray(v) ? v : v ? [v] : []);
   const normalizedParticipants = participants.map(p => ({
     ...p,
-    it_run_bib_bookings:    (p.it_run_bib_bookings    as unknown[] | null) ?? [],
-    it_run_bib_collections: (p.it_run_bib_collections as unknown[] | null) ?? [],
-    it_run_checkins:        (p.it_run_checkins        as unknown[] | null) ?? [],
+    it_run_bib_bookings:    toList(p.it_run_bib_bookings),
+    it_run_bib_collections: toList(p.it_run_bib_collections),
+    it_run_checkins:        toList(p.it_run_checkins),
   }));
 
   return NextResponse.json(
