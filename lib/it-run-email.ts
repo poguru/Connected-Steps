@@ -4,6 +4,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail }         from "@/lib/notify";
 import { APP_URL }           from "@/lib/config";
 import { emailWrapper, emailHeader, emailFooter } from "@/lib/email/layout";
+import { escapeHtml } from "@/lib/it-run-verification";
 
 const PARTICIPANT_TYPE_LABEL: Record<string, string> = {
   solo:      "",
@@ -37,7 +38,7 @@ export async function sendItRunConfirmationEmail(
   const { data: reg } = await db
     .from("it_run_registrations")
     .select(`
-      id, registration_code, lead_email, final_price,
+      id, registration_code, lead_email, final_price, base_price, discount_amount, early_bird_offer_id,
       confirmation_email_sent_at,
       it_run_categories ( name ),
       it_run_events ( title, event_date, venue_name, report_time )
@@ -45,7 +46,8 @@ export async function sendItRunConfirmationEmail(
     .eq("id", registrationId)
     .single<{
       id: string; registration_code: string; lead_email: string;
-      final_price: number; confirmation_email_sent_at: string | null;
+      final_price: number; base_price: number; discount_amount: number; early_bird_offer_id: string | null;
+      confirmation_email_sent_at: string | null;
       it_run_categories: { name: string } | null;
       it_run_events: { title: string; event_date: string; venue_name: string; report_time: string | null } | null;
     }>();
@@ -83,6 +85,21 @@ export async function sendItRunConfirmationEmail(
     return;
   }
 
+  // Discount line: an early bird offer (named) or a discount code. Only shown when a discount was applied.
+  let discount: ConfirmEmailDiscount | undefined;
+  if (reg.discount_amount > 0) {
+    let label = "Discount code";
+    if (reg.early_bird_offer_id) {
+      const { data: offer } = await db
+        .from("it_run_early_bird_offers")
+        .select("name")
+        .eq("id", reg.early_bird_offer_id)
+        .maybeSingle<{ name: string }>();
+      label = offer?.name ?? "Early bird";
+    }
+    discount = { label, baseAmount: reg.base_price, discountAmount: reg.discount_amount };
+  }
+
   const appUrl      = APP_URL;
   const dashUrl     = buildDashboardUrl(reg.registration_code);
   const ev          = reg.it_run_events;
@@ -101,6 +118,7 @@ export async function sendItRunConfirmationEmail(
     venue:        ev?.venue_name  ?? "Hitec City, Hyderabad",
     reportTime:   ev?.report_time ?? "5:30 AM",
     finalPrice:   reg.final_price,
+    discount,
     dashUrl,
     participants: parts.map(p => ({
       name:       `${p.first_name} ${p.last_name}`,
@@ -131,6 +149,12 @@ interface ParticipantData {
   qrUrl:      string;  // HTTPS URL to /api/it-run/qr/{token}
 }
 
+export interface ConfirmEmailDiscount {
+  label:          string;  // "Early Bird — …" or "Discount code"
+  baseAmount:     number;  // rupees, before discount
+  discountAmount: number;  // rupees
+}
+
 interface ConfirmEmailArgs {
   primaryName:  string;
   code:         string;
@@ -139,6 +163,7 @@ interface ConfirmEmailArgs {
   venue:        string;
   reportTime:   string;
   finalPrice:   number;
+  discount?:    ConfirmEmailDiscount;
   dashUrl:      string;
   participants: ParticipantData[];
 }
@@ -369,7 +394,7 @@ function buildBibInviteEmail({ code, category, date, venue, bookUrl, isDuo }: Bi
 }
 
 export function buildConfirmEmail(args: ConfirmEmailArgs): string {
-  const { primaryName, code, category, date, venue, reportTime, finalPrice, dashUrl, participants } = args;
+  const { primaryName, code, category, date, venue, reportTime, finalPrice, discount, dashUrl, participants } = args;
 
   const dateFormatted = new Date(date + "T12:00:00Z").toLocaleDateString("en-IN", {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
@@ -378,6 +403,10 @@ export function buildConfirmEmail(args: ConfirmEmailArgs): string {
   const amountLine = finalPrice > 0
     ? `₹${finalPrice.toLocaleString("en-IN")}`
     : "Free";
+
+  const discountLine = discount && discount.discountAmount > 0
+    ? `<div style="font-size:12px;color:#888;margin-top:4px;">Base ₹${discount.baseAmount.toLocaleString("en-IN")} &minus; ${escapeHtml(discount.label)} ₹${discount.discountAmount.toLocaleString("en-IN")}</div>`
+    : "";
 
   // ── Participant details rows ───────────────────────────────────────────────
   const participantRows = participants.map((p, i) => {
@@ -478,6 +507,7 @@ export function buildConfirmEmail(args: ConfirmEmailArgs): string {
           <td style="padding:14px 24px;width:50%;">
             <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">Amount Paid</div>
             <div style="font-size:18px;font-weight:900;color:#10b981;">${amountLine}</div>
+            ${discountLine}
           </td>
         </tr></table>
       </td></tr>

@@ -16,10 +16,20 @@ export interface MyRegistrationRow {
   payment_status: string;
   registration_status: string;
   final_price: number;
+  base_price: number;
+  discount_amount: number;
+  early_bird_offer_id: string | null;
   participant_count: number;
   created_at: string;
   category: MyRegCategory | null;
   event: MyRegEvent | null;
+}
+
+export interface MyRegPricing {
+  base_price: number;
+  discount_amount: number;
+  /** The early bird offer's name, "Discount code" for a coupon, or null when no discount applied. */
+  discount_label: string | null;
 }
 
 export interface MyRegParticipantRow {
@@ -63,8 +73,16 @@ export interface MyRegistration {
   created_at: string;
   category: MyRegCategory | null;
   event: MyRegEvent | null;
+  pricing: MyRegPricing;
   participants: MyRegParticipant[];
   actions: MyRegActions;
+}
+
+/** Label for the discount on a registration, or null when no discount applied. Offer names are looked up by id. */
+export function discountLabel(r: Pick<MyRegistrationRow, "discount_amount" | "early_bird_offer_id">, offerNames: Map<string, string>): string | null {
+  if (!(r.discount_amount > 0)) return null;
+  if (r.early_bird_offer_id) return offerNames.get(r.early_bird_offer_id) ?? "Early bird";
+  return "Discount code";
 }
 
 /** The lead email may have been stored in any letter case, so both forms are matched. Nothing else is matched. */
@@ -78,6 +96,7 @@ export function buildMyRegistrations(
   regs: MyRegistrationRow[],
   participants: MyRegParticipantRow[],
   collections: MyRegCollectionRow[],
+  offerNames: Map<string, string> = new Map(),
 ): MyRegistration[] {
   const collectedAt = new Map<string, string>();
   for (const c of collections) {
@@ -118,6 +137,11 @@ export function buildMyRegistrations(
       created_at: r.created_at,
       category: r.category,
       event: r.event,
+      pricing: {
+        base_price: r.base_price,
+        discount_amount: r.discount_amount,
+        discount_label: discountLabel(r, offerNames),
+      },
       participants: byRegistration.get(r.id) ?? [],
       actions: {
         canChangeCategory: canOfferCategoryChange(r),
@@ -215,6 +239,13 @@ function isParticipant(v: unknown): boolean {
     isStr(p.verification_status) && (p.collected_at === null || isStr(p.collected_at));
 }
 
+function isPricing(v: unknown): boolean {
+  if (!v || typeof v !== "object") return false;
+  const p = v as Record<string, unknown>;
+  return typeof p.base_price === "number" && typeof p.discount_amount === "number" &&
+    (p.discount_label === null || isStr(p.discount_label));
+}
+
 function isActions(v: unknown): boolean {
   if (!v || typeof v !== "object") return false;
   const a = v as Record<string, unknown>;
@@ -228,7 +259,7 @@ function isRegistration(v: unknown): boolean {
     typeof r.final_price === "number" && typeof r.participant_count === "number" && isStr(r.created_at) &&
     isCategory(r.category) && isEvent(r.event) &&
     Array.isArray(r.participants) && r.participants.every(isParticipant) &&
-    isActions(r.actions);
+    isPricing(r.pricing) && isActions(r.actions);
 }
 
 /** Number of registrations made with this email that are not yet on any account. 0 when absent or malformed. */

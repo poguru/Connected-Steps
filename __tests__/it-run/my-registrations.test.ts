@@ -20,6 +20,7 @@ import { POST as claimPost } from "@/app/api/it-run/my-registrations/claim/route
 import {
   buildMyRegistrations,
   claimEmailVariants,
+  discountLabel,
   paymentStatusView,
   registrationNote,
   canOfferCategoryChange,
@@ -42,7 +43,8 @@ const EVENT = { title: "The IT Run Sprint-2", event_date: "2027-02-07" };
 function reg(over: Partial<MyRegistrationRow> = {}): MyRegistrationRow {
   return {
     id: "reg-1", registration_code: "ITR-AAA", payment_status: "paid", registration_status: "active",
-    final_price: 799, participant_count: 1, created_at: "2026-10-01T10:00:00Z", category: CAT, event: EVENT, ...over,
+    final_price: 799, base_price: 799, discount_amount: 0, early_bird_offer_id: null,
+    participant_count: 1, created_at: "2026-10-01T10:00:00Z", category: CAT, event: EVENT, ...over,
   };
 }
 
@@ -173,6 +175,32 @@ describe("payment and registration status presentation", () => {
 
 // ── Claim helpers ─────────────────────────────────────────────────────────────
 
+describe("discountLabel and pricing", () => {
+  it("names the early bird offer, labels a coupon, and returns null with no discount", () => {
+    const offers = new Map([["offer-1", "Early Bird — 5K Timed Run"]]);
+    expect(discountLabel({ discount_amount: 119, early_bird_offer_id: "offer-1" }, offers)).toBe("Early Bird — 5K Timed Run");
+    expect(discountLabel({ discount_amount: 100, early_bird_offer_id: null }, offers)).toBe("Discount code");
+    expect(discountLabel({ discount_amount: 0, early_bird_offer_id: null }, offers)).toBeNull();
+  });
+
+  it("falls back to 'Early bird' when the offer name is unavailable", () => {
+    expect(discountLabel({ discount_amount: 119, early_bird_offer_id: "gone" }, new Map())).toBe("Early bird");
+  });
+
+  it("puts base price, discount label, and discount on each registration", () => {
+    const out = buildMyRegistrations(
+      [reg({ id: "eb", final_price: 680, base_price: 799, discount_amount: 119, early_bird_offer_id: "offer-1" })],
+      [], [], new Map([["offer-1", "Early Bird — 5K Timed Run"]]),
+    );
+    expect(out[0].pricing).toEqual({ base_price: 799, discount_amount: 119, discount_label: "Early Bird — 5K Timed Run" });
+  });
+
+  it("shows no discount label for a full-price registration", () => {
+    const out = buildMyRegistrations([reg()], [], []);
+    expect(out[0].pricing).toEqual({ base_price: 799, discount_amount: 0, discount_label: null });
+  });
+});
+
 describe("claimEmailVariants", () => {
   it("matches the email as typed and in lower case, and nothing else", () => {
     expect(claimEmailVariants("  Asha@Example.com ")).toEqual(["Asha@Example.com", "asha@example.com"]);
@@ -199,6 +227,7 @@ describe("parseMyRegistrations", () => {
     id: "reg-1", registration_code: "ITR-AAA", payment_status: "paid", registration_status: "active",
     final_price: 799, participant_count: 1, created_at: "2026-10-01T10:00:00Z",
     category: CAT, event: EVENT,
+    pricing: { base_price: 799, discount_amount: 0, discount_label: null },
     participants: [{ id: "p-1", first_name: "Asha", last_name: "Rao", participant_type: "solo", bib_number: null, qr_token: null, verification_status: "pending", collected_at: null }],
     actions: { canChangeCategory: true, canRequestRefund: true },
   };
@@ -226,6 +255,12 @@ describe("parseMyRegistrations", () => {
     expect(parseMyRegistrations({ registrations: [valid, { ...valid, final_price: "799" }] })).toBeNull();
     expect(parseMyRegistrations({ registrations: [valid, { ...valid, participants: [{ id: "p" }] }] })).toBeNull();
     expect(parseMyRegistrations({ registrations: [null] })).toBeNull();
+  });
+
+  it("rejects a registration without its pricing block", () => {
+    const noPricing: Record<string, unknown> = { ...valid };
+    delete noPricing.pricing;
+    expect(parseMyRegistrations({ registrations: [noPricing] })).toBeNull();
   });
 
   it("rejects a registration without its action flags", () => {
@@ -444,6 +479,29 @@ describe("GET /api/it-run/my-registrations", () => {
     const body = await res.json();
     expect(body.registrations).toHaveLength(1);
     expect(body.claimable).toBe(0);
+  });
+});
+
+describe("GET /api/it-run/my-registrations early bird pricing", () => {
+  it("returns the early bird name with the base price and discount for an early bird booking", async () => {
+    mockVerify.mockReturnValue(OWNER);
+    const db = fakeDb({
+      it_run_registrations: [{ data: [reg({ final_price: 680, base_price: 799, discount_amount: 119, early_bird_offer_id: "offer-1" })] }, { data: [] }],
+      it_run_participants: { data: [part()] },
+      it_run_early_bird_offers: { data: [{ id: "offer-1", name: "Early Bird — 5K Timed Run" }] },
+    });
+    mockDb.mockReturnValue(db);
+    const body = await (await GET(req("http://t/x", "tok"))).json();
+    expect(body.registrations[0].pricing).toEqual({ base_price: 799, discount_amount: 119, discount_label: "Early Bird — 5K Timed Run" });
+    expect(db.log).toContainEqual({ table: "it_run_early_bird_offers", method: "in", args: ["id", ["offer-1"]] });
+  });
+
+  it("makes no offer lookup when no registration has an early bird", async () => {
+    mockVerify.mockReturnValue(OWNER);
+    const db = fakeDb({ it_run_registrations: [{ data: [reg()] }, { data: [] }], it_run_participants: { data: [part()] } });
+    mockDb.mockReturnValue(db);
+    await GET(req("http://t/x", "tok"));
+    expect(db.log.some(l => l.table === "it_run_early_bird_offers")).toBe(false);
   });
 });
 

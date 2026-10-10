@@ -194,3 +194,44 @@ describe("GET /api/it-run/dashboard/[code]", () => {
     expect(new Set(touched)).toEqual(new Set(["it_run_registrations", "it_run_participants", "it_run_bib_slots"]));
   });
 });
+
+describe("GET /api/it-run/dashboard/[code] discount label", () => {
+  const EB_REG = {
+    ...REG, base_price: 799, discount_amount: 119, final_price: 680, early_bird_offer_id: "offer-1",
+  };
+
+  it("names the early bird offer for an early bird booking", async () => {
+    mockDb.mockReturnValue(fakeDb({
+      ...handlers(EB_REG),
+      it_run_early_bird_offers: () => ({ data: { name: "Early Bird — 5K Timed Run" }, error: null }),
+    }));
+    const body = await (await call(issueDashboardToken(CODE))).json();
+    expect(body.reg.discount_label).toBe("Early Bird — 5K Timed Run");
+    expect(body.reg.base_price).toBe(799);
+  });
+
+  it("labels a coupon discount as a discount code", async () => {
+    mockDb.mockReturnValue(fakeDb(handlers({ ...REG, base_price: 799, discount_amount: 100, final_price: 699, early_bird_offer_id: null })));
+    const body = await (await call(issueDashboardToken(CODE))).json();
+    expect(body.reg.discount_label).toBe("Discount code");
+  });
+
+  it("returns no label when no discount applied", async () => {
+    mockDb.mockReturnValue(fakeDb(handlers()));
+    const body = await (await call(issueDashboardToken(CODE))).json();
+    expect(body.reg.discount_label).toBeNull();
+  });
+
+  it("falls back to 'Early bird' when the offer name cannot be read, and never returns the offer id", async () => {
+    mockDb.mockReturnValue(fakeDb({
+      ...handlers(EB_REG),
+      it_run_early_bird_offers: () => ({ data: null, error: { code: "XX", message: "boom" } }),
+    }));
+    const res = await call(issueDashboardToken(CODE));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.reg.discount_label).toBe("Early bird");
+    expect(JSON.stringify(body)).not.toContain("offer-1");
+    expect(body.reg.early_bird_offer_id).toBeUndefined();
+  });
+});

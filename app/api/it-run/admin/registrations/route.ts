@@ -102,7 +102,7 @@ export async function GET(req: NextRequest) {
     .from("it_run_registrations")
     .select(`
       id, registration_code, lead_email, participant_count,
-      base_price, discount_amount, final_price, payment_status,
+      base_price, discount_amount, final_price, payment_status, early_bird_offer_id,
       registration_status, cancelled_reason, cancelled_at, admin_notes,
       created_at, updated_at,
       it_run_categories ( id, name, distance_km, category_type, color ),
@@ -147,10 +147,26 @@ export async function GET(req: NextRequest) {
 
   // Normalize PostgREST null nested arrays — same fix as dashboard API.
   // PostgREST returns null (not []) for empty to-many nested relations.
+  // Early bird names for the discount label. A failed lookup leaves the name null and does not hide the list.
+  const offerIds = Array.from(new Set(
+    (data ?? []).map(r => (r as Record<string, unknown>).early_bird_offer_id).filter((id): id is string => typeof id === "string"),
+  ));
+  const offerNames = new Map<string, string>();
+  if (offerIds.length > 0) {
+    const { data: offers, error: offerErr } = await db
+      .from("it_run_early_bird_offers")
+      .select("id, name")
+      .in("id", offerIds)
+      .returns<Array<{ id: string; name: string }>>();
+    if (offerErr) console.error("[it-run/admin/registrations] offer name lookup failed:", offerErr.code ?? "unknown");
+    for (const o of offers ?? []) offerNames.set(o.id, o.name);
+  }
+
   const normalized = (data ?? []).map((reg: unknown) => {
     const r = reg as Record<string, unknown>;
     return {
       ...r,
+      early_bird_name: typeof r.early_bird_offer_id === "string" ? (offerNames.get(r.early_bird_offer_id) ?? "Early bird") : null,
       it_run_participants: ((r.it_run_participants as unknown[] | null) ?? []).map(
       (p: unknown) => {
         const pr = p as Record<string, unknown>;

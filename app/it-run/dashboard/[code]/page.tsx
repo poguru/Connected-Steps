@@ -12,6 +12,7 @@ interface DashboardData {
   reg: {
     id: string; registration_code: string; lead_email: string;
     participant_count: number; base_price: number; discount_amount: number;
+    discount_label: string | null;
     final_price: number; payment_status: string; qr_token: string | null;
     it_run_categories: {
       id: string; slug: string; name: string; distance_km: number;
@@ -378,6 +379,11 @@ export default function DashboardPage() {
                 <div>
                   <div style={S.label}>Amount Paid</div>
                   <div style={{ fontSize: 20, fontWeight: 900, color: "#10b981" }}>Rs. {reg.final_price.toLocaleString("en-IN")}</div>
+                  {reg.discount_label && (
+                    <div style={{ fontSize: 12, color: "#60a5fa", marginTop: 4 }}>
+                      Base Rs. {reg.base_price.toLocaleString("en-IN")} &minus; {reg.discount_label} Rs. {reg.discount_amount.toLocaleString("en-IN")}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

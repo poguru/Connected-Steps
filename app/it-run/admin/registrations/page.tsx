@@ -25,6 +25,7 @@ type Participant = {
 type Registration = {
   id: string; registration_code: string; lead_email: string; participant_count: number;
   base_price: number; discount_amount: number; final_price: number;
+  early_bird_name: string | null;
   payment_status: string; registration_status: string;
   cancelled_reason: string | null; cancelled_at: string | null; admin_notes: string | null;
   created_at: string; updated_at: string;
@@ -48,10 +49,6 @@ const VER_COLOR: Record<string, string> = {
   verified:           GREEN,    pending: "#f59e0b",
   rejected:           "#ef4444", need_clarification: "#6366f1",
 };
-function chip(label: string, color: string) {
-  return { label, color, bg: `${color}18`, border: `1px solid ${color}30` };
-}
-
 // ── KV display ────────────────────────────────────────────────────────────────
 
 function KV({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
@@ -334,7 +331,9 @@ function RegistrationDetail({ reg, onParticipantSave, onCancel, onRefund, onNote
         <KV label="Lead Email"  value={reg.lead_email} />
         <KV label="Participants" value={reg.participant_count} />
         <KV label="Base Price"  value={`₹${reg.base_price.toLocaleString("en-IN")}`} />
-        <KV label="Discount"    value={reg.discount_amount > 0 ? `₹${reg.discount_amount.toLocaleString("en-IN")}` : "None"} />
+        <KV label="Discount"    value={reg.discount_amount > 0
+          ? `₹${reg.discount_amount.toLocaleString("en-IN")}${reg.early_bird_name ? ` (${reg.early_bird_name})` : reg.it_run_coupons?.code ? ` (code ${reg.it_run_coupons.code})` : ""}`
+          : "None"} />
         <KV label="Final Price" value={<span style={{ fontWeight: 700, color: GREEN }}>₹{reg.final_price.toLocaleString("en-IN")}</span>} />
         <KV label="Coupon"      value={reg.it_run_coupons?.code ?? "None"} mono />
         <KV label="Registered"  value={new Date(reg.created_at).toLocaleString("en-IN")} />
@@ -444,6 +443,8 @@ export default function RegistrationsPage() {
       .finally(() => setLoading(false));
   }, [page, payStatus, regStatus, catFilter, verFilter, search]);
 
+  // Loading state must show as soon as a filter changes; the request itself is the external sync.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
   // Debounced search

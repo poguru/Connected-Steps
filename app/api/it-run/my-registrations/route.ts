@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     .from("it_run_registrations")
     .select(`
       id, registration_code, payment_status, registration_status,
-      final_price, participant_count, created_at,
+      final_price, base_price, discount_amount, early_bird_offer_id, participant_count, created_at,
       category:it_run_categories ( name, distance_km, color, category_type ),
       event:it_run_events ( title, event_date )
     `)
@@ -87,8 +87,21 @@ export async function GET(req: NextRequest) {
     collections = cols ?? [];
   }
 
+  // Early bird names for the discount line. A failed lookup falls back to "Early bird" and does not hide the list.
+  const offerIds = Array.from(new Set(rows.map(r => r.early_bird_offer_id).filter((id): id is string => !!id)));
+  const offerNames = new Map<string, string>();
+  if (offerIds.length > 0) {
+    const { data: offers, error: offerErr } = await db
+      .from("it_run_early_bird_offers")
+      .select("id, name")
+      .in("id", offerIds)
+      .returns<Array<{ id: string; name: string }>>();
+    if (offerErr) console.error("[it-run/my-registrations] offer name lookup failed:", offerErr.code ?? "unknown");
+    for (const o of offers ?? []) offerNames.set(o.id, o.name);
+  }
+
   return NextResponse.json(
-    { registrations: buildMyRegistrations(rows, participants, collections), claimable },
+    { registrations: buildMyRegistrations(rows, participants, collections, offerNames), claimable },
     { headers: NO_STORE },
   );
 }

@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   if (type === "registrations") {
     let q = db
       .from("it_run_registrations")
-      .select("registration_code,lead_email,participant_count,base_price,discount_amount,final_price,payment_status,registration_status,created_at,it_run_categories(name),it_run_coupons(code)")
+      .select("registration_code,lead_email,participant_count,base_price,discount_amount,final_price,payment_status,registration_status,created_at,it_run_categories(name),it_run_coupons(code),it_run_early_bird_offers(name)")
       .eq("event_id", event.id)
       .order("created_at", { ascending: false });
     const payFilter = sp.get("payment_status");
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     if (catFilter) q = q.eq("category_id", catFilter);
     const { data } = await q;
 
-    csv  = "Registration Code,Lead Email,Participant Count,Base Price,Discount,Final Price,Payment Status,Reg Status,Coupon,Category,Registered At\n";
+    csv  = "Registration Code,Lead Email,Participant Count,Base Price,Discount,Final Price,Payment Status,Reg Status,Coupon,Offer,Category,Registered At\n";
     csv += (data ?? []).map(r => [
       r.registration_code,
       r.lead_email,
@@ -44,6 +44,7 @@ export async function GET(req: NextRequest) {
       r.payment_status,
       r.registration_status,
       (r.it_run_coupons as unknown as { code: string } | null)?.code ?? "",
+      (r.it_run_early_bird_offers as unknown as { name: string } | null)?.name ?? "",
       (r.it_run_categories as unknown as { name: string } | null)?.name ?? "",
       r.created_at,
     ].map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -90,16 +91,17 @@ export async function GET(req: NextRequest) {
   else if (type === "revenue") {
     const { data } = await db
       .from("it_run_registrations")
-      .select("registration_code,lead_email,base_price,discount_amount,final_price,payment_status,razorpay_payment_id,created_at,it_run_categories(name)")
+      .select("registration_code,lead_email,base_price,discount_amount,final_price,payment_status,razorpay_payment_id,created_at,it_run_categories(name),it_run_early_bird_offers(name)")
       .eq("event_id", event.id)
       .eq("payment_status", "paid")
       .order("created_at", { ascending: false });
 
-    csv  = "Registration Code,Email,Category,Base Price,Discount,Final Price,Payment ID,Date\n";
+    csv  = "Registration Code,Email,Category,Offer,Base Price,Discount,Final Price,Payment ID,Date\n";
     csv += (data ?? []).map(r => [
       r.registration_code,
       r.lead_email,
       (r.it_run_categories as unknown as { name: string } | null)?.name ?? "",
+      (r.it_run_early_bird_offers as unknown as { name: string } | null)?.name ?? "",
       r.base_price,
       r.discount_amount,
       r.final_price,

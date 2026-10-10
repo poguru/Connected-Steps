@@ -392,7 +392,12 @@ export default function MyRegistrationsPage() {
                     )}
 
                     {/* Footer */}
-                    <div style={{ marginTop: 14, fontSize: 12, color: "#333", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 4 }}>
+                    {reg.pricing.discount_label && (
+                      <div style={{ marginTop: 14, fontSize: 12, color: "#60a5fa" }}>
+                        Base &#8377;{reg.pricing.base_price.toLocaleString("en-IN")} &minus; {reg.pricing.discount_label} &#8377;{reg.pricing.discount_amount.toLocaleString("en-IN")}
+                      </div>
+                    )}
+                    <div style={{ marginTop: 6, fontSize: 12, color: "#333", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 4 }}>
                       <span>Registered {formatDate(reg.created_at)}</span>
                       {reg.final_price > 0 && (
                         <span>&#8377;{reg.final_price.toLocaleString("en-IN")}</span>
