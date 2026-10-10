@@ -45,39 +45,61 @@ export function verifyPassword(password: string, hash: string, salt: Buffer): bo
 
 // ── Session encoding/verification ─────────────────────────────────────────────
 
+// The session carries the event and the role's permissions, so route checks can read them without a database
+// lookup. The payload is JSON (base64url) so permission names and emails never collide with a separator.
 export function encodeStaffSession(session: StaffSession): string {
-  const payload = `${session.staffId}:${session.email}:${session.role}:${session.exp}`;
-  const secret = STAFF_SECRET();
+  const body = Buffer.from(JSON.stringify({
+    staffId: session.staffId,
+    email: session.email,
+    role: session.role,
+    eventId: session.eventId,
+    permissions: session.permissions,
+    exp: session.exp,
+  })).toString("base64url");
   const sig = crypto
-    .createHmac("sha256", secret)
-    .update(payload)
+    .createHmac("sha256", STAFF_SECRET())
+    .update(body)
     .digest("hex");
-  return `${payload}.${sig}`;
+  return `${body}.${sig}`;
 }
 
 export function verifyStaffSession(encoded: string): StaffSession | null {
   try {
-    const [payload, sig] = encoded.split(".");
-    if (!payload || !sig) return null;
+    const [body, sig] = encoded.split(".");
+    if (!body || !sig) return null;
 
-    const secret = STAFF_SECRET();
     const expectedSig = crypto
-      .createHmac("sha256", secret)
-      .update(payload)
+      .createHmac("sha256", STAFF_SECRET())
+      .update(body)
       .digest("hex");
 
-    if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))) {
+    const sigBuf = Buffer.from(sig);
+    const expectedBuf = Buffer.from(expectedSig);
+    if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
       return null;
     }
 
-    const [staffId, email, role, expStr] = payload.split(":");
-    const exp = parseInt(expStr, 10);
+    const data = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as Partial<StaffSession>;
+    const exp = Number(data.exp);
 
     if (!Number.isFinite(exp) || Date.now() > exp * 1000) {
       return null; // Expired
     }
+    if (typeof data.staffId !== "string" || typeof data.role !== "string" || typeof data.eventId !== "string") {
+      return null;
+    }
+    const permissions = Array.isArray(data.permissions) ? data.permissions.filter((p): p is string => typeof p === "string") : [];
 
-    return { staffId, email, fullName: "", eventId: "", role, permissions: [], status: "active", exp };
+    return {
+      staffId: data.staffId,
+      email: typeof data.email === "string" ? data.email : "",
+      fullName: "",
+      eventId: data.eventId,
+      role: data.role,
+      permissions,
+      status: "active",
+      exp,
+    };
   } catch {
     return null;
   }

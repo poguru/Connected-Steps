@@ -137,6 +137,22 @@ export async function GET(req: NextRequest) {
     });
   });
 
+  // Which services this volunteer may issue. The issue route enforces the same permissions; this only drives the buttons.
+  const SERVICE_PERMISSIONS: Array<{ type: string; permission: string }> = [
+    { type: "BIB", permission: "BIB_COLLECT" },
+    { type: "BREAKFAST", permission: "BREAKFAST_ISSUE" },
+    { type: "GOODIES", permission: "GOODIES_ISSUE" },
+    { type: "TSHIRT", permission: "TSHIRT_ISSUE" },
+    { type: "MEDAL", permission: "MEDAL_ISSUE" },
+    { type: "CERTIFICATE", permission: "CERTIFICATE_ISSUE" },
+  ];
+  const services = SERVICE_PERMISSIONS.map(s => ({
+    type: s.type,
+    allowed: requireStaffPermission(session, s.permission),
+    issued: entitlementMap.get(s.type)?.status === "issued",
+    issuedAt: entitlementMap.get(s.type)?.issuedAt ?? null,
+  }));
+
   // Check registration eligibility. Identity status does not gate eligibility here: it is shown as a warning and any
   // identity-based restriction is enforced where the service is issued, not in the lookup.
   const canIssue =
@@ -165,5 +181,6 @@ export async function GET(req: NextRequest) {
       registrationStatus: reg.registration_status,
     },
     entitlements: Object.fromEntries(entitlementMap),
+    services,
   });
 }

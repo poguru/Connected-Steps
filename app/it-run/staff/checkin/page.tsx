@@ -19,7 +19,24 @@ interface Participant {
   registrationStatus: string;
   verificationStatus: string;
   idDocumentType: string | null;
+  services: Service[];
 }
+
+interface Service {
+  type: string;
+  allowed: boolean;
+  issued: boolean;
+  issuedAt: string | null;
+}
+
+const SERVICE_LABEL: Record<string, string> = {
+  BIB: "BIB collected",
+  BREAKFAST: "Breakfast",
+  GOODIES: "Goodies",
+  TSHIRT: "T-shirt",
+  MEDAL: "Medal",
+  CERTIFICATE: "Certificate",
+};
 
 // Plain-language identity line for volunteers. The document itself and its number are never shown here.
 function identityLabel(p: Participant): { text: string; unverified: boolean } {
@@ -39,6 +56,43 @@ export default function CheckinPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkedIn, setCheckedIn] = useState(false);
+  const [issuing, setIssuing] = useState<string | null>(null);
+
+  // Issues one service. Each service is independent: a failure on one leaves the others as they were. A service that
+  // is already issued is never sent again; the server also refuses a duplicate and reports it as a conflict.
+  async function issueService(type: string) {
+    if (!participant || issuing) return;
+    setIssuing(type);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch("/api/it-run/staff/entitlements/issue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          participantId: participant.id,
+          entitlementType: type,
+          idempotencyKey: crypto.randomUUID(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok || res.status === 409) {
+        const issuedAt = new Date().toISOString();
+        setParticipant(p => p && {
+          ...p,
+          services: p.services.map(s => s.type === type ? { ...s, issued: true, issuedAt: s.issuedAt ?? issuedAt } : s),
+        });
+        if (res.status === 409) setError(data.error ?? `${SERVICE_LABEL[type] ?? type} already issued`);
+        else setSuccess(`${SERVICE_LABEL[type] ?? type} recorded`);
+      } else {
+        setError(data.error ?? "Could not record that service");
+      }
+    } catch {
+      setError("Network error");
+    } finally {
+      setIssuing(null);
+    }
+  }
 
   // The card stays on screen until the volunteer dismisses it or scans the next participant.
   async function handleScan(query: string) {
@@ -161,6 +215,34 @@ export default function CheckinPage() {
             {checkedIn && (
               <div style={{ padding: "10px 12px", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 8, color: "#10b981", fontSize: 12, marginBottom: 16 }}>
                 ℹ️ Already checked in
+              </div>
+            )}
+
+            {participant.services.some(s => s.allowed) && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, color: "#888", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Services</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {participant.services.filter(s => s.allowed).map(s => (
+                    <div key={s.type} style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 13, color: s.issued ? "#10b981" : "#ccc", fontWeight: 600 }}>
+                        {s.issued ? "✓ " : ""}{SERVICE_LABEL[s.type] ?? s.type}
+                      </span>
+                      <button
+                        onClick={() => issueService(s.type)}
+                        disabled={s.issued || !participant.canIssue || issuing !== null}
+                        style={{
+                          minHeight: 40, padding: "8px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: "inherit",
+                          background: s.issued ? "rgba(16,185,129,0.1)" : "#10b981", color: s.issued ? "#10b981" : "#fff",
+                          border: s.issued ? "1px solid rgba(16,185,129,0.3)" : "none",
+                          cursor: s.issued || !participant.canIssue || issuing !== null ? "not-allowed" : "pointer",
+                          opacity: !participant.canIssue && !s.issued ? 0.5 : 1,
+                        }}
+                      >
+                        {s.issued ? "Done" : issuing === s.type ? "Recording…" : "Record"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
