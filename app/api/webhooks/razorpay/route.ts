@@ -8,6 +8,7 @@ import { signEventQR }          from "@/lib/event-qr";
 import { sendEmail, eventRegistrationEmailHTML } from "@/lib/notify";
 import { activateMembership }   from "@/lib/membership-activate";
 import { sendItRunConfirmationEmail, sendItRunBibInviteEmail } from "@/lib/it-run-email";
+import { runAfterResponse } from "@/lib/after-response";
 
 // POST /api/webhooks/razorpay
 //
@@ -340,11 +341,9 @@ async function handleItRunPaymentCaptured(
 
   console.log(`${label} Payment confirmed via webhook — payment ${paymentId}`);
 
-  sendItRunConfirmationEmail(reg.id, reg.registration_code, reg.lead_email, reg.qr_token ?? "")
-    .catch(e => console.error(`${label} Confirmation email failed:`, e));
-
-  sendItRunBibInviteEmail(reg.id, reg.lead_email)
-    .catch(e => console.error(`${label} BIB invite email failed:`, e));
+  // After the response, so the function stays alive until the emails are sent (see lib/after-response.ts)
+  runAfterResponse("confirmation", () => sendItRunConfirmationEmail(reg.id, reg.registration_code, reg.lead_email, reg.qr_token ?? ""));
+  runAfterResponse("bib_invite", () => sendItRunBibInviteEmail(reg.id, reg.lead_email));
 
 }
 

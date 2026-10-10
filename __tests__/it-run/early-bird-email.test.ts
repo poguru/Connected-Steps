@@ -6,7 +6,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- test fakes are intentionally loosely typed */
 
 jest.mock("@/lib/supabase-server", () => ({ getSupabaseServer: jest.fn() }));
-jest.mock("@/lib/notify", () => ({ sendEmail: jest.fn().mockResolvedValue(undefined) }));
+jest.mock("@/lib/notify", () => ({ sendEmail: jest.fn().mockResolvedValue({ ok: true, to: "x", channel: "email" }) }));
 jest.mock("@/lib/it-run-dashboard-link", () => ({ buildDashboardUrl: () => "https://x/dash" }));
 
 import { getSupabaseServer } from "@/lib/supabase-server";

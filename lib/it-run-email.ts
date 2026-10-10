@@ -38,14 +38,14 @@ export async function sendItRunConfirmationEmail(
   const { data: reg } = await db
     .from("it_run_registrations")
     .select(`
-      id, registration_code, lead_email, final_price, base_price, discount_amount, early_bird_offer_id,
+      id, registration_code, lead_email, linked_user_email, final_price, base_price, discount_amount, early_bird_offer_id,
       confirmation_email_sent_at,
       it_run_categories ( name ),
       it_run_events ( title, event_date, venue_name, report_time )
     `)
     .eq("id", registrationId)
     .single<{
-      id: string; registration_code: string; lead_email: string;
+      id: string; registration_code: string; lead_email: string; linked_user_email: string | null;
       final_price: number; base_price: number; discount_amount: number; early_bird_offer_id: string | null;
       confirmation_email_sent_at: string | null;
       it_run_categories: { name: string } | null;
@@ -128,16 +128,53 @@ export async function sendItRunConfirmationEmail(
     })),
   });
 
-  await sendEmail(
-    leadEmail || reg.lead_email,
+  const recipients = confirmationRecipients(leadEmail || reg.lead_email, reg.linked_user_email);
+  if (recipients.length === 0) {
+    await releaseClaim(db, "confirmation_email_sent_at", registrationId);
+    console.error(JSON.stringify({ src: "it-run-email", kind: "confirmation", outcome: "no_recipient", reg: reg.registration_code }));
+    return;
+  }
+
+  const results = await Promise.all(recipients.map(to => sendEmail(
+    to,
     primaryName,
     `Registration Confirmed - The IT Run Sprint-2 (${reg.registration_code})`,
     html,
     false,
     true,
-  );
+  )));
+  const failed = results.filter(r => !r.ok);
+  if (failed.length > 0) {
+    // Release the claim so an admin resend (or a later trigger) can send it again
+    await releaseClaim(db, "confirmation_email_sent_at", registrationId);
+    console.error(JSON.stringify({
+      src: "it-run-email", kind: "confirmation", outcome: "send_failed",
+      reg: reg.registration_code, failed: failed.length, of: recipients.length,
+      httpStatus: failed[0]?.httpStatus ?? null,
+    }));
+    return;
+  }
 
-  console.log(`${label} Confirmation email sent to ${leadEmail || reg.lead_email}`);
+  console.log(JSON.stringify({ src: "it-run-email", kind: "confirmation", outcome: "sent", reg: reg.registration_code, recipients: recipients.length }));
+}
+
+/**
+ * Who receives a booking's emails: the address on the registration and, when a different address belongs to the
+ * signed-in account that made the booking, that account too. Each address is listed once, case-insensitively.
+ */
+export function confirmationRecipients(leadEmail: string | null, linkedUserEmail: string | null): string[] {
+  const seen = new Map<string, string>();
+  for (const raw of [leadEmail, linkedUserEmail]) {
+    const value = (raw ?? "").trim();
+    // Keep the first spelling seen (the registration address as typed)
+    if (value && !seen.has(value.toLowerCase())) seen.set(value.toLowerCase(), value);
+  }
+  return Array.from(seen.values());
+}
+
+/** Clears a "sent" claim after a failed send, so the email is not recorded as delivered. */
+async function releaseClaim(db: ReturnType<typeof getSupabaseServer>, column: string, registrationId: string): Promise<void> {
+  await db.from("it_run_registrations").update({ [column]: null }).eq("id", registrationId);
 }
 
 // ── Email builder ─────────────────────────────────────────────────────────────
@@ -187,14 +224,14 @@ export async function sendItRunBibInviteEmail(
   const { data: reg } = await db
     .from("it_run_registrations")
     .select(`
-      id, registration_code, lead_email, participant_count,
+      id, registration_code, lead_email, linked_user_email, participant_count,
       bib_invite_token, bib_invite_sent_at,
       it_run_categories ( name ),
       it_run_events ( title, event_date, venue_name )
     `)
     .eq("id", registrationId)
     .single<{
-      id: string; registration_code: string; lead_email: string;
+      id: string; registration_code: string; lead_email: string; linked_user_email: string | null;
       participant_count: number;
       bib_invite_token: string | null; bib_invite_sent_at: string | null;
       it_run_categories: { name: string } | null;
@@ -253,17 +290,33 @@ export async function sendItRunBibInviteEmail(
     isDuo,
   });
 
-  const recipient = leadEmail || reg.lead_email;
-  await sendEmail(
-    recipient,
+  const recipients = confirmationRecipients(leadEmail || reg.lead_email, reg.linked_user_email);
+  if (recipients.length === 0) {
+    await releaseClaim(db, "bib_invite_sent_at", registrationId);
+    console.error(JSON.stringify({ src: "it-run-email", kind: "bib_invite", outcome: "no_recipient", reg: reg.registration_code }));
+    return;
+  }
+
+  const results = await Promise.all(recipients.map(to => sendEmail(
+    to,
     reg.registration_code,
     `Book Your BIB Collection Slot — IT Run Sprint-2 (${reg.registration_code})`,
     html,
     false,
     true,
-  );
+  )));
+  const failed = results.filter(r => !r.ok);
+  if (failed.length > 0) {
+    await releaseClaim(db, "bib_invite_sent_at", registrationId);
+    console.error(JSON.stringify({
+      src: "it-run-email", kind: "bib_invite", outcome: "send_failed",
+      reg: reg.registration_code, failed: failed.length, of: recipients.length,
+      httpStatus: failed[0]?.httpStatus ?? null,
+    }));
+    return;
+  }
 
-  console.log(`${label} BIB invite email sent to ${recipient}`);
+  console.log(JSON.stringify({ src: "it-run-email", kind: "bib_invite", outcome: "sent", reg: reg.registration_code, recipients: recipients.length }));
 }
 
 interface BibInviteEmailArgs {

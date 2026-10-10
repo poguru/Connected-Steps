@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyPaymentSignature } from "@/lib/razorpay-security";
 import { sendItRunConfirmationEmail, sendItRunBibInviteEmail } from "@/lib/it-run-email";
+import { runAfterResponse } from "@/lib/after-response";
 import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
 
 // POST /api/it-run/payment/verify
@@ -98,13 +99,10 @@ export async function POST(req: NextRequest) {
 
     console.log(`[it-run/payment/verify] Registration ${reg.registration_code} confirmed via client verify — payment ${paymentId}`);
 
-    // Send confirmation email with per-participant QR codes (fire-and-forget)
-    sendItRunConfirmationEmail(reg.id, reg.registration_code, reg.lead_email, "")
-      .catch(e => console.error("[it-run/payment/verify] confirmation email error:", e));
-
-    // Send BIB collection invite if bib_invite_token is set (fire-and-forget)
-    sendItRunBibInviteEmail(reg.id, reg.lead_email)
-      .catch(e => console.error("[it-run/payment/verify] bib invite email error:", e));
+    // Confirmation and BIB invite run after the response, so the function stays alive until they finish.
+    // A failed send releases its "sent" claim, so the email can be resent from the admin portal.
+    runAfterResponse("confirmation", () => sendItRunConfirmationEmail(reg.id, reg.registration_code, reg.lead_email, ""));
+    runAfterResponse("bib_invite", () => sendItRunBibInviteEmail(reg.id, reg.lead_email));
 
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
