@@ -81,9 +81,15 @@ async function handleDashboard(
 
   // Plain registration codes need a signed-in owner. Tokens already proved access above.
   if (!viaToken) {
-    const sessionEmail = verifyUserToken(req.cookies.get(USER_SESSION_COOKIE)?.value ?? "");
+    const rawSession = req.cookies.get(USER_SESSION_COOKIE)?.value ?? "";
+    const sessionEmail = verifyUserToken(rawSession);
     if (!sessionEmail) {
-      // No valid session: ask the participant to sign in
+      // No valid session: say why, without logging the cookie value. "no_cookie" means the request
+      // did not carry the session; "not_verified" means it carried one that failed verification or expired.
+      console.warn(JSON.stringify({
+        src: "it-run-dashboard", rid, stage: "session", outcome: "auth_missing",
+        reason: rawSession ? "not_verified" : "no_cookie",
+      }));
       return NextResponse.json({
         error: "Please sign in to view your registration.",
         code: "AUTH_REQUIRED",

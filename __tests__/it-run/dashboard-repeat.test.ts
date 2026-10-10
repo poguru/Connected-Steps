@@ -89,6 +89,7 @@ beforeEach(() => {
   logs = [];
   jest.spyOn(console, "log").mockImplementation((...a: unknown[]) => { logs.push(a.map(String).join(" ")); });
   jest.spyOn(console, "error").mockImplementation((...a: unknown[]) => { logs.push(a.map(String).join(" ")); });
+  jest.spyOn(console, "warn").mockImplementation((...a: unknown[]) => { logs.push(a.map(String).join(" ")); });
 });
 
 afterEach(() => {
@@ -142,12 +143,25 @@ describe("repeated dashboard opens", () => {
 });
 
 describe("failure types", () => {
-  it("no session: 401 AUTH_REQUIRED", async () => {
+  it("no session: 401 AUTH_REQUIRED, logged as no_cookie", async () => {
     mockUser.mockReturnValue(null);
     mockDb.mockReturnValue(fakeDb());
     const res = await call({ cookie: false });
     expect(res.status).toBe(401);
     expect(classifyDashboardFailure(res.status, await res.json())).toBe("AUTH_REQUIRED");
+    expect(logs.some(l => l.includes('"reason":"no_cookie"'))).toBe(true);
+  });
+
+  it("a session cookie that fails verification: 401, logged as not_verified, cookie value not logged", async () => {
+    mockUser.mockReturnValue(null);
+    mockDb.mockReturnValue(fakeDb());
+    const res = await GET(
+      new NextRequest(`http://t/api/it-run/dashboard/${CODE}`, { headers: { cookie: "cs_user_session=secret-value-xyz" } }),
+      { params: Promise.resolve({ code: CODE }) },
+    );
+    expect(res.status).toBe(401);
+    expect(logs.some(l => l.includes('"reason":"not_verified"'))).toBe(true);
+    expect(logs.join("\n")).not.toContain("secret-value-xyz");
   });
 
   it("signed in to another account: 403 FORBIDDEN", async () => {
