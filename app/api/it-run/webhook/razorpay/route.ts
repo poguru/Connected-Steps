@@ -100,6 +100,24 @@ export async function POST(req: NextRequest) {
       break;
     }
 
+    // Paid category change (upgrade). Applied by the same idempotent handler the general webhook and the
+    // participant's verify call use, so a duplicate delivery changes nothing. Registration payments are left
+    // to the general webhook.
+    case "payment.captured": {
+      const payment = event.payload?.payment?.entity;
+      if (payment?.notes?.type === "it_run_category_change") {
+        const changeId: string | undefined = payment.notes?.it_run_change_id;
+        if (changeId && payment.order_id) {
+          const { applyPaidCategoryChange } = await import("@/lib/it-run-category-change");
+          const result = await applyPaidCategoryChange(db, {
+            changeId, orderId: payment.order_id, paymentId: payment.id, amountPaise: payment.amount, actor: "razorpay-webhook",
+          });
+          console.log(`[razorpay-webhook] category change ${changeId}: ${result.kind}`);
+        }
+      }
+      break;
+    }
+
     default:
       console.log(`[razorpay-webhook] Unhandled event: ${event.event}`);
   }
