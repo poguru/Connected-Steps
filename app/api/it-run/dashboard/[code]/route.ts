@@ -2,17 +2,40 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 import { verifyDashboardToken } from "@/lib/it-run-dashboard-link";
+import { randomUUID } from "crypto";
 
 // GET /api/it-run/dashboard/[code]
 // [code] is either a signed dashboard token (from the email or registration page) or a plain
 // registration code. Access:
 //   - Valid token: read access to that one registration, no sign-in needed.
 //   - Plain code: only from a signed-in account that owns the registration (linked_user_email).
+//     No session -> 401 AUTH_REQUIRED. Signed in but not the owner -> 403 FORBIDDEN.
 // Read-only: nothing here changes registration, payment, BIB, or QR state.
+//
+// Every response carries an x-request-id header. The server logs one line per request with the
+// status and duration, and one line per failing stage, all with that id. No cookies, tokens, codes
+// or participant details are logged.
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ code: string }> }
+  ctx: { params: Promise<{ code: string }> }
 ) {
+  const rid = randomUUID();
+  const started = Date.now();
+  const res = await handleDashboard(req, ctx, rid);
+  res.headers.set("x-request-id", rid);
+  console.log(JSON.stringify({ src: "it-run-dashboard", rid, status: res.status, ms: Date.now() - started }));
+  return res;
+}
+
+function stageFailure(rid: string, stage: string, err: { code?: string } | null | undefined) {
+  console.error(JSON.stringify({ src: "it-run-dashboard", rid, stage, outcome: "query_error", dbCode: err?.code ?? "unknown" }));
+}
+
+async function handleDashboard(
+  req: NextRequest,
+  { params }: { params: Promise<{ code: string }> },
+  rid: string,
+): Promise<NextResponse> {
   const { code } = await params;
   if (!code) return NextResponse.json({ error: "Code required" }, { status: 400 });
 
@@ -51,7 +74,7 @@ export async function GET(
     }>();
 
   if (regErr) {
-    console.error("[it-run/dashboard] registration query failed:", regErr.code ?? "unknown");
+    stageFailure(rid, "registration_query", regErr);
     return NextResponse.json({ error: "We couldn't load your dashboard right now.", code: "SERVER_ERROR" }, { status: 500 });
   }
   if (!reg) return NextResponse.json({ error: "We couldn't find a registration associated with this link.", code: "NOT_FOUND" }, { status: 404 });
@@ -59,13 +82,20 @@ export async function GET(
   // Plain registration codes need a signed-in owner. Tokens already proved access above.
   if (!viaToken) {
     const sessionEmail = verifyUserToken(req.cookies.get(USER_SESSION_COOKIE)?.value ?? "");
-    const owns = !!sessionEmail && !!reg.linked_user_email &&
-      sessionEmail.toLowerCase() === reg.linked_user_email.toLowerCase();
-    if (!owns) {
+    if (!sessionEmail) {
+      // No valid session: ask the participant to sign in
       return NextResponse.json({
         error: "Please sign in to view your registration.",
         code: "AUTH_REQUIRED",
       }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
+    }
+    const owns = !!reg.linked_user_email && sessionEmail.toLowerCase() === reg.linked_user_email.toLowerCase();
+    if (!owns) {
+      // Signed in, but this registration belongs to another account (or to none)
+      return NextResponse.json({
+        error: "This registration is not linked to the account you are signed in with.",
+        code: "FORBIDDEN",
+      }, { status: 403, headers: { "Cache-Control": "private, no-store" } });
     }
   }
   // The linked account email and the offer id are internal; only the offer's name is sent.
@@ -81,7 +111,7 @@ export async function GET(
         .select("name")
         .eq("id", offerId)
         .maybeSingle<{ name: string }>();
-      if (offerErr) console.error("[it-run/dashboard] offer name lookup failed:", offerErr.code ?? "unknown");
+      if (offerErr) stageFailure(rid, "offer_lookup", offerErr);
       discountLabel = offer?.name ?? "Early bird";
     } else {
       discountLabel = "Discount code";
@@ -102,7 +132,7 @@ export async function GET(
     .eq("registration_id", reg.id);
 
   if (participantsErr || !participants) {
-    console.error("[it-run/dashboard] participant query failed:", participantsErr?.code ?? "no rows array");
+    stageFailure(rid, "participants_query", participantsErr ?? null);
     return NextResponse.json({ error: "We couldn't load your dashboard right now.", code: "SERVER_ERROR" }, { status: 500 });
   }
 
@@ -116,7 +146,7 @@ export async function GET(
     .order("start_time");
 
   if (bibSlotsErr || !bibSlots) {
-    console.error("[it-run/dashboard] bib slot query failed:", bibSlotsErr?.code ?? "no rows array");
+    stageFailure(rid, "bib_slots_query", bibSlotsErr ?? null);
     return NextResponse.json({ error: "We couldn't load your dashboard right now.", code: "SERVER_ERROR" }, { status: 500 });
   }
 

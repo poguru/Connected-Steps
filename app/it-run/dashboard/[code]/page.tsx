@@ -242,6 +242,8 @@ export default function DashboardPage() {
   const [loading, setLoading]  = useState(true);
   const [failure, setFailure]  = useState<DashboardFailureKind | null>(null);
   const [attempt, setAttempt]  = useState(0);
+  // Server correlation id of the failed request, shown so a failure can be traced in the logs
+  const [requestId, setRequestId] = useState<string | null>(null);
 
   // Loads on mount and on every retry (attempt). State is only set after the await.
   useEffect(() => {
@@ -254,6 +256,7 @@ export default function DashboardPage() {
         if (!active) return;
 
         if (!res.ok) {
+          setRequestId(res.headers.get("x-request-id"));
           setFailure(classifyDashboardFailure(res.status, body));
         } else if (!isDashboardPayload(body)) {
           // Required fields missing or malformed: report it, never render partial data
@@ -273,6 +276,7 @@ export default function DashboardPage() {
   function retry() {
     setLoading(true);
     setFailure(null);
+    setRequestId(null);
     setAttempt(a => a + 1);
   }
 
@@ -291,6 +295,9 @@ export default function DashboardPage() {
         <div style={{ fontSize: 15, color: "#f87171", marginBottom: 20, lineHeight: 1.6 }}>
           {DASHBOARD_FAILURE_MESSAGES[failure ?? "NOT_FOUND"]}
         </div>
+        {requestId && (
+          <div style={{ fontSize: 11, color: "#666", marginBottom: 16, fontFamily: "monospace" }}>Reference: {requestId}</div>
+        )}
         <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
           {(failure === "SERVER_ERROR" || failure === "NETWORK" || failure === "INVALID_RESPONSE") && (
             <button onClick={retry} style={{ ...S.btn, background: ACCENT, color: "#fff" }}>Try again</button>

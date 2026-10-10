@@ -11,11 +11,12 @@
  */
 
 export type DashboardFailureKind =
-  | "NOT_FOUND" | "SERVER_ERROR" | "INVALID_RESPONSE" | "NETWORK"
+  | "NOT_FOUND" | "FORBIDDEN" | "SERVER_ERROR" | "INVALID_RESPONSE" | "NETWORK"
   | "AUTH_REQUIRED" | "EXPIRED_LINK" | "INVALID_LINK";
 
 export const DASHBOARD_FAILURE_MESSAGES: Record<DashboardFailureKind, string> = {
   NOT_FOUND: "We couldn't find a registration associated with this link.",
+  FORBIDDEN: "This registration is not linked to the account you are signed in with. Sign in with the account you registered with.",
   SERVER_ERROR: "We couldn't load your dashboard right now. Your registration has not been changed. Please try again.",
   INVALID_RESPONSE: "We couldn't load your dashboard right now. Your registration has not been changed. Please try again.",
   NETWORK: "We couldn't load your dashboard right now. Check your connection and try again.",
@@ -78,6 +79,7 @@ export function classifyDashboardFailure(status: number, body: unknown): Dashboa
   if (status === 410 || code === "EXPIRED_LINK") return "EXPIRED_LINK";
   if (code === "INVALID_LINK") return "INVALID_LINK";
   if (status === 404 || code === "NOT_FOUND") return "NOT_FOUND";
+  if (status === 403 || code === "FORBIDDEN") return "FORBIDDEN";
   if (status >= 500 || code === "SERVER_ERROR") return "SERVER_ERROR";
   return "INVALID_RESPONSE";
 }

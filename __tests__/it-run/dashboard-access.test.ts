@@ -150,7 +150,8 @@ describe("GET /api/it-run/dashboard/[code]", () => {
 
     const res = await call(CODE, { cookie: "other-session" });
 
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(403);
+    expect((await res.json()).code).toBe("FORBIDDEN");
   });
 
   it("allows the owning account to open a plain code", async () => {
