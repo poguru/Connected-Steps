@@ -392,7 +392,7 @@ describe("GET /api/it-run/my-registrations", () => {
     mockDb.mockReturnValue(db);
     const res = await GET(req("http://t/x", "tok"));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ registrations: [], claimable: 0 });
+    expect(await res.json()).toEqual({ registrations: [], claimable: 0, participantChangesOpen: true });
     expect(db.log.some(l => l.table === "it_run_participants")).toBe(false);
   });
 

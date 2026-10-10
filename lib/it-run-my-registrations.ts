@@ -97,6 +97,7 @@ export function buildMyRegistrations(
   participants: MyRegParticipantRow[],
   collections: MyRegCollectionRow[],
   offerNames: Map<string, string> = new Map(),
+  changesOpen = true,
 ): MyRegistration[] {
   const collectedAt = new Map<string, string>();
   for (const c of collections) {
@@ -144,8 +145,9 @@ export function buildMyRegistrations(
       },
       participants: byRegistration.get(r.id) ?? [],
       actions: {
-        canChangeCategory: canOfferCategoryChange(r),
-        canRequestRefund: canRequestRefund(r),
+        // After the participant cutoff nothing can be changed or requested, whatever the registration state
+        canChangeCategory: changesOpen && canOfferCategoryChange(r),
+        canRequestRefund: changesOpen && canRequestRefund(r),
       },
     });
   }
@@ -260,6 +262,12 @@ function isRegistration(v: unknown): boolean {
     isCategory(r.category) && isEvent(r.event) &&
     Array.isArray(r.participants) && r.participants.every(isParticipant) &&
     isPricing(r.pricing) && isActions(r.actions);
+}
+
+/** Whether participant changes are open. Fails closed: anything other than an explicit true is treated as closed. */
+export function parseChangesOpen(body: unknown): boolean {
+  if (!body || typeof body !== "object") return false;
+  return (body as { participantChangesOpen?: unknown }).participantChangesOpen === true;
 }
 
 /** Number of registrations made with this email that are not yet on any account. 0 when absent or malformed. */

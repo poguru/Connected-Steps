@@ -5,6 +5,7 @@ import { getClientIp } from "@/lib/rate-limit";
 import { requiredParticipantCount, type CategoryType } from "@/lib/it-run-category-rules";
 import { getRazorpaySDK } from "@/lib/razorpay-client";
 import { sendCategoryChangeEmail } from "@/lib/it-run-category-change";
+import { participantChangesOpen, participantChangesClosedBody } from "@/lib/it-run-participant-cutoff";
 
 // Participant category change for an existing registration.
 //
@@ -65,6 +66,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const owned = await ownedRegistration(req, id);
   if ("error" in owned) return owned.error;
+  if (!participantChangesOpen()) {
+    return NextResponse.json(participantChangesClosedBody(), { status: 403, headers: { "Cache-Control": "private, no-store" } });
+  }
   const { reg } = owned;
 
   const db = getSupabaseServer();
@@ -110,6 +114,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params;
   const owned = await ownedRegistration(req, id);
   if ("error" in owned) return owned.error;
+  // Checked before anything is read or written: a closed request changes nothing
+  if (!participantChangesOpen()) {
+    return NextResponse.json(participantChangesClosedBody(), { status: 403 });
+  }
   const { reg, email } = owned;
 
   let body: { categoryId?: unknown };

@@ -3,6 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 import { requiredParticipantCount, type CategoryType } from "@/lib/it-run-category-rules";
 import { getRefundedAmountPaise, paidAmountPaise } from "@/lib/it-run-refunds";
+import { participantChangesOpen, participantChangesClosedBody } from "@/lib/it-run-participant-cutoff";
 
 // POST /api/it-run/registrations/[id]/downgrade   { categoryId, reason }
 //
@@ -37,6 +38,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const email = verifyUserToken(req.cookies.get(USER_SESSION_COOKIE)?.value ?? "");
   if (!email) return NextResponse.json({ error: "Please sign in.", code: "AUTH_REQUIRED" }, { status: 401, headers: NO_STORE });
+  if (!participantChangesOpen()) {
+    return NextResponse.json(participantChangesClosedBody(), { status: 403, headers: NO_STORE });
+  }
 
   let body: { categoryId?: unknown; reason?: unknown };
   try {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
+import { participantChangesOpen } from "@/lib/it-run-participant-cutoff";
 import {
   buildMyRegistrations,
   claimEmailVariants,
@@ -54,9 +55,12 @@ export async function GET(req: NextRequest) {
   if (claimErr) console.error("[it-run/my-registrations] claimable count failed:", claimErr.code ?? "unknown");
   const claimable = claimErr ? 0 : (unclaimed ?? []).length;
 
+  // Server clock. After the cutoff the list is still returned, but no change or refund action is offered.
+  const changesOpen = participantChangesOpen();
+
   const rows = regs ?? [];
   if (rows.length === 0) {
-    return NextResponse.json({ registrations: [], claimable }, { headers: NO_STORE });
+    return NextResponse.json({ registrations: [], claimable, participantChangesOpen: changesOpen }, { headers: NO_STORE });
   }
 
   const { data: parts, error: partErr } = await db
@@ -101,7 +105,7 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json(
-    { registrations: buildMyRegistrations(rows, participants, collections, offerNames), claimable },
+    { registrations: buildMyRegistrations(rows, participants, collections, offerNames, changesOpen), claimable, participantChangesOpen: changesOpen },
     { headers: NO_STORE },
   );
 }

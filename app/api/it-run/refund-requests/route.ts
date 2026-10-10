@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
+import { participantChangesOpen, participantChangesClosedBody } from "@/lib/it-run-participant-cutoff";
 
 // Participant refund requests.
 // A request is ONLY a request. Creating one never calls Razorpay, never cancels the
@@ -64,6 +65,10 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const userEmail = verifyUserToken(req.cookies.get(USER_SESSION_COOKIE)?.value ?? "");
   if (!userEmail) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Closed before anything is read or written. Existing requests stay visible (GET) and admins still process them.
+  if (!participantChangesOpen()) {
+    return NextResponse.json(participantChangesClosedBody(), { status: 403 });
+  }
 
   let body: { registration_code?: unknown; reason?: unknown };
   try {

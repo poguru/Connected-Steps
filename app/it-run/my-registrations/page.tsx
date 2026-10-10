@@ -5,9 +5,11 @@ import Link from "next/link";
 import Image from "next/image";
 import RefundRequestPanel from "./RefundRequestPanel";
 import CategoryChangeButton from "./CategoryChangeButton";
+import { CUTOFF_CLOSED_MESSAGE } from "@/lib/it-run-participant-cutoff";
 import {
   parseMyRegistrations,
   parseClaimableCount,
+  parseChangesOpen,
   paymentStatusView,
   registrationNote,
   loadFailureMessage,
@@ -31,7 +33,7 @@ type LoadState =
   | { status: "loading" }
   | { status: "signed_out" }
   | { status: "error"; kind: MyRegistrationsLoadFailure }
-  | { status: "ready"; email: string; registrations: MyRegistration[]; claimable: number };
+  | { status: "ready"; email: string; registrations: MyRegistration[]; claimable: number; changesOpen: boolean };
 
 /** Session check first, then the registrations. Every failure is classified; no raw server text reaches the page. */
 async function fetchMyRegistrations(): Promise<LoadState> {
@@ -60,7 +62,11 @@ async function fetchMyRegistrations(): Promise<LoadState> {
   const registrations = parseMyRegistrations(body);
   if (!registrations) return { status: "error", kind: "malformed" };
 
-  return { status: "ready", email: me.email, registrations, claimable: parseClaimableCount(body) };
+  return {
+    status: "ready", email: me.email, registrations, claimable: parseClaimableCount(body),
+    // Fails closed: a response without an explicit open flag hides every change action
+    changesOpen: parseChangesOpen(body),
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -226,6 +232,19 @@ export default function MyRegistrationsPage() {
                 Try again
               </button>
             )}
+          </div>
+        )}
+
+        {/* Cutoff notice: open until 15 January 2027, closed after it */}
+        {state.status === "ready" && (
+          <div role="note" style={{
+            background: state.changesOpen ? "rgba(96,165,250,0.06)" : "rgba(255,255,255,0.03)",
+            border: `1px solid ${state.changesOpen ? "rgba(96,165,250,0.2)" : "rgba(255,255,255,0.1)"}`,
+            borderRadius: 12, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#cbd5e1", lineHeight: 1.6,
+          }}>
+            {state.changesOpen
+              ? "Cancellations, category changes, and new refund requests are available until 15 January 2027."
+              : CUTOFF_CLOSED_MESSAGE}
           </div>
         )}
 
@@ -411,7 +430,7 @@ export default function MyRegistrationsPage() {
         )}
 
         {/* Independent of the registration list: a failed list request does not hide this section's own state */}
-        <RefundRequestPanel registrations={registrations} />
+        <RefundRequestPanel registrations={registrations} changesOpen={state.status === "ready" && state.changesOpen} />
       </div>
 
       <style>{`

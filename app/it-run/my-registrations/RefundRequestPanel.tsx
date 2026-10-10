@@ -42,7 +42,7 @@ const STATUS_COLOR: Record<RequestRow["status"], string> = {
 
 const ACCENT = "#e8620a";
 
-export default function RefundRequestPanel({ registrations }: { registrations: RefundEligibleRegistration[] }) {
+export default function RefundRequestPanel({ registrations, changesOpen }: { registrations: RefundEligibleRegistration[]; changesOpen: boolean }) {
   const eligible = registrations.filter(r =>
     r.final_price > 0 &&
     ["paid", "partially_refunded"].includes(r.payment_status) &&
@@ -125,7 +125,12 @@ export default function RefundRequestPanel({ registrations }: { registrations: R
         Submitting a request does not cancel your registration or issue a refund. Our team reviews every request and you will see the decision here.
       </p>
 
-      {eligible.length > 0 && (
+      {!changesOpen && (
+        <div style={{ fontSize: 13, color: "#888", marginBottom: 14, lineHeight: 1.6 }}>
+          New refund requests closed on 15 January 2027. Requests already submitted stay here, and their status is updated as our team reviews them.
+        </div>
+      )}
+      {changesOpen && eligible.length > 0 && (
         <form onSubmit={submit} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
           <label style={{ display: "block", fontSize: 12, color: "#aaa", marginBottom: 6 }}>Registration</label>
           <select value={code} onChange={e => setCode(e.target.value)} style={{ ...INPUT, marginBottom: 12 }}>
