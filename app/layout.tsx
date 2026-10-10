@@ -1,21 +1,25 @@
 import type { Metadata, Viewport } from "next";
-import { Cormorant_Garamond, DM_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import CookieBanner from "@/components/ui/CookieBanner";
 import NativeShell from "@/components/mobile/NativeShell";
 import BugReportFab from "@/components/ui/BugReportFab";
 import { ToastProvider } from "@/components/ui/ds";
 
-const cormorant = Cormorant_Garamond({
-  subsets: ["latin"],
-  weight: ["300", "400", "600"],
+// Self-hosted (latin subset of Google Fonts, OFL). The build no longer fetches fonts from Google,
+// which made Vercel builds fail when the fetch was unavailable. Both files are variable fonts.
+const cormorant = localFont({
+  src: "./fonts/cormorant-garamond-latin.woff2",
+  weight: "300 600",
+  style: "normal",
   variable: "--font-cormorant",
   display: "swap",
 });
 
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500"],
+const dmSans = localFont({
+  src: "./fonts/dm-sans-latin.woff2",
+  weight: "400 500",
+  style: "normal",
   variable: "--font-dm-sans",
   display: "swap",
 });

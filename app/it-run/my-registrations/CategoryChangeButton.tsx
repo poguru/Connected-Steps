@@ -48,7 +48,7 @@ function loadCheckout(): Promise<void> {
   });
 }
 
-export default function CategoryChangeButton({ registrationId }: { registrationId: string }) {
+export default function CategoryChangeButton({ registrationId, onChanged }: { registrationId: string; onChanged?: () => void }) {
   const [open, setOpen]       = useState(false);
   const [loading, setLoading] = useState(false);
   const [data, setData]       = useState<Loaded | null>(null);
@@ -99,9 +99,10 @@ export default function CategoryChangeButton({ registrationId }: { registrationI
         });
         const body = await res.json().catch(() => ({})) as { error?: string };
         if (res.ok) {
-          setDone(`Your category is now ${start.toCategory.name}. You paid the difference, and your registration ID and QR code are unchanged. Refresh to see the update.`);
+          setDone(`Your category is now ${start.toCategory.name}. You paid the difference, and your registration ID and QR code are unchanged.`);
           setData(null);
           setOpen(false);
+          onChanged?.();
         } else {
           setError(body.error ?? "We could not confirm the payment yet. Please refresh in a moment.");
         }
@@ -129,9 +130,10 @@ export default function CategoryChangeButton({ registrationId }: { registrationI
         await payDifference(body as PaymentStart);
         return;
       }
-      setDone(`Your category is now ${body.category?.name ?? opt.name}. Your registration ID and QR code are unchanged. Refresh to see the update.`);
+      setDone(`Your category is now ${body.category?.name ?? opt.name}. Your registration ID and QR code are unchanged.`);
       setData(null);
       setOpen(false);
+      onChanged?.();
     } catch {
       setError("We couldn't reach the server. Your category has not been changed.");
     } finally {

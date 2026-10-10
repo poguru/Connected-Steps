@@ -1,35 +1,94 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
+import {
+  buildMyRegistrations,
+  claimEmailVariants,
+  type MyRegistrationRow,
+  type MyRegParticipantRow,
+  type MyRegCollectionRow,
+} from "@/lib/it-run-my-registrations";
 
 // GET /api/it-run/my-registrations
-// Returns all IT Run registrations linked to the authenticated CS user.
-// Requires cs_user_session cookie.
+// Returns the IT Run registrations linked to the signed-in Connected Steps account, with participants,
+// BIB numbers, and QR tokens. Identity comes only from the signed session cookie. No query parameter or
+// request body can select another account's registrations.
+//
+// Queries are separate on purpose: BIB collections belong to participants, not to registrations, so they
+// cannot be embedded under a registration. Assembly is in lib/it-run-my-registrations.ts.
+
+const NO_STORE = { "Cache-Control": "private, no-store" };
+
 export async function GET(req: NextRequest) {
   const userEmail = verifyUserToken(req.cookies.get(USER_SESSION_COOKIE)?.value ?? "");
   if (!userEmail) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: NO_STORE });
   }
 
   const db = getSupabaseServer();
 
-  const { data, error } = await db
+  const { data: regs, error: regErr } = await db
     .from("it_run_registrations")
     .select(`
       id, registration_code, payment_status, registration_status,
-      final_price, created_at, lead_email,
-      it_run_categories ( name, distance_km, color, category_type ),
-      it_run_events ( title, event_date ),
-      it_run_participants ( first_name, last_name, qr_token ),
-      it_run_bib_collections ( bib_number )
+      final_price, participant_count, created_at,
+      category:it_run_categories ( name, distance_km, color, category_type ),
+      event:it_run_events ( title, event_date )
     `)
     .eq("linked_user_email", userEmail)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .returns<MyRegistrationRow[]>();
 
-  if (error) {
-    console.error("[it-run/my-registrations] query error:", error.message);
-    return NextResponse.json({ error: "Failed to load registrations" }, { status: 500 });
+  if (regErr) {
+    console.error("[it-run/my-registrations] registrations query failed:", regErr.code ?? "unknown");
+    return NextResponse.json({ error: "Failed to load registrations" }, { status: 500, headers: NO_STORE });
   }
 
-  return NextResponse.json({ registrations: data ?? [] });
+  // Registrations made with this email that no account has claimed yet. A failure here must not hide the list.
+  const { data: unclaimed, error: claimErr } = await db
+    .from("it_run_registrations")
+    .select("id")
+    .in("lead_email", claimEmailVariants(userEmail))
+    .is("linked_user_email", null)
+    .returns<Array<{ id: string }>>();
+  if (claimErr) console.error("[it-run/my-registrations] claimable count failed:", claimErr.code ?? "unknown");
+  const claimable = claimErr ? 0 : (unclaimed ?? []).length;
+
+  const rows = regs ?? [];
+  if (rows.length === 0) {
+    return NextResponse.json({ registrations: [], claimable }, { headers: NO_STORE });
+  }
+
+  const { data: parts, error: partErr } = await db
+    .from("it_run_participants")
+    .select("id, registration_id, first_name, last_name, participant_type, bib_number, qr_token, verification_status")
+    .in("registration_id", rows.map(r => r.id))
+    .order("created_at", { ascending: true })
+    .returns<MyRegParticipantRow[]>();
+
+  if (partErr) {
+    console.error("[it-run/my-registrations] participants query failed:", partErr.code ?? "unknown");
+    return NextResponse.json({ error: "Failed to load registrations" }, { status: 500, headers: NO_STORE });
+  }
+
+  const participants = parts ?? [];
+  let collections: MyRegCollectionRow[] = [];
+  if (participants.length > 0) {
+    const { data: cols, error: colErr } = await db
+      .from("it_run_bib_collections")
+      .select("participant_id, collected_at")
+      .in("participant_id", participants.map(p => p.id))
+      .returns<MyRegCollectionRow[]>();
+
+    if (colErr) {
+      console.error("[it-run/my-registrations] BIB collection query failed:", colErr.code ?? "unknown");
+      return NextResponse.json({ error: "Failed to load registrations" }, { status: 500, headers: NO_STORE });
+    }
+    collections = cols ?? [];
+  }
+
+  return NextResponse.json(
+    { registrations: buildMyRegistrations(rows, participants, collections), claimable },
+    { headers: NO_STORE },
+  );
 }
