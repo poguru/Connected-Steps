@@ -7,7 +7,9 @@ import {
   getRefundedAmountPaise,
   finalizeRefundProcessed,
   markRefundFailed,
+  paidAmountPaise,
 } from "@/lib/it-run-refunds";
+import { requiredParticipantCount, type CategoryType } from "@/lib/it-run-category-rules";
 
 // POST /api/it-run/admin/refund
 // Executes an APPROVED refund request. Participants can never call this.
@@ -57,13 +59,14 @@ export async function POST(req: NextRequest) {
   // Step 1: registration
   const { data: reg } = await db
     .from("it_run_registrations")
-    .select("id, event_id, registration_code, razorpay_order_id, razorpay_payment_id, final_price, payment_status, registration_status, lead_email")
+    .select("id, event_id, registration_code, razorpay_order_id, razorpay_payment_id, final_price, amount_paid_paise, category_id, participant_count, payment_status, registration_status, lead_email")
     .eq("id", registration_id)
     .eq("event_id", event.id)
     .maybeSingle<{
       id: string; event_id: string; registration_code: string;
       razorpay_order_id: string | null; razorpay_payment_id: string | null;
-      final_price: number; payment_status: string; registration_status: string;
+      final_price: number; amount_paid_paise: number | null; category_id: string; participant_count: number;
+      payment_status: string; registration_status: string;
       lead_email: string;
     }>();
   if (!reg) return NextResponse.json({ error: "Registration not found" }, { status: 404 });
@@ -81,9 +84,12 @@ export async function POST(req: NextRequest) {
   // Step 1b: approved request for this registration
   const { data: request } = await db
     .from("it_run_refund_requests")
-    .select("id, registration_id, status")
+    .select("id, registration_id, status, request_kind, requested_amount_paise, target_category_id")
     .eq("id", request_id)
-    .maybeSingle<{ id: string; registration_id: string; status: string }>();
+    .maybeSingle<{
+      id: string; registration_id: string; status: string;
+      request_kind: string; requested_amount_paise: number | null; target_category_id: string | null;
+    }>();
   if (!request || request.registration_id !== reg.id) {
     return NextResponse.json({ error: "Refund request not found for this registration" }, { status: 404 });
   }
@@ -99,18 +105,69 @@ export async function POST(req: NextRequest) {
     console.error("[it-run/admin/refund] refunded-amount lookup failed:", e);
     return NextResponse.json({ error: "Failed to calculate refundable amount" }, { status: 500 });
   }
-  // Refund amounts are paise; registrations store rupees
-  const remaining = reg.final_price * 100 - refunded;
+  // Refund amounts are paise; registrations store rupees. The limit is the amount originally paid,
+  // so a downgrade (which lowers the current price) does not shrink what can be refunded.
+  const remaining = paidAmountPaise(reg) - refunded;
   if (remaining <= 0) {
     return NextResponse.json({ error: "Payment is already fully refunded" }, { status: 422 });
   }
-  const refundAmount = (amount_paise as number | undefined) ?? remaining;
-  if (refundAmount > remaining) {
-    return NextResponse.json(
-      { error: `Cannot refund ₹${refundAmount / 100}: only ₹${remaining / 100} remaining refundable` },
-      { status: 422 },
-    );
+
+  // Downgrade: the amount is the one the participant was shown and the admin approved, and the target
+  // seats are reserved before any money moves. Nothing is refunded if the seats cannot be reserved.
+  let refundAmount: number;
+  let reservedCategoryId: string | null = null;
+  if (request.request_kind === "downgrade") {
+    const requested = request.requested_amount_paise;
+    if (!requested || !request.target_category_id) {
+      return NextResponse.json({ error: "This downgrade request is incomplete" }, { status: 422 });
+    }
+    if (amount_paise !== undefined && amount_paise !== requested) {
+      return NextResponse.json({ error: "A downgrade refund uses the amount in the approved request" }, { status: 422 });
+    }
+    const { data: target } = await db
+      .from("it_run_categories")
+      .select("id, name, category_type, price_rupees, is_active, event_id")
+      .eq("id", request.target_category_id)
+      .maybeSingle<{ id: string; name: string; category_type: CategoryType; price_rupees: number; is_active: boolean; event_id: string }>();
+    if (!target || !target.is_active || target.event_id !== reg.event_id) {
+      return NextResponse.json({ error: "The target category is no longer available. Nothing has been refunded." }, { status: 409 });
+    }
+    // The stored amount must still equal the difference in today's prices and the group size must still fit
+    const priceStillMatches = target.price_rupees > 0 && target.price_rupees < reg.final_price &&
+      reg.final_price * 100 - requested === target.price_rupees * 100;
+    if (!priceStillMatches) {
+      return NextResponse.json({ error: "The category price has changed since the request. Ask the participant to request again. Nothing has been refunded." }, { status: 409 });
+    }
+    if (requiredParticipantCount(target.category_type) !== reg.participant_count) {
+      return NextResponse.json({ error: `${target.name} no longer fits this group size. Nothing has been refunded.` }, { status: 409 });
+    }
+    if (requested > remaining) {
+      return NextResponse.json({ error: `Cannot refund ₹${requested / 100}: only ₹${remaining / 100} remaining refundable` }, { status: 422 });
+    }
+    const { data: seats, error: seatErr } = await db.rpc("itr_reserve_capacity", {
+      p_category_id: target.id,
+      p_increment: reg.participant_count,
+    });
+    if (seatErr || seats !== "confirmed") {
+      return NextResponse.json({ error: `${target.name} is full. Nothing has been refunded.` }, { status: 409 });
+    }
+    reservedCategoryId = target.id;
+    refundAmount = requested;
+  } else {
+    refundAmount = (amount_paise as number | undefined) ?? remaining;
+    if (refundAmount > remaining) {
+      return NextResponse.json(
+        { error: `Cannot refund ₹${refundAmount / 100}: only ₹${remaining / 100} remaining refundable` },
+        { status: 422 },
+      );
+    }
   }
+
+  const releaseReservedSeats = async () => {
+    if (reservedCategoryId) {
+      await db.rpc("itr_release_capacity", { p_category_id: reservedCategoryId, p_count: reg.participant_count });
+    }
+  };
 
   const actorEmail = session.email;
   const actorRole  = session.role;
@@ -136,10 +193,12 @@ export async function POST(req: NextRequest) {
     .maybeSingle<{ id: string }>();
 
   if (insertErr?.code === "23505") {
+    await releaseReservedSeats();
     return NextResponse.json({ error: "A refund is already in progress for this registration" }, { status: 409 });
   }
   if (insertErr || !refundRecord) {
     console.error("[it-run/admin/refund] Failed to create refund record:", insertErr?.message);
+    await releaseReservedSeats();
     return NextResponse.json({ error: "Failed to create refund record" }, { status: 500 });
   }
 

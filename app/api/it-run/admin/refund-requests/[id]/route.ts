@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/it-run-auth";
-import { computeRefundableBreakdown } from "@/lib/it-run-refunds";
+import { computeRefundableBreakdown, paidAmountPaise } from "@/lib/it-run-refunds";
 
 // GET /api/it-run/admin/refund-requests/[id]
 // Full context for one request: booking-level payment, every participant on the booking,
@@ -18,8 +18,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     .select(`
       id, status, request_reason, requested_by_email, decision_explanation,
       decided_by_email, decided_at, created_at, refund_id, registration_id,
+      request_kind, requested_amount_paise, target_category_id,
       it_run_registrations (
-        id, registration_code, lead_email, final_price, base_price, discount_amount,
+        id, registration_code, lead_email, final_price, amount_paid_paise, base_price, discount_amount,
         payment_status, registration_status, participant_count, razorpay_order_id, razorpay_payment_id,
         cancelled_reason, cancelled_at, created_at,
         it_run_categories ( id, name ),
@@ -37,11 +38,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!request) return NextResponse.json({ error: "Refund request not found" }, { status: 404 });
 
   type RegistrationDetail = {
-    id: string; final_price: number;
+    id: string; final_price: number; amount_paid_paise: number | null;
     it_run_refunds: Array<{ id: string; status: string; amount_paise: number }> | null;
   };
   const reg = (request as unknown as { it_run_registrations: RegistrationDetail | null }).it_run_registrations;
   const refunds = reg?.it_run_refunds ?? [];
+
+  // For a downgrade: the category the registration moves to, and the amount the participant was shown
+  const downgradeTargetId = (request as unknown as { target_category_id: string | null }).target_category_id;
+  const { data: target } = downgradeTargetId
+    ? await db.from("it_run_categories").select("name, price_rupees").eq("id", downgradeTargetId).maybeSingle<{ name: string; price_rupees: number }>()
+    : { data: null };
 
   const [requestAudit, refundAudit] = await Promise.all([
     db.from("it_run_audit_logs")
@@ -57,10 +64,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .limit(100),
   ]);
 
+  const requestKind = (request as unknown as { request_kind: string }).request_kind;
+  const requestedAmount = (request as unknown as { requested_amount_paise: number | null }).requested_amount_paise;
+
   return NextResponse.json({
     request: {
       ...request,
-      refundable: computeRefundableBreakdown((reg?.final_price ?? 0) * 100, refunds),
+      refundable: computeRefundableBreakdown(reg ? paidAmountPaise(reg) : 0, refunds),
+      downgrade: requestKind === "downgrade" && target && requestedAmount
+        ? {
+            targetCategoryName: target.name,
+            targetPriceRupees: target.price_rupees,
+            refundPaise: requestedAmount,
+          }
+        : null,
     },
     audit: {
       requestDecisions: requestAudit.data ?? [],

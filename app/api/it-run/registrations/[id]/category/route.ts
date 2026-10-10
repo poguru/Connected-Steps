@@ -12,8 +12,8 @@ import { sendCategoryChangeEmail } from "@/lib/it-run-category-change";
 // POST /api/it-run/registrations/[id]/category   { categoryId }
 //
 // Scope in this version: a change to a category with the SAME price is applied directly.
-// Upgrades (payment for the difference) and downgrades (refund of the difference) are not yet
-// available online and are refused with a clear message.
+// Upgrades (payment for the difference) are applied after payment. Downgrades are requests for admin
+// review (POST .../downgrade), so this route refuses them and points there.
 //
 // Never changed by a category change: registration ID, registration code, participant rows,
 // QR tokens, BIB allocations, payment records, attendance.
@@ -88,10 +88,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       if (blocked) note = blocked;
       else if (full) note = "This category is full.";
       else if (change === "upgrade") note = `Pay the difference of ₹${c.price_rupees - (current?.price_rupees ?? 0)} to switch.`;
-      else if (change === "downgrade") note = `Downgrades are not available online yet. Email ${SUPPORT} to request one.`;
+      else if (change === "downgrade") note = `Request a refund of ₹${(current?.price_rupees ?? 0) - c.price_rupees} for this move. Nothing changes until our team approves it.`;
       return {
         id: c.id, name: c.name, distanceKm: c.distance_km, priceRupees: c.price_rupees,
-        change, availability: availability(c), allowed: !blocked && !full && change !== "downgrade", note,
+        change, availability: availability(c),
+        // A downgrade is a request for admin review, made from the downgrade route
+        allowed: !blocked && !full,
+        refundRupees: change === "downgrade" ? (current?.price_rupees ?? 0) - c.price_rupees : null,
+        note,
       };
     });
 
@@ -137,8 +141,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Prices are the server's, never the client's.
   if (target.price_rupees < current.price_rupees) {
     return NextResponse.json({
-      error: `Downgrade refunds are not available online yet. Email ${SUPPORT}.`,
-      code: "PRICE_CHANGE_NOT_SUPPORTED",
+      error: "A downgrade is a refund request for our team to review, so it isn't applied here. Request it from the category options.",
+      code: "DOWNGRADE_REQUIRES_REVIEW",
     }, { status: 409 });
   }
   if (target.price_rupees > current.price_rupees) {

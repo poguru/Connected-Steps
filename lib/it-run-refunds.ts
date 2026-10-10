@@ -46,7 +46,43 @@ export async function finalizeRefundProcessed(
 ): Promise<boolean> {
   const now = new Date().toISOString();
 
-  // Transition pending -> processed exactly once.
+  // Read everything that can make this refund invalid BEFORE taking the pending -> processed lock.
+  // Once the lock is taken, a failure would leave the money refunded but the registration unchanged.
+  const { data: pendingRow } = await db
+    .from("it_run_refunds")
+    .select("id, registration_id, amount_paise, status")
+    .eq("id", refundId)
+    .maybeSingle<{ id: string; registration_id: string; amount_paise: number; status: string }>();
+  if (!pendingRow || pendingRow.status !== "pending") return false;
+
+  const { data: reg, error: regErr } = await db
+    .from("it_run_registrations")
+    .select("id, final_price, amount_paid_paise, registration_status, category_id, participant_count, coupon_id, registration_code, early_bird_offer_id")
+    .eq("id", pendingRow.registration_id)
+    .single<{
+      id: string; final_price: number; amount_paid_paise: number | null; registration_status: string;
+      category_id: string; participant_count: number; coupon_id: string | null;
+      registration_code: string; early_bird_offer_id: string | null;
+    }>();
+  if (regErr || !reg) throw new Error(`Registration not found for refund ${refundId}`);
+
+  // A downgrade refund moves the registration to the target category once it is processed
+  const downgrade = await downgradeForRefund(db, refundId);
+  let targetPrice: number | null = null;
+  if (downgrade) {
+    const { data: target } = await db
+      .from("it_run_categories")
+      .select("id, price_rupees")
+      .eq("id", downgrade.targetCategoryId)
+      .maybeSingle<{ id: string; price_rupees: number }>();
+    if (!target) throw new Error(`Target category missing for downgrade refund ${refundId}`);
+    if (reg.final_price * 100 - downgrade.amountPaise !== target.price_rupees * 100) {
+      throw new Error(`Downgrade refund ${refundId} no longer matches the target price`);
+    }
+    targetPrice = target.price_rupees;
+  }
+
+  // Take the lock: pending -> processed exactly once.
   const { data: transitioned, error: txErr } = await db
     .from("it_run_refunds")
     .update({
@@ -63,24 +99,23 @@ export async function finalizeRefundProcessed(
   if (txErr) throw new Error(`Failed to mark refund processed: ${txErr.message}`);
   if (!transitioned) return false;
 
-  const { data: reg, error: regErr } = await db
-    .from("it_run_registrations")
-    .select("id, final_price, registration_status, category_id, participant_count, coupon_id, registration_code, early_bird_offer_id")
-    .eq("id", transitioned.registration_id)
-    .single<{
-      id: string; final_price: number; registration_status: string;
-      category_id: string; participant_count: number; coupon_id: string | null;
-      registration_code: string; early_bird_offer_id: string | null;
-    }>();
-  if (regErr || !reg) throw new Error(`Registration not found for refund ${refundId}`);
-
+  // Original amount actually paid. Refund limits are measured against this, not the current price.
+  const paidPaise = paidAmountPaise(reg);
   const totalRefunded = await getRefundedAmountPaise(db, reg.id);
-  // Refund rows are paise; the registration stores rupees
-  const fullyRefunded = totalRefunded >= reg.final_price * 100;
+  const fullyRefunded = totalRefunded >= paidPaise;
+  // A downgrade never refunds the whole payment (the target costs more than zero), so it cannot cancel.
+  const movesCategory = downgrade !== null && targetPrice !== null && !fullyRefunded;
 
   const regUpdate: Record<string, unknown> = {
     payment_status: fullyRefunded ? "refunded" : "partially_refunded",
   };
+  if (movesCategory) {
+    regUpdate.amount_paid_paise = paidPaise;
+    regUpdate.category_id = downgrade!.targetCategoryId;
+    regUpdate.base_price = targetPrice;
+    regUpdate.final_price = targetPrice;
+    regUpdate.discount_amount = 0;
+  }
   const shouldCancel = fullyRefunded && reg.registration_status !== "cancelled";
   if (shouldCancel) {
     regUpdate.registration_status = "cancelled";
@@ -90,6 +125,20 @@ export async function finalizeRefundProcessed(
 
   const { error: updErr } = await db.from("it_run_registrations").update(regUpdate).eq("id", reg.id);
   if (updErr) throw new Error(`Failed to update registration after refund: ${updErr.message}`);
+
+  if (movesCategory) {
+    // The target seats were reserved when the refund was started; the old category's seats are now free.
+    await db.rpc("itr_release_capacity", {
+      p_category_id: reg.category_id,
+      p_count: reg.participant_count,
+    });
+  } else if (downgrade) {
+    // Defensive: the downgrade cannot move the registration, so give back the seats reserved for it.
+    await db.rpc("itr_release_capacity", {
+      p_category_id: downgrade.targetCategoryId,
+      p_count: reg.participant_count,
+    });
+  }
 
   if (shouldCancel) {
     await db.rpc("itr_release_capacity", {
@@ -150,6 +199,22 @@ export async function markRefundFailed(
   if (error) throw new Error(`Failed to mark refund failed: ${error.message}`);
   if (!data) return false;
 
+  // A failed downgrade refund gives back the seats it reserved in the target category.
+  const downgrade = await downgradeForRefund(db, refundId);
+  if (downgrade) {
+    const { data: reg } = await db
+      .from("it_run_registrations")
+      .select("participant_count")
+      .eq("id", data.registration_id)
+      .maybeSingle<{ participant_count: number }>();
+    if (reg) {
+      await db.rpc("itr_release_capacity", {
+        p_category_id: downgrade.targetCategoryId,
+        p_count: reg.participant_count,
+      });
+    }
+  }
+
   await db.from("it_run_refund_audit").insert({
     event_id: await eventIdForRegistration(db, data.registration_id),
     refund_id: refundId,
@@ -158,6 +223,41 @@ export async function markRefundFailed(
     details: { failure_reason: failureReason, actor },
   });
   return true;
+}
+
+/** The amount actually paid for a registration, in paise. Before any downgrade this is final_price * 100. */
+export function paidAmountPaise(reg: { final_price: number; amount_paid_paise: number | null }): number {
+  return reg.amount_paid_paise ?? reg.final_price * 100;
+}
+
+export interface DowngradeForRefund {
+  requestId: string;
+  targetCategoryId: string;
+  amountPaise: number;
+}
+
+/**
+ * The downgrade request behind a refund, if the refund was started for one. Read from the refund's
+ * metadata, which is written before the refund is sent, so it works even if the request was never linked.
+ */
+export async function downgradeForRefund(db: Db, refundId: string): Promise<DowngradeForRefund | null> {
+  const { data: refund } = await db
+    .from("it_run_refunds")
+    .select("metadata")
+    .eq("id", refundId)
+    .maybeSingle<{ metadata: Record<string, unknown> | null }>();
+  const requestId = typeof refund?.metadata?.request_id === "string" ? refund.metadata.request_id : null;
+  if (!requestId) return null;
+
+  const { data: request } = await db
+    .from("it_run_refund_requests")
+    .select("id, request_kind, target_category_id, requested_amount_paise")
+    .eq("id", requestId)
+    .maybeSingle<{ id: string; request_kind: string; target_category_id: string | null; requested_amount_paise: number | null }>();
+  if (!request || request.request_kind !== "downgrade" || !request.target_category_id || !request.requested_amount_paise) {
+    return null;
+  }
+  return { requestId: request.id, targetCategoryId: request.target_category_id, amountPaise: request.requested_amount_paise };
 }
 
 async function eventIdForRegistration(db: Db, registrationId: string): Promise<string> {

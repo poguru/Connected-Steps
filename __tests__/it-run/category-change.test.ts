@@ -141,12 +141,12 @@ describe("options", () => {
     expect(ids).not.toContain(TEN_K);
   });
 
-  it("marks same-price options as allowed and upgrades as not available online", async () => {
+  it("marks same-price options as allowed, and a downgrade as a refund request with its amount", async () => {
     mockDb.mockReturnValue(fakeDb());
     const body = await (await GET(req("GET"), params)).json();
     expect(body.options.find((o: any) => o.id === FIVE_K)).toMatchObject({ change: "same", allowed: true });
     expect(body.options.find((o: any) => o.id === PREMIUM)).toMatchObject({ change: "upgrade", allowed: true });
-    expect(body.options.find((o: any) => o.id === BASIC)).toMatchObject({ change: "downgrade", allowed: false });
+    expect(body.options.find((o: any) => o.id === BASIC)).toMatchObject({ change: "downgrade", allowed: true, refundRupees: expect.any(Number) });
   });
 
   it("blocks changes on unpaid registrations and discounted ones", async () => {
@@ -161,12 +161,12 @@ describe("options", () => {
 });
 
 describe("POST refusals happen before any write", () => {
-  it("refuses a downgrade with a price change and touches no capacity", async () => {
+  it("refuses a downgrade here, pointing to the review request, and touches no capacity", async () => {
     const db = fakeDb();
     mockDb.mockReturnValue(db);
     const res = await POST(req("POST", { categoryId: BASIC }), params);
     expect(res.status).toBe(409);
-    expect((await res.json()).code).toBe("PRICE_CHANGE_NOT_SUPPORTED");
+    expect((await res.json()).code).toBe("DOWNGRADE_REQUIRES_REVIEW");
     expect(db.rpcs).toEqual([]);
     expect(db.updates).toEqual([]);
   });

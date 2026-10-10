@@ -7,7 +7,10 @@
 
 jest.mock("@/lib/supabase-server", () => ({ getSupabaseServer: jest.fn() }));
 jest.mock("@/lib/admin-auth", () => ({ verifyUserToken: jest.fn(), USER_SESSION_COOKIE: "cs_user_session" }));
-jest.mock("@/lib/it-run-refunds", () => ({ getRefundedAmountPaise: jest.fn().mockResolvedValue(0) }));
+jest.mock("@/lib/it-run-refunds", () => ({
+  getRefundedAmountPaise: jest.fn().mockResolvedValue(0),
+  paidAmountPaise: (r: { final_price: number; amount_paid_paise: number | null }) => r.amount_paid_paise ?? r.final_price * 100,
+}));
 
 import { NextRequest } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";

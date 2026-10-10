@@ -146,6 +146,10 @@ function adminHandlers(over: {
         return { data: { id: "refund-1" }, error: null };
       }
       if (q.op === "update") return { data: { id: "refund-1", registration_id: REG.id, amount_paise: 100000 }, error: null };
+      // The pending refund read by id (finalize, downgrade lookup)
+      if (q.filters.id === "refund-1") {
+        return { data: { id: "refund-1", registration_id: REG.id, amount_paise: 100000, status: "pending", metadata: { request_id: "req-1" } }, error: null };
+      }
       return { data: over.priorRefunds ?? [], error: null };
     },
     it_run_refund_audit: () => ({ data: null, error: null }),

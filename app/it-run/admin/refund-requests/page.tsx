@@ -54,6 +54,8 @@ interface RequestRow {
   registration_id: string;
   request_refund: RefundRow | null;
   refundable: Refundable;
+  // Set for a downgrade request: the refund amount to send and the category the registration moves to
+  downgrade?: { targetCategoryName: string; targetPriceRupees: number; refundPaise: number } | null;
   it_run_registrations: {
     id: string;
     registration_code: string;
@@ -490,6 +492,13 @@ export default function RefundRequestsPage() {
               <div style={{ fontSize: 11, color: "#666", textTransform: "uppercase", marginBottom: 4 }}>Participant&apos;s reason</div>
               {item.request_reason}
             </div>
+
+            {item.downgrade && (
+              <div style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 10, padding: 12, fontSize: 13, color: "#fde68a", lineHeight: 1.6, marginBottom: 10 }}>
+                <strong style={{ color: "#fff" }}>Downgrade to {item.downgrade.targetCategoryName}</strong> (₹{item.downgrade.targetPriceRupees})
+                <div>Approving and executing this refunds exactly <strong style={{ color: "#fff" }}>{inr(item.downgrade.refundPaise)}</strong>, reserves a place in {item.downgrade.targetCategoryName}, and then moves the registration there. The registration code, QR codes, and BIB allocations stay the same. If the category is full or its price has changed, the refund is refused and nothing is sent.</div>
+              </div>
+            )}
 
             {item.decision_explanation && (
               <div style={{ background: "#161616", borderRadius: 8, padding: 10, fontSize: 13, color: "#ccc", lineHeight: 1.6, marginBottom: 10 }}>

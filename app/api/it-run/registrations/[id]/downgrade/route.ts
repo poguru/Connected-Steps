@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 import { requiredParticipantCount, type CategoryType } from "@/lib/it-run-category-rules";
-import { getRefundedAmountPaise } from "@/lib/it-run-refunds";
+import { getRefundedAmountPaise, paidAmountPaise } from "@/lib/it-run-refunds";
 
 // POST /api/it-run/registrations/[id]/downgrade   { categoryId, reason }
 //
@@ -24,7 +24,7 @@ const NO_STORE = { "Cache-Control": "private, no-store" };
 
 type Reg = {
   id: string; event_id: string; registration_code: string; category_id: string;
-  final_price: number; payment_status: string; registration_status: string;
+  final_price: number; amount_paid_paise: number | null; payment_status: string; registration_status: string;
   participant_count: number; coupon_id: string | null; linked_user_email: string | null;
 };
 type Target = {
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Same response for "missing" and "not yours", so ids cannot be enumerated
   const { data: reg, error: regErr } = await db
     .from("it_run_registrations")
-    .select("id, event_id, registration_code, category_id, final_price, payment_status, registration_status, participant_count, coupon_id, linked_user_email")
+    .select("id, event_id, registration_code, category_id, final_price, amount_paid_paise, payment_status, registration_status, participant_count, coupon_id, linked_user_email")
     .eq("id", id)
     .maybeSingle<Reg>();
   if (regErr) return NextResponse.json({ error: "We couldn't load this registration. Please try again." }, { status: 500, headers: NO_STORE });
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const amountPaise = (reg.final_price - target.price_rupees) * 100;
   const refundedPaise = await getRefundedAmountPaise(db, reg.id);
-  const remainingPaise = reg.final_price * 100 - refundedPaise;
+  const remainingPaise = paidAmountPaise(reg) - refundedPaise;
   if (amountPaise > remainingPaise) {
     return NextResponse.json({ error: "There is not enough left on this payment to refund that difference." }, { status: 422, headers: NO_STORE });
   }
