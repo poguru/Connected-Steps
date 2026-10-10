@@ -26,6 +26,24 @@ async function findLocalRefund(
   return byLocal;
 }
 
+// The fields this webhook reads from a Razorpay event entity (payment or refund).
+interface RazorpayWebhookEntity {
+  id?: string;
+  order_id?: string;
+  amount?: number;
+  notes?: Record<string, string | undefined>;
+  error_description?: string | null;
+  reason_code?: string | null;
+}
+
+interface RazorpayWebhookEvent {
+  event: string;
+  payload?: {
+    refund?: { entity?: RazorpayWebhookEntity };
+    payment?: { entity?: RazorpayWebhookEntity };
+  };
+}
+
 // POST /api/it-run/webhook/razorpay
 // Webhook to reconcile Razorpay events: payments, refunds, etc.
 // Signature verified with RAZORPAY_WEBHOOK_SECRET.
@@ -53,7 +71,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  let event: any;
+  let event: RazorpayWebhookEvent;
   try {
     event = JSON.parse(rawBody);
   } catch {
@@ -107,7 +125,7 @@ export async function POST(req: NextRequest) {
       const payment = event.payload?.payment?.entity;
       if (payment?.notes?.type === "it_run_category_change") {
         const changeId: string | undefined = payment.notes?.it_run_change_id;
-        if (changeId && payment.order_id) {
+        if (changeId && payment.order_id && payment.id && typeof payment.amount === "number") {
           const { applyPaidCategoryChange } = await import("@/lib/it-run-category-change");
           const result = await applyPaidCategoryChange(db, {
             changeId, orderId: payment.order_id, paymentId: payment.id, amountPaise: payment.amount, actor: "razorpay-webhook",
