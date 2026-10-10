@@ -34,6 +34,8 @@ export default function NotificationsPage() {
       .finally(() => setLoading(false));
   }, [filter, offset]);
 
+  // Loading state must show as soon as a filter changes; the request itself is the external sync.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
   async function resend(id: string, force: boolean) {
@@ -82,6 +84,23 @@ export default function NotificationsPage() {
     } finally { setBulkSending(false); }
   }
 
+  // Sends a sample confirmation to the signed-in admin's own address (no participant data)
+  async function sendTestConfirmation() {
+    setMsg(null);
+    try {
+      const res = await fetch("/api/it-run/admin/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "test_confirmation" }),
+      });
+      const d = await res.json();
+      if (!res.ok || !d.ok) { setMsg({ text: d.error ?? "Test email failed to send", ok: false }); return; }
+      setMsg({ text: `Test confirmation sent to ${d.sentTo}`, ok: true });
+    } catch {
+      setMsg({ text: "Network error while sending the test email", ok: false });
+    }
+  }
+
   const confSent    = rows.filter(r => r.confirmation_email_sent_at).length;
   const confUnsent  = rows.filter(r => !r.confirmation_email_sent_at).length;
   const bibSent     = rows.filter(r => r.bib_invite_sent_at).length;
@@ -94,6 +113,18 @@ export default function NotificationsPage() {
         <p style={{ color: "#666", fontSize: 13, margin: "6px 0 0" }}>
           Confirmation emails and BIB collection invites for paid and free registrations.
         </p>
+      </div>
+
+      {/* Test confirmation to the signed-in admin */}
+      <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "14px 20px", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 2 }}>Test confirmation email</div>
+          <div style={{ fontSize: 12, color: "#888" }}>Sends a labelled sample confirmation to your own admin address. No participant data is used.</div>
+        </div>
+        <button onClick={sendTestConfirmation}
+          style={{ padding: "9px 18px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+          Send test to me
+        </button>
       </div>
 
       {/* BIB invite bulk action */}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireRole, getClientIp } from "@/lib/it-run-auth";
 import { sendItRunConfirmationEmail, sendItRunBibInviteEmail } from "@/lib/it-run-email";
+import { APP_URL } from "@/lib/config";
 
 // GET /api/it-run/admin/notifications
 // Lists paid/free registrations with email sent status.
@@ -55,12 +56,45 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json() as {
-    action: "confirmation" | "bib_invite" | "bib_invite_bulk";
+    action: "confirmation" | "bib_invite" | "bib_invite_bulk" | "test_confirmation";
     registrationId?: string;
     force?: boolean;
   };
 
   const db = getSupabaseServer();
+
+  // ── Test confirmation (sample data) ──────────────────────────────────────────
+  // Sends a clearly labelled sample confirmation to the signed-in admin's own address only.
+  // It reads no participant or registration data, and it cannot be aimed at anyone else.
+  if (body.action === "test_confirmation") {
+    const { sendEmail } = await import("@/lib/notify");
+    const { buildConfirmEmail } = await import("@/lib/it-run-email");
+    const html = buildConfirmEmail({
+      primaryName: "Test Recipient",
+      code: "ITR-TEST",
+      category: "5K Timed Run",
+      date: "2027-02-07",
+      venue: "Hitec City, Hyderabad",
+      reportTime: "5:30 AM",
+      finalPrice: 680,
+      discount: { label: "Early Bird (test)", baseAmount: 799, discountAmount: 119 },
+      dashUrl: `${APP_URL}/it-run/my-registrations`,
+      participants: [{ name: "Test Recipient", typeLabel: "", tshirtSize: "M", qrUrl: `${APP_URL}/it-run/logo.png` }],
+    });
+    const result = await sendEmail(
+      session.email,
+      "Admin test",
+      "[TEST] Registration Confirmed - The IT Run Sprint-2 (sample data)",
+      html,
+      false,
+      true,
+    );
+    return NextResponse.json({
+      ok: result.ok,
+      sentTo: session.email,
+      error: result.ok ? null : (result.error ?? "Send failed"),
+    });
+  }
 
   // ── Bulk BIB invite ───────────────────────────────────────────────────────────
   if (body.action === "bib_invite_bulk") {
