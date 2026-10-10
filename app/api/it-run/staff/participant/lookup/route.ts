@@ -83,8 +83,8 @@ export async function GET(req: NextRequest) {
     .from("it_run_participants")
     .select(
       `
-      id, first_name, last_name, bib_number, wave, tshirt_size,
-      verification_status, it_run_registrations!inner(
+      id, first_name, last_name, bib_number, bib_name, gender, company_name, wave, tshirt_size,
+      verification_status, id_document_type, it_run_registrations!inner(
         id, registration_code, payment_status, registration_status,
         it_run_categories(name, color)
       )
@@ -97,9 +97,13 @@ export async function GET(req: NextRequest) {
       first_name: string;
       last_name: string;
       bib_number: string | null;
+      bib_name: string | null;
+      gender: string | null;
+      company_name: string | null;
       wave: string | null;
       tshirt_size: string | null;
       verification_status: string;
+      id_document_type: string | null;
       it_run_registrations: {
         id: string;
         registration_code: string;
@@ -133,20 +137,26 @@ export async function GET(req: NextRequest) {
     });
   });
 
-  // Check registration eligibility
+  // Check registration eligibility. Identity status does not gate eligibility here: it is shown as a warning and any
+  // identity-based restriction is enforced where the service is issued, not in the lookup.
   const canIssue =
     (reg.payment_status === "paid" || reg.payment_status === "free") &&
     reg.registration_status !== "cancelled";
 
+  // Only the document TYPE leaves the server. The document path and ID number are never returned to volunteers.
   return NextResponse.json({
     participant: {
       id: participant.id,
       firstName: participant.first_name,
       lastName: participant.last_name,
+      bibName: participant.bib_name,
       bibNumber: participant.bib_number,
+      gender: participant.gender,
+      companyName: participant.company_name,
       wave: participant.wave,
       tshirtSize: participant.tshirt_size,
       verificationStatus: participant.verification_status,
+      idDocumentType: participant.id_document_type,
       registrationCode: reg.registration_code,
       category: reg.it_run_categories.name,
       categoryColor: reg.it_run_categories.color,

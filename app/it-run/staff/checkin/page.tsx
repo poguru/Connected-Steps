@@ -8,12 +8,28 @@ interface Participant {
   id: string;
   firstName: string;
   lastName: string;
+  bibName: string | null;
   bibNumber: string | null;
+  gender: string | null;
+  companyName: string | null;
   category: string;
   categoryColor: string;
   canIssue: boolean;
   paymentStatus: string;
   registrationStatus: string;
+  verificationStatus: string;
+  idDocumentType: string | null;
+}
+
+// Plain-language identity line for volunteers. The document itself and its number are never shown here.
+function identityLabel(p: Participant): { text: string; unverified: boolean } {
+  if (p.verificationStatus === "verified") {
+    return { text: p.idDocumentType === "government" ? "Government ID verified" : "Company ID verified", unverified: false };
+  }
+  if (p.verificationStatus === "pending") return { text: "ID awaiting review", unverified: true };
+  if (p.verificationStatus === "need_clarification") return { text: "ID needs correction", unverified: true };
+  if (p.verificationStatus === "rejected") return { text: "ID rejected", unverified: true };
+  return { text: "No ID on file", unverified: true };
 }
 
 export default function CheckinPage() {
@@ -24,6 +40,7 @@ export default function CheckinPage() {
   const [loading, setLoading] = useState(false);
   const [checkedIn, setCheckedIn] = useState(false);
 
+  // The card stays on screen until the volunteer dismisses it or scans the next participant.
   async function handleScan(query: string) {
     setError(null);
     setSuccess(null);
@@ -64,7 +81,6 @@ export default function CheckinPage() {
       if (res.ok) {
         setSuccess(`${participant.firstName} checked in!`);
         setCheckedIn(true);
-        setTimeout(() => setParticipant(null), 2000);
       } else {
         setError(data.error ?? "Failed to check in");
       }
@@ -113,9 +129,28 @@ export default function CheckinPage() {
             <div style={{ fontSize: 18, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
               {participant.firstName} {participant.lastName}
             </div>
-            <div style={{ fontSize: 12, color: "#888", marginBottom: 16 }}>
-              {participant.category} · BIB {participant.bibNumber}
+            <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>
+              {participant.category} · BIB {participant.bibNumber ?? "not assigned"}
             </div>
+            {participant.bibName && (
+              <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>
+                Bib name: <span style={{ color: "#ccc", fontWeight: 600 }}>{participant.bibName}</span>
+              </div>
+            )}
+            {participant.companyName && (
+              <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>
+                Company: <span style={{ color: "#ccc" }}>{participant.companyName}</span>
+              </div>
+            )}
+            <div style={{ fontSize: 12, marginBottom: 16, color: identityLabel(participant).unverified ? "#fbbf24" : "#10b981", fontWeight: 600 }}>
+              {identityLabel(participant).text}
+            </div>
+
+            {identityLabel(participant).unverified && (
+              <div role="alert" style={{ padding: "10px 12px", background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.4)", borderRadius: 8, color: "#fbbf24", fontSize: 12, marginBottom: 16, lineHeight: 1.5 }}>
+                ID not verified. Check with the team lead before handing over any kit. This does not change the registration.
+              </div>
+            )}
 
             {!participant.canIssue && (
               <div style={{ padding: "10px 12px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 8, color: "#f87171", fontSize: 12, marginBottom: 16 }}>
