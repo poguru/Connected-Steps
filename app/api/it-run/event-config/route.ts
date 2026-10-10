@@ -1,3 +1,4 @@
+import { bestEarlyBird, type EarlyBirdOffer } from "@/lib/it-run-early-bird";
 import { requiredParticipantCount } from "@/lib/it-run-category-rules";
 import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
@@ -72,6 +73,15 @@ export async function GET() {
   // Child sizes match the DB constraint added in migration 20260924000004
   const CHILD_SIZES = ["5-6Y", "7-8Y", "9-10Y", "11-12Y", "13-14Y"];
 
+  // Early bird offers: the server decides which offer applies and its price. The browser only displays it.
+  const nowMs = Date.now();
+  const { data: ebRows } = await db
+    .from("it_run_early_bird_offers")
+    .select("id, category_id, name, discount_type, discount_value, starts_at, ends_at, status, redemption_limit, redemptions_used, min_payable_rupees")
+    .eq("event_id", event.id)
+    .eq("status", "active");
+  const ebOffers = (ebRows ?? []) as EarlyBirdOffer[];
+
   const categories: ItRunCategory[] = (cats ?? []).map(c => {
     // Derive inclusions from boolean flags — UI reads string array, not individual flags
     const inclusions: string[] = [];
@@ -112,6 +122,10 @@ export async function GET() {
       participant_labels,
       max_participants:     c.max_participants ?? null,
       current_participants: livePartMap[c.id] ?? 0,
+      early_bird: (() => {
+        const applied = bestEarlyBird(c.price_rupees, ebOffers.filter(o => o.category_id === c.id), nowMs);
+        return applied ? { name: applied.offer.name, discount: applied.discount, finalPrice: applied.finalPrice, endsAt: applied.offer.ends_at } : null;
+      })(),
       is_soldout:           c.max_participants != null &&
                             (livePartMap[c.id] ?? 0) >= c.max_participants,
     };

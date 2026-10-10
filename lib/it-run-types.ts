@@ -31,6 +31,8 @@ export interface ItRunCategory {
   distance_km: number;
   category_type: "solo" | "duo" | "kid";
   price_rupees: number;
+  /** Live early bird offer for this category, computed by the server. Null when none applies. */
+  early_bird?: { name: string; discount: number; finalPrice: number; endsAt: string } | null;
   description: string | null;
   color: string;
   // Derived server-side from includes_* booleans — frontend never reads individual flags

@@ -728,9 +728,23 @@ function StepCategory({
 
             {/* Price + arrow */}
             <div style={{ textAlign: "right" as const, flexShrink: 0, display: "flex", flexDirection: "column" as const, alignItems: "flex-end", gap: 4 }}>
-              <div style={{ fontSize: "clamp(18px,2.5vw,22px)", fontWeight: 900, color: cat.color }}>
-                ₹{cat.price_rupees.toLocaleString("en-IN")}
-              </div>
+              {cat.early_bird ? (
+                <>
+                  <div style={{ fontSize: 12, color: "#666", textDecoration: "line-through" }}>
+                    ₹{cat.price_rupees.toLocaleString("en-IN")}
+                  </div>
+                  <div style={{ fontSize: "clamp(18px,2.5vw,22px)", fontWeight: 900, color: cat.color }}>
+                    ₹{cat.early_bird.finalPrice.toLocaleString("en-IN")}
+                  </div>
+                  <div style={{ fontSize: 10, color: "#10b981", fontWeight: 700, letterSpacing: "0.04em" }}>
+                    EARLY BIRD · ends {new Date(cat.early_bird.endsAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: "clamp(18px,2.5vw,22px)", fontWeight: 900, color: cat.color }}>
+                  ₹{cat.price_rupees.toLocaleString("en-IN")}
+                </div>
+              )}
               {cat.participant_count > 1 && (
                 <div style={{ fontSize: 10, color: "#444" }}>for {cat.participant_count}</div>
               )}
@@ -1727,7 +1741,10 @@ function RegisterPageContent() {
 
   // Price
   const basePrice  = selectedCat?.price_rupees ?? 0;
-  const discount   = coupon?.discount ?? 0;
+  // An early bird and a coupon are never combined; the server refuses the pair. The early bird's discount is
+  // the one shown here, as the server computed it for this category.
+  const earlyBirdDiscount = selectedCat?.early_bird?.discount ?? 0;
+  const discount   = earlyBirdDiscount || (coupon?.discount ?? 0);
   const finalPrice = finalPriceOverride ?? Math.max(0, basePrice - discount);
 
   // ── Load event config ──────────────────────────────────────────────────────
