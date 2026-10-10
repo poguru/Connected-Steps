@@ -10,6 +10,7 @@ import { decideUrlCategory, startsNewRegistration } from "@/lib/it-run-category-
 import { idChoiceError, isStoredDocumentPath } from "@/lib/it-run-id-verification";
 import { IssueReportButton } from "@/components/ui/BugReportFab";
 import { checkPersonName, checkBibName, bibNameHint } from "@/lib/it-run-name-validation";
+import { draftKeyOf, saveStatusFor, createMoveGate } from "@/lib/it-run-step-save";
 import {
   EventRegistrationHeader,
   CompactEventHeader,
@@ -1710,6 +1711,8 @@ function RegisterPageContent() {
   const [serverSave, setServerSave] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [serverSaveError, setServerSaveError] = useState("");
   const [serverSavedAt, setServerSavedAt] = useState<number | null>(null);
+  // The details as last confirmed by the server. Compared with the current details to show "Unsaved changes".
+  const [savedKey, setSavedKey] = useState<string | null>(null);
   const savingRef = useRef(false);
   const [categoryNotice, setCategoryNotice] = useState("");
   const [companyError, setCompanyError] = useState("");
@@ -2053,9 +2056,10 @@ function RegisterPageContent() {
     if (!cat) return;
 
     setSelectedCat(cat);
-    setParticipants(
-      (d.participants ?? [emptyParticipant()]).map(p => ({ ...p, companyIdFile: null }))
-    );
+    const restored = (d.participants ?? [emptyParticipant()]).map(p => ({ ...p, companyIdFile: null }));
+    setParticipants(restored);
+    // What was restored is exactly what the server holds, so it is "Saved", not "Unsaved changes"
+    setSavedKey(draftKeyOf(cat.id, d.couponCode ?? "", restored));
     setPErrors(Array.from({ length: d.participants?.length ?? 1 }, () => ({})));
     setParticipantSubIdx(0);
     setCouponCode(d.couponCode ?? "");
@@ -2102,16 +2106,19 @@ function RegisterPageContent() {
 
   // ── Save progress to the server ────────────────────────────────────────────
   // Shows "Saved" only after the server confirms. One request at a time. Stale versions are refused.
-  async function saveProgress(): Promise<void> {
-    if (!selectedCat || savingRef.current) return;
+  // Returns true only when the server has confirmed the save. Navigation waits for this.
+  async function saveProgress(over?: { step?: number; participantSubIdx?: number }): Promise<boolean> {
+    if (!selectedCat) return true; // nothing entered yet, so nothing to save
+    if (savingRef.current) return false;
     savingRef.current = true;
     setServerSave("saving");
     setServerSaveError("");
+    const keyAtSave = draftKeyOf(selectedCat.id, couponCode, participants);
     try {
       const body: Record<string, unknown> = {
         draft: {
-          step,
-          participantSubIdx,
+          step: over?.step ?? step,
+          participantSubIdx: over?.participantSubIdx ?? participantSubIdx,
           selectedCatId: selectedCat.id,
           couponCode,
           participants: participants.map(p => ({ ...p, companyIdFile: null })),
@@ -2138,7 +2145,7 @@ function RegisterPageContent() {
         }
         setServerSave("error");
         setServerSaveError(d.error ?? "We couldn't save your progress. Please try again.");
-        return;
+        return false;
       }
 
       const token = d.token ?? serverDraft?.token;
@@ -2147,13 +2154,37 @@ function RegisterPageContent() {
       const savedAtMs = new Date(d.savedAt).getTime();
       setServerDraft({ token, version: d.version, savedAt: savedAtMs });
       setServerSavedAt(savedAtMs);
+      setSavedKey(keyAtSave);
       setServerSave("saved");
+      return true;
     } catch {
       setServerSave("error");
       setServerSaveError("No connection. Your progress is still on this device. Tap Retry when you're back online.");
+      return false;
     } finally {
       savingRef.current = false;
     }
+  }
+
+  // ── Save, then move ─────────────────────────────────────────────────────────
+  // Every step change goes through here: the details are saved first, and the step changes only after the
+  // server confirms. A failed save keeps the participant on the current step and remembers the move, so
+  // "Retry save" completes it.
+  const moveGate = useRef(createMoveGate()).current;
+
+  async function persistThen(target: { step: number; participantSubIdx?: number }, navigate: () => void): Promise<void> {
+    // A save already in flight (from the header button) finishes first, then this move runs
+    for (let i = 0; i < 100 && savingRef.current; i++) await new Promise(r => setTimeout(r, 100));
+    await moveGate.run(target, saveProgress, navigate);
+  }
+
+  // Retry repeats a failed move with the current details; with no move waiting, it just saves
+  function retrySave() {
+    void (async () => {
+      const retried = moveGate.retry(saveProgress);
+      if (retried === null) await saveProgress();
+      else await retried;
+    })();
   }
 
   // ── Resume from the server draft ───────────────────────────────────────────
@@ -2306,10 +2337,12 @@ function RegisterPageContent() {
   // ── Participant step navigation ────────────────────────────────────────────
 
   function handleParticipantBack() {
+    // Back saves the current details first; it moves only when the save is confirmed
     if (participantSubIdx > 0) {
-      setParticipantSubIdx(i => i - 1);
+      const prev = participantSubIdx - 1;
+      void persistThen({ step: 2, participantSubIdx: prev }, () => setParticipantSubIdx(prev));
     } else {
-      setStep(1);
+      void persistThen({ step: 1 }, () => setStep(1));
     }
   }
 
@@ -2343,25 +2376,30 @@ function RegisterPageContent() {
         return;
       }
     }
-    setReturnToReview(false);
-    setStep(4);
+    void persistThen({ step: 4 }, () => {
+      setReturnToReview(false);
+      setStep(4);
+    });
   }
 
   function handleParticipantNext() {
     setSubmitError("");
     if (!validateParticipant(participantSubIdx)) return;
     if (returnToReview) {
-      setReturnToReview(false);
-      setStep(4);
+      void persistThen({ step: 4 }, () => {
+        setReturnToReview(false);
+        setStep(4);
+      });
       return;
     }
     // Use actual participants array length instead of category.participant_count
     // This allows SOLO categories to have N participants
     const lastIdx = participants.length - 1;
     if (participantSubIdx < lastIdx) {
-      setParticipantSubIdx(i => i + 1);
+      const next = participantSubIdx + 1;
+      void persistThen({ step: 2, participantSubIdx: next }, () => setParticipantSubIdx(next));
     } else {
-      setStep(3);
+      void persistThen({ step: 3 }, () => setStep(3));
     }
   }
 
@@ -2376,11 +2414,14 @@ function RegisterPageContent() {
     }
     // Validate current participant before adding more
     if (!validateParticipant(participantSubIdx)) return;
-    // Add new empty participant
-    setParticipants(p => [...p, emptyParticipant()]);
-    setPErrors(e => [...e, {}]);
-    // Auto-focus the new participant
-    setParticipantSubIdx(participants.length);
+    // Save the current participant first, so the new form never replaces unsaved details
+    const newIdx = participants.length;
+    void persistThen({ step: 2, participantSubIdx }, () => {
+      setParticipants(p => [...p, emptyParticipant()]);
+      setPErrors(e => [...e, {}]);
+      // Auto-focus the new participant
+      setParticipantSubIdx(newIdx);
+    });
   }
 
   function removeParticipant(idx: number) {
@@ -2397,25 +2438,33 @@ function RegisterPageContent() {
   // ── Edit-from-review handlers ──────────────────────────────────────────────
 
   function editParticipant(idx: number) {
-    setParticipantSubIdx(idx);
-    setReturnToReview(true);
-    setStep(2);
+    void persistThen({ step: 2, participantSubIdx: idx }, () => {
+      setParticipantSubIdx(idx);
+      setReturnToReview(true);
+      setStep(2);
+    });
   }
 
   function editVerification() {
-    setReturnToReview(true);
-    setStep(3);
+    void persistThen({ step: 3 }, () => {
+      setReturnToReview(true);
+      setStep(3);
+    });
   }
 
   function editCategory() {
     // Category change resets participants — don't set returnToReview
-    setReturnToReview(false);
-    setStep(1);
+    void persistThen({ step: 1 }, () => {
+      setReturnToReview(false);
+      setStep(1);
+    });
   }
 
   function editCoupon() {
-    setReturnToReview(true);
-    setStep(5);
+    void persistThen({ step: 5 }, () => {
+      setReturnToReview(true);
+      setStep(5);
+    });
   }
 
   // ── Coupon validation ──────────────────────────────────────────────────────
@@ -2443,6 +2492,8 @@ function RegisterPageContent() {
 
   async function submitRegistration() {
     if (!selectedCat) return;
+    // Payment does not begin while the entered details are unsaved. A failed save shows its message and stops here.
+    if (!(await saveProgress({ step: 5 }))) return;
     setSubmitting(true);
     setSubmitError("");
 
@@ -2617,6 +2668,15 @@ function RegisterPageContent() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
+  // Saved status: "Saved" only after the server confirmed the current details
+  const currentDraftKey = draftKeyOf(selectedCat?.id ?? null, couponCode, participants);
+  const hasContent = participants.some(p => p.firstName.trim() !== "" || p.lastName.trim() !== "");
+  const dirty = savedKey === null ? hasContent : currentDraftKey !== savedKey;
+  const status = saveStatusFor({
+    state: serverSave, error: serverSaveError, savedAt: serverSavedAt, dirty, hasContent,
+    offline: saveStatus === "offline",
+  }, ms => new Date(ms).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }));
+
   return (
     <div style={{ background: BG, color: "#fff", fontFamily: "'Inter',system-ui,sans-serif", minHeight: "100vh" }}>
       <EventWatermark />
@@ -2640,16 +2700,13 @@ function RegisterPageContent() {
         </Link>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {step > 1 && step < 7 && (
-            <span role="status" aria-live="polite" style={{ fontSize: 11, color: serverSave === "error" ? "#f87171" : "#8a8a8a", maxWidth: 220, textAlign: "right" }}>
-              {serverSave === "saving" && "Saving…"}
-              {serverSave === "saved" && serverSavedAt && `Saved at ${new Date(serverSavedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`}
-              {serverSave === "error" && (serverSaveError || "Not saved.")}
-              {serverSave === "idle" && (saveStatus === "offline" ? "Offline: kept on this device only" : "Not saved to server yet")}
+            <span role="status" aria-live="polite" style={{ fontSize: 11, color: status.tone === "error" ? "#f87171" : status.tone === "ok" ? "#10b981" : "#8a8a8a", maxWidth: 220, textAlign: "right" }}>
+              {status.text}
             </span>
           )}
           {step > 1 && step < 7 && (
             <button
-              onClick={() => void saveProgress()}
+              onClick={retrySave}
               disabled={serverSave === "saving"}
               style={{
                 fontSize: 12, fontWeight: 700, padding: "7px 12px", borderRadius: 8, fontFamily: "inherit",
@@ -2990,6 +3047,8 @@ function RegisterPageContent() {
           </>
         )}
 
+        {/* Steps 2 to 5 are inert while a save is in flight, so no button can be pressed twice */}
+        <fieldset disabled={serverSave === "saving"} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
         {step === 2 && selectedCat && (
           <>
             <CompactEventHeader
@@ -3015,7 +3074,7 @@ function RegisterPageContent() {
           <StepParticipants
             category={selectedCat}
             participantSubIdx={participantSubIdx}
-            setParticipantSubIdx={setParticipantSubIdx}
+            setParticipantSubIdx={(idx: number) => void persistThen({ step: 2, participantSubIdx: idx }, () => setParticipantSubIdx(idx))}
             participants={participants}
             errors={pErrors}
             onChange={updateParticipant}
@@ -3045,11 +3104,16 @@ function RegisterPageContent() {
             onUpload={uploadCompanyId}
             onBack={() => {
               if (returnToReview) {
-                setReturnToReview(false);
-                setStep(4);
+                void persistThen({ step: 4 }, () => {
+                  setReturnToReview(false);
+                  setStep(4);
+                });
               } else {
-                setParticipantSubIdx(selectedCat.participant_count - 1);
-                setStep(2);
+                const last = selectedCat.participant_count - 1;
+                void persistThen({ step: 2, participantSubIdx: last }, () => {
+                  setParticipantSubIdx(last);
+                  setStep(2);
+                });
               }
             }}
             onNext={handleCompanyNext}
@@ -3069,8 +3133,8 @@ function RegisterPageContent() {
             basePrice={basePrice}
             discount={discount}
             finalPrice={finalPrice}
-            onBack={() => setStep(3)}
-            onNext={() => setStep(5)}
+            onBack={() => void persistThen({ step: 3 }, () => setStep(3))}
+            onNext={() => void persistThen({ step: 5 }, () => setStep(5))}
             onEditParticipant={editParticipant}
             onEditVerification={editVerification}
             onEditCategory={editCategory}
@@ -3097,13 +3161,15 @@ function RegisterPageContent() {
             onCodeChange={v => { setCouponCode(v); setCoupon(null); setCouponError(""); }}
             onValidate={validateCoupon}
             onClearCoupon={() => { setCoupon(null); setCouponCode(""); }}
-            onBack={() => setStep(4)}
+            onBack={() => void persistThen({ step: 4 }, () => setStep(4))}
             onSubmit={submitRegistration}
             returnToReview={returnToReview}
-            onSaveAndReturn={() => { setReturnToReview(false); setStep(4); }}
+            onSaveAndReturn={() => void persistThen({ step: 4 }, () => { setReturnToReview(false); setStep(4); })}
             />
           </>
         )}
+
+        </fieldset>
 
         {step === 6 && selectedCat && (
           <>
@@ -3114,7 +3180,7 @@ function RegisterPageContent() {
             submitting={submitting}
             submitError={submitError}
             onPay={initiatePayment}
-            onBackToEdit={() => { setSubmitError(""); setReturnToReview(true); setStep(4); }}
+            onBackToEdit={() => { setSubmitError(""); void persistThen({ step: 4 }, () => { setReturnToReview(true); setStep(4); }); }}
             />
           </>
         )}
