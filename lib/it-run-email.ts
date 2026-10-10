@@ -760,3 +760,171 @@ ${emailFooter()}
 
   console.log(`${label} Refund confirmation email sent to ${recipient}`);
 }
+
+
+// ── One confirmation for a shared payment (stage 4) ───────────────────────────
+//
+// A checkout that paid for several registrations sends ONE email, with a section per registration: its code,
+// category, runners with their own QR codes, and its dashboard link. Single registrations use the email above.
+
+export interface CheckoutSection {
+  code: string;
+  category: string;
+  date: string;
+  venue: string;
+  reportTime: string;
+  finalPrice: number;
+  discount?: ConfirmEmailDiscount;
+  dashUrl: string;
+  participants: ParticipantData[];
+}
+
+export function buildCheckoutConfirmEmail(sections: CheckoutSection[]): string {
+  const total = sections.reduce((sum, s) => sum + s.finalPrice, 0);
+  const blocks = sections.map(s => {
+    const discountLine = s.discount && s.discount.discountAmount > 0
+      ? `<div style="font-size:12px;color:#888;margin-top:4px;">Base ₹${s.discount.baseAmount.toLocaleString("en-IN")} &minus; ${escapeHtml(s.discount.label)} ₹${s.discount.discountAmount.toLocaleString("en-IN")}</div>`
+      : "";
+    const people = s.participants.map(p => `
+      <tr><td style="padding:12px 24px;border-top:1px solid #2a2a2a;">
+        <table width="100%" cellpadding="0" cellspacing="0"><tr>
+          <td style="vertical-align:top;padding-right:16px;">
+            <div style="font-size:15px;font-weight:700;color:#fff;">${escapeHtml(p.name)}</div>
+            ${p.tshirtSize ? `<div style="font-size:12px;color:#888;margin-top:4px;">T-Shirt: <strong style="color:#ccc;">${escapeHtml(p.tshirtSize)}</strong></div>` : ""}
+          </td>
+          <td style="vertical-align:top;text-align:right;width:150px;">
+            <div style="display:inline-block;background:#fff;padding:6px;border-radius:6px;">
+              <img src="${p.qrUrl}" width="110" height="110" alt="QR for ${escapeHtml(p.name)}" style="display:block;" />
+            </div>
+            <div style="font-size:10px;color:#666;margin-top:4px;">Race-day QR</div>
+          </td>
+        </tr></table>
+      </td></tr>`).join("");
+    return `
+  <tr><td style="padding:0 40px 24px;">
+    <div style="background:#111;border:1px solid #2a2a2a;border-radius:12px;overflow:hidden;">
+      <div style="padding:16px 24px;border-bottom:1px solid #2a2a2a;">
+        <div style="font-size:10px;color:#e8620a;text-transform:uppercase;letter-spacing:0.12em;">${escapeHtml(s.category)}</div>
+        <div style="font-size:14px;color:#fff;font-weight:700;margin-top:4px;">Registration ${escapeHtml(s.code)}</div>
+        <div style="font-size:12px;color:#888;margin-top:4px;">${escapeHtml(s.date)} · ${escapeHtml(s.venue)} · Report ${escapeHtml(s.reportTime)}</div>
+        <div style="font-size:14px;font-weight:900;color:#10b981;margin-top:6px;">₹${s.finalPrice.toLocaleString("en-IN")}</div>
+        ${discountLine}
+      </div>
+      <table width="100%" cellpadding="0" cellspacing="0">${people}</table>
+      <div style="padding:12px 24px;border-top:1px solid #2a2a2a;"><a href="${s.dashUrl}" style="font-size:12px;color:#e8620a;font-weight:700;text-decoration:none;">Open dashboard for ${escapeHtml(s.code)} &rarr;</a></div>
+    </div>
+  </td></tr>`;
+  }).join("");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Registrations Confirmed — The IT Run Sprint-2</title>
+</head>
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:'Helvetica Neue',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:32px 16px;">
+<tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#141414;border-radius:16px;overflow:hidden;">
+  <tr><td style="padding:40px 40px 24px;text-align:center;">
+    <div style="font-size:11px;color:#e8620a;text-transform:uppercase;letter-spacing:0.14em;margin-bottom:10px;">The IT Run Sprint-2</div>
+    <div style="font-size:24px;font-weight:900;color:#fff;">${sections.length} registrations confirmed</div>
+    <div style="font-size:14px;color:#888;margin-top:8px;">Total paid <strong style="color:#10b981;">₹${total.toLocaleString("en-IN")}</strong> in one payment</div>
+  </td></tr>
+  ${blocks}
+  <tr><td style="padding:0 40px 32px;font-size:12px;color:#555;line-height:1.7;">
+    Each registration has its own code and QR codes. Bring the QR code of each runner on race day. Your BIB collection invites are sent separately.
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+}
+
+/**
+ * Sends one confirmation for the registrations a shared payment just confirmed. Each registration's "sent" marker is
+ * claimed first, so a repeated delivery sends nothing. A failed send releases the claims so an admin resend works.
+ */
+export async function sendItRunCheckoutConfirmationEmail(registrationIds: string[]): Promise<void> {
+  if (registrationIds.length === 0) return;
+  const db = getSupabaseServer();
+  const label = `[it-run-email/checkout] regs=${registrationIds.length}`;
+
+  const { data: claimed } = await db
+    .from("it_run_registrations")
+    .update({ confirmation_email_sent_at: new Date().toISOString() })
+    .in("id", registrationIds)
+    .is("confirmation_email_sent_at", null)
+    .select("id");
+  const claimedIds = (claimed ?? []).map(r => (r as { id: string }).id);
+  if (claimedIds.length === 0) { console.log(`${label} Already sent — skipping`); return; }
+
+  const { data: regs } = await db
+    .from("it_run_registrations")
+    .select(`
+      id, registration_code, lead_email, linked_user_email, final_price, base_price, discount_amount, early_bird_offer_id,
+      it_run_categories ( name ),
+      it_run_events ( title, event_date, venue_name, report_time ),
+      it_run_participants ( first_name, last_name, participant_type, tshirt_size, qr_token, created_at )
+    `)
+    .in("id", claimedIds)
+    .returns<Array<{
+      id: string; registration_code: string; lead_email: string; linked_user_email: string | null;
+      final_price: number; base_price: number; discount_amount: number; early_bird_offer_id: string | null;
+      it_run_categories: { name: string } | null;
+      it_run_events: { title: string; event_date: string; venue_name: string; report_time: string | null } | null;
+      it_run_participants: Array<{ first_name: string; last_name: string; participant_type: string; tshirt_size: string | null; qr_token: string | null; created_at: string }> | null;
+    }>>();
+
+  const ordered = (regs ?? []).sort((a, b) => a.registration_code.localeCompare(b.registration_code));
+  const sections: CheckoutSection[] = ordered.map(r => {
+    const ev = r.it_run_events;
+    return {
+      code: r.registration_code,
+      category: r.it_run_categories?.name ?? "IT Run Sprint-2",
+      date: ev?.event_date ?? "2027-02-07",
+      venue: ev?.venue_name ?? "Hitec City, Hyderabad",
+      reportTime: ev?.report_time ?? "5:30 AM",
+      finalPrice: r.final_price,
+      discount: r.discount_amount > 0
+        ? { label: "Discount applied", baseAmount: r.base_price, discountAmount: r.discount_amount }
+        : undefined,
+      dashUrl: buildDashboardUrl(r.registration_code),
+      participants: [...(r.it_run_participants ?? [])]
+        .sort((a, b) => a.created_at.localeCompare(b.created_at))
+        .map(p => ({
+          name: `${p.first_name} ${p.last_name}`,
+          typeLabel: PARTICIPANT_TYPE_LABEL[p.participant_type] ?? "",
+          tshirtSize: p.tshirt_size ?? null,
+          qrUrl: `${APP_URL}/api/it-run/qr/${p.qr_token ?? r.registration_code}`,
+        })),
+    };
+  });
+
+  const first = ordered[0];
+  const recipients = confirmationRecipients(first.lead_email, first.linked_user_email);
+  if (recipients.length === 0) {
+    await db.from("it_run_registrations").update({ confirmation_email_sent_at: null }).in("id", claimedIds);
+    console.error(JSON.stringify({ src: "it-run-email", kind: "checkout_confirmation", outcome: "no_recipient" }));
+    return;
+  }
+
+  const html = buildCheckoutConfirmEmail(sections);
+  const results = await Promise.all(recipients.map(to => sendEmail(
+    to,
+    first.registration_code,
+    `Registrations Confirmed - The IT Run Sprint-2 (${sections.length} registrations)`,
+    html,
+    false,
+    true,
+  )));
+  const failed = results.filter(r => !r.ok);
+  if (failed.length > 0) {
+    await db.from("it_run_registrations").update({ confirmation_email_sent_at: null }).in("id", claimedIds);
+    console.error(JSON.stringify({ src: "it-run-email", kind: "checkout_confirmation", outcome: "send_failed", failed: failed.length, of: recipients.length, httpStatus: failed[0]?.httpStatus ?? null }));
+    return;
+  }
+  console.log(JSON.stringify({ src: "it-run-email", kind: "checkout_confirmation", outcome: "sent", registrations: sections.length, recipients: recipients.length }));
+}

@@ -7,7 +7,7 @@ import { enqueueJob }           from "@/lib/job-queue";
 import { signEventQR }          from "@/lib/event-qr";
 import { sendEmail, eventRegistrationEmailHTML } from "@/lib/notify";
 import { activateMembership }   from "@/lib/membership-activate";
-import { sendItRunConfirmationEmail, sendItRunBibInviteEmail } from "@/lib/it-run-email";
+import { sendItRunConfirmationEmail, sendItRunBibInviteEmail, sendItRunCheckoutConfirmationEmail } from "@/lib/it-run-email";
 import { runAfterResponse } from "@/lib/after-response";
 import { confirmCheckoutPayment } from "@/lib/it-run-checkout-confirm";
 
@@ -317,8 +317,17 @@ async function handleItRunPaymentCaptured(
   }
 
   console.log(`${label} Payment ${paymentId} confirmed for ${result.registrations.length} registration(s)`);
+  // One payment for several registrations: one combined confirmation. A single registration keeps its own email.
+  if (result.registrations.length > 1) {
+    const ids = result.registrations.map(r => r.id);
+    runAfterResponse("checkout_confirmation", () => sendItRunCheckoutConfirmationEmail(ids));
+  } else {
+    for (const reg of result.registrations) {
+      runAfterResponse("confirmation", () => sendItRunConfirmationEmail(reg.id, reg.registration_code, reg.lead_email, reg.qr_token ?? ""));
+    }
+  }
+  // BIB invites are per registration (each has its own booking link)
   for (const reg of result.registrations) {
-    runAfterResponse("confirmation", () => sendItRunConfirmationEmail(reg.id, reg.registration_code, reg.lead_email, reg.qr_token ?? ""));
     runAfterResponse("bib_invite", () => sendItRunBibInviteEmail(reg.id, reg.lead_email));
   }
 }

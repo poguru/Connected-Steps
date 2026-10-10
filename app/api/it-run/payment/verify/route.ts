@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyPaymentSignature } from "@/lib/razorpay-security";
-import { sendItRunConfirmationEmail, sendItRunBibInviteEmail } from "@/lib/it-run-email";
+import { sendItRunConfirmationEmail, sendItRunBibInviteEmail, sendItRunCheckoutConfirmationEmail } from "@/lib/it-run-email";
 import { runAfterResponse } from "@/lib/after-response";
 import { confirmCheckoutPayment } from "@/lib/it-run-checkout-confirm";
 import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
@@ -66,8 +66,17 @@ export async function POST(req: NextRequest) {
 
     // Confirmation and BIB invite run after the response, so the function stays alive until they finish.
     // A failed send releases its "sent" claim, so the email can be resent from the admin portal.
+    // One payment for several registrations: one combined confirmation. A single registration keeps its own email.
+    if (result.registrations.length > 1) {
+      const ids = result.registrations.map(r => r.id);
+      runAfterResponse("checkout_confirmation", () => sendItRunCheckoutConfirmationEmail(ids));
+    } else {
+      for (const reg of result.registrations) {
+        runAfterResponse("confirmation", () => sendItRunConfirmationEmail(reg.id, reg.registration_code, reg.lead_email, ""));
+      }
+    }
+    // BIB invites are per registration (each has its own booking link)
     for (const reg of result.registrations) {
-      runAfterResponse("confirmation", () => sendItRunConfirmationEmail(reg.id, reg.registration_code, reg.lead_email, ""));
       runAfterResponse("bib_invite", () => sendItRunBibInviteEmail(reg.id, reg.lead_email));
     }
 
