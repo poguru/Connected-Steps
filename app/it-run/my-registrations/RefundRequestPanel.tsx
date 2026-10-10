@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { checkRefundReason, REFUND_REASON_MAX } from "@/lib/it-run-refund-reason";
 
 // Participant-side refund requests. Requesting a refund does NOT refund or cancel anything;
 // it sends the request to the admin review queue. The panel shows the admin's response and
@@ -57,6 +58,7 @@ export default function RefundRequestPanel({ registrations, changesOpen }: { reg
   const [busy, setBusy]         = useState(false);
   const [msg, setMsg]           = useState<{ ok: boolean; text: string } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [reasonError, setReasonError] = useState<string | null>(null);
 
   // Default to the first eligible registration without an effect
   const code = eligible.some(r => r.registration_code === chosenCode)
@@ -85,17 +87,21 @@ export default function RefundRequestPanel({ registrations, changesOpen }: { reg
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (reason.trim().length < 10) {
-      setMsg({ ok: false, text: "Please describe the reason in at least 10 characters." });
+    if (busy) return;
+    // The reason is kept as typed when validation fails, so nothing the participant wrote is lost
+    const check = checkRefundReason(reason);
+    if (!check.ok) {
+      setReasonError(check.message);
       return;
     }
+    setReasonError(null);
     setBusy(true);
     setMsg(null);
     try {
       const res = await fetch("/api/it-run/refund-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ registration_code: code, reason: reason.trim() }),
+        body: JSON.stringify({ registration_code: code, reason: check.value }),
       });
       const d = await res.json() as { error?: string; message?: string };
       if (res.ok) {
@@ -138,15 +144,28 @@ export default function RefundRequestPanel({ registrations, changesOpen }: { reg
               <option key={r.registration_code} value={r.registration_code}>{r.registration_code}</option>
             ))}
           </select>
-          <label style={{ display: "block", fontSize: 12, color: "#aaa", marginBottom: 6 }}>Reason for the refund request</label>
+          <label htmlFor="refund-reason" style={{ display: "block", fontSize: 13, color: "#ddd", marginBottom: 4, fontWeight: 600 }}>
+            Reason for refund <span style={{ color: ACCENT }} aria-hidden="true">*</span>
+          </label>
+          <div id="refund-reason-help" style={{ fontSize: 12, color: "#888", marginBottom: 6, lineHeight: 1.5 }}>
+            Please explain why you are requesting a refund (minimum 10 characters).
+          </div>
           <textarea
+            id="refund-reason"
             value={reason}
-            onChange={e => setReason(e.target.value)}
+            onChange={e => { setReason(e.target.value); if (reasonError) setReasonError(null); }}
             rows={3}
-            maxLength={1000}
-            placeholder="Tell us why you cannot attend (at least 10 characters)"
-            style={{ ...INPUT, resize: "vertical", marginBottom: 12 }}
+            maxLength={REFUND_REASON_MAX}
+            required
+            aria-required="true"
+            aria-invalid={reasonError ? "true" : "false"}
+            aria-describedby={reasonError ? "refund-reason-help refund-reason-error" : "refund-reason-help"}
+            placeholder="Tell us why you cannot attend"
+            style={{ ...INPUT, resize: "vertical", marginBottom: reasonError ? 6 : 12, borderColor: reasonError ? "#f87171" : undefined }}
           />
+          {reasonError && (
+            <div id="refund-reason-error" role="alert" style={{ fontSize: 12, color: "#f87171", marginBottom: 12 }}>{reasonError}</div>
+          )}
           {msg && (
             <div role="status" style={{ fontSize: 13, marginBottom: 12, color: msg.ok ? "#10b981" : "#f87171" }}>{msg.text}</div>
           )}

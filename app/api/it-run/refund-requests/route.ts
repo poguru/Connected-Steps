@@ -2,13 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 import { participantChangesOpen, participantChangesClosedBody } from "@/lib/it-run-participant-cutoff";
+import { checkRefundReason } from "@/lib/it-run-refund-reason";
 
 // Participant refund requests.
 // A request is ONLY a request. Creating one never calls Razorpay, never cancels the
 // registration and never releases capacity. An admin must approve and execute it.
 
-const MIN_REASON = 10;
-const MAX_REASON = 1000;
 
 // GET /api/it-run/refund-requests
 // Lists the caller's own refund requests (ownership via linked_user_email).
@@ -78,12 +77,14 @@ export async function POST(req: NextRequest) {
   }
 
   const code   = typeof body.registration_code === "string" ? body.registration_code.trim().toUpperCase() : "";
-  const reason = typeof body.reason === "string" ? body.reason.trim() : "";
 
   if (!code) return NextResponse.json({ error: "Registration code is required" }, { status: 400 });
-  if (reason.length < MIN_REASON || reason.length > MAX_REASON) {
-    return NextResponse.json({ error: `Please describe the reason in ${MIN_REASON}-${MAX_REASON} characters` }, { status: 400 });
+  // Same rule the panel shows: required, trimmed, 10 to 1000 characters. Nothing is stored when it fails.
+  const reasonCheck = checkRefundReason(body.reason);
+  if (!reasonCheck.ok) {
+    return NextResponse.json({ error: reasonCheck.message }, { status: 400 });
   }
+  const reason = reasonCheck.value;
 
   const db = getSupabaseServer();
 

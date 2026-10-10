@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { checkRefundReason } from "@/lib/it-run-refund-reason";
 
 // Change category for one registration. Options and prices come from the server.
 //  - Same price: applied immediately.
@@ -147,8 +148,9 @@ export default function CategoryChangeButton({ registrationId, onChanged }: { re
   // Downgrade: a request for admin review. The server computes the refund amount and creates the request.
   async function requestDowngrade(opt: Option) {
     if (busy) return;
-    if (reason.trim().length < 10) {
-      setError("Please describe the reason in at least 10 characters.");
+    const check = checkRefundReason(reason);
+    if (!check.ok) {
+      setError(check.message);
       return;
     }
     setBusy(true);
@@ -156,7 +158,7 @@ export default function CategoryChangeButton({ registrationId, onChanged }: { re
     try {
       const res = await fetch(`/api/it-run/registrations/${registrationId}/downgrade`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ categoryId: opt.id, reason: reason.trim() }),
+        body: JSON.stringify({ categoryId: opt.id, reason: check.value }),
       });
       const body = await res.json().catch(() => ({})) as { error?: string; message?: string };
       if (!res.ok) { setError(body.error ?? "The request could not be sent. Please try again."); return; }

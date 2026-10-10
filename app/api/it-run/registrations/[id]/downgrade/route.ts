@@ -3,6 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 import { requiredParticipantCount, type CategoryType } from "@/lib/it-run-category-rules";
 import { getRefundedAmountPaise, paidAmountPaise } from "@/lib/it-run-refunds";
+import { checkRefundReason } from "@/lib/it-run-refund-reason";
 import { participantChangesOpen, participantChangesClosedBody } from "@/lib/it-run-participant-cutoff";
 
 // POST /api/it-run/registrations/[id]/downgrade   { categoryId, reason }
@@ -18,8 +19,6 @@ import { participantChangesOpen, participantChangesClosedBody } from "@/lib/it-r
 // that does not fit the target, a full target, and anything that would refund the whole payment
 // (that is a full refund request, not a downgrade).
 
-const MIN_REASON = 10;
-const MAX_REASON = 1000;
 const SUPPORT = "info@connectedsteps.in";
 const NO_STORE = { "Cache-Control": "private, no-store" };
 
@@ -49,11 +48,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Invalid request" }, { status: 400, headers: NO_STORE });
   }
   const categoryId = typeof body.categoryId === "string" ? body.categoryId : "";
-  const reason = typeof body.reason === "string" ? body.reason.trim() : "";
   if (!categoryId) return NextResponse.json({ error: "Choose a category." }, { status: 400, headers: NO_STORE });
-  if (reason.length < MIN_REASON || reason.length > MAX_REASON) {
-    return NextResponse.json({ error: `Please describe the reason in ${MIN_REASON}-${MAX_REASON} characters.` }, { status: 400, headers: NO_STORE });
+  const reasonCheck = checkRefundReason(body.reason);
+  if (!reasonCheck.ok) {
+    return NextResponse.json({ error: reasonCheck.message }, { status: 400, headers: NO_STORE });
   }
+  const reason = reasonCheck.value;
 
   const db = getSupabaseServer();
 
