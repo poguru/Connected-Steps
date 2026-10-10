@@ -13,6 +13,7 @@ import { initialVerificationStatus, isStoredDocumentPath, idDocumentTypeFor } fr
 import { checkPersonName, checkBibName, normalizeName } from "@/lib/it-run-name-validation";
 import {
   isValidEmail, parseCalendarDate, todayInIST, validateDateOfBirth, type CalendarDate,
+  normalizeIndianPhone, emergencyMatchesMobile,
 } from "@/lib/it-run-validation";
 
 interface ParticipantInput {
@@ -44,20 +45,6 @@ function deriveParticipantMeta(
   return Array.from({ length: count }, () => ({
     is_child: false, tshirt_sizes: ADULT_SIZES,
   }));
-}
-
-const MOBILE_RE  = /^\d{10}$/;
-
-// Normalize Indian phone numbers to 10-digit format
-function normalizePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.endsWith("91") && digits.length === 12) {
-    return digits.slice(2); // +91 prefix
-  }
-  if (digits.length === 10) {
-    return digits; // Already 10 digits
-  }
-  return digits.slice(-10); // Take last 10 digits
 }
 
 export interface ParticipantFieldError {
@@ -93,7 +80,8 @@ function validateParticipants(
     if (!m.tshirt_sizes.includes(p.tshirtSize)) {
       return err("tshirtSize", `invalid t-shirt size "${p.tshirtSize}"`);
     }
-    if (!p.mobile?.trim() || !MOBILE_RE.test(p.mobile.trim())) {
+    // Mobile and emergency contact use the shared rule: 10 digits, with or without +91
+    if (!normalizeIndianPhone(p.mobile)) {
       return err("mobile", "valid 10-digit mobile number is required");
     }
 
@@ -119,14 +107,11 @@ function validateParticipants(
     if (!m.is_child) {
       const emergency = checkPersonName(p.emergencyName, "emergency contact name");
       if (!emergency.ok) return err("emergencyName", emergency.message);
-      if (!p.emergencyPhone?.trim() || !MOBILE_RE.test(p.emergencyPhone.trim())) {
+      if (!normalizeIndianPhone(p.emergencyPhone)) {
         return err("emergencyPhone", "valid 10-digit emergency contact phone is required");
       }
-
-      // Emergency phone must be different from participant mobile
-      const normalizedMobile = normalizePhone(p.mobile.trim());
-      const normalizedEmergency = normalizePhone(p.emergencyPhone.trim());
-      if (normalizedMobile === normalizedEmergency) {
+      // Compared after normalization, so +91 and bare forms of the same number match
+      if (emergencyMatchesMobile(p.mobile, p.emergencyPhone)) {
         return err("emergencyPhone", "emergency contact number must be different from your mobile number");
       }
 
@@ -367,7 +352,7 @@ export async function POST(req: NextRequest) {
       gender:             p.gender,
       dob:                p.dob || null,
       email:              p.email?.toLowerCase()?.trim() || null,
-      mobile:             p.mobile.trim(),
+      mobile:             normalizeIndianPhone(p.mobile) ?? p.mobile.trim(),
       blood_group:        p.bloodGroup || null,
       emergency_name:     p.emergencyName ? normalizeName(p.emergencyName) || null : null,
       emergency_phone:    p.emergencyPhone?.trim() || null,
@@ -614,7 +599,7 @@ export async function PATCH(req: NextRequest) {
         gender:             p.gender,
         dob:                p.dob || null,
         email:              p.email?.toLowerCase()?.trim() || null,
-        mobile:             p.mobile.trim(),
+        mobile:             normalizeIndianPhone(p.mobile) ?? p.mobile.trim(),
         blood_group:        p.bloodGroup || null,
         emergency_name:     p.emergencyName ? normalizeName(p.emergencyName) || null : null,
         emergency_phone:    p.emergencyPhone?.trim() || null,

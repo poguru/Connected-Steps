@@ -178,3 +178,41 @@ export function validateDateOfBirth(
   }
   return { ok: true, dob, ageOnEventDate };
 }
+
+// ── Phone numbers ─────────────────────────────────────────────────────────────
+
+/**
+ * The 10-digit Indian mobile number, or null. Accepts the bare 10 digits or the same number with a +91 country code
+ * (any spacing or hyphens). Anything else is null, so a bad number is never guessed at.
+ */
+export function normalizeIndianPhone(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  let digits = value.replace(/\D/g, "");
+  if (digits.length === 12 && digits.startsWith("91")) digits = digits.slice(2);
+  return /^\d{10}$/.test(digits) ? digits : null;
+}
+
+/**
+ * What the phone input keeps while the user types. Digits only, at most 10. A +91 prefix is dropped once it is typed
+ * in full, so "+91 98765 43210" becomes 9876543210 and not the first ten digits of the whole string.
+ */
+export function normalizeIndianPhoneInput(raw: string): string {
+  let digits = raw.replace(/\D/g, "");
+  if (digits.length > 10 && digits.startsWith("91")) digits = digits.slice(2);
+  return digits.slice(0, 10);
+}
+
+/**
+ * True when the emergency contact is the same person's number as the participant's mobile, after normalization.
+ * Either value being invalid is not a match: the format error is reported by its own check.
+ */
+export function emergencyMatchesMobile(mobile: unknown, emergency: unknown): boolean {
+  const m = normalizeIndianPhone(mobile);
+  const e = normalizeIndianPhone(emergency);
+  return m !== null && e !== null && m === e;
+}
+
+/** YYYY-MM-DD for a calendar date, used for the date picker's bounds. */
+export function formatCalendarDate(d: CalendarDate): string {
+  return `${String(d.year).padStart(4, "0")}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`;
+}

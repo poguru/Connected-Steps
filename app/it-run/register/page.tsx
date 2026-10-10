@@ -5,7 +5,10 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import type { ItRunEventConfig, ItRunCategory } from "@/lib/it-run-types";
-import { isValidEmail, parseCalendarDate, todayInIST, validateDateOfBirth } from "@/lib/it-run-validation";
+import {
+  isValidEmail, parseCalendarDate, todayInIST, validateDateOfBirth,
+  normalizeIndianPhone, normalizeIndianPhoneInput, emergencyMatchesMobile, formatCalendarDate,
+} from "@/lib/it-run-validation";
 import { decideUrlCategory, startsNewRegistration } from "@/lib/it-run-category-selection";
 import { idChoiceError, isStoredDocumentPath } from "@/lib/it-run-id-verification";
 import { IssueReportButton } from "@/components/ui/BugReportFab";
@@ -384,6 +387,7 @@ function ParticipantForm({
         <Field label="Date of Birth" error={errors.dob} required
           hint={isChild ? "Must be 10 years or younger" : undefined}>
           <input style={inp("dob", !!errors.dob)} type="date" value={data.dob}
+            min="1900-01-01" max={formatCalendarDate(todayInIST())}
             onChange={e => onChange("dob", e.target.value)} />
         </Field>
       </div>
@@ -401,7 +405,7 @@ function ParticipantForm({
         )}
         <Field label="Mobile" error={errors.mobile} required hint="10-digit Indian number">
           <input style={inp("mobile", !!errors.mobile)} type="tel" value={data.mobile}
-            onChange={e => onChange("mobile", e.target.value.replace(/\D/g, "").slice(0, 10))}
+            onChange={e => onChange("mobile", normalizeIndianPhoneInput(e.target.value))}
             placeholder="9XXXXXXXXX" inputMode="numeric" autoComplete="tel-national" />
         </Field>
       </div>
@@ -440,7 +444,7 @@ function ParticipantForm({
             <Field label="Contact Phone" error={errors.emergencyPhone} required>
               <input style={inp("emergencyPhone", !!errors.emergencyPhone)} type="tel"
                 value={data.emergencyPhone}
-                onChange={e => onChange("emergencyPhone", e.target.value.replace(/\D/g, "").slice(0, 10))}
+                onChange={e => onChange("emergencyPhone", normalizeIndianPhoneInput(e.target.value))}
                 placeholder="Emergency number" inputMode="numeric" />
             </Field>
           </div>
@@ -2359,7 +2363,7 @@ function RegisterPageContent() {
         : { ok: false as const, message: "Event date is unavailable. Please try again later." };
       if (!dobCheck.ok) { e.dob = dobCheck.message; valid = false; }
     }
-    if (!p.mobile || !/^\d{10}$/.test(p.mobile.replace(/\D/g, "").slice(-10))) {
+    if (!normalizeIndianPhone(p.mobile)) {
       e.mobile = "Enter a valid 10-digit Indian mobile number"; valid = false;
     }
     if (!p.bloodGroup)  { e.bloodGroup  = "Required"; valid = false; }
@@ -2375,7 +2379,14 @@ function RegisterPageContent() {
     if (!child) {
       const emergency = checkPersonName(p.emergencyName, "emergency contact name");
       if (!emergency.ok) { e.emergencyName = emergency.message; valid = false; }
-      if (!p.emergencyPhone.trim()) { e.emergencyPhone = "Required"; valid = false; }
+      // Same rule the server applies: a valid 10-digit number that is not the participant's own mobile
+      if (!p.emergencyPhone.trim()) {
+        e.emergencyPhone = "Required"; valid = false;
+      } else if (!normalizeIndianPhone(p.emergencyPhone)) {
+        e.emergencyPhone = "Enter a valid 10-digit contact number"; valid = false;
+      } else if (emergencyMatchesMobile(p.mobile, p.emergencyPhone)) {
+        e.emergencyPhone = "Emergency contact number must be different from your mobile number"; valid = false;
+      }
       // Company names are not person names: they keep their own rule (must contain a letter)
       const companyHasLetter = /[\p{L}]/u;
       if (!p.companyName.trim() || !companyHasLetter.test(p.companyName)) {
@@ -2386,6 +2397,19 @@ function RegisterPageContent() {
 
     setPErrors(prev => { const c = [...prev]; c[idx] = e; return c; });
     return valid;
+  }
+
+  // The server rejected a participant's details on save. Return to that participant's details step with the message
+  // beside the field. The entered details stay as they are.
+  function returnToParticipantError(idx: number, field: string, message: string) {
+    setSubmitError("");
+    setParticipantSubIdx(idx);
+    setPErrors(prev => {
+      const c = [...prev];
+      c[idx] = { [field]: message } as ParticipantErrors;
+      return c;
+    });
+    setStep(2);
   }
 
   // ── Participant step navigation ────────────────────────────────────────────
@@ -2606,8 +2630,15 @@ function RegisterPageContent() {
             })),
           }),
         });
-        const editData = await editRes.json().catch(() => ({})) as { error?: string };
-        if (!editRes.ok) { setSubmitError(editData.error ?? "We couldn't save your changes. Please try again."); return; }
+        const editData = await editRes.json().catch(() => ({})) as { error?: string; field?: string; participant_index?: number };
+        if (!editRes.ok) {
+          if (editData.field && typeof editData.participant_index === "number") {
+            returnToParticipantError(editData.participant_index, editData.field, editData.error ?? "Please check this field.");
+          } else {
+            setSubmitError(editData.error ?? "We couldn't save your changes. Please try again.");
+          }
+          return;
+        }
         // Same registration and the same payment order, so go straight back to payment
         setStep(6);
         return;
@@ -2643,7 +2674,14 @@ function RegisterPageContent() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) { setSubmitError(data.error ?? "Registration failed"); return; }
+      if (!res.ok) {
+        if (data.field && typeof data.participant_index === "number") {
+          returnToParticipantError(data.participant_index, data.field, data.error ?? "Please check this field.");
+        } else {
+          setSubmitError(data.error ?? "Registration failed");
+        }
+        return;
+      }
       setRegCode(data.registrationCode);
       setDashboardUrl(data.dashboardUrl ?? "");
       setRegId(data.registrationId);
