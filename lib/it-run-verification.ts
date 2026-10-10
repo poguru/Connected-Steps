@@ -240,12 +240,18 @@ export function buildCompanyVerificationApprovedEmail(
     eventTitle: string;
     eventDate: string;
   },
+  documentType: "company" | "government" = "company",
 ): string {
-  return `${wrapperOpen("#10b981", "Company ID Verified", eventDetails.eventTitle)}
+  const isGovernment = documentType === "government";
+  const heading = isGovernment ? "ID Verified" : "Company ID Verified";
+  const statement = isGovernment
+    ? "Your government-issued ID was reviewed, and your identity and age verification is complete under the applicable event rules. This is not company ID verification."
+    : "Your company ID has been verified. You're all set for the event!";
+  return `${wrapperOpen("#10b981", heading, eventDetails.eventTitle)}
   <p style="color:#ccc;font-size:14px;margin:0 0 16px;">Hi <strong style="color:#fff;">${escapeHtml(participantName)}</strong>,</p>
 
   <div style="background:#1a1a1a;border-radius:8px;border-left:3px solid #10b981;padding:16px;margin-bottom:20px;">
-    <p style="color:#10b981;font-size:13px;margin:0;font-weight:600;">Your company ID has been verified. You're all set for the event!</p>
+    <p style="color:#10b981;font-size:13px;margin:0;font-weight:600;">${statement}</p>
   </div>
 
   <div style="margin-bottom:20px;">

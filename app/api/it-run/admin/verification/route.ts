@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     .from("it_run_participants")
     .select(`
       id, first_name, last_name, email, mobile,
-      company_name, employee_id, company_id_url, verification_status,
+      company_name, employee_id, company_id_url, verification_status, id_document_type,
       it_run_registrations ( registration_code, payment_status, registration_status,
         it_run_categories ( name ) )
     `, { count: "exact" })
@@ -88,10 +88,10 @@ export async function PATCH(req: NextRequest) {
 
     const { data: part } = await db
       .from("it_run_participants")
-      .select("email, first_name, company_id_url")
+      .select("email, first_name, company_id_url, id_document_type")
       .eq("id", participantId)
       .eq("event_id", event.id)
-      .maybeSingle<{ email: string | null; first_name: string; company_id_url: string | null }>();
+      .maybeSingle<{ email: string | null; first_name: string; company_id_url: string | null; id_document_type: string | null }>();
     if (!part) return NextResponse.json({ error: "Participant not found" }, { status: 404 });
     // A participant who continued without an ID has nothing to review. Never approve or reject them.
     if (!part.company_id_url) {
@@ -135,11 +135,12 @@ export async function PATCH(req: NextRequest) {
       let htmlBody = "";
 
       if (status === "verified") {
-        subject = `Company ID Verified - ${event.title}`;
+        const isGovernment = part.id_document_type === "government";
+        subject = isGovernment ? `ID Verified - ${event.title}` : `Company ID Verified - ${event.title}`;
         htmlBody = buildCompanyVerificationApprovedEmail(part.first_name, {
           eventTitle: event.title,
           eventDate: "February 7, 2027",
-        });
+        }, isGovernment ? "government" : "company");
       } else if (status === "rejected") {
         subject = "Company ID Verification - Action Required (The IT Run Sprint-2)";
         htmlBody = buildCompanyVerificationRejectionEmail(part.first_name, decision.reason!, decision.explanation, {

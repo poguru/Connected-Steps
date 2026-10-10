@@ -9,7 +9,7 @@ import { buildDashboardUrl } from "@/lib/it-run-dashboard-link";
 import { hashDraftToken, isWellFormedDraftToken } from "@/lib/it-run-drafts";
 import { bestEarlyBird, type EarlyBirdOffer } from "@/lib/it-run-early-bird";
 import { participantCountAllowed, participantCountMessage, bookingPrice } from "@/lib/it-run-category-rules";
-import { initialVerificationStatus, isStoredDocumentPath } from "@/lib/it-run-id-verification";
+import { initialVerificationStatus, isStoredDocumentPath, idDocumentTypeFor } from "@/lib/it-run-id-verification";
 import { checkPersonName, checkBibName, normalizeName } from "@/lib/it-run-name-validation";
 import {
   isValidEmail, parseCalendarDate, todayInIST, validateDateOfBirth, type CalendarDate,
@@ -20,6 +20,8 @@ interface ParticipantInput {
   gender: string; dob: string; email: string; mobile: string;
   bloodGroup: string; emergencyName: string; emergencyPhone: string;
   companyName: string; employeeId: string; companyIdUrl: string;
+  /** "company" (default) or "government": the kind of ID in companyIdUrl */
+  idDocumentType?: string;
   tshirtSize: string; medicalConditions: string; foodPreference: string;
 }
 
@@ -372,6 +374,7 @@ export async function POST(req: NextRequest) {
       company_name:       p.companyName?.trim() || null,
       employee_id:        p.employeeId?.trim() || null,
       company_id_url:     p.companyIdUrl || null,
+      id_document_type:   idDocumentTypeFor(p.companyIdUrl, p.idDocumentType),
       tshirt_size:        p.tshirtSize || null,
       medical_conditions: p.medicalConditions?.trim() || null,
       food_preference:    p.foodPreference || null,
@@ -624,6 +627,7 @@ export async function PATCH(req: NextRequest) {
         // No document on file and none given: the participant continues without an ID (not_provided).
         ...(companyChanged ? {
           company_id_url: p.companyIdUrl,
+          id_document_type: idDocumentTypeFor(p.companyIdUrl, p.idDocumentType),
           verification_status: initialVerificationStatus(isChild, p.companyIdUrl),
         } : (!p.companyIdUrl && !current.company_id_url && !isChild) ? {
           verification_status: "not_provided",

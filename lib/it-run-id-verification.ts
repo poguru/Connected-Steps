@@ -51,3 +51,11 @@ export function idChoiceError(
   }
   return null;
 }
+
+/** The kind of ID a participant uploaded. Null when no document was uploaded. Government ID is recorded separately. */
+export type IdDocumentType = "company" | "government";
+
+export function idDocumentTypeFor(companyIdUrl: unknown, requested: unknown): IdDocumentType | null {
+  if (!isStoredDocumentPath(companyIdUrl)) return null;
+  return requested === "government" ? "government" : "company";
+}
