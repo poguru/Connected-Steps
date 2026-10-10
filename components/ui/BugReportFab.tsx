@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, DragEvent } from "react";
 import { usePathname } from "next/navigation";
 import { floatingReportHidden } from "@/lib/issue-report-placement";
+import { FLOATING_BOTTOM_OFFSET } from "@/lib/bottom-bar";
 
 // Any control on the page can open the report form by dispatching this event. One form, one listener.
 export const OPEN_ISSUE_REPORT_EVENT = "cs-open-issue-report";
@@ -156,7 +157,23 @@ export default function BugReportFab() {
   // The registration wizard keeps its own report button inside its bottom bar (see IssueReportButton),
   // so the floating control is hidden there. The form itself stays mounted for that button to open.
   const pathname = usePathname();
-  const floatingHidden = floatingReportHidden(pathname);
+  const routeHidden = floatingReportHidden(pathname);
+  // Hidden while someone is typing in a field, so the control never covers the field or the keyboard area.
+  // It returns as soon as focus leaves the field.
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    const isField = (el: EventTarget | null) =>
+      el instanceof HTMLElement && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
+    const onIn = (e: FocusEvent) => { if (isField(e.target)) setTyping(true); };
+    const onOut = () => setTyping(false);
+    document.addEventListener("focusin", onIn);
+    document.addEventListener("focusout", onOut);
+    return () => {
+      document.removeEventListener("focusin", onIn);
+      document.removeEventListener("focusout", onOut);
+    };
+  }, []);
+  const floatingHidden = routeHidden || typing;
 
   useEffect(() => {
     const open = () => setOpen(true);
@@ -309,7 +326,8 @@ export default function BugReportFab() {
         className="cs-bug-fab"
         style={{
           position: "fixed",
-          bottom: "calc(env(safe-area-inset-bottom) + 20px)",
+          // Sits above the cookie notice and any sticky call to action (see lib/bottom-bar.ts)
+          bottom: FLOATING_BOTTOM_OFFSET,
           left: 16, zIndex: 9990,
           height: 38, paddingLeft: 12, paddingRight: 16, borderRadius: 999,
           background: "rgba(15,15,15,0.9)", border: "1px solid rgba(255,255,255,0.14)",

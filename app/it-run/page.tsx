@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { publishBottomBarHeight } from "@/lib/bottom-bar";
 import Image from "next/image";
 import { categoryCard, type ApiCategory } from "@/lib/it-run-category-view";
 
@@ -153,6 +154,9 @@ const S = {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function ItRunLandingPage() {
+  // The mobile call to action is a bottom bar: it publishes its height so the report button stacks above it
+  const ctaRef = useRef<HTMLDivElement>(null);
+
   // Event config loaded from DB via /api/it-run/categories — never hardcoded
   const [eventDate,   setEventDate]   = useState<Date | null>(null);
   const [regClose,    setRegClose]    = useState<Date | null>(null);
@@ -233,9 +237,12 @@ export default function ItRunLandingPage() {
   }, []);
 
   const regClosed = regClose ? Date.now() > regClose.getTime() : false;
+  // Re-measure when the call to action appears or disappears
+  useEffect(() => publishBottomBarHeight(ctaRef.current, "--it-run-cta-h"), [regClosed]);
 
   return (
-    <div style={S.page}>
+    // The page keeps clear of the sticky call to action and the cookie notice at the bottom, so the footer can be reached
+    <div style={{ ...S.page, paddingBottom: "calc(var(--it-run-cta-h, 0px) + var(--cookie-banner-h, 0px))" }}>
 
       {/* ── Navigation ── */}
       <nav style={{ ...S.nav, background: navScrolled ? "rgba(8,8,8,0.97)" : "transparent", borderBottom: navScrolled ? "1px solid rgba(255,255,255,0.06)" : "none", transition: "all 0.3s" }}>
@@ -712,7 +719,7 @@ export default function ItRunLandingPage() {
 
       {/* ── Sticky CTA (mobile) ── */}
       {!regClosed && (
-        <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 99, padding: "12px 16px", background: "rgba(8,8,8,0.96)", backdropFilter: "blur(20px)", borderTop: "1px solid rgba(255,255,255,0.08)", display: "none" }} className="mobile-sticky-cta">
+        <div ref={ctaRef} style={{ position: "fixed", bottom: "var(--cookie-banner-h, 0px)", left: 0, right: 0, zIndex: 99, padding: "12px 16px", background: "rgba(8,8,8,0.96)", backdropFilter: "blur(20px)", borderTop: "1px solid rgba(255,255,255,0.08)", display: "none" }} className="mobile-sticky-cta">
           <Link href="/it-run/register" style={{ ...S.cta, width: "100%", justifyContent: "center", borderRadius: 12, padding: "15px" }}>
             Register Now - From Rs. 649
           </Link>

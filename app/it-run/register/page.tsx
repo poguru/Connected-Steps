@@ -11,6 +11,7 @@ import { idChoiceError, isStoredDocumentPath } from "@/lib/it-run-id-verificatio
 import { IssueReportButton } from "@/components/ui/BugReportFab";
 import { checkPersonName, checkBibName, bibNameHint } from "@/lib/it-run-name-validation";
 import { draftKeyOf, saveStatusFor, createMoveGate } from "@/lib/it-run-step-save";
+import { publishBottomBarHeight } from "@/lib/bottom-bar";
 import {
   EventRegistrationHeader,
   CompactEventHeader,
@@ -2172,6 +2173,10 @@ function RegisterPageContent() {
   // "Retry save" completes it.
   const moveGate = useRef(createMoveGate()).current;
 
+  // The header's measured height. The content and the offline notice are offset from it (--reg-header-h).
+  const headerRef = useRef<HTMLElement>(null);
+  useEffect(() => publishBottomBarHeight(headerRef.current, "--reg-header-h"), []);
+
   async function persistThen(target: { step: number; participantSubIdx?: number }, navigate: () => void): Promise<void> {
     // A save already in flight (from the header button) finishes first, then this move runs
     for (let i = 0; i < 100 && savingRef.current; i++) await new Promise(r => setTimeout(r, 100));
@@ -2682,12 +2687,13 @@ function RegisterPageContent() {
       <EventWatermark />
 
       {/* Nav */}
-      <nav style={{
+      <nav ref={headerRef} style={{
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
         background: "rgba(8,8,8,0.97)", backdropFilter: "blur(20px)",
         borderBottom: "1px solid rgba(232, 98, 10, 0.15)",
-        height: 52, display: "flex", alignItems: "center",
-        padding: "0 clamp(1rem,4vw,2rem)", justifyContent: "space-between",
+        // Grows with its content (the save status can wrap on narrow screens); content offsets follow --reg-header-h
+        minHeight: 52, display: "flex", alignItems: "center", flexWrap: "wrap", rowGap: 6,
+        padding: "8px clamp(1rem,4vw,2rem)", justifyContent: "space-between",
       }}>
         <Link href="/it-run" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
           <div style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -2729,7 +2735,7 @@ function RegisterPageContent() {
       {/* Offline banner */}
       {isOffline && step < 7 && (
         <div style={{
-          position: "fixed", top: 52, left: 0, right: 0, zIndex: 99,
+          position: "fixed", top: "var(--reg-header-h, 52px)", left: 0, right: 0, zIndex: 99,
           background: "rgba(245,158,11,0.08)", borderBottom: "1px solid rgba(245,158,11,0.18)",
           padding: "8px clamp(1rem,4vw,2rem)", fontSize: 13, color: "#f59e0b", textAlign: "center" as const,
         }}>
@@ -2740,7 +2746,7 @@ function RegisterPageContent() {
       {/* Registration closed banner */}
       {regClosed && step === 1 && (
         <div style={{
-          position: "fixed", top: 52, left: 0, right: 0, zIndex: 99,
+          position: "fixed", top: "var(--reg-header-h, 52px)", left: 0, right: 0, zIndex: 99,
           background: "rgba(248,113,113,0.08)", borderBottom: "1px solid rgba(248,113,113,0.18)",
           padding: "8px clamp(1rem,4vw,2rem)", fontSize: 13, color: "#f87171", textAlign: "center" as const,
         }}>
@@ -2750,7 +2756,7 @@ function RegisterPageContent() {
 
       {/* Loading gate */}
       {!sessionChecked && (
-        <div style={{ maxWidth: 640, margin: "0 auto", padding: "calc(52px + 2rem) clamp(1rem,5vw,2rem)", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ maxWidth: 640, margin: "0 auto", padding: "calc(var(--reg-header-h, 52px) + 2rem) clamp(1rem,5vw,2rem)", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ textAlign: "center" as const }}>
             <div style={{ width: 32, height: 32, border: "3px solid rgba(255,255,255,0.08)", borderTopColor: ACCENT, borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
             <div style={{ fontSize: 14, color: "#555" }}>Loading…</div>
@@ -2760,7 +2766,7 @@ function RegisterPageContent() {
 
       {/* Email gate */}
       {sessionChecked && !emailVerified && (
-        <div style={{ maxWidth: 480, margin: "0 auto", padding: `calc(52px + clamp(2rem,6vw,3rem)) clamp(1rem,5vw,2rem) clamp(2rem,6vw,3rem)`, minHeight: "100vh" }}>
+        <div style={{ maxWidth: 480, margin: "0 auto", padding: `calc(var(--reg-header-h, 52px) + clamp(2rem,6vw,3rem)) clamp(1rem,5vw,2rem) clamp(2rem,6vw,3rem)`, minHeight: "100vh" }}>
 
           {/* Email input */}
           {!otpSent && (
@@ -2955,7 +2961,7 @@ function RegisterPageContent() {
       {sessionChecked && emailVerified && (
       <div style={{
         maxWidth: 640, margin: "0 auto",
-        padding: `calc(52px + ${isOffline && step < 7 ? "36px + " : ""}clamp(1.5rem,5vw,2.5rem)) clamp(1rem,5vw,2rem) ${step >= 2 && step <= 6 && selectedCat ? "80px" : "clamp(1.5rem,5vw,2.5rem)"}`,
+        padding: `calc(var(--reg-header-h, 52px) + ${isOffline && step < 7 ? "36px + " : ""}clamp(1.5rem,5vw,2.5rem)) clamp(1rem,5vw,2rem) ${step >= 2 && step <= 6 && selectedCat ? "80px" : "clamp(1.5rem,5vw,2.5rem)"}`,
         minHeight: "100vh",
       }}>
 

@@ -1,14 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { publishBottomBarHeight } from "@/lib/bottom-bar";
 
 export default function CookieBanner() {
   const [visible, setVisible] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!localStorage.getItem("cs_cookie_consent")) setVisible(true);
   }, []);
+
+  // Other bottom controls clear this banner's height (see lib/bottom-bar.ts)
+  useEffect(() => publishBottomBarHeight(visible ? ref.current : null, "--cookie-banner-h"), [visible]);
 
   function accept() {
     localStorage.setItem("cs_cookie_consent", "1");
@@ -18,7 +23,7 @@ export default function CookieBanner() {
   if (!visible) return null;
 
   return (
-    <div style={{
+    <div ref={ref} style={{
       position:     "fixed",
       bottom:       0,
       left:         0,
