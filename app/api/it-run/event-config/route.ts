@@ -1,5 +1,5 @@
 import { bestEarlyBird, type EarlyBirdOffer } from "@/lib/it-run-early-bird";
-import { requiredParticipantCount } from "@/lib/it-run-category-rules";
+import { fixedParticipantCount } from "@/lib/it-run-category-rules";
 import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import type {
@@ -118,7 +118,7 @@ export async function GET() {
       color:                c.color ?? "#e8620a",
       is_timed:             !!c.includes_timing,
       inclusions,
-      participant_count:    requiredParticipantCount(c.category_type),
+      participant_count:    fixedParticipantCount(c.category_type) ?? 1, // default selection; individual categories can hold more runners
       participant_labels,
       max_participants:     c.max_participants ?? null,
       current_participants: livePartMap[c.id] ?? 0,

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
-import { requiredParticipantCount, type CategoryType } from "@/lib/it-run-category-rules";
+import { participantCountAllowed, bookingPrice, type CategoryType } from "@/lib/it-run-category-rules";
 import { getRefundedAmountPaise, paidAmountPaise } from "@/lib/it-run-refunds";
 import { checkRefundReason } from "@/lib/it-run-refund-reason";
 import { participantChangesOpen, participantChangesClosedBody } from "@/lib/it-run-participant-cutoff";
@@ -91,13 +91,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (tErr) return NextResponse.json({ error: "We couldn't load the category. Please try again." }, { status: 500, headers: NO_STORE });
   if (!target) return NextResponse.json({ error: "That category is not available." }, { status: 422, headers: NO_STORE });
 
+  // The target's price for this booking: per runner for individual categories, once per team otherwise
+  const targetTotal = bookingPrice(target.category_type, target.price_rupees, reg.participant_count);
   if (target.price_rupees <= 0) {
     return NextResponse.json({ error: `A free category is not a downgrade. Email ${SUPPORT} for a full refund request.` }, { status: 422, headers: NO_STORE });
   }
-  if (target.price_rupees >= reg.final_price) {
+  if (targetTotal >= reg.final_price) {
     return NextResponse.json({ error: "That category costs the same or more. Use the category change instead." }, { status: 422, headers: NO_STORE });
   }
-  if (requiredParticipantCount(target.category_type) !== reg.participant_count) {
+  if (!participantCountAllowed(target.category_type, reg.participant_count)) {
     return NextResponse.json({ error: `${target.name} needs a different group size than this registration.` }, { status: 422, headers: NO_STORE });
   }
 
@@ -106,7 +108,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: `${target.name} is full.` }, { status: 409, headers: NO_STORE });
   }
 
-  const amountPaise = (reg.final_price - target.price_rupees) * 100;
+  const amountPaise = (reg.final_price - targetTotal) * 100;
   const refundedPaise = await getRefundedAmountPaise(db, reg.id);
   const remainingPaise = paidAmountPaise(reg) - refundedPaise;
   if (amountPaise > remainingPaise) {

@@ -8,7 +8,7 @@ import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 import { buildDashboardUrl } from "@/lib/it-run-dashboard-link";
 import { hashDraftToken, isWellFormedDraftToken } from "@/lib/it-run-drafts";
 import { bestEarlyBird, type EarlyBirdOffer } from "@/lib/it-run-early-bird";
-import { requiredParticipantCount, categoryTypeLabel } from "@/lib/it-run-category-rules";
+import { participantCountAllowed, participantCountMessage, bookingPrice } from "@/lib/it-run-category-rules";
 import { initialVerificationStatus, isStoredDocumentPath } from "@/lib/it-run-id-verification";
 import { checkPersonName, checkBibName, normalizeName } from "@/lib/it-run-name-validation";
 import {
@@ -189,11 +189,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Registration for this event is now closed" }, { status: 409 });
     }
 
-    // The exact participant count comes from the category type (same rule the form uses).
-    const requiredCount = requiredParticipantCount(cat.category_type);
-    if (participants.length !== requiredCount) {
+    // Fixed-composition categories (duo, parent & child) need exactly their composition. Individual categories
+    // accept one or more runners in the same booking. Both rules come from lib/it-run-category-rules.ts.
+    if (!participantCountAllowed(cat.category_type, participants.length)) {
       return NextResponse.json(
-        { error: `${categoryTypeLabel(cat.category_type)} needs exactly ${requiredCount} participant${requiredCount === 1 ? "" : "s"}. You entered ${participants.length}.`, code: "PARTICIPANT_COUNT" },
+        { error: participantCountMessage(cat.category_type, participants.length), code: "PARTICIPANT_COUNT" },
         { status: 400 },
       );
     }
@@ -221,7 +221,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const basePrice = cat.price_rupees;
+    // Each individual runner pays the category price; a fixed-composition team pays it once.
+    const basePrice = bookingPrice(cat.category_type, cat.price_rupees, participants.length);
 
     // Atomically validate and claim one coupon use.
     // The DB function acquires a FOR UPDATE lock on the coupon row so concurrent

@@ -9,7 +9,7 @@ import {
   markRefundFailed,
   paidAmountPaise,
 } from "@/lib/it-run-refunds";
-import { requiredParticipantCount, type CategoryType } from "@/lib/it-run-category-rules";
+import { participantCountAllowed, bookingPrice, type CategoryType } from "@/lib/it-run-category-rules";
 
 // POST /api/it-run/admin/refund
 // Executes an APPROVED refund request. Participants can never call this.
@@ -133,12 +133,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "The target category is no longer available. Nothing has been refunded." }, { status: 409 });
     }
     // The stored amount must still equal the difference in today's prices and the group size must still fit
-    const priceStillMatches = target.price_rupees > 0 && target.price_rupees < reg.final_price &&
-      reg.final_price * 100 - requested === target.price_rupees * 100;
+    const targetTotal = bookingPrice(target.category_type, target.price_rupees, reg.participant_count);
+    const priceStillMatches = target.price_rupees > 0 && targetTotal < reg.final_price &&
+      reg.final_price * 100 - requested === targetTotal * 100;
     if (!priceStillMatches) {
       return NextResponse.json({ error: "The category price has changed since the request. Ask the participant to request again. Nothing has been refunded." }, { status: 409 });
     }
-    if (requiredParticipantCount(target.category_type) !== reg.participant_count) {
+    if (!participantCountAllowed(target.category_type, reg.participant_count)) {
       return NextResponse.json({ error: `${target.name} no longer fits this group size. Nothing has been refunded.` }, { status: 409 });
     }
     if (requested > remaining) {

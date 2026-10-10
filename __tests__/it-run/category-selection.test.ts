@@ -20,7 +20,7 @@ jest.mock("@/lib/it-run-email", () => ({
 import { NextRequest } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { decideUrlCategory, startsNewRegistration, type CategoryRef } from "@/lib/it-run-category-selection";
-import { requiredParticipantCount, categoryTypeLabel } from "@/lib/it-run-category-rules";
+import { fixedParticipantCount, categoryTypeLabel } from "@/lib/it-run-category-rules";
 import { POST as registerPost } from "@/app/api/it-run/register/route";
 import { POST as draftPost } from "@/app/api/it-run/drafts/route";
 import { newDraftToken, hashDraftToken, DRAFT_TTL_MS } from "@/lib/it-run-drafts";
@@ -102,10 +102,10 @@ describe("changing category starts a new registration", () => {
 // ── Participant rules per category ─────────────────────────────────────────────
 
 describe("participant count comes from the category type", () => {
-  it("solo categories take one runner; Duo Challenge and Parent & Child take two", () => {
-    expect(requiredParticipantCount("solo")).toBe(1);
-    expect(requiredParticipantCount("duo")).toBe(2);
-    expect(requiredParticipantCount("kid")).toBe(2);
+  it("fixed-composition categories need their exact count; individual categories have none", () => {
+    expect(fixedParticipantCount("solo")).toBeNull();
+    expect(fixedParticipantCount("duo")).toBe(2);
+    expect(fixedParticipantCount("kid")).toBe(2);
   });
 
   it("only the Parent & Child category is labelled as one", () => {
@@ -169,12 +169,22 @@ function registerReq(categoryId: string, count: number) {
 describe("registration enforces the selected category's participant count", () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it("a 10K (solo) registration with two participants is refused", async () => {
-    const { db, writes } = categoryDb(ACTIVE_SOLO);
+  it("a 10K (solo) booking with two runners is not refused for its size", async () => {
+    // Individual categories accept several runners in one booking. The fake stops at the first write it does not
+    // model, so only the participant-count rule is asserted here.
+    const { db } = categoryDb(ACTIVE_SOLO);
     mockDb.mockReturnValue(db);
     const res = await registerPost(registerReq("id-10k", 2));
+    const code = (await res.json().catch(() => ({}))).code;
+    expect(code).not.toBe("PARTICIPANT_COUNT");
+  });
+
+  it("a Duo Challenge with one runner is refused with a clear message", async () => {
+    const { db, writes } = categoryDb({ ...ACTIVE_SOLO, id: "id-duo", name: "5K Duo Challenge", category_type: "duo" });
+    mockDb.mockReturnValue(db);
+    const res = await registerPost(registerReq("id-duo", 1));
     expect(res.status).toBe(400);
-    expect((await res.json()).code).toBe("PARTICIPANT_COUNT");
+    expect((await res.json()).error).toMatch(/exactly 2 runners/);
     expect(writes).toEqual([]);
   });
 

@@ -11,6 +11,7 @@ import { idChoiceError, isStoredDocumentPath } from "@/lib/it-run-id-verificatio
 import { IssueReportButton } from "@/components/ui/BugReportFab";
 import { checkPersonName, checkBibName, bibNameHint } from "@/lib/it-run-name-validation";
 import { draftKeyOf, saveStatusFor, createMoveGate } from "@/lib/it-run-step-save";
+import { bookingPrice } from "@/lib/it-run-category-rules";
 import { publishBottomBarHeight } from "@/lib/bottom-bar";
 import {
   EventRegistrationHeader,
@@ -518,15 +519,17 @@ function ParticipantForm({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function PriceBar({
-  category, finalPrice, couponApplied, step, participantSubIdx,
+  category, finalPrice, couponApplied, step, participantSubIdx, participantCount,
 }: {
   category: ItRunCategory;
   finalPrice: number;
   couponApplied: boolean;
   step: number;
   participantSubIdx: number;
+  participantCount: number;
 }) {
-  const showSubStep = step === 2 && category.participant_count > 1;
+  // The runners actually entered decide whether the per-participant navigation shows (individual categories allow several)
+  const showSubStep = step === 2 && participantCount > 1;
 
   return (
     <div style={{
@@ -549,7 +552,7 @@ function PriceBar({
             fontSize: 10, color: ACCENT, fontWeight: 700, flexShrink: 0,
             background: `${ACCENT}15`, padding: "2px 7px", borderRadius: 10,
           }}>
-            {participantSubIdx + 1} / {category.participant_count}
+            {participantSubIdx + 1} / {participantCount}
           </span>
         )}
       </div>
@@ -1744,7 +1747,9 @@ function RegisterPageContent() {
   const [resendSecs,   setResendSecs]   = useState(0);
 
   // Price
-  const basePrice  = selectedCat?.price_rupees ?? 0;
+  // The booking's price: each runner pays the category price in an individual category; a fixed team pays it once.
+  // The server computes the same total (lib/it-run-category-rules.ts) and is authoritative.
+  const basePrice  = selectedCat ? bookingPrice(selectedCat.category_type, selectedCat.price_rupees, participants.length) : 0;
   // An early bird and a coupon are never combined; the server refuses the pair. The early bird's discount is
   // the one shown here, as the server computed it for this category.
   const earlyBirdDiscount = selectedCat?.early_bird?.discount ?? 0;
@@ -3216,6 +3221,7 @@ function RegisterPageContent() {
           couponApplied={!!coupon}
           step={step}
           participantSubIdx={participantSubIdx}
+          participantCount={participants.length}
         />
       )}
 

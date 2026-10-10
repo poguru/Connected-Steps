@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 import { getClientIp } from "@/lib/rate-limit";
-import { requiredParticipantCount, type CategoryType } from "@/lib/it-run-category-rules";
+import { participantCountAllowed, bookingPrice, type CategoryType } from "@/lib/it-run-category-rules";
 import { getRazorpaySDK } from "@/lib/razorpay-client";
 import { sendCategoryChangeEmail } from "@/lib/it-run-category-change";
 import { participantChangesOpen, participantChangesClosedBody } from "@/lib/it-run-participant-cutoff";
@@ -49,6 +49,11 @@ async function ownedRegistration(req: NextRequest, id: string): Promise<{ reg: R
   return { reg, email };
 }
 
+/** The price of a booking in a category: the category price per runner (individual) or once per team (duo, parent & child). */
+function bookingTotal(cat: { category_type: CategoryType; price_rupees: number }, participantCount: number): number {
+  return bookingPrice(cat.category_type, cat.price_rupees, participantCount);
+}
+
 function availability(c: Cat): "available" | "full" {
   return c.max_participants === null || c.current_participants < c.max_participants ? "available" : "full";
 }
@@ -82,30 +87,33 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const current = (cats ?? []).find(c => c.id === reg.category_id);
   const blocked = blockReason(reg);
+  // Prices here are booking totals: an individual category is priced per runner, so a two-runner booking costs twice
+  const n = reg.participant_count;
+  const currentTotal = current ? bookingTotal(current, n) : 0;
   const options = (cats ?? [])
-    .filter(c => c.id !== reg.category_id && requiredParticipantCount(c.category_type) === reg.participant_count)
+    .filter(c => c.id !== reg.category_id && participantCountAllowed(c.category_type, n))
     .map(c => {
-      const samePrice = c.price_rupees === (current?.price_rupees ?? -1);
-      const change = samePrice ? "same" : c.price_rupees > (current?.price_rupees ?? 0) ? "upgrade" : "downgrade";
+      const total = bookingTotal(c, n);
+      const change = total === currentTotal ? "same" : total > currentTotal ? "upgrade" : "downgrade";
       const full = availability(c) === "full";
       let note: string | null = null;
       if (blocked) note = blocked;
       else if (full) note = "This category is full.";
-      else if (change === "upgrade") note = `Pay the difference of ₹${c.price_rupees - (current?.price_rupees ?? 0)} to switch.`;
-      else if (change === "downgrade") note = `Request a refund of ₹${(current?.price_rupees ?? 0) - c.price_rupees} for this move. Nothing changes until our team approves it.`;
+      else if (change === "upgrade") note = `Pay the difference of ₹${total - currentTotal} to switch.`;
+      else if (change === "downgrade") note = `Request a refund of ₹${currentTotal - total} for this move. Nothing changes until our team approves it.`;
       return {
-        id: c.id, name: c.name, distanceKm: c.distance_km, priceRupees: c.price_rupees,
+        id: c.id, name: c.name, distanceKm: c.distance_km, priceRupees: total,
         change, availability: availability(c),
         // A downgrade is a request for admin review, made from the downgrade route
         allowed: !blocked && !full,
-        refundRupees: change === "downgrade" ? (current?.price_rupees ?? 0) - c.price_rupees : null,
+        refundRupees: change === "downgrade" ? currentTotal - total : null,
         note,
       };
     });
 
   return NextResponse.json({
     registrationCode: reg.registration_code,
-    current: current ? { id: current.id, name: current.name, priceRupees: current.price_rupees, distanceKm: current.distance_km } : null,
+    current: current ? { id: current.id, name: current.name, priceRupees: currentTotal, distanceKm: current.distance_km } : null,
     options,
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
@@ -138,23 +146,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .select("id, slug, name, category_type, price_rupees, distance_km, is_active, max_participants, current_participants")
       .eq("id", body.categoryId).eq("event_id", reg.event_id).maybeSingle<Cat>(),
     db.from("it_run_categories")
-      .select("id, price_rupees").eq("id", reg.category_id).maybeSingle<{ id: string; price_rupees: number }>(),
+      .select("id, category_type, price_rupees").eq("id", reg.category_id).maybeSingle<{ id: string; category_type: CategoryType; price_rupees: number }>(),
   ]);
   if (!target || !target.is_active) return NextResponse.json({ error: "That category is not available.", code: "CATEGORY_UNAVAILABLE" }, { status: 409 });
-  if (requiredParticipantCount(target.category_type) !== reg.participant_count) {
+  if (!participantCountAllowed(target.category_type, reg.participant_count)) {
     return NextResponse.json({ error: "That category needs a different number of participants.", code: "PARTICIPANT_COUNT" }, { status: 409 });
   }
   if (!current) return NextResponse.json({ error: "We couldn't load your current category.", code: "SERVER_ERROR" }, { status: 500 });
 
-  // Prices are the server's, never the client's.
-  if (target.price_rupees < current.price_rupees) {
+  // Prices are the server's, never the client's. Compared as booking totals for this many runners.
+  const n = reg.participant_count;
+  const currentTotal = bookingTotal(current, n);
+  const targetTotal = bookingTotal(target, n);
+  if (targetTotal < currentTotal) {
     return NextResponse.json({
       error: "A downgrade is a refund request for our team to review, so it isn't applied here. Request it from the category options.",
       code: "DOWNGRADE_REQUIRES_REVIEW",
     }, { status: 409 });
   }
-  if (target.price_rupees > current.price_rupees) {
-    return startUpgrade(req, reg, email, current, target);
+  if (targetTotal > currentTotal) {
+    return startUpgrade(req, reg, email, { currentTotal, targetTotal }, target);
   }
 
   // Reserve the seats in the target category first (row-locked in the database)
@@ -216,10 +227,11 @@ const HOLD_MINUTES = 20;
 
 async function startUpgrade(
   req: NextRequest, reg: Reg, email: string,
-  current: { id: string; price_rupees: number }, target: Cat,
+  totals: { currentTotal: number; targetTotal: number }, target: Cat,
 ): Promise<NextResponse> {
   const db = getSupabaseServer();
-  const amountPaise = (target.price_rupees - current.price_rupees) * 100;
+  // The difference between the two booking totals (one category price per runner for individual categories)
+  const amountPaise = (totals.targetTotal - totals.currentTotal) * 100;
   if (amountPaise <= 0) {
     return NextResponse.json({ error: "This change does not need a payment.", code: "NO_PAYMENT_NEEDED" }, { status: 400 });
   }
@@ -251,7 +263,7 @@ async function startUpgrade(
     .from("it_run_category_changes")
     .insert({
       registration_id: reg.id,
-      from_category_id: current.id,
+      from_category_id: reg.category_id,
       to_category_id: target.id,
       amount_paise: amountPaise,
       requested_by_email: email.toLowerCase(),

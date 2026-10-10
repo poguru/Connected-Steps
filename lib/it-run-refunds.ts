@@ -15,6 +15,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { listRefundsForPayment } from "@/lib/razorpay-client";
+import { bookingPrice, type CategoryType } from "@/lib/it-run-category-rules";
 
 type Db = SupabaseClient;
 
@@ -72,14 +73,16 @@ export async function finalizeRefundProcessed(
   if (downgrade) {
     const { data: target } = await db
       .from("it_run_categories")
-      .select("id, price_rupees")
+      .select("id, category_type, price_rupees")
       .eq("id", downgrade.targetCategoryId)
-      .maybeSingle<{ id: string; price_rupees: number }>();
+      .maybeSingle<{ id: string; category_type: CategoryType; price_rupees: number }>();
     if (!target) throw new Error(`Target category missing for downgrade refund ${refundId}`);
-    if (reg.final_price * 100 - downgrade.amountPaise !== target.price_rupees * 100) {
+    // The booking's new price in the target, for this many runners
+    const targetTotal = bookingPrice(target.category_type, target.price_rupees, reg.participant_count);
+    if (reg.final_price * 100 - downgrade.amountPaise !== targetTotal * 100) {
       throw new Error(`Downgrade refund ${refundId} no longer matches the target price`);
     }
-    targetPrice = target.price_rupees;
+    targetPrice = targetTotal;
   }
 
   // Take the lock: pending -> processed exactly once.
