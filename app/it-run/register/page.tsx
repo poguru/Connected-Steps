@@ -270,7 +270,7 @@ function Field({
   hint?: string; children: React.ReactNode;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+    <div data-field-error={error ? "true" : undefined} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
       <label style={LABEL_S}>
         {label}
         {required && <span style={{ color: ACCENT, marginLeft: 3 }}>*</span>}
@@ -1724,6 +1724,16 @@ function RegisterPageContent() {
   const [selectedCat,       setSelectedCat]      = useState<ItRunCategory | null>(null);
   const [participants,      setParticipants]     = useState<Participant[]>([emptyParticipant()]);
   const [pErrors,           setPErrors]          = useState<ParticipantErrors[]>([{}]);
+  // Set when a validation pass has just shown errors; the effect below brings the first one into view (mobile especially)
+  const scrollToErrorRef = useRef(false);
+  useEffect(() => {
+    if (!scrollToErrorRef.current) return;
+    scrollToErrorRef.current = false;
+    const el = document.querySelector<HTMLElement>('[data-field-error="true"]');
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    el.querySelector<HTMLElement>("input, select")?.focus({ preventScroll: true });
+  }, [pErrors]);
 
   // Coupon
   const [couponCode,    setCouponCode]    = useState("");
@@ -2395,6 +2405,7 @@ function RegisterPageContent() {
     }
 
 
+    if (!valid) scrollToErrorRef.current = true;
     setPErrors(prev => { const c = [...prev]; c[idx] = e; return c; });
     return valid;
   }
@@ -2404,6 +2415,7 @@ function RegisterPageContent() {
   function returnToParticipantError(idx: number, field: string, message: string) {
     setSubmitError("");
     setParticipantSubIdx(idx);
+    scrollToErrorRef.current = true;
     setPErrors(prev => {
       const c = [...prev];
       c[idx] = { [field]: message } as ParticipantErrors;
