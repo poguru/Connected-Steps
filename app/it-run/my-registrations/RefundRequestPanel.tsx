@@ -50,6 +50,8 @@ export default function RefundRequestPanel({ registrations }: { registrations: R
   );
 
   const [requests, setRequests] = useState<RequestRow[]>([]);
+  // "error" is shown as an error, never as "You have no refund requests"
+  const [listState, setListState] = useState<"loading" | "ok" | "error">("loading");
   const [chosenCode, setCode]   = useState("");
   const [reason, setReason]     = useState("");
   const [busy, setBusy]         = useState(false);
@@ -65,13 +67,17 @@ export default function RefundRequestPanel({ registrations }: { registrations: R
     let active = true;
     void (async () => {
       try {
-        const res = await fetch("/api/it-run/refund-requests");
-        if (res.ok && active) {
-          const d = await res.json() as { requests: RequestRow[] };
-          setRequests(d.requests ?? []);
+        const res = await fetch("/api/it-run/refund-requests", { cache: "no-store" });
+        const d = await res.json().catch(() => null) as { requests?: unknown } | null;
+        if (!active) return;
+        if (!res.ok || !d || !Array.isArray(d.requests)) {
+          setListState("error");
+          return;
         }
+        setRequests(d.requests as RequestRow[]);
+        setListState("ok");
       } catch {
-        // Keep the panel usable even if the list fails to load
+        if (active) setListState("error");
       }
     })();
     return () => { active = false; };
@@ -152,9 +158,25 @@ export default function RefundRequestPanel({ registrations }: { registrations: R
         </form>
       )}
 
-      {requests.length === 0 ? (
+      {listState === "loading" && (
+        <div role="status" style={{ fontSize: 13, color: "#666" }}>Loading your refund requests…</div>
+      )}
+      {listState === "error" && (
+        <div role="alert" style={{ fontSize: 13, color: "#f87171", lineHeight: 1.6 }}>
+          We couldn&apos;t load your refund requests.{" "}
+          <button type="button" onClick={() => { setListState("loading"); setReloadKey(k => k + 1); }} style={{
+            minHeight: 36, padding: "6px 12px", marginLeft: 6, borderRadius: 8, cursor: "pointer",
+            background: "rgba(248,113,113,0.12)", border: "1px solid rgba(248,113,113,0.35)",
+            color: "#fff", fontSize: 13, fontWeight: 700, fontFamily: "inherit",
+          }}>
+            Try again
+          </button>
+        </div>
+      )}
+      {listState === "ok" && requests.length === 0 && (
         <div style={{ fontSize: 13, color: "#666" }}>You have no refund requests.</div>
-      ) : (
+      )}
+      {listState === "ok" && requests.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {requests.map(r => (
             <div key={r.id} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: 14 }}>
