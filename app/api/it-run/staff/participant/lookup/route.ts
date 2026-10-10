@@ -127,10 +127,11 @@ export async function GET(req: NextRequest) {
     .from("it_run_event_entitlements")
     .select("entitlement_type, status, issued_at, issued_by")
     .eq("event_id", session.eventId)
-    .eq("participant_id", participantId);
+    .eq("participant_id", participantId)
+    .returns<Array<{ entitlement_type: string; status: string; issued_at: string | null }>>();
 
   const entitlementMap = new Map<string, { status: string; issuedAt: string | null }>();
-  (entitlements ?? []).forEach((e: any) => {
+  (entitlements ?? []).forEach(e => {
     entitlementMap.set(e.entitlement_type, {
       status: e.status,
       issuedAt: e.issued_at,
