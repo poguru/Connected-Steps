@@ -12,6 +12,7 @@ import { IssueReportButton } from "@/components/ui/BugReportFab";
 import { checkPersonName, checkBibName, bibNameHint } from "@/lib/it-run-name-validation";
 import { draftKeyOf, saveStatusFor, createMoveGate } from "@/lib/it-run-step-save";
 import { bookingPrice } from "@/lib/it-run-category-rules";
+import { payableCheckout } from "@/lib/it-run-checkout";
 import { publishBottomBarHeight } from "@/lib/bottom-bar";
 import {
   EventRegistrationHeader,
@@ -1531,10 +1532,14 @@ function StepCoupon({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function StepPayment({
-  regCode, finalPrice, submitting, submitError, onPay, onBackToEdit,
+  regCode, finalPrice, submitting, submitError, onPay, onBackToEdit, onAddCategory, checkoutCount,
 }: {
   regCode: string; finalPrice: number;
   submitting: boolean; submitError: string; onPay: () => void;
+  /** Stage 3: offered only to allowlisted accounts. Keeps this registration and starts another category. */
+  onAddCategory?: () => void;
+  /** How many registrations this one payment covers */
+  checkoutCount: number;
   /** Returns to the review step. The same registration and payment order are kept. */
   onBackToEdit: () => void;
 }) {
@@ -1569,10 +1574,21 @@ function StepPayment({
         We accept UPI, Cards, Net Banking, and Wallets.
       </div>
 
-      <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 12 }}>
+      {checkoutCount > 1 && (
+        <div style={{ fontSize: 12, color: "#888", marginBottom: 12 }}>
+          {checkoutCount} registrations are paid together in this payment.
+        </div>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "flex-start", gap: 10, flexWrap: "wrap" as const, marginBottom: 12 }}>
         <button onClick={onBackToEdit} disabled={submitting} style={{ ...BTN_GHOST, opacity: submitting ? 0.5 : 1 }}>
           &larr; Back to Edit Details
         </button>
+        {onAddCategory && (
+          <button onClick={onAddCategory} disabled={submitting} style={{ ...BTN_GHOST, opacity: submitting ? 0.5 : 1 }}>
+            + Add another category
+          </button>
+        )}
       </div>
 
       <button
@@ -1694,6 +1710,9 @@ function RegisterPageContent() {
   const [submitError, setSubmitError] = useState("");
   const [regCode,     setRegCode]     = useState("");
   const [regId,       setRegId]       = useState("");
+  // Stage 3: registrations already submitted in this checkout (a second category for someone else). Paid together
+  // with the current one, in one Razorpay order. Empty for an ordinary single-category registration.
+  const [sessionRegs, setSessionRegs] = useState<Array<{ id: string; code: string; finalPrice: number; categoryName: string }>>([]);
   const [dashboardUrl, setDashboardUrl] = useState("");
   // Server IDs of this registration's participants, in form order. Needed to edit an existing registration.
   const [participantIds, setParticipantIds] = useState<string[]>([]);
@@ -2603,7 +2622,9 @@ function RegisterPageContent() {
       setRegId(data.registrationId);
       setParticipantIds(data.participantIds ?? []);
       setRegCouponCode(couponCode ?? "");
-      if (data.finalPrice === 0) { setStep(7); return; }
+      // Nothing to pay for this one (a 100% coupon). Alone it goes straight to success; with paid registrations
+      // waiting in this checkout, the payment for those is still shown.
+      if (data.finalPrice === 0 && sessionRegs.length === 0) { setStep(7); return; }
       setStep(6);
     } catch {
       setSubmitError("Network error. Your information is saved — check your connection and try again.");
@@ -2611,6 +2632,41 @@ function RegisterPageContent() {
       setSubmitting(false);
     }
   }
+
+  // ── Second category in the same checkout (stage 3) ──────────────────────────
+  // Only for the accounts listed in NEXT_PUBLIC_ITRUN_MULTI_CATEGORY_EMAILS. The server still checks every
+  // registration and prices each one itself.
+  const multiCategoryEmails = (process.env.NEXT_PUBLIC_ITRUN_MULTI_CATEGORY_EMAILS ?? "")
+    .split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
+  const canAddCategory = !!verifiedEmail && multiCategoryEmails.includes(verifiedEmail.trim().toLowerCase());
+
+  // Keeps the registration just submitted and starts the form again for another category
+  function startAnotherCategory() {
+    if (!regId) return;
+    setSessionRegs(prev => prev.some(r => r.id === regId)
+      ? prev
+      : [...prev, { id: regId, code: regCode, finalPrice, categoryName: selectedCat?.name ?? "" }]);
+    setRegId("");
+    setRegCode("");
+    setDashboardUrl("");
+    setParticipantIds([]);
+    setRegCouponCode(null);
+    setFinalPriceOverride(null);
+    setCoupon(null);
+    setCouponCode("");
+    setSelectedCat(null);
+    setParticipants([]);
+    setPErrors([]);
+    setParticipantSubIdx(0);
+    setReturnToReview(false);
+    setSubmitError("");
+    setStep(1);
+  }
+
+  // The registrations this payment covers: the ones already submitted plus the current one, free ones excluded
+  // (a free registration is already confirmed and needs no payment)
+  const payRegs = payableCheckout(sessionRegs, regId ? { id: regId, code: regCode, finalPrice, categoryName: selectedCat?.name ?? "" } : null);
+  const payTotal = payRegs ? payRegs.reduce((sum, r) => sum + r.finalPrice, 0) : finalPrice;
 
   // ── Payment ────────────────────────────────────────────────────────────────
 
@@ -2621,7 +2677,7 @@ function RegisterPageContent() {
       await loadRazorpay();
       const res  = await fetch("/api/it-run/payment/create-order", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ registrationId: regId }),
+        body: JSON.stringify(payRegs ? { registrationIds: payRegs.map(r => r.id) } : { registrationId: regId }),
       });
       const data = await res.json();
       if (!res.ok) { setSubmitError(data.error ?? "Could not create payment"); return; }
@@ -2632,7 +2688,7 @@ function RegisterPageContent() {
         currency:    "INR",
         order_id:    data.orderId,
         name:        "Connected Steps",
-        description: `${config?.event.title ?? "The IT Run Sprint-2"} — ${selectedCat?.name ?? "Registration"}`,
+        description: `${config?.event.title ?? "The IT Run Sprint-2"} — ${payRegs && payRegs.length > 1 ? `${payRegs.length} registrations` : (selectedCat?.name ?? "Registration")}`,
         image:       "/logo.png",
         prefill: {
           email:   participants[0]?.email,
@@ -2656,7 +2712,9 @@ function RegisterPageContent() {
     try {
       const res  = await fetch("/api/it-run/payment/verify", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ registrationId: regId, paymentId, orderId, signature }),
+        body: JSON.stringify(payRegs
+          ? { registrationIds: payRegs.map(r => r.id), paymentId, orderId, signature }
+          : { registrationId: regId, paymentId, orderId, signature }),
       });
       const data = await res.json();
       if (!res.ok) { setSubmitError(data.error ?? "Payment verification failed"); return; }
@@ -3187,10 +3245,12 @@ function RegisterPageContent() {
             <CompactEventHeader step={6} stepLabel="Payment" />
             <StepPayment
             regCode={regCode}
-            finalPrice={finalPrice}
+            finalPrice={payTotal}
             submitting={submitting}
             submitError={submitError}
             onPay={initiatePayment}
+            onAddCategory={canAddCategory && payTotal > 0 ? startAnotherCategory : undefined}
+            checkoutCount={payRegs ? payRegs.length : 1}
             onBackToEdit={() => { setSubmitError(""); void persistThen({ step: 4 }, () => { setReturnToReview(true); setStep(4); }); }}
             />
           </>
@@ -3202,11 +3262,11 @@ function RegisterPageContent() {
             <IssueReportButton />
           </div>
           <EventSuccessScreen
-            registrationCode={regCode}
+            registrationCode={payRegs && payRegs.length > 1 ? payRegs.map(r => r.code).join(" · ") : regCode}
             dashboardUrl={dashboardUrl || undefined}
             category={selectedCat?.name ?? "The IT Run Sprint-2"}
             participants={participants.map(p => `${p.firstName} ${p.lastName}`.trim())}
-            finalPrice={finalPrice}
+            finalPrice={payTotal}
           />
           </>
         )}

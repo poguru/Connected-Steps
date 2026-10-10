@@ -188,3 +188,29 @@ describe("confirmCheckoutPayment", () => {
     expect(r.kind).toBe("not_found");
   });
 });
+
+// ── The registrations one checkout pays for (stage 3) ──────────────────────────
+
+import { payableCheckout } from "@/lib/it-run-checkout";
+
+describe("payableCheckout", () => {
+  const duo = { id: "duo", code: "ITR-DUO", finalPrice: 1399, categoryName: "Duo" };
+  const tenk = { id: "tenk", code: "ITR-10K", finalPrice: 999, categoryName: "10K" };
+
+  it("an ordinary single-category registration is not a checkout group", () => {
+    expect(payableCheckout([], tenk)).toBeNull();
+  });
+
+  it("pays for the registration already in the session plus the current one", () => {
+    expect(payableCheckout([duo], tenk)?.map(r => r.id)).toEqual(["duo", "tenk"]);
+  });
+
+  it("leaves out a free registration, which is already confirmed and needs no payment", () => {
+    const free = { id: "free", code: "ITR-FREE", finalPrice: 0, categoryName: "Free" };
+    expect(payableCheckout([duo], free)?.map(r => r.id)).toEqual(["duo"]);
+  });
+
+  it("does not count the current registration twice when it is also in the session", () => {
+    expect(payableCheckout([duo, tenk], tenk)?.map(r => r.id)).toEqual(["duo", "tenk"]);
+  });
+});

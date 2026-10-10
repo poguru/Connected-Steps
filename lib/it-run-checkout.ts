@@ -74,3 +74,24 @@ export function paymentCoversRegistrations(amountPaise: number, registrations: A
   const owed = registrations.reduce((sum, r) => sum + r.final_price * 100, 0);
   return owed > 0 && amountPaise === owed;
 }
+
+export interface SessionRegistration {
+  id: string;
+  code: string;
+  finalPrice: number;
+  categoryName: string;
+}
+
+/**
+ * The registrations one payment covers in a checkout: those already submitted in the session, plus the one being
+ * filled in. Free registrations are left out (already confirmed, nothing to pay). Null means an ordinary
+ * single-category registration: the payment uses the current registration only.
+ */
+export function payableCheckout(
+  session: SessionRegistration[],
+  current: SessionRegistration | null,
+): SessionRegistration[] | null {
+  if (session.length === 0 || !current) return null;
+  const others = session.filter(r => r.id !== current.id && r.finalPrice > 0);
+  return current.finalPrice > 0 ? [...others, current] : others;
+}
