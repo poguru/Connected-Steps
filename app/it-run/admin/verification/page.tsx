@@ -32,6 +32,7 @@ interface CompanyIdMeta {
 
 const ACCENT = "#e8620a";
 const STATUS_OPTS = [
+  { value: "all",                label: "All participants",    color: "#e8620a" },
   { value: "pending",            label: "Pending Review",      color: "#f59e0b" },
   { value: "verified",           label: "Verified",            color: "#10b981" },
   { value: "rejected",           label: "Rejected",            color: "#ef4444" },

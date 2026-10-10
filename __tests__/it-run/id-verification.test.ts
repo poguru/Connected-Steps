@@ -212,17 +212,20 @@ describe("admin verification", () => {
 
     await adminListGet(new NextRequest("http://t/api/it-run/admin/verification?status=not_provided"));
 
-    expect(fake.calls.some(c => c.method === "is" && c.args[0] === "company_id_url" && c.args[1] === null)).toBe(true);
+    expect(fake.calls.some(c => c.method === "eq" && c.args[0] === "verification_status" && c.args[1] === "not_provided")).toBe(true);
     expect(fake.calls.some(c => c.method === "not")).toBe(false);
   });
 
-  it("review tabs list only participants who have a document", async () => {
+  it("review tabs do not require a document: a participant without one is still listed", async () => {
+    // The list is driven by status alone. A document-existence filter hid participants (children, and anyone who
+    // continued without an ID) from every review tab.
     const fake = adminFake(null);
     mockDb.mockReturnValue(fake.db);
 
     await adminListGet(new NextRequest("http://t/api/it-run/admin/verification?status=pending"));
 
-    expect(fake.calls.some(c => c.method === "not" && c.args[0] === "company_id_url")).toBe(true);
+    expect(fake.calls.some(c => c.method === "not" && c.args[0] === "company_id_url")).toBe(false);
+    expect(fake.calls.some(c => c.method === "is" && c.args[0] === "company_id_url")).toBe(false);
   });
 
   it("approving or rejecting someone with no document is refused and nothing is written", async () => {

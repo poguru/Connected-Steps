@@ -24,22 +24,20 @@ export async function GET(req: NextRequest) {
   const { data: event } = await db.from("it_run_events").select("id").eq("slug", "sprint-2").single();
   if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
-  // not_provided = no document on file (a choice, not a review).
-  // Every review status (pending, verified, rejected, need_clarification) has a document on file.
-  const base = db
+  // Every eligible participant is listed for the chosen status, whether or not a document was uploaded.
+  // A document-existence filter here hid participants (for example children, who are verified without a document)
+  // and any participant who continued without an ID. "all" lists every status.
+  let query = db
     .from("it_run_participants")
     .select(`
       id, first_name, last_name, email, mobile,
       company_name, employee_id, company_id_url, verification_status,
-      it_run_registrations!inner ( registration_code, payment_status,
+      it_run_registrations ( registration_code, payment_status, registration_status,
         it_run_categories ( name ) )
     `, { count: "exact" })
-    .eq("event_id", event.id)
-    .eq("verification_status", status);
-  const scoped = status === "not_provided"
-    ? base.is("company_id_url", null)
-    : base.not("company_id_url", "is", null);
-  const { data, count, error } = await scoped
+    .eq("event_id", event.id);
+  if (status !== "all") query = query.eq("verification_status", status);
+  const { data, count, error } = await query
     .order("id")
     .range(page * limit, page * limit + limit - 1);
 
