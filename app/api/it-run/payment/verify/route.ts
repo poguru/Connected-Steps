@@ -3,6 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyPaymentSignature } from "@/lib/razorpay-security";
 import { sendItRunConfirmationEmail, sendItRunBibInviteEmail } from "@/lib/it-run-email";
 import { runAfterResponse } from "@/lib/after-response";
+import { confirmCheckoutPayment } from "@/lib/it-run-checkout-confirm";
 import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
 
 // POST /api/it-run/payment/verify
@@ -19,12 +20,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { registrationId, paymentId, orderId, signature } = await req.json() as {
-      registrationId: string; paymentId: string;
+    const { registrationId, registrationIds, paymentId, orderId, signature } = await req.json() as {
+      registrationId?: string; registrationIds?: string[]; paymentId: string;
       orderId: string; signature: string;
     };
+    const ids = Array.isArray(registrationIds) && registrationIds.length > 0
+      ? registrationIds.filter((x): x is string => typeof x === "string" && x.length > 0)
+      : (registrationId ? [registrationId] : []);
 
-    if (!registrationId || !paymentId || !orderId || !signature) {
+    if (ids.length === 0 || !paymentId || !orderId || !signature) {
       return NextResponse.json({ error: "All fields are required" }, { status: 400 });
     }
 
@@ -39,70 +43,33 @@ export async function POST(req: NextRequest) {
 
     const db = getSupabaseServer();
 
-    // Fetch registration
-    const { data: reg } = await db
+    // The client names every registration in this checkout. They must be exactly the ones on this order, so one
+    // registration cannot be confirmed with another order's payment.
+    const requested = [...new Set(ids)];
+    const { data: onOrder } = await db
       .from("it_run_registrations")
-      .select("id,registration_code,lead_email,final_price,payment_status,razorpay_payment_id,razorpay_order_id")
-      .eq("id", registrationId)
-      .single<{
-        id: string; registration_code: string; lead_email: string; final_price: number;
-        payment_status: string; razorpay_payment_id: string | null;
-        razorpay_order_id: string | null;
-      }>();
-
-    if (!reg) return NextResponse.json({ error: "Registration not found" }, { status: 404 });
-
-    // Validate that the orderId in this request matches what we stored for this registration.
-    // Prevents IDOR: an attacker can't confirm a different registration using a valid
-    // (orderId, paymentId, signature) tuple obtained from their own payment.
-    if (reg.razorpay_order_id && reg.razorpay_order_id !== orderId) {
-      console.error(
-        `[it-run/payment/verify] orderId mismatch reg=${reg.registration_code}` +
-        ` stored=${reg.razorpay_order_id} received=${orderId}`,
-      );
+      .select("id")
+      .eq("razorpay_order_id", orderId)
+      .returns<Array<{ id: string }>>();
+    const onOrderIds = new Set((onOrder ?? []).map(r => r.id));
+    const sameSet = onOrderIds.size === requested.length && requested.every(id => onOrderIds.has(id));
+    if (!sameSet) {
+      console.error(`[it-run/payment/verify] order/registration mismatch order=${orderId}`);
       return NextResponse.json({ error: "Order ID mismatch" }, { status: 400 });
     }
 
-    // Idempotency check
-    if (reg.payment_status === "paid") {
-      return NextResponse.json({ ok: true, already: true });
-    }
-
-    if (reg.razorpay_payment_id === paymentId) {
-      return NextResponse.json({ ok: true, already: true });
-    }
-
-    // Confirm payment — only transitions pending / payment_attempted / failed → paid.
-    // Using .select("id") lets us detect when a concurrent confirm (webhook) already
-    // updated this row, so we don't send a duplicate confirmation email.
-    const { data: updated, error: updateErr } = await db
-      .from("it_run_registrations")
-      .update({
-        payment_status:      "paid",
-        razorpay_payment_id: paymentId,
-        razorpay_order_id:   orderId,
-      })
-      .eq("id", registrationId)
-      .in("payment_status", ["pending", "payment_attempted", "failed"])
-      .select("id");
-
-    if (updateErr) {
-      console.error("[it-run/payment/verify] update error:", updateErr.message);
-      return NextResponse.json({ error: "Failed to confirm payment" }, { status: 500 });
-    }
-
-    if (!updated?.length) {
-      // A concurrent webhook already confirmed this payment — return ok without re-sending email
-      console.log(`[it-run/payment/verify] 0 rows updated for ${reg.registration_code} — confirmed elsewhere`);
-      return NextResponse.json({ ok: true });
-    }
-
-    console.log(`[it-run/payment/verify] Registration ${reg.registration_code} confirmed via client verify — payment ${paymentId}`);
+    // The order amount is ours (set when the order was made), and the signature binds this payment to that order
+    const result = await confirmCheckoutPayment(db, { orderId, paymentId, capturedAmountPaise: null, actor: "client-verify" });
+    if (result.kind === "not_found") return NextResponse.json({ error: "Registration not found" }, { status: 404 });
+    if (result.kind === "amount_mismatch") return NextResponse.json({ error: "Payment amount does not match" }, { status: 400 });
+    if (result.kind === "already") return NextResponse.json({ ok: true, already: true });
 
     // Confirmation and BIB invite run after the response, so the function stays alive until they finish.
     // A failed send releases its "sent" claim, so the email can be resent from the admin portal.
-    runAfterResponse("confirmation", () => sendItRunConfirmationEmail(reg.id, reg.registration_code, reg.lead_email, ""));
-    runAfterResponse("bib_invite", () => sendItRunBibInviteEmail(reg.id, reg.lead_email));
+    for (const reg of result.registrations) {
+      runAfterResponse("confirmation", () => sendItRunConfirmationEmail(reg.id, reg.registration_code, reg.lead_email, ""));
+      runAfterResponse("bib_invite", () => sendItRunBibInviteEmail(reg.id, reg.lead_email));
+    }
 
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {

@@ -9,6 +9,7 @@ import { sendEmail, eventRegistrationEmailHTML } from "@/lib/notify";
 import { activateMembership }   from "@/lib/membership-activate";
 import { sendItRunConfirmationEmail, sendItRunBibInviteEmail } from "@/lib/it-run-email";
 import { runAfterResponse } from "@/lib/after-response";
+import { confirmCheckoutPayment } from "@/lib/it-run-checkout-confirm";
 
 // POST /api/webhooks/razorpay
 //
@@ -143,16 +144,19 @@ export async function POST(req: NextRequest) {
 
     // IT Run registration: mark failed, release reserved capacity, release coupon.
     if (payment.notes?.type === "it_run" || payment.notes?.it_run_reg_id) {
-      const { data: itReg } = await db2
+      const { data: itRegs } = await db2
         .from("it_run_registrations")
         .select("id, category_id, participant_count, payment_status, coupon_id, discount_amount, early_bird_offer_id")
         .eq("razorpay_order_id", payment.order_id ?? "")
-        .maybeSingle<{
+        .returns<Array<{
           id: string; category_id: string; participant_count: number;
           payment_status: string; coupon_id: string | null; discount_amount: number; early_bird_offer_id: string | null;
-        }>();
+        }>>();
 
-      if (itReg && ["pending", "payment_attempted"].includes(itReg.payment_status)) {
+      // A checkout group shares one order: every registration still open on it fails and gives back its seats
+      for (const itReg of itRegs ?? []) {
+        if (!["pending", "payment_attempted"].includes(itReg.payment_status)) continue;
+
         const { data: failedRows } = await db2
           .from("it_run_registrations")
           .update({ payment_status: "failed" })
@@ -295,56 +299,28 @@ async function handleItRunPaymentCaptured(
   paymentId: string,
   orderId:   string,
 ): Promise<void> {
-  const regId   = payment.notes?.it_run_reg_id   ?? "";
-  const regCode = payment.notes?.it_run_reg_code ?? "";
-  const label   = `[razorpay-webhook/it-run] reg=${regCode || regId}`;
+  // One payment can cover several registrations (a checkout group). They are all found by the order id, and
+  // the captured amount must equal what they owe before anything is confirmed. Shared logic: lib/it-run-checkout-confirm.ts
+  const label = `[razorpay-webhook/it-run] order=${orderId}`;
+  const result = await confirmCheckoutPayment(db, {
+    orderId,
+    paymentId,
+    capturedAmountPaise: typeof payment.amount === "number" ? payment.amount : null,
+    actor: "razorpay-webhook",
+  });
 
-  const { data: reg } = await db
-    .from("it_run_registrations")
-    .select("id, registration_code, lead_email, final_price, payment_status, razorpay_payment_id, qr_token")
-    .eq("razorpay_order_id", orderId)
-    .maybeSingle<{ id: string; registration_code: string; lead_email: string; final_price: number; payment_status: string; razorpay_payment_id: string | null; qr_token: string | null }>();
-
-  if (!reg) {
-    console.warn(`${label} Order not found by order_id=${orderId} — skipping`);
+  if (result.kind === "not_found") { console.warn(`${label} Order not found — skipping`); return; }
+  if (result.kind === "already") { console.log(`${label} Already confirmed — skipping`); return; }
+  if (result.kind === "amount_mismatch") {
+    console.error(JSON.stringify({ src: "it-run-webhook", outcome: "amount_mismatch", order: orderId }));
     return;
   }
 
-  if (reg.payment_status === "paid") {
-    console.log(`${label} Already paid — skipping`);
-    return;
+  console.log(`${label} Payment ${paymentId} confirmed for ${result.registrations.length} registration(s)`);
+  for (const reg of result.registrations) {
+    runAfterResponse("confirmation", () => sendItRunConfirmationEmail(reg.id, reg.registration_code, reg.lead_email, reg.qr_token ?? ""));
+    runAfterResponse("bib_invite", () => sendItRunBibInviteEmail(reg.id, reg.lead_email));
   }
-  if (reg.razorpay_payment_id === paymentId) {
-    console.log(`${label} Payment ${paymentId} already processed — skipping`);
-    return;
-  }
-
-  // .select("id") lets us detect a 0-row update (client verify already confirmed it)
-  // so we don't send a duplicate confirmation email.
-  const { data: updated, error } = await db
-    .from("it_run_registrations")
-    .update({ payment_status: "paid", razorpay_payment_id: paymentId, razorpay_order_id: orderId })
-    .eq("id", reg.id)
-    .in("payment_status", ["pending", "payment_attempted", "failed"])
-    .select("id");
-
-  if (error) {
-    if (error.code === "23505") { console.log(`${label} Duplicate payment_id — already handled`); return; }
-    console.error(`${label} DB update failed:`, error.message);
-    return;
-  }
-
-  if (!updated?.length) {
-    console.log(`${label} 0 rows updated — confirmed by client verify, skipping email`);
-    return;
-  }
-
-  console.log(`${label} Payment confirmed via webhook — payment ${paymentId}`);
-
-  // After the response, so the function stays alive until the emails are sent (see lib/after-response.ts)
-  runAfterResponse("confirmation", () => sendItRunConfirmationEmail(reg.id, reg.registration_code, reg.lead_email, reg.qr_token ?? ""));
-  runAfterResponse("bib_invite", () => sendItRunBibInviteEmail(reg.id, reg.lead_email));
-
 }
 
 type RegRow = {

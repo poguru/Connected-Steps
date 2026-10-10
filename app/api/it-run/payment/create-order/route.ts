@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { getRazorpaySDK as getRazorpay } from "@/lib/razorpay-client";
 import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
+import { checkCheckoutGroup, type CheckoutRegistration } from "@/lib/it-run-checkout";
 
 // POST /api/it-run/payment/create-order
 // Body: { registrationId }
@@ -16,7 +17,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { registrationId } = await req.json() as { registrationId: string };
+    const body = await req.json() as { registrationId?: string; registrationIds?: unknown };
+    const ids = Array.isArray(body.registrationIds)
+      ? body.registrationIds.filter((s): s is string => typeof s === "string" && s.length > 0)
+      : [];
+
+    // Several registrations in one checkout: one order for their total (see lib/it-run-checkout.ts)
+    if (ids.length > 1) {
+      return createCheckoutGroupOrder(ids);
+    }
+
+    const registrationId = body.registrationId ?? ids[0];
     if (!registrationId) return NextResponse.json({ error: "registrationId required" }, { status: 400 });
 
     const db = getSupabaseServer();
@@ -160,4 +171,51 @@ export async function POST(req: NextRequest) {
     console.error("[it-run/payment/create-order] error:", e);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
+}
+
+// One Razorpay order for several registrations. Every registration gets the order id, so the confirmation
+// (verify route and webhook) finds them all. Refuses the whole checkout if any registration cannot be paid.
+async function createCheckoutGroupOrder(ids: string[]): Promise<NextResponse> {
+  const db = getSupabaseServer();
+  const { data: regs, error } = await db
+    .from("it_run_registrations")
+    .select("id, registration_code, event_id, lead_email, final_price, payment_status, razorpay_order_id")
+    .in("id", ids)
+    .returns<CheckoutRegistration[]>();
+  if (error) return NextResponse.json({ error: "Server error" }, { status: 500 });
+
+  const check = checkCheckoutGroup(ids, regs ?? []);
+  if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
+
+  const key = process.env.RAZORPAY_KEY_ID;
+  if (check.existingOrderId) {
+    // A retry of the same checkout: reuse the order that already holds these registrations
+    return NextResponse.json({ orderId: check.existingOrderId, amount: check.totalPaise, currency: "INR", key });
+  }
+
+  const lead = (regs ?? [])[0].lead_email;
+  const order = await getRazorpay().orders.create({
+    amount:   check.totalPaise,
+    currency: "INR",
+    receipt:  `itr_group_${Date.now()}`,
+    notes: {
+      email:          lead,
+      type:           "it_run",
+      it_run_reg_ids: ids.join(","),
+    },
+  });
+
+  const { data: attached } = await db
+    .from("it_run_registrations")
+    .update({ razorpay_order_id: order.id, payment_status: "payment_attempted" })
+    .in("id", ids)
+    .eq("payment_status", "pending")
+    .select("id");
+
+  if ((attached ?? []).length !== ids.length) {
+    // Something changed while the order was being made. Nothing was charged; the participant starts again.
+    return NextResponse.json({ error: "Your registrations changed while the payment was being prepared. Please try again." }, { status: 409 });
+  }
+
+  return NextResponse.json({ orderId: order.id, amount: check.totalPaise, currency: "INR", key });
 }
