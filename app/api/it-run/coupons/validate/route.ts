@@ -7,7 +7,7 @@ import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
 export async function POST(req: NextRequest) {
   try {
     const ip = getClientIp(req);
-    const rl = await checkAndRecordEndpointLimit(`itr:coupon:${ip}`, 10, 60_000);
+    const rl = await checkAndRecordEndpointLimit(`itr:coupon:${ip}`, 30, 60_000);
     if (rl.limited) {
       return NextResponse.json(
         { error: "Too many requests. Please wait a moment before trying again." },
