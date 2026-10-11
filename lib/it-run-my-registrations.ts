@@ -59,8 +59,6 @@ export interface MyRegParticipant {
 export interface MyRegActions {
   /** Server-decided: an active paid or free registration may change category (the change route still validates). */
   canChangeCategory: boolean;
-  /** An active paid registration with an amount may be sent for refund review. The admin decides and processes. */
-  canRequestRefund: boolean;
 }
 
 export interface MyRegistration {
@@ -147,7 +145,6 @@ export function buildMyRegistrations(
       actions: {
         // After the participant cutoff nothing can be changed or requested, whatever the registration state
         canChangeCategory: changesOpen && canOfferCategoryChange(r),
-        canRequestRefund: changesOpen && canRequestRefund(r),
       },
     });
   }
@@ -197,11 +194,6 @@ export function canOfferCategoryChange(reg: Pick<MyRegistration, "payment_status
   return reg.registration_status === "active" && (reg.payment_status === "paid" || reg.payment_status === "free");
 }
 
-/** A refund can be requested for a paid registration with an amount still held, whether it is confirmed or still awaiting ID verification. An admin approves every request. */
-export function canRequestRefund(reg: Pick<MyRegistration, "payment_status" | "registration_status" | "final_price">): boolean {
-  return (reg.registration_status === "active" || reg.registration_status === "pending_verification") && reg.final_price > 0 &&
-    (reg.payment_status === "paid" || reg.payment_status === "partially_refunded");
-}
 
 // ── Response validation (client) ──────────────────────────────────────────────
 
@@ -251,7 +243,7 @@ function isPricing(v: unknown): boolean {
 function isActions(v: unknown): boolean {
   if (!v || typeof v !== "object") return false;
   const a = v as Record<string, unknown>;
-  return typeof a.canChangeCategory === "boolean" && typeof a.canRequestRefund === "boolean";
+  return typeof a.canChangeCategory === "boolean";
 }
 
 function isRegistration(v: unknown): boolean {

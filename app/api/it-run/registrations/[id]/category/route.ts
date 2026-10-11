@@ -100,13 +100,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       if (blocked) note = blocked;
       else if (full) note = "This category is full.";
       else if (change === "upgrade") note = `Pay the difference of ₹${total - currentTotal} to switch.`;
-      else if (change === "downgrade") note = `Request a refund of ₹${currentTotal - total} for this move. Nothing changes until our team approves it.`;
+      else if (change === "downgrade") note = "Lower-priced categories can't be chosen online.";
       return {
         id: c.id, name: c.name, distanceKm: c.distance_km, priceRupees: total,
         change, availability: availability(c),
-        // A downgrade is a request for admin review, made from the downgrade route
-        allowed: !blocked && !full,
-        refundRupees: change === "downgrade" ? currentTotal - total : null,
+        // A downgrade is a refund request, which participants can no longer make, so it is not offered online
+        allowed: !blocked && !full && change !== "downgrade",
+        refundRupees: null,
         note,
       };
     });
@@ -160,8 +160,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const targetTotal = bookingTotal(target, n);
   if (targetTotal < currentTotal) {
     return NextResponse.json({
-      error: "A downgrade is a refund request for our team to review, so it isn't applied here. Request it from the category options.",
-      code: "DOWNGRADE_REQUIRES_REVIEW",
+      error: "Lower-priced categories can't be chosen online.",
+      code: "DOWNGRADE_NOT_AVAILABLE",
     }, { status: 409 });
   }
   if (targetTotal > currentTotal) {

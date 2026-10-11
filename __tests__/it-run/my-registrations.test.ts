@@ -24,7 +24,6 @@ import {
   paymentStatusView,
   registrationNote,
   canOfferCategoryChange,
-  canRequestRefund,
   parseMyRegistrations,
   parseClaimableCount,
   loadFailureMessage,
@@ -121,9 +120,9 @@ describe("buildMyRegistrations", () => {
       [], [],
     );
     expect(out.map(r => [r.id, r.actions])).toEqual([
-      ["paid", { canChangeCategory: true, canRequestRefund: true }],
-      ["pending", { canChangeCategory: false, canRequestRefund: false }],
-      ["cancelled", { canChangeCategory: false, canRequestRefund: false }],
+      ["paid", { canChangeCategory: true }],
+      ["pending", { canChangeCategory: false }],
+      ["cancelled", { canChangeCategory: false }],
     ]);
   });
 });
@@ -165,11 +164,6 @@ describe("payment and registration status presentation", () => {
   });
 
   it("offers a refund request only for an active paid registration with an amount", () => {
-    expect(canRequestRefund({ payment_status: "paid", registration_status: "active", final_price: 799 })).toBe(true);
-    expect(canRequestRefund({ payment_status: "partially_refunded", registration_status: "active", final_price: 400 })).toBe(true);
-    expect(canRequestRefund({ payment_status: "free", registration_status: "active", final_price: 0 })).toBe(false);
-    expect(canRequestRefund({ payment_status: "pending", registration_status: "active", final_price: 799 })).toBe(false);
-    expect(canRequestRefund({ payment_status: "paid", registration_status: "cancelled", final_price: 799 })).toBe(false);
   });
 });
 
@@ -229,7 +223,7 @@ describe("parseMyRegistrations", () => {
     category: CAT, event: EVENT,
     pricing: { base_price: 799, discount_amount: 0, discount_label: null },
     participants: [{ id: "p-1", first_name: "Asha", last_name: "Rao", participant_type: "solo", bib_number: null, qr_token: null, verification_status: "pending", collected_at: null }],
-    actions: { canChangeCategory: true, canRequestRefund: true },
+    actions: { canChangeCategory: true },
   };
 
   it("accepts a well-formed list", () => {
@@ -267,7 +261,7 @@ describe("parseMyRegistrations", () => {
     const noActions: Record<string, unknown> = { ...valid };
     delete noActions.actions;
     expect(parseMyRegistrations({ registrations: [noActions] })).toBeNull();
-    expect(parseMyRegistrations({ registrations: [{ ...valid, actions: { canChangeCategory: "yes", canRequestRefund: true } }] })).toBeNull();
+    expect(parseMyRegistrations({ registrations: [{ ...valid, actions: { canChangeCategory: "yes" } }] })).toBeNull();
   });
 });
 
@@ -373,7 +367,7 @@ describe("GET /api/it-run/my-registrations", () => {
     expect(body.registrations[0].participants[0]).toMatchObject({ first_name: "Asha", bib_number: "5K-001", qr_token: "qr-1", collected_at: "2027-02-06T09:00:00Z" });
     expect(body.registrations[1].payment_status).toBe("pending");
     expect(body.registrations[1].participants[0].collected_at).toBeNull();
-    expect(body.registrations[1].actions).toEqual({ canChangeCategory: false, canRequestRefund: false });
+    expect(body.registrations[1].actions).toEqual({ canChangeCategory: false });
   });
 
   it("does not expose the account email or lead email in the response", async () => {

@@ -298,83 +298,12 @@ describe("POST /api/it-run/admin/refund", () => {
 
 // ── Participant request ────────────────────────────────────────────────────────
 
-describe("POST /api/it-run/refund-requests", () => {
-  const body = { registration_code: "itr-0001", reason: "I am unable to attend due to travel." };
-  const ownReg = { id: "reg-1", event_id: "ev-1", registration_code: "ITR-0001", payment_status: "paid", registration_status: "active", final_price: 100000 };
-
-  it("returns 401 without a participant session", async () => {
-    mockUser.mockReturnValue(null);
-    const { db, calls } = fakeDb({});
-    mockDb.mockReturnValue(db);
-
-    const res = await requestPost(req("http://t/api/it-run/refund-requests", body));
-
-    expect(res.status).toBe(401);
-    expect(calls).toHaveLength(0);
-    expect(mockRazorpay).not.toHaveBeenCalled();
-  });
-
-  it("returns 404 for a registration the caller does not own (no existence leak)", async () => {
-    mockUser.mockReturnValue("someone@example.com");
-    const { db, calls } = fakeDb({ it_run_registrations: () => ({ data: null, error: null }) });
-    mockDb.mockReturnValue(db);
-
-    const res = await requestPost(req("http://t/api/it-run/refund-requests", body, "token"));
-
-    expect(res.status).toBe(404);
-    expect(calls.some(c => c.table === "it_run_refund_requests")).toBe(false);
-  });
-
-  it("creates a 'requested' row only; no Razorpay call and no registration change", async () => {
-    mockUser.mockReturnValue("owner@example.com");
-    const { db, calls } = fakeDb({
-      it_run_registrations: () => ({ data: ownReg, error: null }),
-      it_run_refund_requests: () => ({ data: { id: "req-9", status: "requested", created_at: "2026-10-09T00:00:00Z" }, error: null }),
-    });
-    mockDb.mockReturnValue(db);
-
-    const res = await requestPost(req("http://t/api/it-run/refund-requests", body, "token"));
-
-    expect(res.status).toBe(201);
-    expect(mockRazorpay).not.toHaveBeenCalled();
-    const insert = calls.find(c => c.table === "it_run_refund_requests" && c.op === "insert");
-    expect(insert?.payload).toMatchObject({ status: "requested", requested_by_email: "owner@example.com", registration_id: "reg-1" });
-    expect(calls.some(c => c.table === "it_run_registrations" && c.op === "update")).toBe(false);
-    expect(calls.some(c => c.table === "it_run_refunds")).toBe(false);
-  });
-
-  it("returns 409 when an open request already exists (duplicate prevention)", async () => {
-    mockUser.mockReturnValue("owner@example.com");
-    const { db } = fakeDb({
-      it_run_registrations: () => ({ data: ownReg, error: null }),
-      it_run_refund_requests: () => ({ data: null, error: { code: "23505", message: "duplicate" } }),
-    });
-    mockDb.mockReturnValue(db);
-
-    const res = await requestPost(req("http://t/api/it-run/refund-requests", body, "token"));
-
-    expect(res.status).toBe(409);
-    expect(mockRazorpay).not.toHaveBeenCalled();
-  });
-
-  it("refuses free or unpaid registrations", async () => {
-    mockUser.mockReturnValue("owner@example.com");
-    const { db } = fakeDb({
-      it_run_registrations: () => ({ data: { ...ownReg, final_price: 0, payment_status: "free" }, error: null }),
-    });
-    mockDb.mockReturnValue(db);
-
-    const res = await requestPost(req("http://t/api/it-run/refund-requests", body, "token"));
-
-    expect(res.status).toBe(422);
-  });
-
-  it("rejects a reason that is too short", async () => {
-    mockUser.mockReturnValue("owner@example.com");
-    mockDb.mockReturnValue(fakeDb({}).db);
-
-    const res = await requestPost(req("http://t/api/it-run/refund-requests", { registration_code: "ITR-0001", reason: "no" }, "token"));
-
-    expect(res.status).toBe(400);
+describe("POST /api/it-run/refund-requests (discontinued)", () => {
+  // Participants can no longer request refunds. The route answers 410 for every caller and writes nothing.
+  it("answers 410 to a signed-in participant, with no request created", async () => {
+    const res = await requestPost();
+    expect(res.status).toBe(410);
+    expect((await res.json()).code).toBe("REFUND_REQUESTS_DISCONTINUED");
   });
 });
+

@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import RefundRequestPanel from "./RefundRequestPanel";
 import CategoryChangeButton from "./CategoryChangeButton";
 import AddIdControl from "./AddIdControl";
 import { CUTOFF_CLOSED_MESSAGE } from "@/lib/it-run-participant-cutoff";
@@ -244,7 +243,7 @@ export default function MyRegistrationsPage() {
             borderRadius: 12, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#cbd5e1", lineHeight: 1.6,
           }}>
             {state.changesOpen
-              ? "Cancellations, category changes, and new refund requests are available until 15 January 2027."
+              ? "Category changes are available until 15 January 2027."
               : CUTOFF_CLOSED_MESSAGE}
           </div>
         )}
@@ -438,8 +437,6 @@ export default function MyRegistrationsPage() {
           </div>
         )}
 
-        {/* Independent of the registration list: a failed list request does not hide this section's own state */}
-        <RefundRequestPanel registrations={registrations} changesOpen={state.status === "ready" && state.changesOpen} />
       </div>
 
       <style>{`

@@ -115,7 +115,7 @@ export async function sendItRunConfirmationEmail(
     code:         reg.registration_code,
     category:     cat?.name       ?? "IT Run Sprint-2",
     date:         ev?.event_date  ?? "2027-02-07",
-    venue:        ev?.venue_name  ?? "Hitec City, Hyderabad",
+    venue:        ev?.venue_name  ?? "Hyderabad Central University, Gachibowli, Hyderabad",
     reportTime:   ev?.report_time ?? "5:30 AM",
     finalPrice:   reg.final_price,
     discount,
@@ -312,7 +312,7 @@ export async function sendItRunBibInviteEmail(
     code:     reg.registration_code,
     category: reg.it_run_categories?.name ?? "IT Run Sprint-2",
     date:     reg.it_run_events?.event_date ?? "2027-02-07",
-    venue:    reg.it_run_events?.venue_name ?? "Hitec City, Hyderabad",
+    venue:    reg.it_run_events?.venue_name ?? "Hyderabad Central University, Gachibowli, Hyderabad",
     bookUrl,
     isDuo,
   });
@@ -916,7 +916,7 @@ export async function sendItRunCheckoutConfirmationEmail(registrationIds: string
       code: r.registration_code,
       category: r.it_run_categories?.name ?? "IT Run Sprint-2",
       date: ev?.event_date ?? "2027-02-07",
-      venue: ev?.venue_name ?? "Hitec City, Hyderabad",
+      venue: ev?.venue_name ?? "Hyderabad Central University, Gachibowli, Hyderabad",
       reportTime: ev?.report_time ?? "5:30 AM",
       finalPrice: r.final_price,
       discount: r.discount_amount > 0

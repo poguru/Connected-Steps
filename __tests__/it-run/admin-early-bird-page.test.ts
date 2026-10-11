@@ -44,22 +44,3 @@ describe("admin nav", () => {
   });
 });
 
-describe("refund panel load states", () => {
-  const panel = read("app/it-run/my-registrations/RefundRequestPanel.tsx");
-
-  it("shows an error with a retry, not an empty list, when the request fails", () => {
-    expect(panel).toContain("We couldn&apos;t load your refund requests.");
-    expect(panel).toContain("Try again");
-    expect(panel).toContain('setListState("error")');
-  });
-
-  it("shows 'no refund requests' only in the successful state", () => {
-    const line = panel.split("\n").find(l => l.includes("You have no refund requests."));
-    expect(line).toBeDefined();
-    expect(panel).toMatch(/listState === "ok" && requests\.length === 0/);
-  });
-
-  it("does not set the list from a failed response", () => {
-    expect(panel).toMatch(/if \(!res\.ok \|\| !d \|\| !Array\.isArray\(d\.requests\)\)/);
-  });
-});

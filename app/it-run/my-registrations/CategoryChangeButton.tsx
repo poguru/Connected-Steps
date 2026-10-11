@@ -1,12 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { checkRefundReason } from "@/lib/it-run-refund-reason";
 
 // Change category for one registration. Options and prices come from the server.
 //  - Same price: applied immediately.
 //  - Upgrade: the difference is paid through Razorpay. The category changes only after the server verifies the payment.
-//  - Downgrade: not available online yet (support message).
+//  - Downgrade: not available online. A downgrade is a refund, which only the team can process.
 
 interface Option {
   id: string;
@@ -57,8 +56,6 @@ export default function CategoryChangeButton({ registrationId, onChanged }: { re
   const [error, setError]     = useState("");
   const [done, setDone]       = useState("");
   const [busy, setBusy]       = useState(false);
-  const [requestFor, setRequestFor] = useState<string | null>(null);
-  const [reason, setReason]   = useState("");
 
   const base = `/api/it-run/registrations/${registrationId}/category`;
 
@@ -145,36 +142,6 @@ export default function CategoryChangeButton({ registrationId, onChanged }: { re
     }
   }
 
-  // Downgrade: a request for admin review. The server computes the refund amount and creates the request.
-  async function requestDowngrade(opt: Option) {
-    if (busy) return;
-    const check = checkRefundReason(reason);
-    if (!check.ok) {
-      setError(check.message);
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-      const res = await fetch(`/api/it-run/registrations/${registrationId}/downgrade`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ categoryId: opt.id, reason: check.value }),
-      });
-      const body = await res.json().catch(() => ({})) as { error?: string; message?: string };
-      if (!res.ok) { setError(body.error ?? "The request could not be sent. Please try again."); return; }
-      setDone(body.message ?? "Your request has been sent for review.");
-      setReason("");
-      setRequestFor(null);
-      setOpen(false);
-      setData(null);
-      onChanged?.();
-    } catch {
-      setError("We couldn't reach the server. Your request has not been sent.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
     <div style={{ marginTop: 10 }}>
       {done && <div role="status" style={{ fontSize: 13, color: "#10b981", marginBottom: 8, lineHeight: 1.5 }}>{done}</div>}
@@ -205,31 +172,7 @@ export default function CategoryChangeButton({ registrationId, onChanged }: { re
                       <div style={{ fontSize: 12, color: "#888" }}>{opt.distanceKm} km · ₹{opt.priceRupees}</div>
                       {opt.note && <div style={{ fontSize: 12, color: "#f59e0b", marginTop: 4, lineHeight: 1.5 }}>{opt.note}</div>}
                     </div>
-                    {opt.allowed && opt.change === "downgrade" ? (
-                      requestFor === opt.id ? (
-                        <div style={{ width: "100%", display: "grid", gap: 8 }}>
-                          <label style={{ fontSize: 12, color: "#aaa" }}>Why are you moving? (10 characters or more)
-                            <textarea value={reason} onChange={e => setReason(e.target.value)} maxLength={1000} rows={3}
-                              style={{ width: "100%", boxSizing: "border-box", marginTop: 4, padding: "8px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 13, fontFamily: "inherit" }} />
-                          </label>
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                            <button type="button" disabled={busy} onClick={() => requestDowngrade(opt)}
-                              style={{ minHeight: 40, padding: "8px 14px", borderRadius: 8, background: ACCENT, border: "none", color: "#fff", fontWeight: 700, fontSize: 13, cursor: busy ? "wait" : "pointer", fontFamily: "inherit" }}>
-                              {busy ? "Sending…" : `Send request for ₹${opt.refundRupees ?? ""} refund`}
-                            </button>
-                            <button type="button" disabled={busy} onClick={() => { setRequestFor(null); setReason(""); }}
-                              style={{ minHeight: 40, padding: "8px 14px", borderRadius: 8, background: "transparent", border: "1px solid rgba(255,255,255,0.15)", color: "#ccc", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button type="button" disabled={busy} onClick={() => { setRequestFor(opt.id); setError(""); }}
-                          style={{ minHeight: 40, padding: "8px 14px", borderRadius: 8, background: "transparent", border: `1px solid ${ACCENT}`, color: ACCENT, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
-                          Request downgrade
-                        </button>
-                      )
-                    ) : opt.allowed ? (
+                    {opt.allowed ? (
                       <button type="button" disabled={busy} onClick={() => choose(opt)}
                         style={{ minHeight: 40, padding: "8px 14px", borderRadius: 8, background: ACCENT, border: "none", color: "#fff", fontWeight: 700, fontSize: 13, cursor: busy ? "wait" : "pointer", fontFamily: "inherit" }}>
                         {busy ? "Please wait…" : opt.change === "upgrade" ? "Pay difference" : "Switch to this"}

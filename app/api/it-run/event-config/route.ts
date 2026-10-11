@@ -171,7 +171,7 @@ export async function GET() {
       id:                     event.id,
       title:                  event.title,
       subtitle:               event.subtitle ?? "Exclusive for IT Professionals",
-      tagline:                event.tagline  ?? "Your Code Compiles. Now Run It.",
+      tagline:                event.tagline  ?? "Run Beyond the Screen. Break the Loop.",
       event_date:             event.event_date,
       report_time:            event.report_time    ?? "5:30 AM",
       flag_off_time:          event.flag_off_time  ?? "6:00 AM",

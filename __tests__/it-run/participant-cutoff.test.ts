@@ -119,15 +119,16 @@ describe("the cutoff boundary (Asia/Kolkata)", () => {
     expect(participantChangesOpen(Date.parse("2027-01-15T18:30:00Z"))).toBe(false);
   });
 
-  it("uses the server clock, so a timestamp sent by the client cannot reopen it", async () => {
+  it("the client cannot reopen the cutoff with a timestamp: the category route still decides from the server clock", async () => {
     clockAt(IST_CLOSE);
     const db = fakeDb();
     mockDb.mockReturnValue(db);
-    const res = await downgradePost(
-      req(`http://t/api/it-run/registrations/${REG_ID}/downgrade`, { categoryId: "cat-5k", reason: "Moving to 5K this year", now: "2027-01-10T00:00:00Z", open: true }),
+    const res = await categoryPost(
+      req(`http://t/api/it-run/registrations/${REG_ID}/category`, { categoryId: "cat-5k", now: "2027-01-10T00:00:00Z", open: true }),
       params(),
     );
     expect(res.status).toBe(403);
+    expect(writes(db)).toEqual([]);
   });
 });
 
@@ -173,52 +174,43 @@ describe("category change routes", () => {
 
 // ── Refund requests and downgrades ─────────────────────────────────────────────
 
-describe("refund requests and downgrades", () => {
-  it("a new refund request after the cutoff is refused with no insert", async () => {
-    clockAt(IST_CLOSE);
+describe("refund requests and downgrades are discontinued", () => {
+  it("a refund request is refused with 410 before the cutoff, with no insert", async () => {
+    clockAt(IST_LAST_OPEN);
     const db = fakeDb();
     mockDb.mockReturnValue(db);
-    const res = await refundRequestPost(req("http://t/api/it-run/refund-requests", { registration_code: "ITR-AAA", reason: "Cannot attend this year" }));
-    expect(res.status).toBe(403);
-    expect((await res.json()).code).toBe(CUTOFF_CLOSED_CODE);
+    const res = await refundRequestPost();
+    expect(res.status).toBe(410);
     expect(writes(db)).toEqual([]);
   });
 
-  it("a downgrade request after the cutoff is refused with no insert and no capacity change", async () => {
+  it("a refund request is refused with 410 after the cutoff too, with no insert", async () => {
     clockAt(IST_CLOSE);
     const db = fakeDb();
     mockDb.mockReturnValue(db);
-    const res = await downgradePost(req(`http://t/api/it-run/registrations/${REG_ID}/downgrade`, { categoryId: "cat-5k", reason: "Moving to the 5K" }), params());
-    expect(res.status).toBe(403);
+    const res = await refundRequestPost();
+    expect(res.status).toBe(410);
+    expect(writes(db)).toEqual([]);
+  });
+
+  it("a downgrade is refused with 410, with no insert and no capacity change", async () => {
+    clockAt(IST_LAST_OPEN);
+    const db = fakeDb();
+    mockDb.mockReturnValue(db);
+    const res = await downgradePost();
+    expect(res.status).toBe(410);
     expect(writes(db)).toEqual([]);
     expect(db.rpcs).toEqual([]);
   });
 
-  it("a request made just before the cutoff is still accepted by the cutoff check", async () => {
-    clockAt(IST_LAST_OPEN);
-    mockDb.mockReturnValue(fakeDb());
-    const res = await refundRequestPost(req("http://t/api/it-run/refund-requests", { registration_code: "ITR-AAA", reason: "Cannot attend this year" }));
-    expect(res.status).not.toBe(403);
-  });
-
-  it("existing refund requests stay visible to the participant after the cutoff", async () => {
+  it("the participant refund list is gone too (410), so nothing about requests is shown", async () => {
     clockAt(IST_CLOSE);
     mockDb.mockReturnValue(fakeDb());
-    const res = await refundRequestGet(req("http://t/api/it-run/refund-requests"));
-    expect(res.status).toBe(200);
-  });
-
-  it("the downgrade rule applies to parent-and-child and duo bookings as well", async () => {
-    clockAt(IST_CLOSE);
-    for (const participant_count of [1, 2]) {
-      const db = fakeDb({ ...REG, participant_count });
-      mockDb.mockReturnValue(db);
-      const res = await downgradePost(req(`http://t/api/it-run/registrations/${REG_ID}/downgrade`, { categoryId: "cat-5k", reason: "Moving to the 5K" }), params());
-      expect(res.status).toBe(403);
-      expect(writes(db)).toEqual([]);
-    }
+    const res = await refundRequestGet();
+    expect(res.status).toBe(410);
   });
 });
+
 
 // ── Registrations list: notice and actions ─────────────────────────────────────
 
@@ -228,7 +220,7 @@ describe("registrations list after the cutoff", () => {
     mockDb.mockReturnValue(fakeDb());
     const body = await (await myRegistrationsGet(req("http://t/api/it-run/my-registrations"))).json();
     expect(body.participantChangesOpen).toBe(false);
-    expect(body.registrations.every((r: any) => r.actions.canChangeCategory === false && r.actions.canRequestRefund === false)).toBe(true);
+    expect(body.registrations.every((r: any) => r.actions.canChangeCategory === false)).toBe(true);
   });
 
   it("reports changes as open before the cutoff", async () => {
@@ -245,7 +237,7 @@ describe("registrations list after the cutoff", () => {
       created_at: "2026-10-01", category: null, event: null,
     };
     const closed = buildMyRegistrations([row], [], [], new Map(), false);
-    expect(closed[0].actions).toEqual({ canChangeCategory: false, canRequestRefund: false });
+    expect(closed[0].actions).toEqual({ canChangeCategory: false });
   });
 });
 

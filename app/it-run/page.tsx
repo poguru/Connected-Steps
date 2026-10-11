@@ -25,7 +25,7 @@ const FAQS = [
   { q: "What documents do I need to upload?", a: "A valid company ID or employee card showing your company name. A selfie with your ID works too. Our team verifies all documents within 24 hours of registration." },
   { q: "Can I run if I am not physically fit?", a: "Absolutely! The 5K Fun Run and Parent & Child Duo are designed for all fitness levels. Start walking, start running - the community spirit is what matters." },
   { q: "When will I receive my race BIB?", a: "Race BIBs are collected at designated collection counters on February 4-6, 2027. You can book your preferred time slot from your participant dashboard after payment confirmation." },
-  { q: "Is parking available at the venue?", a: "Yes, parking is available at Hitec City. We recommend arriving early. Public transport and ride-sharing options are also convenient to the venue." },
+  { q: "Is parking available at the venue?", a: "Yes, parking is available at Hyderabad Central University. We recommend arriving early. Public transport and ride-sharing options are also convenient to the venue." },
   { q: "What is the refund policy?", a: "Registrations are non-refundable, except the price difference when you move to a lower-priced category. Transfers to another participant are allowed until January 31, 2027. Requests must be emailed to info@connectedsteps.in with the new participant's details." },
   { q: "Will there be water stations and medical support?", a: "Yes. Water stations are set up every 2.5 KM on the 10K route and every 2 KM on the 5K route. Qualified medical support including first-aid teams and an ambulance will be on standby." },
   { q: "Can I upgrade my category after registration?", a: "Category upgrades (e.g. 5K to 10K) are allowed until January 28, 2027 by paying the price difference. Email us at info@connectedsteps.in to request an upgrade." },
@@ -180,13 +180,13 @@ export default function ItRunLandingPage() {
   // Event config loaded from DB via /api/it-run/categories — never hardcoded
   const [eventDate,   setEventDate]   = useState<Date | null>(null);
   const [regClose,    setRegClose]    = useState<Date | null>(null);
-  const [venueName,   setVenueName]   = useState("Hitec City, Hyderabad");
-  const [venueAddress, setVenueAddress] = useState("Hitech City Road, HITEC City\nHyderabad, Telangana 500081");
-  const [mapsUrl,     setMapsUrl]     = useState("https://maps.google.com/?q=HITEC+City+Hyderabad");
+  const [venueName,   setVenueName]   = useState("Hyderabad Central University, Gachibowli, Hyderabad");
+  const [venueAddress, setVenueAddress] = useState("");
+  const [mapsUrl,     setMapsUrl]     = useState("https://maps.google.com/?q=Hyderabad+Central+University+Gachibowli");
   const [eventLabel,  setEventLabel]  = useState("February 7, 2027");
   const [regCloseLabel, setRegCloseLabel] = useState<string>("–");
   const [description,   setDescription]   = useState<string>("");
-  const [heroContent,   setHeroContent]   = useState<string>("Your Code Compiles. Now Run It.");
+  const [heroContent,   setHeroContent]   = useState<string>("Run Beyond the Screen. Break the Loop.");
   const [highlights,    setHighlights]    = useState<string[]>([]);
   const [instructions,  setInstructions]  = useState<string>("");
   const [contactEmail,  setContactEmail]  = useState("info@connectedsteps.in");

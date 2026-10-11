@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
       code: "ITR-TEST",
       category: "5K Timed Run",
       date: "2027-02-07",
-      venue: "Hitec City, Hyderabad",
+      venue: "Hyderabad Central University, Gachibowli, Hyderabad",
       reportTime: "5:30 AM",
       finalPrice: 680,
       discount: { label: "Early Bird (test)", baseAmount: 799, discountAmount: 119 },
