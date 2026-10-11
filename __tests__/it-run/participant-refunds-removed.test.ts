@@ -110,3 +110,22 @@ describe("the deadline for changes is still enforced on the server", () => {
     expect(route).toMatch(/participantChangesOpen/);
   });
 });
+
+describe("administrators are not held to the participant deadline", () => {
+  it("no admin refund route applies the participant change cutoff", () => {
+    const adminRefundRoutes = [
+      "app/api/it-run/admin/refund/route.ts",
+      "app/api/it-run/admin/refund-requests/create/route.ts",
+      "app/api/it-run/admin/refund-requests/[id]/route.ts",
+      "app/api/it-run/admin/id-failure/route.ts",
+    ];
+    for (const r of adminRefundRoutes) {
+      expect({ r, cutoff: /participantChangesOpen|CUTOFF_CLOSED/.test(read(r)) }).toEqual({ r, cutoff: false });
+    }
+  });
+
+  it("administrators can open a general refund request for any paid registration", () => {
+    expect(exists("app/api/it-run/admin/refund-requests/create/route.ts")).toBe(true);
+    expect(read("app/api/it-run/admin/refund-requests/create/route.ts")).toMatch(/requireRole\(req, \["event_admin"\]\)/);
+  });
+});

@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 
 // Refund management for The IT Run Sprint-2 (event_admin / super_admin).
-// Participants only request refunds. Approving a request moves no money. A refund is issued only
+// Refund requests are opened by an administrator (for any paid registration, at any time) or from an ID failure.
+// Approving a request moves no money. A refund is issued only
 // by executing an approved request with explicit confirmation. Razorpay is the source of truth for
 // refund outcomes; uncertain attempts are reconciled against Razorpay, never auto-failed.
 
@@ -147,6 +148,61 @@ function refundLabel(r: RefundRow | null | undefined): { label: string; color: s
   if (r.status === "processed") return { label: "Refunded", color: STATUS_COLOR.processed };
   if (r.status === "pending") return { label: "Processing / uncertain", color: STATUS_COLOR.pending };
   return { label: "Refund failed", color: STATUS_COLOR.failed };
+}
+
+// Opens a refund request for any paid registration. Creating one moves no money: it is approved and executed below.
+function NewRefundForm({ onNotice, onCreated }: { onNotice: (n: { ok: boolean; text: string }) => void; onCreated: () => void }) {
+  const [code, setCode]     = useState("");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy]     = useState(false);
+
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (busy) return;
+    const registrationCode = code.trim();
+    setBusy(true);
+    try {
+      const res = await fetch("/api/it-run/admin/refund-requests/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ registration_code: registrationCode, reason: reason.trim() }),
+      });
+      const d = await res.json().catch(() => ({})) as { error?: string; refundablePaise?: number };
+      if (!res.ok) {
+        onNotice({ ok: false, text: d.error ?? "Could not open the refund request." });
+        return;
+      }
+      onNotice({
+        ok: true,
+        text: `Refund request opened for ${registrationCode}. Refundable now: ${inr(d.refundablePaise ?? 0)}. Approve it in the list, then execute it with confirmation.`,
+      });
+      setCode("");
+      setReason("");
+      onCreated();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} aria-label="Open a refund request" style={{ ...CARD, display: "grid", gap: 10, marginBottom: 18 }}>
+      <div style={{ fontSize: 11, color: "#888", textTransform: "uppercase", letterSpacing: "0.07em" }}>Open a refund request</div>
+      <input
+        value={code} onChange={e => setCode(e.target.value)} required placeholder="Registration code (ITR-…)"
+        style={INPUT}
+      />
+      <textarea
+        value={reason} onChange={e => setReason(e.target.value)} required minLength={10} maxLength={1000} rows={2}
+        placeholder="Reason (10 to 1000 characters). Kept on the audit trail."
+        style={{ ...INPUT, resize: "vertical" }}
+      />
+      <div>
+        <button type="submit" disabled={busy || code.trim() === "" || reason.trim().length < 10} style={BTN(ACCENT, busy)}>
+          {busy ? "Opening…" : "Open refund request"}
+        </button>
+      </div>
+    </form>
+  );
 }
 
 export default function RefundRequestsPage() {
@@ -446,6 +502,8 @@ export default function RefundRequestsPage() {
           color: notice.ok ? "#10b981" : "#f87171",
         }}>{notice.text}</div>
       )}
+
+      <NewRefundForm onNotice={setNotice} onCreated={refreshAll} />
 
       {loadError && <div role="alert" style={{ color: "#f87171", fontSize: 13, marginBottom: 12 }}>{loadError}</div>}
       {loading && <div style={{ color: "#666", fontSize: 13 }}>Loading…</div>}
