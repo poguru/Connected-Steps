@@ -141,12 +141,12 @@ describe("options", () => {
     expect(ids).not.toContain(TEN_K);
   });
 
-  it("marks same-price options as allowed, and a downgrade as not available online", async () => {
+  it("marks same-price and downgrade options as allowed, with no refund", async () => {
     mockDb.mockReturnValue(fakeDb());
     const body = await (await GET(req("GET"), params)).json();
     expect(body.options.find((o: any) => o.id === FIVE_K)).toMatchObject({ change: "same", allowed: true });
     expect(body.options.find((o: any) => o.id === PREMIUM)).toMatchObject({ change: "upgrade", allowed: true });
-    expect(body.options.find((o: any) => o.id === BASIC)).toMatchObject({ change: "downgrade", allowed: false, refundRupees: null });
+    expect(body.options.find((o: any) => o.id === BASIC)).toMatchObject({ change: "downgrade", allowed: true, refundRupees: null });
   });
 
   it("blocks changes on unpaid registrations and discounted ones", async () => {
@@ -161,14 +161,15 @@ describe("options", () => {
 });
 
 describe("POST refusals happen before any write", () => {
-  it("refuses a downgrade online, and touches no capacity", async () => {
+  it("a downgrade moves the registration with no payment, reserves the target seats and frees the old ones", async () => {
     const db = fakeDb();
     mockDb.mockReturnValue(db);
     const res = await POST(req("POST", { categoryId: BASIC }), params);
-    expect(res.status).toBe(409);
-    expect((await res.json()).code).toBe("DOWNGRADE_NOT_AVAILABLE");
-    expect(db.rpcs).toEqual([]);
-    expect(db.updates).toEqual([]);
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.ok).toBe(true);
+    expect(db.rpcs.filter(r => r.name === "itr_reserve_capacity").map(r => r.args.p_category_id)).toEqual([BASIC]);
+    expect(db.updates.some(u => u.table === "it_run_registrations" && u.payload.category_id === BASIC)).toBe(true);
   });
 
   it("an upgrade holds the seat and asks for the exact difference, without moving the registration yet", async () => {

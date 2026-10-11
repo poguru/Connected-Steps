@@ -47,11 +47,13 @@ describe("participant screens offer no refund request", () => {
     }
   });
 
-  it("the category options offer no downgrade request (a downgrade is not offered online)", () => {
+  it("a downgrade is a plain category change: no request, no refund, and no refusal for it", () => {
     const button = read("app/it-run/my-registrations/CategoryChangeButton.tsx");
     expect(button).not.toMatch(/requestDowngrade|checkRefundReason|it-run-refund-reason/);
     const route = read("app/api/it-run/registrations/[id]/category/route.ts");
-    expect(route).toMatch(/allowed: !blocked && !full && change !== "downgrade"/);
+    expect(route).toMatch(/allowed: !blocked && !full,/);
+    expect(route).not.toMatch(/DOWNGRADE_NOT_AVAILABLE/);
+    expect(route).not.toMatch(/it_run_refund_requests|it_run_refunds/);
   });
 
   it("My Registrations no longer returns a refund action", () => {

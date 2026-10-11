@@ -28,7 +28,7 @@ const FAQS = [
   { q: "Is parking available at the venue?", a: "Yes, parking is available at Hyderabad Central University. We recommend arriving early. Public transport and ride-sharing options are also convenient to the venue." },
   { q: "What is the refund policy?", a: "Registrations are final, and participants cannot cancel or request refunds online. Refunds, if applicable under exceptional circumstances or applicable law, are handled only by the Connected Steps administration team after review and approval. No refunds are given for a move to a lower-priced category." },
   { q: "Will there be water stations and medical support?", a: "Yes. Water stations are set up every 2.5 KM on the 10K route and every 2 KM on the 5K route. Qualified medical support including first-aid teams and an ambulance will be on standby." },
-  { q: "Can I upgrade my category after registration?", a: "Category changes may be requested until January 15, 2027, subject to category availability and administrative approval. An upgrade (e.g. 5K to 10K) requires paying the price difference before the change is confirmed. Email info@connectedsteps.in to request a change." },
+  { q: "Can I upgrade my category after registration?", a: "You can change your category online from My Registrations until January 15, 2027, subject to category availability. An upgrade (e.g. 5K to 10K) requires paying the price difference before the change is confirmed. A downgrade needs no approval, but the price difference is not refunded." },
 ];
 
 const SCHEDULE = [
@@ -724,7 +724,7 @@ export default function ItRunLandingPage() {
             </div>
             <div>
               <div style={{ fontSize: 12, color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Category Transfer</div>
-              <div style={{ fontSize: 14, color: "#888", lineHeight: 1.7 }}>Category changes may be requested until 15 January 2027, subject to availability and administrative approval. Upgrades require the price difference to be paid before the change is confirmed. Downgrades may be permitted with administrative approval, but the price difference is not refunded. Category changes are not permitted after 15 January 2027.</div>
+              <div style={{ fontSize: 14, color: "#888", lineHeight: 1.7 }}>Category changes can be made online until 15 January 2027, subject to availability. Upgrades require the price difference to be paid before the change is confirmed. Downgrades need no approval, but the price difference is not refunded. Category changes are not permitted after 15 January 2027.</div>
             </div>
           </div>
         </div>

@@ -147,7 +147,7 @@ export async function GET() {
       },
       {
         heading: "Refund Policy",
-        body: "Registrations are final, and participants cannot cancel or request refunds online. Refunds, if applicable under exceptional circumstances or applicable law, are handled exclusively by the Connected Steps administration team after review and approval. No refunds are given for a move to a lower-priced category. Category changes may be requested until 15 January 2027, subject to availability and administrative approval; upgrades require the price difference to be paid first, and downgrades are not refunded. Email info@connectedsteps.in for questions.",
+        body: "Registrations are final, and participants cannot cancel or request refunds online. Refunds, if applicable under exceptional circumstances or applicable law, are handled exclusively by the Connected Steps administration team after review and approval. No refunds are given for a move to a lower-priced category. Category changes can be made online until 15 January 2027, subject to availability. Upgrades require the price difference to be paid first. Downgrades need no approval, but the price difference is not refunded. Email info@connectedsteps.in for questions.",
       },
       {
         heading: "Age Requirement",

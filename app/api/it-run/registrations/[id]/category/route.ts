@@ -100,12 +100,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       if (blocked) note = blocked;
       else if (full) note = "This category is full.";
       else if (change === "upgrade") note = `Pay the difference of ₹${total - currentTotal} to switch.`;
-      else if (change === "downgrade") note = "Lower-priced categories can't be chosen online.";
+      else if (change === "downgrade") note = "Switches with no payment. The price difference is not refunded.";
       return {
         id: c.id, name: c.name, distanceKm: c.distance_km, priceRupees: total,
         change, availability: availability(c),
         // A downgrade is a refund request, which participants can no longer make, so it is not offered online
-        allowed: !blocked && !full && change !== "downgrade",
+        allowed: !blocked && !full,
         refundRupees: null,
         note,
       };
@@ -158,12 +158,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const n = reg.participant_count;
   const currentTotal = bookingTotal(current, n);
   const targetTotal = bookingTotal(target, n);
-  if (targetTotal < currentTotal) {
-    return NextResponse.json({
-      error: "Lower-priced categories can't be chosen online.",
-      code: "DOWNGRADE_NOT_AVAILABLE",
-    }, { status: 409 });
-  }
   if (targetTotal > currentTotal) {
     return startUpgrade(req, reg, email, { currentTotal, targetTotal }, target);
   }
@@ -211,6 +205,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       to_category_id: target.id,
       price_rupees: target.price_rupees,
       payment_change: "none",
+      // A downgrade keeps what was paid: the price difference is not refunded
+      direction: targetTotal < currentTotal ? "downgrade" : "same",
     },
   }).then(() => {}, () => {});
 
