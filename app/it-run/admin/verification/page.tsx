@@ -581,7 +581,7 @@ export default function VerificationPage() {
                     {/* Action buttons: nothing is decided for participants who provided no ID */}
                     {tab === "not_provided" ? (
                       <div style={{ fontSize: 12, color: "#888", marginTop: 10, lineHeight: 1.6 }}>
-                        No ID document was uploaded. Standard identity checks apply at BIB collection. Nothing to review.
+                        Not verified: no ID uploaded. This registration cannot be confirmed until an ID is uploaded and verified. Nothing to review yet.
                       </div>
                     ) : (
                     <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
