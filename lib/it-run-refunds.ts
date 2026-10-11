@@ -119,10 +119,12 @@ export async function finalizeRefundProcessed(
     regUpdate.final_price = targetPrice;
     regUpdate.discount_amount = 0;
   }
-  const shouldCancel = fullyRefunded && reg.registration_status !== "cancelled";
+  // An ID-failure refund is partial by design (96% or 80%) but ends the registration, so it cancels on its own.
+  const idFailure = await isIdFailureRefund(db, refundId);
+  const shouldCancel = (fullyRefunded || idFailure) && reg.registration_status !== "cancelled";
   if (shouldCancel) {
     regUpdate.registration_status = "cancelled";
-    regUpdate.cancelled_reason = "Refunded";
+    regUpdate.cancelled_reason = idFailure ? "ID verification not completed" : "Refunded";
     regUpdate.cancelled_at = now;
   }
 
@@ -261,6 +263,24 @@ export async function downgradeForRefund(db: Db, refundId: string): Promise<Down
     return null;
   }
   return { requestId: request.id, targetCategoryId: request.target_category_id, amountPaise: request.requested_amount_paise };
+}
+
+/** True when the refund was started for an ID-verification failure (its request carries the kind 'id_failure'). */
+export async function isIdFailureRefund(db: Db, refundId: string): Promise<boolean> {
+  const { data: refund } = await db
+    .from("it_run_refunds")
+    .select("metadata")
+    .eq("id", refundId)
+    .maybeSingle<{ metadata: Record<string, unknown> | null }>();
+  const requestId = typeof refund?.metadata?.request_id === "string" ? refund.metadata.request_id : null;
+  if (!requestId) return false;
+
+  const { data: request } = await db
+    .from("it_run_refund_requests")
+    .select("request_kind")
+    .eq("id", requestId)
+    .maybeSingle<{ request_kind: string }>();
+  return request?.request_kind === "id_failure";
 }
 
 async function eventIdForRegistration(db: Db, registrationId: string): Promise<string> {

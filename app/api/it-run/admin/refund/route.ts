@@ -154,6 +154,19 @@ export async function POST(req: NextRequest) {
     }
     reservedCategoryId = target.id;
     refundAmount = requested;
+  } else if (request.request_kind === "id_failure") {
+    // The amount is the one the admin set when the ID failure was recorded. It must not change at execution.
+    const requested = request.requested_amount_paise;
+    if (!requested) {
+      return NextResponse.json({ error: "This ID-failure request is incomplete" }, { status: 422 });
+    }
+    if (amount_paise !== undefined && amount_paise !== requested) {
+      return NextResponse.json({ error: "An ID-failure refund uses the amount in the approved request" }, { status: 422 });
+    }
+    if (requested > remaining) {
+      return NextResponse.json({ error: `Cannot refund ₹${requested / 100}: only ₹${remaining / 100} remaining refundable` }, { status: 422 });
+    }
+    refundAmount = requested;
   } else {
     refundAmount = (amount_paise as number | undefined) ?? remaining;
     if (refundAmount > remaining) {
