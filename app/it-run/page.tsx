@@ -8,7 +8,7 @@ import { categoryCard, type ApiCategory } from "@/lib/it-run-category-view";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface TimeLeft { days: number; hours: number; minutes: number; seconds: number }
+interface TimeLeft { days: number; hours: number; minutes: number; seconds: number; done: boolean }
 
 interface Category {
   slug: string; name: string; distance: string; price: number;
@@ -55,22 +55,22 @@ const WHY_ITEMS = [
 // ── Countdown timer ────────────────────────────────────────────────────────────
 
 function useCountdown(target: Date | null): TimeLeft {
-  const calc = (): TimeLeft => {
-    if (!target) return { days: 0, hours: 0, minutes: 0, seconds: 0 };
-    const diff = Math.max(0, target.getTime() - Date.now());
-    return {
-      days:    Math.floor(diff / 86400000),
-      hours:   Math.floor((diff % 86400000) / 3600000),
-      minutes: Math.floor((diff % 3600000)  / 60000),
-      seconds: Math.floor((diff % 60000)    / 1000),
-    };
-  };
-  const [t, setT] = useState<TimeLeft>(calc);
+  // The clock is state, updated every second. The remaining time is derived from it on each render. A timer closure
+  // created once would keep the target from its first render (null) and never count down.
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const id = setInterval(() => setT(calc()), 1000);
+    const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  });
-  return t;
+  }, []);
+  if (!target) return { days: 0, hours: 0, minutes: 0, seconds: 0, done: false };
+  const diff = Math.max(0, target.getTime() - now);
+  return {
+    days:    Math.floor(diff / 86400000),
+    hours:   Math.floor((diff % 86400000) / 3600000),
+    minutes: Math.floor((diff % 3600000)  / 60000),
+    seconds: Math.floor((diff % 60000)    / 1000),
+    done:    now >= target.getTime(),
+  };
 }
 
 // ── Icon component (inline SVGs) ──────────────────────────────────────────────
@@ -116,18 +116,18 @@ function Icon({ name, size = 20, color = "currentColor" }: { name: string; size?
 
 function CountBox({ value, label }: { value: number; label: string }) {
   return (
-    <div style={{ textAlign: "center", minWidth: 70 }}>
+    <div style={{ textAlign: "center", minWidth: 50 }}>
       <div style={{
         background: "rgba(255,255,255,0.07)",
         border: "1px solid rgba(255,255,255,0.12)",
         borderRadius: 12,
-        padding: "12px 16px",
-        fontSize: "clamp(28px, 5vw, 48px)",
+        padding: "12px 6px",
+        fontSize: "clamp(24px, 6vw, 48px)",
         fontWeight: 900,
         fontVariantNumeric: "tabular-nums",
         color: "#fff",
         lineHeight: 1,
-        minWidth: 64,
+        minWidth: 50,
         fontFamily: "'SF Pro Display', system-ui, sans-serif",
       }}>
         {String(value).padStart(2, "0")}
@@ -142,7 +142,7 @@ function CountBox({ value, label }: { value: number; label: string }) {
 const S = {
   page:    { background: "#080808", color: "#fff", fontFamily: "'Inter','SF Pro Display',system-ui,sans-serif", overflowX: "hidden" as const },
   nav:     { position: "fixed" as const, top: 0, left: 0, right: 0, zIndex: 100, background: "rgba(8,8,8,0.92)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.06)", height: 64, display: "flex", alignItems: "center", padding: "0 clamp(1rem,4vw,3rem)", justifyContent: "space-between" },
-  section: { padding: "clamp(4rem,8vw,7rem) clamp(1rem,4vw,3rem)", maxWidth: 1200, margin: "0 auto" } as React.CSSProperties,
+  section: { padding: "clamp(2.5rem,5vw,4rem) clamp(1rem,4vw,3rem)", maxWidth: 1200, margin: "0 auto", scrollMarginTop: 72 } as React.CSSProperties,
   tag:     { display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(232,98,10,0.15)", border: "1px solid rgba(232,98,10,0.4)", borderRadius: 100, padding: "5px 14px", fontSize: 11, color: "#e8620a", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const },
   card:    { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "24px" } as React.CSSProperties,
   h2:      { fontSize: "clamp(28px,4vw,44px)", fontWeight: 900, color: "#fff", lineHeight: 1.1, margin: "0 0 12px" } as React.CSSProperties,
@@ -150,6 +150,26 @@ const S = {
   cta:     { display: "inline-flex", alignItems: "center", gap: 8, background: "#e8620a", color: "#fff", fontWeight: 700, fontSize: 15, padding: "14px 28px", borderRadius: 10, border: "none", cursor: "pointer", textDecoration: "none", transition: "all 0.2s", letterSpacing: "0.01em" } as React.CSSProperties,
   ghost:   { display: "inline-flex", alignItems: "center", gap: 8, background: "transparent", color: "#fff", fontWeight: 600, fontSize: 15, padding: "14px 24px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.2)", cursor: "pointer", textDecoration: "none", transition: "all 0.2s" } as React.CSSProperties,
 };
+
+// ── Folded section ─────────────────────────────────────────────────────────────
+// A section whose content is collapsed by default. The header is the control. A native <details> gives keyboard and
+// screen-reader support. The open state is owned by the page, so header links and direct links can open it.
+function Fold({ id, open, onToggle, header, style, children }: {
+  id: string; open: boolean; onToggle: (open: boolean) => void;
+  header: React.ReactNode; style?: React.CSSProperties; children: React.ReactNode;
+}) {
+  return (
+    <section id={id} style={style}>
+      <details className="cs-fold" open={open} onToggle={e => onToggle(e.currentTarget.open)}>
+        <summary style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, cursor: "pointer", listStyle: "none", minHeight: 44 }}>
+          <span style={{ flex: 1, minWidth: 0 }}>{header}</span>
+          <span aria-hidden="true" style={{ flexShrink: 0, width: 36, height: 36, borderRadius: "50%", border: "1px solid rgba(232,98,10,0.4)", color: "#e8620a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 700 }}>{open ? "−" : "+"}</span>
+        </summary>
+        <div style={{ marginTop: 24 }}>{children}</div>
+      </details>
+    </section>
+  );
+}
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
@@ -174,7 +194,34 @@ export default function ItRunLandingPage() {
   const [bibInfo,       setBibInfo]       = useState<string>("");
   const [raceDayInfo,   setRaceDayInfo]   = useState<string>("");
 
+  const [reportTime,  setReportTime]  = useState<string>("");
   const countdown    = useCountdown(eventDate);
+  // Once the start time has passed and the countdown has run out, the hero says the event has started
+  const eventStarted = !!eventDate && countdown.done;
+
+  // Sections folded away by default. Each opens from its header link, its button, or a direct #link.
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const isOpen = (id: string) => !!openSections[id];
+  const setSection = (id: string, value: boolean) => setOpenSections(prev => (prev[id] === value ? prev : { ...prev, [id]: value }));
+  function revealSection(id: string) {
+    setSection(id, true);
+    // Wait for the section to render open before scrolling to it
+    setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+  }
+  useEffect(() => {
+    // A direct link to a folded section (#faq, #schedule, #categories) opens it
+    const id = window.location.hash.slice(1);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a direct link is the source of truth for which section opens
+    if (id) revealSection(id);
+    // The same for a link that changes only the hash while the page is open
+    const onHash = () => {
+      const next = window.location.hash.slice(1);
+      if (next) revealSection(next);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const regCountdown = useCountdown(regClose);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [navScrolled, setNavScrolled] = useState(false);
@@ -195,7 +242,7 @@ export default function ItRunLandingPage() {
         data?: ApiCategory[];
         event?: {
           event_date?: string; registration_closes_at?: string;
-          venue_name?: string | null; venue_address?: string | null;
+          venue_name?: string | null; venue_address?: string | null; report_time?: string | null;
           city?: string | null; maps_url?: string | null;
           description?: string | null; hero_content?: string | null;
           event_highlights?: string[] | null; important_instructions?: string | null;
@@ -216,6 +263,7 @@ export default function ItRunLandingPage() {
           }
           if (event.venue_name) setVenueName(event.venue_name + (event.city ? ", " + event.city : ""));
           if (event.venue_address) setVenueAddress(event.venue_address);
+          if (event.report_time) setReportTime(event.report_time);
           if (event.maps_url)     setMapsUrl(event.maps_url);
           if (event.description)  setDescription(event.description);
           if (event.hero_content) setHeroContent(event.hero_content);
@@ -248,19 +296,19 @@ export default function ItRunLandingPage() {
       <nav style={{ ...S.nav, background: navScrolled ? "rgba(8,8,8,0.97)" : "transparent", borderBottom: navScrolled ? "1px solid rgba(255,255,255,0.06)" : "none", transition: "all 0.3s" }}>
         <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
           <Image src="/logo.png" alt="Connected Steps" width={32} height={32} style={{ borderRadius: "50%" }} />
-          <span style={{ fontSize: 13, color: "#888", fontWeight: 500 }}>Connected Steps</span>
+          <span className="it-run-nav-brand" style={{ fontSize: 13, color: "#888", fontWeight: 500 }}>Connected Steps</span>
         </Link>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <a href="#categories" style={{ color: "#888", fontSize: 13, textDecoration: "none", padding: "0 8px", display: "none" }}>Categories</a>
-          <a href="#schedule"   style={{ color: "#888", fontSize: 13, textDecoration: "none", padding: "0 12px" }}>Schedule</a>
-          <a href="#faq"        style={{ color: "#888", fontSize: 13, textDecoration: "none", padding: "0 12px" }}>FAQ</a>
+          <a href="#schedule" className="it-run-nav-secondary" onClick={e => { e.preventDefault(); revealSection("schedule"); }} style={{ color: "#888", fontSize: 13, textDecoration: "none", padding: "0 12px" }}>Schedule</a>
+          <a href="#faq" className="it-run-nav-secondary" onClick={e => { e.preventDefault(); revealSection("faq"); }} style={{ color: "#888", fontSize: 13, textDecoration: "none", padding: "0 12px" }}>FAQ</a>
           <Link href="/it-run/my-registrations" style={{ color: "#ccc", fontSize: 13, textDecoration: "none", padding: "0 12px", fontWeight: 600 }}>My Registrations</Link>
           <Link href="/it-run/register" style={{ ...S.cta, padding: "10px 20px", fontSize: 13 }}>Register</Link>
         </div>
       </nav>
 
       {/* ── Hero ── */}
-      <div ref={heroRef} style={{ minHeight: "100vh", position: "relative", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "clamp(5rem,10vw,8rem) clamp(1rem,4vw,3rem) 4rem", textAlign: "center", overflow: "hidden" }}>
+      <div ref={heroRef} style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", overflow: "hidden", padding: "calc(64px + clamp(0.5rem,2vw,1.25rem)) clamp(1rem,4vw,3rem) clamp(3.5rem,7vw,4.5rem)" }}>
         {/* Background decoration */}
         <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 80% 60% at 50% 20%, rgba(232,98,10,0.12) 0%, transparent 70%)", pointerEvents: "none" }} />
         <div style={{ position: "absolute", top: "40%", left: "5%",  width: 300, height: 300, background: "rgba(232,98,10,0.04)", borderRadius: "50%", filter: "blur(80px)", pointerEvents: "none" }} />
@@ -268,22 +316,22 @@ export default function ItRunLandingPage() {
 
         {/* Content */}
         <div style={{ position: "relative", maxWidth: 860, width: "100%" }}>
-          <div style={{ ...S.tag, marginBottom: 24, fontSize: 10 }}>
+          <div style={{ ...S.tag, marginBottom: 16, fontSize: 10 }}>
             <span>IT</span>
             <span style={{ width: 4, height: 4, borderRadius: "50%", background: "#e8620a" }} />
             <span>Exclusive for IT Professionals</span>
           </div>
 
           <Image
-            src="/events/it-run-sprint-2/IT Run Sprint-2 Logo.png"
+            src="/events/it-run-sprint-2/IT Run Sprint-2 Logo (trimmed).png"
             alt="The IT Run Sprint-2"
-            width={600}
-            height={300}
+            width={1200}
+            height={582}
             style={{
               width: "100%",
               height: "auto",
-              maxWidth: "clamp(240px,90vw,600px)",
-              margin: "0 0 24px",
+              maxWidth: "clamp(260px,70vw,560px)",
+              margin: "0 auto 20px",
               objectFit: "contain",
             }}
             priority
@@ -293,10 +341,19 @@ export default function ItRunLandingPage() {
             {heroContent}
             <br />
             <span style={{ color: "#666", fontSize: 14 }}>{eventLabel} &nbsp;|&nbsp; {venueName}</span>
+            {reportTime && (
+              <>
+                <br />
+                <span style={{ color: "#666", fontSize: 14 }}>Reporting {reportTime}</span>
+              </>
+            )}
           </p>
 
-          {/* Countdown */}
-          <div style={{ display: "flex", gap: "clamp(8px,2vw,20px)", justifyContent: "center", marginBottom: 40, flexWrap: "wrap" }}>
+          {/* Countdown, or the event-started state once the start time has passed */}
+          {eventStarted ? (
+            <div role="status" style={{ marginBottom: 32, fontSize: 15, color: "#e8620a", fontWeight: 700 }}>The IT Run Sprint-2 has started</div>
+          ) : (
+          <div style={{ display: "flex", gap: "clamp(4px,2vw,20px)", justifyContent: "center", marginBottom: 32, flexWrap: "wrap" }}>
             <CountBox value={countdown.days}    label="Days"    />
             <div style={{ display: "flex", alignItems: "center", paddingBottom: 20, fontSize: 28, color: "#444", fontWeight: 900 }}>:</div>
             <CountBox value={countdown.hours}   label="Hours"   />
@@ -305,6 +362,7 @@ export default function ItRunLandingPage() {
             <div style={{ display: "flex", alignItems: "center", paddingBottom: 20, fontSize: 28, color: "#444", fontWeight: 900 }}>:</div>
             <CountBox value={countdown.seconds} label="Seconds" />
           </div>
+          )}
 
           {/* CTAs */}
           <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
@@ -318,7 +376,7 @@ export default function ItRunLandingPage() {
                 <Icon name="arrow" size={16} />
               </Link>
             )}
-            <a href="#categories" style={S.ghost}>View Categories</a>
+            <a href="#categories" onClick={e => { e.preventDefault(); revealSection("categories"); }} style={S.ghost}>View Categories</a>
           </div>
           <p style={{ fontSize: 13, color: "#888", marginTop: 16, marginBottom: 0 }}>
             Already registered?{" "}
@@ -337,7 +395,7 @@ export default function ItRunLandingPage() {
         </div>
 
         {/* Scroll indicator */}
-        <div style={{ position: "absolute", bottom: 32, left: "50%", transform: "translateX(-50%)", animation: "bounce 2s infinite" }}>
+        <div className="it-run-scroll-cue" style={{ position: "absolute", bottom: 32, left: "50%", transform: "translateX(-50%)", animation: "bounce 2s infinite" }}>
           <div style={{ width: 24, height: 40, border: "2px solid rgba(255,255,255,0.15)", borderRadius: 12, display: "flex", justifyContent: "center", paddingTop: 6 }}>
             <div style={{ width: 3, height: 8, background: "#e8620a", borderRadius: 2, animation: "scrollDown 1.5s ease infinite" }} />
           </div>
@@ -358,11 +416,10 @@ export default function ItRunLandingPage() {
       )}
 
       {/* ── About the Event ── */}
-      <section style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+      <Fold id="about" open={isOpen("about")} onToggle={v => setSection("about", v)} style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}
+        header={<><div style={S.tag}>About</div><h2 style={{ ...S.h2, marginTop: 16 }}>India's Premier Tech Community Run</h2></>}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 48, alignItems: "center" }}>
           <div>
-            <div style={S.tag}>About</div>
-            <h2 style={{ ...S.h2, marginTop: 16 }}>India's Premier Tech Community Run</h2>
             {description ? (
               <p style={{ ...S.sub, marginBottom: 20, whiteSpace: "pre-line" }}>{description}</p>
             ) : (
@@ -395,15 +452,11 @@ export default function ItRunLandingPage() {
             ))}
           </div>
         </div>
-      </section>
+      </Fold>
 
       {/* ── Race Categories ── */}
-      <section id="categories" style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-        <div style={{ textAlign: "center", marginBottom: 48 }}>
-          <div style={S.tag}>Race Categories</div>
-          <h2 style={{ ...S.h2, marginTop: 16 }}>Choose Your Challenge</h2>
-          <p style={S.sub}>Five carefully designed categories to match every fitness level. From hardcore 10K runners to first-timers and families.</p>
-        </div>
+      <Fold id="categories" open={isOpen("categories")} onToggle={v => setSection("categories", v)} style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}
+        header={<><div style={S.tag}>Race Categories</div><h2 style={{ ...S.h2, marginTop: 16 }}>Choose Your Challenge</h2><p style={S.sub}>Five carefully designed categories to match every fitness level. From hardcore 10K runners to first-timers and families.</p></>}>
 
         {categoriesStatus === "loading" && <p style={{ color: "#888", fontSize: 14 }}>Loading categories…</p>}
         {categoriesStatus === "error" && (
@@ -487,15 +540,11 @@ export default function ItRunLandingPage() {
             </div>
           ))}
         </div>
-      </section>
+      </Fold>
 
       {/* ── Why Participate ── */}
-      <section style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-        <div style={{ textAlign: "center", marginBottom: 48 }}>
-          <div style={S.tag}>Why Join</div>
-          <h2 style={{ ...S.h2, marginTop: 16 }}>Why IT Professionals Run</h2>
-          <p style={S.sub}>Because the best code is written by the healthiest minds.</p>
-        </div>
+      <Fold id="why" open={isOpen("why")} onToggle={v => setSection("why", v)} style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}
+        header={<><div style={S.tag}>Why Join</div><h2 style={{ ...S.h2, marginTop: 16 }}>Why IT Professionals Run</h2><p style={S.sub}>Because the best code is written by the healthiest minds.</p></>}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(250px,1fr))", gap: 16 }}>
           {WHY_ITEMS.map(item => (
             <div key={item.title} style={{ ...S.card, transition: "transform 0.2s, border-color 0.2s" }}
@@ -509,7 +558,7 @@ export default function ItRunLandingPage() {
             </div>
           ))}
         </div>
-      </section>
+      </Fold>
 
       {/* ── Race Details ── */}
       <section style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
@@ -555,11 +604,9 @@ export default function ItRunLandingPage() {
       </section>
 
       {/* ── Schedule ── */}
-      <section id="schedule" style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+      <Fold id="schedule" open={isOpen("schedule")} onToggle={v => setSection("schedule", v)} style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}
+        header={<><div style={S.tag}>Event Day</div><h2 style={{ ...S.h2, marginTop: 16 }}>Race Day Schedule</h2><p style={S.sub}>{eventLabel} · {venueName}</p></>}>
         <div style={{ marginBottom: 40 }}>
-          <div style={S.tag}>Event Day</div>
-          <h2 style={{ ...S.h2, marginTop: 16 }}>Race Day Schedule</h2>
-          <p style={S.sub}>{eventLabel} · {venueName}</p>
           {raceDayInfo && (
             <div style={{ marginTop: 16, padding: "14px 18px", background: "rgba(232,98,10,0.06)", border: "1px solid rgba(232,98,10,0.15)", borderRadius: 10, fontSize: 14, color: "#ccc", lineHeight: 1.7, whiteSpace: "pre-line", maxWidth: 620 }}>
               {raceDayInfo}
@@ -591,14 +638,11 @@ export default function ItRunLandingPage() {
             ))}
           </div>
         </div>
-      </section>
+      </Fold>
 
       {/* ── Testimonials ── */}
-      <section style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-        <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <div style={S.tag}>Sprint-1 Voices</div>
-          <h2 style={{ ...S.h2, marginTop: 16 }}>What Runners Said</h2>
-        </div>
+      <Fold id="runners" open={isOpen("runners")} onToggle={v => setSection("runners", v)} style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}
+        header={<><div style={S.tag}>Sprint-1 Voices</div><h2 style={{ ...S.h2, marginTop: 16 }}>What Runners Said</h2></>}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 16 }}>
           {[
             { name: "Priya S.", role: "Senior Engineer, TCS", text: "Best 5K of my life! The energy at the start line was incredible. Every runner was a techie - the conversations before the race were as good as the run itself.", stars: 5 },
@@ -617,39 +661,32 @@ export default function ItRunLandingPage() {
             </div>
           ))}
         </div>
-      </section>
+      </Fold>
 
       {/* ── BIB Collection ── */}
       {bibInfo && (
-        <section style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-          <div style={{ marginBottom: 32 }}>
-            <div style={S.tag}>BIB Collection</div>
-            <h2 style={{ ...S.h2, marginTop: 16 }}>Collect Your Race BIB</h2>
-          </div>
+        <Fold id="bib" open={isOpen("bib")} onToggle={v => setSection("bib", v)} style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}
+          header={<><div style={S.tag}>BIB Collection</div><h2 style={{ ...S.h2, marginTop: 16 }}>Collect Your Race BIB</h2></>}>
           <div style={{ maxWidth: 720, padding: "20px 24px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, fontSize: 14, color: "#ccc", lineHeight: 1.8, whiteSpace: "pre-line" }}>
             {bibInfo}
           </div>
-        </section>
+        </Fold>
       )}
 
       {/* ── Important Instructions ── */}
       {instructions && (
-        <section style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-          <div style={{ marginBottom: 32 }}>
-            <div style={S.tag}>Instructions</div>
-            <h2 style={{ ...S.h2, marginTop: 16 }}>Important Information</h2>
-          </div>
+        <Fold id="instructions" open={isOpen("instructions")} onToggle={v => setSection("instructions", v)} style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}
+          header={<><div style={S.tag}>Instructions</div><h2 style={{ ...S.h2, marginTop: 16 }}>Important Information</h2></>}>
           <div style={{ maxWidth: 720, padding: "20px 24px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, fontSize: 14, color: "#ccc", lineHeight: 1.8, whiteSpace: "pre-line" }}>
             {instructions}
           </div>
-        </section>
+        </Fold>
       )}
 
       {/* ── FAQs ── */}
-      <section id="faq" style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+      <Fold id="faq" open={isOpen("faq")} onToggle={v => setSection("faq", v)} style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}
+        header={<><div style={S.tag}>FAQs</div><h2 style={{ ...S.h2, marginTop: 16 }}>Frequently Asked Questions</h2></>}>
         <div style={{ marginBottom: 40 }}>
-          <div style={S.tag}>FAQs</div>
-          <h2 style={{ ...S.h2, marginTop: 16 }}>Frequently Asked Questions</h2>
         </div>
         <div style={{ maxWidth: 760, display: "flex", flexDirection: "column", gap: 8 }}>
           {FAQS.map((faq, i) => (
@@ -670,10 +707,11 @@ export default function ItRunLandingPage() {
             </div>
           ))}
         </div>
-      </section>
+      </Fold>
 
       {/* ── Refund Policy ── */}
-      <section style={{ background: "rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.05)", padding: "clamp(2rem,4vw,3rem) clamp(1rem,4vw,3rem)" }}>
+      <Fold id="policies" open={isOpen("policies")} onToggle={v => setSection("policies", v)} style={{ background: "rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.05)", padding: "clamp(2rem,4vw,3rem) clamp(1rem,4vw,3rem)" }}
+        header={<h2 style={{ ...S.h2, fontSize: "clamp(22px,3vw,30px)", margin: 0 }}>Refund and Cancellation Policy</h2>}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 24 }}>
             <div>
@@ -690,7 +728,7 @@ export default function ItRunLandingPage() {
             </div>
           </div>
         </div>
-      </section>
+      </Fold>
 
       {/* ── Contact ── */}
       <section style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>

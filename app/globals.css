@@ -1851,3 +1851,19 @@ select.auth-input option {
     bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 16px + var(--cookie-banner-h, 0px) + var(--it-run-cta-h, 0px)) !important;
   }
 }
+
+/* Folded sections on the IT Run landing page: hide the native disclosure marker (the page draws its own +/-) and keep a visible focus ring */
+.cs-fold > summary::-webkit-details-marker { display: none; }
+.cs-fold > summary::marker { content: ""; }
+.cs-fold > summary:focus-visible { outline: 2px solid #e8620a; outline-offset: 4px; border-radius: 8px; }
+
+/* IT Run landing header: on phones the in-page links are dropped so Register and My Registrations stay on screen. Their sections are still reachable from the page. */
+@media (max-width: 479px) {
+  .it-run-nav-secondary { display: none !important; }
+  .it-run-nav-brand { display: none !important; }
+}
+
+/* The scroll cue sits over the stats on a short phone hero, so it is shown from tablet width up */
+@media (max-width: 767px) {
+  .it-run-scroll-cue { display: none !important; }
+}
