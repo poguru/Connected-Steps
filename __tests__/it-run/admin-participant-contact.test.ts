@@ -18,19 +18,22 @@ import { requireRole } from "@/lib/it-run-auth";
 import { PATCH } from "@/app/api/it-run/admin/participants/route";
 
 const CURRENT = {
-  id: "p-1", first_name: "Asha", last_name: "Rao", participant_type: "adult",
+  id: "p-1", event_id: "ev-1", first_name: "Asha", last_name: "Rao", participant_type: "adult",
   mobile: "9876543210", emergency_phone: "9123456789", dob: "1990-05-10",
 };
+const EVENT = { event_date: "2026-08-17" };
 
-function fakeDb() {
+function fakeDb(current: Record<string, unknown> = CURRENT) {
   const updates: any[] = [];
   return {
     updates,
     from(table: string) {
       const b: any = {};
+      const data = () => (table === "it_run_events" ? { ...EVENT } : { ...current });
       b.select = () => b;
       b.eq = () => b;
-      b.single = () => Promise.resolve({ data: { ...CURRENT }, error: null });
+      b.single = () => Promise.resolve({ data: data(), error: null });
+      b.maybeSingle = () => Promise.resolve({ data: data(), error: null });
       b.update = (p: any) => { if (table === "it_run_participants") updates.push(p); return b; };
       b.insert = () => Promise.resolve({ data: null, error: null });
       b.then = (res: any, rej?: any) => Promise.resolve({ data: null, error: null }).then(res, rej);
@@ -108,5 +111,51 @@ describe("PATCH /api/it-run/admin/participants: contact rules", () => {
   it("accepts a valid past date of birth", async () => {
     const res = await patch({ dob: "1988-03-15" });
     expect(res.status).toBe(200);
+  });
+});
+
+describe("PATCH /api/it-run/admin/participants: date of birth uses the registration age rules", () => {
+  it("refuses an adult who is under 18 on the event date", async () => {
+    const res = await patch({ dob: "2008-08-18" });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("at least 18");
+    expect(db.updates).toEqual([]);
+  });
+
+  it("accepts an adult who is 18 on the event date", async () => {
+    const res = await patch({ dob: "2008-08-17" });
+    expect(res.status).toBe(200);
+  });
+
+  it("refuses a child-role participant outside the 5 to 10 range on the event date", async () => {
+    db = fakeDb({ ...CURRENT, participant_type: "child", dob: "2017-01-01" });
+    (getSupabaseServer as jest.Mock).mockReturnValue(db);
+    const res = await patch({ dob: "2010-01-01" }); // 16 on the event date
+    expect(res.status).toBe(400);
+    expect(db.updates).toEqual([]);
+  });
+
+  it("accepts a child-role participant within 5 to 10 on the event date", async () => {
+    db = fakeDb({ ...CURRENT, participant_type: "child", dob: "2017-01-01" });
+    (getSupabaseServer as jest.Mock).mockReturnValue(db);
+    const res = await patch({ dob: "2017-01-01" });
+    expect(res.status).toBe(200);
+  });
+
+  it("refuses the edit when the event date cannot be read, rather than guessing", async () => {
+    db = fakeDb();
+    (getSupabaseServer as jest.Mock).mockReturnValue({
+      ...db,
+      from(table: string) {
+        if (table === "it_run_events") {
+          const b: any = { select: () => b, eq: () => b, maybeSingle: () => Promise.resolve({ data: null, error: null }), then: (r: any) => r({ data: null, error: null }) };
+          return b;
+        }
+        return db.from(table);
+      },
+    });
+    const res = await patch({ dob: "1990-01-01" });
+    expect(res.status).toBe(503);
+    expect(db.updates).toEqual([]);
   });
 });

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireRole, getClientIp } from "@/lib/it-run-auth";
 import {
-  normalizeIndianPhone, emergencyMatchesMobile, parseCalendarDate, compareCalendarDates, todayInIST, DOB_MIN_DATE,
+  normalizeIndianPhone, emergencyMatchesMobile, parseCalendarDate, todayInIST, validateDateOfBirth, formatCalendarDate,
 } from "@/lib/it-run-validation";
 
 // Fields that cannot be changed via the admin API
@@ -175,10 +175,24 @@ export async function PATCH(req: NextRequest) {
     }
   }
   if ("dob" in editable) {
-    const dob = parseCalendarDate(editable.dob);
-    if (!dob) return NextResponse.json({ error: "Please enter a valid date of birth.", field: "dob" }, { status: 400 });
-    if (compareCalendarDates(dob, DOB_MIN_DATE) < 0) return NextResponse.json({ error: "Please enter a valid date of birth.", field: "dob" }, { status: 400 });
-    if (compareCalendarDates(dob, todayInIST()) > 0) return NextResponse.json({ error: "Date of birth cannot be in the future.", field: "dob" }, { status: 400 });
+    // The same age rules as registration: adults 18+ and child-category children 5 to 10, on the event date.
+    // A child is a participant stored with the child role.
+    const { data: event } = await db
+      .from("it_run_events")
+      .select("event_date")
+      .eq("id", current.event_id as string)
+      .maybeSingle<{ event_date: string }>();
+    const eventDate = parseCalendarDate(event?.event_date);
+    if (!eventDate) {
+      return NextResponse.json({ error: "Event date is unavailable. Please try again later." }, { status: 503 });
+    }
+    const check = validateDateOfBirth(editable.dob, {
+      isChild: current.participant_type === "child",
+      eventDate,
+      today: todayInIST(),
+    });
+    if (!check.ok) return NextResponse.json({ error: check.message, field: "dob" }, { status: 400 });
+    editable.dob = formatCalendarDate(check.dob);
   }
 
   const oldValues: Record<string, unknown> = {};
