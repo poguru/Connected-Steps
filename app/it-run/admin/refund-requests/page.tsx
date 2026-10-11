@@ -45,6 +45,8 @@ interface Refundable {
 interface RequestRow {
   id: string;
   status: RequestStatus;
+  request_kind?: string;
+  requested_amount_paise?: number | null;
   request_reason: string;
   requested_by_email: string;
   decision_explanation: string | null;
@@ -150,6 +152,35 @@ function refundLabel(r: RefundRow | null | undefined): { label: string; color: s
   return { label: "Refund failed", color: STATUS_COLOR.failed };
 }
 
+// Turns the amount the admin typed (in rupees) into paise. Blank means the full amount still refundable.
+function parseRefundAmount(text: string, remaining: number): { ok: true; paise: number } | { ok: false; message: string } {
+  const typed = text.trim();
+  if (typed === "") return { ok: true, paise: remaining };
+  const rupees = Number(typed);
+  if (!Number.isFinite(rupees) || rupees <= 0) return { ok: false, message: "Enter the amount to refund in rupees." };
+  const paise = Math.round(rupees * 100);
+  if (Math.abs(rupees * 100 - paise) > 1e-6) return { ok: false, message: "Use at most two decimal places for the amount." };
+  if (paise > remaining) return { ok: false, message: `Only ${inr(remaining)} can still be refunded on this booking.` };
+  return { ok: true, paise };
+}
+
+// What executing this request refunds. An ID-failure request has a fixed amount set by the rule, which the server
+// enforces. Any other request refunds the amount the admin enters, or the full amount still refundable if left blank.
+function planFor(
+  item: { request_kind?: string; requested_amount_paise?: number | null },
+  remaining: number,
+  text: string,
+): { ok: true; paise: number; fixed: boolean } | { ok: false; message: string; fixed: boolean } {
+  if (item.request_kind === "id_failure" && item.requested_amount_paise) {
+    if (item.requested_amount_paise > remaining) {
+      return { ok: false, fixed: true, message: `Only ${inr(remaining)} can still be refunded on this booking.` };
+    }
+    return { ok: true, paise: item.requested_amount_paise, fixed: true };
+  }
+  const p = parseRefundAmount(text, remaining);
+  return p.ok ? { ok: true, paise: p.paise, fixed: false } : { ok: false, message: p.message, fixed: false };
+}
+
 // Opens a refund request for any paid registration. Creating one moves no money: it is approved and executed below.
 function NewRefundForm({ onNotice, onCreated }: { onNotice: (n: { ok: boolean; text: string }) => void; onCreated: () => void }) {
   const [code, setCode]     = useState("");
@@ -227,6 +258,7 @@ export default function RefundRequestsPage() {
   const [details, setDetails]   = useState<Record<string, DetailResponse>>({});
   const [explain, setExplain]   = useState<Record<string, string>>({});
   const [confirmed, setConfirmed] = useState<Record<string, boolean>>({});
+  const [amounts, setAmounts]   = useState<Record<string, string>>({});
   const [busy, setBusy]         = useState<string | null>(null);
   const [notice, setNotice]     = useState<{ ok: boolean; text: string } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -347,18 +379,26 @@ export default function RefundRequestsPage() {
       setNotice({ ok: false, text: "Tick the confirmation box before issuing the refund." });
       return;
     }
+    const plan = planFor(details[item.id]?.request ?? item, remaining, amounts[item.id] ?? "");
+    if (!plan.ok) {
+      setNotice({ ok: false, text: plan.message });
+      return;
+    }
+    const amountPaise = plan.paise;
     setBusy(item.id); setNotice(null);
     try {
       const res = await fetch("/api/it-run/admin/refund", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ registration_id: reg.id, request_id: item.id, confirm: true }),
+        body: JSON.stringify(plan.fixed
+          ? { registration_id: reg.id, request_id: item.id, confirm: true }
+          : { registration_id: reg.id, request_id: item.id, confirm: true, amount_paise: amountPaise }),
       });
       const d = await res.json() as { error?: string; status?: string };
       if (res.ok) {
         setNotice({ ok: true, text: d.status === "processed"
-          ? `Refund of ${inr(remaining)} completed for ${reg.registration_code}.`
-          : `Refund of ${inr(remaining)} sent to Razorpay for ${reg.registration_code}. It is processing; reconcile if it stays pending.` });
+          ? `Refund of ${inr(amountPaise)} completed for ${reg.registration_code}.`
+          : `Refund of ${inr(amountPaise)} sent to Razorpay for ${reg.registration_code}. It is processing; reconcile if it stays pending.` });
       } else {
         setNotice({ ok: false, text: d.error ?? "Refund failed" });
       }
@@ -662,6 +702,33 @@ export default function RefundRequestsPage() {
                     )}
                     {remaining > 0 ? (
                       <>
+                        {(() => {
+                          const plan = planFor(details[item.id]?.request ?? item, remaining, amounts[item.id] ?? "");
+                          if (plan.fixed) {
+                            return (
+                              <div style={{ fontSize: 12, color: "#ccc", marginBottom: 10 }}>
+                                This refund is fixed by the approved request: <strong style={{ color: "#fff" }}>{plan.ok ? inr(plan.paise) : inr(remaining)}</strong>.
+                              </div>
+                            );
+                          }
+                          return (
+                            <div style={{ marginBottom: 10 }}>
+                              <label style={{ display: "block", fontSize: 12, color: "#aaa", marginBottom: 4 }}>
+                                Amount to refund (₹). Leave blank to refund the full {inr(remaining)} still refundable.
+                              </label>
+                              <input
+                                inputMode="decimal"
+                                placeholder={String(remaining / 100)}
+                                value={amounts[item.id] ?? ""}
+                                onChange={e => setAmounts(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                style={{ ...INPUT, maxWidth: 200 }}
+                              />
+                              {!plan.ok
+                                ? <div style={{ fontSize: 12, color: "#f87171", marginTop: 4 }}>{plan.message}</div>
+                                : <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>Will refund {inr(plan.paise)}.</div>}
+                            </div>
+                          );
+                        })()}
                         <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 12, color: "#ccc", lineHeight: 1.5, marginBottom: 10 }}>
                           <input
                             type="checkbox"
@@ -669,12 +736,18 @@ export default function RefundRequestsPage() {
                             onChange={e => setConfirmed(prev => ({ ...prev, [item.id]: e.target.checked }))}
                             style={{ marginTop: 3 }}
                           />
-                          I confirm a refund of {inr(remaining)} will be sent to Razorpay for the whole booking ({reg.registration_code}), and the registration will be cancelled once Razorpay confirms it.
+                          I confirm the refund shown above will be sent to Razorpay for {reg.registration_code}.{" "}
+                          {(() => {
+                            const p = planFor(details[item.id]?.request ?? item, remaining, amounts[item.id] ?? "");
+                            return p.ok && p.paise < remaining
+                              ? "The registration stays active, and the rest of the payment is still held."
+                              : "The registration will be cancelled once Razorpay confirms it.";
+                          })()}
                         </label>
                         <button
                           onClick={() => void execute(item)}
-                          disabled={busyHere || !confirmed[item.id] || hasPending}
-                          style={BTN("#fb923c", busyHere || !confirmed[item.id] || hasPending)}
+                          disabled={busyHere || !confirmed[item.id] || hasPending || !planFor(details[item.id]?.request ?? item, remaining, amounts[item.id] ?? "").ok}
+                          style={BTN("#fb923c", busyHere || !confirmed[item.id] || hasPending || !planFor(details[item.id]?.request ?? item, remaining, amounts[item.id] ?? "").ok)}
                         >
                           {busyHere ? "Processing…" : latestFailed ? "Retry refund" : "Issue refund"}
                         </button>

@@ -294,6 +294,20 @@ describe("POST /api/it-run/admin/refund", () => {
     const processed = calls.find(c => c.table === "it_run_refunds" && c.payload?.status === "processed");
     expect(processed?.filters).toMatchObject({ id: "refund-1", status: "pending" });
   });
+
+  it("issues a partial refund for the amount the admin chose, and the registration stays active", async () => {
+    mockRazorpay.mockResolvedValue({ id: "rfnd_2", status: "processed", amount: 40000 });
+    const { db, calls } = fakeDb(adminHandlers());
+    mockDb.mockReturnValue(db);
+
+    const res = await adminRefundPost(req("http://t/api/it-run/admin/refund", { ...body, amount_paise: 40000 }));
+
+    expect(res.status).toBe(200);
+    expect(mockRazorpay.mock.calls[0][1].amount).toBe(40000);
+    // Only a full refund cancels the registration; a partial one leaves it active
+    const regCancel = calls.find(c => c.table === "it_run_registrations" && c.payload?.registration_status === "cancelled");
+    expect(regCancel).toBeUndefined();
+  });
 });
 
 // ── Participant request ────────────────────────────────────────────────────────
