@@ -2668,12 +2668,9 @@ function RegisterPageContent() {
     }
   }
 
-  // ── Second category in the same checkout (stage 3) ──────────────────────────
-  // Only for the accounts listed in NEXT_PUBLIC_ITRUN_MULTI_CATEGORY_EMAILS. The server still checks every
-  // registration and prices each one itself.
-  const multiCategoryEmails = (process.env.NEXT_PUBLIC_ITRUN_MULTI_CATEGORY_EMAILS ?? "")
-    .split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
-  const canAddCategory = !!verifiedEmail && multiCategoryEmails.includes(verifiedEmail.trim().toLowerCase());
+  // ── Second category in the same checkout ──────────────────────────────────
+  // Open to every verified participant. The server checks and prices each registration itself.
+  const canAddCategory = !!verifiedEmail;
 
   // Keeps the registration just submitted and starts the form again for another category
   function startAnotherCategory() {
