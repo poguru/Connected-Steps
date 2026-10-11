@@ -26,9 +26,9 @@ const FAQS = [
   { q: "Can I run if I am not physically fit?", a: "Absolutely! The 5K Fun Run and Parent & Child Duo are designed for all fitness levels. Start walking, start running - the community spirit is what matters." },
   { q: "When will I receive my race BIB?", a: "Race BIBs are collected at designated collection counters on February 4-6, 2027. You can book your preferred time slot from your participant dashboard after payment confirmation." },
   { q: "Is parking available at the venue?", a: "Yes, parking is available at Hyderabad Central University. We recommend arriving early. Public transport and ride-sharing options are also convenient to the venue." },
-  { q: "What is the refund policy?", a: "Registrations are non-refundable, except the price difference when you move to a lower-priced category. Transfers to another participant are allowed until January 31, 2027. Requests must be emailed to info@connectedsteps.in with the new participant's details." },
+  { q: "What is the refund policy?", a: "Registrations are final, and participants cannot cancel or request refunds online. Refunds, if applicable under exceptional circumstances or applicable law, are handled only by the Connected Steps administration team after review and approval. No refunds are given for a move to a lower-priced category." },
   { q: "Will there be water stations and medical support?", a: "Yes. Water stations are set up every 2.5 KM on the 10K route and every 2 KM on the 5K route. Qualified medical support including first-aid teams and an ambulance will be on standby." },
-  { q: "Can I upgrade my category after registration?", a: "Category upgrades (e.g. 5K to 10K) are allowed until January 28, 2027 by paying the price difference. Email us at info@connectedsteps.in to request an upgrade." },
+  { q: "Can I upgrade my category after registration?", a: "Category changes may be requested until January 15, 2027, subject to category availability and administrative approval. An upgrade (e.g. 5K to 10K) requires paying the price difference before the change is confirmed. Email info@connectedsteps.in to request a change." },
 ];
 
 const SCHEDULE = [
@@ -716,15 +716,15 @@ export default function ItRunLandingPage() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 24 }}>
             <div>
               <div style={{ fontSize: 12, color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Refund Policy</div>
-              <div style={{ fontSize: 14, color: "#888", lineHeight: 1.7 }}>Registrations are non-refundable, except the price difference when you move to a lower-priced category. Transfers to another participant are allowed until January 31, 2027. Email info@connectedsteps.in to request a transfer.</div>
+              <div style={{ fontSize: 14, color: "#888", lineHeight: 1.7 }}>Registrations are final, and participants cannot cancel or request refunds online. Refunds, if applicable under exceptional circumstances or applicable law, are handled only by the Connected Steps administration team after review and approval. No refunds are given for a move to a lower-priced category.</div>
             </div>
             <div>
               <div style={{ fontSize: 12, color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Event Cancellation</div>
-              <div style={{ fontSize: 14, color: "#888", lineHeight: 1.7 }}>In case of event cancellation due to unforeseen circumstances, full refunds will be processed within 7-10 business days to the original payment method.</div>
+              <div style={{ fontSize: 14, color: "#888", lineHeight: 1.7 }}>If the organizer cancels, postpones, or materially changes the event, Connected Steps will communicate the applicable arrangements, subject to applicable law.</div>
             </div>
             <div>
               <div style={{ fontSize: 12, color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Category Transfer</div>
-              <div style={{ fontSize: 14, color: "#888", lineHeight: 1.7 }}>Category upgrades are allowed until January 28, 2027 by paying the price difference. Downgrades are allowed, and the price difference is refunded after review.</div>
+              <div style={{ fontSize: 14, color: "#888", lineHeight: 1.7 }}>Category changes may be requested until 15 January 2027, subject to availability and administrative approval. Upgrades require the price difference to be paid before the change is confirmed. Downgrades may be permitted with administrative approval, but the price difference is not refunded. Category changes are not permitted after 15 January 2027.</div>
             </div>
           </div>
         </div>

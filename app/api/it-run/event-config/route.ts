@@ -147,7 +147,7 @@ export async function GET() {
       },
       {
         heading: "Refund Policy",
-        body: "Registrations are non-refundable. Transfers to another participant are allowed until January 31, 2027. Email info@connectedsteps.in with the new participant's details.",
+        body: "Registrations are final, and participants cannot cancel or request refunds online. Refunds, if applicable under exceptional circumstances or applicable law, are handled exclusively by the Connected Steps administration team after review and approval. No refunds are given for a move to a lower-priced category. Category changes may be requested until 15 January 2027, subject to availability and administrative approval; upgrades require the price difference to be paid first, and downgrades are not refunded. Email info@connectedsteps.in for questions.",
       },
       {
         heading: "Age Requirement",
