@@ -18,7 +18,7 @@ type Participant = {
   id: string; first_name: string; last_name: string;
   participant_type: string; tshirt_size: string | null;
   bib_number: string | null; wave: string | null;
-  mobile: string; email: string | null; verification_status: string;
+  mobile: string; email: string | null; verification_status: string; id_document_type: string | null;
   it_run_registrations: {
     id: string; registration_code: string; payment_status: string;
     registration_status: string;
@@ -126,6 +126,27 @@ function ScanTab() {
       refreshParticipant();
     } else {
       showToast(data.error ?? "Failed", false);
+    }
+  }
+
+  // A government-ID participant whose IT employment is not verified on collection day: 80% is refunded (20% kept),
+  // or the participant runs without a timing chip instead (a BIB decision, not a refund). The admin records the reason;
+  // the refund is then approved and executed on the refund requests page.
+  async function recordBibIdFailure() {
+    if (!participant) return;
+    const reason = window.prompt("Reason for recording this (kept on the audit trail, at least 10 characters):")?.trim() ?? "";
+    if (reason.length < 10) { showToast("A reason of at least 10 characters is required", false); return; }
+    setBibLoading(true);
+    const res = await fetch("/api/it-run/admin/id-failure", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ participant_id: participant.id, stage: "bib_collection", reason }),
+    });
+    const data = await res.json().catch(() => ({})) as { error?: string; refundPaise?: number };
+    setBibLoading(false);
+    if (res.ok) {
+      showToast(`Refund request recorded: ₹${((data.refundPaise ?? 0) / 100).toLocaleString("en-IN")}. Approve it on the refund requests page.`, true);
+    } else {
+      showToast(data.error ?? "Could not record", false);
     }
   }
 
@@ -292,6 +313,13 @@ function ScanTab() {
                 color={GREEN} disabled={bibDone} loading={bibLoading}
                 onClick={collectBib}
               />
+              {p.id_document_type === "government" && !bibDone && p.it_run_registrations.registration_status !== "cancelled" && (
+                <ActionBtn
+                  label="IT employment not verified (refund 80%)"
+                  color="#ef4444" disabled={bibLoading} loading={false}
+                  onClick={recordBibIdFailure}
+                />
+              )}
               {p.tshirt_size && (
                 <ActionBtn
                   label={tshirtDone ? `T-Shirt Issued (${p.tshirt_size})` : `Issue T-Shirt (${p.tshirt_size})`}

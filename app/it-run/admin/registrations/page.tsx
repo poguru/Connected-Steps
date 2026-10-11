@@ -43,7 +43,7 @@ const PAY_COLOR: Record<string, string> = {
   pending: "#f59e0b", failed: "#ef4444",
 };
 const REG_COLOR: Record<string, string> = {
-  active: GREEN, cancelled: "#ef4444",
+  active: GREEN, cancelled: "#ef4444", pending_verification: "#6366f1",
 };
 const VER_COLOR: Record<string, string> = {
   verified:           GREEN,    pending: "#f59e0b",
@@ -618,6 +618,7 @@ export default function RegistrationsPage() {
           <select style={INPUT} value={regStatus} onChange={e => { setRegStatus(e.target.value); setPage(0); }}>
             <option value="">All Status</option>
             <option value="active">Active</option>
+            <option value="pending_verification">Awaiting ID verification</option>
             <option value="cancelled">Cancelled</option>
           </select>
           <select style={INPUT} value={catFilter} onChange={e => { setCatFilter(e.target.value); setPage(0); }}>
@@ -664,6 +665,7 @@ export default function RegistrationsPage() {
                       </code>
                       <StatusChip label={reg.payment_status} color={pc} />
                       {isCancelled && <StatusChip label="cancelled" color={rc} />}
+                      {reg.registration_status === "pending_verification" && <StatusChip label="awaiting ID" color={rc} />}
                       <span style={{ fontSize: 12, color: reg.it_run_categories?.color ?? "#888", fontWeight: 600 }}>
                         {reg.it_run_categories?.name ?? "—"}
                       </span>

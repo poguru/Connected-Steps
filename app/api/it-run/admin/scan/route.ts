@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
     .select(`
       id, first_name, last_name, participant_type,
       tshirt_size, bib_number, wave, mobile, email,
-      verification_status,
+      verification_status, id_document_type,
       it_run_registrations!inner (
         id, registration_code, payment_status, registration_status,
         it_run_categories ( id, name, distance_km, color )

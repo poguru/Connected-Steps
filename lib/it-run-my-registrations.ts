@@ -197,9 +197,9 @@ export function canOfferCategoryChange(reg: Pick<MyRegistration, "payment_status
   return reg.registration_status === "active" && (reg.payment_status === "paid" || reg.payment_status === "free");
 }
 
-/** A refund can be requested only for an active paid registration with an amount still held. */
+/** A refund can be requested for a paid registration with an amount still held, whether it is confirmed or still awaiting ID verification. An admin approves every request. */
 export function canRequestRefund(reg: Pick<MyRegistration, "payment_status" | "registration_status" | "final_price">): boolean {
-  return reg.registration_status === "active" && reg.final_price > 0 &&
+  return (reg.registration_status === "active" || reg.registration_status === "pending_verification") && reg.final_price > 0 &&
     (reg.payment_status === "paid" || reg.payment_status === "partially_refunded");
 }
 
