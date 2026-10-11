@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { isDashboardPayload, classifyDashboardFailure, DASHBOARD_FAILURE_MESSAGES, type DashboardFailureKind } from "@/lib/it-run-dashboard";
+import { dashboardScreen, isDashboardPayload, classifyDashboardFailure, DASHBOARD_FAILURE_MESSAGES, type DashboardFailureKind } from "@/lib/it-run-dashboard";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -280,7 +280,9 @@ export default function DashboardPage() {
     setAttempt(a => a + 1);
   }
 
-  if (loading) return (
+  const screen = dashboardScreen({ hasData: !!data, loading, failure });
+
+  if (screen === "loading") return (
     <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ textAlign: "center", color: "#888" }}>
         <div style={{ fontSize: 24, marginBottom: 8 }}>...</div>
@@ -289,7 +291,7 @@ export default function DashboardPage() {
     </div>
   );
 
-  if (failure || !data) return (
+  if (screen === "error_page" || !data) return (
     <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div role="alert" style={{ textAlign: "center", maxWidth: 420 }}>
         <div style={{ fontSize: 15, color: "#f87171", marginBottom: 20, lineHeight: 1.6 }}>
@@ -348,6 +350,15 @@ export default function DashboardPage() {
             <StatusBadge status={reg.payment_status} />
           </div>
         </div>
+
+        {screen === "content_with_refresh_error" && (
+          <div role="alert" style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 12, padding: 14, marginBottom: 20, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 200, fontSize: 13, color: "#fca5a5", lineHeight: 1.5 }}>
+              {DASHBOARD_FAILURE_MESSAGES[failure ?? "SERVER_ERROR"]}
+            </div>
+            <button onClick={retry} style={{ ...S.btn, background: ACCENT, color: "#fff" }}>Try again</button>
+          </div>
+        )}
 
         {/* Paid, but waiting for an admin to verify the ID of every adult. Confirmed after that. */}
         {paid && reg.registration_status === "pending_verification" && (
@@ -508,7 +519,7 @@ export default function DashboardPage() {
                   )}
 
                   {/* BIB slot booking */}
-                  {paid && !isCollected && bibSlots.length > 0 && (
+                  {paid && reg.registration_status === "active" && !isCollected && bibSlots.length > 0 && (
                     <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 16 }}>
                       <div style={{ fontSize: 12, color: "#fff", fontWeight: 700, marginBottom: 12 }}>BIB Collection Slot</div>
                       <BibSlotBooker

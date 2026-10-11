@@ -83,3 +83,15 @@ export function classifyDashboardFailure(status: number, body: unknown): Dashboa
   if (status >= 500 || code === "SERVER_ERROR") return "SERVER_ERROR";
   return "INVALID_RESPONSE";
 }
+
+/**
+ * What the dashboard shows. A reload that fails after the dashboard has loaded keeps the loaded content on screen and
+ * adds a notice. Only a first load that fails replaces the page with the error.
+ */
+export type DashboardScreen = "loading" | "error_page" | "content" | "content_with_refresh_error";
+
+export function dashboardScreen(state: { hasData: boolean; loading: boolean; failure: DashboardFailureKind | null }): DashboardScreen {
+  if (state.hasData) return state.failure ? "content_with_refresh_error" : "content";
+  if (state.loading) return "loading";
+  return state.failure ? "error_page" : "loading";
+}

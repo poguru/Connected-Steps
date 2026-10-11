@@ -4,6 +4,15 @@ import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 import { verifyDashboardToken } from "@/lib/it-run-dashboard-link";
 import { randomUUID } from "crypto";
 
+// A transient database error (a dropped connection, a timeout) is retried once before the dashboard reports a failure.
+// A query that returns no rows is not an error and is not retried.
+async function withRetry<T extends { error: unknown }>(run: () => PromiseLike<T>): Promise<T> {
+  const first = await run();
+  if (!first.error) return first;
+  await new Promise(resolve => setTimeout(resolve, 150));
+  return run();
+}
+
 // GET /api/it-run/dashboard/[code]
 // [code] is either a signed dashboard token (from the email or registration page) or a plain
 // registration code. Access:
@@ -52,7 +61,7 @@ async function handleDashboard(
   const db = getSupabaseServer();
 
   // Fetch registration. maybeSingle: zero rows = not found; a query error is a server failure (500), not a 404.
-  const { data: reg, error: regErr } = await db
+  const { data: reg, error: regErr } = await withRetry(() => db
     .from("it_run_registrations")
     .select(`
       id, registration_code, lead_email, participant_count,
@@ -71,7 +80,7 @@ async function handleDashboard(
       linked_user_email: string | null;
       it_run_categories: { id: string; slug: string; name: string; distance_km: number; category_type: string; color: string; includes_timing: boolean; includes_medal: boolean } | null;
       it_run_events: { id: string; title: string; event_date: string; report_time: string | null; flag_off_time: string | null; venue_name: string | null; venue_address: string | null; city: string | null } | null;
-    }>();
+    }>());
 
   if (regErr) {
     stageFailure(rid, "registration_query", regErr);
@@ -125,7 +134,7 @@ async function handleDashboard(
   }
 
   // Fetch participants
-  const { data: participants, error: participantsErr } = await db
+  const { data: participants, error: participantsErr } = await withRetry(() => db
     .from("it_run_participants")
     .select(`
       id, participant_type, qr_token, first_name, last_name, gender, email, mobile,
@@ -135,7 +144,7 @@ async function handleDashboard(
       it_run_bib_collections ( id, collected_at ),
       it_run_checkins ( id, checked_in_at )
     `)
-    .eq("registration_id", reg.id);
+    .eq("registration_id", reg.id));
 
   if (participantsErr || !participants) {
     stageFailure(rid, "participants_query", participantsErr ?? null);
@@ -143,13 +152,13 @@ async function handleDashboard(
   }
 
   // Available BIB slots (for booking)
-  const { data: bibSlots, error: bibSlotsErr } = await db
+  const { data: bibSlots, error: bibSlotsErr } = await withRetry(() => db
     .from("it_run_bib_slots")
     .select("id,location_name,location_address,slot_date,start_time,end_time,capacity,booked_count")
     .eq("event_id", reg.it_run_events?.id ?? "")
     .eq("is_active", true)
     .order("slot_date")
-    .order("start_time");
+    .order("start_time"));
 
   if (bibSlotsErr || !bibSlots) {
     stageFailure(rid, "bib_slots_query", bibSlotsErr ?? null);

@@ -1,83 +1,124 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { randomUUID } from "crypto";
 
 // POST /api/it-run/bib-booking
 // Body: { participantId, slotId, registrationCode }
 // registrationCode is REQUIRED — it is the ownership proof that ties this request
 // to the caller's registration. Without it, any caller knowing a participantId
 // (which is discoverable via the public dashboard API) could book any participant's slot.
-// Uses atomic SQL function to prevent overbooking.
+// Uses an atomic SQL function (itr_book_bib_slot) to prevent overbooking.
+//
+// Retry-safe: a participant who already holds a confirmed booking gets that booking back (no second booking, no
+// capacity change). A database error is reported as an error with a retry, never as "not confirmed".
+//
+// Slots open once the registration is confirmed (paid AND every adult's ID verified). A registration that is still
+// awaiting verification gets 409 REGISTRATION_PENDING.
+const SLOT_COLUMNS = "location_name,location_address,slot_date,start_time,end_time";
+
+type Log = (stage: string, extra?: Record<string, unknown>) => void;
+
 export async function POST(req: NextRequest) {
+  const rid = randomUUID();
+  const log: Log = (stage, extra = {}) => console.log(JSON.stringify({ src: "it-run-bib-booking", rid, stage, ...extra }));
+  const fail = (status: number, body: Record<string, unknown>, stage: string, extra: Record<string, unknown> = {}) => {
+    log(stage, { status, ...extra });
+    return NextResponse.json({ ...body, requestId: rid }, { status, headers: { "x-request-id": rid } });
+  };
+
+  let body: { participantId?: string; slotId?: string; registrationCode?: string };
   try {
-    const { participantId, slotId, registrationCode } = await req.json() as { participantId: string; slotId: string; registrationCode?: string };
-    if (!participantId || !slotId) return NextResponse.json({ error: "participantId and slotId required" }, { status: 400 });
-    if (!registrationCode) return NextResponse.json({ error: "registrationCode required" }, { status: 400 });
-
-    const db = getSupabaseServer();
-
-    // Verify participant exists + registration is paid/free
-    const { data: part } = await db
-      .from("it_run_participants")
-      .select("id, registration_id, first_name, last_name, email")
-      .eq("id", participantId)
-      .single();
-
-    if (!part) return NextResponse.json({ error: "Participant not found" }, { status: 404 });
-
-    const { data: reg } = await db
-      .from("it_run_registrations")
-      .select("payment_status, registration_code")
-      .eq("id", part.registration_id)
-      .single();
-
-    if (!reg || !["paid","free"].includes(reg.payment_status)) {
-      return NextResponse.json({ error: "Registration not confirmed" }, { status: 400 });
-    }
-
-    // Ownership check: registrationCode must match if provided (prevents IDOR)
-    if (registrationCode && reg.registration_code !== registrationCode) {
-      return NextResponse.json({ error: "Participant not found" }, { status: 404 });
-    }
-
-    // Atomic booking via RPC
-    const { data: result, error: rpcErr } = await db
-      .rpc("itr_book_bib_slot", { p_participant_id: participantId, p_slot_id: slotId });
-
-    if (rpcErr) {
-      console.error("[it-run/bib-booking] RPC error:", rpcErr.message);
-      return NextResponse.json({ error: "Booking failed" }, { status: 500 });
-    }
-
-    if (result === "full") return NextResponse.json({ error: "This slot is fully booked" }, { status: 409 });
-    if (result === "slot_not_found") return NextResponse.json({ error: "Slot not found" }, { status: 404 });
-    if (result === "already_booked") return NextResponse.json({ ok: true, already: true, message: "Already booked a slot" });
-
-    // Fetch slot details for confirmation
-    const { data: slot } = await db
-      .from("it_run_bib_slots")
-      .select("location_name,location_address,slot_date,start_time,end_time")
-      .eq("id", slotId)
-      .single();
-
-    // Send confirmation notification (fire-and-forget)
-    if (part.email && slot) {
-      import("@/lib/notify").then(({ sendEmail }) =>
-        sendEmail(
-          part.email!,
-          `${part.first_name} ${part.last_name}`,
-          "BIB Collection Slot Confirmed - The IT Run Sprint-2",
-          buildSlotConfirmEmail(`${part.first_name} ${part.last_name}`, slot),
-          false,
-          true,
-        ).catch(e => console.error("[it-run/bib-booking] email error:", e))
-      ).catch(() => {});
-    }
-
-    return NextResponse.json({ ok: true, slot });
-  } catch (e: unknown) {
-    console.error("[it-run/bib-booking] error:", e);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    body = await req.json();
+  } catch {
+    return fail(400, { error: "Invalid request" }, "bad_json");
   }
+  const { participantId, slotId, registrationCode } = body;
+  if (!participantId || !slotId) return fail(400, { error: "participantId and slotId required" }, "missing_fields");
+  if (!registrationCode) return fail(400, { error: "registrationCode required" }, "missing_code");
+
+  const db = getSupabaseServer();
+
+  const { data: part, error: partErr } = await db
+    .from("it_run_participants")
+    .select("id, registration_id, first_name, last_name, email")
+    .eq("id", participantId)
+    .maybeSingle<{ id: string; registration_id: string; first_name: string; last_name: string; email: string | null }>();
+  if (partErr) {
+    return fail(500, { error: "We couldn't book your slot right now. Your registration is unchanged. Please try again." }, "participant_query", { dbCode: partErr.code ?? null });
+  }
+  if (!part) return fail(404, { error: "Participant not found" }, "participant_missing");
+
+  const { data: reg, error: regErr } = await db
+    .from("it_run_registrations")
+    .select("id, payment_status, registration_status, registration_code")
+    .eq("id", part.registration_id)
+    .maybeSingle<{ id: string; payment_status: string; registration_status: string; registration_code: string }>();
+  if (regErr) {
+    return fail(500, { error: "We couldn't book your slot right now. Your registration is unchanged. Please try again." }, "registration_query", { dbCode: regErr.code ?? null });
+  }
+  // Ownership check: the registration code must match (prevents IDOR). A mismatch looks like a missing participant.
+  if (!reg || reg.registration_code !== registrationCode) return fail(404, { error: "Participant not found" }, "ownership_mismatch");
+
+  log("registration_state", { registrationId: reg.id, paymentStatus: reg.payment_status, registrationStatus: reg.registration_status });
+  if (reg.registration_status === "cancelled") return fail(400, { error: "This registration is cancelled." }, "cancelled");
+  if (!["paid", "free"].includes(reg.payment_status)) return fail(400, { error: "Registration not confirmed" }, "unpaid");
+  if (reg.registration_status !== "active") {
+    return fail(409, {
+      error: "Your BIB collection slot can be booked once your ID is verified and your registration is confirmed.",
+      code: "REGISTRATION_PENDING",
+    }, "awaiting_verification");
+  }
+
+  // Atomic booking. Returns confirmed | already_booked | full | slot_not_found.
+  const { data: result, error: rpcErr } = await db.rpc("itr_book_bib_slot", { p_participant_id: participantId, p_slot_id: slotId });
+  if (rpcErr) {
+    return fail(500, { error: "We couldn't book that slot. Your registration is unchanged, so please try again." }, "rpc_error", { dbCode: rpcErr.code ?? null });
+  }
+  log("rpc_result", { slotId, result });
+
+  if (result === "full") return fail(409, { error: "This slot is fully booked. Please choose another slot." }, "full", { slotId });
+  if (result === "slot_not_found") return fail(404, { error: "Slot not found" }, "slot_not_found", { slotId });
+
+  // Slot details for the response and the confirmation email. For a retry, the slot the participant already holds.
+  let bookedSlotId = slotId;
+  if (result === "already_booked") {
+    const { data: existing } = await db
+      .from("it_run_bib_bookings")
+      .select("slot_id")
+      .eq("participant_id", participantId)
+      .eq("status", "confirmed")
+      .maybeSingle<{ slot_id: string }>();
+    bookedSlotId = existing?.slot_id ?? slotId;
+  }
+  const { data: slot, error: slotErr } = await db
+    .from("it_run_bib_slots")
+    .select(SLOT_COLUMNS)
+    .eq("id", bookedSlotId)
+    .maybeSingle<{ location_name: string; location_address: string | null; slot_date: string; start_time: string; end_time: string }>();
+  if (slotErr) log("slot_detail_error", { dbCode: slotErr.code ?? null });
+
+  if (result === "already_booked") {
+    log("already_booked", { slotId: bookedSlotId });
+    return NextResponse.json({ ok: true, already: true, message: "Already booked a slot", slot: slot ?? null, requestId: rid }, { headers: { "x-request-id": rid } });
+  }
+
+  log("booked", { slotId: bookedSlotId });
+
+  // Confirmation email (fire-and-forget; a failed email never undoes the booking)
+  if (part.email && slot) {
+    import("@/lib/notify").then(({ sendEmail }) =>
+      sendEmail(
+        part.email!,
+        `${part.first_name} ${part.last_name}`,
+        "BIB Collection Slot Confirmed - The IT Run Sprint-2",
+        buildSlotConfirmEmail(`${part.first_name} ${part.last_name}`, slot),
+        false,
+        true,
+      ).catch(e => console.error("[it-run/bib-booking] email error:", e))
+    ).catch(() => {});
+  }
+
+  return NextResponse.json({ ok: true, slot, requestId: rid }, { headers: { "x-request-id": rid } });
 }
 
 function buildSlotConfirmEmail(name: string, slot: { location_name: string; location_address: string | null; slot_date: string; start_time: string; end_time: string }): string {
