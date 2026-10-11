@@ -1,19 +1,17 @@
 /**
  * Company ID choice and identity-verification status for The IT Run Sprint-2.
  *
- * A participant either uploads an ID (faster BIB collection, once an admin approves it) or continues
- * without one (standard identity checks at BIB collection). Neither choice blocks registration or payment.
+ * Every adult uploads a company ID or a government-issued photo ID to register. The ID is verified by an admin, and
+ * the registration is confirmed only after that verification (payment comes first).
  *
- * Identity verification is a separate state from registration and payment. Values:
- *   not_provided       no document uploaded; standard checks at BIB collection (not a failure)
+ * Identity verification is a separate state from payment. Values:
+ *   not_provided       no document on file (legacy registrations made before the upload was required)
  *   pending            document uploaded, waiting for admin review
  *   verified           admin approved the document
  *   rejected           admin rejected the document; the participant can resubmit
  *   need_clarification admin asked for more information
  * Children in a kid category are exempt from document checks and are recorded as verified.
  */
-
-export type IdChoice = "upload" | "skip";
 
 export type IdVerificationStatus = "not_provided" | "pending" | "verified" | "rejected" | "need_clarification";
 
@@ -36,19 +34,13 @@ export function initialVerificationStatus(isChild: boolean, companyIdUrl: unknow
 }
 
 /**
- * Client-side check of the company step. Children are exempt. An adult must make a choice, and
- * "upload" needs a finished upload. "skip" never needs anything.
+ * Every adult must upload a company ID or a government-issued photo ID before the registration can be made.
+ * Children are exempt. The admin verifies the document before the registration is confirmed.
  * Returns an error message, or null when the step can continue.
  */
-export function idChoiceError(
-  participant: { idChoice?: IdChoice | null; companyIdUrl?: string | null },
-  isChild: boolean,
-): string | null {
+export function idUploadError(companyIdUrl: unknown, isChild: boolean): string | null {
   if (isChild) return null;
-  if (!participant.idChoice) return "Choose Upload ID or Continue Without ID.";
-  if (participant.idChoice === "upload" && !isStoredDocumentPath(participant.companyIdUrl)) {
-    return "Upload your ID, or choose Continue Without ID.";
-  }
+  if (!isStoredDocumentPath(companyIdUrl)) return "Upload a company ID or a government-issued photo ID to continue.";
   return null;
 }
 

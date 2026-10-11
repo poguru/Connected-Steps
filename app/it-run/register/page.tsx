@@ -10,7 +10,7 @@ import {
   normalizeIndianPhone, normalizeIndianPhoneInput, emergencyMatchesMobile, formatCalendarDate,
 } from "@/lib/it-run-validation";
 import { decideUrlCategory, startsNewRegistration } from "@/lib/it-run-category-selection";
-import { idChoiceError, isStoredDocumentPath } from "@/lib/it-run-id-verification";
+import { idUploadError, isStoredDocumentPath } from "@/lib/it-run-id-verification";
 import { IssueReportButton } from "@/components/ui/BugReportFab";
 import { checkPersonName, checkBibName, bibNameHint } from "@/lib/it-run-name-validation";
 import { draftKeyOf, saveStatusFor, createMoveGate } from "@/lib/it-run-step-save";
@@ -36,8 +36,6 @@ interface Participant {
   bloodGroup: string; emergencyName: string; emergencyPhone: string;
   companyName: string; employeeId: string;
   companyIdFile: File | null; companyIdUrl: string;
-  /** "upload" = the participant will upload an ID for faster BIB collection; "skip" = continue without an ID. */
-  idChoice?: "upload" | "skip";
   /** When an ID is uploaded: a company ID (default) or a government-issued ID */
   idDocType?: "company" | "government";
   tshirtSize: string; medicalConditions: string; foodPreference: string;
@@ -1024,8 +1022,7 @@ function StepCompany({
         Company Verification
       </h2>
       <p style={{ fontSize: 13, color: "#555", marginBottom: 20 }}>
-        Upload your company ID to skip physical verification at BIB collection.
-        This step is <span style={{ color: "#aaa" }}>optional</span> — you can always bring your ID on the day.
+        Upload a company ID or a government-issued photo ID for each adult. This is required to complete your registration.
       </p>
 
       <div style={{
@@ -1051,50 +1048,11 @@ function StepCompany({
               {label} — {p.companyName || "Company not specified"}
             </div>
 
-            {/* Two explicit choices. Neither blocks registration or payment. */}
+            {/* An ID is required: a company or government-issued photo ID, verified by an admin before confirmation. */}
             {(() => {
-              const choice = p.idChoice ?? (uploaded ? "upload" : null);
-              const option = (active: boolean): React.CSSProperties => ({
-                flex: "1 1 220px", textAlign: "left" as const, padding: 14, borderRadius: 12, cursor: "pointer",
-                fontFamily: "inherit", color: "#fff",
-                background: active ? `${ACCENT}14` : "rgba(255,255,255,0.02)",
-                border: `1px solid ${active ? ACCENT : "rgba(255,255,255,0.1)"}`,
-              });
+              const choice = "upload" as const;
               return (
                 <>
-                  <div role="radiogroup" aria-label={`Identity document choice for ${label}`}
-                    style={{ display: "flex", gap: 10, flexWrap: "wrap" as const, marginBottom: 12 }}>
-                    <button type="button" role="radio" aria-checked={choice === "upload"}
-                      onClick={() => onChange(idx, "idChoice", "upload")} style={option(choice === "upload")}>
-                      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
-                        {choice === "upload" ? "✓ " : ""}Upload ID
-                      </div>
-                      <div style={{ fontSize: 12, color: "#999", lineHeight: 1.5 }}>
-                        Verify your identity in advance for a smoother BIB collection experience. Your document will be reviewed by the event admin.
-                      </div>
-                    </button>
-                    <button type="button" role="radio" aria-checked={choice === "skip"}
-                      onClick={() => {
-                        onChange(idx, "idChoice", "skip");
-                        onChange(idx, "companyIdUrl", "");
-                        onChange(idx, "companyIdFile", null);
-                      }}
-                      style={option(choice === "skip")}>
-                      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
-                        {choice === "skip" ? "✓ " : ""}Continue Without ID
-                      </div>
-                      <div style={{ fontSize: 12, color: "#999", lineHeight: 1.5 }}>
-                        You can complete your registration without uploading an ID. Standard identity checks may apply during BIB collection.
-                      </div>
-                    </button>
-                  </div>
-
-                  {choice === "skip" && (
-                    <div style={{ fontSize: 12, color: "#888", lineHeight: 1.6, padding: "10px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8 }}>
-                      You are continuing without an ID. You will not get the fast-track BIB process. The standard identity check applies at collection.
-                    </div>
-                  )}
-
                   {choice === "upload" && (
                     <div role="radiogroup" aria-label={`Type of ID for ${label}`}
                       style={{ display: "flex", gap: 8, flexWrap: "wrap" as const, marginBottom: 12 }}>
@@ -1153,7 +1111,7 @@ function StepCompany({
                           <div style={{ fontSize: 14, color: "#ccc", fontWeight: 600 }}>Choose your company ID file</div>
                           <div style={{ fontSize: 11, color: "#666" }}>JPG, PNG, WEBP or PDF · max 5 MB</div>
                           {errored && (
-                            <div role="alert" style={{ fontSize: 12, color: "#f87171", marginTop: 4 }}>Upload failed. Please try again, or choose Continue Without ID.</div>
+                            <div role="alert" style={{ fontSize: 12, color: "#f87171", marginTop: 4 }}>Upload failed. Please try again.</div>
                           )}
                         </>
                       )}
@@ -1177,7 +1135,7 @@ function StepCompany({
         ...CARD_BASE, padding: 14, marginBottom: 24,
         fontSize: 12, color: "#777", lineHeight: 1.7,
       }}>
-        Either choice completes your registration. Identity checks happen at BIB collection in both cases.
+        Your ID is checked by an admin. Your registration is confirmed once the ID is verified.
       </div>
 
       {idError && (
@@ -2452,14 +2410,14 @@ function RegisterPageContent() {
     });
   }
 
-  // Company step: every adult must choose Upload ID or Continue Without ID. Neither blocks registration.
+  // Company step: every adult must upload a company or government-issued ID before continuing.
   function handleCompanyNext() {
     setCompanyError("");
     for (let idx = 0; idx < participants.length; idx++) {
       const isChild = selectedCat?.participant_labels[idx]?.is_child ?? false;
       // A draft saved before this choice existed: an uploaded document means "upload"
       const p = participants[idx];
-      const err = idChoiceError({ ...p, idChoice: p.idChoice ?? (isStoredDocumentPath(p.companyIdUrl) ? "upload" : undefined) }, isChild);
+      const err = idUploadError(p.companyIdUrl, isChild);
       if (err) {
         const label = selectedCat?.participant_labels[idx]?.label ?? `Participant ${idx + 1}`;
         setCompanyError(`${label}: ${err}`);

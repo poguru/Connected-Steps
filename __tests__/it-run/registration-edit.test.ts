@@ -83,7 +83,7 @@ function adult(overrides: Record<string, unknown> = {}) {
     id: P1, type: "solo", firstName: "Asha", lastName: "Rao", bibName: "Asha Rao",
     gender: "F", dob: "1990-05-10", email: "asha@example.com", mobile: "9876543210",
     bloodGroup: "O+", emergencyName: "Ravi", emergencyPhone: "9123456789",
-    companyName: "Acme", employeeId: "E1", companyIdUrl: "", tshirtSize: "M",
+    companyName: "Acme", employeeId: "E1", companyIdUrl: "1760000000000-doc1.jpg", tshirtSize: "M",
     medicalConditions: "", foodPreference: "veg", ...overrides,
   };
 }

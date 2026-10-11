@@ -9,7 +9,7 @@ import { buildDashboardUrl } from "@/lib/it-run-dashboard-link";
 import { hashDraftToken, isWellFormedDraftToken } from "@/lib/it-run-drafts";
 import { bestEarlyBird, type EarlyBirdOffer } from "@/lib/it-run-early-bird";
 import { participantCountAllowed, participantCountMessage, bookingPrice } from "@/lib/it-run-category-rules";
-import { initialVerificationStatus, isStoredDocumentPath, idDocumentTypeFor } from "@/lib/it-run-id-verification";
+import { initialVerificationStatus, isStoredDocumentPath, idDocumentTypeFor, idUploadError } from "@/lib/it-run-id-verification";
 import { checkPersonName, checkBibName, normalizeName } from "@/lib/it-run-name-validation";
 import {
   isValidEmail, parseCalendarDate, todayInIST, validateDateOfBirth, type CalendarDate,
@@ -89,6 +89,10 @@ function validateParticipants(
     if (p.companyIdUrl && !isStoredDocumentPath(p.companyIdUrl)) {
       return err("companyIdUrl", "the ID document could not be verified. Please upload it again or choose Continue Without ID");
     }
+
+    // Every adult uploads a company or government-issued ID to register. Children are exempt.
+    const uploadMessage = idUploadError(p.companyIdUrl, m.is_child);
+    if (uploadMessage) return err("companyIdUrl", uploadMessage);
 
     // Date of birth: strict calendar parse (no rollover), not in the future, and age-eligible
     // on the event date. Adults must be 18+; the kid-category child must be 5 to 10.

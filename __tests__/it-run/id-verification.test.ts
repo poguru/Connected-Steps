@@ -34,7 +34,7 @@ import { requireRole } from "@/lib/it-run-auth";
 import {
   isStoredDocumentPath,
   initialVerificationStatus,
-  idChoiceError,
+  idUploadError,
 } from "@/lib/it-run-id-verification";
 import { POST as registerPost } from "@/app/api/it-run/register/route";
 import { GET as adminListGet, PATCH as adminDecisionPatch } from "@/app/api/it-run/admin/verification/route";
@@ -74,7 +74,7 @@ describe("the stored identity status comes from the document, not the client", (
     expect(initialVerificationStatus(false, UPLOADED)).toBe("pending");
   });
 
-  it("an adult who continues without an ID is not_provided, never a rejection or clarification", () => {
+  it("an adult with no stored document is not_provided, never a rejection or clarification (legacy rows only)", () => {
     expect(initialVerificationStatus(false, "")).toBe("not_provided");
     expect(initialVerificationStatus(false, undefined)).toBe("not_provided");
     expect(initialVerificationStatus(false, "error")).toBe("not_provided");
@@ -85,25 +85,28 @@ describe("the stored identity status comes from the document, not the client", (
   });
 });
 
-// ── Client choice ──────────────────────────────────────────────────────────────
+// ── Required upload ───────────────────────────────────────────────────────────
 
-describe("the company step requires a choice, and neither choice blocks", () => {
-  it("an adult with no choice cannot continue", () => {
-    expect(idChoiceError({}, false)).toMatch(/Choose Upload ID or Continue Without ID/);
+describe("every adult uploads a company or government ID to register", () => {
+  it("an adult with no upload cannot continue", () => {
+    expect(idUploadError("", false)).toMatch(/Upload a company ID or a government-issued photo ID/);
+    expect(idUploadError(undefined, false)).toMatch(/Upload a company ID/);
   });
 
-  it("Continue Without ID can continue with no document", () => {
-    expect(idChoiceError({ idChoice: "skip", companyIdUrl: "" }, false)).toBeNull();
+  it("an adult whose upload failed (sentinel value) cannot continue", () => {
+    expect(idUploadError("error", false)).toMatch(/Upload a company ID/);
   });
 
-  it("Upload ID needs a finished upload before continuing", () => {
-    expect(idChoiceError({ idChoice: "upload", companyIdUrl: "" }, false)).toMatch(/Upload your ID/);
-    expect(idChoiceError({ idChoice: "upload", companyIdUrl: "error" }, false)).toMatch(/Upload your ID/);
-    expect(idChoiceError({ idChoice: "upload", companyIdUrl: UPLOADED }, false)).toBeNull();
+  it("an adult with a finished upload can continue", () => {
+    expect(idUploadError(UPLOADED, false)).toBeNull();
   });
 
-  it("children never need a choice", () => {
-    expect(idChoiceError({}, true)).toBeNull();
+  it("there is no Continue Without ID path: a sentinel or URL is never a document", () => {
+    expect(idUploadError("https://example.com/id.pdf", false)).not.toBeNull();
+  });
+
+  it("children never need a document", () => {
+    expect(idUploadError("", true)).toBeNull();
   });
 });
 
@@ -170,15 +173,16 @@ describe("POST /api/it-run/register: company ID handling", () => {
     expect(fake.inserts).toEqual([]);
   });
 
-  it("does not reject a registration that continues without an ID (the field is simply empty)", async () => {
+  it("refuses an adult registration with no ID, and writes nothing", async () => {
     const fake = registerFake();
     mockDb.mockReturnValue(fake.db);
 
     const res = await registerPost(regReq(adultBody("")));
     const json = await res.json();
 
-    expect(json.field).not.toBe("companyIdUrl");
-    expect(res.status).not.toBe(400);
+    expect(res.status).toBe(400);
+    expect(json.field).toBe("companyIdUrl");
+    expect(fake.inserts).toEqual([]);
   });
 });
 
