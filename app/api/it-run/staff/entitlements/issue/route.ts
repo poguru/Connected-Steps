@@ -124,6 +124,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (reg.registration_status === "pending_verification") {
+      return NextResponse.json({ error: "This registration is awaiting ID verification. It can be used once the ID is verified.", code: "AWAITING_ID_VERIFICATION" }, { status: 409 });
+
+    }
+
     if (reg.registration_status === "cancelled") {
       return NextResponse.json({ error: "Registration is cancelled" }, { status: 400 });
     }

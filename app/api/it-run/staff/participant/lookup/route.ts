@@ -158,7 +158,7 @@ export async function GET(req: NextRequest) {
   // identity-based restriction is enforced where the service is issued, not in the lookup.
   const canIssue =
     (reg.payment_status === "paid" || reg.payment_status === "free") &&
-    reg.registration_status !== "cancelled";
+    reg.registration_status === "active";
 
   // Only the document TYPE leaves the server. The document path and ID number are never returned to volunteers.
   return NextResponse.json({

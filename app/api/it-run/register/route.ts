@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { generateRegistrationCode, signItRunQR } from "@/lib/it-run-auth";
-import { sendItRunConfirmationEmail, sendItRunBibInviteEmail } from "@/lib/it-run-email";
+import { sendItRunPaymentReceivedEmail } from "@/lib/it-run-email";
 import { runAfterResponse } from "@/lib/after-response";
 import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
@@ -332,6 +332,8 @@ export async function POST(req: NextRequest) {
         early_bird_offer_id: earlyBirdOfferId,
         coupon_id:         couponId ?? null,
         payment_status:    finalPrice === 0 ? "free" : "pending",
+        // Confirmed only after payment AND an admin has verified every adult's ID (see lib/it-run-confirmation.ts)
+        registration_status: "pending_verification",
         linked_user_email: linkedUserEmail,
       })
       .select("id")
@@ -450,9 +452,9 @@ export async function POST(req: NextRequest) {
     // sendItRunConfirmationEmail is idempotent: its atomic
     //   UPDATE ... WHERE confirmation_email_sent_at IS NULL
     // guard means only the first call sends; retries are silently skipped.
+    // A free registration still waits for ID verification: it gets the received notice now, and the confirmation later.
     if (finalPrice === 0) {
-      runAfterResponse("free_confirmation", () => sendItRunConfirmationEmail(reg.id, regCode, "", ""));
-      runAfterResponse("free_bib_invite", () => sendItRunBibInviteEmail(reg.id, participants[0]?.email?.toLowerCase()?.trim() ?? ""));
+      runAfterResponse("free_received", () => sendItRunPaymentReceivedEmail(reg.id));
     }
 
     // Mark the draft this registration came from as converted, so it can't be saved over afterwards.
@@ -525,7 +527,8 @@ export async function PATCH(req: NextRequest) {
   if (!reg || reg.registration_code !== registrationCode) {
     return NextResponse.json({ error: "We couldn't find this registration.", code: "NOT_FOUND" }, { status: 404 });
   }
-  if (reg.registration_status !== "active") {
+  // Details can be corrected until payment, and while the IDs are being verified. A cancelled registration cannot.
+  if (reg.registration_status !== "active" && reg.registration_status !== "pending_verification") {
     return NextResponse.json({ error: "This registration is no longer active.", code: "REGISTRATION_CLOSED" }, { status: 409 });
   }
   if (reg.payment_status === "paid" || reg.payment_status === "partially_refunded" || reg.payment_status === "refunded") {

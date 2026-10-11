@@ -959,3 +959,62 @@ export async function sendItRunCheckoutConfirmationEmail(registrationIds: string
   }
   console.log(JSON.stringify({ src: "it-run-email", kind: "checkout_confirmation", outcome: "sent", registrations: sections.length, recipients: recipients.length }));
 }
+
+/**
+ * Sent after payment (or after a free registration) while the IDs are still being verified. It is not the
+ * confirmation: the registration is confirmed, and the confirmation email sent, only once every adult's ID is verified.
+ */
+export async function sendItRunPaymentReceivedEmail(registrationId: string): Promise<void> {
+  const label = "[it-run-email] payment-received";
+  const db = getSupabaseServer();
+  const { data: reg } = await db
+    .from("it_run_registrations")
+    .select("registration_code, lead_email, linked_user_email, payment_status, final_price, it_run_categories ( name )")
+    .eq("id", registrationId)
+    .maybeSingle<{
+      registration_code: string; lead_email: string; linked_user_email: string | null;
+      payment_status: string; final_price: number; it_run_categories: { name: string } | null;
+    }>();
+  if (!reg) { console.warn(`${label} registration not found`); return; }
+
+  const { data: first } = await db
+    .from("it_run_participants")
+    .select("first_name, last_name")
+    .eq("registration_id", registrationId)
+    .order("created_at")
+    .limit(1)
+    .maybeSingle<{ first_name: string; last_name: string }>();
+  const name = first ? `${first.first_name} ${first.last_name}` : "there";
+
+  const paid = reg.payment_status === "paid";
+  const dashUrl = buildDashboardUrl(reg.registration_code);
+  const body = `
+    <p style="margin:0 0 14px;">Hi ${escapeHtml(name)},</p>
+    <p style="margin:0 0 14px;">
+      ${paid ? "We have received your payment" : "Your registration has been received"} for registration
+      <strong>${escapeHtml(reg.registration_code)}</strong>${reg.it_run_categories ? ` (${escapeHtml(reg.it_run_categories.name)})` : ""}.
+    </p>
+    <p style="margin:0 0 14px;">
+      This event is for IT professionals, so your registration is confirmed only after our team has verified an ID for
+      every adult participant (a company ID or a government-issued photo ID). You will receive a separate confirmation
+      email once it is confirmed.
+    </p>
+    <p style="margin:0 0 14px;">You can check the status of your ID at any time on your dashboard.</p>
+    <p style="margin:0;"><a href="${dashUrl}" style="color:#e8620a;">Open your dashboard</a></p>`;
+  const html = emailWrapper(
+    emailHeader() +
+    `<tr><td style="padding:32px 40px;font-size:15px;color:#222;line-height:1.6;">${body}</td></tr>` +
+    emailFooter(),
+  );
+
+  const recipients = confirmationRecipients(reg.lead_email, reg.linked_user_email);
+  if (recipients.length === 0) {
+    console.error(JSON.stringify({ src: "it-run-email", kind: "payment_received", outcome: "no_recipient", reg: reg.registration_code }));
+    return;
+  }
+  const results = await Promise.all(recipients.map(to => sendEmail(
+    to, name, `Registration Received - The IT Run Sprint-2 (${reg.registration_code})`, html, false, true,
+  )));
+  const failed = results.filter(r => !r.ok).length;
+  console.log(JSON.stringify({ src: "it-run-email", kind: "payment_received", outcome: failed ? "send_failed" : "sent", reg: reg.registration_code }));
+}

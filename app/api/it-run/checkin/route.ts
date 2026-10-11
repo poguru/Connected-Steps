@@ -93,6 +93,9 @@ export async function POST(req: NextRequest) {
     if (!["paid","free"].includes(part.it_run_registrations.payment_status)) {
       return NextResponse.json({ error: "Registration not confirmed" }, { status: 400 });
     }
+    if (part.it_run_registrations.registration_status === "pending_verification") {
+      return NextResponse.json({ error: "This registration is awaiting ID verification. It can be used once the ID is verified.", code: "AWAITING_ID_VERIFICATION" }, { status: 409 });
+    }
     if (part.it_run_registrations.registration_status === "cancelled") {
       return NextResponse.json({ error: "This registration has been cancelled" }, { status: 400 });
     }

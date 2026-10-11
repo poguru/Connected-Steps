@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { confirmIfVerified, sendConfirmedNotices } from "@/lib/it-run-confirmation";
+import { runAfterResponse } from "@/lib/after-response";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireRole, getClientIp } from "@/lib/it-run-auth";
 import {
@@ -88,10 +90,10 @@ export async function PATCH(req: NextRequest) {
 
     const { data: part } = await db
       .from("it_run_participants")
-      .select("email, first_name, company_id_url, id_document_type")
+      .select("email, first_name, company_id_url, id_document_type, registration_id")
       .eq("id", participantId)
       .eq("event_id", event.id)
-      .maybeSingle<{ email: string | null; first_name: string; company_id_url: string | null; id_document_type: string | null }>();
+      .maybeSingle<{ email: string | null; first_name: string; company_id_url: string | null; id_document_type: string | null; registration_id: string }>();
     if (!part) return NextResponse.json({ error: "Participant not found" }, { status: 404 });
     // A participant who continued without an ID has nothing to review. Never approve or reject them.
     if (!part.company_id_url) {
@@ -177,6 +179,15 @@ export async function PATCH(req: NextRequest) {
         admin_explanation: decision.explanation,
       },
     }).then(() => {}, () => {});
+
+    // A verified ID can complete the registration. It is confirmed only when every adult is verified and the payment is
+    // in place; then its confirmation email and BIB invite are sent. Rejection or a clarification keeps it pending.
+    if (status === "verified") {
+      const outcome = await confirmIfVerified(db, part.registration_id);
+      if (outcome === "confirmed") {
+        runAfterResponse("confirmed_notice", () => sendConfirmedNotices(part.registration_id));
+      }
+    }
 
     return NextResponse.json({ ok: true });
   } catch {

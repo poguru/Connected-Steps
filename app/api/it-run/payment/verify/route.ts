@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyPaymentSignature } from "@/lib/razorpay-security";
-import { sendItRunConfirmationEmail, sendItRunBibInviteEmail, sendItRunCheckoutConfirmationEmail } from "@/lib/it-run-email";
-import { runAfterResponse } from "@/lib/after-response";
+import { noticesAfterPayment } from "@/lib/it-run-confirmation";
 import { confirmCheckoutPayment } from "@/lib/it-run-checkout-confirm";
 import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -64,21 +63,9 @@ export async function POST(req: NextRequest) {
     if (result.kind === "amount_mismatch") return NextResponse.json({ error: "Payment amount does not match" }, { status: 400 });
     if (result.kind === "already") return NextResponse.json({ ok: true, already: true });
 
-    // Confirmation and BIB invite run after the response, so the function stays alive until they finish.
-    // A failed send releases its "sent" claim, so the email can be resent from the admin portal.
-    // One payment for several registrations: one combined confirmation. A single registration keeps its own email.
-    if (result.registrations.length > 1) {
-      const ids = result.registrations.map(r => r.id);
-      runAfterResponse("checkout_confirmation", () => sendItRunCheckoutConfirmationEmail(ids));
-    } else {
-      for (const reg of result.registrations) {
-        runAfterResponse("confirmation", () => sendItRunConfirmationEmail(reg.id, reg.registration_code, reg.lead_email, ""));
-      }
-    }
-    // BIB invites are per registration (each has its own booking link)
-    for (const reg of result.registrations) {
-      runAfterResponse("bib_invite", () => sendItRunBibInviteEmail(reg.id, reg.lead_email));
-    }
+    // Each registration is confirmed (with its confirmation email and BIB invite) once its IDs are verified.
+    // Until then it gets the payment-received notice. Runs after the response.
+    noticesAfterPayment(db, result.registrations.map(r => r.id));
 
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {

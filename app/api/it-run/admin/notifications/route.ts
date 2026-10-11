@@ -143,9 +143,9 @@ export async function POST(req: NextRequest) {
 
   const { data: reg } = await db
     .from("it_run_registrations")
-    .select("id, registration_code, lead_email, payment_status")
+    .select("id, registration_code, lead_email, payment_status, registration_status")
     .eq("id", registrationId)
-    .single<{ id: string; registration_code: string; lead_email: string; payment_status: string }>();
+    .single<{ id: string; registration_code: string; lead_email: string; payment_status: string; registration_status: string }>();
 
   if (!reg) return NextResponse.json({ error: "Registration not found" }, { status: 404 });
 
@@ -175,7 +175,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  // Default: confirmation email
+  // Default: confirmation email. Only for a confirmed registration (every adult verified), never a pending one.
+  if (reg.registration_status === "pending_verification") {
+    return NextResponse.json({ error: "This registration is awaiting ID verification, so it is not confirmed yet." }, { status: 409 });
+  }
   if (force) {
     await db.from("it_run_registrations")
       .update({ confirmation_email_sent_at: null })
