@@ -2,6 +2,9 @@ import { checkPersonName, checkBibName, normalizeName } from "@/lib/it-run-name-
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireRole, getClientIp } from "@/lib/it-run-auth";
+import {
+  normalizeIndianPhone, emergencyMatchesMobile, parseCalendarDate, compareCalendarDates, todayInIST, DOB_MIN_DATE,
+} from "@/lib/it-run-validation";
 
 // Fields that cannot be changed via the admin API
 const IMMUTABLE = new Set([
@@ -152,6 +155,31 @@ export async function PATCH(req: NextRequest) {
     .single<Record<string, unknown>>();
 
   if (!current) return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+
+  // Contact and date rules are the registration rules, so an admin edit cannot store what registration refuses
+  if ("mobile" in editable) {
+    const mobile = normalizeIndianPhone(editable.mobile);
+    if (!mobile) return NextResponse.json({ error: "valid 10-digit mobile number is required", field: "mobile" }, { status: 400 });
+    editable.mobile = mobile;
+  }
+  if ("emergency_phone" in editable && editable.emergency_phone !== null && editable.emergency_phone !== "") {
+    const emergency = normalizeIndianPhone(editable.emergency_phone);
+    if (!emergency) return NextResponse.json({ error: "valid 10-digit emergency contact phone is required", field: "emergency_phone" }, { status: 400 });
+    editable.emergency_phone = emergency;
+  }
+  if ("mobile" in editable || "emergency_phone" in editable) {
+    const mobile = "mobile" in editable ? editable.mobile : current.mobile;
+    const emergency = "emergency_phone" in editable ? editable.emergency_phone : current.emergency_phone;
+    if (emergencyMatchesMobile(mobile, emergency)) {
+      return NextResponse.json({ error: "emergency contact number must be different from the mobile number", field: "emergency_phone" }, { status: 400 });
+    }
+  }
+  if ("dob" in editable) {
+    const dob = parseCalendarDate(editable.dob);
+    if (!dob) return NextResponse.json({ error: "Please enter a valid date of birth.", field: "dob" }, { status: 400 });
+    if (compareCalendarDates(dob, DOB_MIN_DATE) < 0) return NextResponse.json({ error: "Please enter a valid date of birth.", field: "dob" }, { status: 400 });
+    if (compareCalendarDates(dob, todayInIST()) > 0) return NextResponse.json({ error: "Date of birth cannot be in the future.", field: "dob" }, { status: 400 });
+  }
 
   const oldValues: Record<string, unknown> = {};
   for (const k of Object.keys(editable)) oldValues[k] = current[k] ?? null;
