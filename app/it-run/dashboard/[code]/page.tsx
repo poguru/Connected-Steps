@@ -13,7 +13,7 @@ interface DashboardData {
     id: string; registration_code: string; lead_email: string;
     participant_count: number; base_price: number; discount_amount: number;
     discount_label: string | null;
-    final_price: number; payment_status: string; qr_token: string | null;
+    final_price: number; payment_status: string; registration_status: string; qr_token: string | null;
     it_run_categories: {
       id: string; slug: string; name: string; distance_km: number;
       category_type: string; color: string; includes_timing: boolean; includes_medal: boolean;
@@ -348,6 +348,17 @@ export default function DashboardPage() {
             <StatusBadge status={reg.payment_status} />
           </div>
         </div>
+
+        {/* Paid, but waiting for an admin to verify the ID of every adult. Confirmed after that. */}
+        {paid && reg.registration_status === "pending_verification" && (
+          <div role="status" style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
+            <div style={{ fontSize: 14, color: "#a5b4fc", fontWeight: 700 }}>Awaiting ID verification</div>
+            <div style={{ fontSize: 13, color: "#ccc", lineHeight: 1.6 }}>
+              Your payment is received. Your registration is confirmed once an admin has verified an ID for every adult participant.
+              You will get a confirmation email then.
+            </div>
+          </div>
+        )}
 
         {/* Payment required warning */}
         {!paid && (

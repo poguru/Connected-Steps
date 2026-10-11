@@ -9,7 +9,8 @@ import { idFailureRefundPaise, ID_FAILURE_STAGES, type IdFailureStage } from "@/
 // with the amount the rules give. Nothing is refunded here. The request is approved on the refund requests page, and
 // the refund is then executed with an explicit confirmation, exactly like any other refund.
 //
-// Body: { registration_id, participant_id, stage: "verification" | "bib_collection", reason }
+// Body: { participant_id, stage: "verification" | "bib_collection", reason }
+//   The registration is found from the participant, so the admin only names the person whose ID failed.
 //   verification  company ID rejected (after any clarification): 96% refunded
 //   bib_collection government ID, IT employment not verified on collection day: 80% refunded
 //
@@ -28,13 +29,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const registrationId = typeof body.registration_id === "string" ? body.registration_id : "";
   const participantId = typeof body.participant_id === "string" ? body.participant_id : "";
   const stage = body.stage;
   const reason = typeof body.reason === "string" ? body.reason.trim() : "";
 
-  if (!registrationId || !participantId) {
-    return NextResponse.json({ error: "registration_id and participant_id are required" }, { status: 400 });
+  if (!participantId) {
+    return NextResponse.json({ error: "participant_id is required" }, { status: 400 });
   }
   if (typeof stage !== "string" || !(ID_FAILURE_STAGES as readonly string[]).includes(stage)) {
     return NextResponse.json({ error: "stage must be 'verification' or 'bib_collection'" }, { status: 400 });
@@ -47,10 +47,18 @@ export async function POST(req: NextRequest) {
   const { data: event } = await db.from("it_run_events").select("id").eq("slug", "sprint-2").maybeSingle<{ id: string }>();
   if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
+  const { data: part } = await db
+    .from("it_run_participants")
+    .select("id, registration_id, event_id, verification_status, id_document_type")
+    .eq("id", participantId)
+    .eq("event_id", event.id)
+    .maybeSingle<{ id: string; registration_id: string; event_id: string; verification_status: string; id_document_type: string | null }>();
+  if (!part) return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+
   const { data: reg } = await db
     .from("it_run_registrations")
     .select("id, event_id, payment_status, registration_status, final_price, amount_paid_paise, participant_count")
-    .eq("id", registrationId)
+    .eq("id", part.registration_id)
     .eq("event_id", event.id)
     .maybeSingle<{
       id: string; event_id: string; payment_status: string; registration_status: string;
@@ -64,14 +72,6 @@ export async function POST(req: NextRequest) {
   if (!["paid", "partially_refunded"].includes(reg.payment_status) || reg.final_price <= 0) {
     return NextResponse.json({ error: "Only a paid registration can be refunded for an ID failure." }, { status: 422 });
   }
-
-  const { data: part } = await db
-    .from("it_run_participants")
-    .select("id, registration_id, verification_status, id_document_type")
-    .eq("id", participantId)
-    .eq("registration_id", reg.id)
-    .maybeSingle<{ id: string; registration_id: string; verification_status: string; id_document_type: string | null }>();
-  if (!part) return NextResponse.json({ error: "Participant not found on this registration" }, { status: 404 });
 
   // A company ID refund needs a rejected document (after any clarification). A government ID refund is recorded on
   // collection day, when the employment check fails, so the status is not required to be 'rejected' for it.

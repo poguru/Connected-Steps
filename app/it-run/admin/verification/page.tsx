@@ -14,6 +14,7 @@ interface Participant {
   // company_id_url is only used server-side (to drive has_company_id).
   // The frontend never renders it as an img src — it fetches a signed URL instead.
   company_id_url: string | null; verification_status: string;
+  id_document_type: string | null;
   it_run_registrations: {
     registration_code: string; payment_status: string;
     it_run_categories: { name: string } | null;
@@ -355,6 +356,7 @@ export default function VerificationPage() {
   const [notes,    setNotes]    = useState<Record<string, string>>({});
   const [reasons,  setReasons]  = useState<Record<string, VerificationReason | "">>({});
   const [rowError, setRowError] = useState<Record<string, string>>({});
+  const [rowNotice, setRowNotice] = useState<Record<string, string>>({});
   const [updating, setUpdating] = useState<string | null>(null);
   const [viewer,   setViewer]   = useState<CompanyIdMeta | null>(null);
 
@@ -399,6 +401,42 @@ export default function VerificationPage() {
       setReasons(prev => ({ ...prev, [id]: "" }));
       setNotes(prev => ({ ...prev, [id]: "" }));
       await load();
+    } catch {
+      setRowError(prev => ({ ...prev, [id]: "Network error. Please try again." }));
+    } finally {
+      setUpdating(null);
+    }
+  }
+
+  // A company ID that was rejected: the admin records the failure, and the refund amount follows the rule (96%).
+  // The refund is only a request here; it is approved and executed on the refund requests page.
+  async function recordIdFailure(id: string) {
+    const reason = (notes[id] ?? "").trim();
+    if (reason.length < 10) {
+      setRowError(prev => ({ ...prev, [id]: "Write the reason in the explanation box (at least 10 characters)." }));
+      return;
+    }
+    setRowError(prev => ({ ...prev, [id]: "" }));
+    setRowNotice(prev => ({ ...prev, [id]: "" }));
+    setUpdating(id);
+    try {
+      const res = await fetch("/api/it-run/admin/id-failure", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ participant_id: id, stage: "verification", reason }),
+      });
+      const d = await res.json().catch(() => ({})) as { error?: string; refundPaise?: number; retainedPaise?: number };
+      if (!res.ok) {
+        setRowError(prev => ({ ...prev, [id]: d.error ?? "Could not record the ID failure." }));
+        return;
+      }
+      const refund = ((d.refundPaise ?? 0) / 100).toLocaleString("en-IN");
+      const kept   = ((d.retainedPaise ?? 0) / 100).toLocaleString("en-IN");
+      setRowNotice(prev => ({
+        ...prev,
+        [id]: `Refund request recorded: ₹${refund} (₹${kept} kept as platform charge). Approve it on the refund requests page to refund.`,
+      }));
+      setNotes(prev => ({ ...prev, [id]: "" }));
     } catch {
       setRowError(prev => ({ ...prev, [id]: "Network error. Please try again." }));
     } finally {
@@ -574,11 +612,25 @@ export default function VerificationPage() {
                           {updating === p.id ? "…" : "Clarification"}
                         </button>
                       )}
+                      {p.verification_status === "rejected" && p.id_document_type !== "government" && (
+                        <button
+                          onClick={() => recordIdFailure(p.id)}
+                          disabled={updating === p.id}
+                          style={BTN("#ef4444")}
+                        >
+                          {updating === p.id ? "…" : "Record ID failure (refund 96%)"}
+                        </button>
+                      )}
                     </div>
                     )}
                     {rowError[p.id] && (
                       <div role="alert" style={{ fontSize: 12, color: "#f87171", marginTop: 8 }}>
                         {rowError[p.id]}
+                      </div>
+                    )}
+                    {rowNotice[p.id] && (
+                      <div role="status" style={{ fontSize: 12, color: "#10b981", marginTop: 8 }}>
+                        {rowNotice[p.id]}
                       </div>
                     )}
                   </div>

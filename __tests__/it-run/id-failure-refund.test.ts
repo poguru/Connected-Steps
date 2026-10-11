@@ -66,8 +66,8 @@ const REG = {
 function fakeDb(opts: { part?: Record<string, unknown> | null; insertError?: { code: string } | null } = {}) {
   const inserts: Array<{ table: string; payload: any }> = [];
   const part = opts.part === undefined
-    ? { id: "p-1", registration_id: "r-1", verification_status: "rejected", id_document_type: "company" }
-    : opts.part;
+    ? { id: "p-1", event_id: "ev-1", registration_id: "r-1", verification_status: "rejected", id_document_type: "company" }
+    : opts.part && { event_id: "ev-1", ...opts.part };
   return {
     inserts,
     from(table: string) {
@@ -100,7 +100,7 @@ function req(body: unknown) {
   });
 }
 
-const GOOD = { registration_id: "r-1", participant_id: "p-1", stage: "verification", reason: "Company ID is not a valid card" };
+const GOOD = { participant_id: "p-1", stage: "verification", reason: "Company ID is not a valid card" };
 
 beforeEach(() => {
   jest.clearAllMocks();
