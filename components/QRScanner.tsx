@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import jsQR from "jsqr";
+
+// Shared scanner for the IT Run staff screens (check-in, BIB, T-shirt, breakfast, goodies, medal, certificate).
+// The camera reads QR codes in the browser with jsQR and reports the first code it finds, once. Manual entry stays
+// available. The decoded text is only a candidate: the server verifies it. The camera is released on unmount.
 
 interface QRScannerProps {
   onScan: (data: string) => Promise<void>;
@@ -8,83 +13,115 @@ interface QRScannerProps {
   placeholder?: string;
 }
 
+const MAX_SIDE = 640;
+
+function cameraMessage(err: unknown): string {
+  const name = (err as { name?: string })?.name;
+  if (name === "NotAllowedError" || name === "SecurityError") return "Camera permission denied";
+  if (name === "NotFoundError" || name === "OverconstrainedError") return "No camera found on this device";
+  if (name === "NotReadableError") return "The camera is in use by another app";
+  return "Camera unavailable";
+}
+
 export default function QRScanner({ onScan, onError, placeholder = "Scan QR, BIB, or registration code…" }: QRScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const frameRef = useRef<number | null>(null);
+  const doneRef = useRef(false);
+  const onScanRef = useRef(onScan);
+  const onErrorRef = useRef(onError);
   const [scanning, setScanning] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [manualInput, setManualInput] = useState("");
   const [permError, setPermError] = useState<string | null>(null);
+  // Each finished lookup starts the camera again, so the next code can be read
+  const [round, setRound] = useState(0);
+
+  // Keep the latest callbacks without restarting the camera
+  useEffect(() => {
+    onScanRef.current = onScan;
+    onErrorRef.current = onError;
+  }, [onScan, onError]);
 
   useEffect(() => {
-    const startCamera = async () => {
+    let cancelled = false;
+
+    function stopCamera() {
+      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+      streamRef.current?.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
+    }
+
+    function scan() {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (!video || !canvas || doneRef.current) return;
+      if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
+        const scale = Math.min(1, MAX_SIDE / Math.max(video.videoWidth, video.videoHeight));
+        canvas.width = Math.round(video.videoWidth * scale);
+        canvas.height = Math.round(video.videoHeight * scale);
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(image.data, image.width, image.height, { inversionAttempts: "dontInvert" });
+          if (code?.data && !doneRef.current) {
+            doneRef.current = true;
+            stopCamera();
+            setCameraActive(false);
+            setScanning(true);
+            void onScanRef.current(code.data).finally(() => {
+              // Allow the next scan only after this one has finished, then read again
+              setScanning(false);
+              setRound(r => r + 1);
+            });
+            return;
+          }
+        }
+      }
+      frameRef.current = requestAnimationFrame(scan);
+    }
+
+    async function start() {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setPermError("This browser can't use the camera. Use manual entry below.");
+        onErrorRef.current?.("This browser can't use the camera");
+        return;
+      }
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
         });
-
+        if (cancelled) {
+          stream.getTracks().forEach(t => t.stop());
+          return;
+        }
+        streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          setCameraActive(true);
-          setPermError(null);
+          await videoRef.current.play().catch(() => {});
         }
-      } catch (err: any) {
-        const msg = err?.name === "NotAllowedError" ? "Camera permission denied" : "Camera unavailable";
+        doneRef.current = false;
+        setCameraActive(true);
+        setPermError(null);
+        scan();
+      } catch (err) {
+        if (cancelled) return;
+        const msg = cameraMessage(err);
         setPermError(msg);
-        onError?.(msg);
+        onErrorRef.current?.(msg);
       }
-    };
+    }
 
-    startCamera();
-
+    start();
     return () => {
-      if (videoRef.current?.srcObject) {
-        (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
-      }
+      cancelled = true;
+      stopCamera();
     };
-  }, [onError]);
-
-  const decodeQR = (canvas: HTMLCanvasElement) => {
-    const ctx = canvas.getContext("2d");
-    if (!ctx || !videoRef.current) return null;
-
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
-    ctx.drawImage(videoRef.current, 0, 0);
-
-    // Simple QR detection: look for patterns
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-
-    let qrPattern = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i] < 128) qrPattern++;
-    }
-
-    // If we detect enough dark pixels (typical QR pattern), try to read from canvas
-    if (qrPattern > canvas.width * canvas.height * 0.3) {
-      return "qr_detected";
-    }
-
-    return null;
-  };
-
-  useEffect(() => {
-    if (!cameraActive || scanning) return;
-
-    const interval = setInterval(() => {
-      if (canvasRef.current && videoRef.current && videoRef.current.readyState === 4) {
-        const result = decodeQR(canvasRef.current);
-        if (result) {
-          setScanning(true);
-          // In production, use a QR library like jsQR or html5-qrcode
-          // For now, manual input fallback
-        }
-      }
-    }, 500);
-
-    return () => clearInterval(interval);
-  }, [cameraActive, scanning]);
+  }, [round]);
 
   async function handleManualSubmit(value: string) {
     if (!value.trim()) return;
@@ -101,27 +138,24 @@ export default function QRScanner({ onScan, onError, placeholder = "Scan QR, BIB
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {/* Camera View */}
-      {!permError && cameraActive && (
+      {!permError && (
         <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", background: "#000", aspectRatio: "4/3" }}>
           <video
             ref={videoRef}
             autoPlay
+            muted
             playsInline
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
           />
           <canvas ref={canvasRef} style={{ display: "none" }} />
           {/* QR Frame Overlay */}
           <div
+            aria-hidden="true"
             style={{
               position: "absolute",
-              inset: 0,
-              border: "3px solid #e8620a",
-              borderRadius: "50%",
-              width: "60%",
-              height: "60%",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
+              inset: "18% 14%",
+              border: "2px solid #e8620a",
+              borderRadius: 12,
               pointerEvents: "none",
             }}
           />
@@ -136,9 +170,10 @@ export default function QRScanner({ onScan, onError, placeholder = "Scan QR, BIB
               background: "rgba(0,0,0,0.6)",
               padding: "6px 12px",
               borderRadius: 6,
+              whiteSpace: "nowrap",
             }}
           >
-            Point at QR code
+            {cameraActive ? "Point at QR code" : "Starting camera…"}
           </div>
         </div>
       )}
@@ -146,6 +181,7 @@ export default function QRScanner({ onScan, onError, placeholder = "Scan QR, BIB
       {/* Permission Error */}
       {permError && (
         <div
+          role="alert"
           style={{
             padding: 16,
             background: "rgba(239,68,68,0.1)",
