@@ -2,6 +2,10 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+
+// The camera code runs only in the browser, and only when a volunteer opens the scanner
+const BibQrScanner = dynamic(() => import("@/components/BibQrScanner"), { ssr: false });
 
 interface ParticipantResult {
   id: string; first_name: string; last_name: string;
@@ -34,18 +38,20 @@ export default function BibCollectionPage() {
   const [searching,  setSearching]  = useState(false);
   const [issuing,    setIssuing]    = useState(false);
   const [message,    setMessage]    = useState<{ text: string; type: "success" | "error" | "info" } | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
-  async function search(e?: React.FormEvent) {
+  async function search(e?: React.FormEvent, override?: string) {
     e?.preventDefault();
-    if (!query.trim()) return;
+    const value = (override ?? query).trim();
+    if (!value) return;
     setSearching(true);
     setResult(null);
     setMessage(null);
     try {
-      const res = await fetch(`/api/it-run/bib-collection?q=${encodeURIComponent(query.trim())}`);
+      const res = await fetch(`/api/it-run/bib-collection?q=${encodeURIComponent(value)}`);
       const d   = await res.json();
       if (!res.ok) {
         setMessage({ text: d.error ?? "Search failed. Try again.", type: "error" });
@@ -121,6 +127,17 @@ export default function BibCollectionPage() {
       </header>
 
       <div style={{ maxWidth: 560, margin: "0 auto", padding: "clamp(1rem,4vw,2rem) 16px" }}>
+        {scannerOpen && (
+          <BibQrScanner
+            onClose={() => setScannerOpen(false)}
+            onDetected={text => {
+              setScannerOpen(false);
+              setQuery("");
+              void search(undefined, text);
+            }}
+          />
+        )}
+
         {/* Search */}
         <div style={{ marginBottom: 20 }}>
           <form onSubmit={search}>
@@ -128,9 +145,13 @@ export default function BibCollectionPage() {
               <input
                 ref={inputRef}
                 value={query} onChange={e => setQuery(e.target.value)}
-                placeholder="Scan QR / enter reg code / mobile / email..."
+                placeholder="Enter reg code / mobile / email, or scan QR"
                 style={{ flex: 1, padding: "12px 16px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, color: "#fff", fontSize: 14, fontFamily: "inherit", outline: "none" }}
               />
+              <button type="button" onClick={() => setScannerOpen(true)} aria-label="Scan participant QR code"
+                style={{ padding: "12px 14px", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 10, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", minHeight: 44 }}>
+                Scan QR
+              </button>
               <button type="submit" disabled={searching || !query.trim()}
                 style={{ padding: "12px 18px", background: ACCENT, border: "none", borderRadius: 10, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
                 {searching ? "..." : "Search"}

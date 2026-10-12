@@ -16,7 +16,8 @@ export async function GET(req: NextRequest) {
   // Try QR token first
   const qrData = verifyItRunQR(q);
   if (qrData) {
-    return lookupByRegistrationCode(db, qrData.registrationCode);
+    // A participant's QR names that participant: only their record is returned, never another runner on the booking
+    return lookupByRegistrationCode(db, qrData.registrationCode, qrData.participantId);
   }
 
   // Try registration code (ITRUN2-XXXXXXXX)
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ results: parts ?? [] });
 }
 
-async function lookupByRegistrationCode(db: ReturnType<typeof import("@/lib/supabase-server").getSupabaseServer>, code: string) {
+async function lookupByRegistrationCode(db: ReturnType<typeof import("@/lib/supabase-server").getSupabaseServer>, code: string, participantId?: string) {
   const { data: parts } = await db
     .from("it_run_participants")
     .select(`
@@ -57,7 +58,8 @@ async function lookupByRegistrationCode(db: ReturnType<typeof import("@/lib/supa
     `)
     .eq("it_run_registrations.registration_code", code);
 
-  return NextResponse.json({ results: parts ?? [] });
+  const scoped = participantId ? (parts ?? []).filter(p => p.id === participantId) : (parts ?? []);
+  return NextResponse.json({ results: scoped });
 }
 
 export async function POST(req: NextRequest) {
