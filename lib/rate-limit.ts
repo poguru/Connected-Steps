@@ -30,19 +30,24 @@ async function redisGet(key: string): Promise<string | null> {
   } catch { return null; }
 }
 
+// Fixed window. SET NX EX creates the window (with its expiry) only when no window exists, so the expiry is set once
+// when a window starts and is never pushed back by later requests. INCR then counts within that window. Both run in
+// one pipeline; each command is atomic in Redis, so concurrent first requests cannot create two windows.
 async function redisIncr(key: string, ttlSeconds: number): Promise<number | null> {
   const url   = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) return null;
   try {
-    // INCR then EXPIRE in a pipeline (single HTTP request)
     const res  = await fetch(`${url}/pipeline`, {
       method:  "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body:    JSON.stringify([["INCR", key], ["EXPIRE", key, ttlSeconds]]),
+      body:    JSON.stringify([["SET", key, "0", "NX", "EX", ttlSeconds], ["INCR", key]]),
     });
-    const data = await res.json() as [{ result: number }, unknown];
-    return data[0]?.result ?? null;
+    if (!res.ok) return null;
+    const data = await res.json() as Array<{ result?: unknown; error?: string }>;
+    if (data[1]?.error) return null;
+    const count = data[1]?.result;
+    return typeof count === "number" ? count : null;
   } catch { return null; }
 }
 
