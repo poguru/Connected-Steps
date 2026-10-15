@@ -12,7 +12,9 @@ interface Props {
   onClose: () => void;
 }
 
-const MAX_SIDE = 640;
+// Read at full camera resolution. A QR shown on another screen is small in the frame, and shrinking it first
+// removes the detail the decoder needs.
+const MAX_SIDE = 1280;
 
 function cameraMessage(err: unknown): string {
   const name = (err as { name?: string })?.name;

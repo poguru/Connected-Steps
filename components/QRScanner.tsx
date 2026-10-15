@@ -13,7 +13,8 @@ interface QRScannerProps {
   placeholder?: string;
 }
 
-const MAX_SIDE = 640;
+// Read at full camera resolution: a QR shown on another screen is small in the frame, and shrinking it loses detail
+const MAX_SIDE = 1280;
 
 function cameraMessage(err: unknown): string {
   const name = (err as { name?: string })?.name;

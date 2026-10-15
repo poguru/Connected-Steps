@@ -31,10 +31,11 @@ export async function GET(
 
     // Generate QR code from the token
     // The token itself encodes the participant identity (signed)
+    // Large, with a wide quiet zone: a code shown on a phone or laptop screen is photographed, so it must stay readable small
     const qrPng = await QRCode.toBuffer(token, {
       type: "png",
-      width: 200,
-      margin: 2,
+      width: 480,
+      margin: 4,
       color: { dark: "#000000", light: "#ffffff" },
       errorCorrectionLevel: "M",
     });
