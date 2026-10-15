@@ -83,9 +83,12 @@ function Cta({ label, height }: { label: string; height: number }) {
 function Title({ model, format }: { model: CardModel; format: ShareFormat }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 22, width: "100%" }}>
-      <span style={{ fontSize: format === "story" ? 34 : 30, color: ORANGE, fontWeight: 800, letterSpacing: 6, textTransform: "uppercase", textAlign: "center" }}>
-        {model.kicker}
-      </span>
+      {/* The kicker is left out when it would repeat the title */}
+      {model.kicker.toLowerCase() !== model.title.toLowerCase() && (
+        <span style={{ fontSize: format === "story" ? 34 : 30, color: ORANGE, fontWeight: 800, letterSpacing: 6, textTransform: "uppercase", textAlign: "center" }}>
+          {model.kicker}
+        </span>
+      )}
       <span style={{ fontSize: titleFontSize(model.title, format), color: WHITE, fontWeight: 900, lineHeight: 1.04, textTransform: "uppercase", textAlign: "center" }}>
         {model.title}
       </span>
@@ -94,11 +97,11 @@ function Title({ model, format }: { model: CardModel; format: ShareFormat }) {
   );
 }
 
-function Brand({ logoDataUrl, size }: { logoDataUrl: string | null; size: number }) {
+function Brand({ logoDataUrl, size, wordSize }: { logoDataUrl: string | null; size: number; wordSize: number }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
       {logoDataUrl && <img src={logoDataUrl} width={size} height={size} style={{ width: size, height: size }} />}
-      <span style={{ fontSize: 26, color: WHITE, fontWeight: 700, letterSpacing: 8, textTransform: "uppercase" }}>Connected Steps</span>
+      <span style={{ fontSize: wordSize, color: WHITE, fontWeight: 800, letterSpacing: 8, textTransform: "uppercase" }}>Connected Steps</span>
     </div>
   );
 }
@@ -113,7 +116,7 @@ export function StoryCard({ model, logoDataUrl, photoDataUrl, tagline }: ShareCa
         position: "absolute", top: 0, left: 0, width, height, display: "flex", flexDirection: "column", alignItems: "center",
         justifyContent: "space-between", padding: "250px 90px 330px",
       }}>
-        <Brand logoDataUrl={logoDataUrl} size={150} />
+        <Brand logoDataUrl={logoDataUrl} size={150} wordSize={46} />
         <Title model={model} format="story" />
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 40, width: "100%" }}>
           <InfoPanel rows={detailRows(model)} />
@@ -135,7 +138,7 @@ export function WhatsAppCard({ model, logoDataUrl, photoDataUrl, joinUrl, taglin
         position: "absolute", top: 0, left: 0, width, height, display: "flex", flexDirection: "column", alignItems: "center",
         justifyContent: "space-between", padding: "70px 80px 70px",
       }}>
-        <Brand logoDataUrl={logoDataUrl} size={120} />
+        <Brand logoDataUrl={logoDataUrl} size={120} wordSize={40} />
         <Title model={model} format="whatsapp" />
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 30, width: "100%" }}>
           <InfoPanel rows={detailRows(model)} />
