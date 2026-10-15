@@ -211,3 +211,21 @@ describe("PATCH /api/it-run/register: a valid edit", () => {
     expect(partUpdate?.payload).not.toHaveProperty("company_id_url");
   });
 });
+
+describe("PATCH /api/it-run/register: each participant's category is locked", () => {
+  it("refuses a participant whose category is changed, and writes nothing", async () => {
+    const { db, calls } = fakeDb({});
+    mockDb.mockReturnValue(db);
+    const res = await PATCH(req(body([adult({ categoryId: "other-category" })])));
+    expect(res.status).toBe(409);
+    expect((await res.json()).code).toBe("CATEGORY_LOCKED");
+    expect(calls.some(c => c.op === "update")).toBe(false);
+  });
+
+  it("accepts a participant who names their own category unchanged", async () => {
+    const { db } = fakeDb({});
+    mockDb.mockReturnValue(db);
+    const res = await PATCH(req(body([adult({ categoryId: CAT_ID })])));
+    expect(res.status).toBe(200);
+  });
+});

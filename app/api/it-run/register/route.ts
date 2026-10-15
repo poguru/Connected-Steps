@@ -12,6 +12,7 @@ import {
   participantCountAllowed, participantCountMessage, bookingPrice, isChildPosition, type CategoryType,
 } from "@/lib/it-run-category-rules";
 import { reserveSeats, releaseSeats, type SeatLine } from "@/lib/it-run-seats";
+import { couponUncoveredCategories, claimRunners, releaseRunnerClaim } from "@/lib/it-run-registration-guards";
 import { initialVerificationStatus, isStoredDocumentPath, idDocumentTypeFor, idUploadError } from "@/lib/it-run-id-verification";
 import { checkPersonName, checkBibName, normalizeName } from "@/lib/it-run-name-validation";
 import {
@@ -249,7 +250,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // One line per category: its seats and its price. A fixed-composition team pays once; each individual runner pays.
+    // The same runners cannot be registered twice while the first booking waits for payment. The claim is one atomic
+  // statement in the database, taken before any seat or discount is held. It is given back if this registration
+  // does not go ahead (see releaseHolds below).
+  const leadEmail = participants[0]?.email?.toLowerCase()?.trim() ?? "";
+  const runnerMobiles = participants.map(p => normalizeIndianPhone(p.mobile) ?? p.mobile.trim());
+  let claimedRunners = false;
+  if (leadEmail) {
+    const claim = await claimRunners(db, primary.event_id, leadEmail, runnerMobiles);
+    if (claim.result === "error") {
+      return NextResponse.json({ error: "We couldn't check your registration right now. Please try again." }, { status: 500 });
+    }
+    if (claim.result === "duplicate") {
+      return NextResponse.json({
+        error: "These runners already have a registration waiting for payment. Finish that payment, or wait 15 minutes before registering them again.",
+        code: "DUPLICATE_REGISTRATION",
+      }, { status: 409 });
+    }
+    claimedRunners = claim.claimed;
+  }
+
+  // One line per category: its seats and its price. A fixed-composition team pays once; each individual runner pays.
     const lines = Array.from(groups, ([id, indexes]) => {
       const cat = categoryById.get(id)!;
       return {
@@ -268,6 +289,7 @@ export async function POST(req: NextRequest) {
     // Releases every hold this request took: its coupon use and any early bird places it claimed.
     const releaseHolds = async () => {
       if (couponReserved) void db.rpc("itr_release_coupon", { p_coupon_id: couponId });
+      if (claimedRunners) void releaseRunnerClaim(db, primary.event_id, leadEmail, runnerMobiles);
       for (const offerId of claimedOffers) void db.rpc("itr_early_bird_release", { p_offer_id: offerId });
     };
 
@@ -281,6 +303,7 @@ export async function POST(req: NextRequest) {
       .gt("ends_at", nowIso);
     if (ebErr) {
       console.error("[it-run/register] early bird lookup failed:", ebErr.message);
+      await releaseHolds();
       return NextResponse.json({ error: "We couldn't check offers right now. Please try again." }, { status: 500 });
     }
 
@@ -323,6 +346,28 @@ export async function POST(req: NextRequest) {
     // inactive, expired, exhausted, or the order is below the minimum amount.
     let discountAmt = earlyBirdDiscount;
     if (couponId && claimedOffers.length === 0) {
+      // A code limited to some categories must cover every category in the booking. Checked here, on the server,
+      // because the validate step is only advice that the browser follows.
+      const { data: couponRow, error: couponRowErr } = await db
+        .from("it_run_coupons")
+        .select("applicable_category_ids")
+        .eq("id", couponId)
+        .maybeSingle<{ applicable_category_ids: string[] | null }>();
+      if (couponRowErr) {
+        console.error("[it-run/register] coupon lookup failed:", couponRowErr.code ?? "unknown");
+        await releaseHolds();
+        return NextResponse.json({ error: "Coupon validation failed" }, { status: 500 });
+      }
+      const uncovered = couponUncoveredCategories(couponRow?.applicable_category_ids ?? null, uniqueCategoryIds);
+      if (uncovered.length > 0) {
+        await releaseHolds();
+        const names = uncovered.map(id => categoryById.get(id)?.name ?? "a category in this booking").join(", ");
+        return NextResponse.json({
+          error: "This discount code doesn't apply to " + names + ". Remove the code, or that category, to continue.",
+          code: "COUPON_CATEGORY",
+        }, { status: 409 });
+      }
+
       const { data: couponDiscount, error: couponErr } = await db.rpc("itr_use_coupon", {
         p_coupon_id:  couponId,
         p_event_id:   primary.event_id,
@@ -331,10 +376,12 @@ export async function POST(req: NextRequest) {
 
       if (couponErr) {
         console.error("[it-run/register] coupon RPC error:", couponErr.message);
+        await releaseHolds();
         return NextResponse.json({ error: "Coupon validation failed" }, { status: 500 });
       }
 
       if (couponDiscount === null) {
+        await releaseHolds();
         return NextResponse.json({ error: "Coupon is invalid or no longer available" }, { status: 409 });
       }
 
