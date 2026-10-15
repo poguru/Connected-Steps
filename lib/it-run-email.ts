@@ -1044,3 +1044,93 @@ export async function sendItRunPaymentReceivedEmail(registrationId: string): Pro
     console.log(JSON.stringify({ src: "it-run-email", kind: "payment_received", outcome: failed ? "send_failed" : "sent", reg: reg.registration_code, category: group.name }));
   }
 }
+
+/**
+ * The confirmation for the category that holds one runner, rebuilt from the current registration data. Nothing is
+ * written here: the caller queues the email. The QR codes are the runners' existing tokens, so no new QR is made.
+ * Used for confirmation resends from the admin portal.
+ */
+export async function buildCategoryConfirmation(
+  registrationId: string,
+  participantId: string,
+): Promise<{ recipients: string[]; name: string; subject: string; html: string } | null> {
+  const db = getSupabaseServer();
+  const { data: reg } = await db
+    .from("it_run_registrations")
+    .select(`
+      id, registration_code, lead_email, linked_user_email, category_id, final_price, base_price, discount_amount, early_bird_offer_id,
+      it_run_categories ( name ),
+      it_run_events ( title, event_date, venue_name, report_time )
+    `)
+    .eq("id", registrationId)
+    .maybeSingle<{
+      id: string; registration_code: string; lead_email: string; linked_user_email: string | null; category_id: string;
+      final_price: number; base_price: number; discount_amount: number; early_bird_offer_id: string | null;
+      it_run_categories: { name: string } | null;
+      it_run_events: { title: string; event_date: string; venue_name: string; report_time: string | null } | null;
+    }>();
+  if (!reg) return null;
+
+  const { data: parts } = await db
+    .from("it_run_participants")
+    .select("id, first_name, last_name, participant_type, tshirt_size, qr_token, verification_status, id_document_type, category_id")
+    .eq("registration_id", reg.id)
+    .order("created_at")
+    .returns<Array<{
+      id: string; first_name: string; last_name: string; participant_type: string; tshirt_size: string | null;
+      qr_token: string | null; verification_status: string; id_document_type: string | null; category_id: string | null;
+    }>>();
+  if (!parts?.length) return null;
+
+  const names = await participantCategoryMap(db, parts.map(p => p.category_id ?? ""));
+  const groups = groupParticipantsByCategory(
+    parts,
+    reg.category_id,
+    reg.it_run_categories?.name ?? "IT Run Sprint-2",
+    new Map(Array.from(names, ([id, c]) => [id, c.name])),
+  );
+  const group = groups.find(g => g.participants.some(p => p.id === participantId));
+  if (!group) return null;
+
+  let discount: ConfirmEmailDiscount | undefined;
+  if (reg.discount_amount > 0) {
+    let discountLabel = "Discount code";
+    if (reg.early_bird_offer_id) {
+      const { data: offer } = await db
+        .from("it_run_early_bird_offers")
+        .select("name")
+        .eq("id", reg.early_bird_offer_id)
+        .maybeSingle<{ name: string }>();
+      discountLabel = offer?.name ?? "Early bird";
+    }
+    discount = { label: discountLabel, baseAmount: reg.base_price, discountAmount: reg.discount_amount };
+  }
+
+  const ev = reg.it_run_events;
+  const primaryName = `${group.participants[0].first_name} ${group.participants[0].last_name}`;
+  const html = buildConfirmEmail({
+    primaryName,
+    code:         reg.registration_code,
+    category:     group.name,
+    date:         ev?.event_date  ?? "2027-02-07",
+    venue:        ev?.venue_name  ?? "Hyderabad Central University, Gachibowli, Hyderabad",
+    reportTime:   ev?.report_time ?? "5:30 AM",
+    finalPrice:   reg.final_price,
+    discount,
+    dashUrl:      buildDashboardUrl(reg.registration_code),
+    participants: group.participants.map(p => ({
+      name:       `${p.first_name} ${p.last_name}`,
+      typeLabel:  PARTICIPANT_TYPE_LABEL[p.participant_type] ?? "",
+      tshirtSize: p.tshirt_size ?? null,
+      qrUrl:      `${APP_URL}/api/it-run/qr/${p.qr_token ?? reg.registration_code}`,
+      idNote:     idStatusNote(p.verification_status, p.id_document_type),
+    })),
+  });
+
+  return {
+    recipients: confirmationRecipients(reg.lead_email, reg.linked_user_email),
+    name: primaryName,
+    subject: `Registration Confirmed - The IT Run Sprint-2 (${reg.registration_code} · ${group.name})`,
+    html,
+  };
+}
