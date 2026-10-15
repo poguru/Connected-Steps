@@ -1,3 +1,4 @@
+import type { ShareFormat } from "@/lib/session-share-card";
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -95,9 +96,12 @@ export default function SessionShareSheet({ session, onClose }: Props) {
   const [busy,       setBusy]       = useState(false);
   const [toast,      setToast]      = useState("");
   const [toastGreen, setToastGreen] = useState(true);
-  const blobRef = useRef<Blob | null>(null);
+  // The image for each format (story and WhatsApp), cached until the admin refreshes it
+  const blobRef = useRef<Partial<Record<ShareFormat, Blob>>>({});
+  const [format, setFormat] = useState<ShareFormat>("story");
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const shareImageUrl = `${APP_URL}/api/og/session/${session.id}?format=story&v=3`;
+  const shareImageUrl = `${APP_URL}/api/og/session/${session.id}?format=${format}&v=4&r=${refreshKey}`;
   const joinUrl       = `${APP_URL}/join/${session.id}`;
   const dateStr       = formatDate(session.date);
   const caption       = buildCaption(session, joinUrl, dateStr);
@@ -119,17 +123,31 @@ export default function SessionShareSheet({ session, onClose }: Props) {
   }
 
   async function getBlob(): Promise<Blob | null> {
-    if (blobRef.current) return blobRef.current;
+    const cached = blobRef.current[format];
+    if (cached && refreshKey === 0) return cached;
     try {
       const res = await fetch(shareImageUrl);
       if (!res.ok) return null;
-      blobRef.current = await res.blob();
-      return blobRef.current;
+      const blob = await res.blob();
+      blobRef.current[format] = blob;
+      return blob;
     } catch { return null; }
   }
 
+  function chooseFormat(next: ShareFormat) {
+    setFormat(next);
+    setRefreshKey(0);
+  }
+
+  function refreshImage() {
+    blobRef.current = {};
+    setRefreshKey(k => k + 1);
+    showToast("Image refreshed.");
+  }
+
   function makeFile(blob: Blob): File {
-    return new File([blob], `${session.title.replace(/\s+/g, "-")}-session.png`, { type: "image/png" });
+    const label = format === "story" ? "story" : "whatsapp";
+    return new File([blob], `${session.title.replace(/\s+/g, "-")}-${label}.png`, { type: "image/png" });
   }
 
   // ── WhatsApp ─────────────────────────────────────────────────────────────────
@@ -265,6 +283,36 @@ export default function SessionShareSheet({ session, onClose }: Props) {
             <div style={{ fontSize: "0.875rem", fontWeight: 700, color: "#fff", marginBottom: 3 }}>{session.title}</div>
             <div style={{ fontSize: "0.75rem", color: "#888", lineHeight: 1.6 }}>
               {dateStr}{session.time ? ` · ${session.time}` : ""}{session.venue ? ` · ${session.venue}` : ""}
+            </div>
+          </div>
+
+          {/* Image format and preview */}
+          <div style={{ marginBottom: "1.25rem" }}>
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              {([["story", "Instagram Story"], ["whatsapp", "WhatsApp image"]] as const).map(([key, text]) => (
+                <button key={key} type="button" aria-pressed={format === key} onClick={() => chooseFormat(key)}
+                  style={{
+                    flex: 1, padding: "9px 10px", borderRadius: 10, fontSize: "0.78rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                    background: format === key ? "#F97316" : "transparent", color: "#fff",
+                    border: format === key ? "1px solid #F97316" : "1px solid rgba(255,255,255,0.16)",
+                  }}>
+                  {text}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              {/* The preview is the same image that is shared, so what the admin sees is what goes out */}
+              <img src={shareImageUrl} alt={`${session.title} ${format === "story" ? "Instagram Story" : "WhatsApp"} image preview`}
+                style={{ width: 96, height: format === "story" ? 170 : 120, objectFit: "cover", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", flexShrink: 0 }} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
+                <span style={{ fontSize: "0.72rem", color: "#888", lineHeight: 1.5 }}>
+                  {format === "story" ? "9:16 for Instagram and WhatsApp Status." : "4:5 for chats and groups."}
+                </span>
+                <button type="button" onClick={refreshImage}
+                  style={{ alignSelf: "flex-start", padding: "6px 12px", borderRadius: 8, fontSize: "0.75rem", background: "transparent", color: "#ccc", border: "1px solid rgba(255,255,255,0.16)", cursor: "pointer", fontFamily: "inherit" }}>
+                  Refresh image
+                </button>
+              </div>
             </div>
           </div>
 
