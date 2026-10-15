@@ -55,6 +55,8 @@ function fakeDb(opts: {
       const b: any = {
         select() { return b; },
         eq(k: string, v: unknown) { c.filters[k] = v; return b; },
+        in(k: string, v: unknown) { c.filters[k] = v; return b; },
+        returns() { return b; },
         order() { return b; },
         insert(p: unknown) { c.op = "insert"; c.payload = p; return b; },
         update(p: unknown) { c.op = "update"; c.payload = p; return b; },
@@ -66,7 +68,7 @@ function fakeDb(opts: {
         calls.push({ ...c, filters: { ...c.filters } });
         if (c.op !== "select") return Promise.resolve({ data: null, error: null });
         if (table === "it_run_registrations") return Promise.resolve({ data: reg, error: null });
-        if (table === "it_run_categories") return Promise.resolve({ data: { id: CAT_ID, category_type: opts.category ?? "solo" }, error: null });
+        if (table === "it_run_categories") return Promise.resolve({ data: [{ id: CAT_ID, category_type: opts.category ?? "solo" }], error: null });
         if (table === "it_run_events") return Promise.resolve({ data: { event_date: "2026-08-17" }, error: null });
         if (table === "it_run_participants") return Promise.resolve({ data: participants, error: null });
         return Promise.resolve({ data: single ? null : [], error: null });

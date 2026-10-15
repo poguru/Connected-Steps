@@ -130,7 +130,9 @@ function categoryDb(category: Record<string, unknown> | null, draftRow: any = nu
         b.gt = () => b;
         b.order = () => b;
         b.limit = () => b;
-        b.in = () => b;
+        b.in = () => { b.inMode = true; return b; };
+        b.returns = () => b;
+        b.lte = () => b;
         b.insert = () => { b.op = "insert"; writes.push(table); return b; };
         b.update = () => { b.op = "update"; writes.push(table); return b; };
         b.maybeSingle = () => b.single();
@@ -142,7 +144,7 @@ function categoryDb(category: Record<string, unknown> | null, draftRow: any = nu
           return Promise.resolve({ data: null, error: null });
         };
         b.then = (res: (v: any) => unknown, rej?: (e: unknown) => unknown) =>
-          Promise.resolve({ data: [], error: null }).then(res, rej);
+          Promise.resolve({ data: table === "it_run_categories" && b.inMode ? [category] : [], error: null }).then(res, rej);
         return b;
       },
       rpc() { writes.push("rpc"); return Promise.resolve({ data: null, error: null }); },
@@ -184,7 +186,7 @@ describe("registration enforces the selected category's participant count", () =
     mockDb.mockReturnValue(db);
     const res = await registerPost(registerReq("id-duo", 1));
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/exactly 2 runners/);
+    expect((await res.json()).error).toMatch(/in pairs \(2 per team\)/);
     expect(writes).toEqual([]);
   });
 

@@ -9,6 +9,7 @@ import { sendEmail, eventRegistrationEmailHTML } from "@/lib/notify";
 import { activateMembership }   from "@/lib/membership-activate";
 import { noticesAfterPayment } from "@/lib/it-run-confirmation";
 import { confirmCheckoutPayment } from "@/lib/it-run-checkout-confirm";
+import { releaseSeats, seatLinesForRegistration } from "@/lib/it-run-seats";
 
 // POST /api/webhooks/razorpay
 //
@@ -164,10 +165,10 @@ export async function POST(req: NextRequest) {
           .select("id");
 
         if (failedRows?.length) {
-          await db2.rpc("itr_release_capacity", {
-            p_category_id: itReg.category_id,
-            p_count:       itReg.participant_count,
-          });
+          // Seats per participant category: a booking can hold runners from several categories
+          await releaseSeats(db2, await seatLinesForRegistration(db2, itReg.id, {
+            categoryId: itReg.category_id, participantCount: itReg.participant_count,
+          }));
           if (itReg.early_bird_offer_id) await db2.rpc("itr_early_bird_release", { p_offer_id: itReg.early_bird_offer_id });
           if (itReg.coupon_id && itReg.discount_amount > 0) {
             await db2.rpc("itr_release_coupon", { p_coupon_id: itReg.coupon_id });
@@ -499,11 +500,10 @@ async function handleItRunRefund(
     return;
   }
 
-  // Release capacity slot(s)
-  await db.rpc("itr_release_capacity", {
-    p_category_id: itReg.category_id,
-    p_count:       itReg.participant_count,
-  });
+  // Release capacity slot(s), per participant category
+  await releaseSeats(db, await seatLinesForRegistration(db, itReg.id, {
+    categoryId: itReg.category_id, participantCount: itReg.participant_count,
+  }));
 
   // Release coupon usage if one was applied (was missing — bug fix)
   if (itReg.early_bird_offer_id) await db.rpc("itr_early_bird_release", { p_offer_id: itReg.early_bird_offer_id });

@@ -8,7 +8,10 @@ import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 import { buildDashboardUrl } from "@/lib/it-run-dashboard-link";
 import { hashDraftToken, isWellFormedDraftToken } from "@/lib/it-run-drafts";
 import { bestEarlyBird, type EarlyBirdOffer } from "@/lib/it-run-early-bird";
-import { participantCountAllowed, participantCountMessage, bookingPrice } from "@/lib/it-run-category-rules";
+import {
+  participantCountAllowed, participantCountMessage, bookingPrice, isChildPosition, type CategoryType,
+} from "@/lib/it-run-category-rules";
+import { reserveSeats, releaseSeats, type SeatLine } from "@/lib/it-run-seats";
 import { initialVerificationStatus, isStoredDocumentPath, idDocumentTypeFor, idUploadError } from "@/lib/it-run-id-verification";
 import { checkPersonName, checkBibName, normalizeName } from "@/lib/it-run-name-validation";
 import {
@@ -24,6 +27,14 @@ interface ParticipantInput {
   /** "company" (default) or "government": the kind of ID in companyIdUrl */
   idDocumentType?: string;
   tshirtSize: string; medicalConditions: string; foodPreference: string;
+  /** The category this participant is registered in. Each participant chooses their own. */
+  categoryId?: string;
+}
+
+interface CategoryRow {
+  id: string; event_id: string; name: string;
+  category_type: CategoryType;
+  price_rupees: number; max_participants: number | null; is_active: boolean;
 }
 
 // Server-authoritative size lists (mirrors event-config/route.ts — keep in sync)
@@ -32,19 +43,34 @@ const CHILD_SIZES = ["5-6Y", "7-8Y", "9-10Y", "11-12Y", "13-14Y"];
 
 type ParticipantMeta = { is_child: boolean; tshirt_sizes: string[] };
 
-function deriveParticipantMeta(
-  categoryType: "solo" | "duo" | "kid",
-  count: number,
-): ParticipantMeta[] {
-  if (categoryType === "kid") {
-    return [
-      { is_child: false, tshirt_sizes: ADULT_SIZES }, // index 0 = parent
-      { is_child: true,  tshirt_sizes: CHILD_SIZES  }, // index 1 = child
-    ];
-  }
-  return Array.from({ length: count }, () => ({
-    is_child: false, tshirt_sizes: ADULT_SIZES,
-  }));
+/** Metadata for the participant at this position within their own category. */
+function participantMetaFor(categoryType: CategoryType, indexInCategory: number): ParticipantMeta {
+  const child = isChildPosition(categoryType, indexInCategory);
+  return { is_child: child, tshirt_sizes: child ? CHILD_SIZES : ADULT_SIZES };
+}
+
+/**
+ * Metadata for every participant in booking order. Each category's participants are numbered within that
+ * category, so a parent and child pair is read correctly even when several categories share the booking.
+ */
+function participantMetaByIndex(categoryIds: string[], typeById: Map<string, CategoryType>): ParticipantMeta[] {
+  const positionInCategory = new Map<string, number>();
+  return categoryIds.map(id => {
+    const position = positionInCategory.get(id) ?? 0;
+    positionInCategory.set(id, position + 1);
+    return participantMetaFor(typeById.get(id) ?? "solo", position);
+  });
+}
+
+/** Participant indexes grouped by category, in the order they were entered. */
+function indexesByCategory(categoryIds: string[]): Map<string, number[]> {
+  const groups = new Map<string, number[]>();
+  categoryIds.forEach((id, index) => {
+    const list = groups.get(id);
+    if (list) list.push(index);
+    else groups.set(id, [index]);
+  });
+  return groups;
 }
 
 export interface ParticipantFieldError {
@@ -128,8 +154,9 @@ function validateParticipants(
 }
 
 // POST /api/it-run/register
-// Creates a new registration + participant records.
-// Payment is handled separately via /api/it-run/payment/create-order.
+// Creates one registration for the whole booking: one registration code, one payment, and one row per participant.
+// Each participant names their own category, and the categories may differ within the booking (all of the same
+// event). Payment is handled separately via /api/it-run/payment/create-order and charges the booking's total.
 export async function POST(req: NextRequest) {
   try {
     const ip = getClientIp(req);
@@ -141,58 +168,68 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { categoryId, couponId, participants, draftToken } = await req.json() as {
-      categoryId:   string;
+    const { categoryId: bodyCategoryId, couponId, participants, draftToken } = await req.json() as {
+      /** Used when a participant names no category of their own (a single-category booking) */
+      categoryId?:  string | null;
       couponId:     string | null;
       participants: ParticipantInput[];
       draftToken?:  string | null;
     };
 
-    if (!categoryId || !Array.isArray(participants) || participants.length === 0) {
+    if (!Array.isArray(participants) || participants.length === 0) {
+      return NextResponse.json({ error: "categoryId and participants are required" }, { status: 400 });
+    }
+    const participantCategoryIds = participants.map(p => p.categoryId || bodyCategoryId || "");
+    if (participantCategoryIds.some(id => !id)) {
       return NextResponse.json({ error: "categoryId and participants are required" }, { status: 400 });
     }
 
     const db = getSupabaseServer();
+    const uniqueCategoryIds = Array.from(new Set(participantCategoryIds));
 
-    // Fetch category + event
-    const { data: cat } = await db
+    // Fetch every category the booking uses
+    const { data: catRows, error: catErr } = await db
       .from("it_run_categories")
       .select("id,event_id,name,category_type,price_rupees,max_participants,is_active")
-      .eq("id", categoryId)
-      .single<{
-        id: string; event_id: string; name: string;
-        category_type: "solo" | "duo" | "kid";
-        price_rupees: number; max_participants: number | null; is_active: boolean;
-      }>();
-
-    if (!cat || !cat.is_active) {
+      .in("id", uniqueCategoryIds)
+      .returns<CategoryRow[]>();
+    if (catErr || !catRows || catRows.length !== uniqueCategoryIds.length || catRows.some(c => !c.is_active)) {
       return NextResponse.json({ error: "Category not found or inactive" }, { status: 404 });
     }
+    const categoryById = new Map(catRows.map(c => [c.id, c]));
+    const primary = categoryById.get(participantCategoryIds[0])!;
+    if (catRows.some(c => c.event_id !== primary.event_id)) {
+      return NextResponse.json({ error: "All categories in one registration must belong to the same event." }, { status: 400 });
+    }
+    const typeById = new Map(catRows.map(c => [c.id, c.category_type]));
 
     // Check registration window; also fetch event_date for child age validation
     const { data: evStatus } = await db
       .from("it_run_events")
       .select("registration_closes_at,event_date")
-      .eq("id", cat.event_id)
+      .eq("id", primary.event_id)
       .single<{ registration_closes_at: string | null; event_date: string }>();
 
     if (evStatus?.registration_closes_at && new Date(evStatus.registration_closes_at) < new Date()) {
       return NextResponse.json({ error: "Registration for this event is now closed" }, { status: 409 });
     }
 
-    // Fixed-composition categories (duo, parent & child) need exactly their composition. Individual categories
-    // accept one or more runners in the same booking. Both rules come from lib/it-run-category-rules.ts.
-    if (!participantCountAllowed(cat.category_type, participants.length)) {
-      return NextResponse.json(
-        { error: participantCountMessage(cat.category_type, participants.length), code: "PARTICIPANT_COUNT" },
-        { status: 400 },
-      );
+    // Each category must be a valid number of people: individual runners, or whole pairs for duo and kid.
+    const groups = indexesByCategory(participantCategoryIds);
+    for (const [id, indexes] of groups) {
+      const cat = categoryById.get(id)!;
+      if (!participantCountAllowed(cat.category_type, indexes.length)) {
+        return NextResponse.json(
+          { error: participantCountMessage(cat.category_type, indexes.length), code: "PARTICIPANT_COUNT" },
+          { status: 400 },
+        );
+      }
     }
 
     // Derive per-participant metadata (child/adult, valid t-shirt sizes) server-side.
     // This ensures validation rules match what the event-config API advertises,
     // without trusting any client-supplied type or role field.
-    const participantMeta = deriveParticipantMeta(cat.category_type, participants.length);
+    const participantMeta = participantMetaByIndex(participantCategoryIds, typeById);
 
     // Age reference date = the event's calendar date (YYYY-MM-DD from the database), so ages are
     // calendar-based and independent of the server's timezone. Missing event date is a server error.
@@ -212,61 +249,83 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Each individual runner pays the category price; a fixed-composition team pays it once.
-    const basePrice = bookingPrice(cat.category_type, cat.price_rupees, participants.length);
+    // One line per category: its seats and its price. A fixed-composition team pays once; each individual runner pays.
+    const lines = Array.from(groups, ([id, indexes]) => {
+      const cat = categoryById.get(id)!;
+      return {
+        categoryId: id,
+        count:      indexes.length,
+        price:      bookingPrice(cat.category_type, cat.price_rupees, indexes.length),
+      };
+    });
+    const basePrice = lines.reduce((sum, line) => sum + line.price, 0);
+    const seatLines: SeatLine[] = lines.map(line => ({ categoryId: line.categoryId, count: line.count }));
+
+    // Discounts. Only one of an early bird or a coupon applies to a booking. An early bird is per category: each
+    // category with an offer gets its own, on its own line. Both are claimed here, on the server.
+    let couponReserved = false;
+    const claimedOffers: string[] = [];
+    // Releases every hold this request took: its coupon use and any early bird places it claimed.
+    const releaseHolds = async () => {
+      if (couponReserved) void db.rpc("itr_release_coupon", { p_coupon_id: couponId });
+      for (const offerId of claimedOffers) void db.rpc("itr_early_bird_release", { p_offer_id: offerId });
+    };
+
+    const nowIso = new Date().toISOString();
+    const { data: ebOffers, error: ebErr } = await db
+      .from("it_run_early_bird_offers")
+      .select("id, category_id, name, discount_type, discount_value, starts_at, ends_at, status, redemption_limit, redemptions_used, min_payable_rupees")
+      .in("category_id", uniqueCategoryIds)
+      .eq("status", "active")
+      .lte("starts_at", nowIso)
+      .gt("ends_at", nowIso);
+    if (ebErr) {
+      console.error("[it-run/register] early bird lookup failed:", ebErr.message);
+      return NextResponse.json({ error: "We couldn't check offers right now. Please try again." }, { status: 500 });
+    }
+
+    const offers = (ebOffers ?? []) as EarlyBirdOffer[];
+    const applied: Array<{ offerId: string; discount: number }> = [];
+    for (const line of lines) {
+      const best = bestEarlyBird(line.price, offers.filter(o => o.category_id === line.categoryId), Date.now());
+      if (best) applied.push({ offerId: best.offer.id, discount: best.discount });
+    }
+    if (applied.length > 0 && couponId) {
+      return NextResponse.json({
+        error: "An early bird offer applies to a category in this registration, and it can't be combined with a discount code. Remove the code to continue.",
+        code: "EARLY_BIRD_NO_COUPON",
+      }, { status: 409 });
+    }
+    let earlyBirdDiscount = 0;
+    for (const claim of applied) {
+      const { data: claimed, error: claimErr } = await db.rpc("itr_early_bird_claim", { p_offer_id: claim.offerId });
+      if (claimErr || !claimed) {
+        await releaseHolds();
+        if (claimErr) {
+          console.error("[it-run/register] early bird claim failed:", claimErr.message);
+          return NextResponse.json({ error: "We couldn't apply the offer right now. Please try again." }, { status: 500 });
+        }
+        return NextResponse.json({
+          error: "An early bird offer in this registration has just sold out or ended. Refresh the page to see the current price.",
+          code: "EARLY_BIRD_UNAVAILABLE",
+        }, { status: 409 });
+      }
+      claimedOffers.push(claim.offerId);
+      earlyBirdDiscount += claim.discount;
+    }
+    // The registration stores one offer for display; each claimed offer is still recorded on its own.
+    const earlyBirdOfferId = applied[0]?.offerId ?? null;
 
     // Atomically validate and claim one coupon use.
     // The DB function acquires a FOR UPDATE lock on the coupon row so concurrent
     // uses serialize — the 101st use of a 100-use coupon is impossible.
     // Returns the discount amount in rupees, or NULL if the coupon is invalid,
     // inactive, expired, exhausted, or the order is below the minimum amount.
-    let discountAmt    = 0;
-    let couponReserved = false;
-
-    // Early bird: an admin-configured offer for this category, valid now and with quota left.
-    // Only one of an early bird or a coupon applies. The offer is checked and its place is claimed here, on the server.
-    let earlyBirdOfferId: string | null = null;
-    {
-      const nowIso = new Date().toISOString();
-      const { data: ebOffers, error: ebErr } = await db
-        .from("it_run_early_bird_offers")
-        .select("id, category_id, name, discount_type, discount_value, starts_at, ends_at, status, redemption_limit, redemptions_used, min_payable_rupees")
-        .eq("category_id", categoryId)
-        .eq("status", "active")
-        .lte("starts_at", nowIso)
-        .gt("ends_at", nowIso);
-      if (ebErr) {
-        console.error("[it-run/register] early bird lookup failed:", ebErr.message);
-        return NextResponse.json({ error: "We couldn't check offers right now. Please try again." }, { status: 500 });
-      }
-      const applied = bestEarlyBird(basePrice, (ebOffers ?? []) as EarlyBirdOffer[], Date.now());
-      if (applied && couponId) {
-        return NextResponse.json({
-          error: "An early bird offer applies to this category, and it can't be combined with a discount code. Remove the code to continue.",
-          code: "EARLY_BIRD_NO_COUPON",
-        }, { status: 409 });
-      }
-      if (applied) {
-        const { data: claimed, error: claimErr } = await db.rpc("itr_early_bird_claim", { p_offer_id: applied.offer.id });
-        if (claimErr) {
-          console.error("[it-run/register] early bird claim failed:", claimErr.message);
-          return NextResponse.json({ error: "We couldn't apply the offer right now. Please try again." }, { status: 500 });
-        }
-        if (!claimed) {
-          return NextResponse.json({
-            error: "This early bird offer has just sold out or ended. Refresh the page to see the current price.",
-            code: "EARLY_BIRD_UNAVAILABLE",
-          }, { status: 409 });
-        }
-        earlyBirdOfferId = applied.offer.id;
-        discountAmt = applied.discount;
-      }
-    }
-
-    if (couponId && !earlyBirdOfferId) {
+    let discountAmt = earlyBirdDiscount;
+    if (couponId && claimedOffers.length === 0) {
       const { data: couponDiscount, error: couponErr } = await db.rpc("itr_use_coupon", {
         p_coupon_id:  couponId,
-        p_event_id:   cat.event_id,
+        p_event_id:   primary.event_id,
         p_base_price: basePrice,
       });
 
@@ -286,32 +345,23 @@ export async function POST(req: NextRequest) {
     const finalPrice = Math.max(0, basePrice - discountAmt);
     const regCode    = generateRegistrationCode();
 
-    // Atomically reserve capacity.
-    // The DB function acquires a FOR UPDATE row lock on it_run_categories so
-    // two simultaneous requests for the final slot serialize here — only one
-    // can increment the counter past max_participants.
-    // It also expires stale pending registrations (> 15 min without payment)
-    // so abandoned attempts don't permanently consume capacity.
-    const { data: reserveStatus, error: reserveErr } = await db.rpc(
-      "itr_reserve_capacity",
-      { p_category_id: categoryId, p_increment: participants.length, p_payment_ttl_mins: 15 },
-    );
-
-    if (reserveErr) {
-      console.error("[it-run/register] capacity RPC error:", reserveErr.message);
-      if (couponReserved) void db.rpc("itr_release_coupon", { p_coupon_id: couponId });
-      if (earlyBirdOfferId) void db.rpc("itr_early_bird_release", { p_offer_id: earlyBirdOfferId });
+    // Atomically reserve the seats of every category, or none. The DB function locks the event's categories
+    // in id order, so two simultaneous bookings for the final seats serialize here.
+    // It also expires stale pending registrations (> 15 min without payment) so abandoned attempts don't
+    // permanently consume capacity.
+    const reserved = await reserveSeats(db, seatLines, 15);
+    if (reserved !== "confirmed") {
+      await releaseHolds();
+      if (reserved === "full") {
+        return NextResponse.json({
+          error: "A category in this registration is fully booked. Remove it, or choose another category.",
+          code: "CATEGORY_FULL",
+        }, { status: 409 });
+      }
+      if (reserved === "unavailable") {
+        return NextResponse.json({ error: "Category not found or inactive" }, { status: 404 });
+      }
       return NextResponse.json({ error: "Capacity check failed" }, { status: 500 });
-    }
-    if (reserveStatus === "full") {
-      if (couponReserved) void db.rpc("itr_release_coupon", { p_coupon_id: couponId });
-      if (earlyBirdOfferId) void db.rpc("itr_early_bird_release", { p_offer_id: earlyBirdOfferId });
-      return NextResponse.json({ error: "This category is fully booked" }, { status: 409 });
-    }
-    if (reserveStatus === "unavailable") {
-      if (couponReserved) void db.rpc("itr_release_coupon", { p_coupon_id: couponId });
-      if (earlyBirdOfferId) void db.rpc("itr_early_bird_release", { p_offer_id: earlyBirdOfferId });
-      return NextResponse.json({ error: "Category not found or inactive" }, { status: 404 });
     }
 
     // Insert registration
@@ -321,8 +371,9 @@ export async function POST(req: NextRequest) {
     const { data: reg, error: regErr } = await db
       .from("it_run_registrations")
       .insert({
-        event_id:          cat.event_id,
-        category_id:       categoryId,
+        event_id:          primary.event_id,
+        // The booking's first category. Each participant's own category is on their participant row.
+        category_id:       primary.id,
         registration_code: regCode,
         lead_email:        participants[0]?.email?.toLowerCase()?.trim() ?? "",
         participant_count: participants.length,
@@ -341,16 +392,16 @@ export async function POST(req: NextRequest) {
 
     if (regErr || !reg) {
       console.error("[it-run/register] reg insert error:", regErr?.message);
-      void db.rpc("itr_release_capacity", { p_category_id: categoryId, p_count: participants.length });
-      if (couponReserved) void db.rpc("itr_release_coupon", { p_coupon_id: couponId });
-      if (earlyBirdOfferId) void db.rpc("itr_early_bird_release", { p_offer_id: earlyBirdOfferId });
+      await releaseSeats(db, seatLines);
+      await releaseHolds();
       return NextResponse.json({ error: "Failed to create registration" }, { status: 500 });
     }
 
     // Insert participants
     const partInserts = participants.map((p, idx) => ({
       registration_id:    reg.id,
-      event_id:           cat.event_id,
+      event_id:           primary.event_id,
+      category_id:        participantCategoryIds[idx],
       participant_type:   p.type,
       first_name:         normalizeName(p.firstName),
       last_name:          normalizeName(p.lastName),
@@ -383,9 +434,8 @@ export async function POST(req: NextRequest) {
     if (partErr || !parts) {
       console.error("[it-run/register] participant insert error:", partErr?.message);
       await db.from("it_run_registrations").delete().eq("id", reg.id);
-      void db.rpc("itr_release_capacity", { p_category_id: categoryId, p_count: participants.length });
-      if (couponReserved) void db.rpc("itr_release_coupon", { p_coupon_id: couponId });
-      if (earlyBirdOfferId) void db.rpc("itr_early_bird_release", { p_offer_id: earlyBirdOfferId });
+      await releaseSeats(db, seatLines);
+      await releaseHolds();
       return NextResponse.json({ error: "Failed to create participant records" }, { status: 500 });
     }
 
@@ -414,9 +464,8 @@ export async function POST(req: NextRequest) {
       );
       // Roll back: delete the registration (cascade removes participants) and release reserved slot/coupon
       await db.from("it_run_registrations").delete().eq("id", reg.id);
-      void db.rpc("itr_release_capacity", { p_category_id: categoryId, p_count: participants.length });
-      if (couponReserved) void db.rpc("itr_release_coupon", { p_coupon_id: couponId });
-      if (earlyBirdOfferId) void db.rpc("itr_early_bird_release", { p_offer_id: earlyBirdOfferId });
+      await releaseSeats(db, seatLines);
+      await releaseHolds();
       return NextResponse.json(
         { error: "Failed to generate QR codes, please try again" },
         { status: 500 },
@@ -432,7 +481,7 @@ export async function POST(req: NextRequest) {
 
     // Record coupon use for audit trail.
     // use_count was already incremented atomically by itr_use_coupon above.
-    if (couponId && discountAmt > 0) {
+    if (couponId && discountAmt > 0 && couponReserved) {
       const { error: useErr } = await db
         .from("it_run_coupon_uses")
         .insert({
@@ -465,8 +514,8 @@ export async function POST(req: NextRequest) {
         .update({ status: "converted", registration_id: reg.id })
         .eq("token_hash", hashDraftToken(draftToken))
         .eq("status", "open")
-        // Only close the draft for the category this registration was made for
-        .eq("state->>selectedCatId", categoryId)
+        // Only close the draft for the booking's first category, as before
+        .eq("state->>selectedCatId", primary.id)
         .then(() => {}, e => console.error("[it-run/register] draft conversion failed:", (e as Error).name));
     }
 
@@ -486,11 +535,11 @@ export async function POST(req: NextRequest) {
 // PATCH /api/it-run/register
 // Edits the participant details of an EXISTING, unpaid registration (used when a participant goes back
 // from review or payment to correct something). It never creates a registration or an order, never
-// changes capacity or coupons, and never changes QR tokens or the registration code.
+// changes capacity or coupons, and never changes QR tokens, the registration code, or any participant's category.
 //
 // Refused: confirmed payments, category changes, expired reservations, and any participant ID that
 // does not belong to this registration. Validation is identical to POST.
-// Body: { registrationId, registrationCode, categoryId, participants: [{ id, ...fields }] }
+// Body: { registrationId, registrationCode, categoryId, participants: [{ id, categoryId?, ...fields }] }
 export async function PATCH(req: NextRequest) {
   const rl = await checkAndRecordEndpointLimit(`itr:edit:${getClientIp(req)}`, 20, 60_000);
   if (rl.limited) {
@@ -553,43 +602,57 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "The number of participants doesn't match this registration.", code: "PARTICIPANT_COUNT" }, { status: 400 });
   }
 
-  const { data: cat } = await db
-    .from("it_run_categories")
-    .select("id, category_type")
-    .eq("id", reg.category_id)
-    .maybeSingle<{ id: string; category_type: "solo" | "duo" | "kid" }>();
-  const { data: ev } = await db
-    .from("it_run_events")
-    .select("event_date")
-    .eq("id", reg.event_id)
-    .maybeSingle<{ event_date: string }>();
-  const eventDate = parseCalendarDate(ev?.event_date);
-  if (!cat || !eventDate) {
-    return NextResponse.json({ error: "Registration is temporarily unavailable. Please try again later.", code: "SERVER_ERROR" }, { status: 503 });
-  }
-
-  // Same rules as registration. The server is the authority.
-  const meta = deriveParticipantMeta(cat.category_type, participants.length);
-  const fieldError = validateParticipants(participants, meta, eventDate, todayInIST());
-  if (fieldError) {
-    return NextResponse.json({ error: fieldError.message, field: fieldError.field, participant_index: fieldError.participantIndex }, { status: 400 });
-  }
-
   // Every participant must be one of this registration's participants, each exactly once
   const { data: existing, error: existingErr } = await db
     .from("it_run_participants")
-    .select("id, company_id_url, verification_status")
+    .select("id, company_id_url, verification_status, category_id")
     .eq("registration_id", reg.id);
   if (existingErr) {
     return NextResponse.json({ error: "We couldn't save your changes. Please try again.", code: "SERVER_ERROR" }, { status: 500 });
   }
-  const byId = new Map((existing ?? []).map(r => [r.id as string, r as { id: string; company_id_url: string | null; verification_status: string }]));
+  const byId = new Map((existing ?? []).map(r => [r.id as string, r as { id: string; company_id_url: string | null; verification_status: string; category_id: string | null }]));
   const seen = new Set<string>();
   for (const p of participants) {
     if (!p.id || !byId.has(p.id) || seen.has(p.id)) {
       return NextResponse.json({ error: "These participant details don't match this registration. Reload and try again.", code: "PARTICIPANT_MISMATCH" }, { status: 400 });
     }
     seen.add(p.id);
+  }
+
+  // A participant's category is set at registration and never changes here
+  const storedCategoryIds = participants.map(p => byId.get(p.id as string)!.category_id ?? reg.category_id);
+  for (let i = 0; i < participants.length; i++) {
+    const requested = participants[i].categoryId;
+    if (requested && requested !== storedCategoryIds[i]) {
+      return NextResponse.json({
+        error: "A participant's category can't be changed after registration has started. Email info@connectedsteps.in for help.",
+        code: "CATEGORY_LOCKED",
+      }, { status: 409 });
+    }
+  }
+
+  const uniqueCategoryIds = Array.from(new Set(storedCategoryIds));
+  const { data: cats } = await db
+    .from("it_run_categories")
+    .select("id, category_type")
+    .in("id", uniqueCategoryIds)
+    .returns<Array<{ id: string; category_type: CategoryType }>>();
+  const { data: ev } = await db
+    .from("it_run_events")
+    .select("event_date")
+    .eq("id", reg.event_id)
+    .maybeSingle<{ event_date: string }>();
+  const eventDate = parseCalendarDate(ev?.event_date);
+  if (!cats || cats.length !== uniqueCategoryIds.length || !eventDate) {
+    return NextResponse.json({ error: "Registration is temporarily unavailable. Please try again later.", code: "SERVER_ERROR" }, { status: 503 });
+  }
+
+  // Same rules as registration. The server is the authority.
+  const typeById = new Map(cats.map(c => [c.id, c.category_type]));
+  const meta = participantMetaByIndex(storedCategoryIds, typeById);
+  const fieldError = validateParticipants(participants, meta, eventDate, todayInIST());
+  if (fieldError) {
+    return NextResponse.json({ error: fieldError.message, field: fieldError.field, participant_index: fieldError.participantIndex }, { status: 400 });
   }
 
   const results = await Promise.all(participants.map((p, idx) => {

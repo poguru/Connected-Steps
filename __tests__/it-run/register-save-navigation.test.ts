@@ -161,7 +161,7 @@ describe("registration wizard wiring", () => {
   const page = fs.readFileSync(path.join(__dirname, "..", "..", "app/it-run/register/page.tsx"), "utf8");
 
   it("the step moves that go through the save are the Back, Next and review actions", () => {
-    for (const fn of ["handleParticipantBack", "handleCompanyNext", "handleParticipantNext", "addParticipant",
+    for (const fn of ["handleParticipantBack", "handleCompanyNext", "handleParticipantNext",
       "editParticipant", "editVerification", "editCategory", "editCoupon"]) {
       const body = page.slice(page.indexOf(`function ${fn}`), page.indexOf(`function ${fn}`) + 900);
       expect(body).toContain("persistThen(");

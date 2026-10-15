@@ -14,7 +14,10 @@ import { idUploadError, isStoredDocumentPath } from "@/lib/it-run-id-verificatio
 import { IssueReportButton } from "@/components/ui/BugReportFab";
 import { checkPersonName, checkBibName, bibNameHint } from "@/lib/it-run-name-validation";
 import { draftKeyOf, saveStatusFor, createMoveGate } from "@/lib/it-run-step-save";
-import { bookingPrice } from "@/lib/it-run-category-rules";
+import {
+  countsFromCategoryIds, slotsFor, rebuildParticipants, primaryCategory, maxCountFor, seatsLeft, teamSize,
+  bookingLines, bookingTotals, bookingSummary, type ParticipantSlot, type BookingLine,
+} from "@/lib/it-run-booking";
 import { payableCheckout } from "@/lib/it-run-checkout";
 import { publishBottomBarHeight } from "@/lib/bottom-bar";
 import {
@@ -39,6 +42,8 @@ interface Participant {
   /** When an ID is uploaded: a company ID (default) or a government-issued ID */
   idDocType?: "company" | "government";
   tshirtSize: string; medicalConditions: string; foodPreference: string;
+  /** The category this participant is registered in. Each participant has their own. */
+  categoryId: string;
 }
 
 type ParticipantErrors = Partial<Record<keyof Participant, string>>;
@@ -113,11 +118,12 @@ const BLOOD_GROUPS = ["A+","A-","B+","B-","AB+","AB-","O+","O-"];
 const TSHIRT_SIZES = ["XS","S","M","L","XL","XXL","3XL"]; // adult fallback only
 const FOOD_PREFS   = ["veg","non-veg","vegan"];
 
-const emptyParticipant = (): Participant => ({
+const emptyParticipant = (categoryId = ""): Participant => ({
   firstName: "", lastName: "", bibName: "", gender: "", dob: "", email: "", mobile: "",
   bloodGroup: "", emergencyName: "", emergencyPhone: "",
   companyName: "", employeeId: "", companyIdFile: null, companyIdUrl: "",
   tshirtSize: "", medicalConditions: "", foodPreference: "veg",
+  categoryId,
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -524,9 +530,10 @@ function ParticipantForm({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function PriceBar({
-  category, finalPrice, couponApplied, step, participantSubIdx, participantCount,
+  categoryName, color, finalPrice, couponApplied, step, participantSubIdx, participantCount,
 }: {
-  category: ItRunCategory;
+  categoryName: string;
+  color: string;
   finalPrice: number;
   couponApplied: boolean;
   step: number;
@@ -545,12 +552,12 @@ function PriceBar({
       display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
-        <div style={{ width: 7, height: 7, borderRadius: "50%", background: category.color, flexShrink: 0 }} />
+        <div style={{ width: 7, height: 7, borderRadius: "50%", background: color, flexShrink: 0 }} />
         <span style={{
           fontSize: 13, color: "#999", fontWeight: 600,
           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const,
         }}>
-          {category.name}
+          {categoryName}
         </span>
         {showSubStep && (
           <span style={{
@@ -582,15 +589,19 @@ function PriceBar({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Step 1 — Category Selection (unchanged UX, direct navigation to step 2)
+// Step 1 — Runners per category: choose how many people are registered in each category
 // ─────────────────────────────────────────────────────────────────────────────
 
-function StepCategory({
-  config, loading, onSelect,
+function StepCounts({
+  config, loading, counts, locked, onChange, onContinue,
 }: {
   config: ItRunEventConfig | null;
   loading: boolean;
-  onSelect: (cat: ItRunCategory) => void;
+  counts: Record<string, number>;
+  /** True once the registration exists: the runners are then fixed */
+  locked: boolean;
+  onChange: (categoryId: string, count: number) => void;
+  onContinue: () => void;
 }) {
   const eventDate = config?.event.event_date
     ? new Date(config.event.event_date + "T12:00:00Z").toLocaleDateString("en-IN", {
@@ -611,9 +622,19 @@ function StepCategory({
     );
   }
 
+  const categories = config?.categories ?? [];
+  const lines = bookingLines(counts, categories);
+  const totals = bookingTotals(lines);
+  const runners = Object.values(counts).reduce((sum, n) => sum + n, 0);
+  const stepButton = {
+    width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+    border: "1px solid rgba(232,98,10,0.4)", background: "transparent",
+    color: ACCENT, fontSize: 22, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+  };
+
   return (
     <div>
-      <div style={{ marginBottom: 28 }}>
+      <div style={{ marginBottom: 24 }}>
         <div style={{
           display: "inline-flex", alignItems: "center", gap: 6,
           background: "rgba(232,98,10,0.1)", border: "1px solid rgba(232,98,10,0.25)",
@@ -630,141 +651,121 @@ function StepCategory({
           fontSize: "clamp(22px,4vw,30px)", fontWeight: 900, color: "#fff",
           margin: "0 0 6px", lineHeight: 1.2,
         }}>
-          Choose Your Race Category
+          How many runners?
         </h1>
-        <p style={{ fontSize: 13, color: "#555", margin: 0 }}>
+        <p style={{ fontSize: 13, color: "#555", margin: "0 0 12px" }}>
           {config?.event.venue_name && `${config.event.venue_name} · `}{eventDate}
+        </p>
+        <p style={{ fontSize: 13, color: "#888", margin: 0, lineHeight: 1.6 }}>
+          Choose how many people you are registering in each category. Each person gets their own QR, BIB and race-day details.
+          Duo and Parent &amp; Child categories are sold in pairs, and each pair pays once.
         </p>
       </div>
 
+      {locked && (
+        <div role="note" style={{
+          fontSize: 13, color: "#fbbf24", background: "rgba(251,191,36,0.06)",
+          border: "1px solid rgba(251,191,36,0.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, lineHeight: 1.5,
+        }}>
+          Your runners are fixed once registration has started. To change them, email info@connectedsteps.in.
+        </div>
+      )}
+
       <div style={{ display: "flex", flexDirection: "column" as const, gap: 10 }}>
-        {(config?.categories ?? []).map(cat => (
-          <button
-            key={cat.id}
-            onClick={() => !cat.is_soldout && onSelect(cat)}
-            disabled={cat.is_soldout}
-            style={{
+        {categories.map(cat => {
+          const count = counts[cat.id] ?? 0;
+          const team = teamSize(cat);
+          const max = maxCountFor(cat);
+          const left = seatsLeft(cat);
+          const disabled = locked || cat.is_soldout;
+          const price = cat.early_bird ? cat.early_bird.finalPrice : cat.price_rupees;
+          return (
+            <div key={cat.id} style={{
               ...CARD_BASE,
-              padding: "18px 20px",
-              cursor: cat.is_soldout ? "not-allowed" : "pointer",
-              textAlign: "left" as const, width: "100%",
+              padding: 16,
               border: `1px solid ${cat.color}22`,
-              fontFamily: "inherit",
-              display: "flex", alignItems: "center", gap: 16,
               opacity: cat.is_soldout ? 0.45 : 1,
-              transition: "all 0.2s",
-            }}
-            onMouseEnter={e => {
-              if (!cat.is_soldout) (e.currentTarget as HTMLButtonElement).style.borderColor = `${cat.color}60`;
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = `${cat.color}22`;
-            }}
-          >
-            {/* Distance */}
-            <div style={{
-              fontSize: "clamp(22px,3.5vw,26px)", fontWeight: 900, color: cat.color,
-              minWidth: 60, lineHeight: 1, flexShrink: 0,
+              display: "flex", flexWrap: "wrap" as const, alignItems: "center", gap: 14,
             }}>
-              {cat.distance_km}
-              <span style={{ fontSize: 11, fontWeight: 700, marginLeft: 2 }}>KM</span>
-            </div>
-
-            {/* Middle */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 5 }}>
-                {cat.name}
-                {cat.is_soldout && (
-                  <span style={{
-                    marginLeft: 8, fontSize: 10, color: "#f87171",
-                    background: "rgba(248,113,113,0.1)", padding: "1px 6px", borderRadius: 4,
-                  }}>
-                    SOLD OUT
-                  </span>
-                )}
-              </div>
-              <div style={{ display: "flex", gap: 5, flexWrap: "wrap" as const }}>
-                <span style={{
-                  fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4,
-                  color:      cat.is_timed ? cat.color : "#64748b",
-                  background: cat.is_timed ? `${cat.color}18` : "rgba(100,116,139,0.12)",
-                }}>
-                  {cat.is_timed ? "Timed" : "Non-Timed"}
-                </span>
-                {cat.inclusions.map(inc => (
-                  <span key={inc} style={{
-                    fontSize: 10, color: "#666",
-                    background: "rgba(255,255,255,0.04)", padding: "2px 7px", borderRadius: 4,
-                  }}>
-                    {inc}
-                  </span>
-                ))}
-                {cat.participant_count > 1 && (
-                  <span style={{
-                    fontSize: 10, color: cat.color, background: `${cat.color}15`,
-                    padding: "2px 7px", borderRadius: 4,
-                  }}>
-                    {cat.participant_labels.map(l => l.label).join(" + ")}
-                  </span>
-                )}
-              </div>
-
-              {/* Capacity indicator */}
-              {cat.max_participants != null && !cat.is_soldout && (
-                (() => {
-                  const remaining = cat.max_participants - cat.current_participants;
-                  const pct = Math.min(100, (cat.current_participants / cat.max_participants) * 100);
-                  const low = remaining <= 20;
-                  return (
-                    <div style={{ marginTop: 10 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                        <span style={{ fontSize: 10, color: low ? "#fbbf24" : "#444" }}>
-                          {low ? `Only ${remaining} spots left!` : `${remaining} spots available`}
-                        </span>
-                        <span style={{ fontSize: 10, color: "#333" }}>{Math.round(pct)}% filled</span>
-                      </div>
-                      <div style={{ height: 3, background: "rgba(255,255,255,0.05)", borderRadius: 2 }}>
-                        <div style={{
-                          height: "100%", width: `${pct}%`,
-                          background: low ? "#fbbf24" : cat.color,
-                          borderRadius: 2, transition: "width 0.3s",
-                        }} />
-                      </div>
-                    </div>
-                  );
-                })()
-              )}
-            </div>
-
-            {/* Price + arrow */}
-            <div style={{ textAlign: "right" as const, flexShrink: 0, display: "flex", flexDirection: "column" as const, alignItems: "flex-end", gap: 4 }}>
-              {cat.early_bird ? (
-                <>
-                  <div style={{ fontSize: 12, color: "#666", textDecoration: "line-through" }}>
-                    ₹{cat.price_rupees.toLocaleString("en-IN")}
-                  </div>
-                  <div style={{ fontSize: "clamp(18px,2.5vw,22px)", fontWeight: 900, color: cat.color }}>
-                    ₹{cat.early_bird.finalPrice.toLocaleString("en-IN")}
-                  </div>
-                  <div style={{ fontSize: 10, color: "#10b981", fontWeight: 700, letterSpacing: "0.04em" }}>
-                    EARLY BIRD · ends {new Date(cat.early_bird.endsAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                  </div>
-                </>
-              ) : (
-                <div style={{ fontSize: "clamp(18px,2.5vw,22px)", fontWeight: 900, color: cat.color }}>
-                  ₹{cat.price_rupees.toLocaleString("en-IN")}
+              <div style={{ flex: "1 1 180px", minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>
+                  {cat.name}
+                  {cat.is_soldout && (
+                    <span style={{
+                      marginLeft: 8, fontSize: 10, color: "#f87171",
+                      background: "rgba(248,113,113,0.1)", padding: "1px 6px", borderRadius: 4,
+                    }}>
+                      SOLD OUT
+                    </span>
+                  )}
                 </div>
-              )}
-              {cat.participant_count > 1 && (
-                <div style={{ fontSize: 10, color: "#444" }}>for {cat.participant_count}</div>
-              )}
-              {!cat.is_soldout && (
-                <div style={{ color: "#333", fontSize: 18, lineHeight: 1 }}>›</div>
-              )}
+                <div style={{ fontSize: 12, color: "#666", marginTop: 3, lineHeight: 1.5 }}>
+                  {cat.distance_km} KM · {cat.is_timed ? "Timed" : "Non-Timed"}
+                  {cat.category_type !== "solo" && ` · Pairs: ${cat.participant_labels.map(l => l.label).join(" + ")}`}
+                </div>
+                {left !== null && !cat.is_soldout && left <= 20 && (
+                  <div style={{ fontSize: 11, color: "#fbbf24", marginTop: 4 }}>Only {left} spots left</div>
+                )}
+              </div>
+
+              <div style={{ textAlign: "right" as const, flexShrink: 0 }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: cat.color }}>
+                  ₹{price.toLocaleString("en-IN")}
+                </div>
+                <div style={{ fontSize: 10, color: "#555" }}>
+                  {cat.early_bird ? "early bird · " : ""}{cat.category_type === "solo" ? "per runner" : "per pair"}
+                </div>
+              </div>
+
+              <div role="group" aria-label={`Runners in ${cat.name}`} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button
+                  type="button"
+                  aria-label={`Remove ${team} from ${cat.name}`}
+                  disabled={disabled || count <= 0}
+                  onClick={() => onChange(cat.id, Math.max(0, count - team))}
+                  style={{ ...stepButton, opacity: disabled || count <= 0 ? 0.35 : 1 }}
+                >
+                  −
+                </button>
+                <span aria-live="polite" style={{ minWidth: 28, textAlign: "center" as const, fontSize: 18, fontWeight: 800, color: "#fff" }}>
+                  {count}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Add ${team} to ${cat.name}`}
+                  disabled={disabled || count + team > max}
+                  onClick={() => onChange(cat.id, count + team)}
+                  style={{ ...stepButton, opacity: disabled || count + team > max ? 0.35 : 1 }}
+                >
+                  +
+                </button>
+              </div>
             </div>
-          </button>
-        ))}
+          );
+        })}
       </div>
+
+      <div style={{ ...CARD_BASE, padding: 16, marginTop: 20, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" as const }}>
+        <div style={{ fontSize: 13, color: "#888" }}>
+          {runners} {runners === 1 ? "runner" : "runners"}
+          {lines.length > 0 && ` in ${lines.length} ${lines.length === 1 ? "category" : "categories"}`}
+        </div>
+        <div style={{ fontSize: 20, fontWeight: 900, color: ACCENT }}>
+          ₹{totals.total.toLocaleString("en-IN")}
+        </div>
+      </div>
+      <p style={{ fontSize: 11, color: "#555", margin: "8px 0 0", lineHeight: 1.5 }}>
+        Shown before any coupon. The amount is confirmed by the server when you register.
+      </p>
+
+      <button
+        type="button"
+        onClick={onContinue}
+        disabled={runners === 0}
+        style={{ ...BTN_PRIMARY, width: "100%", justifyContent: "center", marginTop: 18, opacity: runners === 0 ? 0.5 : 1 }}
+      >
+        Continue to participant details →
+      </button>
 
       {config && (
         <div style={{ marginTop: 24, fontSize: 12, color: "#3a3a3a", lineHeight: 1.7 }}>
@@ -780,15 +781,15 @@ function StepCategory({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Step 2 — Participant Details (one participant at a time)
+// Step 2 — Participant Details (one participant at a time). Each participant's category comes from their slot.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function StepParticipants({
-  category, participantSubIdx, setParticipantSubIdx,
+  slots, participantSubIdx, setParticipantSubIdx,
   participants, errors, onChange, submitError,
-  onBack, onNext, onAddParticipant, onRemoveParticipant, returnToReview, validateParticipant, validateNameField,
+  onBack, onNext, returnToReview, validateParticipant, validateNameField,
 }: {
-  category: ItRunCategory;
+  slots: ParticipantSlot[];
   participantSubIdx: number;
   setParticipantSubIdx: (idx: number) => void;
   participants: Participant[];
@@ -798,166 +799,88 @@ function StepParticipants({
   onBack: () => void;
   validateNameField: (idx: number, field: "firstName" | "lastName" | "bibName" | "emergencyName") => void;
   onNext: () => void;
-  onAddParticipant?: () => void;
-  onRemoveParticipant?: (idx: number) => void;
   returnToReview?: boolean;
   validateParticipant?: (idx: number) => boolean;
 }) {
-  const pl    = category.participant_labels[participantSubIdx];
+  const slot = slots[participantSubIdx];
+  const category = slot?.category ?? null;
   const total = participants.length;
   const isLast = participantSubIdx === total - 1;
-  const allowMultiParticipant = ["solo", "duo", "kid"].includes(category.category_type);
+  const nextSlot = slots[participantSubIdx + 1];
 
   return (
     <div>
       <ProgressStepper step={2} participantSubIdx={participantSubIdx} participantCount={total} />
 
-      {/* Who are you registering? — Multi-participant prompt */}
-      {participantSubIdx === 0 && (
+      {/* Category of the runner being entered */}
+      {category && (
         <div style={{
-          marginBottom: 20,
-          padding: "14px 16px",
-          background: "rgba(232,98,10,0.08)",
-          border: "1px solid rgba(232,98,10,0.3)",
+          display: "flex", alignItems: "center", gap: 10,
+          marginBottom: 24,
+          padding: "10px 14px",
+          background: `${category.color}09`,
+          border: `1px solid ${category.color}22`,
           borderRadius: 10,
         }}>
-          <div style={{ fontSize: 12, color: "#888", marginBottom: 8, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            Register Multiple Participants
-          </div>
-          <div style={{ fontSize: 14, color: "#ccc", marginBottom: 12, lineHeight: 1.6 }}>
-            Register yourself, or add friends, family, or teammates. Each person gets their own QR, BIB, and race-day details.
-          </div>
-          {total === 1 && allowMultiParticipant && (
-            <button
-              onClick={onAddParticipant}
-              style={{
-                padding: "8px 14px",
-                background: "rgba(232,98,10,0.2)",
-                border: "1px solid rgba(232,98,10,0.5)",
-                borderRadius: 6,
-                color: "#e8620a",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              + Add Another Participant
-            </button>
-          )}
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: category.color, flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: "#888", flex: 1, minWidth: 0 }}>
+            {category.name}
+            <span style={{ color: "#555", marginLeft: 6 }}>
+              {category.distance_km} KM
+              {category.is_timed ? " · Timed" : " · Non-Timed"}
+            </span>
+          </span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: category.color }}>
+            ₹{category.price_rupees.toLocaleString("en-IN")}
+          </span>
         </div>
       )}
 
-      {/* Category mini-reminder */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 10,
-        marginBottom: 24,
-        padding: "10px 14px",
-        background: `${category.color}09`,
-        border: `1px solid ${category.color}22`,
-        borderRadius: 10,
-      }}>
-        <div style={{ width: 6, height: 6, borderRadius: "50%", background: category.color, flexShrink: 0 }} />
-        <span style={{ fontSize: 12, color: "#888", flex: 1 }}>
-          {category.name}
-          <span style={{ color: "#555", marginLeft: 6 }}>
-            {category.distance_km} KM
-            {category.is_timed ? " · Timed" : " · Non-Timed"}
-          </span>
-        </span>
-        <span style={{ fontSize: 13, fontWeight: 700, color: category.color }}>
-          ₹{category.price_rupees.toLocaleString("en-IN")}
-        </span>
-      </div>
-
-      {/* ── Participant navigation tabs (Phase 3: multi-participant) ── */}
+      {/* ── Participant navigation tabs: each shows the runner's label and their category ── */}
       {total > 1 && (
         <div style={{ marginBottom: 24 }}>
           <div style={{
-            display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const,
+            display: "flex", alignItems: "stretch", gap: 8, flexWrap: "wrap" as const,
             paddingBottom: 12, borderBottom: "1px solid rgba(255,255,255,0.05)",
           }}>
-            {participants.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => {
-                  if (!validateParticipant || validateParticipant(participantSubIdx)) {
-                    setParticipantSubIdx(idx);
-                  }
-                }}
-                style={{
-                  padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-                  cursor: "pointer", border: "1px solid rgba(255,255,255,0.1)",
-                  background: idx === participantSubIdx ? ACCENT : "transparent",
-                  color: idx === participantSubIdx ? "#000" : "#888",
-                  transition: "all 0.15s",
-                }}
-                onMouseEnter={(e) => {
-                  if (idx !== participantSubIdx) {
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.2)";
-                    (e.currentTarget as HTMLButtonElement).style.color = "#aaa";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (idx !== participantSubIdx) {
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.1)";
-                    (e.currentTarget as HTMLButtonElement).style.color = "#888";
-                  }
-                }}
-              >
-                {category.participant_labels[idx]?.label ?? `Participant ${idx + 1}`}
-                {idx > 0 && (
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRemoveParticipant?.(idx);
-                    }}
-                    style={{
-                      marginLeft: 6, cursor: "pointer", fontWeight: 700,
-                      opacity: 0.6, transition: "opacity 0.15s",
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLElement).style.opacity = "1";
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLElement).style.opacity = "0.6";
-                    }}
-                  >
-                    ✕
-                  </span>
-                )}
-              </button>
-            ))}
-            {allowMultiParticipant && (
-              <button
-                onClick={onAddParticipant}
-                style={{
-                  padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-                  cursor: "pointer", border: "1px dashed rgba(232,98,10,0.4)",
-                  background: "transparent", color: ACCENT,
-                  transition: "all 0.15s",
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(232,98,10,0.6)";
-                  (e.currentTarget as HTMLButtonElement).style.background = "rgba(232,98,10,0.08)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(232,98,10,0.4)";
-                  (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-                }}
-              >
-                + Add Participant
-              </button>
-            )}
+            {participants.map((_, idx) => {
+              const active = idx === participantSubIdx;
+              const tabCategory = slots[idx]?.category;
+              return (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    if (!validateParticipant || validateParticipant(participantSubIdx)) {
+                      setParticipantSubIdx(idx);
+                    }
+                  }}
+                  style={{
+                    padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                    cursor: "pointer", border: "1px solid rgba(255,255,255,0.1)",
+                    background: active ? ACCENT : "transparent",
+                    color: active ? "#000" : "#888",
+                    transition: "all 0.15s", textAlign: "left" as const, fontFamily: "inherit",
+                  }}
+                >
+                  <span style={{ display: "block" }}>{slots[idx]?.label ?? `Participant ${idx + 1}`}</span>
+                  {tabCategory && (
+                    <span style={{ display: "block", fontSize: 10, fontWeight: 500, opacity: active ? 0.8 : 0.6 }}>
+                      {tabCategory.name}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
 
       <ParticipantForm
-        participantLabel={pl?.label ?? `Participant ${participantSubIdx + 1}`}
+        participantLabel={slot?.label ?? `Participant ${participantSubIdx + 1}`}
         roleLabel={
           total === 1 ? "Your personal details — printed on BIB and certificate" :
-          pl?.is_child ? "Child participant (age ≤ 10) — child sizes shown" :
-          category.category_type === "kid" ? "Parent / Guardian — confirmation email goes here" :
+          slot?.isChild ? "Child participant (age ≤ 10) — child sizes shown" :
+          category?.category_type === "kid" ? "Parent / Guardian — confirmation email goes here" :
           participantSubIdx === 0 ? "Lead registrant — confirmation email goes here" :
           "Second participant — BIB and certificate details"
         }
@@ -965,8 +888,8 @@ function StepParticipants({
         onChange={(field, val) => onChange(participantSubIdx, field, val)}
         onNameBlur={field => validateNameField(participantSubIdx, field)}
         errors={errors[participantSubIdx] ?? {}}
-        isChild={pl?.is_child ?? false}
-        tshirtSizes={pl?.tshirt_sizes ?? TSHIRT_SIZES}
+        isChild={slot?.isChild ?? false}
+        tshirtSizes={slot?.tshirtSizes.length ? slot.tshirtSizes : TSHIRT_SIZES}
         indexOfTotal={`${participantSubIdx + 1} of ${total}`}
       />
 
@@ -987,7 +910,7 @@ function StepParticipants({
             ? "Save & Return to Review →"
             : isLast
               ? "Continue to Verification →"
-              : `Next: ${category.participant_labels[participantSubIdx + 1]?.label ?? "Participant " + (participantSubIdx + 2)} →`}
+              : `Next: ${nextSlot?.label ?? "Participant " + (participantSubIdx + 2)} →`}
         </button>
       </div>
     </div>
@@ -999,9 +922,9 @@ function StepParticipants({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function StepCompany({
-  category, participants, uploading, onChange, onUpload, onBack, onNext, returnToReview, idError,
+  slots, participants, uploading, onChange, onUpload, onBack, onNext, returnToReview, idError,
 }: {
-  category: ItRunCategory;
+  slots: ParticipantSlot[];
   participants: Participant[];
   uploading: number[];
   onChange: (idx: number, field: keyof Participant, val: string | File | null) => void;
@@ -1013,7 +936,7 @@ function StepCompany({
 }) {
   const nonChildIdxs = participants
     .map((_, idx) => idx)
-    .filter(idx => !(category.participant_labels[idx]?.is_child ?? false));
+    .filter(idx => !(slots[idx]?.isChild ?? false));
 
   return (
     <div>
@@ -1038,7 +961,7 @@ function StepCompany({
 
       {nonChildIdxs.map(idx => {
         const p       = participants[idx];
-        const label   = category.participant_labels[idx]?.label ?? `Participant ${idx + 1}`;
+        const label   = slots[idx]?.label ?? `Participant ${idx + 1}`;
         const uploaded = p.companyIdUrl && p.companyIdUrl !== "error";
         const errored  = p.companyIdUrl === "error";
 
@@ -1189,11 +1112,12 @@ function ReviewSectionHeader({
 }
 
 function StepReview({
-  category, participants, coupon, basePrice, discount, finalPrice,
+  slots, lines, participants, coupon, basePrice, discount, finalPrice,
   onBack, onNext,
   onEditParticipant, onEditVerification, onEditCategory, onEditCoupon,
 }: {
-  category: ItRunCategory;
+  slots: ParticipantSlot[];
+  lines: BookingLine[];
   participants: Participant[];
   coupon: CouponData | null;
   basePrice: number;
@@ -1208,7 +1132,7 @@ function StepReview({
 }) {
   const nonChildIdxs = participants
     .map((_, i) => i)
-    .filter(i => !(category.participant_labels[i]?.is_child ?? false));
+    .filter(i => !(slots[i]?.isChild ?? false));
 
   return (
     <div>
@@ -1220,33 +1144,45 @@ function StepReview({
         Everything look right? You can edit any section below before paying.
       </p>
 
-      {/* ── Category ── */}
+      {/* ── Categories ── */}
       <div style={{ ...CARD_BASE, padding: 18, marginBottom: 10 }}>
-        <ReviewSectionHeader label="Category" onEdit={onEditCategory} editLabel="Change" />
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>{category.name}</div>
-            <div style={{ fontSize: 12, color: "#555", marginTop: 3, display: "flex", gap: 8, flexWrap: "wrap" as const }}>
-              <span>{`${category.distance_km} KM`}</span>
-              <span style={{ color: "#333" }}>·</span>
-              <span>{category.is_timed ? "Timed" : "Non-Timed"}</span>
-              {category.participant_count > 1 && (
-                <>
+        <ReviewSectionHeader label="Categories" onEdit={onEditCategory} editLabel="Change" />
+        <div style={{ display: "flex", flexDirection: "column" as const, gap: 12 }}>
+          {lines.map(line => (
+            <div key={line.category.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>
+                  {line.category.name}
+                  {line.count > 1 && <span style={{ fontSize: 12, color: "#888", fontWeight: 500 }}>{` × ${line.count} runners`}</span>}
+                </div>
+                <div style={{ fontSize: 12, color: "#555", marginTop: 3, display: "flex", gap: 8, flexWrap: "wrap" as const }}>
+                  <span>{`${line.category.distance_km} KM`}</span>
                   <span style={{ color: "#333" }}>·</span>
-                  <span>{category.participant_labels.map(l => l.label).join(" + ")}</span>
-                </>
-              )}
+                  <span>{line.category.is_timed ? "Timed" : "Non-Timed"}</span>
+                  {line.category.category_type !== "solo" && (
+                    <>
+                      <span style={{ color: "#333" }}>·</span>
+                      <span>{`${line.count / teamSize(line.category)} ${line.count / teamSize(line.category) === 1 ? "pair" : "pairs"}`}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div style={{ textAlign: "right" as const, flexShrink: 0 }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: line.category.color }}>
+                  ₹{line.total.toLocaleString("en-IN")}
+                </div>
+                {line.discount > 0 && (
+                  <div style={{ fontSize: 10, color: "#10b981" }}>early bird applied</div>
+                )}
+              </div>
             </div>
-          </div>
-          <div style={{ fontSize: 20, fontWeight: 900, color: category.color, flexShrink: 0 }}>
-            ₹{category.price_rupees.toLocaleString("en-IN")}
-          </div>
+          ))}
         </div>
       </div>
 
       {/* ── Per-participant cards ── */}
       {participants.map((p, idx) => {
-        const pl    = category.participant_labels[idx];
+        const pl    = slots[idx];
         const label = pl?.label ?? `Participant ${idx + 1}`;
         const fields: string[][] = [
           ["Name",    `${p.firstName} ${p.lastName}`],
@@ -1255,7 +1191,7 @@ function StepReview({
           ["Mobile",  p.mobile],
           ["Blood",   p.bloodGroup],
           ["T-Shirt", p.tshirtSize],
-          ...(pl?.is_child ? [] : [
+          ...(pl?.isChild ? [] : [
             ["Email",      p.email],
             ["Company",    p.companyName],
             ["Emergency",  p.emergencyName ? `${p.emergencyName} · ${p.emergencyPhone}` : ""],
@@ -1265,7 +1201,7 @@ function StepReview({
         return (
           <div key={idx} style={{ ...CARD_BASE, padding: 18, marginBottom: 10 }}>
             <ReviewSectionHeader
-              label={label + (pl?.is_child ? " (Child)" : "")}
+              label={label + (pl?.isChild ? " (Child)" : "") + (pl?.category ? ` · ${pl.category.name}` : "")}
               onEdit={() => onEditParticipant(idx)}
             />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: "10px 16px" }}>
@@ -1289,7 +1225,7 @@ function StepReview({
           <div style={{ display: "flex", flexDirection: "column" as const, gap: 10 }}>
             {nonChildIdxs.map(idx => {
               const p     = participants[idx];
-              const label = category.participant_labels[idx]?.label ?? `Participant ${idx + 1}`;
+              const label = slots[idx]?.label ?? `Participant ${idx + 1}`;
               const ok    = p.companyIdUrl && p.companyIdUrl !== "error";
               return (
                 <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1323,7 +1259,7 @@ function StepReview({
         <ReviewSectionHeader label="Order Summary" onEdit={onEditCoupon} editLabel={coupon ? "Edit Coupon" : "Add Coupon"} />
 
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#888", marginBottom: 8 }}>
-          <span>{category.name}</span>
+          <span>{bookingSummary(lines)}</span>
           <span>₹{basePrice.toLocaleString("en-IN")}</span>
         </div>
 
@@ -1369,13 +1305,13 @@ function StepReview({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function StepCoupon({
-  category, couponEnabled, couponCode, coupon, couponError, couponLoading,
+  categoryName, couponEnabled, couponCode, coupon, couponError, couponLoading,
   basePrice, discount, finalPrice,
   submitting, submitError,
   onCodeChange, onValidate, onClearCoupon,
   onBack, onSubmit, returnToReview, onSaveAndReturn,
 }: {
-  category: ItRunCategory;
+  categoryName: string;
   couponEnabled: boolean;
   couponCode: string;
   coupon: CouponData | null;
@@ -1463,7 +1399,7 @@ function StepCoupon({
           Order Summary
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: "#aaa", marginBottom: 8 }}>
-          <span>{category.name}</span>
+          <span>{categoryName}</span>
           <span>₹{basePrice.toLocaleString("en-IN")}</span>
         </div>
         {coupon && (
@@ -1680,6 +1616,8 @@ function RegisterPageContent() {
   const [step,              setStep]             = useState(1);
   const [participantSubIdx, setParticipantSubIdx] = useState(0);
   const [selectedCat,       setSelectedCat]      = useState<ItRunCategory | null>(null);
+  // Runners per category, chosen on step 1. The participant list follows from these counts.
+  const [counts,            setCounts]           = useState<Record<string, number>>({});
   const [participants,      setParticipants]     = useState<Participant[]>([emptyParticipant()]);
   const [pErrors,           setPErrors]          = useState<ParticipantErrors[]>([{}]);
   // Set when a validation pass has just shown errors; the effect below brings the first one into view (mobile especially)
@@ -1765,10 +1703,15 @@ function RegisterPageContent() {
   // Price
   // The booking's price: each runner pays the category price in an individual category; a fixed team pays it once.
   // The server computes the same total (lib/it-run-category-rules.ts) and is authoritative.
-  const basePrice  = selectedCat ? bookingPrice(selectedCat.category_type, selectedCat.price_rupees, participants.length) : 0;
+  // Each category line is priced on its own. The server computes the same lines and is authoritative.
+  const slots = slotsFor(participants.map(p => p.categoryId), config?.categories ?? []);
+  const bookingLinesNow = bookingLines(countsFromCategoryIds(participants.map(p => p.categoryId)), config?.categories ?? []);
+  const bookingTotalsNow = bookingTotals(bookingLinesNow);
+  const lineSummary = bookingSummary(bookingLinesNow) || (selectedCat?.name ?? "");
+  const basePrice = bookingTotalsNow.listPrice;
   // An early bird and a coupon are never combined; the server refuses the pair. The early bird's discount is
-  // the one shown here, as the server computed it for this category.
-  const earlyBirdDiscount = selectedCat?.early_bird?.discount ?? 0;
+  // the one shown here, summed over the category lines that have one.
+  const earlyBirdDiscount = bookingTotalsNow.discount;
   const discount   = earlyBirdDiscount || (coupon?.discount ?? 0);
   const finalPrice = finalPriceOverride ?? Math.max(0, basePrice - discount);
 
@@ -1779,6 +1722,37 @@ function RegisterPageContent() {
       .then((d: ItRunEventConfig) => { setConfig(d); setConfigLoading(false); })
       .catch(() => setConfigLoading(false));
   }, []);
+
+  // ── Category selection ─────────────────────────────────────────────────────
+
+  function selectCategory(cat: ItRunCategory) {
+    // A different category is a different registration: drop anything tied to the previous one
+    // (draft token, registration, payment order, coupon) so nothing leaks into it. The previous
+    // draft stays open on the server; it is not changed.
+    if (startsNewRegistration(selectedCat?.id, cat.id)) {
+      setRegId("");
+      setRegCode("");
+      setDashboardUrl("");
+      setParticipantIds([]);
+      setRegCouponCode(null);
+      setServerDraft(null);
+      setServerSave("idle");
+      setServerSavedAt(null);
+      setServerSaveError("");
+      setCoupon(null);
+      setCouponCode("");
+      try { localStorage.removeItem(DRAFT_TOKEN_KEY); } catch {}
+    }
+    const nextCounts = { [cat.id]: cat.participant_count };
+    setCounts(nextCounts);
+    setSelectedCat(cat);
+    setParticipants(rebuildParticipants(nextCounts, config?.categories ?? [cat], [], id => emptyParticipant(id)));
+    setPErrors(Array.from({ length: cat.participant_count }, () => ({})));
+    setParticipantSubIdx(0);
+    setDraftToResume(null); // clear resume banner when user picks a new category
+    setCategoryNotice("");
+    setStep(2);
+  }
 
   // ── Pre-select category from URL ───────────────────────────────────────────
   // Skip if a v4 or v3 draft exists — the resume banner will handle restoration.
@@ -2042,31 +2016,24 @@ function RegisterPageContent() {
     }
   }
 
-  // ── Category selection ─────────────────────────────────────────────────────
 
-  function selectCategory(cat: ItRunCategory) {
-    // A different category is a different registration: drop anything tied to the previous one
-    // (draft token, registration, payment order, coupon) so nothing leaks into it. The previous
-    // draft stays open on the server; it is not changed.
-    if (startsNewRegistration(selectedCat?.id, cat.id)) {
-      setRegId("");
-      setRegCode("");
-      setDashboardUrl("");
-      setParticipantIds([]);
-      setRegCouponCode(null);
-      setServerDraft(null);
-      setServerSave("idle");
-      setServerSavedAt(null);
-      setServerSaveError("");
-      setCoupon(null);
-      setCouponCode("");
-      try { localStorage.removeItem(DRAFT_TOKEN_KEY); } catch {}
-    }
-    setSelectedCat(cat);
-    setParticipants(Array.from({ length: cat.participant_count }, emptyParticipant));
-    setPErrors(Array.from({ length: cat.participant_count }, () => ({})));
+  // ── Runners per category (step 1): continue to the participant details ──────
+  // Details already entered are kept. Only the people in a category whose count changed are added or removed.
+  function continueFromCounts() {
+    // Once the registration exists the runners are fixed; the form only edits details
+    if (regId) { setStep(2); return; }
+    const categories = config?.categories ?? [];
+    const next = rebuildParticipants(counts, categories, participants, id => emptyParticipant(id));
+    const primary = primaryCategory(next.map(p => p.categoryId), categories);
+    if (next.length === 0 || !primary) return;
+    const before = JSON.stringify(countsFromCategoryIds(participants.map(p => p.categoryId)));
+    const after = JSON.stringify(countsFromCategoryIds(next.map(p => p.categoryId)));
+    // A discount was worked out for the old total, so it is checked again
+    if (before !== after) setCoupon(null);
+    setParticipants(next);
+    setPErrors(prev => next.map((_, i) => prev[i] ?? {}));
+    setSelectedCat(primary);
     setParticipantSubIdx(0);
-    setDraftToResume(null); // clear resume banner when user picks a new category
     setCategoryNotice("");
     setStep(2);
   }
@@ -2078,8 +2045,10 @@ function RegisterPageContent() {
     if (!cat) return;
 
     setSelectedCat(cat);
-    const restored = (d.participants ?? [emptyParticipant()]).map(p => ({ ...p, companyIdFile: null }));
+    const restored = (d.participants ?? [emptyParticipant(d.selectedCatId)])
+      .map(p => ({ ...p, categoryId: p.categoryId || d.selectedCatId, companyIdFile: null }));
     setParticipants(restored);
+    setCounts(countsFromCategoryIds(restored.map(p => p.categoryId)));
     // What was restored is exactly what the server holds, so it is "Saved", not "Unsaved changes"
     setSavedKey(draftKeyOf(cat.id, d.couponCode ?? "", restored));
     setPErrors(Array.from({ length: d.participants?.length ?? 1 }, () => ({})));
@@ -2306,7 +2275,7 @@ function RegisterPageContent() {
   function validateParticipant(idx: number): boolean {
     if (!selectedCat) return false;
     const p     = participants[idx];
-    const child = selectedCat.participant_labels[idx]?.is_child ?? false;
+    const child = slots[idx]?.isChild ?? false;
     const e: ParticipantErrors = {};
     let valid = true;
 
@@ -2414,12 +2383,12 @@ function RegisterPageContent() {
   function handleCompanyNext() {
     setCompanyError("");
     for (let idx = 0; idx < participants.length; idx++) {
-      const isChild = selectedCat?.participant_labels[idx]?.is_child ?? false;
+      const isChild = slots[idx]?.isChild ?? false;
       // A draft saved before this choice existed: an uploaded document means "upload"
       const p = participants[idx];
       const err = idUploadError(p.companyIdUrl, isChild);
       if (err) {
-        const label = selectedCat?.participant_labels[idx]?.label ?? `Participant ${idx + 1}`;
+        const label = slots[idx]?.label ?? `Participant ${idx + 1}`;
         setCompanyError(`${label}: ${err}`);
         return;
       }
@@ -2451,37 +2420,6 @@ function RegisterPageContent() {
     }
   }
 
-  // ── Multi-participant management (Phase 3) ──────────────────────────────────
-
-  function addParticipant() {
-    if (!selectedCat) return;
-    // Allow adding participants for SOLO, DUO, and KID categories
-    if (!["solo", "duo", "kid"].includes(selectedCat.category_type)) {
-      setSubmitError("Cannot add participants to this category type");
-      return;
-    }
-    // Validate current participant before adding more
-    if (!validateParticipant(participantSubIdx)) return;
-    // Save the current participant first, so the new form never replaces unsaved details
-    const newIdx = participants.length;
-    void persistThen({ step: 2, participantSubIdx }, () => {
-      setParticipants(p => [...p, emptyParticipant()]);
-      setPErrors(e => [...e, {}]);
-      // Auto-focus the new participant
-      setParticipantSubIdx(newIdx);
-    });
-  }
-
-  function removeParticipant(idx: number) {
-    // Never remove first participant
-    if (idx === 0) return;
-    setParticipants(p => p.filter((_, i) => i !== idx));
-    setPErrors(e => e.filter((_, i) => i !== idx));
-    // If we're viewing the removed participant, go back to previous
-    if (participantSubIdx >= idx) {
-      setParticipantSubIdx(Math.max(0, participantSubIdx - 1));
-    }
-  }
 
   // ── Edit-from-review handlers ──────────────────────────────────────────────
 
@@ -2579,7 +2517,7 @@ function RegisterPageContent() {
             categoryId:       selectedCat.id,
             participants: participants.map((p, idx) => ({
               id:                participantIds[idx],
-              type:              selectedCat.participant_labels[idx]?.role ?? "solo",
+              type:              slots[idx]?.role ?? "solo",
               firstName:         p.firstName,
               lastName:          p.lastName,
               bibName:           p.bibName,
@@ -2622,7 +2560,8 @@ function RegisterPageContent() {
           // Lets the server close this draft once the registration exists (never changes the registration)
           draftToken:   serverDraft?.token ?? (() => { try { return localStorage.getItem(DRAFT_TOKEN_KEY); } catch { return null; } })(),
           participants: participants.map((p, idx) => ({
-            type:              selectedCat.participant_labels[idx]?.role ?? "solo",
+            categoryId:        p.categoryId,
+            type:              slots[idx]?.role ?? "solo",
             firstName:         p.firstName,
             lastName:          p.lastName,
             bibName:           p.bibName,
@@ -2666,33 +2605,6 @@ function RegisterPageContent() {
     } finally {
       setSubmitting(false);
     }
-  }
-
-  // ── Second category in the same checkout ──────────────────────────────────
-  // Open to every verified participant. The server checks and prices each registration itself.
-  const canAddCategory = !!verifiedEmail;
-
-  // Keeps the registration just submitted and starts the form again for another category
-  function startAnotherCategory() {
-    if (!regId) return;
-    setSessionRegs(prev => prev.some(r => r.id === regId)
-      ? prev
-      : [...prev, { id: regId, code: regCode, finalPrice, categoryName: selectedCat?.name ?? "" }]);
-    setRegId("");
-    setRegCode("");
-    setDashboardUrl("");
-    setParticipantIds([]);
-    setRegCouponCode(null);
-    setFinalPriceOverride(null);
-    setCoupon(null);
-    setCouponCode("");
-    setSelectedCat(null);
-    setParticipants([]);
-    setPErrors([]);
-    setParticipantSubIdx(0);
-    setReturnToReview(false);
-    setSubmitError("");
-    setStep(1);
   }
 
   // The registrations this payment covers: the ones already submitted plus the current one, free ones excluded
@@ -3144,7 +3056,14 @@ function RegisterPageContent() {
             {categoryNotice && (
               <p role="alert" style={{ fontSize: 13, color: "#f87171", margin: "0 0 12px", lineHeight: 1.5 }}>{categoryNotice}</p>
             )}
-            <StepCategory config={config} loading={configLoading} onSelect={selectCategory} />
+            <StepCounts
+              config={config}
+              loading={configLoading}
+              counts={counts}
+              locked={!!regId}
+              onChange={(categoryId, n) => setCounts(prev => ({ ...prev, [categoryId]: n }))}
+              onContinue={continueFromCounts}
+            />
           </>
         )}
 
@@ -3173,7 +3092,7 @@ function RegisterPageContent() {
 
         {step === 2 && selectedCat && (
           <StepParticipants
-            category={selectedCat}
+            slots={slots}
             participantSubIdx={participantSubIdx}
             setParticipantSubIdx={(idx: number) => void persistThen({ step: 2, participantSubIdx: idx }, () => setParticipantSubIdx(idx))}
             participants={participants}
@@ -3183,8 +3102,6 @@ function RegisterPageContent() {
             onBack={handleParticipantBack}
             onNext={handleParticipantNext}
             validateNameField={validateNameField}
-            onAddParticipant={addParticipant}
-            onRemoveParticipant={removeParticipant}
             returnToReview={returnToReview}
             validateParticipant={validateParticipant}
           />
@@ -3198,7 +3115,7 @@ function RegisterPageContent() {
               participantName={participants[participantSubIdx]?.firstName || "Participant"}
             />
             <StepCompany
-            category={selectedCat}
+            slots={slots}
             participants={participants}
             uploading={uploading}
             onChange={updateParticipant}
@@ -3210,7 +3127,7 @@ function RegisterPageContent() {
                   setStep(4);
                 });
               } else {
-                const last = selectedCat.participant_count - 1;
+                const last = participants.length - 1;
                 void persistThen({ step: 2, participantSubIdx: last }, () => {
                   setParticipantSubIdx(last);
                   setStep(2);
@@ -3228,7 +3145,8 @@ function RegisterPageContent() {
           <>
             <CompactEventHeader step={4} stepLabel="Review" />
             <StepReview
-            category={selectedCat}
+            slots={slots}
+            lines={bookingLinesNow}
             participants={participants}
             coupon={coupon}
             basePrice={basePrice}
@@ -3248,7 +3166,7 @@ function RegisterPageContent() {
           <>
             <CompactEventHeader step={5} stepLabel="Coupon" />
             <StepCoupon
-            category={selectedCat}
+            categoryName={lineSummary}
             couponEnabled={config?.registration.coupon_enabled ?? false}
             couponCode={couponCode}
             coupon={coupon}
@@ -3281,7 +3199,6 @@ function RegisterPageContent() {
             submitting={submitting}
             submitError={submitError}
             onPay={initiatePayment}
-            onAddCategory={canAddCategory && payTotal > 0 ? startAnotherCategory : undefined}
             checkoutCount={payRegs ? payRegs.length : 1}
             onBackToEdit={() => { setSubmitError(""); void persistThen({ step: 4 }, () => { setReturnToReview(true); setStep(4); }); }}
             />
@@ -3296,7 +3213,7 @@ function RegisterPageContent() {
           <EventSuccessScreen
             registrationCode={payRegs && payRegs.length > 1 ? payRegs.map(r => r.code).join(" · ") : regCode}
             dashboardUrl={dashboardUrl || undefined}
-            category={selectedCat?.name ?? "The IT Run Sprint-2"}
+            category={lineSummary || "The IT Run Sprint-2"}
             participants={participants.map(p => `${p.firstName} ${p.lastName}`.trim())}
             finalPrice={payTotal}
           />
@@ -3308,7 +3225,8 @@ function RegisterPageContent() {
       {/* Sticky price bar */}
       {step >= 2 && step <= 6 && selectedCat && (
         <PriceBar
-          category={selectedCat}
+          categoryName={lineSummary}
+          color={selectedCat?.color ?? ACCENT}
           finalPrice={finalPrice}
           couponApplied={!!coupon}
           step={step}

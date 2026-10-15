@@ -61,7 +61,7 @@ function fake(opts: { offers?: any[]; claimResult?: boolean } = {}) {
         if (b.op === "insert") return { data: { id: "reg-1", version: 1 }, error: null };
         if (table === "it_run_categories") {
           const cat = { id: CAT, event_id: EVENT, name: "5K Timed", category_type: "solo", price_rupees: 799, max_participants: null, is_active: true };
-          return { data: single ? cat : [{ id: CAT, name: "5K Timed", price_rupees: 799, is_active: true }], error: null };
+          return { data: single ? cat : [cat], error: null };
         }
         if (table === "it_run_events") return { data: { registration_closes_at: null, event_date: "2026-08-17" }, error: null };
         if (table === "it_run_early_bird_offers") return { data: single ? (opts.offers ?? [])[0] ?? null : opts.offers ?? [], error: null };

@@ -106,9 +106,14 @@ type Result = { data: unknown; error: unknown };
 function fakeDb(handlers: Record<string, () => Result>) {
   return {
     from(table: string) {
+      let inMode = false;
       const b: any = {
         select() { return b; },
         eq() { return b; },
+        in() { inMode = true; return b; },
+        lte() { return b; },
+        gt() { return b; },
+        returns() { return b; },
         insert() { return b; },
         update() { return b; },
         single() { return run(); },
@@ -116,11 +121,14 @@ function fakeDb(handlers: Record<string, () => Result>) {
         then(res: (v: Result) => unknown, rej?: (e: unknown) => unknown) { return run().then(res, rej); },
       };
       function run() {
-        return Promise.resolve(handlers[table] ? handlers[table]() : { data: null, error: null });
+        const r = handlers[table] ? handlers[table]() : { data: null, error: null };
+        // A .in() lookup returns a list, as the database does
+        const data = inMode && r.data && !Array.isArray(r.data) ? [r.data] : r.data;
+        return Promise.resolve({ ...r, data });
       }
       return b;
     },
-    rpc() { return Promise.resolve({ data: null, error: null }); },
+    rpc(name: string) { return Promise.resolve({ data: name === "itr_reserve_capacity_multi" ? "confirmed" : null, error: null }); },
   };
 }
 

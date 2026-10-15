@@ -141,6 +141,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (blocked) return NextResponse.json({ error: blocked, code: "NOT_ELIGIBLE" }, { status: 409 });
 
   const db = getSupabaseServer();
+  // A booking whose runners are in several categories cannot move as a whole. Its categories stay as booked.
+  const { data: runnerCategories } = await db
+    .from("it_run_participants")
+    .select("category_id")
+    .eq("registration_id", reg.id)
+    .returns<Array<{ category_id: string | null }>>();
+  if ((runnerCategories ?? []).some(p => (p.category_id ?? reg.category_id) !== reg.category_id)) {
+    return NextResponse.json({
+      error: "This booking has runners in more than one category, so its category can't be changed here. Email info@connectedsteps.in for help.",
+      code: "MIXED_CATEGORY",
+    }, { status: 409 });
+  }
   const [{ data: target }, { data: current }] = await Promise.all([
     db.from("it_run_categories")
       .select("id, slug, name, category_type, price_rupees, distance_km, is_active, max_participants, current_participants")

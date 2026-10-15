@@ -124,6 +124,10 @@ function registerFake() {
         const b: any = { op: "select" };
         b.select = () => b;
         b.eq = () => b;
+        b.in = () => { b.inMode = true; return b; };
+        b.returns = () => b;
+        b.lte = () => b;
+        b.gt = () => b;
         b.insert = (p: unknown) => { b.op = "insert"; inserts.push({ table, payload: p }); return b; };
         b.update = () => { b.op = "update"; return b; };
         b.single = () => {
@@ -132,10 +136,11 @@ function registerFake() {
           return Promise.resolve({ data: null, error: null });
         };
         b.maybeSingle = () => b.single();
-        b.then = (res: (v: any) => unknown, rej?: (e: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(res, rej);
+        b.then = (res: (v: any) => unknown, rej?: (e: unknown) => unknown) =>
+          Promise.resolve({ data: table === "it_run_categories" && b.inMode ? [{ id: CAT_ID, event_id: EVENT_ID, name: "10K", category_type: "solo", price_rupees: 799, max_participants: null, is_active: true }] : [], error: null }).then(res, rej);
         return b;
       },
-      rpc() { return Promise.resolve({ data: null, error: null }); },
+      rpc(name: string) { return Promise.resolve({ data: name === "itr_reserve_capacity_multi" ? "confirmed" : null, error: null }); },
     },
   };
 }

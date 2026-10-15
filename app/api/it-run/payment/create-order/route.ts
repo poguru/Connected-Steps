@@ -3,6 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { getRazorpaySDK as getRazorpay } from "@/lib/razorpay-client";
 import { checkAndRecordEndpointLimit, getClientIp } from "@/lib/rate-limit";
 import { checkCheckoutGroup, type CheckoutRegistration } from "@/lib/it-run-checkout";
+import { reserveSeats, releaseSeats, seatLinesForRegistration } from "@/lib/it-run-seats";
 
 // POST /api/it-run/payment/create-order
 // Body: { registrationId }
@@ -64,19 +65,19 @@ export async function POST(req: NextRequest) {
     // re-acquire both before opening a new Razorpay checkout. Uses an optimistic
     // lock (eq("payment_status","failed")) so only one concurrent retry wins.
     if (reg.payment_status === "failed") {
-      const { data: reserveStatus } = await db.rpc("itr_reserve_capacity", {
-        p_category_id: reg.category_id,
-        p_increment:   reg.participant_count,
-        p_payment_ttl_mins: 15,
+      // Seats per participant category: the booking may hold runners from several categories
+      const seatLines = await seatLinesForRegistration(db, reg.id, {
+        categoryId: reg.category_id, participantCount: reg.participant_count,
       });
+      const reserveStatus = await reserveSeats(db, seatLines, 15);
 
       if (reserveStatus === "full") {
         return NextResponse.json(
-          { error: "This category is now fully booked. Your slot is no longer available." },
+          { error: "A category in this booking is now fully booked. Your slots are no longer available." },
           { status: 409 },
         );
       }
-      if (reserveStatus === "unavailable") {
+      if (reserveStatus !== "confirmed") {
         return NextResponse.json({ error: "Category unavailable" }, { status: 409 });
       }
 
@@ -87,10 +88,7 @@ export async function POST(req: NextRequest) {
           p_base_price: reg.base_price,
         });
         if (couponDiscount === null) {
-          void db.rpc("itr_release_capacity", {
-            p_category_id: reg.category_id,
-            p_count: reg.participant_count,
-          });
+          void releaseSeats(db, seatLines);
           return NextResponse.json(
             { error: "Your coupon is no longer valid. Please contact support." },
             { status: 409 },
@@ -108,9 +106,7 @@ export async function POST(req: NextRequest) {
 
       if (!transitioned?.length) {
         // A concurrent retry already claimed the slot — release what we just reserved
-        void db.rpc("itr_release_capacity", {
-          p_category_id: reg.category_id, p_count: reg.participant_count,
-        });
+        void releaseSeats(db, seatLines);
         if (reg.coupon_id && reg.discount_amount > 0) {
           void db.rpc("itr_release_coupon", { p_coupon_id: reg.coupon_id });
         }

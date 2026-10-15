@@ -199,7 +199,7 @@ describe("registration refuses inactive categories", () => {
     mockDb.mockReturnValue({
       from(table: string) {
         const b: any = {
-          select() { return b; }, eq() { return b; },
+          select() { return b; }, eq() { return b; }, in() { return b; }, returns() { return b; }, lte() { return b; }, gt() { return b; },
           insert() { writes.push(table); return b; },
           update() { writes.push(table); return b; },
           single() {
@@ -209,7 +209,7 @@ describe("registration refuses inactive categories", () => {
             return Promise.resolve({ data: null, error: null });
           },
           maybeSingle() { return this.single(); },
-          then(res: (v: any) => unknown) { return Promise.resolve({ data: null, error: null }).then(res); },
+          then(res: (v: any) => unknown) { return Promise.resolve({ data: [{ id: "cat-1", event_id: "ev", name: "5K", category_type: "solo", price_rupees: 799, max_participants: null, is_active: false }], error: null }).then(res); },
         };
         return b;
       },

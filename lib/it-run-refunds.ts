@@ -16,6 +16,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { listRefundsForPayment } from "@/lib/razorpay-client";
 import { bookingPrice, type CategoryType } from "@/lib/it-run-category-rules";
+import { releaseSeats, seatLinesForRegistration } from "@/lib/it-run-seats";
 
 type Db = SupabaseClient;
 
@@ -146,10 +147,10 @@ export async function finalizeRefundProcessed(
   }
 
   if (shouldCancel) {
-    await db.rpc("itr_release_capacity", {
-      p_category_id: reg.category_id,
-      p_count: reg.participant_count,
-    });
+    // Give back each participant's own category's seats: a booking can hold runners from several categories
+    await releaseSeats(db, await seatLinesForRegistration(db, reg.id, {
+      categoryId: reg.category_id, participantCount: reg.participant_count,
+    }));
     if (reg.early_bird_offer_id) {
       await db.rpc("itr_early_bird_release", { p_offer_id: reg.early_bird_offer_id });
     }
