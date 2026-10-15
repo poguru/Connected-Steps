@@ -7,6 +7,8 @@
  * registrations), so the assembly is done in code, with de-duplication by id.
  */
 
+import { categoryOfParticipant, type ParticipantCategory } from "@/lib/it-run-participant-category";
+
 export interface MyRegCategory { name: string; distance_km: number | null; color: string | null; category_type: string }
 export interface MyRegEvent { title: string; event_date: string }
 
@@ -35,6 +37,8 @@ export interface MyRegPricing {
 export interface MyRegParticipantRow {
   id: string;
   registration_id: string;
+  /** The category this participant is in; null for rows made before participants carried one */
+  category_id?: string | null;
   first_name: string;
   last_name: string;
   participant_type: string;
@@ -54,6 +58,8 @@ export interface MyRegParticipant {
   qr_token: string | null;
   verification_status: string;
   collected_at: string | null;
+  /** The category this participant is registered in */
+  category: { name: string; color: string | null } | null;
 }
 
 export interface MyRegActions {
@@ -96,8 +102,12 @@ export function buildMyRegistrations(
   collections: MyRegCollectionRow[],
   offerNames: Map<string, string> = new Map(),
   changesOpen = true,
+  participantCategories: Map<string, ParticipantCategory> = new Map(),
 ): MyRegistration[] {
   const collectedAt = new Map<string, string>();
+  const registrationCategory = new Map<string, ParticipantCategory | null>(
+    regs.map(r => [r.id, r.category ? { name: r.category.name, color: r.category.color } : null]),
+  );
   for (const c of collections) {
     if (!collectedAt.has(c.participant_id)) collectedAt.set(c.participant_id, c.collected_at);
   }
@@ -117,6 +127,7 @@ export function buildMyRegistrations(
       qr_token: p.qr_token,
       verification_status: p.verification_status,
       collected_at: collectedAt.get(p.id) ?? null,
+      category: categoryOfParticipant(p.category_id, participantCategories, registrationCategory.get(p.registration_id) ?? null),
     });
     byRegistration.set(p.registration_id, list);
   }

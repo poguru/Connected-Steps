@@ -33,6 +33,8 @@ interface Participant {
   email: string | null; mobile: string; company_name: string | null;
   tshirt_size: string | null; bib_number: string | null; wave: string | null;
   verification_status: string;
+  /** The category this runner is in */
+  category: { name: string; color: string | null } | null;
   it_run_bib_bookings: Array<{ id: string; status: string; it_run_bib_slots: BibSlot | null }>;
   it_run_bib_collections: Array<{ id: string; collected_at: string }>;
   it_run_checkins: Array<{ id: string; checked_in_at: string }>;
@@ -454,6 +456,9 @@ export default function DashboardPage() {
                         {p.first_name} {p.last_name}
                       </div>
                       <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{p.company_name ?? "IT Professional"}</div>
+                      {p.category && (
+                        <div style={{ fontSize: 12, color: p.category.color ?? "#e8620a", marginTop: 2, fontWeight: 600 }}>{p.category.name}</div>
+                      )}
                     </div>
                     {hasBib && (
                       <div style={{ background: "rgba(232,98,10,0.1)", border: "1px solid rgba(232,98,10,0.3)", borderRadius: 8, padding: "6px 12px", textAlign: "center" }}>

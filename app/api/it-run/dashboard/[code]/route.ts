@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 import { verifyDashboardToken } from "@/lib/it-run-dashboard-link";
+import { participantCategoryMap, categoryOfParticipant } from "@/lib/it-run-participant-category";
 import { randomUUID } from "crypto";
 
 // A transient database error (a dropped connection, a timeout) is retried once before the dashboard reports a failure.
@@ -138,7 +139,7 @@ async function handleDashboard(
     .from("it_run_participants")
     .select(`
       id, participant_type, qr_token, first_name, last_name, gender, email, mobile,
-      blood_group, company_name, tshirt_size,
+      blood_group, company_name, tshirt_size, category_id,
       bib_number, wave, collection_counter, verification_status,
       it_run_bib_bookings ( id, status, it_run_bib_slots ( id, location_name, location_address, slot_date, start_time, end_time ) ),
       it_run_bib_collections ( id, collected_at ),
@@ -173,8 +174,11 @@ async function handleDashboard(
   // object (not a list) for an embed over a unique key, and null when there is none. Normalize all three
   // shapes to a list so the page's contract (arrays) holds for every participant.
   const toList = (v: unknown): unknown[] => (Array.isArray(v) ? v : v ? [v] : []);
+  // Each runner's own category; rows without one show the registration's
+  const participantCategories = await participantCategoryMap(db, participants.map(p => (p as { category_id?: string | null }).category_id ?? ""));
   const normalizedParticipants = participants.map(p => ({
     ...p,
+    category: categoryOfParticipant((p as { category_id?: string | null }).category_id, participantCategories, reg.it_run_categories ? { name: reg.it_run_categories.name, color: reg.it_run_categories.color } : null),
     it_run_bib_bookings:    toList(p.it_run_bib_bookings),
     it_run_bib_collections: toList(p.it_run_bib_collections),
     it_run_checkins:        toList(p.it_run_checkins),

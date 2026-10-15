@@ -396,6 +396,9 @@ export default function MyRegistrationsPage() {
                             borderRadius: 8, padding: "5px 12px",
                           }}>
                             {p.first_name} {p.last_name}
+                            {p.category && (
+                              <div style={{ fontSize: 11, color: p.category.color ?? "#888", marginTop: 2 }}>{p.category.name}</div>
+                            )}
                             <span style={{ color: "#555", marginLeft: 6 }}>
                               {PARTICIPANT_TYPE_LABEL[p.participant_type] ?? ""}
                               {p.collected_at ? " · BIB collected" : ""}

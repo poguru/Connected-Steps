@@ -9,6 +9,7 @@ import {
   type MyRegParticipantRow,
   type MyRegCollectionRow,
 } from "@/lib/it-run-my-registrations";
+import { participantCategoryMap } from "@/lib/it-run-participant-category";
 
 // GET /api/it-run/my-registrations
 // Returns the IT Run registrations linked to the signed-in Connected Steps account, with participants,
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest) {
 
   const { data: parts, error: partErr } = await db
     .from("it_run_participants")
-    .select("id, registration_id, first_name, last_name, participant_type, bib_number, qr_token, verification_status")
+    .select("id, registration_id, first_name, last_name, participant_type, bib_number, qr_token, verification_status, category_id")
     .in("registration_id", rows.map(r => r.id))
     .order("created_at", { ascending: true })
     .returns<MyRegParticipantRow[]>();
@@ -76,6 +77,8 @@ export async function GET(req: NextRequest) {
   }
 
   const participants = parts ?? [];
+  // Each participant's own category: a booking can hold runners from several
+  const participantCategories = await participantCategoryMap(db, participants.map(p => p.category_id ?? ""));
   let collections: MyRegCollectionRow[] = [];
   if (participants.length > 0) {
     const { data: cols, error: colErr } = await db
@@ -105,7 +108,7 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json(
-    { registrations: buildMyRegistrations(rows, participants, collections, offerNames, changesOpen), claimable, participantChangesOpen: changesOpen },
+    { registrations: buildMyRegistrations(rows, participants, collections, offerNames, changesOpen, participantCategories), claimable, participantChangesOpen: changesOpen },
     { headers: NO_STORE },
   );
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireRole, getClientIp } from "@/lib/it-run-auth";
+import { participantCategoryMap, categoryOfParticipant, type ParticipantCategory } from "@/lib/it-run-participant-category";
 
 // Fields that can never be changed via the admin API
 const IMMUTABLE_REG = new Set([
@@ -112,7 +113,7 @@ export async function GET(req: NextRequest) {
         email, mobile, blood_group, emergency_name, emergency_phone,
         company_name, employee_id, company_id_url,
         tshirt_size, medical_conditions, food_preference,
-        bib_number, wave, collection_counter, verification_status,
+        bib_number, wave, collection_counter, verification_status, category_id,
         it_run_bib_collections ( id, collected_at, counter_number ),
         it_run_checkins ( id, checked_in_at )
       )
@@ -162,8 +163,14 @@ export async function GET(req: NextRequest) {
     for (const o of offers ?? []) offerNames.set(o.id, o.name);
   }
 
+  // Each participant's own category, from one lookup for every participant on the page
+  const participantCategoryIds = (data ?? []).flatMap(reg =>
+    (((reg as Record<string, unknown>).it_run_participants as Array<{ category_id: string | null }> | null) ?? []).map(p => p.category_id ?? ""),
+  );
+  const categories = await participantCategoryMap(db, participantCategoryIds);
   const normalized = (data ?? []).map((reg: unknown) => {
     const r = reg as Record<string, unknown>;
+    const regCategory = (r.it_run_categories as ParticipantCategory | null) ?? null;
     return {
       ...r,
       early_bird_name: typeof r.early_bird_offer_id === "string" ? (offerNames.get(r.early_bird_offer_id) ?? "Early bird") : null,
@@ -172,6 +179,7 @@ export async function GET(req: NextRequest) {
         const pr = p as Record<string, unknown>;
         return {
           ...pr,
+          participant_category: categoryOfParticipant(pr.category_id as string | null, categories, regCategory),
           it_run_bib_collections: (pr.it_run_bib_collections as unknown[] | null) ?? [],
           it_run_checkins:        (pr.it_run_checkins        as unknown[] | null) ?? [],
         };

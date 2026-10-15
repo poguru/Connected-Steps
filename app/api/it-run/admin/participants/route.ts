@@ -2,6 +2,7 @@ import { checkPersonName, checkBibName, normalizeName } from "@/lib/it-run-name-
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireRole, getClientIp } from "@/lib/it-run-auth";
+import { participantCategoryMap, categoryOfParticipant, type ParticipantCategory } from "@/lib/it-run-participant-category";
 import {
   normalizeIndianPhone, emergencyMatchesMobile, parseCalendarDate, todayInIST, validateDateOfBirth, formatCalendarDate,
 } from "@/lib/it-run-validation";
@@ -41,7 +42,7 @@ export async function GET(req: NextRequest) {
       id, first_name, last_name, gender, dob, email, mobile, blood_group,
       emergency_name, emergency_phone, company_name, employee_id,
       company_id_url, tshirt_size, medical_conditions, food_preference,
-      bib_number, wave, collection_counter, verification_status, participant_type,
+      bib_number, wave, collection_counter, verification_status, participant_type, category_id,
       it_run_registrations!inner(
         id, registration_code, payment_status, registration_status,
         it_run_categories(name, color),
@@ -75,8 +76,15 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Normalize PostgREST null nested arrays to prevent .length crashes in the UI
+  // Each participant's own category (a booking can hold several). Rows without one use the registration's.
+  const categories = await participantCategoryMap(db, (data ?? []).map(p => (p as Record<string, unknown>).category_id as string | null).filter((id): id is string => !!id));
   const normalized = (data ?? []).map((p: Record<string, unknown>) => ({
     ...p,
+    participant_category: categoryOfParticipant(
+      p.category_id as string | null,
+      categories,
+      ((p.it_run_registrations as { it_run_categories?: ParticipantCategory | null } | null)?.it_run_categories) ?? null,
+    ),
     it_run_bib_collections: (p.it_run_bib_collections as unknown[] | null) ?? [],
     it_run_checkins:        (p.it_run_checkins        as unknown[] | null) ?? [],
   }));
