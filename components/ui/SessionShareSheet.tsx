@@ -1,5 +1,5 @@
-import type { ShareFormat } from "@/lib/session-share-card";
 "use client";
+import type { ShareFormat } from "@/lib/session-share-card";
 
 import { useState, useRef, useEffect } from "react";
 
