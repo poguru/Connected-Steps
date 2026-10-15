@@ -561,8 +561,6 @@ export async function POST(req: NextRequest) {
         .update({ status: "converted", registration_id: reg.id })
         .eq("token_hash", hashDraftToken(draftToken))
         .eq("status", "open")
-        // Only close the draft for the booking's first category, as before
-        .eq("state->>selectedCatId", primary.id)
         .then(() => {}, e => console.error("[it-run/register] draft conversion failed:", (e as Error).name));
     }
 

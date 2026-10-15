@@ -392,7 +392,11 @@ function ParticipantForm({
           hint={isChild ? "Must be 10 years or younger" : undefined}>
           <input style={inp("dob", !!errors.dob)} type="date" value={data.dob}
             min="1900-01-01" max={formatCalendarDate(todayInIST())}
-            onChange={e => onChange("dob", e.target.value)} />
+            onChange={e => {
+              // Browsers let the year run past four digits while typing; such a value is never kept
+              if (/^\d{5,}-/.test(e.target.value)) return;
+              onChange("dob", e.target.value);
+            }} />
         </Field>
       </div>
 
@@ -787,7 +791,7 @@ function StepCounts({
 function StepParticipants({
   slots, participantSubIdx, setParticipantSubIdx,
   participants, errors, onChange, submitError,
-  onBack, onNext, returnToReview, validateParticipant, validateNameField,
+  onBack, onNext, returnToReview, validateNameField,
 }: {
   slots: ParticipantSlot[];
   participantSubIdx: number;
@@ -800,7 +804,6 @@ function StepParticipants({
   validateNameField: (idx: number, field: "firstName" | "lastName" | "bibName" | "emergencyName") => void;
   onNext: () => void;
   returnToReview?: boolean;
-  validateParticipant?: (idx: number) => boolean;
 }) {
   const slot = slots[participantSubIdx];
   const category = slot?.category ?? null;
@@ -849,11 +852,7 @@ function StepParticipants({
               return (
                 <button
                   key={idx}
-                  onClick={() => {
-                    if (!validateParticipant || validateParticipant(participantSubIdx)) {
-                      setParticipantSubIdx(idx);
-                    }
-                  }}
+                  onClick={() => setParticipantSubIdx(idx)}
                   style={{
                     padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600,
                     cursor: "pointer", border: "1px solid rgba(255,255,255,0.1)",
@@ -3103,7 +3102,6 @@ function RegisterPageContent() {
             onNext={handleParticipantNext}
             validateNameField={validateNameField}
             returnToReview={returnToReview}
-            validateParticipant={validateParticipant}
           />
         )}
 

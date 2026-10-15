@@ -220,7 +220,7 @@ describe("a saved draft cannot be reused for another category", () => {
     });
   }
 
-  it("saving 10K into a Parent & Child draft is refused without writing", async () => {
+  it("a draft whose first category changed is still saved: a draft is the whole booking", async () => {
     const token = newDraftToken();
     const kidDraft = {
       id: "d1", status: "open", version: 1, expires_at: new Date(Date.now() + DRAFT_TTL_MS).toISOString(),
@@ -232,9 +232,8 @@ describe("a saved draft cannot be reused for another category", () => {
 
     const res = await draftPost(draftReq(token, "id-10k"));
 
-    expect(res.status).toBe(409);
-    expect((await res.json()).code).toBe("DRAFT_CATEGORY_MISMATCH");
-    expect(writes).not.toContain("it_run_drafts");
+    expect((await res.json()).code).not.toBe("DRAFT_CATEGORY_MISMATCH");
+    expect(writes).toContain("it_run_drafts");
     expect(hashDraftToken(token)).toBeTruthy();
   });
 });
