@@ -34,6 +34,9 @@ export default function BibQrScanner({ onDetected, onClose }: Props) {
   const [cameraCount, setCameraCount] = useState(0);
   const [deviceIndex, setDeviceIndex] = useState(0);
   const [supported, setSupported] = useState(true);
+  const [manual, setManual] = useState("");
+  // Shown after a few seconds without a read, so the volunteer knows the code can be typed instead
+  const [stalled, setStalled] = useState(false);
 
   function stopCamera() {
     if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
@@ -88,7 +91,8 @@ export default function BibQrScanner({ onDetected, onClose }: Props) {
         if (ctx) {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const code = jsQR(image.data, image.width, image.height, { inversionAttempts: "dontInvert" });
+          // "attemptBoth" also reads light-on-dark codes, which some screens and prints produce
+          const code = jsQR(image.data, image.width, image.height, { inversionAttempts: "attemptBoth" });
           if (code?.data && !doneRef.current) {
             doneRef.current = true;
             stopCamera();
@@ -101,9 +105,12 @@ export default function BibQrScanner({ onDetected, onClose }: Props) {
     }
 
     doneRef.current = false;
+    setStalled(false);
     start();
+    const stallTimer = window.setTimeout(() => { if (!cancelled) setStalled(true); }, 8000);
     return () => {
       cancelled = true;
+      window.clearTimeout(stallTimer);
       stopCamera();
     };
     // The camera restarts only when the volunteer switches cameras (deviceIndex)
@@ -145,6 +152,32 @@ export default function BibQrScanner({ onDetected, onClose }: Props) {
       {message && (
         <div role="alert" style={{ color: "#f87171", fontSize: 13, textAlign: "center", maxWidth: 360, marginTop: 12 }}>{message}</div>
       )}
+
+      {supported && stalled && !message && (
+        <div style={{ color: "#fbbf24", fontSize: 12, textAlign: "center", maxWidth: 360, marginTop: 12, lineHeight: 1.5 }}>
+          No code read yet. Move closer so the code fills the frame, hold the phone steady, or type the code below.
+        </div>
+      )}
+
+      {/* Typed fallback: a registration code, BIB or QR token. It goes through the same server check as a scan. */}
+      <form
+        onSubmit={e => { e.preventDefault(); if (manual.trim()) { doneRef.current = true; stopCamera(); onDetected(manual.trim()); } }}
+        style={{ display: "flex", gap: 8, width: "min(88vw, 420px)", marginTop: 14 }}
+      >
+        <input
+          value={manual}
+          onChange={e => setManual(e.target.value)}
+          placeholder="Registration code or BIB"
+          autoCapitalize="characters"
+          autoCorrect="off"
+          spellCheck={false}
+          style={{ flex: 1, minHeight: 44, padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: 16, fontFamily: "inherit" }}
+        />
+        <button type="submit" disabled={!manual.trim()} style={{
+          minHeight: 44, padding: "10px 16px", borderRadius: 10, border: "none", fontWeight: 700, fontSize: 14,
+          background: manual.trim() ? "#e8620a" : "rgba(255,255,255,0.08)", color: "#fff", cursor: manual.trim() ? "pointer" : "not-allowed",
+        }}>Find</button>
+      </form>
 
       <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap", justifyContent: "center" }}>
         {cameraCount > 1 && (
