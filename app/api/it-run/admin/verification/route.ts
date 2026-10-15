@@ -1,3 +1,4 @@
+import { APP_URL } from "@/lib/config";
 import { cancelRunnerCategory, CATEGORY_REFUND_PERCENT } from "@/lib/it-run-category-cancel";
 import { buildCategoryCancelledEmail } from "@/lib/it-run-category-cancel-email";
 import { NextRequest, NextResponse } from "next/server";
@@ -92,10 +93,10 @@ export async function PATCH(req: NextRequest) {
 
     const { data: part } = await db
       .from("it_run_participants")
-      .select("email, first_name, company_id_url, id_document_type, registration_id")
+      .select("email, first_name, company_id_url, id_document_type, registration_id, qr_token")
       .eq("id", participantId)
       .eq("event_id", event.id)
-      .maybeSingle<{ email: string | null; first_name: string; company_id_url: string | null; id_document_type: string | null; registration_id: string }>();
+      .maybeSingle<{ email: string | null; first_name: string; company_id_url: string | null; id_document_type: string | null; registration_id: string; qr_token: string | null }>();
     if (!part) return NextResponse.json({ error: "Participant not found" }, { status: 404 });
     // A participant who continued without an ID has nothing to review. Never approve or reject them.
     if (!part.company_id_url) {
@@ -162,9 +163,17 @@ export async function PATCH(req: NextRequest) {
       if (status === "verified") {
         const isGovernment = part.id_document_type === "government";
         subject = isGovernment ? `ID Verified - ${event.title}` : `Company ID Verified - ${event.title}`;
+        // The registration ID and this runner's QR code come with the verified email
+        const { data: regRow } = await db
+          .from("it_run_registrations")
+          .select("registration_code")
+          .eq("id", part.registration_id)
+          .maybeSingle<{ registration_code: string }>();
+        const qrUrl = `${APP_URL}/api/it-run/qr/${part.qr_token ?? regRow?.registration_code ?? ""}`;
         htmlBody = buildCompanyVerificationApprovedEmail(part.first_name, {
           eventTitle: event.title,
           eventDate: "February 7, 2027",
+          registration: regRow?.registration_code ? { code: regRow.registration_code, qrUrl } : undefined,
         }, isGovernment ? "government" : "company");
       } else if (status === "rejected") {
         // Only sent when the cancellation happened in this request (not on a repeat)

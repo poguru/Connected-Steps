@@ -239,6 +239,8 @@ export function buildCompanyVerificationApprovedEmail(
   eventDetails: {
     eventTitle: string;
     eventDate: string;
+    /** The registration ID and this runner's QR code, shown once the ID is verified */
+    registration?: { code: string; qrUrl: string };
   },
   documentType: "company" | "government" = "company",
 ): string {
@@ -253,6 +255,14 @@ export function buildCompanyVerificationApprovedEmail(
   <div style="background:#1a1a1a;border-radius:8px;border-left:3px solid #10b981;padding:16px;margin-bottom:20px;">
     <p style="color:#10b981;font-size:13px;margin:0;font-weight:600;">${statement}</p>
   </div>
+
+  ${eventDetails.registration ? `
+  <div style="margin-bottom:20px;background:#161616;border-radius:8px;padding:16px;text-align:center;">
+    <div style="font-size:11px;color:#888;text-transform:uppercase;margin-bottom:6px;font-weight:600;">Registration ID</div>
+    <div style="font-size:18px;color:#fff;font-weight:800;letter-spacing:0.04em;margin-bottom:14px;">${escapeHtml(eventDetails.registration.code)}</div>
+    <img src="${escapeHtml(eventDetails.registration.qrUrl)}" width="180" height="180" alt="Your QR code" style="display:inline-block;border-radius:8px;background:#fff;padding:6px;" />
+    <div style="font-size:12px;color:#888;margin-top:10px;">Show this QR code at BIB collection and on race day.</div>
+  </div>` : ""}
 
   <div style="margin-bottom:20px;">
     <div style="font-size:11px;color:#888;text-transform:uppercase;margin-bottom:8px;font-weight:600;">Event Details</div>
