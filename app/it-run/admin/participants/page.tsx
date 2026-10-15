@@ -10,7 +10,7 @@ interface Participant {
   company_name: string | null; employee_id: string | null;
   food_preference: string | null; medical_conditions: string | null;
   bib_number: string | null; wave: string | null;
-  verification_status: string; participant_type: string;
+  verification_status: string; participant_type: string; cancelled_at?: string | null; cancelled_reason?: string | null;
   it_run_registrations: {
     registration_code: string; payment_status: string;
     it_run_categories: { name: string; color: string } | null;
@@ -213,6 +213,11 @@ export default function ParticipantsPage() {
                         <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 5px", borderRadius: 4, color: VERIFY_COLOR[p.verification_status] ?? "#888", background: `${VERIFY_COLOR[p.verification_status] ?? "#888"}15` }}>
                           {p.verification_status}
                         </span>
+                        {p.cancelled_at && (
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 4, color: "#f87171", background: "rgba(248,113,113,0.12)" }} title={p.cancelled_reason ?? undefined}>
+                            Category cancelled
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: 11, color: "#888", display: "flex", gap: 12, flexWrap: "wrap" }}>
                         <span>{p.email ?? p.mobile}</span>

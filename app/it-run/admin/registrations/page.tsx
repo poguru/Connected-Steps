@@ -18,6 +18,8 @@ type Participant = {
   tshirt_size: string | null; medical_conditions: string | null; food_preference: string | null;
   bib_number: string | null; wave: string | null; collection_counter: string | null;
   verification_status: string;
+  cancelled_at?: string | null;
+  cancelled_reason?: string | null;
   it_run_bib_collections: BibCollection[];
   it_run_checkins: Checkin[];
 };
@@ -230,6 +232,7 @@ function ParticipantCard({ p, idx, onEdit }: {
             {p.participant_type}
           </span>
           <StatusChip label={p.verification_status.replace("_"," ")} color={vc} />
+          {p.cancelled_at && <StatusChip label="Category cancelled" color="#f87171" />}
           {p.bib_number && <span style={{ fontSize: 12, fontWeight: 800, color: ACCENT }}>BIB {p.bib_number}</span>}
           {collected && <StatusChip label="BIB Collected" color={GREEN} />}
           {checkedIn  && <StatusChip label="Checked In" color="#60a5fa" />}

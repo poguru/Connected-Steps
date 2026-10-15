@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
         email, mobile, blood_group, emergency_name, emergency_phone,
         company_name, employee_id, company_id_url,
         tshirt_size, medical_conditions, food_preference,
-        bib_number, wave, collection_counter, verification_status, category_id,
+        bib_number, wave, collection_counter, verification_status, category_id, cancelled_at, cancelled_reason,
         it_run_bib_collections ( id, collected_at, counter_number ),
         it_run_checkins ( id, checked_in_at )
       )
