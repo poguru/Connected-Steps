@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
       .from("it_run_participants")
       .select(
         `
-        id, first_name, last_name, event_id, registration_id,
+        id, first_name, last_name, event_id, registration_id, cancelled_at,
         it_run_registrations!inner(id, registration_code, payment_status, registration_status)
       `,
       )
@@ -102,6 +102,7 @@ export async function POST(req: NextRequest) {
         last_name: string;
         event_id: string;
         registration_id: string;
+        cancelled_at: string | null;
         it_run_registrations: {
           id: string;
           registration_code: string;
@@ -112,6 +113,12 @@ export async function POST(req: NextRequest) {
 
     if (!participant) {
       return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+    }
+    if (participant.cancelled_at) {
+      return NextResponse.json({
+        error: "This runner's category was cancelled after an ID was rejected. Do not issue anything to this runner.",
+        code: "RUNNER_CANCELLED",
+      }, { status: 409 });
     }
 
     const reg = participant.it_run_registrations;

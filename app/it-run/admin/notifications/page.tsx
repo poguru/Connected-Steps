@@ -9,7 +9,7 @@ type Reg = {
   id: string; registration_code: string; lead_email: string;
   payment_status: string; final_price: number;
   confirmation_email_sent_at: string | null;
-  bib_invite_sent_at: string | null;
+  bib_email_sent_at: string | null;
   created_at: string;
   it_run_categories: { name: string } | null;
 };
@@ -63,13 +63,13 @@ export default function NotificationsPage() {
       });
       const d = await res.json();
       if (!res.ok) { setMsg({ text: d.error ?? "Failed", ok: false }); return; }
-      setMsg({ text: "BIB invite sent", ok: true });
+      setMsg({ text: "BIB email sent", ok: true });
       load();
     } finally { setSending(null); }
   }
 
   async function sendBibInviteBulk() {
-    if (!confirm("Send BIB collection invites to ALL confirmed registrations that haven't received one yet?")) return;
+    if (!confirm("Send the BIB email (numbers, QR codes and slot link) to every confirmed registration that has its BIB numbers and hasn't received it yet?")) return;
     setBulkSending(true); setMsg(null);
     try {
       const res = await fetch("/api/it-run/admin/notifications", {
@@ -79,7 +79,7 @@ export default function NotificationsPage() {
       });
       const d = await res.json();
       if (!res.ok) { setMsg({ text: d.error ?? "Bulk send failed", ok: false }); return; }
-      setMsg({ text: `BIB invites sent: ${d.sent} of ${d.total}`, ok: true });
+      setMsg({ text: `BIB emails sent: ${d.sent} of ${d.total}`, ok: true });
       load();
     } finally { setBulkSending(false); }
   }
@@ -103,8 +103,8 @@ export default function NotificationsPage() {
 
   const confSent    = rows.filter(r => r.confirmation_email_sent_at).length;
   const confUnsent  = rows.filter(r => !r.confirmation_email_sent_at).length;
-  const bibSent     = rows.filter(r => r.bib_invite_sent_at).length;
-  const bibUnsent   = rows.filter(r => !r.bib_invite_sent_at).length;
+  const bibSent     = rows.filter(r => r.bib_email_sent_at).length;
+  const bibUnsent   = rows.filter(r => !r.bib_email_sent_at).length;
 
   return (
     <div style={{ maxWidth: 1100 }}>
@@ -130,7 +130,7 @@ export default function NotificationsPage() {
       {/* BIB invite bulk action */}
       <div style={{ background: "rgba(232,98,10,0.06)", border: "1px solid rgba(232,98,10,0.2)", borderRadius: 12, padding: "16px 20px", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 2 }}>BIB Collection Invites</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 2 }}>BIB Emails</div>
           <div style={{ fontSize: 12, color: "#888" }}>
             Send slot-booking links to all confirmed registrations. Run this ~2 days before the event (around 5 Feb 2027).
           </div>
@@ -150,8 +150,8 @@ export default function NotificationsPage() {
         <Pill label="Total shown"        value={total} />
         <Pill label="Confirmation sent"  value={confSent}   color={GREEN} />
         <Pill label="Confirmation unsent" value={confUnsent} color="#f59e0b" />
-        <Pill label="BIB invite sent"    value={bibSent}    color={GREEN} />
-        <Pill label="BIB invite pending" value={bibUnsent}  color="#f59e0b" />
+        <Pill label="BIB email sent"    value={bibSent}    color={GREEN} />
+        <Pill label="BIB email pending" value={bibUnsent}  color="#f59e0b" />
       </div>
 
       {msg && (
@@ -182,7 +182,7 @@ export default function NotificationsPage() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-                {["Code","Email","Category","Amount","Registered","Confirmation","BIB Invite","Actions"].map(h => (
+                {["Code","Email","Category","Amount","Registered","Confirmation","BIB Email","Actions"].map(h => (
                   <th key={h} style={{ padding: "10px 14px", textAlign: "left", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
@@ -222,10 +222,10 @@ export default function NotificationsPage() {
                   </td>
                   {/* BIB invite */}
                   <td style={{ padding: "10px 14px" }}>
-                    {r.bib_invite_sent_at ? (
+                    {r.bib_email_sent_at ? (
                       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                        <span style={{ color: GREEN, fontSize: 12 }}>✓ {new Date(r.bib_invite_sent_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
-                        <button disabled={!!sending} onClick={() => { if (confirm(`Force resend BIB invite to ${r.lead_email}?`)) sendBibInvite(r.id, true); }}
+                        <span style={{ color: GREEN, fontSize: 12 }}>✓ {new Date(r.bib_email_sent_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
+                        <button disabled={!!sending} onClick={() => { if (confirm(`Force resend BIB email to ${r.lead_email}?`)) sendBibInvite(r.id, true); }}
                           style={{ padding: "3px 8px", background: "transparent", border: "none", color: "#555", fontSize: 11, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
                           Resend
                         </button>

@@ -254,32 +254,54 @@ interface ConfirmEmailArgs {
 // Called by: /api/it-run/payment/verify
 //            /api/webhooks/razorpay  handleItRunPaymentCaptured
 //            /api/it-run/register    (free registrations)
+export type BibEmailOutcome = "sent" | "skipped" | "not_allocated" | "failed";
+
+/**
+ * The BIB email: every participant's BIB number and QR code, and the link to book a collection slot.
+ * It goes out only when every participant already has a BIB number (see the admin BIB route), so it never
+ * carries a blank number. Idempotent through bib_email_sent_at.
+ */
 export async function sendItRunBibInviteEmail(
   registrationId: string,
   leadEmail:       string,
-): Promise<void> {
+): Promise<BibEmailOutcome> {
   const label = `[it-run-email/bib-invite] reg=${registrationId}`;
   const db    = getSupabaseServer();
 
   const { data: reg } = await db
     .from("it_run_registrations")
     .select(`
-      id, registration_code, lead_email, linked_user_email, participant_count,
-      bib_invite_token, bib_invite_sent_at,
-      it_run_categories ( name ),
+      id, event_id, registration_code, lead_email, linked_user_email,
+      bib_invite_token, bib_email_sent_at,
       it_run_events ( title, event_date, venue_name )
     `)
     .eq("id", registrationId)
     .single<{
-      id: string; registration_code: string; lead_email: string; linked_user_email: string | null;
-      participant_count: number;
-      bib_invite_token: string | null; bib_invite_sent_at: string | null;
-      it_run_categories: { name: string } | null;
+      id: string; event_id: string; registration_code: string; lead_email: string; linked_user_email: string | null;
+      bib_invite_token: string | null; bib_email_sent_at: string | null;
       it_run_events: { title: string; event_date: string; venue_name: string } | null;
     }>();
 
-  if (!reg) { console.warn(`${label} Registration not found`); return; }
-  if (reg.bib_invite_sent_at) { console.log(`${label} Already sent — skipping`); return; }
+  if (!reg) { console.warn(`${label} Registration not found`); return "skipped"; }
+  if (reg.bib_email_sent_at) { console.log(`${label} Already sent — skipping`); return "skipped"; }
+
+  // Every participant who is still in the booking needs a BIB number first
+  const { data: parts } = await db
+    .from("it_run_participants")
+    .select("id, first_name, last_name, bib_number, qr_token, category_id")
+    .eq("registration_id", registrationId)
+    .is("cancelled_at", null)
+    .returns<Array<{ id: string; first_name: string; last_name: string; bib_number: string | null; qr_token: string | null; category_id: string | null }>>();
+  if (!parts?.length || parts.some(p => !p.bib_number)) {
+    console.log(`${label} BIB numbers not allocated yet — not sent`);
+    return "not_allocated";
+  }
+  const { data: cats } = await db
+    .from("it_run_categories")
+    .select("id, name")
+    .eq("event_id", reg.event_id)
+    .returns<Array<{ id: string; name: string }>>();
+  const categoryName = new Map((cats ?? []).map(c => [c.id, c.name]));
 
   // ── Ensure bib_invite_token exists ──────────────────────────────────────────
   let token = reg.bib_invite_token;
@@ -305,80 +327,107 @@ export async function sendItRunBibInviteEmail(
     }
   }
 
-  if (!token) { console.error(`${label} Could not obtain bib_invite_token`); return; }
+  if (!token) { console.error(`${label} Could not obtain bib_invite_token`); return "failed"; }
 
   // ── Atomic idempotency claim ─────────────────────────────────────────────────
   const { data: claimed } = await db
     .from("it_run_registrations")
-    .update({ bib_invite_sent_at: new Date().toISOString() })
+    .update({ bib_email_sent_at: new Date().toISOString() })
     .eq("id", registrationId)
-    .is("bib_invite_sent_at", null)
+    .is("bib_email_sent_at", null)
     .select("id");
 
-  if (!claimed?.length) { console.log(`${label} Claimed by concurrent call — skipping`); return; }
+  if (!claimed?.length) { console.log(`${label} Claimed by concurrent call — skipping`); return "skipped"; }
 
   // ── Build + send ─────────────────────────────────────────────────────────────
   const bookUrl = `${APP_URL}/events/it-run-sprint-2/bib-collection/${token}`;
-  const isDuo   = (reg.participant_count ?? 1) > 1;
 
   const html = buildBibInviteEmail({
     code:     reg.registration_code,
-    category: reg.it_run_categories?.name ?? "IT Run Sprint-2",
     date:     reg.it_run_events?.event_date ?? "2027-02-07",
     venue:    reg.it_run_events?.venue_name ?? "Hyderabad Central University, Gachibowli, Hyderabad",
     bookUrl,
-    isDuo,
+    isDuo:    parts.length > 1,
+    participants: parts.map(p => ({
+      name:     `${p.first_name} ${p.last_name}`.trim(),
+      category: categoryName.get(p.category_id ?? "") ?? "IT Run Sprint-2",
+      bib:      p.bib_number!,
+      qrUrl:    `${APP_URL}/api/it-run/qr/${p.qr_token ?? ""}`,
+    })),
   });
 
   const recipients = confirmationRecipients(leadEmail || reg.lead_email, reg.linked_user_email);
   if (recipients.length === 0) {
-    await releaseClaim(db, "bib_invite_sent_at", registrationId);
+    await releaseClaim(db, "bib_email_sent_at", registrationId);
     console.error(JSON.stringify({ src: "it-run-email", kind: "bib_invite", outcome: "no_recipient", reg: reg.registration_code }));
-    return;
+    return "failed";
   }
 
   const results = await Promise.all(recipients.map(to => sendEmail(
     to,
     reg.registration_code,
-    `Book Your BIB Collection Slot — IT Run Sprint-2 (${reg.registration_code})`,
+    `Your BIB Numbers and Collection Slot — IT Run Sprint-2 (${reg.registration_code})`,
     html,
     false,
     true,
   )));
   const failed = results.filter(r => !r.ok);
   if (failed.length > 0) {
-    await releaseClaim(db, "bib_invite_sent_at", registrationId);
+    await releaseClaim(db, "bib_email_sent_at", registrationId);
     console.error(JSON.stringify({
       src: "it-run-email", kind: "bib_invite", outcome: "send_failed",
       reg: reg.registration_code, failed: failed.length, of: recipients.length,
       httpStatus: failed[0]?.httpStatus ?? null,
     }));
-    return;
+    return "failed";
   }
 
   console.log(JSON.stringify({ src: "it-run-email", kind: "bib_invite", outcome: "sent", reg: reg.registration_code, recipients: recipients.length }));
+  return "sent";
+}
+
+interface BibEmailParticipant {
+  name:     string;
+  category: string;
+  bib:      string;
+  qrUrl:    string;
 }
 
 interface BibInviteEmailArgs {
-  code:     string;
-  category: string;
-  date:     string;
-  venue:    string;
-  bookUrl:  string;
-  isDuo:    boolean;
+  code:         string;
+  date:         string;
+  venue:        string;
+  bookUrl:      string;
+  isDuo:        boolean;
+  participants: BibEmailParticipant[];
 }
 
-function buildBibInviteEmail({ code, category, date, venue, bookUrl, isDuo }: BibInviteEmailArgs): string {
+function buildBibInviteEmail({ code, date, venue, bookUrl, isDuo, participants }: BibInviteEmailArgs): string {
   const dateFormatted = new Date(date + "T12:00:00Z").toLocaleDateString("en-IN", {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
   });
 
   const duoNote = isDuo
     ? `<p style="margin:0 0 16px;font-size:13px;color:#888;line-height:1.7;">
-         This link covers all participants in your registration.
-         Each participant will need to book their own time slot on the page.
+         Everyone in your registration has a BIB below. Each participant's QR code is on their card.
        </p>`
     : "";
+
+  // One card per participant: the BIB number, their name and category, and their QR code for race day.
+  const cards = participants.map(p => `
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#141414;border:1px solid #262626;border-radius:10px;overflow:hidden;margin-bottom:12px;">
+      <tr>
+        <td style="padding:16px 20px;vertical-align:middle;">
+          <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">BIB Number</div>
+          <div style="font-size:30px;font-weight:900;color:#e8620a;letter-spacing:0.04em;line-height:1.1;">${escapeHtml(p.bib)}</div>
+          <div style="font-size:15px;font-weight:700;color:#fff;margin-top:8px;">${escapeHtml(p.name)}</div>
+          <div style="font-size:12px;color:#888;margin-top:2px;">${escapeHtml(p.category)}</div>
+        </td>
+        <td style="padding:16px 20px;width:160px;text-align:center;vertical-align:middle;">
+          <img src="${escapeHtml(p.qrUrl)}" width="140" height="140" alt="Your QR code" style="display:block;margin:0 auto;width:140px;height:140px;background:#fff;border-radius:8px;"/>
+        </td>
+      </tr>
+    </table>`).join("");
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -396,28 +445,25 @@ function buildBibInviteEmail({ code, category, date, venue, bookUrl, isDuo }: Bi
 
   <tr><td style="padding:28px 40px 20px;text-align:center;">
     <div style="font-size:11px;color:#e8620a;letter-spacing:0.18em;text-transform:uppercase;margin-bottom:6px;">Connected Steps</div>
-    <div style="font-size:24px;font-weight:900;color:#fff;letter-spacing:-0.02em;">BIB Collection Booking</div>
+    <div style="font-size:24px;font-weight:900;color:#fff;letter-spacing:-0.02em;">Your BIB Numbers</div>
     <div style="font-size:13px;color:#888;margin-top:6px;">The IT Run Sprint-2 &middot; ${dateFormatted}</div>
   </td></tr>
 
   <tr><td style="padding:0 40px 20px;">
     <p style="margin:0 0 12px;font-size:15px;color:#ccc;line-height:1.7;">
-      Your registration is confirmed. Now it&rsquo;s time to <strong style="color:#fff;">book your BIB collection slot</strong>
+      Your BIB numbers are ready. Keep this email for race day, and <strong style="color:#fff;">book your BIB collection slot</strong>
       at a time and location that works for you.
     </p>
     ${duoNote}
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#141414;border:1px solid #262626;border-radius:10px;overflow:hidden;margin-bottom:20px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#141414;border:1px solid #262626;border-radius:10px;overflow:hidden;margin-bottom:16px;">
       <tr>
-        <td style="padding:14px 24px;border-right:1px solid #222;width:50%;">
+        <td style="padding:14px 24px;">
           <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">Registration Code</div>
           <div style="font-size:16px;font-weight:900;color:#fff;letter-spacing:0.08em;">${code}</div>
         </td>
-        <td style="padding:14px 24px;width:50%;">
-          <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">Category</div>
-          <div style="font-size:14px;font-weight:700;color:#fff;">${category}</div>
-        </td>
       </tr>
     </table>
+    ${cards}
   </td></tr>
 
   <tr><td style="padding:0 40px 28px;text-align:center;">
@@ -456,7 +502,7 @@ function buildBibInviteEmail({ code, category, date, venue, bookUrl, isDuo }: Bi
       <tr><td style="padding:14px 20px;">
         <table cellpadding="0" cellspacing="0" style="font-size:13px;color:#888;line-height:2;width:100%;">
           <tr><td>&#10003;&nbsp; <strong style="color:#ccc;">Original company / employee ID card</strong> for physical verification</td></tr>
-          <tr><td>&#10003;&nbsp; Race-day QR code (from your confirmation email or participant dashboard)</td></tr>
+          <tr><td>&#10003;&nbsp; Race-day QR code for each participant (shown on the cards above)</td></tr>
         </table>
       </td></tr>
     </table>

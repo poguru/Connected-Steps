@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { requireRole } from "@/lib/it-run-auth";
+import { requireRole, getClientIp } from "@/lib/it-run-auth";
+import { planBibNumbers, type BibAssignment, type BibCandidate } from "@/lib/it-run-bib";
+import { sendItRunBibInviteEmail, type BibEmailOutcome } from "@/lib/it-run-email";
 
 // GET /api/it-run/admin/bibs?unallocated=1
 export async function GET(req: NextRequest) {
@@ -40,103 +42,134 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ data: normalizedData });
 }
 
-// POST /api/it-run/admin/bibs — bulk auto-allocate BIBs
-// Body: { categorySlug? } — allocate for one category or all
+// POST /api/it-run/admin/bibs — "Allocate BIBs and send"
+//
+// Allocates BIB numbers to every confirmed participant who has none, then sends the BIB email (numbers, QR codes
+// and the collection slot link) to each confirmed registration that now has all its numbers and has not had one.
+// Refused until registration has closed. Safe to press again: a participant is numbered once, and an email is sent once.
 export async function POST(req: NextRequest) {
   const session = requireRole(req, ["event_admin"]);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const { categorySlug } = await req.json() as { categorySlug?: string };
     const db = getSupabaseServer();
 
-    const { data: event } = await db.from("it_run_events").select("id").eq("slug", "sprint-2").single();
+    const { data: event } = await db
+      .from("it_run_events")
+      .select("id, registration_closes_at")
+      .eq("slug", "sprint-2")
+      .single<{ id: string; registration_closes_at: string | null }>();
     if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
-    // Get unallocated participants (paid/free registrations only)
-    let q = db
-      .from("it_run_participants")
-      .select(`
-        id, participant_type,
-        it_run_registrations!inner ( payment_status,
-          it_run_categories ( slug, sort_order ) )
-      `)
-      .eq("event_id", event.id)
-      .is("bib_number", null)
-      .in("it_run_registrations.payment_status", ["paid","free"]);
-
-    if (categorySlug) {
-      q = q.eq("it_run_registrations.it_run_categories.slug", categorySlug);
+    if (event.registration_closes_at && Date.now() < new Date(event.registration_closes_at).getTime()) {
+      return NextResponse.json({
+        error: "Registration has not closed yet. BIB numbers are allocated after it closes.",
+        code: "REGISTRATION_OPEN",
+      }, { status: 409 });
     }
 
-    const { data: parts } = await q.order("id");
-    if (!parts?.length) return NextResponse.json({ allocated: 0, message: "No unallocated participants found" });
+    const { data: cats } = await db
+      .from("it_run_categories")
+      .select("id, slug")
+      .eq("event_id", event.id)
+      .returns<Array<{ id: string; slug: string }>>();
+    const slugById = new Map((cats ?? []).map(c => [c.id, c.slug]));
 
-    // BIB number range by category sort_order:
-    // sort 1 (10K): 1001-1999, Wave A
-    // sort 2 (5K Timed): 2001-2999, Wave A
-    // sort 3 (5K Fun): 3001-3999, Wave B
-    // sort 4 (Duo): 4001-4999, Wave B
-    // sort 5 (Kid): 5001-5999, Wave C
-    const RANGES: Record<number, { start: number; wave: string }> = {
-      1: { start: 1001, wave: "A" },
-      2: { start: 2001, wave: "A" },
-      3: { start: 3001, wave: "B" },
-      4: { start: 4001, wave: "B" },
-      5: { start: 5001, wave: "C" },
-    };
+    // Confirmed participants without a BIB (a confirmed registration has every adult verified and is paid or free)
+    const { data: unnumbered, error: candidateErr } = await db
+      .from("it_run_participants")
+      .select("id, registration_id, category_id, participant_type, team_key, created_at, it_run_registrations!inner ( payment_status, registration_status )")
+      .eq("event_id", event.id)
+      .is("bib_number", null)
+      .is("cancelled_at", null)
+      .eq("it_run_registrations.registration_status", "active")
+      .in("it_run_registrations.payment_status", ["paid", "free"])
+      .returns<Array<{
+        id: string; registration_id: string; category_id: string | null; participant_type: string;
+        team_key: string | null; created_at: string;
+      }>>();
+    if (candidateErr) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
-    // Fetch all currently-assigned BIBs for this event in a single query and
-    // parse them to integers immediately.  Doing the range check and max-find
-    // in JavaScript with Number comparison is numerically exact regardless of
-    // string length — unlike PostgreSQL text comparison where "999" > "1001".
-    const { data: existingBibRows } = await db
+    const { data: existing } = await db
       .from("it_run_participants")
       .select("bib_number")
       .eq("event_id", event.id)
-      .not("bib_number", "is", null);
+      .not("bib_number", "is", null)
+      .returns<Array<{ bib_number: string }>>();
 
-    const existingBibs: number[] = (existingBibRows ?? [])
-      .map(r => parseInt(r.bib_number ?? "", 10))
-      .filter(n => Number.isFinite(n));
+    const candidates: BibCandidate[] = (unnumbered ?? []).map(p => ({
+      participantId:   p.id,
+      registrationId: p.registration_id,
+      categorySlug:    slugById.get(p.category_id ?? "") ?? "",
+      participantType: p.participant_type,
+      teamKey:         p.team_key,
+      createdAt:       p.created_at,
+    }));
+    const plan = planBibNumbers(candidates, (existing ?? []).map(r => r.bib_number));
 
-    // Pre-compute the highest assigned BIB per category range using numeric
-    // comparison.  Each range occupies a non-overlapping 999-slot band so a
-    // BIB can belong to at most one range.
-    const bibCounters: Record<number, number> = {};
-    for (const n of existingBibs) {
-      for (const sordKey in RANGES) {
-        const sord  = Number(sordKey);
-        const range = RANGES[sord];
-        if (n >= range.start && n < range.start + 999) {
-          if (bibCounters[sord] === undefined || n > bibCounters[sord]) {
-            bibCounters[sord] = n;
-          }
-        }
-      }
-    }
-
-    for (const part of parts) {
-      const cat   = (part.it_run_registrations as unknown as { it_run_categories: { slug: string; sort_order: number } }).it_run_categories;
-      const sord  = cat?.sort_order ?? 3;
-      const range = RANGES[sord] ?? { start: 9001, wave: "D" };
-
-      // First participant in this range for this run — seed the counter.
-      if (bibCounters[sord] === undefined) {
-        bibCounters[sord] = range.start - 1;
-      }
-
-      bibCounters[sord]++;
-      const bib  = String(bibCounters[sord]);
-      const wave = range.wave;
-
-      await db
+    // Write every number, or none. A team's two numbers must stay paired, so a failed write rolls the run back.
+    const written: BibAssignment[] = [];
+    for (const a of plan.assignments) {
+      const { data: row, error } = await db
         .from("it_run_participants")
-        .update({ bib_number: bib, wave })
-        .eq("id", part.id);
+        .update({ bib_number: a.bib })
+        .eq("id", a.participantId)
+        .is("bib_number", null)
+        .select("id");
+      if (error || !row?.length) {
+        for (const w of written) {
+          await db.from("it_run_participants").update({ bib_number: null }).eq("id", w.participantId).eq("bib_number", w.bib);
+        }
+        console.error("[it-run/admin/bibs] allocation write failed, rolled back:", error?.message ?? "no row updated");
+        return NextResponse.json({
+          error: "BIB allocation was interrupted and nothing was kept. Press Allocate BIBs and send again.",
+          code: "ALLOCATION_RETRY",
+        }, { status: 409 });
+      }
+      written.push(a);
     }
 
-    return NextResponse.json({ allocated: parts.length });
+    // Confirmed registrations that have not had their BIB email. Those without numbers are not sent.
+    const { data: ready } = await db
+      .from("it_run_registrations")
+      .select("id, lead_email")
+      .eq("event_id", event.id)
+      .eq("registration_status", "active")
+      .in("payment_status", ["paid", "free"])
+      .is("bib_email_sent_at", null)
+      .returns<Array<{ id: string; lead_email: string }>>();
+
+    const outcomes = { sent: 0, not_allocated: 0, failed: 0, skipped: 0 };
+    for (const reg of ready ?? []) {
+      let outcome: BibEmailOutcome;
+      try {
+        outcome = await sendItRunBibInviteEmail(reg.id, reg.lead_email);
+      } catch (e) {
+        console.error(`[admin/bibs] BIB email failed reg=${reg.id}:`, e);
+        outcome = "failed";
+      }
+      outcomes[outcome]++;
+    }
+
+    db.from("it_run_audit_logs").insert({
+      event_id:    event.id,
+      actor_email: session.email,
+      actor_role:  session.role,
+      action:      "allocate_bibs_and_send",
+      entity_type: "event",
+      entity_id:   "sprint-2",
+      ip:          getClientIp(req),
+      detail:      { allocated: written.length, problems: plan.problems.length, ...outcomes },
+    }).then(() => {}, () => {});
+
+    return NextResponse.json({
+      ok: true,
+      allocated: written.length,
+      problems: plan.problems,
+      emailed: outcomes.sent,
+      notAllocated: outcomes.not_allocated,
+      emailFailed: outcomes.failed,
+    });
   } catch (e: unknown) {
     console.error("[it-run/admin/bibs] error:", e);
     return NextResponse.json({ error: "Server error" }, { status: 500 });

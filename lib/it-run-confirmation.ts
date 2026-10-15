@@ -5,7 +5,8 @@
  * 2. ID verification. An admin verifies the ID of every adult. Children are verified on creation.
  *
  * The registration becomes `active` (confirmed) only when it is paid or free AND every participant is verified.
- * The confirmation email and the BIB invite are sent at that moment, never at payment.
+ * The confirmation email is sent at that moment, never at payment. The BIB email (numbers, QR codes and the slot link)
+ * waits until an admin allocates BIBs after registration closes.
  */
 
 import { getSupabaseServer } from "@/lib/supabase-server";
@@ -63,7 +64,11 @@ export async function confirmIfVerified(db: Db, registrationId: string): Promise
   return "confirmed";
 }
 
-/** The confirmation email and the BIB invite, for a registration that has just been confirmed. */
+/**
+ * The confirmation email for a registration that has just been confirmed. The BIB email is sent here only when the
+ * BIB numbers already exist (BIBs allocated after closing, then this registration was confirmed). Otherwise the
+ * admin's "Allocate BIBs and send" sends it. No slot-link email goes out at confirmation.
+ */
 export async function sendConfirmedNotices(registrationId: string): Promise<void> {
   const db = getSupabaseServer();
   const { data: reg } = await db

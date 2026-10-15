@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     .select(`
       id, registration_code, lead_email,
       payment_status, final_price,
-      confirmation_email_sent_at, bib_invite_sent_at, created_at,
+      confirmation_email_sent_at, bib_email_sent_at, created_at,
       it_run_categories ( name )
     `, { count: "exact" })
     .eq("event_id", event.id)
@@ -108,14 +108,14 @@ export async function POST(req: NextRequest) {
       .eq("event_id", event.id)
       .in("payment_status", ["paid", "free"])
       .eq("registration_status", "active")
-      .is("bib_invite_sent_at", null);
+      .is("bib_email_sent_at", null);
 
     const targets = pending ?? [];
     let sent = 0;
     for (const reg of targets) {
       try {
-        await sendItRunBibInviteEmail(reg.id, reg.lead_email);
-        sent++;
+        // Registrations without BIB numbers yet are not sent (see sendItRunBibInviteEmail)
+        if (await sendItRunBibInviteEmail(reg.id, reg.lead_email) === "sent") sent++;
       } catch (e) {
         console.error(`[admin/notifications] bulk bib invite failed reg=${reg.id}:`, e);
       }
@@ -159,10 +159,16 @@ export async function POST(req: NextRequest) {
   if (body.action === "bib_invite") {
     if (force) {
       await db.from("it_run_registrations")
-        .update({ bib_invite_sent_at: null, bib_invite_token: null })
+        .update({ bib_email_sent_at: null })
         .eq("id", registrationId);
     }
-    await sendItRunBibInviteEmail(reg.id, reg.lead_email);
+    const outcome = await sendItRunBibInviteEmail(reg.id, reg.lead_email);
+    if (outcome === "not_allocated") {
+      return NextResponse.json({
+        error: "BIB numbers are not allocated yet. Use Allocate BIBs and send on the BIB page, after registration closes.",
+        code: "BIBS_NOT_ALLOCATED",
+      }, { status: 409 });
+    }
 
     db.from("it_run_audit_logs").insert({
       actor_email: session.email, actor_role: session.role,

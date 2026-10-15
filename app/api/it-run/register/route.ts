@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { teamKeysByIndex } from "@/lib/it-run-bib";
 import { generateRegistrationCode, signItRunQR } from "@/lib/it-run-auth";
 import { sendItRunPaymentReceivedEmail } from "@/lib/it-run-email";
 import { runAfterResponse } from "@/lib/after-response";
@@ -231,6 +233,8 @@ export async function POST(req: NextRequest) {
     // This ensures validation rules match what the event-config API advertises,
     // without trusting any client-supplied type or role field.
     const participantMeta = participantMetaByIndex(participantCategoryIds, typeById);
+    // The two members of each duo or parent-and-child team share a key, so their BIB numbers pair exactly
+    const participantTeamKeys = teamKeysByIndex(participantCategoryIds, typeById, randomUUID);
 
     // Age reference date = the event's calendar date (YYYY-MM-DD from the database), so ages are
     // calendar-based and independent of the server's timezone. Missing event date is a server error.
@@ -449,6 +453,7 @@ export async function POST(req: NextRequest) {
       registration_id:    reg.id,
       event_id:           primary.event_id,
       category_id:        participantCategoryIds[idx],
+      team_key:           participantTeamKeys[idx],
       participant_type:   p.type,
       first_name:         normalizeName(p.firstName),
       last_name:          normalizeName(p.lastName),

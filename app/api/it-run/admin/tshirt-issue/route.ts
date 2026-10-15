@@ -27,16 +27,19 @@ export async function POST(req: NextRequest) {
   const { data: part } = await db
     .from("it_run_participants")
     .select(`
-      id, first_name, last_name, tshirt_size,
+      id, first_name, last_name, tshirt_size, cancelled_at,
       it_run_registrations!inner ( payment_status, registration_status )
     `)
     .eq("id", participantId)
     .single<{
-      id: string; first_name: string; last_name: string; tshirt_size: string | null;
+      id: string; first_name: string; last_name: string; tshirt_size: string | null; cancelled_at: string | null;
       it_run_registrations: { payment_status: string; registration_status: string };
     }>();
 
   if (!part) return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+  if (part.cancelled_at) {
+    return NextResponse.json({ error: "This runner's category was cancelled after an ID was rejected. Do not issue a T-shirt.", code: "RUNNER_CANCELLED" }, { status: 409 });
+  }
 
   const { payment_status, registration_status } = part.it_run_registrations;
   if (!["paid", "free"].includes(payment_status)) {

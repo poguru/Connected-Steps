@@ -24,14 +24,14 @@ const mockSend = sendEmail as jest.Mock;
 const REG = {
   id: "reg-1", registration_code: "ITR-AAA", lead_email: "lead@example.com", linked_user_email: "parent@example.com",
   final_price: 799, base_price: 799, discount_amount: 0, early_bird_offer_id: null, confirmation_email_sent_at: null,
-  participant_count: 2, bib_invite_token: "tok-1", bib_invite_sent_at: null,
-  it_run_categories: { name: "5K Timed Run" },
+  participant_count: 2, event_id: "ev-1", bib_invite_token: "tok-1", bib_email_sent_at: null,
+  it_run_categories: { name: "2K Parent & Child Duo" },
   it_run_events: { title: "The IT Run Sprint-2", event_date: "2027-02-07", venue_name: "Hitec City", report_time: "5:30 AM" },
 };
 
 const PARTS = [
-  { id: "p-1", first_name: "Asha", last_name: "Rao", participant_type: "parent", tshirt_size: "M", qr_token: "qr-1" },
-  { id: "p-2", first_name: "Ravi", last_name: "Rao", participant_type: "child", tshirt_size: "S", qr_token: "qr-2" },
+  { id: "p-1", first_name: "Asha", last_name: "Rao", participant_type: "parent", tshirt_size: "M", qr_token: "qr-1", bib_number: "001P", cancelled_at: null, category_id: "cat-1" },
+  { id: "p-2", first_name: "Ravi", last_name: "Rao", participant_type: "child", tshirt_size: "S", qr_token: "qr-2", bib_number: "001C", cancelled_at: null, category_id: "cat-1" },
 ];
 
 /** Fake database. `claimed` decides whether the atomic "sent" claim succeeds. Every update is recorded. */
@@ -47,10 +47,11 @@ function fakeDb(opts: { reg?: any; claimed?: boolean } = {}) {
         if (q.op === "update") return { data: claimed ? [{ id: reg.id }] : [], error: null };
         if (table === "it_run_registrations") return { data: reg, error: null };
         if (table === "it_run_participants") return { data: PARTS, error: null };
+        if (table === "it_run_categories") return { data: [{ id: "cat-1", name: "2K Parent & Child Duo" }], error: null };
         return { data: [], error: null };
       };
       const b: any = {};
-      for (const m of ["select", "eq", "is", "in", "order"]) b[m] = () => b;
+      for (const m of ["select", "eq", "is", "in", "order", "returns"]) b[m] = () => b;
       b.update = (payload: any) => { q.op = "update"; q.payload = payload; updates.push({ table, payload }); return b; };
       b.single = () => Promise.resolve(result());
       b.maybeSingle = () => Promise.resolve(result());
@@ -147,20 +148,45 @@ describe("confirmation delivery", () => {
 
 // ── BIB invite ────────────────────────────────────────────────────────────────
 
-describe("BIB invite delivery", () => {
-  it("a provider failure releases the BIB invite claim so it can be sent again", async () => {
+describe("BIB email delivery", () => {
+  it("a provider failure releases the BIB email claim so it can be sent again", async () => {
     mockSend.mockResolvedValue(failed);
     const db = fakeDb();
     mockDb.mockReturnValue(db);
-    await sendItRunBibInviteEmail("reg-1", "lead@example.com");
-    expect(db.updates).toContainEqual({ table: "it_run_registrations", payload: { bib_invite_sent_at: null } });
+    await expect(sendItRunBibInviteEmail("reg-1", "lead@example.com")).resolves.toBe("failed");
+    expect(db.updates).toContainEqual({ table: "it_run_registrations", payload: { bib_email_sent_at: null } });
   });
 
   it("sends to the booking contact as well as the registration address", async () => {
     mockSend.mockResolvedValue(ok);
     mockDb.mockReturnValue(fakeDb());
-    await sendItRunBibInviteEmail("reg-1", "lead@example.com");
+    await expect(sendItRunBibInviteEmail("reg-1", "lead@example.com")).resolves.toBe("sent");
     expect(mockSend.mock.calls.map(c => c[0])).toEqual(["lead@example.com", "parent@example.com"]);
+  });
+
+  it("is not sent before every participant has a BIB number", async () => {
+    const db = fakeDb();
+    const original = PARTS[1].bib_number;
+    PARTS[1].bib_number = null as unknown as string;
+    mockDb.mockReturnValue(db);
+    try {
+      await expect(sendItRunBibInviteEmail("reg-1", "lead@example.com")).resolves.toBe("not_allocated");
+      expect(mockSend).not.toHaveBeenCalled();
+      expect(db.updates).toEqual([]);
+    } finally {
+      PARTS[1].bib_number = original;
+    }
+  });
+
+  it("carries each participant's BIB number and QR code", async () => {
+    mockSend.mockResolvedValue(ok);
+    mockDb.mockReturnValue(fakeDb());
+    await sendItRunBibInviteEmail("reg-1", "lead@example.com");
+    const html = mockSend.mock.calls[0][3] as string;
+    expect(html).toContain("001P");
+    expect(html).toContain("001C");
+    expect(html).toContain("/api/it-run/qr/qr-1");
+    expect(html).toContain("/api/it-run/qr/qr-2");
   });
 });
 

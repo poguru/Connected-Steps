@@ -381,7 +381,10 @@ function AllocationTab() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Allocates BIB numbers to every confirmed participant without one, then sends the BIB email (numbers, QR codes and
+  // the collection slot link). The server refuses until registration has closed.
   async function allocateBibs() {
+    if (!window.confirm("Allocate BIB numbers and send the BIB email to every confirmed registration? This cannot be undone.")) return;
     setAllocating(true); setMessage("");
     try {
       const res = await fetch("/api/it-run/admin/bibs", {
@@ -389,7 +392,18 @@ function AllocationTab() {
         body: JSON.stringify({}),
       });
       const d = await res.json();
-      setMessage(d.message ?? `${d.allocated} BIBs allocated`);
+      if (!res.ok) {
+        setMessage(d.error ?? "Allocation failed");
+        return;
+      }
+      const parts = [
+        `${d.allocated} BIB number${d.allocated === 1 ? "" : "s"} allocated`,
+        `${d.emailed} BIB email${d.emailed === 1 ? "" : "s"} sent`,
+      ];
+      if (d.notAllocated) parts.push(`${d.notAllocated} waiting for numbers`);
+      if (d.emailFailed) parts.push(`${d.emailFailed} failed to send (press again to retry)`);
+      if (d.problems?.length) parts.push(`${d.problems.length} registration(s) could not be numbered: check them`);
+      setMessage(parts.join(" · ") + ".");
       await load();
     } catch {
       setMessage("Allocation failed");
@@ -427,9 +441,9 @@ function AllocationTab() {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <a href="/api/it-run/admin/reports?type=participants" download style={{ padding: "8px 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#888", fontSize: 12, textDecoration: "none" }}>Export CSV</a>
-          <button onClick={allocateBibs} disabled={allocating || unallocatedCount === 0}
-            style={{ padding: "8px 14px", background: unallocatedCount === 0 ? "rgba(255,255,255,0.04)" : ACCENT, border: "none", borderRadius: 8, color: unallocatedCount === 0 ? "#444" : "#fff", fontSize: 13, fontWeight: 700, cursor: unallocatedCount === 0 ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
-            {allocating ? "Allocating…" : `Auto-Allocate ${unallocatedCount} BIBs`}
+          <button onClick={allocateBibs} disabled={allocating}
+            style={{ padding: "8px 14px", background: allocating ? "rgba(255,255,255,0.04)" : ACCENT, border: "none", borderRadius: 8, color: allocating ? "#444" : "#fff", fontSize: 13, fontWeight: 700, cursor: allocating ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+            {allocating ? "Allocating…" : "Allocate BIBs and send"}
           </button>
         </div>
       </div>
