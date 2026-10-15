@@ -1,4 +1,6 @@
 import { buildDashboardUrl } from "@/lib/it-run-dashboard-link";
+import { groupParticipantsByCategory } from "@/lib/it-run-email-groups";
+import { participantCategoryMap } from "@/lib/it-run-participant-category";
 import { randomBytes }        from "crypto";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendEmail }         from "@/lib/notify";
@@ -38,7 +40,7 @@ export async function sendItRunConfirmationEmail(
   const { data: reg } = await db
     .from("it_run_registrations")
     .select(`
-      id, registration_code, lead_email, linked_user_email, final_price, base_price, discount_amount, early_bird_offer_id,
+      id, registration_code, lead_email, linked_user_email, category_id, final_price, base_price, discount_amount, early_bird_offer_id,
       confirmation_email_sent_at,
       it_run_categories ( name ),
       it_run_events ( title, event_date, venue_name, report_time )
@@ -46,6 +48,7 @@ export async function sendItRunConfirmationEmail(
     .eq("id", registrationId)
     .single<{
       id: string; registration_code: string; lead_email: string; linked_user_email: string | null;
+      category_id: string;
       final_price: number; base_price: number; discount_amount: number; early_bird_offer_id: string | null;
       confirmation_email_sent_at: string | null;
       it_run_categories: { name: string } | null;
@@ -60,7 +63,8 @@ export async function sendItRunConfirmationEmail(
   // ── Atomic idempotency claim ─────────────────────────────────────────────
   // The UPDATE only succeeds (returns 1 row) when confirmation_email_sent_at
   // IS NULL — i.e., when this is the first call. Concurrent or repeated calls
-  // see a non-NULL value and are silently skipped.
+  // see a non-NULL value and are silently skipped. The claim covers the whole
+  // booking: one email per category is sent under it.
   const { data: claimed } = await db
     .from("it_run_registrations")
     .update({ confirmation_email_sent_at: new Date().toISOString() })
@@ -76,7 +80,7 @@ export async function sendItRunConfirmationEmail(
   // ── Fetch all participants ───────────────────────────────────────────────
   const { data: parts } = await db
     .from("it_run_participants")
-    .select("id, first_name, last_name, participant_type, tshirt_size, qr_token, verification_status, id_document_type")
+    .select("id, first_name, last_name, participant_type, tshirt_size, qr_token, verification_status, id_document_type, category_id")
     .eq("registration_id", reg.id)
     .order("created_at");
 
@@ -104,31 +108,15 @@ export async function sendItRunConfirmationEmail(
   const dashUrl     = buildDashboardUrl(reg.registration_code);
   const ev          = reg.it_run_events;
   const cat         = reg.it_run_categories;
-  const primaryName = `${parts[0].first_name} ${parts[0].last_name}`;
 
-  // Build QR URLs pointing to the HTTPS endpoint.
-  // Each participant's QR is served from their signed token.
-  // Email clients fetch these images on open (cached for 1 year since immutable).
-  // This works in Gmail, Apple Mail, mobile, etc. (Data URIs are stripped by email clients).
-  const html = buildConfirmEmail({
-    primaryName,
-    code:         reg.registration_code,
-    category:     cat?.name       ?? "IT Run Sprint-2",
-    date:         ev?.event_date  ?? "2027-02-07",
-    venue:        ev?.venue_name  ?? "Hyderabad Central University, Gachibowli, Hyderabad",
-    reportTime:   ev?.report_time ?? "5:30 AM",
-    finalPrice:   reg.final_price,
-    discount,
-    dashUrl,
-    participants: parts.map(p => ({
-      name:       `${p.first_name} ${p.last_name}`,
-      typeLabel:  PARTICIPANT_TYPE_LABEL[p.participant_type] ?? "",
-      tshirtSize: p.tshirt_size ?? null,
-      qrUrl:      `${appUrl}/api/it-run/qr/${p.qr_token ?? reg.registration_code}`,
-      idNote:     idStatusNote(p.verification_status, p.id_document_type),
-    })),
-  });
-
+  // One email per category, each listing only the runners in that category
+  const names = await participantCategoryMap(db, parts.map(p => p.category_id ?? ""));
+  const groups = groupParticipantsByCategory(
+    parts,
+    reg.category_id,
+    cat?.name ?? "IT Run Sprint-2",
+    new Map(Array.from(names, ([id, c]) => [id, c.name])),
+  );
   const recipients = confirmationRecipients(leadEmail || reg.lead_email, reg.linked_user_email);
   if (recipients.length === 0) {
     await releaseClaim(db, "confirmation_email_sent_at", registrationId);
@@ -136,27 +124,51 @@ export async function sendItRunConfirmationEmail(
     return;
   }
 
-  const results = await Promise.all(recipients.map(to => sendEmail(
-    to,
-    primaryName,
-    `Registration Confirmed - The IT Run Sprint-2 (${reg.registration_code})`,
-    html,
-    false,
-    true,
-  )));
-  const failed = results.filter(r => !r.ok);
-  if (failed.length > 0) {
-    // Release the claim so an admin resend (or a later trigger) can send it again
-    await releaseClaim(db, "confirmation_email_sent_at", registrationId);
-    console.error(JSON.stringify({
-      src: "it-run-email", kind: "confirmation", outcome: "send_failed",
-      reg: reg.registration_code, failed: failed.length, of: recipients.length,
-      httpStatus: failed[0]?.httpStatus ?? null,
-    }));
-    return;
+  for (const group of groups) {
+    const primaryName = `${group.participants[0].first_name} ${group.participants[0].last_name}`;
+    // Build QR URLs pointing to the HTTPS endpoint. Each participant's QR is served from their signed token.
+    // Email clients fetch these images on open. Data URIs are stripped by email clients, so the URL is used.
+    const html = buildConfirmEmail({
+      primaryName,
+      code:         reg.registration_code,
+      category:     group.name,
+      date:         ev?.event_date  ?? "2027-02-07",
+      venue:        ev?.venue_name  ?? "Hyderabad Central University, Gachibowli, Hyderabad",
+      reportTime:   ev?.report_time ?? "5:30 AM",
+      finalPrice:   reg.final_price,
+      discount,
+      dashUrl,
+      participants: group.participants.map(p => ({
+        name:       `${p.first_name} ${p.last_name}`,
+        typeLabel:  PARTICIPANT_TYPE_LABEL[p.participant_type] ?? "",
+        tshirtSize: p.tshirt_size ?? null,
+        qrUrl:      `${appUrl}/api/it-run/qr/${p.qr_token ?? reg.registration_code}`,
+        idNote:     idStatusNote(p.verification_status, p.id_document_type),
+      })),
+    });
+
+    const results = await Promise.all(recipients.map(to => sendEmail(
+      to,
+      primaryName,
+      `Registration Confirmed - The IT Run Sprint-2 (${reg.registration_code} · ${group.name})`,
+      html,
+      false,
+      true,
+    )));
+    const failed = results.filter(r => !r.ok);
+    if (failed.length > 0) {
+      // Release the claim so an admin resend (or a later trigger) can send it again
+      await releaseClaim(db, "confirmation_email_sent_at", registrationId);
+      console.error(JSON.stringify({
+        src: "it-run-email", kind: "confirmation", outcome: "send_failed", category: group.name,
+        reg: reg.registration_code, failed: failed.length, of: recipients.length,
+        httpStatus: failed[0]?.httpStatus ?? null,
+      }));
+      return;
+    }
   }
 
-  console.log(JSON.stringify({ src: "it-run-email", kind: "confirmation", outcome: "sent", reg: reg.registration_code, recipients: recipients.length }));
+  console.log(JSON.stringify({ src: "it-run-email", kind: "confirmation", outcome: "sent", reg: reg.registration_code, emails: groups.length, recipients: recipients.length }));
 }
 
 /**
@@ -969,31 +981,50 @@ export async function sendItRunPaymentReceivedEmail(registrationId: string): Pro
   const db = getSupabaseServer();
   const { data: reg } = await db
     .from("it_run_registrations")
-    .select("registration_code, lead_email, linked_user_email, payment_status, final_price, it_run_categories ( name )")
+    .select("registration_code, lead_email, linked_user_email, payment_status, final_price, category_id, it_run_categories ( name )")
     .eq("id", registrationId)
     .maybeSingle<{
       registration_code: string; lead_email: string; linked_user_email: string | null;
-      payment_status: string; final_price: number; it_run_categories: { name: string } | null;
+      payment_status: string; final_price: number; category_id: string;
+      it_run_categories: { name: string } | null;
     }>();
   if (!reg) { console.warn(`${label} registration not found`); return; }
 
-  const { data: first } = await db
+  const { data: parts } = await db
     .from("it_run_participants")
-    .select("first_name, last_name")
+    .select("first_name, last_name, category_id")
     .eq("registration_id", registrationId)
     .order("created_at")
-    .limit(1)
-    .maybeSingle<{ first_name: string; last_name: string }>();
-  const name = first ? `${first.first_name} ${first.last_name}` : "there";
+    .returns<Array<{ first_name: string; last_name: string; category_id: string | null }>>();
+  if (!parts?.length) { console.warn(`${label} no participants`); return; }
+
+  // One email per category, each naming only the runners in that category
+  const names = await participantCategoryMap(db, parts.map(p => p.category_id ?? ""));
+  const groups = groupParticipantsByCategory(
+    parts,
+    reg.category_id,
+    reg.it_run_categories?.name ?? "IT Run Sprint-2",
+    new Map(Array.from(names, ([id, c]) => [id, c.name])),
+  );
 
   const paid = reg.payment_status === "paid";
   const dashUrl = buildDashboardUrl(reg.registration_code);
-  const body = `
+  const recipients = confirmationRecipients(reg.lead_email, reg.linked_user_email);
+  if (recipients.length === 0) {
+    console.error(JSON.stringify({ src: "it-run-email", kind: "payment_received", outcome: "no_recipient", reg: reg.registration_code }));
+    return;
+  }
+
+  for (const group of groups) {
+    const name = `${group.participants[0].first_name} ${group.participants[0].last_name}`;
+    const runners = group.participants.map(p => `${p.first_name} ${p.last_name}`).join(", ");
+    const body = `
     <p style="margin:0 0 14px;">Hi ${escapeHtml(name)},</p>
     <p style="margin:0 0 14px;">
       ${paid ? "We have received your payment" : "Your registration has been received"} for registration
-      <strong>${escapeHtml(reg.registration_code)}</strong>${reg.it_run_categories ? ` (${escapeHtml(reg.it_run_categories.name)})` : ""}.
+      <strong>${escapeHtml(reg.registration_code)}</strong> (${escapeHtml(group.name)}).
     </p>
+    <p style="margin:0 0 14px;">Runners in this category: ${escapeHtml(runners)}.</p>
     <p style="margin:0 0 14px;">
       This event is for IT professionals, so your registration is confirmed only after our team has verified an ID for
       every adult participant (a company ID or a government-issued photo ID). You will receive a separate confirmation
@@ -1001,20 +1032,15 @@ export async function sendItRunPaymentReceivedEmail(registrationId: string): Pro
     </p>
     <p style="margin:0 0 14px;">You can check the status of your ID at any time on your dashboard.</p>
     <p style="margin:0;"><a href="${dashUrl}" style="color:#e8620a;">Open your dashboard</a></p>`;
-  const html = emailWrapper(
-    emailHeader() +
-    `<tr><td style="padding:32px 40px;font-size:15px;color:#222;line-height:1.6;">${body}</td></tr>` +
-    emailFooter(),
-  );
-
-  const recipients = confirmationRecipients(reg.lead_email, reg.linked_user_email);
-  if (recipients.length === 0) {
-    console.error(JSON.stringify({ src: "it-run-email", kind: "payment_received", outcome: "no_recipient", reg: reg.registration_code }));
-    return;
+    const html = emailWrapper(
+      emailHeader() +
+      `<tr><td style="padding:32px 40px;font-size:15px;color:#222;line-height:1.6;">${body}</td></tr>` +
+      emailFooter(),
+    );
+    const results = await Promise.all(recipients.map(to => sendEmail(
+      to, name, `Registration Received - The IT Run Sprint-2 (${reg.registration_code} · ${group.name})`, html, false, true,
+    )));
+    const failed = results.filter(r => !r.ok).length;
+    console.log(JSON.stringify({ src: "it-run-email", kind: "payment_received", outcome: failed ? "send_failed" : "sent", reg: reg.registration_code, category: group.name }));
   }
-  const results = await Promise.all(recipients.map(to => sendEmail(
-    to, name, `Registration Received - The IT Run Sprint-2 (${reg.registration_code})`, html, false, true,
-  )));
-  const failed = results.filter(r => !r.ok).length;
-  console.log(JSON.stringify({ src: "it-run-email", kind: "payment_received", outcome: failed ? "send_failed" : "sent", reg: reg.registration_code }));
 }

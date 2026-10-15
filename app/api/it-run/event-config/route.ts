@@ -151,7 +151,7 @@ export async function GET() {
       },
       {
         heading: "Age Requirement",
-        body: "For the Parent & Child Duo category, the child must be 10 years of age or younger on the event date.",
+        body: "For the Parent & Child Duo category, the child must be 15 years of age or younger on the event date.",
       },
       {
         heading: "Category Upgrade",

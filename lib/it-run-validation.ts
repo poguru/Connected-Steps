@@ -6,7 +6,7 @@
  *
  * Age rules (from the existing event configuration in code, not invented here):
  *   - Adult participants (solo, duo, and the parent of a kid category): at least 18 on the event date.
- *   - Child participants (kid category only): 5 to 10 years old on the event date.
+ *   - Child participants (kid category only): 5 to 15 years old on the event date.
  *     The category has no configured minimum child age, so none is enforced.
  *   - Ages are calendar-based: age = event year - birth year, minus one if the birthday has
  *     not yet occurred on the reference date. A Feb 29 birthday counts as Mar 1 in non-leap years.
@@ -71,7 +71,7 @@ export const ADULT_MIN_AGE = 18;
 /** Children must be at least this old on the event date (kid category). */
 export const CHILD_MIN_AGE = 5;
 /** Children must be at most this old on the event date (kid category). */
-export const CHILD_MAX_AGE = 10;
+export const CHILD_MAX_AGE = 15;
 
 const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 

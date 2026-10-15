@@ -308,6 +308,48 @@ function SectionHeader({ label }: { label: string }) {
 // ParticipantForm — one participant, grouped fields, collapsible optional section
 // ─────────────────────────────────────────────────────────────────────────────
 
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/** Day, month and year pickers. The year can only be chosen from a fixed range, so it never runs past four digits. */
+function DobPicker({ value, onChange, inputStyle, maxYear }: { value: string; onChange: (v: string) => void; inputStyle: React.CSSProperties; maxYear: number }) {
+  const [partial, setPartial] = useState({ y: "", m: "", d: "" });
+  const parsed = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const current = parsed ? { y: parsed[1], m: parsed[2], d: parsed[3] } : partial;
+  const daysIn = (y: string, m: string) => (y && m ? new Date(Date.UTC(Number(y), Number(m), 0)).getUTCDate() : 31);
+  const maxDay = daysIn(current.y, current.m);
+
+  function change(part: "y" | "m" | "d", raw: string) {
+    const next = { ...current, [part]: raw };
+    // A day beyond the end of the chosen month is brought back to the last day
+    if (next.d && Number(next.d) > daysIn(next.y, next.m)) next.d = String(daysIn(next.y, next.m)).padStart(2, "0");
+    setPartial(next);
+    onChange(next.y && next.m && next.d ? `${next.y}-${next.m}-${next.d}` : "");
+  }
+
+  const style = { ...inputStyle, flex: 1, minWidth: 0 };
+  const years: number[] = [];
+  for (let y = maxYear; y >= 1930; y--) years.push(y);
+  return (
+    <div style={{ display: "flex", gap: 8 }}>
+      <select aria-label="Day" style={{ ...style, flex: "0 0 30%" }} value={current.d}
+        onChange={e => change("d", e.target.value)}>
+        <option value="">Day</option>
+        {Array.from({ length: maxDay }, (_, i) => String(i + 1).padStart(2, "0")).map(d => <option key={d} value={d}>{Number(d)}</option>)}
+      </select>
+      <select aria-label="Month" style={{ ...style, flex: "1 1 40%" }} value={current.m}
+        onChange={e => change("m", e.target.value)}>
+        <option value="">Month</option>
+        {MONTH_NAMES.map((name, i) => <option key={name} value={String(i + 1).padStart(2, "0")}>{name}</option>)}
+      </select>
+      <select aria-label="Year" style={{ ...style, flex: "0 0 30%" }} value={current.y}
+        onChange={e => change("y", e.target.value)}>
+        <option value="">Year</option>
+        {years.map(y => <option key={y} value={String(y)}>{y}</option>)}
+      </select>
+    </div>
+  );
+}
+
 function ParticipantForm({
   participantLabel, roleLabel, data, onChange, errors, isChild, tshirtSizes, indexOfTotal, onNameBlur,
 }: {
@@ -389,14 +431,9 @@ function ParticipantForm({
           </select>
         </Field>
         <Field label="Date of Birth" error={errors.dob} required
-          hint={isChild ? "Must be 10 years or younger" : undefined}>
-          <input style={inp("dob", !!errors.dob)} type="date" value={data.dob}
-            min="1900-01-01" max={formatCalendarDate(todayInIST())}
-            onChange={e => {
-              // Browsers let the year run past four digits while typing; such a value is never kept
-              if (/^\d{5,}-/.test(e.target.value)) return;
-              onChange("dob", e.target.value);
-            }} />
+          hint={isChild ? "Must be 15 years or younger" : undefined}>
+          <DobPicker value={data.dob} inputStyle={inp("dob", !!errors.dob)} maxYear={todayInIST().year}
+            onChange={v => onChange("dob", v)} />
         </Field>
       </div>
 
@@ -878,7 +915,7 @@ function StepParticipants({
         participantLabel={slot?.label ?? `Participant ${participantSubIdx + 1}`}
         roleLabel={
           total === 1 ? "Your personal details — printed on BIB and certificate" :
-          slot?.isChild ? "Child participant (age ≤ 10) — child sizes shown" :
+          slot?.isChild ? "Child participant (age ≤ 15) — child sizes shown" :
           category?.category_type === "kid" ? "Parent / Guardian — confirmation email goes here" :
           participantSubIdx === 0 ? "Lead registrant — confirmation email goes here" :
           "Second participant — BIB and certificate details"

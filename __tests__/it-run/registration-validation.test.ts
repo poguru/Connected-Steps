@@ -191,7 +191,7 @@ describe("validateDateOfBirth: general", () => {
   });
 });
 
-describe("validateDateOfBirth: kid category child (5 to 10 on the event date)", () => {
+describe("validateDateOfBirth: kid category child (5 to 15 on the event date)", () => {
   it("accepts a child exactly 10 on the event date", () => {
     expect(child("2016-08-17").ok).toBe(true);
   });
@@ -200,8 +200,8 @@ describe("validateDateOfBirth: kid category child (5 to 10 on the event date)", 
     expect(child("2016-08-18").ok).toBe(true);
   });
 
-  it("rejects a child who turns 11 on the event date", () => {
-    const r = child("2015-08-17");
+  it("rejects a child who turns 16 on the event date", () => {
+    const r = child("2010-08-17");
     expect(r.ok).toBe(false);
     if (!r.ok) {
       expect(r.code).toBe("child_out_of_range");
@@ -359,7 +359,7 @@ describe("POST /api/it-run/register: server-side validation", () => {
 
     const res = await postRegister([
       adultParticipant(),
-      childParticipant({ dob: "2015-08-17" }), // turns 11 on the event date
+      childParticipant({ dob: "2010-08-17" }), // turns 16 on the event date
     ]);
     const body = await res.json();
 
