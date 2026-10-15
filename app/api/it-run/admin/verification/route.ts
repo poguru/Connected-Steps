@@ -198,8 +198,16 @@ export async function PATCH(req: NextRequest) {
       }
 
       if (subject) {
-        await sendEmail(part.email, part.first_name, subject, htmlBody, false, true)
-          .catch(e => console.error("[it-run/verification] email error:", e));
+        // sendEmail reports a provider failure in its result rather than throwing, so the result is checked here
+        const sent = await sendEmail(part.email, part.first_name, subject, htmlBody, false, true)
+          .catch(e => ({ ok: false as const, error: e instanceof Error ? e.message : String(e), httpStatus: null }));
+        if (!sent.ok) {
+          console.error(JSON.stringify({
+            src: "it-run/verification", outcome: "email_failed", status, participant: participantId,
+            httpStatus: "httpStatus" in sent ? sent.httpStatus : null,
+            error: "error" in sent ? sent.error : null,
+          }));
+        }
       }
     }
 
