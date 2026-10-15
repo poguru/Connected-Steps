@@ -115,6 +115,7 @@ export default function EarlyBirdAdminPage() {
           <label style={{ fontSize: 12, color: "#aaa" }}>Category
             <select style={INPUT} value={form.category_id} onChange={e => set("category_id", e.target.value)}>
               <option value="">Choose…</option>
+              <option value="all">All categories ({categories.length})</option>
               {categories.map(c => <option key={c.id} value={c.id}>{c.name} — {inr(c.priceRupees)}</option>)}
             </select>
           </label>

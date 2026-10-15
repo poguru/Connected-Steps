@@ -84,27 +84,42 @@ export async function POST(req: NextRequest) {
   const ctx = await eventAndCategories(db);
   if (!ctx) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
+  // "all" creates the same offer for every category of the event. Each category is checked on its own price first
+  // (a fixed discount must stay below that category's price), and nothing is saved unless every category passes.
   const categoryId = typeof body.category_id === "string" ? body.category_id : "";
-  const cat = ctx.categories.find(c => c.id === categoryId);
-  if (!cat) return NextResponse.json({ error: "Choose a category of this event." }, { status: 400 });
+  const targets = categoryId === "all" ? ctx.categories : ctx.categories.filter(c => c.id === categoryId);
+  if (targets.length === 0) return NextResponse.json({ error: "Choose a category of this event." }, { status: 400 });
 
-  const v = validateOfferInput(body, cat.price_rupees);
-  if (!v.ok) return NextResponse.json({ error: v.message }, { status: 400 });
+  const checked: Array<{ category: string; value: Record<string, unknown> }> = [];
+  for (const cat of targets) {
+    const v = validateOfferInput({ ...body, category_id: cat.id }, cat.price_rupees);
+    if (!v.ok) {
+      return NextResponse.json({
+        error: targets.length > 1 ? `${cat.name}: ${v.message}` : v.message,
+      }, { status: 400 });
+    }
+    checked.push({ category: cat.id, value: v.value as unknown as Record<string, unknown> });
+  }
 
+  // One insert statement for all rows: either every offer is saved or none is
+  const rows = checked.map(c => ({ ...c.value, event_id: ctx.eventId, created_by: session.email, updated_by: session.email }));
   const { data: created, error } = await db
     .from("it_run_early_bird_offers")
-    .insert({ ...v.value, event_id: ctx.eventId, created_by: session.email, updated_by: session.email })
+    .insert(rows)
     .select("*")
-    .maybeSingle<OfferRow>();
-  if (error || !created) return NextResponse.json({ error: "Could not create the offer" }, { status: 500 });
+    .returns<OfferRow[]>();
+  if (error || !created || created.length !== rows.length) {
+    return NextResponse.json({ error: "Could not create the offer" }, { status: 500 });
+  }
 
-  await db.from("it_run_audit_logs").insert({
+  await db.from("it_run_audit_logs").insert(created.map(o => ({
     event_id: ctx.eventId, actor_email: session.email, actor_role: session.role,
-    action: "early_bird_created", entity_type: "early_bird_offer", entity_id: created.id,
-    ip: getClientIp(req), detail: { after: v.value },
-  }).then(() => {}, () => {});
+    action: "early_bird_created", entity_type: "early_bird_offer", entity_id: o.id,
+    ip: getClientIp(req), detail: { after: o, scope: categoryId === "all" ? "all_categories" : "single_category" },
+  }))).then(() => {}, () => {});
 
-  return NextResponse.json({ ok: true, offer: created }, { status: 201 });
+  if (created.length === 1) return NextResponse.json({ ok: true, offer: created[0] }, { status: 201 });
+  return NextResponse.json({ ok: true, offers: created, count: created.length }, { status: 201 });
 }
 
 export async function PATCH(req: NextRequest) {
