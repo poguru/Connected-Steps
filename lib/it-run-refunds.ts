@@ -122,10 +122,17 @@ export async function finalizeRefundProcessed(
   }
   // An ID-failure refund is partial by design (96% or 80%) but ends the registration, so it cancels on its own.
   const idFailure = await isIdFailureRefund(db, refundId);
-  const shouldCancel = (fullyRefunded || idFailure) && reg.registration_status !== "cancelled";
+  // A category cancelled for an ID rejection leaves the other runners. The registration ends only when none is left.
+  const { count: activeRunners } = await db
+    .from("it_run_participants")
+    .select("id", { count: "exact", head: true })
+    .eq("registration_id", reg.id)
+    .is("cancelled_at", null);
+  const noRunnersLeft = activeRunners === 0;
+  const shouldCancel = (fullyRefunded || idFailure || noRunnersLeft) && reg.registration_status !== "cancelled";
   if (shouldCancel) {
     regUpdate.registration_status = "cancelled";
-    regUpdate.cancelled_reason = idFailure ? "ID verification not completed" : "Refunded";
+    regUpdate.cancelled_reason = idFailure ? "ID verification not completed" : noRunnersLeft && !fullyRefunded ? "All runners cancelled after ID verification" : "Refunded";
     regUpdate.cancelled_at = now;
   }
 

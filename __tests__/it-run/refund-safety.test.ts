@@ -63,6 +63,7 @@ function fakeDb(handlers: Record<string, Handler>, rpc: Record<string, () => Res
         insert(payload: unknown) { q.op = "insert"; q.payload = payload; return b; },
         update(payload: unknown) { q.op = "update"; q.payload = payload; return b; },
         eq(k: string, v: unknown) { q.filters[k] = v; return b; },
+        is() { return b; },
         in() { return b; },
         order() { return b; },
         limit() { return b; },

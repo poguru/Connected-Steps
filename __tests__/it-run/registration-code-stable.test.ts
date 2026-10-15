@@ -1,3 +1,7 @@
+jest.mock("@/lib/it-run-category-cancel", () => ({
+  cancelRunnerCategory: jest.fn().mockResolvedValue({ status: "cancelled", refundRequestId: "rr-1", refundPaise: 9000, runners: 1, categoryName: "5K Fun Run" }),
+  CATEGORY_REFUND_PERCENT: 90,
+}));
 /**
  * The registration ID is assigned when the registration is created and stays the same for its whole life: whether the
  * ID is pending, verified, rejected, or refused, and after an ID-failure refund cancels the registration. Verification

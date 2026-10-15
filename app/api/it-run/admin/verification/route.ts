@@ -1,3 +1,5 @@
+import { cancelRunnerCategory, CATEGORY_REFUND_PERCENT } from "@/lib/it-run-category-cancel";
+import { buildCategoryCancelledEmail } from "@/lib/it-run-category-cancel-email";
 import { NextRequest, NextResponse } from "next/server";
 import { confirmIfVerified, sendConfirmedNotices } from "@/lib/it-run-confirmation";
 import { runAfterResponse } from "@/lib/after-response";
@@ -127,6 +129,27 @@ export async function PATCH(req: NextRequest) {
       console.error("[it-run/verification] verification log insert failed:", logErr.message);
     }
 
+    // A rejected ID cancels that runner's category only, releases its seats, and records its refund (90%).
+    // Nothing is emailed unless the cancellation succeeded, so the email never describes a cancellation that did not happen.
+    let rejectionCancel: { refundPaise: number; categoryName: string; runners: number } | null = null;
+    if (status === "rejected") {
+      const cancel = await cancelRunnerCategory(db, {
+        participantId,
+        reason: decision.explanation ?? decision.reason ?? "ID verification failed",
+        actorEmail: session.email,
+      });
+      if (cancel.status === "cancelled") {
+        rejectionCancel = { refundPaise: cancel.refundPaise, categoryName: cancel.categoryName, runners: cancel.runners };
+      } else if (cancel.status !== "already_cancelled") {
+        const message = cancel.status === "refund_already_open"
+          ? "This booking already has an open refund. Handle it on the refund page, then reject this ID again."
+          : cancel.status === "not_paid"
+            ? "This registration is not paid, so no refund applies. Nothing was cancelled."
+            : cancel.status === "error" ? cancel.message : "Nothing was cancelled.";
+        return NextResponse.json({ error: message, code: "CATEGORY_NOT_CANCELLED" }, { status: 409 });
+      }
+    }
+
     // Correction link is bound to the document currently on file. No document = no correction link to send.
     const correctionUrl = part.company_id_url ? buildCompanyIdCorrectionUrl(participantId, part.company_id_url) : null;
 
@@ -144,15 +167,18 @@ export async function PATCH(req: NextRequest) {
           eventDate: "February 7, 2027",
         }, isGovernment ? "government" : "company");
       } else if (status === "rejected") {
-        subject = "Company ID Verification - Action Required (The IT Run Sprint-2)";
-        htmlBody = buildCompanyVerificationRejectionEmail(part.first_name, decision.reason!, decision.explanation, {
-          eventTitle: event.title,
-          bibLocations: [
-            { name: "Main BIB Counter", address: "HITEC City, Hyderabad", date: "Feb 4, 2027, 10 AM - 6 PM" },
-            { name: "Secondary Counter", address: "Tech Park, Hyderabad", date: "Feb 5, 2027, 10 AM - 4 PM" },
-          ],
-          correctionUrl: correctionUrl ?? "",
-        });
+        // Only sent when the cancellation happened in this request (not on a repeat)
+        if (rejectionCancel) {
+          subject = "ID Verification Failed - Registration Cancelled (The IT Run Sprint-2)";
+          htmlBody = buildCategoryCancelledEmail({
+            firstName: part.first_name,
+            eventTitle: event.title,
+            categoryName: rejectionCancel.categoryName,
+            refundPaise: rejectionCancel.refundPaise,
+            refundPercent: CATEGORY_REFUND_PERCENT,
+            otherRunnersKept: rejectionCancel.runners > 0,
+          });
+        }
       } else {
         subject = "Company ID - Clarification Needed (The IT Run Sprint-2)";
         htmlBody = buildCompanyVerificationClarificationEmail(
@@ -162,8 +188,10 @@ export async function PATCH(req: NextRequest) {
         );
       }
 
-      await sendEmail(part.email, part.first_name, subject, htmlBody, false, true)
-        .catch(e => console.error("[it-run/verification] email error:", e));
+      if (subject) {
+        await sendEmail(part.email, part.first_name, subject, htmlBody, false, true)
+          .catch(e => console.error("[it-run/verification] email error:", e));
+      }
     }
 
     await db.from("it_run_audit_logs").insert({

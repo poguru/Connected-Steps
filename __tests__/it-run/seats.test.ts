@@ -76,6 +76,7 @@ describe("database calls", () => {
         const b: any = {};
         b.select = () => b;
         b.eq = () => b;
+        b.is = () => b;
         b.returns = () => Promise.resolve({ data: participants, error: null });
         return b;
       },
@@ -138,8 +139,7 @@ describe("database calls", () => {
     ]);
 
     const empty = fakeDb();
-    expect(await seatLinesForRegistration(empty, "reg-2", { categoryId: "solo", participantCount: 2 })).toEqual([
-      { categoryId: "solo", count: 2 },
-    ]);
+    // No active runner (every runner cancelled): nothing is held
+    expect(await seatLinesForRegistration(empty, "reg-2", { categoryId: "solo", participantCount: 2 })).toEqual([]);
   });
 });

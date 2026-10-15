@@ -48,6 +48,8 @@ export async function confirmIfVerified(db: Db, registrationId: string): Promise
     .from("it_run_participants")
     .select("verification_status")
     .eq("registration_id", registrationId)
+    // A runner whose category was cancelled after a rejected ID is not part of the confirmation
+    .is("cancelled_at", null)
     .returns<Array<{ verification_status: string }>>();
   if (!allVerified(parts ?? [])) return "waiting";
 

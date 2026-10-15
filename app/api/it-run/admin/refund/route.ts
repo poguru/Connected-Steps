@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
     }
     reservedCategoryId = target.id;
     refundAmount = requested;
-  } else if (request.request_kind === "id_failure") {
+  } else if (request.request_kind === "id_failure" || request.request_kind === "category_cancel") {
     // The amount is the one the admin set when the ID failure was recorded. It must not change at execution.
     const requested = request.requested_amount_paise;
     if (!requested) {

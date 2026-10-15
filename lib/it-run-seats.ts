@@ -76,9 +76,12 @@ export async function seatLinesForRegistration(
     .from("it_run_participants")
     .select("category_id")
     .eq("registration_id", registrationId)
+    .is("cancelled_at", null)
     .returns<Array<{ category_id: string | null }>>();
-  if (error || !data || data.length === 0) {
+  if (error) {
     return [{ categoryId: fallback.categoryId, count: fallback.participantCount }];
   }
+  // No active runner left: nothing is held (the cancelled categories gave their seats back when they were cancelled)
+  if (!data || data.length === 0) return [];
   return seatLinesFromParticipants(data, fallback.categoryId);
 }

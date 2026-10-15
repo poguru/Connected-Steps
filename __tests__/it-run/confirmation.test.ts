@@ -28,6 +28,7 @@ function fakeDb(reg: Reg | null, participants: Array<{ verification_status: stri
       let op: "select" | "update" = "select";
       b.select = () => b;
       b.eq = () => b;
+      b.is = () => b;
       b.update = (p: any) => { op = "update"; updates.push(p); return b; };
       b.maybeSingle = () => Promise.resolve({ data: table === "it_run_registrations" ? reg : null, error: null });
       b.returns = () => Promise.resolve({ data: table === "it_run_participants" ? participants : [], error: null });
