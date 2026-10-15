@@ -28,7 +28,7 @@ export interface EarlyBirdOffer {
   min_payable_rupees: number;
 }
 
-export const PERCENT_MAX = 90;
+export const PERCENT_MAX = 99;
 
 /** True when `now` is inside the offer's window: starts_at <= now < ends_at. */
 export function inWindow(offer: Pick<EarlyBirdOffer, "starts_at" | "ends_at">, nowMs: number): boolean {

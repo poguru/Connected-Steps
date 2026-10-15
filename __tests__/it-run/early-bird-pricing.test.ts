@@ -113,7 +113,7 @@ describe("admin validation (server side)", () => {
     ["a negative value", { discount_value: -5 }],
     ["a zero value", { discount_value: 0 }],
     ["a fractional value", { discount_value: 10.5 }],
-    ["a percentage above 90", { discount_value: 91 }],
+    ["a percentage above 99", { discount_value: 100 }],
     ["an end before the start", { ends_at: "2026-10-01T00:00:00Z" }],
     ["an equal start and end", { ends_at: START }],
     ["a name that is too short", { name: "ab" }],

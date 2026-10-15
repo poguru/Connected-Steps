@@ -153,9 +153,9 @@ describe("admin early bird endpoints", () => {
     mockRole.mockReturnValue({ email: "admin@example.com", role: "event_admin" });
     const db = fake({ offers: [offerRow()] });
     mockDb.mockReturnValue(db);
-    const res = await offersPatch(adminReq("PATCH", { id: OFFER, discount_value: 95 }));
+    const res = await offersPatch(adminReq("PATCH", { id: OFFER, discount_value: 100 }));
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/at most 90%/);
+    expect((await res.json()).error).toMatch(/at most 99%/);
     expect(db.inserts).toEqual([]);
   });
 });
