@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { eventStartDate } from "@/lib/it-run-countdown";
 import Link from "next/link";
 import { publishBottomBarHeight } from "@/lib/bottom-bar";
 import Image from "next/image";
@@ -242,7 +243,7 @@ export default function ItRunLandingPage() {
         data?: ApiCategory[];
         event?: {
           event_date?: string; registration_closes_at?: string;
-          venue_name?: string | null; venue_address?: string | null; report_time?: string | null;
+          venue_name?: string | null; venue_address?: string | null; report_time?: string | null; flag_off_time?: string | null;
           city?: string | null; maps_url?: string | null;
           description?: string | null; hero_content?: string | null;
           event_highlights?: string[] | null; important_instructions?: string | null;
@@ -251,10 +252,10 @@ export default function ItRunLandingPage() {
         };
       }) => {
         if (event) {
-          if (event.event_date) {
-            const d = new Date(event.event_date + "T06:00:00+05:30");
-            setEventDate(d);
-            setEventLabel(d.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }));
+          const start = eventStartDate(event.event_date, event.flag_off_time);
+          if (start) {
+            setEventDate(start);
+            setEventLabel(start.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }));
           }
           if (event.registration_closes_at) {
             const rc = new Date(event.registration_closes_at);
@@ -322,6 +323,7 @@ export default function ItRunLandingPage() {
             <span>Exclusive for IT Professionals</span>
           </div>
 
+          <div className="it-run-logo" style={{ position: "relative", isolation: "isolate" }}>
           <Image
             src="/events/it-run-sprint-2/IT Run Sprint-2 Logo (trimmed).png"
             alt="The IT Run Sprint-2"
@@ -336,6 +338,7 @@ export default function ItRunLandingPage() {
             }}
             priority
           />
+          </div>
 
           <p style={{ fontSize: "clamp(14px,2vw,18px)", color: "#999", marginBottom: 32, lineHeight: 1.6 }}>
             {heroContent}
@@ -350,7 +353,9 @@ export default function ItRunLandingPage() {
           </p>
 
           {/* Countdown, or the event-started state once the start time has passed */}
-          {eventStarted ? (
+          {!eventDate ? (
+            <div aria-hidden="true" style={{ minHeight: 92, marginBottom: 32 }} />
+          ) : eventStarted ? (
             <div role="status" style={{ marginBottom: 32, fontSize: 15, color: "#e8620a", fontWeight: 700 }}>The IT Run Sprint-2 has started</div>
           ) : (
           <div style={{ display: "flex", gap: "clamp(4px,2vw,20px)", justifyContent: "center", marginBottom: 32, flexWrap: "wrap" }}>
@@ -371,7 +376,7 @@ export default function ItRunLandingPage() {
                 Registration Closed
               </div>
             ) : (
-              <Link href="/it-run/register" style={S.cta}>
+              <Link href="/it-run/register" className="it-run-cta" style={S.cta}>
                 Register Now
                 <Icon name="arrow" size={16} />
               </Link>
@@ -789,6 +794,23 @@ export default function ItRunLandingPage() {
         @keyframes bounce { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(-8px)} }
         @keyframes scrollDown { 0%{opacity:1;transform:translateY(0)} 100%{opacity:0;transform:translateY(10px)} }
         @media (max-width:640px) { .mobile-sticky-cta { display:block !important; } }
+        .it-run-logo { animation: itRunLogoIn 1.1s cubic-bezier(.2,.7,.2,1) both, itRunLogoFloat 7s ease-in-out 1.2s infinite; }
+        .it-run-logo::before { content: ""; position: absolute; inset: 6% 14%; z-index: -1; pointer-events: none; background: radial-gradient(closest-side, rgba(232,98,10,0.30), rgba(232,98,10,0) 72%); filter: blur(16px); animation: itRunLogoGlow 4.5s ease-in-out 1.1s infinite; }
+        @keyframes itRunLogoIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+        @keyframes itRunLogoFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+        @keyframes itRunLogoGlow { 0%, 100% { opacity: 0.55; } 50% { opacity: 0.95; } }
+        .it-run-cta { position: relative; isolation: isolate; transition: transform .25s ease; }
+        .it-run-cta::before { content: ""; position: absolute; inset: -4px; z-index: -1; border-radius: inherit; background: rgba(232,98,10,0.5); filter: blur(12px); pointer-events: none; animation: itRunCtaBreathe 5s ease-in-out infinite; }
+        .it-run-cta:hover { transform: translateY(-2px); }
+        .it-run-cta:active { transform: scale(0.98); }
+        .it-run-cta:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+        .it-run-cta svg { transition: transform .25s ease; }
+        .it-run-cta:hover svg { transform: translateX(3px); }
+        @keyframes itRunCtaBreathe { 0%, 100% { opacity: 0.3; transform: scale(0.98); } 50% { opacity: 0.7; transform: scale(1.03); } }
+        @media (prefers-reduced-motion: reduce) {
+          .it-run-logo, .it-run-logo::before, .it-run-cta::before, .it-run-cta, .it-run-cta svg, .it-run-scroll-cue, .it-run-scroll-cue div { animation: none !important; transition: none !important; }
+          .it-run-cta:hover, .it-run-cta:active { transform: none !important; }
+        }
         * { box-sizing: border-box; }
       `}</style>
     </div>
