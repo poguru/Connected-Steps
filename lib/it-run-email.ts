@@ -82,6 +82,7 @@ export async function sendItRunConfirmationEmail(
     .from("it_run_participants")
     .select("id, first_name, last_name, participant_type, tshirt_size, qr_token, verification_status, id_document_type, category_id")
     .eq("registration_id", reg.id)
+    .is("cancelled_at", null)
     .order("created_at");
 
   if (!parts?.length) {
@@ -994,6 +995,7 @@ export async function sendItRunPaymentReceivedEmail(registrationId: string): Pro
     .from("it_run_participants")
     .select("first_name, last_name, category_id")
     .eq("registration_id", registrationId)
+    .is("cancelled_at", null)
     .order("created_at")
     .returns<Array<{ first_name: string; last_name: string; category_id: string | null }>>();
   if (!parts?.length) { console.warn(`${label} no participants`); return; }
@@ -1075,6 +1077,7 @@ export async function buildCategoryConfirmation(
     .from("it_run_participants")
     .select("id, first_name, last_name, participant_type, tshirt_size, qr_token, verification_status, id_document_type, category_id")
     .eq("registration_id", reg.id)
+    .is("cancelled_at", null)
     .order("created_at")
     .returns<Array<{
       id: string; first_name: string; last_name: string; participant_type: string; tshirt_size: string | null;

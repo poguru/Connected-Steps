@@ -73,6 +73,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Only a paid registration can be refunded for an ID failure." }, { status: 422 });
   }
 
+  // A rejected company ID is handled by rejecting it on the verification page. That cancels only the runner's category
+  // and records a 90% refund. Recording a whole-booking refund here would cancel every runner.
+  if (stage === "verification") {
+    return NextResponse.json({
+      error: "A rejected company ID is handled by rejecting it on the verification page. That cancels this runner's category and refunds 90%.",
+      code: "USE_REJECTION",
+    }, { status: 409 });
+  }
+
   // A company ID refund needs a rejected document (after any clarification). A government ID refund is recorded on
   // collection day, when the employment check fails, so the status is not required to be 'rejected' for it.
   if (stage === "verification" && part.verification_status !== "rejected") {

@@ -49,7 +49,7 @@ function fakeDb(b: Behaviour = {}) {
   const reads: string[] = [];
   const handle = (table: string) => {
     const bld: any = {};
-    for (const m of ["select", "eq", "order", "in"]) bld[m] = () => bld;
+    for (const m of ["select", "eq", "is", "order", "in"]) bld[m] = () => bld;
     for (const m of ["insert", "update", "upsert", "delete"]) bld[m] = () => { writes.push(`${table}.${m}`); return bld; };
     const run = async (single: boolean) => {
       reads.push(table);
@@ -173,7 +173,7 @@ describe("failure types", () => {
   });
 
   it("unknown code: 404 NOT_FOUND", async () => {
-    mockDb.mockReturnValue({ ...fakeDb(), from: () => { const bld: any = {}; for (const m of ["select", "eq", "order", "in"]) bld[m] = () => bld; bld.maybeSingle = () => Promise.resolve({ data: null, error: null }); return bld; } });
+    mockDb.mockReturnValue({ ...fakeDb(), from: () => { const bld: any = {}; for (const m of ["select", "eq", "is", "order", "in"]) bld[m] = () => bld; bld.maybeSingle = () => Promise.resolve({ data: null, error: null }); return bld; } });
     const res = await call();
     expect(res.status).toBe(404);
     expect(classifyDashboardFailure(res.status, await res.json())).toBe("NOT_FOUND");

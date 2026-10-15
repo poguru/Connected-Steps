@@ -54,6 +54,7 @@ function dashboardDb(opts: { regFailuresBeforeSuccess?: number; regMissing?: boo
       const b: any = {};
       b.select = () => b;
       b.eq = () => b;
+      b.is = () => b;
       b.order = () => b;
       b.maybeSingle = () => {
         if (table === "it_run_registrations") {

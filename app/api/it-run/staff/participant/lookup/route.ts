@@ -119,6 +119,9 @@ export async function GET(req: NextRequest) {
   if (!participant) {
     return NextResponse.json({ error: "Participant not found" }, { status: 404 });
   }
+  if ((participant as { cancelled_at?: string | null }).cancelled_at) {
+    return NextResponse.json({ error: "This runner's category was cancelled after an ID was rejected.", code: "RUNNER_CANCELLED" }, { status: 409 });
+  }
 
   const reg = participant.it_run_registrations;
 

@@ -145,7 +145,8 @@ async function handleDashboard(
       it_run_bib_collections ( id, collected_at ),
       it_run_checkins ( id, checked_in_at )
     `)
-    .eq("registration_id", reg.id));
+    .eq("registration_id", reg.id)
+    .is("cancelled_at", null));
 
   if (participantsErr || !participants) {
     stageFailure(rid, "participants_query", participantsErr ?? null);

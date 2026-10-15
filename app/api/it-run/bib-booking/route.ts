@@ -40,13 +40,14 @@ export async function POST(req: NextRequest) {
 
   const { data: part, error: partErr } = await db
     .from("it_run_participants")
-    .select("id, registration_id, first_name, last_name, email")
+    .select("id, registration_id, first_name, last_name, email, cancelled_at")
     .eq("id", participantId)
     .maybeSingle<{ id: string; registration_id: string; first_name: string; last_name: string; email: string | null }>();
   if (partErr) {
     return fail(500, { error: "We couldn't book your slot right now. Your registration is unchanged. Please try again." }, "participant_query", { dbCode: partErr.code ?? null });
   }
   if (!part) return fail(404, { error: "Participant not found" }, "participant_missing");
+  if ((part as { cancelled_at?: string | null }).cancelled_at) return fail(409, { error: "This runner's category was cancelled.", code: "RUNNER_CANCELLED" }, "runner_cancelled");
 
   const { data: reg, error: regErr } = await db
     .from("it_run_registrations")

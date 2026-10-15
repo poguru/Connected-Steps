@@ -142,22 +142,17 @@ describe("POST /api/it-run/admin/id-failure", () => {
     const db = fakeDb({ part: { id: "p-1", registration_id: "r-1", verification_status: "rejected", id_document_type: "government" } });
     (getSupabaseServer as jest.Mock).mockReturnValue(db);
     const res = await POST(req(GOOD));
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(409);
     expect(db.inserts).toEqual([]);
   });
 
-  it("opens an id_failure request for 96% of a company ID rejection, and refunds nothing", async () => {
+  it("refuses a company ID rejection here: rejecting the ID on the verification page cancels that category instead", async () => {
     const db = fakeDb();
     (getSupabaseServer as jest.Mock).mockReturnValue(db);
     const res = await POST(req(GOOD));
-    const json = await res.json();
-    expect(res.status).toBe(200);
-    expect(json).toMatchObject({ refundPaise: 95904, retainedPaise: 3996, status: "requested" });
-    const request = db.inserts.find(i => i.table === "it_run_refund_requests");
-    expect(request?.payload).toMatchObject({
-      request_kind: "id_failure", requested_amount_paise: 95904, target_category_id: null, status: "requested",
-    });
-    expect(db.inserts.some(i => i.table === "it_run_refunds")).toBe(false);
+    expect(res.status).toBe(409);
+    expect((await res.json()).code).toBe("USE_REJECTION");
+    expect(db.inserts).toEqual([]);
   });
 
   it("opens an 80% request for a government ID failed on collection day", async () => {
@@ -168,9 +163,9 @@ describe("POST /api/it-run/admin/id-failure", () => {
   });
 
   it("never writes the document path into the audit trail", async () => {
-    const db = fakeDb();
+    const db = fakeDb({ part: { id: "p-1", registration_id: "r-1", verification_status: "verified", id_document_type: "government" } });
     (getSupabaseServer as jest.Mock).mockReturnValue(db);
-    await POST(req(GOOD));
+    await POST(req({ ...GOOD, stage: "bib_collection" }));
     const audit = db.inserts.find(i => i.table === "it_run_audit_logs");
     expect(audit?.payload.action).toBe("id_failure_refund_requested");
     expect(JSON.stringify(audit?.payload)).not.toMatch(/\.(jpg|jpeg|png|webp|pdf)/);

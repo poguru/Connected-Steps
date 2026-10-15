@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
   const { data: part } = await db
     .from("it_run_participants")
     .select(`
-      id, first_name, last_name, bib_number, wave,
+      id, first_name, last_name, bib_number, wave, cancelled_at,
       it_run_registrations!inner ( registration_code, payment_status,
         it_run_categories ( name, distance_km, color )
       ),
@@ -55,6 +55,7 @@ export async function GET(req: NextRequest) {
     .single();
 
   if (!part) return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+  if (part.cancelled_at) return NextResponse.json({ error: "This runner's category was cancelled after an ID was rejected. Do not admit or collect for check-in.", code: "RUNNER_CANCELLED" }, { status: 409 });
 
   return NextResponse.json({ participant: part });
 }
@@ -80,16 +81,19 @@ export async function POST(req: NextRequest) {
     // Verify participant exists, belongs to THIS event, and registration is confirmed
     const { data: part } = await db
       .from("it_run_participants")
-      .select("id,first_name,last_name,bib_number,it_run_registrations!inner(payment_status,registration_status)")
+      .select("id,first_name,last_name,bib_number,cancelled_at,it_run_registrations!inner(payment_status,registration_status)")
       .eq("id", participantId)
       .eq("event_id", event.id)
       .single<{
         id: string; first_name: string; last_name: string;
         bib_number: string | null;
+        cancelled_at: string | null;
         it_run_registrations: { payment_status: string; registration_status: string };
       }>();
 
     if (!part) return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+    if (part.cancelled_at) return NextResponse.json({ error: "This runner's category was cancelled after an ID was rejected. Do not admit or collect for check-in.", code: "RUNNER_CANCELLED" }, { status: 409 });
+  if (part.cancelled_at) return NextResponse.json({ error: "This runner's category was cancelled after an ID was rejected. Do not admit or collect for check-in.", code: "RUNNER_CANCELLED" }, { status: 409 });
     if (!["paid","free"].includes(part.it_run_registrations.payment_status)) {
       return NextResponse.json({ error: "Registration not confirmed" }, { status: 400 });
     }

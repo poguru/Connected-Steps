@@ -58,7 +58,7 @@ function fakeDb(participants: unknown[]) {
   return {
     from(table: string) {
       const b: any = {};
-      for (const m of ["select", "eq", "order", "in"]) b[m] = () => b;
+      for (const m of ["select", "eq", "is", "order", "in"]) b[m] = () => b;
       b.maybeSingle = () => Promise.resolve(table === "it_run_registrations" ? { data: REG, error: null } : { data: null, error: null });
       b.then = (res: any, rej?: any) => {
         const data = table === "it_run_participants" ? participants : table === "it_run_bib_slots" ? [] : [];

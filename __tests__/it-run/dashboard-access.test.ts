@@ -43,6 +43,7 @@ function fakeDb(handlers: Record<string, () => Result>) {
       const b: any = {
         select() { return b; },
         eq() { return b; },
+        is() { return b; },
         order() { return b; },
         maybeSingle() { return run(); },
         then(res: (v: Result) => unknown, rej?: (e: unknown) => unknown) { return run().then(res, rej); },

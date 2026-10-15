@@ -68,6 +68,7 @@ export async function GET(req: NextRequest) {
     .from("it_run_participants")
     .select("id, registration_id, first_name, last_name, participant_type, bib_number, qr_token, verification_status, category_id")
     .in("registration_id", rows.map(r => r.id))
+    .is("cancelled_at", null)
     .order("created_at", { ascending: true })
     .returns<MyRegParticipantRow[]>();
 
