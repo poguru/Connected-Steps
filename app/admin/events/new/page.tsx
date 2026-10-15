@@ -133,7 +133,7 @@ const BLANK: WizardState = {
   description: "", start_date: "", end_date: "", start_time: "", end_time: "",
   location: "", meeting_point: "", maps_url: "",
   organizer: "Connected Steps", organizer_email: "info@connectedsteps.in",
-  organizer_phone: "+91 97036 20570", support_email: "info@connectedsteps.in",
+  organizer_phone: "+91 97036 20571", support_email: "info@connectedsteps.in",
   cover_image: "", banner_image: "", website: "",
   registration_opens_at: "", registration_closes_at: "", early_bird_ends_at: "",
   max_participants: "",

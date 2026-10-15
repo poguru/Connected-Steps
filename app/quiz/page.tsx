@@ -149,7 +149,7 @@ export default function QuizPage() {
                 <Link href="/pricing" style={{ display: "block", padding: "14px", background: "var(--cs-orange)", color: "#fff", borderRadius: "8px", textDecoration: "none", fontWeight: 700, fontSize: "0.95rem" }}>
                   View pricing & join →
                 </Link>
-                <a href="https://wa.me/9703620570?text=Hi%2C%20I%20completed%20the%20quiz%20and%20want%20to%20know%20more%20about%20the%20{rec?.plan}%20plan!" target="_blank" rel="noopener noreferrer"
+                <a href="https://wa.me/9703620571?text=Hi%2C%20I%20completed%20the%20quiz%20and%20want%20to%20know%20more%20about%20the%20{rec?.plan}%20plan!" target="_blank" rel="noopener noreferrer"
                   style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", padding: "14px", background: "var(--surface)", color: "var(--muted-foreground)", border: "1px solid var(--border)", borderRadius: "8px", textDecoration: "none", fontWeight: 500, fontSize: "0.875rem", transition: "border-color 0.2s, color 0.2s" }}
                   onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "oklch(0.72 0.19 49 / 40%)"; (e.currentTarget as HTMLAnchorElement).style.color = "var(--foreground)"; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLAnchorElement).style.color = "var(--muted-foreground)"; }}>

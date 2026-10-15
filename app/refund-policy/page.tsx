@@ -93,7 +93,7 @@ export default function RefundPolicyPage() {
             Email <a href="mailto:info@connectedsteps.in" style={{ color: "var(--cs-orange)" }}>info@connectedsteps.in</a>{" "}
             with the subject line <em>"Refund Request"</em> and include your registered name, phone number, and a brief
             description of the reason. You may also reach us on WhatsApp at{" "}
-            <a href="https://wa.me/919703620570" style={{ color: "#25d366" }} target="_blank" rel="noopener noreferrer">+91 97036 20570</a>.
+            <a href="https://wa.me/919703620571" style={{ color: "#25d366" }} target="_blank" rel="noopener noreferrer">+91 97036 20571</a>.
             We typically respond within 1 business day.
           </p>
         </Section>

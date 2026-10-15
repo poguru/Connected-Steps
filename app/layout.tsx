@@ -4,6 +4,7 @@ import "./globals.css";
 import CookieBanner from "@/components/ui/CookieBanner";
 import NativeShell from "@/components/mobile/NativeShell";
 import BugReportFab from "@/components/ui/BugReportFab";
+import SupportWhatsApp from "@/components/ui/SupportWhatsApp";
 import { ToastProvider } from "@/components/ui/ds";
 
 // Self-hosted (latin subset of Google Fonts, OFL). The build no longer fetches fonts from Google,
@@ -76,6 +77,7 @@ export default function RootLayout({
           </NativeShell>
           <CookieBanner />
           <BugReportFab />
+          <SupportWhatsApp />
         </ToastProvider>
       </body>
     </html>

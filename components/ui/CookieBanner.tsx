@@ -32,14 +32,14 @@ export default function CookieBanner() {
       background:   "rgba(17,17,17,0.97)",
       backdropFilter: "blur(12px)",
       borderTop:    "1px solid rgba(255,255,255,0.08)",
-      padding:      "1rem 1.5rem",
+      padding:      "0.6rem 1rem",
       display:      "flex",
       alignItems:   "center",
       justifyContent: "space-between",
-      gap:          "1rem",
+      gap:          "0.6rem",
       flexWrap:     "wrap",
     }}>
-      <p style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.6, maxWidth: "680px" }}>
+      <p style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.6, maxWidth: "680px" }}>
         We use local storage to keep you signed in and remember your preferences. No tracking cookies, no ad networks.{" "}
         <Link href="/cookies" style={{ color: "var(--cs-orange)", textDecoration: "none" }}>Cookie policy</Link>
         {" "}·{" "}
@@ -49,7 +49,7 @@ export default function CookieBanner() {
         onClick={accept}
         style={{
           flexShrink:   0,
-          padding:      "9px 24px",
+          padding:      "7px 18px",
           background:   "var(--cs-orange)",
           color:        "#fff",
           border:       "none",

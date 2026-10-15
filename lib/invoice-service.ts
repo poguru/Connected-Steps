@@ -19,7 +19,7 @@ export const CS_BUSINESS = {
   type:    "Partnership Firm",
   address: "SVR Homes, 3rd Floor, Plot No. 8-169,\nIndra Reddy Allwyn Colony, Miyapur,\nHyderabad, Telangana – 500049",
   email:   SUPPORT_EMAIL,
-  phone:   "+91 97036 20570",
+  phone:   "+91 97036 20571",
   website: APP_URL,
   logo:    LOGO_URL,
 };
@@ -542,7 +542,7 @@ async function sendInvoiceEmail(
       <a href="${viewUrl}" style="display:inline-block;padding:12px 28px;background:#e8620a;color:#fff;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">View & Download Invoice →</a>
       <p style="font-size:11px;color:#555;margin-top:20px;">Or copy: ${viewUrl}</p>
       <hr style="border-color:rgba(255,255,255,0.08);margin:20px 0;"/>
-      <p style="font-size:11px;color:#444;">Connected Steps · Hyderabad · info@connectedsteps.in · +91 97036 20570</p>
+      <p style="font-size:11px;color:#444;">Connected Steps · Hyderabad · info@connectedsteps.in · +91 97036 20571</p>
     </div>`;
 
   try {

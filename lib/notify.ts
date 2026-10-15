@@ -216,7 +216,7 @@ export function expiryReminderEmailHTML(name: string, plan: string, expiresAt: s
           <a href="https://www.connectedsteps.in/dashboard" style="display:block;padding:14px 36px;font-size:15px;font-weight:700;color:#fff;text-decoration:none;">Renew Membership →</a>
         </td></tr>
       </table>
-      <p style="margin:0;font-size:14px;color:#888;line-height:1.6;text-align:center;">Questions? <a href="https://wa.me/9703620570" style="color:#e8620a;text-decoration:none;">WhatsApp us</a></p>
+      <p style="margin:0;font-size:14px;color:#888;line-height:1.6;text-align:center;">Questions? <a href="https://wa.me/9703620571" style="color:#e8620a;text-decoration:none;">WhatsApp us</a></p>
     </td></tr>
     ${emailFooter()}
   `);
@@ -346,7 +346,7 @@ export function welcomeEmailHTML(firstName: string): string {
 
       <p style="margin:0 0 8px;font-size:14px;color:#888;line-height:1.6;text-align:center;">Need help? We're one WhatsApp message away.</p>
       <p style="margin:0;font-size:14px;text-align:center;">
-        <a href="https://wa.me/9703620570" style="color:#e8620a;text-decoration:none;font-weight:600;">💬 WhatsApp Support</a>
+        <a href="https://wa.me/9703620571" style="color:#e8620a;text-decoration:none;font-weight:600;">💬 WhatsApp Support</a>
       </p>
     </td></tr>
     ${emailFooter()}

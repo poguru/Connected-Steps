@@ -29,7 +29,7 @@ export default function ContactPage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 320px), 1fr))", gap: "1rem", marginBottom: "3rem" }}>
 
           {/* WhatsApp */}
-          <a href="https://wa.me/919703620570" target="_blank" rel="noopener noreferrer"
+          <a href="https://wa.me/919703620571" target="_blank" rel="noopener noreferrer"
             style={{ display: "flex", alignItems: "flex-start", gap: "1rem", background: "var(--cs-dark)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "10px", padding: "1.5rem", textDecoration: "none", transition: "border-color 0.2s" }}
             onMouseEnter={(e) => (e.currentTarget.style.borderColor = "oklch(0.72 0.19 49 / 40%)")}
             onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)")}>
@@ -41,7 +41,7 @@ export default function ContactPage() {
             <div>
               <div style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--cs-white)", marginBottom: "4px" }}>WhatsApp</div>
               <div style={{ fontSize: "0.82rem", color: "var(--cs-muted)", marginBottom: "8px" }}>Fastest way to reach us — for coaching questions and support.</div>
-              <div style={{ fontSize: "0.8rem", color: "#25d366", fontWeight: 600 }}>+91 97036 20570</div>
+              <div style={{ fontSize: "0.8rem", color: "#25d366", fontWeight: 600 }}>+91 97036 20571</div>
             </div>
           </a>
 

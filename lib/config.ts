@@ -12,7 +12,7 @@ export const LOGO_URL      = `${APP_URL}/logo.png`;
 
 // Contact
 export const SUPPORT_EMAIL        = "info@connectedsteps.in";
-export const SUPPORT_PHONE        = "9703620570";
+export const SUPPORT_PHONE        = "9703620571";
 export const SUPPORT_PHONE_INTL   = `+91${SUPPORT_PHONE}`;
 export const SUPPORT_WHATSAPP_URL = `https://wa.me/${SUPPORT_PHONE}`;
 

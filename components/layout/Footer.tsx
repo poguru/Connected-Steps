@@ -37,7 +37,7 @@ export default function Footer() {
               {[
                 { href: INSTAGRAM_URL,                                icon: <InstagramIcon />, label: "Instagram" },
                 { href: "mailto:training@connectedsteps.in",         icon: <Mail size={16} />,    label: "Email"     },
-                { href: "https://wa.me/9703620570",                  icon: <WhatsAppIcon />, label: "WhatsApp"  },
+                { href: "https://wa.me/9703620571",                  icon: <WhatsAppIcon />, label: "WhatsApp"  },
               ].map(({ href, icon, label }) => (
                 <a key={label} href={href} aria-label={label} target="_blank" rel="noopener noreferrer"
                   style={{ width: 38, height: 38, borderRadius: 10, background: "var(--surface)", display: "grid", placeItems: "center", color: "var(--muted-foreground)", textDecoration: "none", transition: "background 0.2s, color 0.2s", border: "1px solid var(--border)" }}
@@ -79,7 +79,7 @@ export default function Footer() {
                 { href: "/community",              label: "Find runners"        },
                 { href: "/leaderboard",            label: "Leaderboard"         },
                 { href: "/achievements",           label: "Achievements"        },
-                { href: "https://wa.me/9703620570",label: "WhatsApp group"      },
+                { href: "https://wa.me/9703620571",label: "WhatsApp group"      },
               ].map(({ href, label }) => (
                 <li key={label}>
                   <Link href={href} style={{ fontSize: "0.82rem", color: "var(--muted-foreground)", textDecoration: "none" }}

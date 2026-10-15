@@ -259,7 +259,7 @@ async function sendJoinConfirmationEmail(p: {
         <p style="margin:0 0 4px;font-size:13px;color:#555;font-weight:600;">In case of any queries or questions</p>
         <p style="margin:0;font-size:13px;color:#555;">
           📞 Call / WhatsApp us at
-          <a href="https://wa.me/919703620570" style="color:#e8620a;text-decoration:none;font-weight:700;">+91 97036 20570</a>
+          <a href="https://wa.me/919703620571" style="color:#e8620a;text-decoration:none;font-weight:700;">+91 97036 20571</a>
         </p>
       </td></tr>
 

@@ -416,7 +416,7 @@ export default function PricingPage() {
 
         <p style={{ textAlign: "center", fontSize: 11, color: "var(--muted-foreground)", marginBottom: "4rem" }}>
           All prices inclusive of GST. Questions?{" "}
-          <a href="https://wa.me/9703620570" target="_blank" rel="noopener noreferrer" style={{ color: "var(--cs-orange)", textDecoration: "none" }}>Chat with us on WhatsApp →</a>
+          <a href="https://wa.me/9703620571" target="_blank" rel="noopener noreferrer" style={{ color: "var(--cs-orange)", textDecoration: "none" }}>Chat with us on WhatsApp →</a>
         </p>
 
         {/* ── WHY JOIN CONNECTED STEPS ── */}
@@ -503,7 +503,7 @@ export default function PricingPage() {
             <Link href="/auth?tab=signup" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 30px", background: "var(--gradient-accent)", color: "#fff", borderRadius: 10, textDecoration: "none", fontSize: "0.95rem", fontWeight: 700, boxShadow: "0 8px 24px rgba(232,98,10,0.35)" }}>
               Join the Community →
             </Link>
-            <a href="https://wa.me/9703620570" target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 24px", background: "transparent", color: "var(--foreground)", borderRadius: 10, textDecoration: "none", fontSize: "0.95rem", fontWeight: 600, border: "1px solid rgba(255,255,255,0.15)" }}>
+            <a href="https://wa.me/9703620571" target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 24px", background: "transparent", color: "var(--foreground)", borderRadius: 10, textDecoration: "none", fontSize: "0.95rem", fontWeight: 600, border: "1px solid rgba(255,255,255,0.15)" }}>
               Chat with us
             </a>
           </div>

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, DragEvent } from "react";
 import { usePathname } from "next/navigation";
 import { floatingReportHidden } from "@/lib/issue-report-placement";
 import { FLOATING_BOTTOM_OFFSET } from "@/lib/bottom-bar";
+import { useIsPhone } from "@/components/ui/useIsPhone";
 
 // Any control on the page can open the report form by dispatching this event. One form, one listener.
 export const OPEN_ISSUE_REPORT_EVENT = "cs-open-issue-report";
@@ -157,7 +158,9 @@ export default function BugReportFab() {
   // The registration wizard keeps its own report button inside its bottom bar (see IssueReportButton),
   // so the floating control is hidden there. The form itself stays mounted for that button to open.
   const pathname = usePathname();
-  const routeHidden = floatingReportHidden(pathname);
+  const phone = useIsPhone();
+  // On phones the landing page hides this control: its help link sits in the hero, clear of the Register Now button
+  const routeHidden = floatingReportHidden(pathname) || (phone && pathname === "/it-run");
   // Hidden while someone is typing in a field, so the control never covers the field or the keyboard area.
   // It returns as soon as focus leaves the field.
   const [typing, setTyping] = useState(false);
@@ -329,7 +332,8 @@ export default function BugReportFab() {
           // Sits above the cookie notice and any sticky call to action (see lib/bottom-bar.ts)
           bottom: FLOATING_BOTTOM_OFFSET,
           left: 16, zIndex: 9990,
-          height: 38, paddingLeft: 12, paddingRight: 16, borderRadius: 999,
+          height: 38, width: phone ? 40 : undefined, paddingLeft: phone ? 0 : 12, paddingRight: phone ? 0 : 16, borderRadius: 999,
+          justifyContent: phone ? "center" : undefined,
           background: "rgba(15,15,15,0.9)", border: "1px solid rgba(255,255,255,0.14)",
           backdropFilter: "blur(14px)", boxShadow: "0 4px 16px rgba(0,0,0,0.45)",
           cursor: "pointer", display: "flex", alignItems: "center", gap: 7,
@@ -340,7 +344,7 @@ export default function BugReportFab() {
         onMouseLeave={e => { const b = e.currentTarget; b.style.transform = "scale(1)"; b.style.color = "#aaa"; b.style.boxShadow = "0 4px 16px rgba(0,0,0,0.45)"; }}
       >
         <FlagIcon />
-        Report an issue
+        {!phone && <span>Report an issue</span>}
       </button>
       )}
 

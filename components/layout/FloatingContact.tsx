@@ -37,7 +37,7 @@ export default function FloatingContact() {
       }}>
         {/* WhatsApp */}
         <div className="fab-wa">
-          <a href="https://wa.me/9703620570" target="_blank" rel="noopener noreferrer"
+          <a href="https://wa.me/9703620571" target="_blank" rel="noopener noreferrer"
             aria-label="Chat on WhatsApp" title="Chat on WhatsApp" className="fab-btn"
             style={{ width:44, height:44, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center",
               background:"oklch(0.20 0.006 250)", border:"1px solid rgba(37,211,102,0.28)", boxShadow:"0 4px 16px rgba(0,0,0,0.5)", flexShrink:0 }}>

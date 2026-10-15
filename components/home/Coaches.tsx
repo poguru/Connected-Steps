@@ -237,7 +237,7 @@ function CoachModal({
           {/* CTAs */}
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <a
-              href="https://wa.me/9703620570"
+              href="https://wa.me/9703620571"
               target="_blank" rel="noreferrer"
               style={{
                 flex: 1, minWidth: 140,

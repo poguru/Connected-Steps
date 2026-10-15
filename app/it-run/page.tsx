@@ -2,6 +2,12 @@
 
 import { useState, useEffect, useRef } from "react";
 import { eventStartDate } from "@/lib/it-run-countdown";
+import { whatsappSupportLink } from "@/lib/support-whatsapp";
+import { SUPPORT_PHONE } from "@/lib/config";
+import { OPEN_ISSUE_REPORT_EVENT } from "@/components/ui/BugReportFab";
+
+// The help link for the landing page. Null when no support number is set, so the link is then not shown.
+const HELP_WHATSAPP = whatsappSupportLink(SUPPORT_PHONE, "Hi, I need help with The IT Run Sprint-2 registration.");
 import Link from "next/link";
 import { publishBottomBarHeight } from "@/lib/bottom-bar";
 import Image from "next/image";
@@ -191,7 +197,7 @@ export default function ItRunLandingPage() {
   const [highlights,    setHighlights]    = useState<string[]>([]);
   const [instructions,  setInstructions]  = useState<string>("");
   const [contactEmail,  setContactEmail]  = useState("info@connectedsteps.in");
-  const [contactPhone,  setContactPhone]  = useState("+91 97036 20570");
+  const [contactPhone,  setContactPhone]  = useState("+91 97036 20571");
   const [bibInfo,       setBibInfo]       = useState<string>("");
   const [raceDayInfo,   setRaceDayInfo]   = useState<string>("");
 
@@ -387,6 +393,12 @@ export default function ItRunLandingPage() {
             Already registered?{" "}
             <Link href="/it-run/my-registrations" style={{ color: "#e8620a", fontWeight: 700, textDecoration: "underline" }}>Sign in to view or manage your registration</Link>
           </p>
+          {HELP_WHATSAPP && (
+            <p style={{ fontSize: 13, color: "#888", marginTop: 10, marginBottom: 0 }}>
+              Need help?{" "}
+              <a href={HELP_WHATSAPP} target="_blank" rel="noopener noreferrer" style={{ color: "#25d366", fontWeight: 700, textDecoration: "underline" }}>Chat with us on WhatsApp</a>
+            </p>
+          )}
 
           {/* Quick stats */}
           <div style={{ display: "flex", gap: "clamp(24px,4vw,48px)", justifyContent: "center", marginTop: 48, flexWrap: "wrap" }}>
@@ -785,6 +797,9 @@ export default function ItRunLandingPage() {
             <Link href="/privacy" style={{ color: "#555", textDecoration: "none" }}>Privacy</Link>
             &nbsp;|&nbsp;
             <Link href="/terms"   style={{ color: "#555", textDecoration: "none" }}>Terms</Link>
+            &nbsp;|&nbsp;
+            <button type="button" onClick={() => window.dispatchEvent(new Event(OPEN_ISSUE_REPORT_EVENT))}
+              style={{ background: "none", border: "none", padding: 0, color: "#555", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Report an issue</button>
           </div>
         </div>
       </footer>

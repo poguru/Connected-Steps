@@ -46,7 +46,7 @@ export default function CorporateForm() {
       <div style={{ background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.25)", borderRadius: "10px", padding: "2rem", textAlign: "center" }}>
         <div style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>✅</div>
         <div style={{ fontSize: "1rem", fontWeight: 600, color: "var(--cs-white)", marginBottom: "0.5rem" }}>We'll be in touch within 24 hours!</div>
-        <div style={{ fontSize: "0.875rem", color: "var(--cs-muted)" }}>Or WhatsApp us now at +91 97036 20570 for a faster response.</div>
+        <div style={{ fontSize: "0.875rem", color: "var(--cs-muted)" }}>Or WhatsApp us now at +91 97036 20571 for a faster response.</div>
       </div>
     );
   }

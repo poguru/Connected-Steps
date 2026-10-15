@@ -178,7 +178,7 @@ function CoachModal({ coach, rating, onClose, isMobile }: {
           )}
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <a href="https://wa.me/9703620570" target="_blank" rel="noreferrer"
+            <a href="https://wa.me/9703620571" target="_blank" rel="noreferrer"
               style={{ flex: 1, minWidth: 140, padding: "13px 20px", borderRadius: 8, background: "var(--cs-orange)", color: "#fff", textAlign: "center", textDecoration: "none", fontWeight: 700, fontSize: "0.875rem", fontFamily: "var(--font-body)" }}>
               Book Consultation
             </a>
