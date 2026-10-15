@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import jsQR from "jsqr";
+import { decodeQr } from "@/lib/qr-decode";
 
 // Shared scanner for the IT Run staff screens (check-in, BIB, T-shirt, breakfast, goodies, medal, certificate).
 // The camera reads QR codes in the browser with jsQR and reports the first code it finds, once. Manual entry stays
@@ -68,13 +68,13 @@ export default function QRScanner({ onScan, onError, placeholder = "Scan QR, BIB
         if (ctx) {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const code = jsQR(image.data, image.width, image.height, { inversionAttempts: "dontInvert" });
-          if (code?.data && !doneRef.current) {
+          const text = decodeQr(image.data, image.width, image.height);
+          if (text && !doneRef.current) {
             doneRef.current = true;
             stopCamera();
             setCameraActive(false);
             setScanning(true);
-            void onScanRef.current(code.data).finally(() => {
+            void onScanRef.current(text).finally(() => {
               // Allow the next scan only after this one has finished, then read again
               setScanning(false);
               setRound(r => r + 1);

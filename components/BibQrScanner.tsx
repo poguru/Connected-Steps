@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import jsQR from "jsqr";
+import { decodeQr } from "@/lib/qr-decode";
 
 // Camera QR scanner for volunteers' phones and tablets. It reads frames in the browser with jsQR and reports the first
 // code it finds, once. The camera starts only when this component mounts (the volunteer opened it), and it is released
@@ -91,12 +91,11 @@ export default function BibQrScanner({ onDetected, onClose }: Props) {
         if (ctx) {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          // "attemptBoth" also reads light-on-dark codes, which some screens and prints produce
-          const code = jsQR(image.data, image.width, image.height, { inversionAttempts: "attemptBoth" });
-          if (code?.data && !doneRef.current) {
+          const text = decodeQr(image.data, image.width, image.height);
+          if (text && !doneRef.current) {
             doneRef.current = true;
             stopCamera();
-            onDetected(code.data);
+            onDetected(text);
             return;
           }
         }
