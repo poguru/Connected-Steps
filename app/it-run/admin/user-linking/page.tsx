@@ -147,15 +147,15 @@ export default function UserLinkingPage() {
         <Link href="/it-run/admin" style={{ color: "#888", textDecoration: "none", fontSize: 13, fontWeight: 600 }}>
           ← Admin
         </Link>
-        <div style={{ fontSize: 13, fontWeight: 600 }}>User Linking Tool</div>
+        <div style={{ fontSize: 13, fontWeight: 600 }}>Link accounts</div>
       </nav>
 
       {/* Content */}
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "calc(52px + 2rem) clamp(1rem,4vw,2rem) 3rem" }}>
-        <h1 style={{ fontSize: 28, fontWeight: 900, marginBottom: 8 }}>User Linking Tool</h1>
+        <h1 style={{ fontSize: 28, fontWeight: 900, marginBottom: 8 }}>Connect registrations to accounts</h1>
         <p style={{ fontSize: 14, color: "#666", marginBottom: 32, maxWidth: 600, lineHeight: 1.6 }}>
-          Link orphaned registrations (without linked_user_email) to Connected Steps accounts.
-          This tool is used to repair registrations that were created before user linking was implemented.
+          Some registrations are not connected to a Connected Steps account, so the runner may not see them when signed in.
+          Connect each one to the right account here. This is only for repairing older registrations.
         </p>
 
         {error && (
@@ -195,8 +195,8 @@ export default function UserLinkingPage() {
         {!loading && orphanedRegs.length === 0 && (
           <div style={{ textAlign: "center", paddingTop: 40 }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>✨</div>
-            <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>No orphaned registrations</h2>
-            <p style={{ color: "#666", marginBottom: 24 }}>All registrations have been linked to user accounts!</p>
+            <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Every registration is connected</h2>
+            <p style={{ color: "#666", marginBottom: 24 }}>Nothing is waiting to be connected.</p>
           </div>
         )}
 
@@ -205,7 +205,7 @@ export default function UserLinkingPage() {
             {/* Left: List of orphaned registrations */}
             <div>
               <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
-                Orphaned Registrations ({orphanedRegs.length})
+                Not yet connected ({orphanedRegs.length})
               </h2>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {orphanedRegs.map(reg => (
@@ -256,7 +256,7 @@ export default function UserLinkingPage() {
                   position: "sticky",
                   top: "calc(52px + 1rem)",
                 }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>Link Registration</h3>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>Connect this registration</h3>
 
                   {/* Registration details */}
                   <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
@@ -281,7 +281,7 @@ export default function UserLinkingPage() {
                   {/* Search */}
                   <div style={{ marginBottom: 16 }}>
                     <label style={{ display: "block", fontSize: 11, color: "#888", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                      Search User Email
+                      Find the runner's account by email
                     </label>
                     <div style={{ display: "flex", gap: 8 }}>
                       <input
@@ -365,7 +365,7 @@ export default function UserLinkingPage() {
                                 whiteSpace: "nowrap",
                               }}
                             >
-                              {linkingRegId === selectedReg.id ? "Linking..." : "Link"}
+                              {linkingRegId === selectedReg.id ? "Connecting..." : "Connect"}
                             </button>
                           </div>
                         ))}
@@ -396,7 +396,7 @@ export default function UserLinkingPage() {
                   textAlign: "center",
                   color: "#666",
                 }}>
-                  <p>Select a registration to begin linking</p>
+                  <p>Choose a registration on the left to start.</p>
                 </div>
               )}
             </div>
