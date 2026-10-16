@@ -92,7 +92,7 @@ function SizeTable({ title, rows, accent }: {
             <div style={{ fontSize: 10, color: "#444" }}>SIZE</div>
             <div style={{ fontSize: 10, color: "#444" }}></div>
             <div style={{ fontSize: 10, color: "#888", textAlign: "right" }}>REQ</div>
-            <div style={{ fontSize: 10, color: GREEN,  textAlign: "right" }}>ISSUED</div>
+            <div style={{ fontSize: 10, color: GREEN,  textAlign: "right" }}>HANDED OUT</div>
             <div style={{ fontSize: 10, color: RED,    textAlign: "right" }}>LEFT</div>
           </div>
 
@@ -232,10 +232,10 @@ export default function TshirtPage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 24 }}>
         <div>
           <h1 style={{ fontSize: "clamp(18px,3vw,24px)", fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>
-            T-Shirt Inventory
+            T-shirt inventory
           </h1>
           <div style={{ fontSize: 13, color: "#555" }}>
-            Live counts from participant records and BIB collection status
+            How many T-shirts each size needs, and how many have been handed out so far.
           </div>
         </div>
         <a href={csvUrl()} download
@@ -247,13 +247,13 @@ export default function TshirtPage() {
       {/* Summary tiles */}
       {s && (
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
-          <Tile label="Total Participants"    value={s.total_participants} />
-          <Tile label="T-Shirts Required"     value={s.total_required}
+          <Tile label="Runners"                value={s.total_participants} />
+          <Tile label="Shirts needed"         value={s.total_required}
             sub={`${pct(s.total_required, s.total_participants)}% of participants`} />
-          <Tile label="T-Shirts Issued"       value={s.total_issued}
+          <Tile label="Shirts handed out"     value={s.total_issued}
             sub={`${pct(s.total_issued, s.total_required)}% of required`}
             accent={GREEN} />
-          <Tile label="T-Shirts Not Issued"   value={s.total_not_issued}
+          <Tile label="Shirts still to hand out" value={s.total_not_issued}
             sub={s.total_not_issued > 0 ? `${pct(s.total_not_issued, s.total_required)}% remaining` : "All issued!"}
             accent={s.total_not_issued > 0 ? RED : GREEN} />
         </div>
@@ -263,7 +263,7 @@ export default function TshirtPage() {
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
         <input
           style={{ ...INPUT, flex: 2, minWidth: 200 }}
-          placeholder="Search: name, mobile, email, registration code…"
+          placeholder="Search name, mobile, email or registration code"
           value={search}
           onChange={e => handleSearch(e.target.value)}
         />
@@ -274,20 +274,20 @@ export default function TshirtPage() {
           ))}
         </select>
         <select style={INPUT} value={groupFilter} onChange={e => handleFilter(setGroupFilter, e.target.value)}>
-          <option value="">Adult + Child</option>
-          <option value="adult">Adult Only</option>
-          <option value="child">Child Only</option>
+          <option value="">Adults and children</option>
+          <option value="adult">Adults only</option>
+          <option value="child">Children only</option>
         </select>
         <select style={INPUT} value={issuedFilter} onChange={e => handleFilter(setIssuedFilter, e.target.value)}>
-          <option value="">All Issuance</option>
-          <option value="yes">Issued Only</option>
-          <option value="no">Not Issued Only</option>
+          <option value="">Handed out or not</option>
+          <option value="yes">Handed out</option>
+          <option value="no">Not yet handed out</option>
         </select>
       </div>
 
       {/* Note */}
       <div style={{ fontSize: 12, color: "#444", marginBottom: 18, lineHeight: 1.5 }}>
-        <span style={{ color: GREEN, fontWeight: 700 }}>Issued</span> = BIB collected (BIB collection day = t-shirt issuance).
+        <span style={{ color: GREEN, fontWeight: 700 }}>Handed out</span> means the runner collected their BIB, and the T-shirt is handed over at the same time.
         <span style={{ color: "#555" }}> Only active registrations with paid/free payment status are counted.</span>
       </div>
 
@@ -329,7 +329,7 @@ export default function TshirtPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                    {["Name", "Category", "Type", "Size", "Issued", "Registration", "Mobile"].map(h => (
+                    {["Name", "Category", "Type", "Size", "Handed out", "Registration", "Mobile"].map(h => (
                       <th key={h} style={{ padding: "9px 14px", textAlign: "left", color: "#555", fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.07em", whiteSpace: "nowrap" }}>{h}</th>
                     ))}
                   </tr>
@@ -362,7 +362,7 @@ export default function TshirtPage() {
                       <td style={{ padding: "8px 14px" }}>
                         {p.issued ? (
                           <span style={{ fontSize: 11, fontWeight: 700, color: GREEN, background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: 5, padding: "2px 8px", whiteSpace: "nowrap" }}>
-                            ✓ Issued{p.issued_at ? ` · ${new Date(p.issued_at).toLocaleDateString("en-IN")}` : ""}
+                            ✓ Handed out{p.issued_at ? ` · ${new Date(p.issued_at).toLocaleDateString("en-IN")}` : ""}
                           </span>
                         ) : (
                           <span style={{ fontSize: 11, fontWeight: 700, color: "#f87171", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 5, padding: "2px 8px" }}>
