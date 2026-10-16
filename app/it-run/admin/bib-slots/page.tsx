@@ -198,7 +198,7 @@ export default function BibSlotsPage() {
           <input type="time" style={INPUT} required value={form.end_time}
             onChange={e => upd("end_time", e.target.value)} />
         </LabeledInput>
-        <LabeledInput label={`Capacity *${isEdit && activeSlot ? ` (min ${activeSlot.live_booked_count} booked)` : ""}`}>
+        <LabeledInput label={`Places (capacity) *${isEdit && activeSlot ? ` (min ${activeSlot.live_booked_count} booked)` : ""}`}>
           <input type="number" min={isEdit && activeSlot ? activeSlot.live_booked_count : 1} style={INPUT} required
             value={form.capacity} onChange={e => upd("capacity", e.target.value)} />
         </LabeledInput>
@@ -306,12 +306,13 @@ export default function BibSlotsPage() {
       <div style={{ maxWidth: 800 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
           <div>
-            <h1 style={{ fontSize: "clamp(18px,3vw,24px)", fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>BIB Collection Slots</h1>
-            <div style={{ fontSize: 13, color: "#888" }}>{slots.length} slot{slots.length !== 1 ? "s" : ""} configured</div>
+            <h1 style={{ fontSize: "clamp(18px,3vw,24px)", fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>Collection Slots</h1>
+            <div style={{ fontSize: 13, color: "#888" }}>{slots.length} slot{slots.length !== 1 ? "s" : ""}. Participants pick one of the active slots to collect their BIB.</div>
+            <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>Hiding a slot removes it from what participants can choose. It does not change existing bookings.</div>
           </div>
           <button onClick={openAdd}
             style={{ padding: "9px 18px", background: ACCENT, border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-            + Add Slot
+            + Add slot
           </button>
         </div>
 
@@ -361,12 +362,12 @@ export default function BibSlotsPage() {
                               {/* Status badge */}
                               {st === "full" && (
                                 <span style={{ fontSize: 10, fontWeight: 800, padding: "2px 7px", borderRadius: 5, background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", color: RED, textTransform: "uppercase", letterSpacing: "0.07em" }}>
-                                  FULL
+                                  Full
                                 </span>
                               )}
                               {st === "disabled" && (
                                 <span style={{ fontSize: 10, fontWeight: 800, padding: "2px 7px", borderRadius: 5, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#666", textTransform: "uppercase", letterSpacing: "0.07em" }}>
-                                  DISABLED
+                                  Hidden
                                 </span>
                               )}
                             </div>
@@ -388,7 +389,7 @@ export default function BibSlotsPage() {
                             </button>
                             <button onClick={() => handleToggle(slot)}
                               style={{ padding: "6px 12px", background: slot.is_active ? "rgba(239,68,68,0.08)" : "rgba(16,185,129,0.08)", border: `1px solid ${slot.is_active ? "rgba(239,68,68,0.25)" : "rgba(16,185,129,0.25)"}`, borderRadius: 8, color: slot.is_active ? "#f87171" : GREEN, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                              {slot.is_active ? "Disable" : "Enable"}
+                              {slot.is_active ? "Hide from participants" : "Show to participants"}
                             </button>
                             <button onClick={() => openDelete(slot)}
                               style={{ padding: "6px 12px", background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.18)", borderRadius: 8, color: "#f87171", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
