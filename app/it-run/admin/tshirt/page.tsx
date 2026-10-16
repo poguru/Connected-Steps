@@ -162,6 +162,8 @@ function SizeTable({ title, rows, accent }: {
 
 export default function TshirtPage() {
   const [data,    setData]    = useState<ApiData | null>(null);
+  // A failed request is shown as a message. It is never stored as data, which is what used to blank the page.
+  const [loadError, setLoadError] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [listPage, setListPage] = useState(0);
 
@@ -180,10 +182,17 @@ export default function TshirtPage() {
     if (groupFilter)  params.set("group",        groupFilter);
     if (issuedFilter) params.set("issued",        issuedFilter);
     if (search)       params.set("search",        search);
+    setLoadError("");
     fetch(`/api/it-run/admin/tshirt?${params}`)
-      .then(r => r.json())
-      .then(d => setData(d))
-      .catch(() => {})
+      .then(async r => {
+        const d = await r.json().catch(() => ({})) as Record<string, unknown>;
+        if (!r.ok || !d.summary) {
+          setLoadError((typeof d.error === "string" ? d.error : "") || "Could not load the T-shirt list (HTTP " + r.status + "). Check that you are signed in as an event admin.");
+          return;
+        }
+        setData(d as unknown as ApiData);
+      })
+      .catch(() => setLoadError("Network error while loading the T-shirt list. Try again."))
       .finally(() => setLoading(false));
   }, [catFilter, groupFilter, issuedFilter, search]);
 
@@ -284,6 +293,12 @@ export default function TshirtPage() {
 
       {loading && !data && (
         <div style={{ color: "#888", padding: 60, textAlign: "center" }}>Loading…</div>
+      )}
+
+      {loadError && (
+        <div role="alert" style={{ margin: "16px 0", padding: "12px 16px", borderRadius: 10, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", fontSize: 13 }}>
+          {loadError}
+        </div>
       )}
 
       {data && (
