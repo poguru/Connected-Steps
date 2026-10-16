@@ -132,7 +132,7 @@ export async function PATCH(req: NextRequest) {
 
     // A rejected ID cancels that runner's category only, releases its seats, and records its refund (90%).
     // Nothing is emailed unless the cancellation succeeded, so the email never describes a cancellation that did not happen.
-    let rejectionCancel: { refundPaise: number; categoryName: string; runners: number } | null = null;
+    let rejectionCancel: { refundPaise: number; categoryName: string; runners: number; free: boolean } | null = null;
     if (status === "rejected") {
       const cancel = await cancelRunnerCategory(db, {
         participantId,
@@ -140,7 +140,7 @@ export async function PATCH(req: NextRequest) {
         actorEmail: session.email,
       });
       if (cancel.status === "cancelled") {
-        rejectionCancel = { refundPaise: cancel.refundPaise, categoryName: cancel.categoryName, runners: cancel.runners };
+        rejectionCancel = { refundPaise: cancel.refundPaise, categoryName: cancel.categoryName, runners: cancel.runners, free: cancel.free };
       } else if (cancel.status !== "already_cancelled") {
         const message = cancel.status === "refund_already_open"
           ? "This booking already has an open refund. Handle it on the refund page, then reject this ID again."
@@ -186,6 +186,7 @@ export async function PATCH(req: NextRequest) {
             refundPaise: rejectionCancel.refundPaise,
             refundPercent: CATEGORY_REFUND_PERCENT,
             otherRunnersKept: rejectionCancel.runners > 0,
+            free: rejectionCancel.free,
           });
         }
       } else {

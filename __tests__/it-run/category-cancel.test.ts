@@ -153,3 +153,33 @@ describe("cancelRunnerCategory", () => {
     expect(db.writes).toEqual([]);
   });
 });
+
+describe("a free registration whose ID is rejected", () => {
+  const FREE_REG = { ...PAID_REG, payment_status: "free", final_price: 0, base_price: 0 };
+
+  it("cancels the category with no refund request, since nothing was paid", async () => {
+    const db = fakeDb({
+      participant: { id: "p-asha", registration_id: "reg-1", category_id: "cat-10k", cancelled_at: null },
+      registration: FREE_REG,
+      category: SOLO_CAT,
+      siblings: [{ id: "p-asha", registration_id: "reg-1", category_id: "cat-10k", cancelled_at: null }],
+    });
+    const out = await cancelRunnerCategory(db as any, { participantId: "p-asha", reason: "unreadable", actorEmail: "v@x" });
+    expect(out).toMatchObject({ status: "cancelled", runners: 1, refundPaise: 0, refundRequestId: null, free: true });
+    expect(db.writes.some(w => w.table === "it_run_refund_requests")).toBe(false);
+    expect(db.writes.some(w => w.table === "it_run_participants" && w.op === "update")).toBe(true);
+    expect(db.rpcs).toEqual([{ name: "itr_release_capacity", args: { p_category_id: "cat-10k", p_count: 1 } }]);
+  });
+
+  it("an unpaid registration (not free, not paid) is still refused and nothing is cancelled", async () => {
+    const db = fakeDb({
+      participant: { id: "p-asha", registration_id: "reg-1", category_id: "cat-10k", cancelled_at: null },
+      registration: { ...PAID_REG, payment_status: "pending", final_price: 2398 },
+      category: SOLO_CAT,
+      siblings: [{ id: "p-asha", registration_id: "reg-1", category_id: "cat-10k", cancelled_at: null }],
+    });
+    const out = await cancelRunnerCategory(db as any, { participantId: "p-asha", reason: "x", actorEmail: "v@x" });
+    expect(out.status).toBe("not_paid");
+    expect(db.writes).toEqual([]);
+  });
+});

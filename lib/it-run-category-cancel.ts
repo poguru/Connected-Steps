@@ -2,6 +2,8 @@
  * Cancelling one category of a booking when a runner's ID is rejected. Only that category's runners are cancelled, their
  * seats are released, and a refund request for the category is recorded. The refund itself is executed by an admin from
  * the refund page (the same executor as every other refund). The rest of the booking is not changed.
+ *
+ * A free registration has nothing to refund: its category is cancelled and no refund request is made.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -25,7 +27,7 @@ export function categoryRefundPaise(args: { lineBaseRupees: number; bookingBaseR
 }
 
 export type CancelOutcome =
-  | { status: "cancelled"; refundRequestId: string; refundPaise: number; runners: number; categoryName: string }
+  | { status: "cancelled"; refundRequestId: string | null; refundPaise: number; runners: number; categoryName: string; free: boolean }
   | { status: "already_cancelled" }
   | { status: "not_paid" }
   | { status: "refund_already_open" }
@@ -39,8 +41,8 @@ interface ParticipantRow {
 }
 
 /**
- * Cancels the category of one runner in their booking, and records its refund request. Order matters: the refund request
- * is created first, so if another refund is already open for the booking nothing is cancelled.
+ * Cancels the category of one runner in their booking, and records its refund request when one is owed. Order matters:
+ * the refund request is created first, so if another refund is already open for the booking nothing is cancelled.
  */
 export async function cancelRunnerCategory(
   db: SupabaseClient,
@@ -63,7 +65,12 @@ export async function cancelRunnerCategory(
       base_price: number; discount_amount: number; registration_status: string;
     }>();
   if (!reg) return { status: "error", message: "Registration not found" };
-  if (!["paid", "partially_refunded"].includes(reg.payment_status) || reg.final_price <= 0) return { status: "not_paid" };
+
+  // A paid booking gets a refund request. A free booking is cancelled without one. A booking not yet paid is not
+  // confirmed, so nothing is cancelled for it.
+  const paid = ["paid", "partially_refunded"].includes(reg.payment_status) && reg.final_price > 0;
+  const free = reg.payment_status === "free";
+  if (!paid && !free) return { status: "not_paid" };
 
   const categoryId = part.category_id ?? reg.category_id;
   const { data: category } = await db
@@ -84,31 +91,36 @@ export async function cancelRunnerCategory(
   const runners = inCategory.length;
   if (runners === 0) return { status: "already_cancelled" };
 
-  const lineBase = bookingPrice(category.category_type, category.price_rupees, runners);
-  const refundPaise = categoryRefundPaise({
-    lineBaseRupees: lineBase,
-    bookingBaseRupees: reg.base_price,
-    bookingDiscountRupees: reg.discount_amount,
-  });
-  if (refundPaise <= 0) return { status: "error", message: "The refund for this category is zero. Nothing was cancelled." };
+  let refundPaise = 0;
+  let refundRequestId: string | null = null;
+  if (paid) {
+    const lineBase = bookingPrice(category.category_type, category.price_rupees, runners);
+    refundPaise = categoryRefundPaise({
+      lineBaseRupees: lineBase,
+      bookingBaseRupees: reg.base_price,
+      bookingDiscountRupees: reg.discount_amount,
+    });
+    if (refundPaise <= 0) return { status: "error", message: "The refund for this category is zero. Nothing was cancelled." };
 
-  // 1. The refund request, first: a second open refund for the booking is refused before anything changes
-  const { data: request, error: reqErr } = await db
-    .from("it_run_refund_requests")
-    .insert({
-      event_id: reg.event_id,
-      registration_id: reg.id,
-      requested_by_email: args.actorEmail,
-      request_reason: args.reason,
-      status: "requested",
-      request_kind: "category_cancel",
-      requested_amount_paise: refundPaise,
-      target_category_id: categoryId,
-    })
-    .select("id")
-    .maybeSingle<{ id: string }>();
-  if (reqErr?.code === "23505") return { status: "refund_already_open" };
-  if (reqErr || !request) return { status: "error", message: "The refund request could not be recorded. Nothing was cancelled." };
+    // 1. The refund request, first: a second open refund for the booking is refused before anything changes
+    const { data: request, error: reqErr } = await db
+      .from("it_run_refund_requests")
+      .insert({
+        event_id: reg.event_id,
+        registration_id: reg.id,
+        requested_by_email: args.actorEmail,
+        request_reason: args.reason,
+        status: "requested",
+        request_kind: "category_cancel",
+        requested_amount_paise: refundPaise,
+        target_category_id: categoryId,
+      })
+      .select("id")
+      .maybeSingle<{ id: string }>();
+    if (reqErr?.code === "23505") return { status: "refund_already_open" };
+    if (reqErr || !request) return { status: "error", message: "The refund request could not be recorded. Nothing was cancelled." };
+    refundRequestId = request.id;
+  }
 
   // 2. Cancel this category's runners and give back their seats
   const now = new Date().toISOString();
@@ -133,8 +145,8 @@ export async function cancelRunnerCategory(
     action: "category_cancelled_for_id_rejection",
     entity_type: "registration",
     entity_id: reg.id,
-    detail: { category_id: categoryId, runners, refund_request_id: request.id, refund_paise: refundPaise },
+    detail: { category_id: categoryId, runners, refund_request_id: refundRequestId, refund_paise: refundPaise, free },
   }).then(() => {}, () => {});
 
-  return { status: "cancelled", refundRequestId: request.id, refundPaise, runners, categoryName: category.name };
+  return { status: "cancelled", refundRequestId, refundPaise, runners, categoryName: category.name, free };
 }
