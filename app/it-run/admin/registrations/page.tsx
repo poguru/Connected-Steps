@@ -2,6 +2,14 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 
+const ID_STATUS_WORDS: Record<string, string> = {
+  pending: "Awaiting review",
+  verified: "Verified",
+  rejected: "Rejected",
+  need_clarification: "Needs correction",
+  not_provided: "No ID",
+};
+
 const ACCENT = "#e8620a";
 const GREEN  = "#10b981";
 
@@ -231,7 +239,7 @@ function ParticipantCard({ p, idx, onEdit }: {
           <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 5, color: "#888", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
             {p.participant_type}
           </span>
-          <StatusChip label={p.verification_status.replace("_"," ")} color={vc} />
+          <StatusChip label={ID_STATUS_WORDS[p.verification_status] ?? p.verification_status.replace("_", " ")} color={vc} />
           {p.cancelled_at && <StatusChip label="Category cancelled" color="#f87171" />}
           {p.bib_number && <span style={{ fontSize: 12, fontWeight: 800, color: ACCENT }}>BIB {p.bib_number}</span>}
           {collected && <StatusChip label="BIB Collected" color={GREEN} />}
@@ -584,6 +592,9 @@ export default function RegistrationsPage() {
             {total} registration{total !== 1 ? "s" : ""}
             {regStatus === "cancelled" ? " (showing cancelled)" : ""}
           </div>
+          <div style={{ fontSize: 12, color: "#666", marginTop: 6 }}>
+            A registration is one booking, which can cover several runners. Open a row to see each runner, their ID and their payment.
+          </div>
         </div>
 
         {msg && (
@@ -612,28 +623,28 @@ export default function RegistrationsPage() {
             onChange={e => handleSearchInput(e.target.value)}
           />
           <select style={INPUT} value={payStatus} onChange={e => { setPayStatus(e.target.value); setPage(0); }}>
-            <option value="">All Payment</option>
+            <option value="">Any payment</option>
             <option value="paid">Paid</option>
             <option value="free">Free</option>
-            <option value="pending">Pending</option>
-            <option value="failed">Failed</option>
+            <option value="pending">Payment pending</option>
+            <option value="failed">Payment failed</option>
           </select>
           <select style={INPUT} value={regStatus} onChange={e => { setRegStatus(e.target.value); setPage(0); }}>
-            <option value="">All Status</option>
-            <option value="active">Active</option>
+            <option value="">Any status</option>
+            <option value="active">Confirmed</option>
             <option value="pending_verification">Awaiting ID verification</option>
             <option value="cancelled">Cancelled</option>
           </select>
           <select style={INPUT} value={catFilter} onChange={e => { setCatFilter(e.target.value); setPage(0); }}>
-            <option value="">All Categories</option>
+            <option value="">Any category</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <select style={INPUT} value={verFilter} onChange={e => { setVerFilter(e.target.value); setPage(0); }}>
-            <option value="">All Verification</option>
-            <option value="pending">Pending</option>
+            <option value="">Any ID status</option>
+            <option value="pending">Awaiting review</option>
             <option value="verified">Verified</option>
             <option value="rejected">Rejected</option>
-            <option value="need_clarification">Needs Clarification</option>
+            <option value="need_clarification">Needs correction</option>
           </select>
           <a href={`/api/it-run/admin/reports?type=registrations${payStatus ? `&payment_status=${payStatus}` : ""}${regStatus ? `&registration_status=${regStatus}` : ""}${catFilter ? `&category_id=${catFilter}` : ""}`} download
             style={{ padding: "9px 14px", background: "rgba(232,98,10,0.1)", border: "1px solid rgba(232,98,10,0.3)", borderRadius: 8, color: ACCENT, fontSize: 13, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" }}>
