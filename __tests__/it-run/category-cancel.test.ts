@@ -198,7 +198,7 @@ describe("the 50% refund for a runner who goes without a BIB", () => {
   it("the no-BIB route and its rules are in place", () => {
     const fs2 = require("fs") as typeof import("fs");
     const route = fs2.readFileSync(require("path").join(__dirname, "../../app/api/it-run/admin/bib-desk/no-bib-cancel/route.ts"), "utf8");
-    expect(route).toMatch(/percent,\n\s*\}\);/);
+    expect(route).toMatch(/percent,\s*\}\);/);
     expect(route).toMatch(/noBibRefundPercent\(/);
     expect(route).toMatch(/BIB_COLLECTED/);
     expect(route).toMatch(/ALREADY_VERIFIED/);

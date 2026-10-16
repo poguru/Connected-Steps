@@ -131,7 +131,7 @@ export default function BibCollectionPage() {
     if (!result) return;
     const reason = window.prompt("Reason for going without a BIB (kept on the audit trail, at least 10 characters):")?.trim() ?? "";
     if (reason.length < 10) { setMessage({ text: "A reason of at least 10 characters is required.", type: "error" }); return; }
-    if (!window.confirm("Cancel this runner's category? A 50% refund of their paid share will be requested. This cannot be undone here.")) return;
+    if (!window.confirm("Cancel this runner's category? A refund of their paid share will be requested: 90% before registration closes, 50% after. This cannot be undone here.")) return;
     setIssuing(true);
     setMessage(null);
     try {
@@ -141,7 +141,7 @@ export default function BibCollectionPage() {
       });
       const d = await res.json().catch(() => ({})) as { error?: string; refundPaise?: number };
       if (!res.ok) { setMessage({ text: d.error ?? "Could not cancel", type: "error" }); return; }
-      setMessage({ text: "Category cancelled. 50% refund requested: Rs. " + ((d.refundPaise ?? 0) / 100).toLocaleString("en-IN") + ". The refund is approved on the refund page.", type: "success" });
+      setMessage({ text: "Category cancelled. Refund requested: Rs. " + ((d.refundPaise ?? 0) / 100).toLocaleString("en-IN") + ". The refund is approved on the refund page.", type: "success" });
       setResult(null);
       setQuery("");
     } finally {
@@ -346,7 +346,7 @@ export default function BibCollectionPage() {
                     </button>
                     <button onClick={noBibCancel} disabled={issuing}
                       style={{ padding: "12px 20px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)", borderRadius: 10, color: "#f87171", fontSize: 14, fontWeight: 700, cursor: issuing ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
-                      Cannot verify: go without BIB (50% refund)
+                      Cannot verify: go without BIB (refund)
                     </button>
                   </>
                 )}
