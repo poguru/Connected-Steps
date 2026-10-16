@@ -47,15 +47,15 @@ export default function OperationsDashboardPage() {
 
   const ACCENT = "#e8620a";
   const cards = [
-    { label: "Total Participants", value: stats.totalParticipants, color: "#60a5fa" },
-    { label: "Checked In", value: stats.checkedIn, color: "#10b981" },
-    { label: "BIB Collected", value: stats.bibCollected, color: ACCENT },
-    { label: "Breakfast", value: stats.breakfastIssued, color: "#ec4899" },
-    { label: "Goodies", value: stats.goodiesIssued, color: "#8b5cf6" },
-    { label: "T-Shirts", value: stats.tshirtIssued, color: "#06b6d4" },
-    { label: "Medals", value: stats.medalIssued, color: "#fbbf24" },
-    { label: "Certificates", value: stats.certificateIssued, color: "#60a5fa" },
-    { label: "Active Staff", value: stats.staffActive, color: "#10b981" },
+    { label: "Runners", value: stats.totalParticipants, color: "#60a5fa" },
+    { label: "Checked in", value: stats.checkedIn, color: "#10b981" },
+    { label: "BIBs handed out", value: stats.bibCollected, color: ACCENT },
+    { label: "Breakfast given", value: stats.breakfastIssued, color: "#ec4899" },
+    { label: "Goodies given", value: stats.goodiesIssued, color: "#8b5cf6" },
+    { label: "T-shirts given", value: stats.tshirtIssued, color: "#06b6d4" },
+    { label: "Medals given", value: stats.medalIssued, color: "#fbbf24" },
+    { label: "Certificates given", value: stats.certificateIssued, color: "#60a5fa" },
+    { label: "Staff on duty", value: stats.staffActive, color: "#10b981" },
   ];
 
   const completion = {
@@ -68,7 +68,7 @@ export default function OperationsDashboardPage() {
     <div style={{ maxWidth: 1200, margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <h1 style={{ fontSize: 28, fontWeight: 800, color: "#fff", margin: 0 }}>
-          Live Operations Dashboard
+          Live operations
         </h1>
         <label style={{ display: "flex", alignItems: "center", gap: 8, color: "#888", fontSize: 13 }}>
           <input
@@ -77,7 +77,7 @@ export default function OperationsDashboardPage() {
             onChange={e => setAutoRefresh(e.target.checked)}
             style={{ cursor: "pointer" }}
           />
-          Auto-refresh (5s)
+          Refresh every 5 seconds
         </label>
       </div>
 
@@ -112,8 +112,8 @@ export default function OperationsDashboardPage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
           {[
             { label: "Check-In", pct: completion.checkin, color: "#10b981" },
-            { label: "BIB Collection", pct: completion.bib, color: ACCENT },
-            { label: "Breakfast", pct: completion.breakfast, color: "#ec4899" },
+            { label: "BIBs handed out", pct: completion.bib, color: ACCENT },
+            { label: "Breakfast given", pct: completion.breakfast, color: "#ec4899" },
           ].map(item => (
             <div key={item.label}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
