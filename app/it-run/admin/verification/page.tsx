@@ -34,15 +34,15 @@ interface CompanyIdMeta {
 
 const ACCENT = "#e8620a";
 const STATUS_OPTS = [
-  { value: "all",                label: "All participants",    color: "#e8620a" },
-  { value: "pending",            label: "Pending Review",      color: "#f59e0b" },
-  { value: "verified",           label: "Verified",            color: "#10b981" },
-  { value: "rejected",           label: "Rejected",            color: "#ef4444" },
-  { value: "need_clarification", label: "Needs Clarification", color: "#6366f1" },
-  { value: "not_provided",       label: "No ID (not provided)", color: "#64748b" },
-  { value: "company_submitted",   label: "Company ID submitted",    color: "#0ea5e9" },
-  { value: "government_submitted", label: "Government ID submitted", color: "#a855f7" },
-  { value: "company_verified",   label: "Company ID verified",    color: "#14b8a6" },
+  { value: "all",                label: "Everyone",              color: "#e8620a" },
+  { value: "pending",            label: "Awaiting review",       color: "#f59e0b" },
+  { value: "verified",           label: "Verified (any ID)",     color: "#10b981" },
+  { value: "rejected",           label: "Rejected",              color: "#ef4444" },
+  { value: "need_clarification", label: "Needs correction",      color: "#6366f1" },
+  { value: "not_provided",       label: "No ID uploaded",       color: "#64748b" },
+  { value: "company_submitted",   label: "Company ID uploaded",  color: "#0ea5e9" },
+  { value: "government_submitted", label: "Government ID uploaded", color: "#a855f7" },
+  { value: "company_verified",   label: "Company ID verified", color: "#14b8a6" },
   { value: "government_verified", label: "Government ID verified", color: "#22c55e" },
 ];
 
@@ -468,10 +468,16 @@ export default function VerificationPage() {
 
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontSize: "clamp(18px,3vw,24px)", fontWeight: 800, color: "#fff", margin: 0 }}>
-          Company ID Verification
+          Company ID Checks
         </h1>
         <div style={{ fontSize: 13, color: "#888", marginTop: 4 }}>
-          Review uploaded company IDs from participants
+          Check the ID each runner uploaded, then choose one action for that runner.
+        </div>
+        <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", fontSize: 12, color: "#aaa", lineHeight: 1.7 }}>
+          <strong style={{ color: "#fff" }}>How to use:</strong> pick a filter, open the ID, then choose an action.<br />
+          <span style={{ color: "#10b981" }}>Verify ID</span> confirms the document.&nbsp;
+          <span style={{ color: "#6366f1" }}>Ask for correction</span> asks for a clearer or correct upload and cancels nothing.&nbsp;
+          <span style={{ color: "#ef4444" }}>Reject ID</span> cancels that runner's category.
         </div>
       </div>
 
@@ -496,7 +502,7 @@ export default function VerificationPage() {
       ) : (
         <>
           <div style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>
-            {total} participant(s) with this status
+            {total} {total === 1 ? "person" : "people"} in this list
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -591,6 +597,9 @@ export default function VerificationPage() {
                       </div>
                     ) : (
                     <>
+                    <div style={{ fontSize: 11, color: "#777", marginTop: 8, lineHeight: 1.6 }}>
+                      Reject ID cancels this runner's category (the refund follows the rules). Ask for correction keeps the registration and cancels nothing.
+                    </div>
                     {p.verification_outcome && (
                       <div style={{ fontSize: 12, color: "#10b981", fontWeight: 600, marginTop: 10 }}>
                         Outcome: {p.verification_outcome === "company_verified" ? "Company ID verified" : "Government ID verified"}
@@ -603,7 +612,7 @@ export default function VerificationPage() {
                           disabled={updating === p.id}
                           style={BTN("#14b8a6")}
                         >
-                          {updating === p.id ? "…" : "Company ID Verified"}
+                          {updating === p.id ? "…" : "Company ID verified"}
                         </button>
                       )}
                       {tab !== "verified" && (
@@ -612,7 +621,7 @@ export default function VerificationPage() {
                           disabled={updating === p.id}
                           style={BTN("#10b981")}
                         >
-                          {updating === p.id ? "…" : "Verify"}
+                          {updating === p.id ? "…" : "Verify ID"}
                         </button>
                       )}
                       {tab !== "rejected" && (
@@ -621,7 +630,7 @@ export default function VerificationPage() {
                           disabled={updating === p.id}
                           style={BTN("#ef4444")}
                         >
-                          {updating === p.id ? "…" : "Reject"}
+                          {updating === p.id ? "…" : "Reject ID"}
                         </button>
                       )}
                       {tab !== "need_clarification" && (
@@ -630,7 +639,7 @@ export default function VerificationPage() {
                           disabled={updating === p.id}
                           style={BTN("#6366f1")}
                         >
-                          {updating === p.id ? "…" : "Clarification"}
+                          {updating === p.id ? "…" : "Ask for correction"}
                         </button>
                       )}
                       {p.verification_status === "rejected" && p.id_document_type !== "government" && (
