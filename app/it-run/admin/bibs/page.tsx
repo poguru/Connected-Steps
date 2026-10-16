@@ -129,24 +129,24 @@ function ScanTab() {
     }
   }
 
-  // A government-ID participant whose IT employment is not verified on collection day: 80% is refunded (20% kept),
-  // or the participant runs without a timing chip instead (a BIB decision, not a refund). The admin records the reason;
-  // the refund is then approved and executed on the refund requests page.
+  // A runner who could not be verified at the BIB desk and chooses to go without a BIB. The category is cancelled and a
+  // refund is requested: 90% before registration closes, 50% after. The runner is emailed. The same route as the BIB desk.
   async function recordBibIdFailure() {
     if (!participant) return;
-    const reason = window.prompt("Reason for recording this (kept on the audit trail, at least 10 characters):")?.trim() ?? "";
+    const reason = window.prompt("Reason for going without a BIB (kept on the audit trail, at least 10 characters):")?.trim() ?? "";
     if (reason.length < 10) { showToast("A reason of at least 10 characters is required", false); return; }
+    if (!window.confirm("Cancel this runner's category? A refund of their paid share will be requested: 90% before registration closes, 50% after.")) return;
     setBibLoading(true);
-    const res = await fetch("/api/it-run/admin/id-failure", {
+    const res = await fetch("/api/it-run/admin/bib-desk/no-bib-cancel", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ participant_id: participant.id, stage: "bib_collection", reason }),
+      body: JSON.stringify({ participantId: participant.id, reason }),
     });
-    const data = await res.json().catch(() => ({})) as { error?: string; refundPaise?: number };
+    const data = await res.json().catch(() => ({})) as { error?: string; refundPaise?: number; percent?: number };
     setBibLoading(false);
     if (res.ok) {
-      showToast(`Refund request recorded: ₹${((data.refundPaise ?? 0) / 100).toLocaleString("en-IN")}. Approve it on the refund requests page.`, true);
+      showToast(`Category cancelled. Refund requested: ₹${((data.refundPaise ?? 0) / 100).toLocaleString("en-IN")} (${data.percent ?? ""}%). Approve it on the refund requests page.`, true);
     } else {
-      showToast(data.error ?? "Could not record", false);
+      showToast(data.error ?? "Could not cancel", false);
     }
   }
 
@@ -229,7 +229,7 @@ function ScanTab() {
         {/* Counter */}
         <div style={{ marginTop: 10 }}>
           <input value={counter} onChange={e => setCounter(e.target.value)}
-            placeholder="Counter name (optional: Counter A, Gate 2…)"
+            placeholder="Counter (optional), e.g. Counter 2"
             style={{ width: "100%", boxSizing: "border-box", padding: "9px 14px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, color: "#888", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
         </div>
       </div>
@@ -313,9 +313,9 @@ function ScanTab() {
                 color={GREEN} disabled={bibDone} loading={bibLoading}
                 onClick={collectBib}
               />
-              {p.id_document_type === "government" && !bibDone && p.it_run_registrations.registration_status !== "cancelled" && (
+              {!bibDone && p.it_run_registrations.registration_status !== "cancelled" && (
                 <ActionBtn
-                  label="IT employment not verified (refund 80%)"
+                  label="Cannot verify: go without BIB (refund)"
                   color="#ef4444" disabled={bibLoading} loading={false}
                   onClick={recordBibIdFailure}
                 />
@@ -456,12 +456,12 @@ function AllocationTab() {
 
       {/* Filters */}
       <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, BIB, reg code…"
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, BIB number or registration code"
           style={{ ...INPUT, flex: 1, minWidth: 180 }} />
         {[
-          { key: "all",         label: `All (${data.length})` },
-          { key: "unallocated", label: `Unallocated (${unallocatedCount})` },
-          { key: "collected",   label: `Collected (${collectedCount})` },
+          { key: "all",         label: `Everyone (${data.length})` },
+          { key: "unallocated", label: `No number yet (${unallocatedCount})` },
+          { key: "collected",   label: `BIB collected (${collectedCount})` },
         ].map(f => (
           <button key={f.key} onClick={() => setFilter(f.key)}
             style={{ padding: "7px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: filter === f.key ? "rgba(232,98,10,0.1)" : "rgba(255,255,255,0.03)", border: `1px solid ${filter === f.key ? ACCENT : "rgba(255,255,255,0.1)"}`, color: filter === f.key ? ACCENT : "#888" }}>
