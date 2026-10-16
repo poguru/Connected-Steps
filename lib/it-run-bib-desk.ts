@@ -49,3 +49,14 @@ export function collectionReadiness(f: CollectionFacts): CollectionReadiness {
   }
   return { state: "ready", message: "Ready. Send the runner to the assigned counter." };
 }
+
+/**
+ * The refund share for a runner who goes without a BIB at the desk: 90% if it happens before registration closes,
+ * 50% once registration has closed. With no closing time recorded, registration is treated as still open.
+ */
+export function noBibRefundPercent(registrationClosesAt: string | null, now: Date): number {
+  if (!registrationClosesAt) return 90;
+  const closes = new Date(registrationClosesAt).getTime();
+  if (!Number.isFinite(closes)) return 90;
+  return now.getTime() >= closes ? 50 : 90;
+}
