@@ -23,17 +23,17 @@ const ACTION_META: Record<string, ActionMeta> = {
   cancel_registration:        { label: "Cancel Registration",    color: "#ef4444", category: "registration" },
   update_registration:        { label: "Update Registration",    color: "#f59e0b", category: "registration" },
   resend_email:               { label: "Resend Email",           color: "#60a5fa", category: "registration" },
-  force_resend_email:         { label: "Force Resend Email",     color: "#f59e0b", category: "registration" },
+  force_resend_email:         { label: "Resent email (forced)", color: "#f59e0b", category: "registration" },
   // Participant
   edit_participant:           { label: "Edit Participant",       color: "#a78bfa", category: "participant" },
   // Verification
   verification_verified:      { label: "Verified",              color: "#10b981", category: "verification" },
   verification_rejected:      { label: "Rejected",              color: "#ef4444", category: "verification" },
-  verification_need_clarification: { label: "Needs Clarification", color: "#f59e0b", category: "verification" },
+  verification_need_clarification: { label: "Asked for correction", color: "#f59e0b", category: "verification" },
   // BIB & T-shirt
-  bib_collected:              { label: "BIB Collected",         color: "#10b981", category: "race_day" },
-  tshirt_issued:              { label: "T-Shirt Issued",        color: "#10b981", category: "race_day" },
-  tshirt_override_issued:     { label: "T-Shirt Override",      color: "#ef4444", category: "race_day" },
+  bib_collected:              { label: "BIB handed out",       color: "#10b981", category: "race_day" },
+  tshirt_issued:              { label: "T-shirt handed out",   color: "#10b981", category: "race_day" },
+  tshirt_override_issued:     { label: "T-shirt handed out again (override)", color: "#ef4444", category: "race_day" },
   checkin:                    { label: "Check In",              color: "#22d3ee", category: "race_day" },
   // Coupons
   create_coupon:              { label: "Create Coupon",         color: "#10b981", category: "coupon" },
@@ -52,7 +52,7 @@ function actionMeta(action: string): ActionMeta {
 }
 
 const ENTITY_TYPES = [
-  { value: "",             label: "All entities" },
+  { value: "",             label: "Everything" },
   { value: "event",        label: "Event" },
   { value: "category",     label: "Category" },
   { value: "registration", label: "Registration" },
@@ -183,16 +183,17 @@ export default function AuditLogsPage() {
     <div style={{ maxWidth: 1100 }}>
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: "clamp(20px,3vw,26px)", fontWeight: 800, color: "#fff", margin: 0 }}>Audit Logs</h1>
+        <h1 style={{ fontSize: "clamp(20px,3vw,26px)", fontWeight: 800, color: "#fff", margin: 0 }}>Audit log</h1>
         <p style={{ color: "#666", fontSize: 13, margin: "6px 0 0" }}>
           Immutable record of all admin actions.{total ? ` ${total.toLocaleString()} entries.` : ""}
         </p>
       </div>
 
+      {/* Who changed what, and when. Use it to check a decision or a change. */}
       {/* Filters */}
       <form onSubmit={applyFilters} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: 10, marginBottom: 10 }}>
-          <Inp value={actor}      onChange={setActor}      placeholder="Actor email…" />
+          <Inp value={actor}      onChange={setActor}      placeholder="Who did it (email)" />
           <div>
             <Sel value={action} onChange={v => { setAction(v); setOffset(0); }}>
               <option value="" style={{ background: "#1a1a1a" }}>All actions</option>
@@ -206,14 +207,14 @@ export default function AuditLogsPage() {
               {ENTITY_TYPES.map(e => <option key={e.value} value={e.value} style={{ background: "#1a1a1a" }}>{e.label}</option>)}
             </Sel>
           </div>
-          <Inp value={entityId}  onChange={setEntityId}  placeholder="Entity ID or code…" />
+          <Inp value={entityId}  onChange={setEntityId}  placeholder="Registration code or ID" />
           <Inp value={dateFrom}  onChange={setDateFrom}  type="date" />
           <Inp value={dateTo}    onChange={setDateTo}    type="date" />
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button type="submit"
             style={{ padding: "8px 18px", background: ACCENT, border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
-            Apply Filters
+            Show results
           </button>
           {hasFilters && (
             <button type="button" onClick={clearFilters}
