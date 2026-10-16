@@ -69,19 +69,19 @@ export default function PaymentsPage() {
     <div style={{ maxWidth: 1100 }}>
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: "clamp(20px,3vw,26px)", fontWeight: 800, color: "#fff", margin: 0 }}>Payments</h1>
-        <p style={{ color: "#666", fontSize: 13, margin: "6px 0 0" }}>All registrations with payment status and Razorpay references.</p>
+        <p style={{ color: "#666", fontSize: 13, margin: "6px 0 0" }}>Each registration's payment. Use the Razorpay payment ID to trace a payment in Razorpay.</p>
       </div>
 
       {/* Quick stats */}
       <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-        <Pill label="Total shown" value={total} />
-        <Pill label="Revenue (shown paid)" value={`₹${totalRevenue.toLocaleString("en-IN")}`} color="#60a5fa" />
+        <Pill label="Registrations shown" value={total} />
+        <Pill label="Paid so far (this list)" value={`₹${totalRevenue.toLocaleString("en-IN")}`} color="#60a5fa" />
       </div>
 
       {/* Filters */}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
         <form onSubmit={handleSearch} style={{ display: "flex", gap: 8, flex: 1, minWidth: 220 }}>
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search code, email, Razorpay ID…"
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search registration code, email or Razorpay payment ID"
             style={{ flex: 1, padding: "9px 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
           <button type="submit" style={{ padding: "9px 16px", background: ACCENT, border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Search</button>
         </form>
@@ -97,7 +97,7 @@ export default function PaymentsPage() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-                {["Code","Email","Category","Status","Amount","Discount","Razorpay Payment ID","Date","Email Sent"].map(h => (
+                {["Code","Email","Category","Status","Amount","Discount","Razorpay payment ID","Date","Confirmation sent"].map(h => (
                   <th key={h} style={{ padding: "10px 14px", textAlign: "left", color: "#888", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
@@ -106,7 +106,7 @@ export default function PaymentsPage() {
               {loading ? (
                 <tr><td colSpan={9} style={{ padding: 32, textAlign: "center", color: "#555" }}>Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={9} style={{ padding: 32, textAlign: "center", color: "#555" }}>No records found</td></tr>
+                <tr><td colSpan={9} style={{ padding: 32, textAlign: "center", color: "#555" }}>No payments match these filters.</td></tr>
               ) : rows.map((r, i) => (
                 <tr key={r.id} style={{ borderBottom: i < rows.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
                   <td style={{ padding: "10px 14px", fontWeight: 700, color: ACCENT, whiteSpace: "nowrap" }}>{r.registration_code}</td>
