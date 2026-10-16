@@ -36,6 +36,10 @@ function getStatus(c: Coupon): CouponStatus {
   return "active";
 }
 
+const COUPON_STATUS_WORD: Record<CouponStatus, string> = {
+  active: "Active", scheduled: "Starts later", expired: "Expired", exhausted: "Used up", disabled: "Switched off",
+};
+
 const STATUS_STYLES: Record<CouponStatus, { bg: string; border: string; color: string }> = {
   active:    { bg: "rgba(16,185,129,0.1)",  border: "rgba(16,185,129,0.3)",  color: "#10b981" },
   scheduled: { bg: "rgba(245,158,11,0.1)",  border: "rgba(245,158,11,0.3)",  color: "#f59e0b" },
@@ -133,10 +137,10 @@ function CouponForm({
             value={form.code} onChange={e => upd("code", e.target.value.toUpperCase())}
             placeholder="e.g. WELCOME500" />
         </Field>
-        <Field label="Type">
+        <Field label="Kind of code">
           <select style={SELECT_STYLE} value={form.coupon_type} onChange={e => upd("coupon_type", e.target.value)}>
-            <option value="generic">Generic (multi-use code)</option>
-            <option value="unique">Unique (single-use code)</option>
+            <option value="generic">Shared code (many uses)</option>
+            <option value="unique">Single-use code</option>
           </select>
         </Field>
       </div>
@@ -160,12 +164,12 @@ function CouponForm({
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <Field label="Max Total Uses (blank = unlimited)">
+        <Field label="Most times it can be used (blank = no limit)">
           <input type="number" min="1" style={INPUT}
             value={form.max_uses} onChange={e => upd("max_uses", e.target.value)}
             placeholder="100" />
         </Field>
-        <Field label="Min Order Amount ₹ (optional)">
+        <Field label="Only for bookings of at least ₹ (optional)">
           <input type="number" min="0" style={{ ...INPUT, ...(hasBeenUsed ? { opacity: 0.5 } : {}) }}
             disabled={hasBeenUsed}
             value={form.min_amount} onChange={e => upd("min_amount", e.target.value)}
@@ -184,7 +188,7 @@ function CouponForm({
         </Field>
       </div>
 
-      <Field label="Applicable Categories (leave empty = all categories)">
+      <Field label="Which categories it works for (empty = all)">
         {cats.length === 0 ? (
           <div style={{ fontSize: 12, color: "#555" }}>No categories loaded</div>
         ) : (
@@ -205,7 +209,7 @@ function CouponForm({
         )}
       </Field>
 
-      <Field label="Description / Internal Note">
+      <Field label="Internal note (for admins)">
         <input style={INPUT} value={form.description} onChange={e => upd("description", e.target.value)}
           placeholder="Optional note" />
       </Field>
@@ -452,7 +456,7 @@ export default function CouponsPage() {
                 {mode === "create" && "Create Coupon"}
                 {mode === "edit" && `Edit Coupon — ${activeCpn?.code}`}
                 {mode === "delete" && "Delete Coupon"}
-                {mode === "generate" && "Generate Unique Coupons"}
+                {mode === "generate" && "Create a set of single-use codes"}
               </div>
               <button onClick={closeModal}
                 style={{ padding: "4px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#888", cursor: "pointer", fontFamily: "inherit" }}>
@@ -524,12 +528,12 @@ export default function CouponsPage() {
                   Generates cryptographically unique single-use coupon codes. Each code will be: <code style={{ color: ACCENT }}>{"<PREFIX><6 RANDOM CHARS>"}</code>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <Field label="Prefix">
+                  <Field label="Start of each code (prefix)">
                     <input style={{ ...INPUT, textTransform: "uppercase" }}
                       value={genForm.prefix} onChange={e => setGenForm(f => ({ ...f, prefix: e.target.value.toUpperCase() }))}
                       placeholder="CS-" />
                   </Field>
-                  <Field label="Quantity (1–1000) *">
+                  <Field label="How many codes (1 to 1000) *">
                     <input type="number" min="1" max="1000" required style={INPUT}
                       value={genForm.quantity} onChange={e => setGenForm(f => ({ ...f, quantity: e.target.value }))} />
                   </Field>
@@ -677,7 +681,7 @@ export default function CouponsPage() {
                         {/* Status badge */}
                         <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 5, textTransform: "uppercase", letterSpacing: "0.07em",
                           background: sts.bg, border: `1px solid ${sts.border}`, color: sts.color }}>
-                          {st}
+                          {COUPON_STATUS_WORD[st] ?? st}
                         </span>
                       </div>
 
