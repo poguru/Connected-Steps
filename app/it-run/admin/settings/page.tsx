@@ -108,7 +108,7 @@ function ConfirmModal({ changes, onConfirm, onCancel }: {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <div style={{ background: "#111", border: "1px solid rgba(232,98,10,0.4)", borderRadius: 16, maxWidth: 480, width: "100%", padding: 28 }}>
-        <div style={{ fontSize: 18, fontWeight: 800, color: "#fff", marginBottom: 8 }}>Confirm Critical Changes</div>
+        <div style={{ fontSize: 18, fontWeight: 800, color: "#fff", marginBottom: 8 }}>Confirm these important changes</div>
         <div style={{ fontSize: 13, color: "#888", marginBottom: 20, lineHeight: 1.6 }}>
           The following fields affect live registrations and public-facing dates. Please review carefully before saving.
         </div>
@@ -273,7 +273,7 @@ export default function EventSettingsPage() {
               setForm(reset); setMsg(null);
             }}
               style={{ padding: "10px 18px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, color: "#888", fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
-              Reset
+              Undo unsaved changes
             </button>
           </div>
         </div>
@@ -311,13 +311,13 @@ export default function EventSettingsPage() {
           <TwoCol>
             <Input label="Event Date ⚠" name="event_date" value={f.event_date ?? ""} type="date" onChange={update} hint="Changes trigger a confirmation dialog" />
             <TwoCol>
-              <Input label="Report Time"   name="report_time"   value={f.report_time   ?? ""} onChange={update} hint="e.g. 05:30 AM" />
-              <Input label="Flag-off Time" name="flag_off_time" value={f.flag_off_time ?? ""} onChange={update} hint="e.g. 06:00 AM" />
+              <Input label="Report time (arrive by)" name="report_time"   value={f.report_time   ?? ""} onChange={update} hint="e.g. 05:30 AM" />
+              <Input label="Flag-off time (race start)" name="flag_off_time" value={f.flag_off_time ?? ""} onChange={update} hint="e.g. 06:00 AM. The countdown on the event page counts to this time." />
             </TwoCol>
           </TwoCol>
           <TwoCol>
             <Input label="Registration Opens"        name="registration_opens_at"  value={f.registration_opens_at  ?? ""} type="datetime-local" onChange={update} />
-            <Input label="Registration Closes ⚠"    name="registration_closes_at" value={f.registration_closes_at ?? ""} type="datetime-local" onChange={update} hint="Changes trigger a confirmation dialog" />
+            <Input label="Registration Closes ⚠"    name="registration_closes_at" value={f.registration_closes_at ?? ""} type="datetime-local" onChange={update} hint="Changes trigger a confirmation dialog. BIB numbers are allocated after this time." />
           </TwoCol>
         </Section>
 
