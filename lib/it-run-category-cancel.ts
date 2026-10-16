@@ -12,18 +12,22 @@ import { bookingPrice, type CategoryType } from "@/lib/it-run-category-rules";
 /** The share of a category's price that is refunded when its ID is rejected. The rest is kept as the charge. */
 export const CATEGORY_REFUND_PERCENT = 90;
 
+/** The share refunded when a runner who could not be verified at the BIB centre chooses to go without a BIB. */
+export const NO_BIB_REFUND_PERCENT = 50;
+
 /**
  * The refund for one category, in paise. The category's share of the booking is its price, less the same share of
  * any discount (the discount is spread across the booking in proportion to the price). Rounded down to the paisa.
  */
-export function categoryRefundPaise(args: { lineBaseRupees: number; bookingBaseRupees: number; bookingDiscountRupees: number }): number {
+export function categoryRefundPaise(args: { lineBaseRupees: number; bookingBaseRupees: number; bookingDiscountRupees: number; percent?: number }): number {
   const { lineBaseRupees, bookingBaseRupees, bookingDiscountRupees } = args;
+  const percent = args.percent ?? CATEGORY_REFUND_PERCENT;
   if (lineBaseRupees <= 0 || bookingBaseRupees <= 0) return 0;
   const share = lineBaseRupees / bookingBaseRupees;
   const discountShare = bookingDiscountRupees * share;
   const paidRupees = lineBaseRupees - discountShare;
   const paidPaise = Math.round(paidRupees * 100);
-  return Math.floor((paidPaise * CATEGORY_REFUND_PERCENT) / 100);
+  return Math.floor((paidPaise * percent) / 100);
 }
 
 export type CancelOutcome =
@@ -46,8 +50,9 @@ interface ParticipantRow {
  */
 export async function cancelRunnerCategory(
   db: SupabaseClient,
-  args: { participantId: string; reason: string; actorEmail: string },
+  args: { participantId: string; reason: string; actorEmail: string; percent?: number },
 ): Promise<CancelOutcome> {
+  const percent = args.percent ?? CATEGORY_REFUND_PERCENT;
   const { data: part } = await db
     .from("it_run_participants")
     .select("id, registration_id, category_id, cancelled_at")
@@ -99,6 +104,7 @@ export async function cancelRunnerCategory(
       lineBaseRupees: lineBase,
       bookingBaseRupees: reg.base_price,
       bookingDiscountRupees: reg.discount_amount,
+      percent,
     });
     if (refundPaise <= 0) return { status: "error", message: "The refund for this category is zero. Nothing was cancelled." };
 
@@ -145,7 +151,7 @@ export async function cancelRunnerCategory(
     action: "category_cancelled_for_id_rejection",
     entity_type: "registration",
     entity_id: reg.id,
-    detail: { category_id: categoryId, runners, refund_request_id: refundRequestId, refund_paise: refundPaise, free },
+    detail: { category_id: categoryId, runners, refund_request_id: refundRequestId, refund_paise: refundPaise, percent, free },
   }).then(() => {}, () => {});
 
   return { status: "cancelled", refundRequestId, refundPaise, runners, categoryName: category.name, free };

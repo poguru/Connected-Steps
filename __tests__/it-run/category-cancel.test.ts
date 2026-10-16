@@ -183,3 +183,23 @@ describe("a free registration whose ID is rejected", () => {
     expect(db.writes).toEqual([]);
   });
 });
+
+describe("the 50% refund for a runner who goes without a BIB", () => {
+  it("refunds 50% of the runner's paid share, not the whole booking", () => {
+    // 10K Timed Run at Rs. 999 in a Rs. 2,398 booking, no discount: 50% of Rs. 999 is Rs. 499.50
+    expect(categoryRefundPaise({ lineBaseRupees: 999, bookingBaseRupees: 2398, bookingDiscountRupees: 0, percent: 50 })).toBe(49950);
+  });
+
+  it("is taken from the discounted amount actually paid", () => {
+    // Rs. 240 discount over Rs. 2,398: the 999 line carries Rs. 99.98 of it, so Rs. 899.02 is paid, and 50% of that
+    expect(categoryRefundPaise({ lineBaseRupees: 999, bookingBaseRupees: 2398, bookingDiscountRupees: 240, percent: 50 })).toBe(44951);
+  });
+
+  it("the no-BIB route and its rules are in place", () => {
+    const fs2 = require("fs") as typeof import("fs");
+    const route = fs2.readFileSync(require("path").join(__dirname, "../../app/api/it-run/admin/bib-desk/no-bib-cancel/route.ts"), "utf8");
+    expect(route).toMatch(/percent: NO_BIB_REFUND_PERCENT/);
+    expect(route).toMatch(/BIB_COLLECTED/);
+    expect(route).toMatch(/ALREADY_VERIFIED/);
+  });
+});
