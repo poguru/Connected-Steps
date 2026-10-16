@@ -19,6 +19,20 @@ interface Participant {
   it_run_checkins: Array<{ id: string; checked_in_at: string }>;
 }
 
+const ID_STATUS_LABEL: Record<string, string> = {
+  pending: "Awaiting review",
+  verified: "Verified",
+  rejected: "Rejected",
+  need_clarification: "Needs correction",
+  not_provided: "No ID",
+};
+const TYPE_LABEL: Record<string, string> = {
+  child: "Child",
+  parent: "Parent",
+  primary: "Runner 1",
+  secondary: "Runner 2",
+};
+
 const ACCENT = "#e8620a";
 const VERIFY_COLOR: Record<string, string> = {
   verified:           "#10b981",
@@ -164,8 +178,8 @@ export default function ParticipantsPage() {
     <div style={{ maxWidth: 1000 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
         <div>
-          <h1 style={{ fontSize: "clamp(18px,3vw,24px)", fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>All Participants</h1>
-          <div style={{ fontSize: 13, color: "#888" }}>{total} participant(s)</div>
+          <h1 style={{ fontSize: "clamp(18px,3vw,24px)", fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>Participants</h1>
+          <div style={{ fontSize: 13, color: "#888" }}>{total} {total === 1 ? "person" : "people"}. Search for a runner, then press Edit details to change their information.</div>
         </div>
         <a href="/api/it-run/admin/reports?type=participants" download
           style={{ padding: "9px 14px", background: "rgba(232,98,10,0.1)", border: "1px solid rgba(232,98,10,0.3)", borderRadius: 8, color: ACCENT, fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
@@ -178,11 +192,11 @@ export default function ParticipantsPage() {
           placeholder="Search by name, email, mobile, or BIB..."
           value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} />
         <select style={INPUT} value={status} onChange={e => { setStatus(e.target.value); setPage(0); }}>
-          <option value="">All Verification</option>
-          <option value="pending">Pending</option>
+          <option value="">Any ID status</option>
+          <option value="pending">Awaiting review</option>
           <option value="verified">Verified</option>
           <option value="rejected">Rejected</option>
-          <option value="need_clarification">Clarification</option>
+          <option value="need_clarification">Needs correction</option>
         </select>
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#ccc", whiteSpace: "nowrap" }}>
           <input type="checkbox" checked={altOnly} onChange={e => { setAltOnly(e.target.checked); setPage(0); }} />
@@ -217,7 +231,7 @@ export default function ParticipantsPage() {
                         <span style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{p.first_name} {p.last_name}</span>
                         <span style={{ fontSize: 11, color: cat?.color ?? "#888" }}>{cat?.name ?? "-"}</span>
                         <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 5px", borderRadius: 4, color: VERIFY_COLOR[p.verification_status] ?? "#888", background: `${VERIFY_COLOR[p.verification_status] ?? "#888"}15` }}>
-                          {p.verification_status}
+                          {ID_STATUS_LABEL[p.verification_status] ?? p.verification_status}
                         </span>
                         {p.cancelled_at && (
                           <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 4, color: "#f87171", background: "rgba(248,113,113,0.12)" }} title={p.cancelled_reason ?? undefined}>
@@ -227,13 +241,13 @@ export default function ParticipantsPage() {
                       </div>
                       <div style={{ fontSize: 11, color: "#888", display: "flex", gap: 12, flexWrap: "wrap" }}>
                         <span>{p.email ?? p.mobile}</span>
-                        {p.alt_email && <span style={{ color: "#888" }}>Alt: {p.alt_email}</span>}
+                        {p.alt_email && <span style={{ color: "#888" }}>Alternative email: {p.alt_email}</span>}
                         {p.company_name && <span>{p.company_name}</span>}
                         {p.participant_type && p.participant_type !== "solo" && (
                           <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 4,
                             color: p.participant_type === "child" ? "#a78bfa" : "#60a5fa",
                             background: p.participant_type === "child" ? "rgba(167,139,250,0.1)" : "rgba(96,165,250,0.1)" }}>
-                            {p.participant_type.toUpperCase()}
+                            {TYPE_LABEL[p.participant_type] ?? p.participant_type}
                           </span>
                         )}
                         {p.tshirt_size && <span>T: {p.tshirt_size}</span>}
@@ -246,19 +260,19 @@ export default function ParticipantsPage() {
                       {checkedIn && <span style={{ fontSize: 9, fontWeight: 700, color: "#60a5fa", background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.2)", borderRadius: 4, padding: "2px 6px" }}>Checked In</span>}
                       <button onClick={() => setEditing(p)}
                         style={{ marginTop: 4, fontSize: 10, fontWeight: 600, padding: "3px 8px", background: "rgba(232,98,10,0.08)", border: "1px solid rgba(232,98,10,0.25)", borderRadius: 5, color: "#e8620a", cursor: "pointer", fontFamily: "inherit" }}>
-                        Edit
+                        Edit details
                       </button>
                     </div>
                   </div>
                 </div>
               );
             })}
-            {data.length === 0 && <div style={{ color: "#888", textAlign: "center", padding: 40 }}>No participants found</div>}
+            {data.length === 0 && <div style={{ color: "#888", textAlign: "center", padding: 40 }}>No one matches these filters. Clear the search or filters to see everyone.</div>}
           </div>
 
           {total > 40 && (
             <div style={{ display: "flex", gap: 8, marginTop: 20, justifyContent: "center" }}>
-              <button disabled={page === 0} onClick={() => setPage(p => p - 1)} style={{ padding: "7px 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#ccc", cursor: "pointer", fontFamily: "inherit" }}>Prev</button>
+              <button disabled={page === 0} onClick={() => setPage(p => p - 1)} style={{ padding: "7px 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#ccc", cursor: "pointer", fontFamily: "inherit" }}>Previous</button>
               <span style={{ padding: "7px 14px", fontSize: 13, color: "#888" }}>{page + 1} / {Math.ceil(total / 40)}</span>
               <button disabled={(page + 1) * 40 >= total} onClick={() => setPage(p => p + 1)} style={{ padding: "7px 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#ccc", cursor: "pointer", fontFamily: "inherit" }}>Next</button>
             </div>
