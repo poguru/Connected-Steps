@@ -12,7 +12,7 @@ import {
 import { decideUrlCategory, startsNewRegistration } from "@/lib/it-run-category-selection";
 import { idUploadError, isStoredDocumentPath } from "@/lib/it-run-id-verification";
 import { IssueReportButton } from "@/components/ui/BugReportFab";
-import { checkPersonName, checkBibName, bibNameHint } from "@/lib/it-run-name-validation";
+import { checkPersonName, checkBibName, bibNameHint, firstBibNameProblem, labelParticipantMessage } from "@/lib/it-run-name-validation";
 import { draftKeyOf, saveStatusFor, createMoveGate } from "@/lib/it-run-step-save";
 import {
   countsFromCategoryIds, slotsFor, rebuildParticipants, primaryCategory, maxCountFor, seatsLeft, teamSize,
@@ -2102,8 +2102,18 @@ function RegisterPageContent() {
       if (d.finalPrice !== undefined) setFinalPriceOverride(d.finalPrice);
       setStep(6);
     } else {
-      // Restore to the saved step (2–5); never skip back to step 1 or forward to 6+
-      setStep(Math.min(Math.max(d.step, 2), 5));
+      // A draft saved past the details step may hold a blank BIB name. Return to that participant's details
+      // instead of resuming at verification, review or payment with the name still missing.
+      const bibProblem = firstBibNameProblem(restored.map(p => p.bibName));
+      if (bibProblem && d.step >= 3) {
+        setParticipantSubIdx(bibProblem.index);
+        setPErrors(Array.from({ length: restored.length }, (_, i) =>
+          i === bibProblem.index ? { bibName: labelParticipantMessage(i, restored.length, bibProblem.message) } : {}));
+        setStep(2);
+      } else {
+        // Restore to the saved step (2–5); never skip back to step 1 or forward to 6+
+        setStep(Math.min(Math.max(d.step, 2), 5));
+      }
     }
 
     // Migrate from v3: write to v4 key immediately
@@ -2435,9 +2445,19 @@ function RegisterPageContent() {
     });
   }
 
+  // Every participant's BIB name is checked before the details step hands over to verification, review or payment.
+  // If one is missing, the participant is sent back to their details with the message beside the field.
+  function bibNamesReady(): boolean {
+    const problem = firstBibNameProblem(participants.map(p => p.bibName));
+    if (!problem) return true;
+    returnToParticipantError(problem.index, "bibName", labelParticipantMessage(problem.index, participants.length, problem.message));
+    return false;
+  }
+
   function handleParticipantNext() {
     setSubmitError("");
     if (!validateParticipant(participantSubIdx)) return;
+    if (!bibNamesReady()) return;
     if (returnToReview) {
       void persistThen({ step: 4 }, () => {
         setReturnToReview(false);
@@ -2514,6 +2534,8 @@ function RegisterPageContent() {
 
   async function submitRegistration() {
     if (!selectedCat) return;
+    // No registration, order or charge while a required BIB name is missing. The server checks it too.
+    if (!bibNamesReady()) return;
     // Payment does not begin while the entered details are unsaved. A failed save shows its message and stops here.
     if (!(await saveProgress({ step: 5 }))) return;
     setSubmitting(true);

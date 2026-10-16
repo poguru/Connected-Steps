@@ -57,9 +57,9 @@ export function checkPersonName(input: unknown, label = "name"): NameCheck {
  * The message says this is the name printed on the BIB.
  */
 export function checkBibName(input: unknown): NameCheck {
-  if (typeof input !== "string") return { ok: false, message: "Enter the name to print on your BIB." };
+  if (typeof input !== "string") return { ok: false, message: "BIB Name is required." };
   const value = normalizeName(input);
-  if (value.length === 0) return { ok: false, message: "Enter the name to print on your BIB." };
+  if (value.length === 0) return { ok: false, message: "BIB Name is required." };
   if (codePointLength(value) > BIB_NAME_MAX) {
     return { ok: false, message: `The BIB name must be ${BIB_NAME_MAX} characters or fewer.` };
   }
@@ -73,6 +73,23 @@ export function checkBibName(input: unknown): NameCheck {
     return { ok: false, message: "Use one hyphen or apostrophe at a time, with no space next to it." };
   }
   return { ok: true, value };
+}
+
+/**
+ * The first participant whose BIB name is not valid, with its message, or null when all are valid. Every participant
+ * is checked, not only the one on screen, so a draft or a jump between steps cannot skip a missing name.
+ */
+export function firstBibNameProblem(bibNames: unknown[]): { index: number; message: string } | null {
+  for (let i = 0; i < bibNames.length; i++) {
+    const r = checkBibName(bibNames[i]);
+    if (!r.ok) return { index: i, message: r.message };
+  }
+  return null;
+}
+
+/** "Participant 2: …" when the booking has several people, so the message says whose name is missing. */
+export function labelParticipantMessage(index: number, count: number, message: string): string {
+  return count <= 1 ? message : `Participant ${index + 1}: ${message}`;
 }
 
 /** Live hint under the BIB field: what will be printed, or why it cannot be. */
