@@ -19,6 +19,11 @@ const CARD: React.CSSProperties = { background: "rgba(255,255,255,0.03)", border
 const INPUT: React.CSSProperties = { width: "100%", boxSizing: "border-box", padding: "9px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 14, fontFamily: "inherit" };
 const BTN = (color: string, disabled = false): React.CSSProperties => ({ minHeight: 40, padding: "8px 14px", borderRadius: 8, background: `${color}18`, border: `1px solid ${color}55`, color, fontWeight: 700, fontSize: 13, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1, fontFamily: "inherit" });
 
+// What each offer is doing right now, in words
+const LIVE_WORD: Record<string, string> = {
+  running: "Running now", scheduled: "Starts later", expired: "Ended", sold_out: "All places taken",
+  paused: "Paused", draft: "Draft (not live)", archived: "Archived",
+};
 const STATE_COLOR: Record<string, string> = { running: "#10b981", scheduled: "#60a5fa", expired: "#888", sold_out: "#f59e0b", paused: "#f59e0b", draft: "#888", archived: "#555" };
 
 // datetime-local gives "YYYY-MM-DDTHH:mm" with no zone; the event zone is IST (+05:30)
@@ -107,7 +112,7 @@ export default function EarlyBirdAdminPage() {
       {notice && <div role="status" style={{ color: "#10b981", fontSize: 13, marginBottom: 12 }}>{notice}</div>}
 
       <div style={CARD}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 12 }}>New offer</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 12 }}>Create a new offer</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 12 }}>
           <label style={{ fontSize: 12, color: "#aaa" }}>Name
             <input style={INPUT} value={form.name} onChange={e => set("name", e.target.value)} placeholder="Early Bird — 5K Timed Run" />
@@ -137,7 +142,7 @@ export default function EarlyBirdAdminPage() {
           <label style={{ fontSize: 12, color: "#aaa" }}>Places (blank = no limit)
             <input style={INPUT} inputMode="numeric" value={form.redemption_limit} onChange={e => set("redemption_limit", e.target.value)} />
           </label>
-          <label style={{ fontSize: 12, color: "#aaa" }}>Minimum payable (₹)
+          <label style={{ fontSize: 12, color: "#aaa" }}>Customer must still pay at least (₹)
             <input style={INPUT} inputMode="numeric" value={form.min_payable_rupees} onChange={e => set("min_payable_rupees", e.target.value)} placeholder="0" />
           </label>
           <label style={{ fontSize: 12, color: "#aaa" }}>Start as
@@ -165,7 +170,7 @@ export default function EarlyBirdAdminPage() {
               <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>{o.name}</div>
               <div style={{ fontSize: 12, color: "#888" }}>{o.category_name} · base {o.base_price_rupees !== null ? inr(o.base_price_rupees) : "—"}</div>
             </div>
-            <span style={{ fontSize: 12, fontWeight: 700, color: STATE_COLOR[o.live_state] ?? "#888", alignSelf: "flex-start" }}>{o.live_state.replace("_", " ")}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: STATE_COLOR[o.live_state] ?? "#888", alignSelf: "flex-start" }}>{LIVE_WORD[o.live_state] ?? o.live_state.replace("_", " ")}</span>
           </div>
           <div style={{ fontSize: 13, color: "#ccc", lineHeight: 1.7 }}>
             Discount: {o.discount_type === "percent" ? `${o.discount_value}%` : inr(o.discount_value)}
