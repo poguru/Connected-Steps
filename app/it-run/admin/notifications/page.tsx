@@ -109,9 +109,9 @@ export default function NotificationsPage() {
   return (
     <div style={{ maxWidth: 1100 }}>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: "clamp(20px,3vw,26px)", fontWeight: 800, color: "#fff", margin: 0 }}>Email / Notifications</h1>
+        <h1 style={{ fontSize: "clamp(20px,3vw,26px)", fontWeight: 800, color: "#fff", margin: 0 }}>Confirmation emails</h1>
         <p style={{ color: "#666", fontSize: 13, margin: "6px 0 0" }}>
-          Confirmation emails and BIB collection invites for paid and free registrations.
+          Confirmation and BIB emails for paid and free registrations. Each row shows whether each one was sent.
         </p>
       </div>
 
@@ -132,7 +132,7 @@ export default function NotificationsPage() {
         <div>
           <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 2 }}>BIB Emails</div>
           <div style={{ fontSize: 12, color: "#888" }}>
-            Send slot-booking links to all confirmed registrations. Run this ~2 days before the event (around 5 Feb 2027).
+            Sends the BIB email (numbers, QR codes and the collection slot link). It only goes to confirmed registrations that already have their BIB numbers. Allocate the numbers first on the BIB Numbers page.
           </div>
         </div>
         <button onClick={sendBibInviteBulk} disabled={bulkSending || bibUnsent === 0}
@@ -141,17 +141,17 @@ export default function NotificationsPage() {
             borderRadius: 8, color: bibUnsent > 0 ? ACCENT : "#555",
             fontSize: 13, fontWeight: 700, cursor: bibUnsent > 0 ? "pointer" : "not-allowed",
             fontFamily: "inherit", whiteSpace: "nowrap" }}>
-          {bulkSending ? "Sending…" : bibUnsent > 0 ? `Send to ${bibUnsent} pending` : "All sent"}
+          {bulkSending ? "Sending…" : bibUnsent > 0 ? `Send to ${bibUnsent} who have not had it` : "All sent"}
         </button>
       </div>
 
       {/* Quick stats */}
       <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-        <Pill label="Total shown"        value={total} />
+        <Pill label="Registrations shown"  value={total} />
         <Pill label="Confirmation sent"  value={confSent}   color={GREEN} />
-        <Pill label="Confirmation unsent" value={confUnsent} color="#f59e0b" />
+        <Pill label="Confirmation not sent" value={confUnsent} color="#f59e0b" />
         <Pill label="BIB email sent"    value={bibSent}    color={GREEN} />
-        <Pill label="BIB email pending" value={bibUnsent}  color="#f59e0b" />
+        <Pill label="BIB email not sent" value={bibUnsent}  color="#f59e0b" />
       </div>
 
       {msg && (
@@ -165,7 +165,7 @@ export default function NotificationsPage() {
 
       {/* Filter */}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-        {[["all","All"],["sent","Email Sent"],["unsent","Not Sent"]].map(([v, lbl]) => (
+        {[["all","Everyone"],["sent","Confirmation sent"],["unsent","Confirmation not sent"]].map(([v, lbl]) => (
           <button key={v} onClick={() => { setFilter(v); setOffset(0); }}
             style={{ padding: "7px 14px", background: filter === v ? `${ACCENT}20` : "rgba(255,255,255,0.04)",
               border: `1px solid ${filter === v ? ACCENT : "rgba(255,255,255,0.1)"}`,
@@ -191,7 +191,7 @@ export default function NotificationsPage() {
               {loading ? (
                 <tr><td colSpan={8} style={{ padding: 32, textAlign: "center", color: "#555" }}>Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={8} style={{ padding: 32, textAlign: "center", color: "#555" }}>No records</td></tr>
+                <tr><td colSpan={8} style={{ padding: 32, textAlign: "center", color: "#555" }}>No registrations match these filters.</td></tr>
               ) : rows.map((r, i) => (
                 <tr key={r.id} style={{ borderBottom: i < rows.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
                   <td style={{ padding: "10px 14px", fontWeight: 700, color: ACCENT, whiteSpace: "nowrap" }}>{r.registration_code}</td>
@@ -208,7 +208,7 @@ export default function NotificationsPage() {
                     {r.confirmation_email_sent_at ? (
                       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                         <span style={{ color: GREEN, fontSize: 12 }}>✓ {new Date(r.confirmation_email_sent_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
-                        <button disabled={!!sending} onClick={() => { if (confirm(`Force resend confirmation to ${r.lead_email}?`)) resend(r.id, true); }}
+                        <button disabled={!!sending} onClick={() => { if (confirm(`Send the confirmation email again to ${r.lead_email}?`)) resend(r.id, true); }}
                           style={{ padding: "3px 8px", background: "transparent", border: "none", color: "#555", fontSize: 11, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
                           Resend
                         </button>
@@ -225,7 +225,7 @@ export default function NotificationsPage() {
                     {r.bib_email_sent_at ? (
                       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                         <span style={{ color: GREEN, fontSize: 12 }}>✓ {new Date(r.bib_email_sent_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
-                        <button disabled={!!sending} onClick={() => { if (confirm(`Force resend BIB email to ${r.lead_email}?`)) sendBibInvite(r.id, true); }}
+                        <button disabled={!!sending} onClick={() => { if (confirm(`Send the BIB email again to ${r.lead_email}?`)) sendBibInvite(r.id, true); }}
                           style={{ padding: "3px 8px", background: "transparent", border: "none", color: "#555", fontSize: 11, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
                           Resend
                         </button>
