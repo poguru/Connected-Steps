@@ -88,7 +88,7 @@ export default function BIBCollectionDashboard() {
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h1 style={{ fontSize: 32, fontWeight: 800, color: "#fff", margin: 0 }}>
-            BIB Collection Operations
+            BIB Collection: live status
           </h1>
           <label style={{ display: "flex", alignItems: "center", gap: 8, color: "#888", fontSize: 13 }}>
             <input
@@ -97,7 +97,7 @@ export default function BIBCollectionDashboard() {
               onChange={e => setAutoRefresh(e.target.checked)}
               style={{ cursor: "pointer" }}
             />
-            Auto-refresh (5s)
+            Refresh every 5 seconds
           </label>
         </div>
         <div style={{ fontSize: 12, color: "#666" }}>
@@ -114,13 +114,13 @@ export default function BIBCollectionDashboard() {
           marginBottom: 28,
         }}
       >
-        <KPICard label="Total Participants" value={kpis.totalEligibleParticipants} color={GREEN} />
-        <KPICard label="BIBs Allocated" value={kpis.bibsAllocated} color={ACCENT} />
-        <KPICard label="BIBs Collected" value={kpis.bibsCollected} color={GREEN} />
-        <KPICard label="BIBs Pending" value={kpis.bibsPending} color={YELLOW} />
-        <KPICard label="T-Shirts Issued" value={kpis.tshirtIssued} color={ACCENT} />
-        <KPICard label="T-Shirts Pending" value={kpis.tshirtPending} color={YELLOW} />
-        <KPICard label="Exceptions" value={kpis.exceptionCount} color={RED} />
+        <KPICard label="Runners eligible" value={kpis.totalEligibleParticipants} color={GREEN} />
+        <KPICard label="Numbers given" value={kpis.bibsAllocated} color={ACCENT} />
+        <KPICard label="BIBs handed out" value={kpis.bibsCollected} color={GREEN} />
+        <KPICard label="BIBs still to hand out" value={kpis.bibsPending} color={YELLOW} />
+        <KPICard label="T-shirts handed out" value={kpis.tshirtIssued} color={ACCENT} />
+        <KPICard label="T-shirts still to hand out" value={kpis.tshirtPending} color={YELLOW} />
+        <KPICard label="Exceptions (refund or no BIB)" value={kpis.exceptionCount} color={RED} />
       </div>
 
       {/* Live Progress Section */}
