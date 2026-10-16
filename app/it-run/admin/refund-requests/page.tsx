@@ -104,7 +104,7 @@ const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "all", label: "All requests" },
   { value: "requested", label: "Awaiting review" },
   { value: "approved", label: "Approved" },
-  { value: "executed", label: "Refund executed" },
+  { value: "executed", label: "Refund issued" },
   { value: "rejected", label: "Rejected" },
   { value: "cancelled", label: "Cancelled" },
 ];
@@ -133,6 +133,9 @@ const BTN = (color: string, disabled = false): React.CSSProperties => ({
   cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1,
 });
 
+const STATUS_WORD: Record<string, string> = {
+  requested: "Awaiting review", approved: "Approved", rejected: "Rejected", executed: "Refund issued", cancelled: "Cancelled",
+};
 const STATUS_COLOR: Record<string, string> = {
   requested: "#f59e0b", approved: "#60a5fa", rejected: "#f87171", executed: "#10b981",
   cancelled: "#888", pending: "#60a5fa", processed: "#10b981", failed: "#f87171",
@@ -482,7 +485,7 @@ export default function RefundRequestsPage() {
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const tiles: Array<{ label: string; value: number | undefined; color: string }> = [
     { label: "Total requests", value: summary?.total, color: "#fff" },
-    { label: "Pending review", value: summary?.pendingReview, color: STATUS_COLOR.requested },
+    { label: "Awaiting review", value: summary?.pendingReview, color: STATUS_COLOR.requested },
     { label: "Approved", value: summary?.approved, color: STATUS_COLOR.approved },
     { label: "Processing", value: summary?.processing, color: STATUS_COLOR.pending },
     { label: "Refunded", value: summary?.refunded, color: STATUS_COLOR.processed },
@@ -571,7 +574,7 @@ export default function RefundRequestsPage() {
                 <div style={{ fontSize: 12, color: "#888", fontFamily: "monospace" }}>{reg.registration_code} · {reg.it_run_categories?.name ?? "-"}</div>
               </div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "flex-start" }}>
-                <Pill label={item.status} color={STATUS_COLOR[item.status]} />
+                <Pill label={STATUS_WORD[item.status] ?? item.status} color={STATUS_COLOR[item.status]} />
                 {refund && <Pill label={refund.label} color={refund.color} />}
               </div>
             </div>
