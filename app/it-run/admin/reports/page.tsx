@@ -44,8 +44,8 @@ export default function ReportsPage() {
   return (
     <div style={{ maxWidth: 800 }}>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: "clamp(18px,3vw,24px)", fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>Reports & Exports</h1>
-        <div style={{ fontSize: 13, color: "#888" }}>Download CSV files for offline analysis, printing, or sharing</div>
+        <h1 style={{ fontSize: "clamp(18px,3vw,24px)", fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>Reports</h1>
+        <div style={{ fontSize: 13, color: "#888" }}>Download a spreadsheet to check, print or share. Each file opens in Excel or Google Sheets.</div>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -68,7 +68,7 @@ export default function ReportsPage() {
                   color: r.color, fontSize: 13, fontWeight: 700,
                   textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0,
                 }}>
-                Download CSV
+                Download spreadsheet
               </a>
             </div>
           </div>
