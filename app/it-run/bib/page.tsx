@@ -13,6 +13,8 @@ interface ParticipantResult {
   bib_number: string | null; wave: string | null;
   verification_status: string; participant_type: string;
   company_name: string | null;
+  verification_outcome: string | null; verification_version: number; cancelled_at: string | null;
+  readiness?: { state: string; message: string };
   it_run_registrations: {
     registration_code: string; payment_status: string;
     it_run_categories: { name: string; distance_km: number; color?: string } | null;
@@ -39,9 +41,19 @@ export default function BibCollectionPage() {
   const [issuing,    setIssuing]    = useState(false);
   const [message,    setMessage]    = useState<{ text: string; type: "success" | "error" | "info" } | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [counters, setCounters] = useState<Array<{ id: string; label: string }>>([]);
+  const [counterId, setCounterId] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
+
+  // The counters a volunteer may choose: the server returns only the enabled ones for collection staff
+  useEffect(() => {
+    fetch("/api/it-run/admin/bib-counters")
+      .then(r => r.json())
+      .then(d => setCounters((d as { counters?: Array<{ id: string; label: string }> }).counters ?? []))
+      .catch(() => setCounters([]));
+  }, []);
 
   async function search(e?: React.FormEvent, override?: string) {
     e?.preventDefault();
@@ -78,7 +90,7 @@ export default function BibCollectionPage() {
       const res = await fetch("/api/it-run/bib-collection", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ participantId: result.id }),
+        body:    JSON.stringify({ participantId: result.id, counterId: counterId || undefined }),
       });
       const d = await res.json();
       if (res.status === 409 || d.already) {
@@ -90,6 +102,48 @@ export default function BibCollectionPage() {
       setResult(null);
       setQuery("");
       setTimeout(() => inputRef.current?.focus(), 100);
+    } finally {
+      setIssuing(false);
+    }
+  }
+
+  // Records Company ID Verified at the desk, after the physical check
+  async function deskVerify() {
+    if (!result) return;
+    setIssuing(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/it-run/bib-desk/verify-company", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ participantId: result.id, expectedVersion: result.verification_version }),
+      });
+      const d = await res.json().catch(() => ({})) as { error?: string };
+      if (!res.ok) { setMessage({ text: d.error ?? "Could not record the verification", type: "error" }); return; }
+      setMessage({ text: "Company ID verified. Checking the BIB status again…", type: "success" });
+      await search(undefined, result.it_run_registrations.registration_code);
+    } finally {
+      setIssuing(false);
+    }
+  }
+
+  // The runner cannot be verified and chooses to go without a BIB. Their category is cancelled and 50% is refunded.
+  async function noBibCancel() {
+    if (!result) return;
+    const reason = window.prompt("Reason for going without a BIB (kept on the audit trail, at least 10 characters):")?.trim() ?? "";
+    if (reason.length < 10) { setMessage({ text: "A reason of at least 10 characters is required.", type: "error" }); return; }
+    if (!window.confirm("Cancel this runner's category? A 50% refund of their paid share will be requested. This cannot be undone here.")) return;
+    setIssuing(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/it-run/admin/bib-desk/no-bib-cancel", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ participantId: result.id, reason }),
+      });
+      const d = await res.json().catch(() => ({})) as { error?: string; refundPaise?: number };
+      if (!res.ok) { setMessage({ text: d.error ?? "Could not cancel", type: "error" }); return; }
+      setMessage({ text: "Category cancelled. 50% refund requested: Rs. " + ((d.refundPaise ?? 0) / 100).toLocaleString("en-IN") + ". The refund is approved on the refund page.", type: "success" });
+      setResult(null);
+      setQuery("");
     } finally {
       setIssuing(false);
     }
@@ -235,16 +289,44 @@ export default function BibCollectionPage() {
                 )}
               </div>
 
-              {/* Warning for unverified */}
-              {result.verification_status !== "verified" && result.it_run_registrations?.payment_status === "paid" && (
-                <div style={{ padding: "10px 14px", background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: 10, fontSize: 12, color: "#fbbf24", marginBottom: 16 }}>
-                  Physical ID verification required at BIB desk. Ask participant to show valid IT company ID card.
+              {/* Readiness: the server decides, the screen only shows it */}
+              {result.readiness && result.readiness.state === "ready" && (
+                <div role="status" style={{ padding: "16px 18px", marginBottom: 16, borderRadius: 12, background: "rgba(16,185,129,0.1)", border: "2px solid rgba(16,185,129,0.5)" }}>
+                  <div style={{ fontSize: 16, fontWeight: 900, color: "#10b981", marginBottom: 4 }}>✓ Company ID Verified: ready</div>
+                  <div style={{ fontSize: 13, color: "#a7f3d0", lineHeight: 1.5 }}>
+                    BIB {result.bib_number} · {result.tshirt_size ?? "no T-shirt size"} · {result.it_run_registrations?.it_run_categories?.name ?? ""}
+                  </div>
+                  <div style={{ fontSize: 13, color: "#a7f3d0", marginTop: 6 }}>{result.readiness.message}</div>
+                  {counters.length > 0 && (
+                    <label style={{ display: "block", marginTop: 12, fontSize: 12, color: "#a7f3d0" }}>
+                      Counter
+                      <select value={counterId} onChange={e => setCounterId(e.target.value)}
+                        style={{ display: "block", width: "100%", marginTop: 4, padding: "10px 12px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 8, color: "#fff", fontSize: 14, fontFamily: "inherit" }}>
+                        <option value="">Choose a counter</option>
+                        {counters.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                      </select>
+                    </label>
+                  )}
+                </div>
+              )}
+              {result.readiness && result.readiness.state === "needs_desk_verification" && (
+                <div role="alert" style={{ padding: "16px 18px", marginBottom: 16, borderRadius: 12, background: "rgba(245,158,11,0.08)", border: "2px solid rgba(245,158,11,0.5)" }}>
+                  <div style={{ fontSize: 16, fontWeight: 900, color: "#fbbf24", marginBottom: 4 }}>Manual ID verification needed</div>
+                  <div style={{ fontSize: 13, color: "#fde68a", lineHeight: 1.5 }}>{result.readiness.message}</div>
+                  <div style={{ fontSize: 12, color: "#a16207", marginTop: 6 }}>
+                    A government ID alone does not prove employment. Only record Company ID Verified after the company ID itself is checked.
+                  </div>
+                </div>
+              )}
+              {result.readiness && result.readiness.state !== "ready" && result.readiness.state !== "needs_desk_verification" && (
+                <div role="status" style={{ padding: "14px 16px", marginBottom: 16, borderRadius: 12, background: "rgba(148,163,184,0.08)", border: "1px solid rgba(148,163,184,0.3)", fontSize: 13, color: "#cbd5e1", lineHeight: 1.5 }}>
+                  {result.readiness.message}
                 </div>
               )}
 
               {/* Action buttons */}
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                {result.it_run_bib_collections.length === 0 && result.it_run_registrations?.payment_status === "paid" && (
+                {result.readiness?.state === "ready" && (
                   <button onClick={issueBib} disabled={issuing}
                     style={{ padding: "12px 24px", background: issuing ? "rgba(255,255,255,0.1)" : "#10b981", border: "none", borderRadius: 10, color: "#fff", fontSize: 14, fontWeight: 700, cursor: issuing ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
                     {issuing ? "Issuing..." : "Issue BIB"}
@@ -255,6 +337,18 @@ export default function BibCollectionPage() {
                     style={{ padding: "12px 24px", background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 10, color: "#818cf8", fontSize: 14, fontWeight: 700, cursor: "not-allowed", fontFamily: "inherit" }}>
                     Already Collected
                   </button>
+                )}
+                {result.readiness?.state === "needs_desk_verification" && (
+                  <>
+                    <button onClick={deskVerify} disabled={issuing}
+                      style={{ padding: "12px 20px", background: issuing ? "rgba(255,255,255,0.1)" : "#10b981", border: "none", borderRadius: 10, color: "#fff", fontSize: 14, fontWeight: 700, cursor: issuing ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                      Company ID checked: record Company ID Verified
+                    </button>
+                    <button onClick={noBibCancel} disabled={issuing}
+                      style={{ padding: "12px 20px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)", borderRadius: 10, color: "#f87171", fontSize: 14, fontWeight: 700, cursor: issuing ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                      Cannot verify: go without BIB (50% refund)
+                    </button>
+                  </>
                 )}
                 <button onClick={reset}
                   style={{ padding: "12px 24px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, color: "#888", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
