@@ -40,6 +40,10 @@ const STATUS_OPTS = [
   { value: "rejected",           label: "Rejected",            color: "#ef4444" },
   { value: "need_clarification", label: "Needs Clarification", color: "#6366f1" },
   { value: "not_provided",       label: "No ID (not provided)", color: "#64748b" },
+  { value: "company_submitted",   label: "Company ID submitted",    color: "#0ea5e9" },
+  { value: "government_submitted", label: "Government ID submitted", color: "#a855f7" },
+  { value: "company_verified",   label: "Company ID verified",    color: "#14b8a6" },
+  { value: "government_verified", label: "Government ID verified", color: "#22c55e" },
 ];
 
 // ── CompanyIdViewer ────────────────────────────────────────────────────────────

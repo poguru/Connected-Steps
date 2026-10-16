@@ -81,3 +81,18 @@ describe("the admin verification route and page use the rules", () => {
     expect(resubmit).toMatch(/verification_status: "pending"/);
   });
 });
+
+describe("the admin queue filters", () => {
+  it("filters by outcome and by the submitted document type, beside the status filter", () => {
+    const route = fs.readFileSync(path.join(ROOT, "app/api/it-run/admin/verification/route.ts"), "utf8");
+    expect(route).toMatch(/query\.eq\("verification_outcome", status\)/);
+    expect(route).toMatch(/status === "company_submitted"/);
+    expect(route).toMatch(/status === "government_submitted"/);
+  });
+
+  it("the page offers the outcome and submitted-document filters", () => {
+    const page = fs.readFileSync(path.join(ROOT, "app/it-run/admin/verification/page.tsx"), "utf8");
+    expect(page).toMatch(/value: "company_verified"/);
+    expect(page).toMatch(/value: "government_submitted"/);
+  });
+});

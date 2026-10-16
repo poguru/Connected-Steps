@@ -44,7 +44,16 @@ export async function GET(req: NextRequest) {
         it_run_categories ( name ) )
     `, { count: "exact" })
     .eq("event_id", event.id);
-  if (status !== "all") query = query.eq("verification_status", status);
+  // Queue filters: the status values, plus the outcome and the submitted document type
+  if (status === "company_verified" || status === "government_verified") {
+    query = query.eq("verification_outcome", status);
+  } else if (status === "company_submitted") {
+    query = query.eq("id_document_type", "company");
+  } else if (status === "government_submitted") {
+    query = query.eq("id_document_type", "government");
+  } else if (status !== "all") {
+    query = query.eq("verification_status", status);
+  }
   const { data, count, error } = await query
     .order("id")
     .range(page * limit, page * limit + limit - 1);
