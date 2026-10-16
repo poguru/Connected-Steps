@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireStaffPermission, requireStaffRole, getClientIp } from "@/lib/staff-auth";
+import { collectionReadiness } from "@/lib/it-run-bib-desk";
 
 // POST /api/it-run/staff/entitlements/issue
 // Staff issues an entitlement (BIB, breakfast, goodies, t-shirt, medal, certificate)
@@ -90,7 +91,7 @@ export async function POST(req: NextRequest) {
       .from("it_run_participants")
       .select(
         `
-        id, first_name, last_name, event_id, registration_id, cancelled_at,
+        id, first_name, last_name, event_id, registration_id, cancelled_at, participant_type, verification_outcome, bib_number,
         it_run_registrations!inner(id, registration_code, payment_status, registration_status)
       `,
       )
@@ -103,6 +104,9 @@ export async function POST(req: NextRequest) {
         event_id: string;
         registration_id: string;
         cancelled_at: string | null;
+        participant_type: string;
+        verification_outcome: string | null;
+        bib_number: string | null;
         it_run_registrations: {
           id: string;
           registration_code: string;
@@ -122,6 +126,26 @@ export async function POST(req: NextRequest) {
     }
 
     const reg = participant.it_run_registrations;
+
+    // A BIB follows the BIB desk policy: a company-verified adult, an allocated number, and not already collected
+    if (entitlementType === "BIB") {
+      const { data: collected } = await db
+        .from("it_run_bib_collections")
+        .select("id")
+        .eq("participant_id", participantId)
+        .maybeSingle<{ id: string }>();
+      const readiness = collectionReadiness({
+        cancelled: !!participant.cancelled_at,
+        paymentStatus: reg.payment_status,
+        participantType: participant.participant_type,
+        verificationOutcome: participant.verification_outcome,
+        bibNumber: participant.bib_number,
+        bibCollected: !!collected,
+      });
+      if (readiness.state !== "ready") {
+        return NextResponse.json({ error: readiness.message, code: readiness.state.toUpperCase() }, { status: 409 });
+      }
+    }
 
     // Validate registration eligibility
     if (reg.payment_status !== "paid" && reg.payment_status !== "free") {

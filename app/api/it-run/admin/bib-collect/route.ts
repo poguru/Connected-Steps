@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireRole, getClientIp } from "@/lib/it-run-auth";
+import { collectionReadiness } from "@/lib/it-run-bib-desk";
 
 // POST /api/it-run/admin/bib-collect
 // Body: { participantId, counter_name? }
@@ -32,19 +33,34 @@ export async function POST(req: NextRequest) {
   const { data: part } = await db
     .from("it_run_participants")
     .select(`
-      id, first_name, last_name, bib_number, cancelled_at,
+      id, first_name, last_name, bib_number, cancelled_at, participant_type, verification_outcome,
+      it_run_bib_collections ( id ),
       it_run_registrations!inner ( payment_status, registration_status )
     `)
     .eq("id", participantId)
     .eq("event_id", event.id)
     .single<{
       id: string; first_name: string; last_name: string; bib_number: string | null; cancelled_at: string | null;
+      participant_type: string; verification_outcome: string | null; it_run_bib_collections: Array<{ id: string }> | null;
       it_run_registrations: { payment_status: string; registration_status: string };
     }>();
 
   if (!part) return NextResponse.json({ error: "Participant not found" }, { status: 404 });
   if (part.cancelled_at) {
     return NextResponse.json({ error: "This runner's category was cancelled after an ID was rejected. Do not collect a BIB for this runner.", code: "RUNNER_CANCELLED" }, { status: 409 });
+  }
+
+  // The same policy as the BIB desk: a company-verified adult, an allocated number, and not already collected
+  const readiness = collectionReadiness({
+    cancelled: !!part.cancelled_at,
+    paymentStatus: part.it_run_registrations.payment_status,
+    participantType: part.participant_type,
+    verificationOutcome: part.verification_outcome,
+    bibNumber: part.bib_number,
+    bibCollected: (part.it_run_bib_collections ?? []).length > 0,
+  });
+  if (readiness.state !== "ready") {
+    return NextResponse.json({ error: readiness.message, code: readiness.state.toUpperCase() }, { status: 409 });
   }
 
   const { payment_status, registration_status } = part.it_run_registrations;

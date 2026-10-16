@@ -50,6 +50,7 @@ function fakeDb(participant: any) {
 function participant(cancelled: boolean) {
   return {
     id: "p-1", first_name: "Asha", last_name: "Rao", bib_number: "5D001A", tshirt_size: "M",
+    participant_type: "solo", verification_outcome: "company_verified", it_run_bib_collections: [],
     event_id: "ev-1", registration_id: "reg-1",
     cancelled_at: cancelled ? "2026-12-01T00:00:00Z" : null,
     it_run_registrations: { id: "reg-1", registration_code: "ITR-AAA", payment_status: "paid", registration_status: "active" },
