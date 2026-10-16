@@ -70,10 +70,10 @@ function Stars({ n, max = 5 }: { n: number | null; max?: number }) {
 
 function IssueBadge({ status }: { status: string }) {
   const map: Record<string, { color: string; label: string }> = {
-    none:        { color: "#444",  label: "None"       },
-    open:        { color: RED,     label: "Open"       },
-    in_progress: { color: AMBER,   label: "In Progress"},
-    resolved:    { color: GREEN,   label: "Resolved"   },
+    none:        { color: "#444",  label: "No problem" },
+    open:        { color: RED,     label: "Needs action" },
+    in_progress: { color: AMBER,   label: "Being fixed" },
+    resolved:    { color: GREEN,   label: "Fixed"      },
     closed:      { color: "#555",  label: "Closed"     },
   };
   const m = map[status] ?? { color: "#444", label: status };
@@ -264,23 +264,23 @@ export default function FeedbackAdminPage() {
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {/* Key metrics */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 12 }}>
-          <StatCard label="Responses"        value={summary.total_responses} />
-          <StatCard label="Avg Rating"       value={summary.avg_overall !== null ? `${summary.avg_overall}/5` : null} color={AMBER} />
-          <StatCard label="NPS Score"        value={summary.nps_score !== null ? (summary.nps_score > 0 ? `+${summary.nps_score}` : String(summary.nps_score)) : null} color={summary.nps_score !== null && summary.nps_score > 0 ? GREEN : RED} />
-          <StatCard label="Would Recommend"  value={summary.would_recommend_pct !== null ? `${summary.would_recommend_pct}%` : null} color={GREEN} />
-          <StatCard label="Open Issues"      value={summary.open_issues} color={summary.open_issues > 0 ? RED : "#555"} />
-          <StatCard label="Flagged"          value={summary.flagged_count} color={summary.flagged_count > 0 ? AMBER : "#555"} />
+          <StatCard label="Forms received"    value={summary.total_responses} />
+          <StatCard label="Average rating"     value={summary.avg_overall !== null ? `${summary.avg_overall}/5` : null} color={AMBER} />
+          <StatCard label="Recommend score (NPS)" value={summary.nps_score !== null ? (summary.nps_score > 0 ? `+${summary.nps_score}` : String(summary.nps_score)) : null} color={summary.nps_score !== null && summary.nps_score > 0 ? GREEN : RED} />
+          <StatCard label="Would recommend"     value={summary.would_recommend_pct !== null ? `${summary.would_recommend_pct}%` : null} color={GREEN} />
+          <StatCard label="Problems still open" value={summary.open_issues} color={summary.open_issues > 0 ? RED : "#555"} />
+          <StatCard label="Flagged for follow-up" value={summary.flagged_count} color={summary.flagged_count > 0 ? AMBER : "#555"} />
         </div>
 
         {/* NPS breakdown */}
         {summary.promoters_pct !== null && (
           <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: 20 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#ccc", marginBottom: 12 }}>NPS Breakdown</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#ccc", marginBottom: 12 }}>Recommend score breakdown</div>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               {[
-                { label: "Promoters (9–10)", pct: summary.promoters_pct,  color: GREEN },
-                { label: "Passives (7–8)",   pct: summary.passives_pct!,  color: AMBER },
-                { label: "Detractors (0–6)", pct: summary.detractors_pct!, color: RED  },
+                { label: "Very likely (9–10)", pct: summary.promoters_pct,  color: GREEN },
+                { label: "Neutral (7–8)",     pct: summary.passives_pct!,  color: AMBER },
+                { label: "Unlikely (0–6)",    pct: summary.detractors_pct!, color: RED  },
               ].map(g => (
                 <div key={g.label} style={{ flex: 1, minWidth: 120, textAlign: "center", padding: "12px 8px", background: `${g.color}10`, borderRadius: 10, border: `1px solid ${g.color}25` }}>
                   <div style={{ fontSize: 24, fontWeight: 800, color: g.color }}>{g.pct}%</div>
@@ -294,13 +294,13 @@ export default function FeedbackAdminPage() {
         {/* Rating distribution + category averages */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: 20 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#ccc", marginBottom: 12 }}>Rating Distribution</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#ccc", marginBottom: 12 }}>How people rated it</div>
             {["5","4","3","2","1"].map(k => (
               <MiniBar key={k} label={k} value={summary.rating_distribution[k] ?? 0} max={maxDist || 1} color={(distColors as Record<string, string>)[k]} />
             ))}
           </div>
           <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: 20 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#ccc", marginBottom: 12 }}>Category Averages</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#ccc", marginBottom: 12 }}>Average by area</div>
             {[
               { label: "Organisation", val: summary.avg_organisation },
               { label: "Route",        val: summary.avg_route        },
@@ -324,7 +324,7 @@ export default function FeedbackAdminPage() {
         {/* Top improvement areas */}
         {topAreas.length > 0 && (
           <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: 20 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#ccc", marginBottom: 12 }}>Top Improvement Areas</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#ccc", marginBottom: 12 }}>What people want improved</div>
             {topAreas.map(([area, count]) => (
               <MiniBar key={area} label={area.replace(/_/g, " ")} value={count} max={maxArea} color={PURPLE} />
             ))}
@@ -355,12 +355,12 @@ export default function FeedbackAdminPage() {
         />
         <select value={filterRatingMin} onChange={e => { setFilterRatingMin(e.target.value); setPage(0); }}
           style={{ padding: "8px 10px", background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#aaa", fontSize: 13, fontFamily: "inherit" }}>
-          <option value="">Min ★</option>
+          <option value="">Lowest rating</option>
           {[1,2,3,4,5].map(n => <option key={n} value={String(n)}>{n}★</option>)}
         </select>
         <select value={filterRatingMax} onChange={e => { setFilterRatingMax(e.target.value); setPage(0); }}
           style={{ padding: "8px 10px", background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#aaa", fontSize: 13, fontFamily: "inherit" }}>
-          <option value="">Max ★</option>
+          <option value="">Highest rating</option>
           {[1,2,3,4,5].map(n => <option key={n} value={String(n)}>{n}★</option>)}
         </select>
         <button onClick={() => { setFilterFlag(!filterFlag); setPage(0); }}
@@ -492,7 +492,7 @@ export default function FeedbackAdminPage() {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: 20 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#ccc", marginBottom: 16 }}>Category Ratings</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#ccc", marginBottom: 16 }}>Average ratings</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 12 }}>
             {[
               { label: "Overall",      val: summary.avg_overall,      color: AMBER  },
@@ -520,7 +520,7 @@ export default function FeedbackAdminPage() {
               <div style={{ fontSize: 48, fontWeight: 800, color: summary.nps_score >= 50 ? GREEN : summary.nps_score >= 0 ? AMBER : RED }}>
                 {summary.nps_score > 0 ? "+" : ""}{summary.nps_score}
               </div>
-              <div style={{ fontSize: 12, color: "#666" }}>Net Promoter Score</div>
+              <div style={{ fontSize: 12, color: "#666" }}>Recommend score (NPS)</div>
               <div style={{ display: "flex", height: 20, borderRadius: 10, overflow: "hidden", marginTop: 8 }}>
                 <div style={{ flex: summary.detractors_pct!, background: RED, transition: "flex 0.4s" }} title={`Detractors: ${summary.detractors_pct}%`} />
                 <div style={{ flex: summary.passives_pct!, background: AMBER, transition: "flex 0.4s" }} title={`Passives: ${summary.passives_pct}%`} />
@@ -538,10 +538,10 @@ export default function FeedbackAdminPage() {
         </div>
 
         <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: 20 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#ccc", marginBottom: 16 }}>Issue Resolution</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#ccc", marginBottom: 16 }}>Problems and fixes</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 10 }}>
             <StatCard label="Open Issues"     value={summary.open_issues}    color={RED}   />
-            <StatCard label="Resolved"        value={summary.resolved_issues} color={GREEN} />
+            <StatCard label="Problems fixed"    value={summary.resolved_issues} color={GREEN} />
             <StatCard label="Flagged"         value={summary.flagged_count}  color={AMBER} />
           </div>
         </div>
