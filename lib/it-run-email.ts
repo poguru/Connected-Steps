@@ -7,6 +7,7 @@ import { sendEmail }         from "@/lib/notify";
 import { APP_URL }           from "@/lib/config";
 import { emailWrapper, emailHeader, emailFooter } from "@/lib/email/layout";
 import { escapeHtml } from "@/lib/it-run-verification";
+import { recipientsFor } from "@/lib/it-run-alt-email";
 
 const PARTICIPANT_TYPE_LABEL: Record<string, string> = {
   solo:      "",
@@ -118,7 +119,7 @@ export async function sendItRunConfirmationEmail(
     cat?.name ?? "IT Run Sprint-2",
     new Map(Array.from(names, ([id, c]) => [id, c.name])),
   );
-  const recipients = confirmationRecipients(leadEmail || reg.lead_email, reg.linked_user_email);
+  const recipients = confirmationRecipients(leadEmail || reg.lead_email, reg.linked_user_email, await alternativeEmailsFor(db, reg.id));
   if (recipients.length === 0) {
     await releaseClaim(db, "confirmation_email_sent_at", registrationId);
     console.error(JSON.stringify({ src: "it-run-email", kind: "confirmation", outcome: "no_recipient", reg: reg.registration_code }));
@@ -176,14 +177,33 @@ export async function sendItRunConfirmationEmail(
  * Who receives a booking's emails: the address on the registration and, when a different address belongs to the
  * signed-in account that made the booking, that account too. Each address is listed once, case-insensitively.
  */
-export function confirmationRecipients(leadEmail: string | null, linkedUserEmail: string | null): string[] {
-  const seen = new Map<string, string>();
-  for (const raw of [leadEmail, linkedUserEmail]) {
-    const value = (raw ?? "").trim();
-    // Keep the first spelling seen (the registration address as typed)
-    if (value && !seen.has(value.toLowerCase())) seen.set(value.toLowerCase(), value);
+export function confirmationRecipients(
+  leadEmail: string | null,
+  linkedUserEmail: string | null,
+  alternativeEmails: Array<string | null> = [],
+): string[] {
+  // The booking contact, the linked account, and each participant's own alternative address, each address once
+  return recipientsFor([leadEmail, linkedUserEmail, ...alternativeEmails]);
+}
+
+/** The alternative addresses of the people in one booking. Only that booking's participants are read. */
+async function alternativeEmailsFor(db: ReturnType<typeof getSupabaseServer>, registrationId: string): Promise<Array<string | null>> {
+  // If the lookup fails, the primary address still receives the message: nothing is lost because of it
+  try {
+    const result = await db
+      .from("it_run_participants")
+      .select("alt_email")
+      .eq("registration_id", registrationId)
+      .is("cancelled_at", null);
+    if (result.error) {
+      console.error(JSON.stringify({ src: "it-run-email", outcome: "alt_email_lookup_failed" }));
+      return [];
+    }
+    return ((result.data ?? []) as Array<{ alt_email: string | null }>).map(p => p.alt_email);
+  } catch {
+    console.error(JSON.stringify({ src: "it-run-email", outcome: "alt_email_lookup_failed" }));
+    return [];
   }
-  return Array.from(seen.values());
 }
 
 /** Clears a "sent" claim after a failed send, so the email is not recorded as delivered. */
@@ -356,7 +376,7 @@ export async function sendItRunBibInviteEmail(
     })),
   });
 
-  const recipients = confirmationRecipients(leadEmail || reg.lead_email, reg.linked_user_email);
+  const recipients = confirmationRecipients(leadEmail || reg.lead_email, reg.linked_user_email, await alternativeEmailsFor(db, reg.id));
   if (recipients.length === 0) {
     await releaseClaim(db, "bib_email_sent_at", registrationId);
     console.error(JSON.stringify({ src: "it-run-email", kind: "bib_invite", outcome: "no_recipient", reg: reg.registration_code }));
@@ -994,7 +1014,7 @@ export async function sendItRunCheckoutConfirmationEmail(registrationIds: string
   });
 
   const first = ordered[0];
-  const recipients = confirmationRecipients(first.lead_email, first.linked_user_email);
+  const recipients = confirmationRecipients(first.lead_email, first.linked_user_email, await alternativeEmailsFor(db, first.id));
   if (recipients.length === 0) {
     await db.from("it_run_registrations").update({ confirmation_email_sent_at: null }).in("id", claimedIds);
     console.error(JSON.stringify({ src: "it-run-email", kind: "checkout_confirmation", outcome: "no_recipient" }));
@@ -1057,7 +1077,7 @@ export async function sendItRunPaymentReceivedEmail(registrationId: string): Pro
 
   const paid = reg.payment_status === "paid";
   const dashUrl = buildDashboardUrl(reg.registration_code);
-  const recipients = confirmationRecipients(reg.lead_email, reg.linked_user_email);
+  const recipients = confirmationRecipients(reg.lead_email, reg.linked_user_email, await alternativeEmailsFor(db, registrationId));
   if (recipients.length === 0) {
     console.error(JSON.stringify({ src: "it-run-email", kind: "payment_received", outcome: "no_recipient", reg: reg.registration_code }));
     return;
@@ -1177,7 +1197,7 @@ export async function buildCategoryConfirmation(
   });
 
   return {
-    recipients: confirmationRecipients(reg.lead_email, reg.linked_user_email),
+    recipients: confirmationRecipients(reg.lead_email, reg.linked_user_email, await alternativeEmailsFor(db, reg.id)),
     name: primaryName,
     subject: `Registration Confirmed - The IT Run Sprint-2 (${reg.registration_code} · ${group.name})`,
     html,

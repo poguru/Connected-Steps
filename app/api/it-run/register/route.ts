@@ -17,6 +17,7 @@ import { reserveSeats, releaseSeats, type SeatLine } from "@/lib/it-run-seats";
 import { couponUncoveredCategories, claimRunners, releaseRunnerClaim } from "@/lib/it-run-registration-guards";
 import { initialVerificationStatus, isStoredDocumentPath, idDocumentTypeFor, idUploadError } from "@/lib/it-run-id-verification";
 import { checkPersonName, checkBibName, normalizeName } from "@/lib/it-run-name-validation";
+import { normalizeAltEmail, altEmailOrNull } from "@/lib/it-run-alt-email";
 import {
   isValidEmail, parseCalendarDate, todayInIST, validateDateOfBirth, type CalendarDate,
   normalizeIndianPhone, emergencyMatchesMobile,
@@ -24,7 +25,7 @@ import {
 
 interface ParticipantInput {
   type: string; firstName: string; lastName: string; bibName: string;
-  gender: string; dob: string; email: string; mobile: string;
+  gender: string; dob: string; email: string; mobile: string; altEmail?: string | null;
   bloodGroup: string; emergencyName: string; emergencyPhone: string;
   companyName: string; employeeId: string; companyIdUrl: string;
   /** "company" (default) or "government": the kind of ID in companyIdUrl */
@@ -78,7 +79,7 @@ function indexesByCategory(categoryIds: string[]): Map<string, number[]> {
 
 export interface ParticipantFieldError {
   message: string;
-  field: "firstName" | "lastName" | "bibName" | "gender" | "bloodGroup" | "tshirtSize" | "mobile" | "dob" | "email" | "emergencyName" | "emergencyPhone" | "companyName" | "companyIdUrl";
+  field: "firstName" | "lastName" | "bibName" | "gender" | "bloodGroup" | "tshirtSize" | "mobile" | "dob" | "email" | "altEmail" | "emergencyName" | "emergencyPhone" | "companyName" | "companyIdUrl";
   participantIndex: number;
 }
 
@@ -135,6 +136,9 @@ function validateParticipants(
     if (p.email?.trim() && !isValidEmail(p.email)) {
       return err("email", "please enter a valid email address");
     }
+    // The optional alternative address is checked here too, never trusted from the browser
+    const alt = normalizeAltEmail(p.altEmail);
+    if (!alt.ok) return err("altEmail", alt.message);
 
     // Adult-only required fields
     if (!m.is_child) {
@@ -461,6 +465,7 @@ export async function POST(req: NextRequest) {
       gender:             p.gender,
       dob:                p.dob || null,
       email:              p.email?.toLowerCase()?.trim() || null,
+      alt_email:          altEmailOrNull(p.altEmail),
       mobile:             normalizeIndianPhone(p.mobile) ?? p.mobile.trim(),
       blood_group:        p.bloodGroup || null,
       emergency_name:     p.emergencyName ? normalizeName(p.emergencyName) || null : null,
@@ -719,6 +724,7 @@ export async function PATCH(req: NextRequest) {
         gender:             p.gender,
         dob:                p.dob || null,
         email:              p.email?.toLowerCase()?.trim() || null,
+        alt_email:          altEmailOrNull(p.altEmail),
         mobile:             normalizeIndianPhone(p.mobile) ?? p.mobile.trim(),
         blood_group:        p.bloodGroup || null,
         emergency_name:     p.emergencyName ? normalizeName(p.emergencyName) || null : null,
