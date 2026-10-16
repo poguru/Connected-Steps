@@ -73,6 +73,13 @@ export default function RefundReconciliationPage() {
 
   const filteredRefunds = refunds.filter(r => filter === "all" || r.status === filter);
 
+  const REFUND_STATUS_WORD: Record<string, string> = {
+    all: "All",
+    pending: "Still processing",
+    processed: "Refunded",
+    failed: "Failed",
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "processed":
@@ -103,10 +110,10 @@ export default function RefundReconciliationPage() {
     <div style={{ maxWidth: 1200, margin: "0 auto" }}>
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ fontSize: 28, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>
-          Refund Reconciliation
+          Refund status
         </h1>
         <div style={{ fontSize: 13, color: "#888" }}>
-          Monitor refund status and detect inconsistencies
+          Checks each refund against Razorpay. Use this to find refunds still processing or that failed.
         </div>
       </div>
 
@@ -115,15 +122,15 @@ export default function RefundReconciliationPage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 28 }}>
           <div style={{ background: `${GREEN}15`, border: `1px solid ${GREEN}40`, borderRadius: 12, padding: 16, textAlign: "center" }}>
             <div style={{ fontSize: 24, fontWeight: 900, color: GREEN, marginBottom: 4 }}>{stats.total}</div>
-            <div style={{ fontSize: 11, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em" }}>Total Refunds</div>
+            <div style={{ fontSize: 11, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em" }}>All refunds</div>
           </div>
           <div style={{ background: `${YELLOW}15`, border: `1px solid ${YELLOW}40`, borderRadius: 12, padding: 16, textAlign: "center" }}>
             <div style={{ fontSize: 24, fontWeight: 900, color: YELLOW, marginBottom: 4 }}>{stats.pending}</div>
-            <div style={{ fontSize: 11, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em" }}>Pending</div>
+            <div style={{ fontSize: 11, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em" }}>Still processing</div>
           </div>
           <div style={{ background: `${GREEN}15`, border: `1px solid ${GREEN}40`, borderRadius: 12, padding: 16, textAlign: "center" }}>
             <div style={{ fontSize: 24, fontWeight: 900, color: GREEN, marginBottom: 4 }}>{stats.processed}</div>
-            <div style={{ fontSize: 11, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em" }}>Processed</div>
+            <div style={{ fontSize: 11, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em" }}>Refunded</div>
           </div>
           <div style={{ background: `${RED}15`, border: `1px solid ${RED}40`, borderRadius: 12, padding: 16, textAlign: "center" }}>
             <div style={{ fontSize: 24, fontWeight: 900, color: RED, marginBottom: 4 }}>{stats.failed}</div>
@@ -131,7 +138,7 @@ export default function RefundReconciliationPage() {
           </div>
           <div style={{ background: `${ACCENT}15`, border: `1px solid ${ACCENT}40`, borderRadius: 12, padding: 16, textAlign: "center" }}>
             <div style={{ fontSize: 24, fontWeight: 900, color: ACCENT, marginBottom: 4 }}>₹{(stats.totalRefunded / 100).toLocaleString("en-IN")}</div>
-            <div style={{ fontSize: 11, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em" }}>Total Amount</div>
+            <div style={{ fontSize: 11, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em" }}>Total amount</div>
           </div>
         </div>
       )}
@@ -187,7 +194,7 @@ export default function RefundReconciliationPage() {
               textTransform: "capitalize",
             }}
           >
-            {f}
+            {REFUND_STATUS_WORD[f] ?? f}
           </button>
         ))}
       </div>
@@ -247,7 +254,7 @@ export default function RefundReconciliationPage() {
                           textTransform: "capitalize",
                         }}
                       >
-                        {r.status}
+                        {REFUND_STATUS_WORD[r.status] ?? r.status}
                       </span>
                     </td>
                     <td style={{ padding: "12px 16px", fontSize: 12, color: "#999", fontFamily: "monospace" }}>
