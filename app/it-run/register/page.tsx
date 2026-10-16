@@ -7,7 +7,7 @@ import Image from "next/image";
 import type { ItRunEventConfig, ItRunCategory } from "@/lib/it-run-types";
 import {
   isValidEmail, parseCalendarDate, todayInIST, validateDateOfBirth,
-  normalizeIndianPhone, normalizeIndianPhoneInput, emergencyMatchesMobile, formatCalendarDate,
+  normalizeIndianPhone, normalizeIndianPhoneInput, prefillIndianMobile, emergencyMatchesMobile, formatCalendarDate,
 } from "@/lib/it-run-validation";
 import { decideUrlCategory, startsNewRegistration } from "@/lib/it-run-category-selection";
 import { idUploadError, isStoredDocumentPath } from "@/lib/it-run-id-verification";
@@ -1955,7 +1955,7 @@ function RegisterPageContent() {
       if (!p.firstName)       p.firstName       = profileData.firstName;
       if (!p.lastName)        p.lastName        = profileData.lastName;
       if (!p.bibName)         p.bibName         = profileData.bibName || profileData.firstName;
-      if (!p.mobile)          p.mobile          = profileData.mobile;
+      if (!p.mobile)          p.mobile          = prefillIndianMobile(profileData.mobile);
       if (!p.dob)             p.dob             = profileData.dob;
       if (!p.gender)          p.gender          = profileData.gender;
       if (!p.bloodGroup)      p.bloodGroup      = profileData.bloodGroup;

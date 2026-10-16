@@ -189,7 +189,20 @@ export function normalizeIndianPhone(value: unknown): string | null {
   if (typeof value !== "string") return null;
   let digits = value.replace(/\D/g, "");
   if (digits.length === 12 && digits.startsWith("91")) digits = digits.slice(2);
-  return /^\d{10}$/.test(digits) ? digits : null;
+  // Indian mobile numbers start with 6, 7, 8 or 9. A leading 0 is a trunk prefix, not part of the number.
+  return /^[6-9]\d{9}$/.test(digits) ? digits : null;
+}
+
+/**
+ * The mobile to fill in from a saved profile. A trunk 0 (11 digits) or a +91 prefix is dropped. A number that is
+ * still not 10 digits is left empty, so the participant types it, rather than pre-filling a number that cannot be valid.
+ */
+export function prefillIndianMobile(value: unknown): string {
+  if (typeof value !== "string") return "";
+  let digits = value.replace(/\D/g, "");
+  if (digits.length === 11 && digits.startsWith("0")) digits = digits.slice(1);
+  if (digits.length === 12 && digits.startsWith("91")) digits = digits.slice(2);
+  return /^[6-9]\d{9}$/.test(digits) ? digits : "";
 }
 
 /**
