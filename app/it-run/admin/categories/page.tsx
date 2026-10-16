@@ -21,10 +21,10 @@ const RACE_TYPE_LABELS: Record<string, string> = {
   solo: "Solo", duo: "Duo (2 runners)", kid: "Parent & Child",
 };
 const INCLUSIONS: Array<[keyof Category, string]> = [
-  ["includes_bib",         "Race BIB"],
-  ["includes_timing",      "Chip Timing"],
+  ["includes_bib",         "Race number (BIB)"],
+  ["includes_timing",      "Chip timing"],
   ["includes_medal",       "Medal"],
-  ["includes_tshirt",      "T-Shirt"],
+  ["includes_tshirt",      "T-shirt"],
   ["includes_certificate", "Certificate"],
 ];
 
@@ -264,9 +264,9 @@ export default function CategoriesPage() {
 
       <div style={{ maxWidth: 920 }}>
         <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: "clamp(20px,3vw,26px)", fontWeight: 800, color: "#fff", margin: 0 }}>Categories · Pricing · Capacity</h1>
+          <h1 style={{ fontSize: "clamp(20px,3vw,26px)", fontWeight: 800, color: "#fff", margin: 0 }}>Race categories, prices and places</h1>
           <p style={{ color: "#666", fontSize: 13, margin: "6px 0 0" }}>
-            Slug and race type are locked — they anchor registration records and public URLs.
+            The web address (slug) and race type cannot be changed, because registrations and links depend on them.
             Price changes never affect existing paid registrations.
           </p>
         </div>
@@ -400,7 +400,7 @@ export default function CategoriesPage() {
                 <ModalSection title="Identity (Locked)">
                   <TwoCol>
                     <FInput label="Slug"       name="slug"          value={editing.slug}          readOnly />
-                    <FInput label="Race Type"  name="category_type" value={RACE_TYPE_LABELS[editing.category_type] ?? editing.category_type} readOnly hint="Determines participant count" />
+                    <FInput label="Race type"  name="category_type" value={RACE_TYPE_LABELS[editing.category_type] ?? editing.category_type} readOnly hint="Sets how people book: solo, a duo team, or a parent and child" />
                   </TwoCol>
                   <div style={{ fontSize: 11, color: "#444", lineHeight: 1.5 }}>
                     Slug and race type are permanently locked. They anchor every registration record in the database.
@@ -428,14 +428,14 @@ export default function CategoriesPage() {
                     <FInput label="Price (₹)"            name="price_rupees"    value={Number(f.price_rupees ?? 0)}    type="number" onChange={upd} />
                     <FInput label="Early Bird Price (₹)"  name="early_bird_price" value={String(f.early_bird_price ?? "")} type="number" onChange={upd} hint="Leave empty to disable" />
                   </TwoCol>
-                  <FInput label="Early Bird Ends At" name="early_bird_ends_at" value={String(f.early_bird_ends_at ?? "")} type="datetime-local" onChange={upd} />
+                  <FInput label="Early bird ends at" name="early_bird_ends_at" value={String(f.early_bird_ends_at ?? "")} type="datetime-local" onChange={upd} />
                 </ModalSection>
 
                 {/* Capacity */}
                 <ModalSection title="Capacity">
                   <TwoCol>
-                    <FInput label="Maximum Participants" name="max_participants"   value={String(f.max_participants ?? "")} type="number" onChange={upd} hint="Leave empty for no limit" />
-                    <FInput label="Active Registrations" name="live_registered_count" value={String(editing.live_registered_count)} readOnly hint="Live count from registrations table" />
+                    <FInput label="Maximum places" name="max_participants"   value={String(f.max_participants ?? "")} type="number" onChange={upd} hint="Leave empty for no limit" />
+                    <FInput label="Registrations so far" name="live_registered_count" value={String(editing.live_registered_count)} readOnly hint="Live count for this category" />
                   </TwoCol>
                   {editing.live_registered_count > 0 && (
                     <div style={{ fontSize: 11, color: "#666" }}>
@@ -447,7 +447,7 @@ export default function CategoriesPage() {
                 {/* Display */}
                 <ModalSection title="Display">
                   <TwoCol>
-                    <FInput label="Sort Order" name="sort_order" value={Number(f.sort_order ?? 0)} type="number" onChange={upd} hint="Lower = appears first" />
+                    <FInput label="Display order" name="sort_order" value={Number(f.sort_order ?? 0)} type="number" onChange={upd} hint="Lower numbers appear first" />
                     <div />
                   </TwoCol>
                 </ModalSection>
