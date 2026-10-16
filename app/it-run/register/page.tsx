@@ -13,6 +13,7 @@ import { decideUrlCategory, startsNewRegistration } from "@/lib/it-run-category-
 import { idUploadError, isStoredDocumentPath } from "@/lib/it-run-id-verification";
 import { IssueReportButton } from "@/components/ui/BugReportFab";
 import { checkPersonName, checkBibName, bibNameHint, firstBibNameProblem, labelParticipantMessage } from "@/lib/it-run-name-validation";
+import { normalizeAltEmail } from "@/lib/it-run-alt-email";
 import { draftKeyOf, saveStatusFor, createMoveGate } from "@/lib/it-run-step-save";
 import {
   countsFromCategoryIds, slotsFor, rebuildParticipants, primaryCategory, maxCountFor, seatsLeft, teamSize,
@@ -35,7 +36,7 @@ import {
 
 interface Participant {
   firstName: string; lastName: string; bibName: string; gender: string;
-  dob: string; email: string; mobile: string;
+  dob: string; email: string; altEmail: string; mobile: string;
   bloodGroup: string; emergencyName: string; emergencyPhone: string;
   companyName: string; employeeId: string;
   companyIdFile: File | null; companyIdUrl: string;
@@ -119,7 +120,7 @@ const TSHIRT_SIZES = ["XS","S","M","L","XL","XXL","3XL"]; // adult fallback only
 const FOOD_PREFS   = ["veg","non-veg","vegan"];
 
 const emptyParticipant = (categoryId = ""): Participant => ({
-  firstName: "", lastName: "", bibName: "", gender: "", dob: "", email: "", mobile: "",
+  firstName: "", lastName: "", bibName: "", gender: "", dob: "", email: "", altEmail: "", mobile: "",
   bloodGroup: "", emergencyName: "", emergencyPhone: "",
   companyName: "", employeeId: "", companyIdFile: null, companyIdUrl: "",
   tshirtSize: "", medicalConditions: "", foodPreference: "veg",
@@ -447,6 +448,11 @@ function ParticipantForm({
               placeholder="your@email.com" autoComplete="email" />
           </Field>
         )}
+        <Field label="Alternative email" error={errors.altEmail} optional hint="Use a personal email address if your company email blocks event updates or confirmation emails.">
+          <input style={inp("altEmail", !!errors.altEmail)} type="email" value={data.altEmail}
+            onChange={e => onChange("altEmail", e.target.value)}
+            placeholder="personal@email.com" autoComplete="off" />
+        </Field>
         <Field label="Mobile" error={errors.mobile} required hint="10-digit Indian number">
           <input style={inp("mobile", !!errors.mobile)} type="tel" value={data.mobile}
             onChange={e => onChange("mobile", normalizeIndianPhoneInput(e.target.value))}
@@ -2022,7 +2028,7 @@ function RegisterPageContent() {
 
     setSelectedCat(cat);
     const restored = (d.participants ?? [emptyParticipant(d.selectedCatId)])
-      .map(p => ({ ...p, categoryId: p.categoryId || d.selectedCatId, companyIdFile: null }));
+      .map(p => ({ ...p, altEmail: p.altEmail ?? "", categoryId: p.categoryId || d.selectedCatId, companyIdFile: null }));
     setParticipants(restored);
     setCounts(countsFromCategoryIds(restored.map(p => p.categoryId)));
     // What was restored is exactly what the server holds, so it is "Saved", not "Unsaved changes"
@@ -2292,6 +2298,10 @@ function RegisterPageContent() {
     if (!p.bloodGroup)  { e.bloodGroup  = "Required"; valid = false; }
     if (!p.tshirtSize)  { e.tshirtSize  = "Required"; valid = false; }
 
+    // Optional alternative email: trimmed, and checked only when given
+    const alt = normalizeAltEmail(p.altEmail);
+    if (!alt.ok) { e.altEmail = alt.message; valid = false; }
+
     // Email: required for adults; for a child it is optional but must be valid if given
     if (!child && !p.email?.trim()) {
       e.email = "Email address is required"; valid = false;
@@ -2522,6 +2532,7 @@ function RegisterPageContent() {
               gender:            p.gender,
               dob:               p.dob,
               email:             p.email,
+              altEmail:          p.altEmail,
               mobile:            p.mobile,
               bloodGroup:        p.bloodGroup,
               emergencyName:     p.emergencyName,
@@ -2566,6 +2577,7 @@ function RegisterPageContent() {
             gender:            p.gender,
             dob:               p.dob,
             email:             p.email,
+            altEmail:          p.altEmail,
             mobile:            p.mobile,
             bloodGroup:        p.bloodGroup,
             emergencyName:     p.emergencyName,
