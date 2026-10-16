@@ -194,9 +194,9 @@ function ScanTab() {
 
             {/* Status pills */}
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-              <StatusPill done={bibDone}    label="BIB Collected"
+              <StatusPill done={bibDone}    label="BIB collected"
                 detail={bibDone ? new Date(p.it_run_bib_collections[0].collected_at).toLocaleDateString("en-IN") : undefined} />
-              <StatusPill done={tshirtDone} label="T-Shirt Issued"
+              <StatusPill done={tshirtDone} label="T-shirt given"
                 detail={tshirtDone ? new Date(p.it_run_tshirt_issuances[0].issued_at).toLocaleDateString("en-IN") : undefined} />
               <StatusPill done={checkinDone} label="Checked In"
                 detail={checkinDone ? new Date(p.it_run_checkins[0].checked_in_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : undefined} />
@@ -284,7 +284,7 @@ function LogTab() {
           <span style={{ color: GREEN, fontWeight: 800, fontSize: 20 }}>{total}</span> checked in
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <input style={{ ...INPUT, minWidth: 220 }} placeholder="Search name, BIB, reg code…"
+          <input style={{ ...INPUT, minWidth: 220 }} placeholder="Search name, BIB number or registration code"
             value={search} onChange={e => setSearch(e.target.value)} />
           <a href="/api/it-run/admin/reports?type=checkin" download
             style={{ padding: "9px 14px", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 8, color: GREEN, fontSize: 13, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" }}>
@@ -319,7 +319,7 @@ function LogTab() {
                 </div>
               );
             })}
-            {filtered.length === 0 && <div style={{ color: "#888", padding: 40, textAlign: "center" }}>No check-ins found</div>}
+            {filtered.length === 0 && <div style={{ color: "#888", padding: 40, textAlign: "center" }}>Nobody has checked in yet, or no one matches the search.</div>}
           </div>
 
           {total > 50 && (
@@ -351,16 +351,19 @@ export default function CheckinsPage() {
     <div style={{ maxWidth: 880 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
         <h1 style={{ fontSize: "clamp(18px,3vw,24px)", fontWeight: 800, color: "#fff", margin: 0 }}>
-          Race-Day Check-In
+          Race-day check-in
         </h1>
+        <div style={{ width: "100%", fontSize: 12, color: "#888", marginTop: -8 }}>
+          Scan a runner's QR code or type their BIB number, then check them in. The log lists who has checked in.
+        </div>
         <div style={{ display: "flex", gap: 6 }}>
           <button style={{ ...TAB, background: tab === "scan" ? `${GREEN}14` : "rgba(255,255,255,0.04)", color: tab === "scan" ? GREEN : "#888", outline: tab === "scan" ? `1px solid ${GREEN}40` : "1px solid rgba(255,255,255,0.08)" }}
             onClick={() => setTab("scan")}>
-            Scan &amp; Check In
+            Scan and check in
           </button>
           <button style={{ ...TAB, background: tab === "log" ? `${GREEN}14` : "rgba(255,255,255,0.04)", color: tab === "log" ? GREEN : "#888", outline: tab === "log" ? `1px solid ${GREEN}40` : "1px solid rgba(255,255,255,0.08)" }}
             onClick={() => setTab("log")}>
-            Check-In Log
+            Who has checked in
           </button>
         </div>
       </div>
