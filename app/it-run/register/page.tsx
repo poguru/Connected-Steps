@@ -363,7 +363,6 @@ function ParticipantForm({
   indexOfTotal: string; // e.g. "1 of 2"
   onNameBlur?: (field: "firstName" | "lastName" | "bibName" | "emergencyName") => void;
 }) {
-  const [showOptional, setShowOptional] = useState(false);
 
   const inp = (field: keyof Participant, hasErr: boolean) =>
     hasErr ? INPUT_ERR : INPUT_S;
@@ -503,63 +502,6 @@ function ParticipantForm({
             </Field>
           </div>
 
-          {/* ── Collapsible optional section ── */}
-          <button
-            type="button"
-            onClick={() => setShowOptional(v => !v)}
-            style={{
-              width: "100%", background: "none", fontFamily: "inherit",
-              border: "1px dashed rgba(255,255,255,0.09)",
-              borderRadius: 10, padding: "10px 16px",
-              color: "#3a3a3a", fontSize: 12, cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              transition: "border-color 0.2s",
-              marginBottom: showOptional ? 16 : 0,
-            }}
-            onMouseEnter={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)")}
-            onMouseLeave={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.09)")}
-          >
-            <span>
-              {showOptional ? "▲  Hide" : "▼  Show"} optional fields
-            </span>
-            <span style={{ color: "#2a2a2a", fontSize: 11 }}>
-              Employee ID · Medical info · Food preference
-            </span>
-          </button>
-
-          {showOptional && (
-            <div style={{
-              padding: "18px 18px 4px",
-              background: "rgba(255,255,255,0.015)",
-              border: "1px dashed rgba(255,255,255,0.07)",
-              borderRadius: 12, marginBottom: 4,
-            }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
-                <Field label="Employee ID" optional>
-                  <input style={INPUT_S} value={data.employeeId}
-                    onChange={e => onChange("employeeId", e.target.value)}
-                    placeholder="Staff or employee ID" />
-                </Field>
-                <Field label="Food Preference" optional>
-                  <select style={INPUT_S} value={data.foodPreference}
-                    onChange={e => onChange("foodPreference", e.target.value)}>
-                    {FOOD_PREFS.map(f => (
-                      <option key={f} value={f}>
-                        {f.charAt(0).toUpperCase() + f.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              </div>
-              <div style={{ marginBottom: 14 }}>
-                <Field label="Medical Conditions" optional>
-                  <input style={INPUT_S} value={data.medicalConditions}
-                    onChange={e => onChange("medicalConditions", e.target.value)}
-                    placeholder="Any conditions the team should know about" />
-                </Field>
-              </div>
-            </div>
-          )}
         </>
       )}
     </div>
@@ -1962,12 +1904,10 @@ function RegisterPageContent() {
       if (!p.emergencyName)   p.emergencyName   = profileData.emergencyName;
       if (!p.emergencyPhone)  p.emergencyPhone  = profileData.emergencyPhone;
       if (!p.companyName)     p.companyName     = profileData.companyName;
-      if (!p.employeeId)      p.employeeId      = profileData.employeeId;
       if (!p.tshirtSize)      p.tshirtSize      = profileData.tshirtSize;
       if (!p.foodPreference || p.foodPreference === "veg") {
         if (profileData.foodPreference) p.foodPreference = profileData.foodPreference;
       }
-      if (!p.medicalConditions) p.medicalConditions = profileData.medicalConditions;
       copy[0] = p;
       return copy;
     });
