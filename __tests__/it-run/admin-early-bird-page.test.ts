@@ -40,7 +40,8 @@ describe("admin nav", () => {
     const layout = read("app/it-run/admin/layout.tsx");
     const line = layout.split("\n").find(l => l.includes('"/it-run/admin/early-bird"'));
     expect(line).toBeDefined();
-    expect(line).toContain('roles: ["super_admin","event_admin"]');
+    // Spacing inside the list does not matter; the roles do
+    expect(line!.replace(/\s/g, "")).toContain('roles:["super_admin","event_admin"]');
   });
 });
 

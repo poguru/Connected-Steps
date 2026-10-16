@@ -6,35 +6,51 @@ import { usePathname, useRouter } from "next/navigation";
 
 const ACCENT = "#e8620a";
 
-const NAV_ITEMS = [
-  // ── Overview ──────────────────────────────────────────────────────────
-  { href: "/it-run/admin",                label: "Dashboard",          icon: "&#9632;",  roles: ["super_admin","event_admin","support_desk"] },
-  // ── Event configuration ───────────────────────────────────────────────
-  { href: "/it-run/admin/settings",       label: "Event Settings",     icon: "&#9881;",  roles: ["super_admin","event_admin"] },
-  { href: "/it-run/admin/categories",     label: "Categories / Pricing", icon: "&#9776;", roles: ["super_admin","event_admin"] },
-  // ── Registrations ──────────────────────────────────────────────────────
-  { href: "/it-run/admin/registrations",  label: "Registrations",      icon: "&#9679;",  roles: ["super_admin","event_admin","support_desk","verification_team","bib_collection","checkin_team"] },
-  { href: "/it-run/admin/coupons",        label: "Coupons",             icon: "&#127315;",roles: ["super_admin","event_admin"] },
-  // ── Verification & BIB ────────────────────────────────────────────────
-  { href: "/it-run/admin/verification",   label: "Company Verification",icon: "&#9745;",  roles: ["super_admin","event_admin","verification_team"] },
-  { href: "/it-run/admin/tshirt",         label: "T-Shirt Reports",     icon: "&#128085;",roles: ["super_admin","event_admin","support_desk"] },
-  { href: "/it-run/admin/bib-slots",      label: "BIB Slots",           icon: "&#128197;",roles: ["super_admin","event_admin"] },
-  { href: "/it-run/admin/bibs",           label: "BIB Allocation",      icon: "&#127987;",roles: ["super_admin","event_admin","bib_collection"] },
-  // ── Payments & Comms ──────────────────────────────────────────────────
-  { href: "/it-run/admin/payments",       label: "Payments",            icon: "&#128179;",roles: ["super_admin","event_admin","support_desk"] },
-  { href: "/it-run/admin/early-bird",     label: "Early Bird",          icon: "&#127919;",roles: ["super_admin","event_admin"] },
-  { href: "/it-run/admin/refund-requests",  label: "Refund Requests", icon: "&#128203;",roles: ["super_admin","event_admin"] },
-  { href: "/it-run/admin/refund-reconciliation", label: "Refunds",       icon: "&#128190;",roles: ["super_admin","event_admin"] },
-  { href: "/it-run/admin/notifications",  label: "Email / Notifications",icon: "&#9993;", roles: ["super_admin","event_admin"] },
-  // ── Race day ──────────────────────────────────────────────────────────
-  { href: "/it-run/admin/bib-collection", label: "BIB Collection Ops",   icon: "&#128197;",roles: ["super_admin","event_admin"] },
-  { href: "/it-run/admin/checkins",       label: "QR / Check-in",       icon: "&#10003;", roles: ["super_admin","event_admin","checkin_team"] },
-  // ── Post-Event ────────────────────────────────────────────────────────
-  { href: "/it-run/admin/feedback",       label: "Feedback",            icon: "&#9733;",  roles: ["super_admin","event_admin"] },
-  // ── Admin ─────────────────────────────────────────────────────────────
-  { href: "/it-run/admin/staff",          label: "Staff Management",    icon: "&#128119;",roles: ["super_admin","event_admin"] },
-  { href: "/it-run/admin/reports",        label: "Reports",             icon: "&#128202;",roles: ["super_admin","event_admin"] },
-  { href: "/it-run/admin/audit-logs",     label: "Audit Logs",          icon: "&#128196;",roles: ["super_admin","event_admin"] },
+// Menu sections, in the order staff see them. Each item lists the roles that may open its page.
+const SECTIONS = ["Overview", "Event setup", "Registrations", "Verification & BIB", "Race day", "Payments & refunds", "Communication", "Reports & admin"];
+
+const NAV_ITEMS: Array<{ href: string; label: string; icon: string; section: string; roles: string[] }> = [
+  // Overview
+  { section: "Overview", href: "/it-run/admin", label: "Dashboard", icon: "&#9632;", roles: ["super_admin", "event_admin", "support_desk"] },
+
+  // Event setup
+  { section: "Event setup", href: "/it-run/admin/settings", label: "Event Settings", icon: "&#9881;", roles: ["super_admin", "event_admin"] },
+  { section: "Event setup", href: "/it-run/admin/categories", label: "Categories & Prices", icon: "&#9776;", roles: ["super_admin", "event_admin"] },
+  { section: "Event setup", href: "/it-run/admin/coupons", label: "Coupons", icon: "&#127315;", roles: ["super_admin", "event_admin"] },
+  { section: "Event setup", href: "/it-run/admin/early-bird", label: "Early Bird Offers", icon: "&#127919;", roles: ["super_admin", "event_admin"] },
+
+  // Registrations
+  { section: "Registrations", href: "/it-run/admin/registrations", label: "Registrations", icon: "&#9679;", roles: ["super_admin", "event_admin", "support_desk", "verification_team", "bib_collection", "checkin_team"] },
+  { section: "Registrations", href: "/it-run/admin/participants", label: "Participants", icon: "&#128100;", roles: ["super_admin", "event_admin", "support_desk", "verification_team"] },
+  { section: "Registrations", href: "/it-run/admin/user-linking", label: "Link Accounts", icon: "&#128279;", roles: ["super_admin", "event_admin"] },
+
+  // Verification & BIB
+  { section: "Verification & BIB", href: "/it-run/admin/verification", label: "Company ID Checks", icon: "&#9745;", roles: ["super_admin", "event_admin", "verification_team"] },
+  { section: "Verification & BIB", href: "/it-run/admin/bibs", label: "BIB Numbers", icon: "&#127987;", roles: ["super_admin", "event_admin", "bib_collection"] },
+  { section: "Verification & BIB", href: "/it-run/admin/bib-counters", label: "BIB Counters", icon: "&#128205;", roles: ["super_admin", "event_admin"] },
+  { section: "Verification & BIB", href: "/it-run/admin/bib-slots", label: "Collection Slots", icon: "&#128197;", roles: ["super_admin", "event_admin"] },
+  { section: "Verification & BIB", href: "/it-run/admin/tshirt", label: "T-Shirt Reports", icon: "&#128085;", roles: ["super_admin", "event_admin", "support_desk"] },
+
+  // Race day
+  { section: "Race day", href: "/it-run/admin/bib-collection", label: "BIB Collection", icon: "&#127915;", roles: ["super_admin", "event_admin"] },
+  { section: "Race day", href: "/it-run/admin/checkins", label: "Check-in", icon: "&#10003;", roles: ["super_admin", "event_admin", "checkin_team"] },
+  { section: "Race day", href: "/it-run/admin/staff-ops", label: "Staff Operations", icon: "&#128119;", roles: ["super_admin", "event_admin"] },
+  { section: "Race day", href: "/it-run/admin/operations-dashboard", label: "Live Operations", icon: "&#128200;", roles: ["super_admin", "event_admin"] },
+
+  // Payments & refunds
+  { section: "Payments & refunds", href: "/it-run/admin/payments", label: "Payments", icon: "&#128179;", roles: ["super_admin", "event_admin", "support_desk"] },
+  { section: "Payments & refunds", href: "/it-run/admin/refund-requests", label: "Refund Requests", icon: "&#128203;", roles: ["super_admin", "event_admin"] },
+  { section: "Payments & refunds", href: "/it-run/admin/refund-reconciliation", label: "Refund Status", icon: "&#128190;", roles: ["super_admin", "event_admin"] },
+
+  // Communication
+  { section: "Communication", href: "/it-run/admin/emails", label: "Event Emails", icon: "&#9993;", roles: ["super_admin", "event_admin"] },
+  { section: "Communication", href: "/it-run/admin/notifications", label: "Confirmation Emails", icon: "&#128232;", roles: ["super_admin", "event_admin"] },
+
+  // Reports & admin
+  { section: "Reports & admin", href: "/it-run/admin/reports", label: "Reports", icon: "&#128202;", roles: ["super_admin", "event_admin"] },
+  { section: "Reports & admin", href: "/it-run/admin/feedback", label: "Feedback", icon: "&#9733;", roles: ["super_admin", "event_admin"] },
+  { section: "Reports & admin", href: "/it-run/admin/staff", label: "Staff Accounts", icon: "&#128100;", roles: ["super_admin", "event_admin"] },
+  { section: "Reports & admin", href: "/it-run/admin/audit-logs", label: "Audit Log", icon: "&#128196;", roles: ["super_admin", "event_admin"] },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -88,7 +104,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Navigation */}
         <nav style={{ flex: 1, padding: "12px 0" }}>
-          {visibleItems.map(item => (
+          {SECTIONS.map(section => {
+            const items = visibleItems.filter(i => i.section === section);
+            if (items.length === 0) return null;
+            return (
+              <div key={section}>
+                <div style={{ padding: "14px 20px 4px", fontSize: 10, color: "#666", textTransform: "uppercase", letterSpacing: "0.12em" }}>{section}</div>
+                {items.map(item => (
             <Link key={item.href} href={item.href}
               onClick={() => setSideOpen(false)}
               style={{
@@ -106,7 +128,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <span dangerouslySetInnerHTML={{ __html: item.icon }} style={{ width: 18, textAlign: "center" }} />
               {item.label}
             </Link>
-          ))}
+                ))}
+              </div>
+            );
+          })}
         </nav>
 
         {/* User + Logout */}
