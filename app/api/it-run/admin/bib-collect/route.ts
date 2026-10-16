@@ -10,8 +10,8 @@ export async function POST(req: NextRequest) {
   const session = requireRole(req, ["event_admin", "bib_collection"]);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await req.json() as { participantId?: string; counter_name?: string };
-  const { participantId, counter_name } = body;
+  const body = await req.json() as { participantId?: string; counter_name?: string; counterId?: string };
+  const { participantId, counter_name, counterId } = body;
 
   if (!participantId) {
     return NextResponse.json({ error: "participantId required" }, { status: 400 });
@@ -58,12 +58,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Registration is cancelled" }, { status: 400 });
   }
 
+  // A collection can be recorded at one of the event's counters. A disabled counter is refused.
+  let counterLabel: string | null = counter_name ?? null;
+  let counterRef: string | null = null;
+  if (counterId) {
+    const { data: counter } = await db
+      .from("it_run_bib_counters")
+      .select("id, label, is_enabled")
+      .eq("id", counterId)
+      .eq("event_id", event.id)
+      .maybeSingle<{ id: string; label: string; is_enabled: boolean }>();
+    if (!counter) return NextResponse.json({ error: "Counter not found" }, { status: 404 });
+    if (!counter.is_enabled) return NextResponse.json({ error: "This counter is disabled. Choose an active counter.", code: "COUNTER_DISABLED" }, { status: 409 });
+    counterLabel = counter.label;
+    counterRef = counter.id;
+  }
+
   const { error: insErr } = await db
     .from("it_run_bib_collections")
     .insert({
       participant_id:  participantId,
       volunteer_email: session.email,
-      counter_number:  counter_name ?? null,
+      counter_number:  counterLabel,
+      counter_id:      counterRef,
     });
 
   if (insErr) {
