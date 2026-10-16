@@ -17,6 +17,12 @@ interface Staff {
 const ROLES = ["bib_staff", "checkin_staff", "breakfast_staff", "goodies_staff", "tshirt_staff", "medal_staff", "event_admin"];
 const ACCENT = "#e8620a";
 
+/** A role code in plain words, e.g. bib_staff -> "Bib staff" */
+function roleLabel(role: string): string {
+  const words = role.replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 export default function StaffOpsPage() {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,7 +106,7 @@ export default function StaffOpsPage() {
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: "#fff", margin: 0 }}>Race-Day Staff</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 800, color: "#fff", margin: 0 }}>Race-day staff accounts</h1>
         <button
           onClick={() => setOpenCreate(!openCreate)}
           style={{
@@ -114,13 +120,13 @@ export default function StaffOpsPage() {
             fontFamily: "inherit",
           }}
         >
-          {openCreate ? "Cancel" : "+ Add Staff"}
+          {openCreate ? "Cancel" : "+ Add a staff member"}
         </button>
       </div>
 
       {openCreate && (
         <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: 20, marginBottom: 24 }}>
-          <h3 style={{ color: "#fff", marginTop: 0 }}>Create New Staff</h3>
+          <h3 style={{ color: "#fff", marginTop: 0 }}>New staff member</h3>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
             <input
               placeholder="Full Name"
@@ -161,7 +167,7 @@ export default function StaffOpsPage() {
             >
               {ROLES.map(r => (
                 <option key={r} value={r}>
-                  {r.replace("_", " ").toUpperCase()}
+                  {roleLabel(r)}
                 </option>
               ))}
             </select>
@@ -170,7 +176,7 @@ export default function StaffOpsPage() {
             onClick={handleCreate}
             style={{ padding: "10px 16px", background: ACCENT, border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
           >
-            Create Staff
+            Add staff member
           </button>
         </div>
       )}
@@ -188,7 +194,7 @@ export default function StaffOpsPage() {
                     {s.email} · {s.staff_code}
                   </div>
                   <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>
-                    {s.role.replace("_", " ").toUpperCase()} · {s.status === "active" ? "🟢 Active" : "🔴 " + s.status}
+                    {roleLabel(s.role)} · {s.status === "active" ? "🟢 Active" : "🔴 " + s.status}
                     {s.last_login_at && ` · Last: ${new Date(s.last_login_at).toLocaleDateString()}`}
                   </div>
                 </div>
