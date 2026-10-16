@@ -130,6 +130,7 @@ export default function ParticipantsPage() {
   const [loading, setLoading] = useState(false);
   const [search,  setSearch]  = useState("");
   const [status,  setStatus]  = useState("");
+  const [altOnly, setAltOnly] = useState(false);
   const [editing, setEditing] = useState<Participant | null>(null);
 
   const load = useCallback(async () => {
@@ -138,6 +139,7 @@ export default function ParticipantsPage() {
       const params = new URLSearchParams({ page: String(page), limit: "40" });
       if (search) params.set("search", search);
       if (status) params.set("status", status);
+      if (altOnly) params.set("alt", "yes");
       const res = await fetch(`/api/it-run/admin/participants?${params}`);
       const d   = await res.json();
       setData(d.data ?? []);
@@ -145,7 +147,7 @@ export default function ParticipantsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, status]);
+  }, [page, search, status, altOnly]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -182,6 +184,10 @@ export default function ParticipantsPage() {
           <option value="rejected">Rejected</option>
           <option value="need_clarification">Clarification</option>
         </select>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#ccc", whiteSpace: "nowrap" }}>
+          <input type="checkbox" checked={altOnly} onChange={e => { setAltOnly(e.target.checked); setPage(0); }} />
+          Has alternative email
+        </label>
       </div>
 
       {loading ? <div style={{ color: "#888", padding: 40, textAlign: "center" }}>Loading...</div> : (

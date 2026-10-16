@@ -30,6 +30,8 @@ export async function GET(req: NextRequest) {
   const limit  = parseInt(sp.get("limit")  ?? "40");
   const search = sp.get("search") ?? "";
   const status = sp.get("status") ?? "";
+  // alt=yes: only runners who gave an alternative email address
+  const alt    = sp.get("alt") ?? "";
 
   const db = getSupabaseServer();
   const { data: event } = await db
@@ -54,6 +56,7 @@ export async function GET(req: NextRequest) {
     .eq("it_run_registrations.event_id", event.id);
 
   if (status) query = query.eq("verification_status", status);
+  if (alt === "yes") query = query.not("alt_email", "is", null);
 
   if (search) {
     query = query.or(

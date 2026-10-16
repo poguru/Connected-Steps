@@ -124,7 +124,7 @@ export default function CheckinPage() {
     setError(null);
 
     try {
-      const res = await fetch("/api/it-run/admin/checkins", {
+      const res = await fetch("/api/it-run/checkin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ participantId: participant.id }),
