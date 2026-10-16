@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
       id, first_name, last_name, gender, dob, email, mobile, blood_group,
       emergency_name, emergency_phone, company_name, employee_id,
       company_id_url, tshirt_size, medical_conditions, food_preference,
-      bib_number, wave, collection_counter, verification_status, participant_type, category_id, cancelled_at, cancelled_reason,
+      bib_number, wave, collection_counter, verification_status, participant_type, category_id, cancelled_at, cancelled_reason, alt_email,
       it_run_registrations!inner(
         id, registration_code, payment_status, registration_status,
         it_run_categories(name, color),

@@ -44,7 +44,9 @@ export default function AdminEmailsPage() {
   const [statuses, setStatuses] = useState<string[]>([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [preview, setPreview] = useState<{ recipientCount: number; excludedInvalid: number; excludedDuplicate: number; previewHtml: string } | null>(null);
+  // Which address receives the message: both, primary only, or alternative only. Both is the default.
+  const [destination, setDestination] = useState<"primary" | "alternative" | "both">("both");
+  const [preview, setPreview] = useState<{ recipientCount: number; excludedInvalid: number; excludedDuplicate: number; previewHtml: string; destination?: string; alternativeCount?: number } | null>(null);
   const [updateBatch, setUpdateBatch] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
 
@@ -81,6 +83,7 @@ export default function AdminEmailsPage() {
       paymentStatuses: statuses,
       registeredFrom: from || undefined,
       registeredTo: to || undefined,
+      destination,
     };
   }
 
@@ -158,7 +161,7 @@ export default function AdminEmailsPage() {
     setResendBatch(batch);
     setMessage(null);
     try {
-      const data = await post({ action: "queue_confirmation", batchId: batch, participantIds: picked });
+      const data = await post({ action: "queue_confirmation", batchId: batch, participantIds: picked, destination });
       setMessage({ text: data.status === "already_queued" ? "These confirmations were already queued. Their progress is shown below." : `Queued ${data.count} confirmation emails.`, ok: true });
       await deliver(batch);
       setResendBatch(null);
@@ -225,6 +228,14 @@ export default function AdminEmailsPage() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 10 }}>
               <div><label style={label} htmlFor="from">Registered from</label><input id="from" type="date" style={input} value={from} onChange={e => { setFrom(e.target.value); setPreview(null); }} /></div>
               <div><label style={label} htmlFor="to">Registered to</label><input id="to" type="date" style={input} value={to} onChange={e => { setTo(e.target.value); setPreview(null); }} /></div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={label} htmlFor="dest">Send to</label>
+                <select id="dest" style={input} value={destination} onChange={e => { setDestination(e.target.value as "primary" | "alternative" | "both"); setPreview(null); setConfirming(false); }}>
+                  <option value="both">Primary and alternative address (default)</option>
+                  <option value="primary">Primary address only</option>
+                  <option value="alternative">Alternative address only</option>
+                </select>
+              </div>
             </div>
             <p style={{ fontSize: 12, color: "#666", margin: "10px 0 0" }}>Runners without a valid email address are left out. The same address is only emailed once.</p>
             <div style={{ marginTop: 14 }}>
@@ -238,6 +249,9 @@ export default function AdminEmailsPage() {
                 <strong>{preview.recipientCount}</strong> {preview.recipientCount === 1 ? "person" : "people"} will receive this email.
               </div>
               <div style={{ fontSize: 12, color: "#777", marginBottom: 12 }}>
+                Sending to: {preview.destination === "primary" ? "primary address only" : preview.destination === "alternative" ? "alternative address only" : "primary and alternative addresses"}
+                {preview.alternativeCount ? " (" + preview.alternativeCount + " alternative)" : ""}.
+                <br />
                 Left out: {preview.excludedInvalid} without a valid address, {preview.excludedDuplicate} duplicate addresses.
               </div>
               <div style={{ fontSize: 13, color: "#aaa", marginBottom: 8 }}>Preview (as the first person sees it)</div>

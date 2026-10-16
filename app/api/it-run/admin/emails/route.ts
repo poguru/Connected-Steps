@@ -4,7 +4,7 @@ import { requireRole, getClientIp } from "@/lib/it-run-auth";
 import { sanitizeEmailHtml } from "@/lib/it-run-email-html";
 import {
   selectRecipients, loadEventRunners, buildEventUpdateHtml, queueBatch, processBatch,
-  requeueRetryable, batchSummary, type RecipientFilter,
+  requeueRetryable, batchSummary, type RecipientFilter, type Destination, DESTINATIONS,
 } from "@/lib/it-run-email-campaign";
 import { buildCategoryConfirmation } from "@/lib/it-run-email";
 
@@ -25,6 +25,11 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const STATUSES = ["paid", "free", "pending", "payment_attempted", "failed", "partially_refunded"];
 
+// Which address receives the message. Both is the default: the primary and the alternative address of each runner.
+function destinationOf(raw: unknown): Destination {
+  return DESTINATIONS.includes(raw as Destination) ? (raw as Destination) : "both";
+}
+
 function cleanFilter(raw: unknown): RecipientFilter | { error: string } {
   const f = (raw ?? {}) as Record<string, unknown>;
   const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
@@ -35,7 +40,7 @@ function cleanFilter(raw: unknown): RecipientFilter | { error: string } {
   const registeredFrom = typeof f.registeredFrom === "string" && f.registeredFrom ? f.registeredFrom : undefined;
   const registeredTo = typeof f.registeredTo === "string" && f.registeredTo ? f.registeredTo : undefined;
   if ((registeredFrom && !DATE.test(registeredFrom)) || (registeredTo && !DATE.test(registeredTo))) return { error: "Dates must be YYYY-MM-DD." };
-  return { categoryIds, participantIds, paymentStatuses, registeredFrom, registeredTo };
+  return { categoryIds, participantIds, paymentStatuses, registeredFrom, registeredTo, destination: destinationOf(f.destination) };
 }
 
 function cleanUpdate(subject: unknown, body: unknown): { subject: string; html: string } | { error: string } {
@@ -93,6 +98,8 @@ export async function POST(req: NextRequest) {
     if (action === "preview_update") {
       return NextResponse.json({
         recipientCount: selection.recipients.length,
+        destination: filter.destination,
+        alternativeCount: selection.recipients.filter(r => r.addressKind === "alternative").length,
         excludedInvalid: selection.excludedInvalid,
         excludedDuplicate: selection.excludedDuplicate,
         subject: update.subject,
@@ -141,13 +148,23 @@ export async function POST(req: NextRequest) {
       if (!groups.has(key)) groups.set(key, id);
     }
 
+    const destination = destinationOf(body.destination);
     const rows: Array<{ email: string; name: string; registrationId: string; participantId: string; html: string; subject: string }> = [];
     let subject = "";
     for (const [key, participantId] of groups) {
-      const built = await buildCategoryConfirmation(key.split("|")[0], participantId);
+      const regId = key.split("|")[0];
+      const built = await buildCategoryConfirmation(regId, participantId);
       if (!built) continue;
       subject = built.subject;
+      // Each person's own primary and alternative addresses in this booking tell the two apart
+      const booking = runners.filter(r => r.registration_id === regId);
+      const primaries = new Set(booking.map(r => (r.email ?? "").trim().toLowerCase()).filter(Boolean));
+      const alternatives = new Set(booking.map(r => (r.alt_email ?? "").trim().toLowerCase()).filter(Boolean));
       for (const to of built.recipients) {
+        const address = to.toLowerCase();
+        const isAlternative = alternatives.has(address) && !primaries.has(address);
+        if (destination === "primary" && isAlternative) continue;
+        if (destination === "alternative" && !isAlternative) continue;
         rows.push({ email: to.toLowerCase(), name: built.name, registrationId: key.split("|")[0], participantId, html: built.html, subject: built.subject });
       }
     }

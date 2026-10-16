@@ -11,6 +11,10 @@ import { emailWrapper, emailHeader, emailFooter } from "@/lib/email/layout";
 import { escapeHtml } from "@/lib/it-run-verification";
 
 export type EmailType = "event_update" | "confirmation_resend";
+
+/** Which address of each runner receives the message. Both is the default: the primary and the alternative address. */
+export type Destination = "primary" | "alternative" | "both";
+export const DESTINATIONS: Destination[] = ["primary", "alternative", "both"];
 export const MAX_ATTEMPTS = 3;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -25,6 +29,8 @@ export interface RecipientFilter {
   registeredTo?: string;
   /** Only these runners (chosen by hand) */
   participantIds?: string[];
+  /** Which address of each runner receives the message. Missing means the primary address only (the earlier behaviour). */
+  destination?: Destination;
 }
 
 export interface Recipient {
@@ -33,6 +39,8 @@ export interface Recipient {
   email: string;
   name: string;
   categoryId: string | null;
+  /** Which of the runner's addresses this is */
+  addressKind: "primary" | "alternative";
 }
 
 export interface RecipientSelection {
@@ -49,6 +57,8 @@ export interface EventRunnerRow {
   first_name: string;
   last_name: string;
   email: string | null;
+  /** The optional alternative address of this runner */
+  alt_email?: string | null;
   category_id: string | null;
   event_id: string;
   registration_category_id: string;
@@ -79,17 +89,24 @@ export function selectRecipients(rows: EventRunnerRow[], filter: RecipientFilter
     if (from && day < from) continue;
     if (to && day > to) continue;
 
-    if (!isValidEmail(row.email)) { excludedInvalid++; continue; }
-    const email = (row.email as string).trim().toLowerCase();
-    if (seen.has(email)) { excludedDuplicate++; continue; }
-    seen.add(email);
-    recipients.push({
-      participantId: row.id,
-      registrationId: row.registration_id,
-      email,
-      name: `${row.first_name} ${row.last_name}`.trim(),
-      categoryId,
-    });
+    const destination = filter.destination ?? "primary";
+    const name = `${row.first_name} ${row.last_name}`.trim();
+    const add = (address: string, kind: "primary" | "alternative") => {
+      const email = address.trim().toLowerCase();
+      if (seen.has(email)) { excludedDuplicate++; return; }
+      seen.add(email);
+      recipients.push({ participantId: row.id, registrationId: row.registration_id, email, name, categoryId, addressKind: kind });
+    };
+    // The primary address: counted as invalid when missing, as before
+    if (destination !== "alternative") {
+      if (!isValidEmail(row.email)) excludedInvalid++;
+      else add(row.email as string, "primary");
+    }
+    // The alternative address: optional, so an empty one is simply not used
+    if (destination !== "primary" && row.alt_email) {
+      if (!isValidEmail(row.alt_email)) excludedInvalid++;
+      else add(row.alt_email, "alternative");
+    }
   }
   return { recipients, excludedInvalid, excludedDuplicate };
 }
@@ -98,7 +115,7 @@ export function selectRecipients(rows: EventRunnerRow[], filter: RecipientFilter
 export async function loadEventRunners(db: SupabaseClient, eventId: string): Promise<EventRunnerRow[]> {
   const { data, error } = await db
     .from("it_run_participants")
-    .select("id, registration_id, first_name, last_name, email, category_id, it_run_registrations!inner(event_id, category_id, payment_status, registration_status, created_at)")
+    .select("id, registration_id, first_name, last_name, email, alt_email, category_id, it_run_registrations!inner(event_id, category_id, payment_status, registration_status, created_at)")
     .eq("it_run_registrations.event_id", eventId)
     .returns<Array<Record<string, unknown>>>();
   if (error) throw new Error("runners could not be loaded");
@@ -110,6 +127,7 @@ export async function loadEventRunners(db: SupabaseClient, eventId: string): Pro
       first_name: row.first_name as string,
       last_name: row.last_name as string,
       email: (row.email as string | null) ?? null,
+      alt_email: (row.alt_email as string | null) ?? null,
       category_id: (row.category_id as string | null) ?? null,
       event_id: reg.event_id,
       registration_category_id: reg.category_id,

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 
 interface Participant {
-  id: string; first_name: string; last_name: string; email: string | null;
+  id: string; first_name: string; last_name: string; email: string | null; alt_email?: string | null;
   mobile: string; tshirt_size: string | null; dob: string | null;
   gender: string; blood_group: string | null;
   emergency_name: string | null; emergency_phone: string | null;
@@ -221,6 +221,7 @@ export default function ParticipantsPage() {
                       </div>
                       <div style={{ fontSize: 11, color: "#888", display: "flex", gap: 12, flexWrap: "wrap" }}>
                         <span>{p.email ?? p.mobile}</span>
+                        {p.alt_email && <span style={{ color: "#888" }}>Alt: {p.alt_email}</span>}
                         {p.company_name && <span>{p.company_name}</span>}
                         {p.participant_type && p.participant_type !== "solo" && (
                           <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 4,
