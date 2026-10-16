@@ -14,6 +14,7 @@ interface Participant {
   // company_id_url is only used server-side (to drive has_company_id).
   // The frontend never renders it as an img src — it fetches a signed URL instead.
   company_id_url: string | null; verification_status: string;
+  verification_outcome: string | null; verification_version: number;
   id_document_type: string | null;
   it_run_registrations: {
     registration_code: string; payment_status: string;
@@ -374,12 +375,12 @@ export default function VerificationPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  async function updateStatus(id: string, status: "verified" | "rejected" | "need_clarification") {
+  async function updateStatus(id: string, status: "verified" | "company_verified" | "rejected" | "need_clarification") {
     const reason      = reasons[id] || undefined;
     const explanation = notes[id] ?? "";
 
     // Client-side mirror of the server rules, so the admin sees the problem before a request is sent
-    const check = validateReviewDecision({ status, reason, adminExplanation: explanation });
+    const check = validateReviewDecision({ status: status === "company_verified" ? "verified" : status, reason, adminExplanation: explanation });
     if (!check.ok) {
       setRowError(prev => ({ ...prev, [id]: check.error }));
       return;
@@ -391,7 +392,8 @@ export default function VerificationPage() {
       const res = await fetch("/api/it-run/admin/verification", {
         method:  "PATCH",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ participantId: id, status, reason, adminExplanation: explanation }),
+        // The version of the record this review is made on. The server refuses it if someone changed the record since.
+        body:    JSON.stringify({ participantId: id, status, reason, adminExplanation: explanation, expectedVersion: data.find(r => r.id === id)?.verification_version }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({})) as { error?: string };
@@ -584,7 +586,22 @@ export default function VerificationPage() {
                         Not verified: no ID uploaded. This registration cannot be confirmed until an ID is uploaded and verified. Nothing to review yet.
                       </div>
                     ) : (
+                    <>
+                    {p.verification_outcome && (
+                      <div style={{ fontSize: 12, color: "#10b981", fontWeight: 600, marginTop: 10 }}>
+                        Outcome: {p.verification_outcome === "company_verified" ? "Company ID verified" : "Government ID verified"}
+                      </div>
+                    )}
                     <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                      {p.verification_outcome !== "company_verified" && (
+                        <button
+                          onClick={() => updateStatus(p.id, "company_verified")}
+                          disabled={updating === p.id}
+                          style={BTN("#14b8a6")}
+                        >
+                          {updating === p.id ? "…" : "Company ID Verified"}
+                        </button>
+                      )}
                       {tab !== "verified" && (
                         <button
                           onClick={() => updateStatus(p.id, "verified")}
@@ -622,6 +639,7 @@ export default function VerificationPage() {
                         </button>
                       )}
                     </div>
+                    </>
                     )}
                     {rowError[p.id] && (
                       <div role="alert" style={{ fontSize: 12, color: "#f87171", marginTop: 8 }}>

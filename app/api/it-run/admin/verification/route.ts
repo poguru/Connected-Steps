@@ -13,6 +13,9 @@ import {
   buildCompanyVerificationClarificationEmail,
 } from "@/lib/it-run-verification";
 import { buildCompanyIdCorrectionUrl } from "@/lib/it-run-company-id-link";
+import { outcomeForDecision, rejectionCancelsCategory, storedStatusFor, type ReviewAction } from "@/lib/it-run-verification-outcome";
+
+const REVIEW_ACTIONS: ReviewAction[] = ["verified", "company_verified", "rejected", "need_clarification"];
 
 // GET /api/it-run/admin/verification?status=pending&page=0&limit=50
 export async function GET(req: NextRequest) {
@@ -36,7 +39,7 @@ export async function GET(req: NextRequest) {
     .from("it_run_participants")
     .select(`
       id, first_name, last_name, email, mobile,
-      company_name, employee_id, company_id_url, verification_status, id_document_type,
+      company_name, employee_id, company_id_url, verification_status, verification_outcome, verification_version, id_document_type,
       it_run_registrations ( registration_code, payment_status, registration_status,
         it_run_categories ( name ) )
     `, { count: "exact" })
@@ -64,6 +67,7 @@ export async function PATCH(req: NextRequest) {
     status?: string;
     reason?: unknown;
     adminExplanation?: unknown;
+    expectedVersion?: unknown;
   };
   try {
     body = await req.json();
@@ -76,8 +80,18 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "participantId and status required" }, { status: 400 });
   }
 
+  // The review must say which version of the record it was made on. A decision on an out-of-date record is refused.
+  if (!REVIEW_ACTIONS.includes(status as ReviewAction)) {
+    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+  }
+  const action = status as ReviewAction;
+  if (typeof body.expectedVersion !== "number" || !Number.isInteger(body.expectedVersion)) {
+    return NextResponse.json({ error: "Reload the list before reviewing: the record version is missing.", code: "VERSION_REQUIRED" }, { status: 400 });
+  }
+  const expectedVersion = body.expectedVersion;
+
   const decision = validateReviewDecision({
-    status,
+    status: storedStatusFor(action),
     reason: body.reason,
     adminExplanation: body.adminExplanation,
   });
@@ -88,15 +102,15 @@ export async function PATCH(req: NextRequest) {
   try {
     const db = getSupabaseServer();
 
-    const { data: event } = await db.from("it_run_events").select("id, title, slug").eq("slug", "sprint-2").single();
+    const { data: event } = await db.from("it_run_events").select("id, title, slug, registration_closes_at").eq("slug", "sprint-2").single<{ id: string; title: string; slug: string; registration_closes_at: string | null }>();
     if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
     const { data: part } = await db
       .from("it_run_participants")
-      .select("email, first_name, company_id_url, id_document_type, registration_id, qr_token")
+      .select("email, first_name, company_id_url, id_document_type, registration_id, qr_token, verification_version")
       .eq("id", participantId)
       .eq("event_id", event.id)
-      .maybeSingle<{ email: string | null; first_name: string; company_id_url: string | null; id_document_type: string | null; registration_id: string; qr_token: string | null }>();
+      .maybeSingle<{ email: string | null; first_name: string; company_id_url: string | null; id_document_type: string | null; registration_id: string; qr_token: string | null; verification_version: number }>();
     if (!part) return NextResponse.json({ error: "Participant not found" }, { status: 404 });
     // A participant who continued without an ID has nothing to review. Never approve or reject them.
     if (!part.company_id_url) {
@@ -106,21 +120,34 @@ export async function PATCH(req: NextRequest) {
       }, { status: 409 });
     }
 
-    const { error: updErr } = await db
+    // The outcome is stored with the status. The version guard makes this update apply only to the record that was reviewed.
+    const { data: updated, error: updErr } = await db
       .from("it_run_participants")
-      .update({ verification_status: status })
-      .eq("id", participantId);
+      .update({
+        verification_status: storedStatusFor(action),
+        verification_outcome: outcomeForDecision(action, (part.id_document_type as "company" | "government" | null)),
+        verification_version: part.verification_version + 1,
+      })
+      .eq("id", participantId)
+      .eq("verification_version", expectedVersion)
+      .select("id");
 
     if (updErr) {
       console.error("[it-run/verification] participant update failed:", updErr.message);
       return NextResponse.json({ error: "Failed to update verification status" }, { status: 500 });
+    }
+    if (!updated?.length) {
+      return NextResponse.json({
+        error: "This record was changed by another reviewer. Reload the list and review it again.",
+        code: "VERSION_CONFLICT",
+      }, { status: 409 });
     }
 
     const { error: logErr } = await db
       .from("it_run_company_verifications")
       .insert({
         participant_id: participantId,
-        status,
+        status: storedStatusFor(action),
         verification_reason: decision.reason,
         admin_explanation: decision.explanation,
         reviewer_email: session.email,
@@ -133,7 +160,8 @@ export async function PATCH(req: NextRequest) {
     // A rejected ID cancels that runner's category only, releases its seats, and records its refund (90%).
     // Nothing is emailed unless the cancellation succeeded, so the email never describes a cancellation that did not happen.
     let rejectionCancel: { refundPaise: number; categoryName: string; runners: number; free: boolean } | null = null;
-    if (status === "rejected") {
+    // Before registration closes, a rejected ID only asks for a correct upload: nothing is cancelled.
+    if (action === "rejected" && rejectionCancelsCategory(event.registration_closes_at, new Date())) {
       const cancel = await cancelRunnerCategory(db, {
         participantId,
         reason: decision.explanation ?? decision.reason ?? "ID verification failed",
@@ -154,13 +182,14 @@ export async function PATCH(req: NextRequest) {
     // Correction link is bound to the document currently on file. No document = no correction link to send.
     const correctionUrl = part.company_id_url ? buildCompanyIdCorrectionUrl(participantId, part.company_id_url) : null;
 
-    if (part.email && (status === "verified" || correctionUrl)) {
+    const stored = storedStatusFor(action);
+    if (part.email && (stored === "verified" || correctionUrl)) {
       const { sendEmail } = await import("@/lib/notify");
 
       let subject = "";
       let htmlBody = "";
 
-      if (status === "verified") {
+      if (stored === "verified") {
         const isGovernment = part.id_document_type === "government";
         subject = isGovernment ? `ID Verified - ${event.title}` : `Company ID Verified - ${event.title}`;
         // The registration ID and this runner's QR code come with the verified email
@@ -175,9 +204,17 @@ export async function PATCH(req: NextRequest) {
           eventDate: "February 7, 2027",
           registration: regRow?.registration_code ? { code: regRow.registration_code, qrUrl } : undefined,
         }, isGovernment ? "government" : "company");
-      } else if (status === "rejected") {
+      } else if (stored === "rejected") {
         // Only sent when the cancellation happened in this request (not on a repeat)
-        if (rejectionCancel) {
+        if (!rejectionCancel && correctionUrl) {
+          // Before registration closes: the runner is asked for a correct document. Nothing is cancelled.
+          subject = "Company ID - Please Upload a Correct ID (The IT Run Sprint-2)";
+          htmlBody = buildCompanyVerificationClarificationEmail(
+            part.first_name,
+            decision.explanation ?? "The document we received could not be accepted. Please upload a clear, correct ID.",
+            { eventTitle: event.title, correctionUrl },
+          );
+        } else if (rejectionCancel) {
           subject = "ID Verification Failed - Registration Cancelled (The IT Run Sprint-2)";
           htmlBody = buildCategoryCancelledEmail({
             firstName: part.first_name,
@@ -228,7 +265,7 @@ export async function PATCH(req: NextRequest) {
 
     // A verified ID can complete the registration. It is confirmed only when every adult is verified and the payment is
     // in place; then its confirmation email and BIB invite are sent. Rejection or a clarification keeps it pending.
-    if (status === "verified") {
+    if (stored === "verified") {
       const outcome = await confirmIfVerified(db, part.registration_id);
       if (outcome === "confirmed") {
         runAfterResponse("confirmed_notice", () => sendConfirmedNotices(part.registration_id));

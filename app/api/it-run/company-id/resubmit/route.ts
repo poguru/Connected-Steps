@@ -23,6 +23,7 @@ interface LoadedCorrection {
   participant: {
     id: string; first_name: string; email: string | null;
     company_id_url: string | null; verification_status: string;
+    verification_outcome: string | null; verification_version: number;
     event_id: string;
   };
   eventTitle: string;
@@ -52,7 +53,7 @@ async function loadCorrection(token: string): Promise<{ ok: true; data: LoadedCo
   const db = getSupabaseServer();
   const { data: participant, error } = await db
     .from("it_run_participants")
-    .select("id, first_name, email, company_id_url, verification_status, event_id")
+    .select("id, first_name, email, company_id_url, verification_status, verification_outcome, verification_version, event_id")
     .eq("id", verified.payload.participantId)
     .maybeSingle<LoadedCorrection["participant"]>();
   if (error) {
@@ -169,9 +170,10 @@ export async function POST(req: NextRequest) {
   const previousUrl = participant.company_id_url;
   const { data: updated, error: updErr } = await db
     .from("it_run_participants")
-    .update({ company_id_url: path, verification_status: "pending" })
+    .update({ company_id_url: path, verification_status: "pending", verification_outcome: null, verification_version: participant.verification_version + 1 })
     .eq("id", participant.id)
     .eq("company_id_url", previousUrl)
+    .eq("verification_version", participant.verification_version)
     .in("verification_status", CORRECTABLE)
     .select("id")
     .maybeSingle<{ id: string }>();

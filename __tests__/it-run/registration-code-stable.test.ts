@@ -48,13 +48,14 @@ function fakeDb() {
       b.maybeSingle = () => Promise.resolve({
         data: {
           email: "asha@example.com", first_name: "Asha", company_id_url: "1760000000000-doc1.jpg",
-          id_document_type: "company", registration_id: "r-1",
+          id_document_type: "company", registration_id: "r-1", verification_version: 0,
         },
         error: null,
       });
       b.update = (p: any) => { writes.push({ table, payload: p }); return b; };
       b.insert = (p: any) => { writes.push({ table, payload: p }); return Promise.resolve({ data: null, error: null }); };
-      b.then = (res: any, rej?: any) => Promise.resolve({ data: null, error: null }).then(res, rej);
+      // The version-guarded update returns the row it changed
+      b.then = (res: any, rej?: any) => Promise.resolve({ data: [{ id: "p-1" }], error: null }).then(res, rej);
       return b;
     },
   };
@@ -64,7 +65,7 @@ function review(status: string, extra: Record<string, unknown> = {}) {
   return PATCH(new NextRequest("http://t/api/it-run/admin/verification", {
     method: "PATCH",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ participantId: "p-1", status, ...extra }),
+    body: JSON.stringify({ participantId: "p-1", status, expectedVersion: 0, ...extra }),
   }));
 }
 

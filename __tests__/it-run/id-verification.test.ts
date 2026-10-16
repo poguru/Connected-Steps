@@ -243,7 +243,7 @@ describe("admin verification", () => {
 
     const res = await adminDecisionPatch(new NextRequest("http://t/api/it-run/admin/verification", {
       method: "PATCH", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ participantId: "p1", status: "rejected", reason: "unreadable_id" }),
+      body: JSON.stringify({ participantId: "p1", status: "rejected", reason: "unreadable_id", expectedVersion: 0 }),
     }));
 
     expect(res.status).toBe(409);

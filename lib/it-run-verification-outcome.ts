@@ -1,0 +1,40 @@
+/**
+ * The identity-verification outcome, and the rules for each review decision.
+ *
+ * Two different facts are recorded, and they are never mixed:
+ *   - government_verified: a government-issued ID was checked and accepted. It does not prove employment.
+ *   - company_verified:    employment proof (a company ID) was checked and accepted, either online or by the manual desk
+ *                          at BIB collection. A participant who registered with a government ID can reach this outcome
+ *                          there, after the physical check.
+ *
+ * Rejection is treated differently before and after registration closes:
+ *   - Before close: the document is wrong, so the runner is asked to upload a correct one. Nothing is cancelled.
+ *   - After close: the rejection cancels that runner's category, with the refund rule (see it-run-category-cancel).
+ */
+
+export type VerificationOutcome = "government_verified" | "company_verified";
+
+export type ReviewAction = "verified" | "company_verified" | "rejected" | "need_clarification";
+
+/**
+ * The outcome to store for a decision. "verified" is the standard online check: the outcome follows the document type
+ * that was checked. "company_verified" is the explicit employment check, and it applies whatever document was supplied.
+ * Returns null for decisions that do not verify anyone.
+ */
+export function outcomeForDecision(action: ReviewAction, documentType: "company" | "government" | null): VerificationOutcome | null {
+  if (action === "company_verified") return "company_verified";
+  if (action === "verified") return documentType === "company" ? "company_verified" : "government_verified";
+  return null;
+}
+
+/** Whether a rejection cancels the runner's category right now. Only once registration has closed. */
+export function rejectionCancelsCategory(registrationClosesAt: string | null, now: Date): boolean {
+  if (!registrationClosesAt) return false;
+  const closes = new Date(registrationClosesAt).getTime();
+  return Number.isFinite(closes) && now.getTime() >= closes;
+}
+
+/** The stored status for a decision. "company_verified" is stored as verified, with the outcome recorded beside it. */
+export function storedStatusFor(action: ReviewAction): "verified" | "rejected" | "need_clarification" {
+  return action === "company_verified" ? "verified" : action;
+}
