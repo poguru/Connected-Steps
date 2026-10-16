@@ -178,10 +178,12 @@ export default function AdminEmailsPage() {
   return (
     <div style={{ maxWidth: 880, margin: "0 auto", padding: "24px 16px 80px", color: "#ddd", fontFamily: "inherit" }}>
       <h1 style={{ fontSize: 22, color: "#fff", margin: "0 0 4px" }}>Event emails</h1>
-      <p style={{ fontSize: 13, color: "#777", margin: "0 0 18px" }}>The IT Run Sprint-2. Nothing is sent until you confirm.</p>
+      <p style={{ fontSize: 13, color: "#777", margin: "0 0 18px", lineHeight: 1.6 }}>
+        Send an update to runners, or resend their confirmation. You check the list of people and see a preview first. Nothing is sent until you confirm.
+      </p>
 
       <div role="tablist" style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        {([["update", "Event update"], ["confirmation", "Resend confirmation"]] as const).map(([key, text]) => (
+        {([["update", "Send an update"], ["confirmation", "Resend a confirmation"]] as const).map(([key, text]) => (
           <button key={key} role="tab" aria-selected={tab === key} onClick={() => setTab(key)}
             style={{ ...button(tab === key), padding: "8px 14px" }}>{text}</button>
         ))}
@@ -208,7 +210,7 @@ export default function AdminEmailsPage() {
           </div>
 
           <div style={card}>
-            <span style={label}>Who receives it</span>
+            <span style={label}>Who should receive it</span>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
               {categories.map(c => (
                 <label key={c.id} style={{ fontSize: 13, display: "flex", gap: 6, alignItems: "center" }}>
@@ -278,9 +280,9 @@ export default function AdminEmailsPage() {
 
       {tab === "confirmation" && (
         <div style={card}>
-          <span style={label}>Find a runner</span>
+          <span style={label}>Pick runners to resend to (optional)</span>
           <div style={{ display: "flex", gap: 8 }}>
-            <input style={input} placeholder="Name, email or mobile" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === "Enter") searchRunners(); }} />
+            <input style={input} placeholder="Type a name, email or mobile, then press Search" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === "Enter") searchRunners(); }} />
             <button style={button()} onClick={searchRunners}>Search</button>
           </div>
           <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
@@ -312,7 +314,7 @@ export default function AdminEmailsPage() {
               {progress.running && <span style={{ color: "#aaa" }}> · sending…</span>}
               {!progress.running && progress.summary.retryable > 0 && (
                 <div style={{ marginTop: 10 }}>
-                  <button style={button()} onClick={() => deliver(progress.batchId, true)}>Retry {progress.summary.retryable} failed</button>
+                  <button style={button()} onClick={() => deliver(progress.batchId, true)}>Retry the {progress.summary.retryable} that failed</button>
                 </div>
               )}
             </div>
@@ -322,7 +324,7 @@ export default function AdminEmailsPage() {
       )}
 
       <div style={card}>
-        <span style={label}>History</span>
+        <span style={label}>Past sends</span>
         {history.length === 0 && <div style={{ fontSize: 13, color: "#666" }}>No emails sent yet.</div>}
         {history.map(h => (
           <div key={h.batchId} style={{ padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: 13 }}>
@@ -335,7 +337,7 @@ export default function AdminEmailsPage() {
             </div>
             {h.summary.retryable > 0 && (
               <button style={{ ...button(), marginTop: 6, padding: "6px 10px", fontSize: 12 }} onClick={() => deliver(h.batchId, true)}>
-                Retry {h.summary.retryable} failed
+                Retry the {h.summary.retryable} that failed
               </button>
             )}
           </div>
