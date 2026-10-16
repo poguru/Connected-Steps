@@ -5,7 +5,7 @@
 
 import fs from "fs";
 import path from "path";
-import { outcomeForDecision, rejectionCancelsCategory, storedStatusFor } from "@/lib/it-run-verification-outcome";
+import { outcomeForDecision, storedStatusFor } from "@/lib/it-run-verification-outcome";
 
 const ROOT = path.resolve(__dirname, "../..");
 
@@ -49,30 +49,6 @@ describe("storedStatusFor", () => {
   });
 });
 
-describe("rejectionCancelsCategory: only once registration has closed", () => {
-  const closes = "2027-01-15T18:29:59Z";
-
-  it("does not cancel before registration closes", () => {
-    expect(rejectionCancelsCategory(closes, new Date("2027-01-10T00:00:00Z"))).toBe(false);
-  });
-
-  it("cancels once registration has closed", () => {
-    expect(rejectionCancelsCategory(closes, new Date("2027-01-16T00:00:00Z"))).toBe(true);
-  });
-
-  it("cancels at the exact closing moment", () => {
-    expect(rejectionCancelsCategory(closes, new Date(closes))).toBe(true);
-  });
-
-  it("does not cancel when there is no closing time set (the safe default)", () => {
-    expect(rejectionCancelsCategory(null, new Date("2027-06-01T00:00:00Z"))).toBe(false);
-  });
-
-  it("does not cancel for an unreadable closing time", () => {
-    expect(rejectionCancelsCategory("not a date", new Date("2027-06-01T00:00:00Z"))).toBe(false);
-  });
-});
-
 describe("the admin verification route and page use the rules", () => {
   it("the route requires the record version, so a stale review is refused", () => {
     const route = fs.readFileSync(path.join(ROOT, "app/api/it-run/admin/verification/route.ts"), "utf8");
@@ -81,9 +57,10 @@ describe("the admin verification route and page use the rules", () => {
     expect(route).toMatch(/VERSION_CONFLICT/);
   });
 
-  it("the route cancels a category only when rejectionCancelsCategory allows it", () => {
+  it("a rejection cancels the runner's category, not the booking", () => {
     const route = fs.readFileSync(path.join(ROOT, "app/api/it-run/admin/verification/route.ts"), "utf8");
-    expect(route).toMatch(/action === "rejected" && rejectionCancelsCategory\(event\.registration_closes_at/);
+    expect(route).toMatch(/if \(action === "rejected"\) \{[\s\S]*?cancelRunnerCategory/);
+    expect(route).not.toMatch(/rejectionCancelsCategory/);
   });
 
   it("the route accepts Company ID Verified and stores its outcome", () => {

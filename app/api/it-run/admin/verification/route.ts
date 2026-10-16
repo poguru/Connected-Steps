@@ -13,7 +13,7 @@ import {
   buildCompanyVerificationClarificationEmail,
 } from "@/lib/it-run-verification";
 import { buildCompanyIdCorrectionUrl } from "@/lib/it-run-company-id-link";
-import { outcomeForDecision, rejectionCancelsCategory, storedStatusFor, type ReviewAction } from "@/lib/it-run-verification-outcome";
+import { outcomeForDecision, storedStatusFor, type ReviewAction } from "@/lib/it-run-verification-outcome";
 
 const REVIEW_ACTIONS: ReviewAction[] = ["verified", "company_verified", "rejected", "need_clarification"];
 
@@ -160,8 +160,8 @@ export async function PATCH(req: NextRequest) {
     // A rejected ID cancels that runner's category only, releases its seats, and records its refund (90%).
     // Nothing is emailed unless the cancellation succeeded, so the email never describes a cancellation that did not happen.
     let rejectionCancel: { refundPaise: number; categoryName: string; runners: number; free: boolean } | null = null;
-    // Before registration closes, a rejected ID only asks for a correct upload: nothing is cancelled.
-    if (action === "rejected" && rejectionCancelsCategory(event.registration_closes_at, new Date())) {
+    // A rejected ID always cancels that runner's category (not the whole booking), at any time before the event.
+    if (action === "rejected") {
       const cancel = await cancelRunnerCategory(db, {
         participantId,
         reason: decision.explanation ?? decision.reason ?? "ID verification failed",
@@ -206,15 +206,7 @@ export async function PATCH(req: NextRequest) {
         }, isGovernment ? "government" : "company");
       } else if (stored === "rejected") {
         // Only sent when the cancellation happened in this request (not on a repeat)
-        if (!rejectionCancel && correctionUrl) {
-          // Before registration closes: the runner is asked for a correct document. Nothing is cancelled.
-          subject = "Company ID - Please Upload a Correct ID (The IT Run Sprint-2)";
-          htmlBody = buildCompanyVerificationClarificationEmail(
-            part.first_name,
-            decision.explanation ?? "The document we received could not be accepted. Please upload a clear, correct ID.",
-            { eventTitle: event.title, correctionUrl },
-          );
-        } else if (rejectionCancel) {
+        if (rejectionCancel) {
           subject = "ID Verification Failed - Registration Cancelled (The IT Run Sprint-2)";
           htmlBody = buildCategoryCancelledEmail({
             firstName: part.first_name,

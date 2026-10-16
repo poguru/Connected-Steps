@@ -7,9 +7,8 @@
  *                          at BIB collection. A participant who registered with a government ID can reach this outcome
  *                          there, after the physical check.
  *
- * Rejection is treated differently before and after registration closes:
- *   - Before close: the document is wrong, so the runner is asked to upload a correct one. Nothing is cancelled.
- *   - After close: the rejection cancels that runner's category, with the refund rule (see it-run-category-cancel).
+ * A rejection cancels that runner's category (not the whole booking), with the refund rule (see it-run-category-cancel).
+ * Clarification is the choice when the reviewer is not sure: it cancels nothing.
  */
 
 export type VerificationOutcome = "government_verified" | "company_verified";
@@ -25,13 +24,6 @@ export function outcomeForDecision(action: ReviewAction, documentType: "company"
   if (action === "company_verified") return "company_verified";
   if (action === "verified") return documentType === "company" ? "company_verified" : "government_verified";
   return null;
-}
-
-/** Whether a rejection cancels the runner's category right now. Only once registration has closed. */
-export function rejectionCancelsCategory(registrationClosesAt: string | null, now: Date): boolean {
-  if (!registrationClosesAt) return false;
-  const closes = new Date(registrationClosesAt).getTime();
-  return Number.isFinite(closes) && now.getTime() >= closes;
 }
 
 /** The stored status for a decision. "company_verified" is stored as verified, with the outcome recorded beside it. */
