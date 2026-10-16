@@ -1,5 +1,5 @@
 import { buildCardModel, SHARE_FORMAT_SIZE, type ShareFormat } from "@/lib/session-share-card";
-import { StoryCard, WhatsAppCard, BRAND_FONT } from "@/lib/session-share-card-render";
+import { StoryCard, WhatsAppCard, LinkCard, LINK_PREVIEW_SIZE, BRAND_FONT } from "@/lib/session-share-card-render";
 import { ImageResponse } from "next/og";
 import { NextRequest } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
@@ -47,7 +47,8 @@ async function fetchImageAsDataUrl(url: string): Promise<string | null> {
   }
 }
 
-// GET /api/og/session/[id]               → 1200x630 Open Graph card
+// GET /api/og/session/[id]?format=link   → 1200x630 link preview (new design)
+// GET /api/og/session/[id]               → 1200x630 Open Graph card (older design)
 // GET /api/og/session/[id]?format=story  → 1080x1920 Instagram Story
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id }  = await params;
@@ -77,6 +78,29 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const cacheHeaders = { "Cache-Control": "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400" };
 
+
+  // The link preview (1200 x 630), shown by WhatsApp and other chats when the join link is pasted
+  if (format === "link") {
+    if (!session) {
+      return new Response("Session not found", { status: 404 });
+    }
+    const model = buildCardModel({
+      title: session.title,
+      date: session.date,
+      time: session.time,
+      venue: session.venue,
+      location: session.location,
+      photo_url: session.photo_url,
+    });
+    const fontData = await fetchImageAsArrayBuffer(`${new URL(req.url).origin}/fonts/BarlowCondensed-Black.ttf`);
+    return new ImageResponse(
+      <LinkCard model={model} logoDataUrl={logoDataUrl} photoDataUrl={photoDataUrl} joinUrl={`${APP_URL}/join/${id}`} tagline="Your goal, our plan." />,
+      {
+        width: LINK_PREVIEW_SIZE.width, height: LINK_PREVIEW_SIZE.height, headers: cacheHeaders,
+        fonts: fontData ? [{ name: BRAND_FONT, data: fontData, weight: 900, style: "normal" as const }] : undefined,
+      }
+    );
+  }
 
   if (format === "story" || format === "whatsapp") {
     if (!session) {

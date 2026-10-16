@@ -32,7 +32,7 @@ export async function generateMetadata(
   const title    = session.title;
   const desc     = `📅 ${dateStr}${timeStr} · 📍 ${venue}. Join the Connected Steps community run.`;
   const pageUrl  = `${APP_URL}/join/${id}`;
-  const ogImage  = `${APP_URL}/api/og/session/${id}`;
+  const ogImage  = `${APP_URL}/api/og/session/${id}?format=link`;
 
   return {
     title: `${title} – Connected Steps`,

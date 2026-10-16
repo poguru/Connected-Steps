@@ -150,3 +150,35 @@ export function WhatsAppCard({ model, logoDataUrl, photoDataUrl, joinUrl, taglin
     </div>
   );
 }
+
+/** The size of the link preview: what WhatsApp and other chats show when the join link is pasted. */
+export const LINK_PREVIEW_SIZE = { width: 1200, height: 630 } as const;
+
+/** The 1200 x 630 link preview, in the same style as the story and WhatsApp images. */
+export function LinkCard({ model, logoDataUrl, photoDataUrl }: ShareCardAssets) {
+  const { width, height } = LINK_PREVIEW_SIZE;
+  const details = [model.dateLabel, model.timeLabel, model.venueLabel].filter(Boolean).join("  ·  ");
+  return (
+    <div style={{ width, height, display: "flex", position: "relative", fontFamily: BRAND_FONT }}>
+      <Background photoDataUrl={photoDataUrl} width={width} height={height} />
+      <div style={{ position: "absolute", top: 0, left: 0, width, height, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 80px", gap: 48 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 18, flex: 1, minWidth: 0 }}>
+          {model.kicker.toLowerCase() !== model.title.toLowerCase() && (
+            <span style={{ fontSize: 26, color: ORANGE, fontWeight: 800, letterSpacing: 5, textTransform: "uppercase" }}>{model.kicker}</span>
+          )}
+          <span style={{ fontSize: 84, color: WHITE, fontWeight: 900, lineHeight: 1.02, textTransform: "uppercase" }}>{model.title}</span>
+          <div style={{ display: "flex", width: 120, height: 6, background: ORANGE, borderRadius: 99 }} />
+          {details && <span style={{ fontSize: 30, color: WHITE, fontWeight: 700 }}>{details}</span>}
+          <div style={{ display: "flex", marginTop: 8, height: 76, width: 330, alignItems: "center", justifyContent: "center", background: ORANGE, borderRadius: 18 }}>
+            <span style={{ fontSize: 30, color: WHITE, fontWeight: 900, letterSpacing: 3, textTransform: "uppercase" }}>{model.ctaLabel}</span>
+          </div>
+        </div>
+        {logoDataUrl && (
+          <div style={{ display: "flex", flexShrink: 0 }}>
+            <img src={logoDataUrl} width={250} height={250} style={{ width: 250, height: 250 }} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
