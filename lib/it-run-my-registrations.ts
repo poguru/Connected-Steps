@@ -169,6 +169,10 @@ export interface StatusView { label: string; color: string; bg: string }
 /** Every payment_status the database allows, plus a safe fallback. Unpaid states are never shown as confirmed. */
 export function paymentStatusView(paymentStatus: string, registrationStatus: string): StatusView {
   if (registrationStatus === "cancelled") return { label: "Cancelled", color: "#888", bg: "rgba(136,136,136,0.12)" };
+  // Paid, but not confirmed until every adult's ID is verified. The dashboard says the same.
+  if (registrationStatus === "pending_verification" && paymentStatus === "paid") {
+    return { label: "Awaiting ID verification", color: "#a5b4fc", bg: "rgba(99,102,241,0.1)" };
+  }
   switch (paymentStatus) {
     case "paid":                return { label: "Confirmed", color: "#4ade80", bg: "rgba(74,222,128,0.1)" };
     case "free":                return { label: "Confirmed (free)", color: "#60a5fa", bg: "rgba(96,165,250,0.1)" };

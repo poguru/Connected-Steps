@@ -66,6 +66,8 @@ export async function GET(req: NextRequest) {
         .from("it_run_participants")
         .select("id")
         .eq("registration_id", reg.id)
+        // An active runner first, so a cancelled runner does not stand in for the booking
+        .order("cancelled_at", { ascending: true, nullsFirst: true })
         .order("created_at")
         .limit(1)
         .maybeSingle<{ id: string }>();

@@ -44,6 +44,45 @@ interface ParticipantRow {
   cancelled_at: string | null;
 }
 
+/** The registration reason used once no runner is left. Matches the reason the refund path uses for the same state. */
+const NO_RUNNERS_LEFT_REASON = "All runners cancelled after ID verification";
+
+/**
+ * Marks a booking cancelled once none of its runners is still active, so every surface (My Registrations, the dashboard,
+ * staff lookup, BIB and check-in) reads it as cancelled. A booking that still has active runners is not touched. It only
+ * moves an uncancelled booking to cancelled, so running it again on a retry changes nothing further.
+ */
+async function cancelRegistrationIfNoRunnersLeft(
+  db: SupabaseClient,
+  registrationId: string,
+): Promise<{ ok: true } | { ok: false }> {
+  // Already cancelled (or not there): nothing to write
+  const { data: reg, error: regErr } = await db
+    .from("it_run_registrations")
+    .select("registration_status")
+    .eq("id", registrationId)
+    .maybeSingle<{ registration_status: string }>();
+  if (regErr) return { ok: false };
+  if (!reg || reg.registration_status === "cancelled") return { ok: true };
+
+  const { data: left, error: leftErr } = await db
+    .from("it_run_participants")
+    .select("id")
+    .eq("registration_id", registrationId)
+    .is("cancelled_at", null)
+    .returns<Array<{ id: string }>>();
+  if (leftErr) return { ok: false };
+  if ((left ?? []).length > 0) return { ok: true };
+
+  const now = new Date().toISOString();
+  const { error } = await db
+    .from("it_run_registrations")
+    .update({ registration_status: "cancelled", cancelled_at: now, cancelled_reason: NO_RUNNERS_LEFT_REASON })
+    .eq("id", registrationId)
+    .neq("registration_status", "cancelled");
+  return error ? { ok: false } : { ok: true };
+}
+
 /**
  * Cancels the category of one runner in their booking, and records its refund request when one is owed. Order matters:
  * the refund request is created first, so if another refund is already open for the booking nothing is cancelled.
@@ -59,7 +98,12 @@ export async function cancelRunnerCategory(
     .eq("id", args.participantId)
     .maybeSingle<ParticipantRow>();
   if (!part) return { status: "error", message: "Runner not found" };
-  if (part.cancelled_at) return { status: "already_cancelled" };
+  if (part.cancelled_at) {
+    // A retry after the runner was cancelled but before the booking was marked: finish that step now
+    const healed = await cancelRegistrationIfNoRunnersLeft(db, part.registration_id);
+    if (!healed.ok) return { status: "error", message: "The runner is cancelled, but the registration could not be marked cancelled. Try again." };
+    return { status: "already_cancelled" };
+  }
 
   const { data: reg } = await db
     .from("it_run_registrations")
@@ -143,7 +187,14 @@ export async function cancelRunnerCategory(
   }
   await db.rpc("itr_release_capacity", { p_category_id: categoryId, p_count: runners });
 
-  // 3. Record it for the admins (no addresses or amounts beyond the amount itself)
+  // 3. A booking with no runner left is cancelled as a registration. A refund still pending is shown as such.
+  const registrationCancel = await cancelRegistrationIfNoRunnersLeft(db, reg.id);
+  if (!registrationCancel.ok) {
+    console.error("[it-run/category-cancel] runners cancelled but the registration was not marked cancelled");
+    return { status: "error", message: "The runners were cancelled, but the registration could not be marked cancelled. Reject this ID again to finish." };
+  }
+
+  // 4. Record it for the admins (no addresses or amounts beyond the amount itself)
   await db.from("it_run_audit_logs").insert({
     event_id: reg.event_id,
     actor_email: args.actorEmail,

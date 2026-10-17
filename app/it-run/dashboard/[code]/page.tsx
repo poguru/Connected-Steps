@@ -73,6 +73,7 @@ function StatusBadge({ status }: { status: string }) {
     need_clarification:{ label: "Clarification Needed", color: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
     pending_verification:{ label: "Verification Pending", color: "#6366f1", bg: "rgba(99,102,241,0.1)" },
     not_provided:       { label: "ID Not Provided", color: "#888", bg: "rgba(255,255,255,0.06)" },
+    cancelled:          { label: "Cancelled", color: "#888", bg: "rgba(136,136,136,0.12)" },
   };
   const s = map[status] ?? { label: status, color: "#888", bg: "rgba(255,255,255,0.06)" };
   return (
@@ -326,6 +327,8 @@ export default function DashboardPage() {
   const ev   = reg.it_run_events;
   const cat  = reg.it_run_categories;
   const paid = reg.payment_status === "paid" || reg.payment_status === "free";
+  // A cancelled registration keeps its record and any refund owed, but its QR codes are no longer valid
+  const cancelled = reg.registration_status === "cancelled";
   const eventDate = ev?.event_date ? new Date(ev.event_date + "T12:00:00Z").toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "";
 
   return (
@@ -349,7 +352,7 @@ export default function DashboardPage() {
           </h1>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <span style={{ fontSize: 13, color: "#888" }}>Registration Code: <strong style={{ color: "#fff", letterSpacing: "0.05em" }}>{reg.registration_code}</strong></span>
-            <StatusBadge status={reg.payment_status} />
+            <StatusBadge status={cancelled ? "cancelled" : reg.payment_status} />
           </div>
         </div>
 
@@ -369,6 +372,15 @@ export default function DashboardPage() {
             <div style={{ fontSize: 13, color: "#ccc", lineHeight: 1.6 }}>
               Your payment is received. Your registration is confirmed once an admin has verified an ID for every adult participant.
               You will get a confirmation email then.
+            </div>
+          </div>
+        )}
+
+        {cancelled && (
+          <div role="status" style={{ background: "rgba(136,136,136,0.08)", border: "1px solid rgba(136,136,136,0.3)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
+            <div style={{ fontSize: 14, color: "#ccc", fontWeight: 700 }}>This registration has been cancelled</div>
+            <div style={{ fontSize: 13, color: "#ccc", lineHeight: 1.6 }}>
+              Your QR code is no longer valid for BIB collection or race-day check-in. If a refund is owed, it is shown in your confirmation email once it has been processed.
             </div>
           </div>
         )}
@@ -421,7 +433,7 @@ export default function DashboardPage() {
           </div>
 
           {/* QR Code — solo only; for multi-participant registrations QR appears inside each participant card */}
-          {paid && reg.participant_count === 1 && (
+          {paid && !cancelled && reg.participant_count === 1 && (
             <div style={{ ...S.card, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
               <div style={{ fontSize: 11, color: ACCENT, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Your QR Code</div>
               <QRDisplay code={reg.registration_code} token={participants[0]?.qr_token ?? reg.qr_token} />
@@ -511,7 +523,7 @@ export default function DashboardPage() {
                   </div>
 
                   {/* Per-participant QR — shown for multi-participant registrations (duo, parent-child) */}
-                  {paid && reg.participant_count > 1 && (
+                  {paid && !cancelled && reg.participant_count > 1 && (
                     <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 16, marginTop: 4 }}>
                       <div style={{ fontSize: 11, color: ACCENT, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 10 }}>
                         {p.first_name}&apos;s QR Code

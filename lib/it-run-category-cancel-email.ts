@@ -18,11 +18,13 @@ export function buildCategoryCancelledEmail(args: {
 }): string {
   const refund = (args.refundPaise / 100).toLocaleString("en-IN", { maximumFractionDigits: 2 });
   const deductionPercent = 100 - args.refundPercent;
+  // The refund is requested when this email is sent. It is paid only after our team approves and processes it.
   const paymentLine = args.free
     ? `<p style="margin:0 0 14px;">This registration was free, so no payment was taken and no refund applies.</p>`
     : `<p style="margin:0 0 14px;">
-      A refund of <strong>Rs. ${escapeHtml(refund)}</strong> will be processed to your original payment method. This is
-      ${args.refundPercent}% of the category price. A ${deductionPercent}% deduction applies because the ID verification failed.
+      A refund of <strong>Rs. ${escapeHtml(refund)}</strong> has been requested. It will be paid to your original payment method
+      once our team has processed it. This is ${args.refundPercent}% of the category price. A ${deductionPercent}% deduction
+      applies because the ID verification failed.
     </p>`;
   const body = `
     <p style="margin:0 0 14px;">Hi ${escapeHtml(args.firstName)},</p>
