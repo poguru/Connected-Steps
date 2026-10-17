@@ -182,7 +182,30 @@ export async function POST(
 
     if (result === "full")           return NextResponse.json({ error: "This slot is fully booked" }, { status: 409 });
     if (result === "slot_not_found") return NextResponse.json({ error: "Slot not found" }, { status: 404 });
-    if (result === "already_booked") return NextResponse.json({ ok: true, already: true });
+    if (result === "already_booked") {
+      // A confirmed slot is never moved. The same slot again is a safe success. A different slot is refused, and the
+      // confirmed slot is returned so the page shows what the runner actually holds.
+      const { data: held } = await db
+        .from("it_run_bib_bookings")
+        .select("slot_id")
+        .eq("participant_id", participantId)
+        .eq("status", "confirmed")
+        .maybeSingle<{ slot_id: string }>();
+      const heldSlotId = held?.slot_id ?? slotId;
+      const { data: heldSlot } = await db
+        .from("it_run_bib_slots")
+        .select("id, location_name, location_address, slot_date, start_time, end_time")
+        .eq("id", heldSlotId)
+        .maybeSingle();
+      if (heldSlotId !== slotId) {
+        return NextResponse.json({
+          error: "Your BIB collection slot is already confirmed and cannot be changed.",
+          code: "SLOT_ALREADY_CONFIRMED",
+          slot: heldSlot ?? null,
+        }, { status: 409 });
+      }
+      return NextResponse.json({ ok: true, already: true, slot: heldSlot ?? null });
+    }
 
     // Fetch slot details for confirmation response
     const { data: slot } = await db

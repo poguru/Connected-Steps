@@ -122,10 +122,17 @@ export default function BibCollectionPage() {
         body:    JSON.stringify({ participantId, slotId }),
       });
       const json = await res.json() as {
-        ok?: boolean; already?: boolean; error?: string;
-        slot?: { id: string; location_name: string; location_address: string | null; slot_date: string; start_time: string; end_time: string };
+        ok?: boolean; already?: boolean; error?: string; code?: string;
+        slot?: { id: string; location_name: string; location_address: string | null; slot_date: string; start_time: string; end_time: string } | null;
       };
 
+      if (res.status === 409 && json.code === "SLOT_ALREADY_CONFIRMED") {
+        // A confirmed slot cannot be changed. Nothing was booked: say so, and show the slot the runner holds.
+        setBookingError(json.error ?? "Your BIB collection slot is already confirmed and cannot be changed.");
+        setSelecting(null);
+        void fetchData();
+        return;
+      }
       if (!res.ok) { setBookingError(json.error ?? "Booking failed"); return; }
 
       // Update local state: set participant's current_booking + refresh slot counts
@@ -136,7 +143,7 @@ export default function BibCollectionPage() {
           ...prev,
           participants: prev.participants.map(p =>
             p.id === participantId
-              ? { ...p, current_booking: json.already ? p.current_booking : (slot ? { id: slot.id, location_name: slot.location_name, location_address: slot.location_address, slot_date: slot.slot_date, start_time: slot.start_time, end_time: slot.end_time } : null) }
+              ? { ...p, current_booking: json.already ? (json.slot ?? p.current_booking) : (slot ? { id: slot.id, location_name: slot.location_name, location_address: slot.location_address, slot_date: slot.slot_date, start_time: slot.start_time, end_time: slot.end_time } : null) }
               : p
           ),
           // Decrement available count for the booked slot (unless already_booked)
@@ -232,9 +239,15 @@ export default function BibCollectionPage() {
           <div style={{ ...styles.banner, borderColor: "rgba(16,185,129,0.3)", background: "rgba(16,185,129,0.08)" }}>
             <span style={{ color: "#10b981", fontWeight: 700, marginRight: "8px" }}>✓</span>
             <span style={{ color: "#ccc", fontSize: "14px" }}>
-              {participants.length === 1
-                ? "Your BIB collection slot is booked!"
-                : "All participants have booked their BIB collection slots!"}
+              {participants.length === 1 ? (
+                <>
+                  <strong style={{ color: "#fff" }}>You’ve Already Booked Your BIB Collection Slot!</strong>
+                  <br />
+                  Your BIB collection slot is confirmed. You don’t need to book it again.
+                </>
+              ) : (
+                "All participants have booked their BIB collection slots!"
+              )}
             </span>
           </div>
         ) : (
@@ -251,7 +264,6 @@ export default function BibCollectionPage() {
         {/* ── Participants ── */}
         {participants.map(participant => {
           const label     = PARTICIPANT_TYPE_LABEL[participant.participant_type] ?? "";
-          const isSelecting = selecting === participant.id;
 
           return (
             <div key={participant.id} style={styles.card}>
@@ -273,7 +285,7 @@ export default function BibCollectionPage() {
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
-                        <span style={{ color: "#10b981", fontSize: "13px", fontWeight: 700 }}>✓ Slot booked</span>
+                        <span style={{ color: "#10b981", fontSize: "13px", fontWeight: 700 }}>✓ Slot Confirmed</span>
                       </div>
                       <div style={styles.bookedSlotDetail}>
                         <span style={styles.bookedSlotIcon}>📍</span>
@@ -293,24 +305,11 @@ export default function BibCollectionPage() {
                         <span style={styles.bookedSlotIcon}>🕐</span>
                         <span style={{ color: "#ccc" }}>{participant.current_booking.start_time} – {participant.current_booking.end_time}</span>
                       </div>
+                      <div style={{ color: "#888", fontSize: "12px", marginTop: "10px", lineHeight: 1.5 }}>
+                        Your BIB collection slot is confirmed and cannot be changed.
+                      </div>
                     </div>
-                    <button
-                      onClick={() => setSelecting(isSelecting ? null : participant.id)}
-                      style={styles.changeBtn}
-                    >
-                      {isSelecting ? "Cancel" : "Change Slot"}
-                    </button>
                   </div>
-
-                  {isSelecting && (
-                    <SlotPicker
-                      groups={slotGroups}
-                      currentSlotId={participant.current_booking.id}
-                      bookingSlot={bookingSlot}
-                      error={bookingError}
-                      onBook={slotId => void bookSlot(participant.id, slotId)}
-                    />
-                  )}
                 </div>
               ) : (
                 <div style={{ padding: "16px 20px" }}>
