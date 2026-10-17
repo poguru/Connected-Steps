@@ -2155,6 +2155,80 @@ function RegisterPageContent() {
     }
   }
 
+  // ── Save when the page is hidden ─────────────────────────────────────────────
+  // Phones pause or discard a page when the user switches apps, often before Next or Save is tapped. Unsent details
+  // are sent in the background (keepalive). When the page is shown again the page asks the server for the version: a
+  // background save counts only if it moved the version by exactly one. Otherwise the details stay "Unsaved changes".
+  const backgroundSave = useRef<{ key: string; version: number; token: string } | null>(null);
+  const latestForBackground = useRef({ selectedCat, couponCode, step, participantSubIdx, participants, serverDraft, savedKey });
+  latestForBackground.current = { selectedCat, couponCode, step, participantSubIdx, participants, serverDraft, savedKey };
+
+  useEffect(() => {
+    function onVisibilityChange() {
+      const now = latestForBackground.current;
+      if (document.visibilityState === "hidden") {
+        if (!now.selectedCat || now.step <= 1 || !now.serverDraft || savingRef.current) return;
+        const key = draftKeyOf(now.selectedCat.id, now.couponCode, now.participants);
+        if (key === now.savedKey) return; // nothing unsent
+        const expectedVersion = now.serverDraft.version;
+        const token = now.serverDraft.token;
+        backgroundSave.current = { key, version: expectedVersion + 1, token };
+        void fetch("/api/it-run/drafts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          keepalive: true,
+          body: JSON.stringify({
+            draft: {
+              step: now.step,
+              participantSubIdx: now.participantSubIdx,
+              selectedCatId: now.selectedCat.id,
+              couponCode: now.couponCode,
+              participants: now.participants.map(p => ({ ...p, companyIdFile: null })),
+            },
+            token,
+            expectedVersion,
+          }),
+        }).then(async res => {
+          if (!res.ok) return;
+          const d = await res.json().catch(() => ({})) as { version?: number; savedAt?: string };
+          if (typeof d.version === "number" && d.savedAt && d.version === expectedVersion + 1) {
+            const savedAtMs = new Date(d.savedAt).getTime();
+            setServerDraft({ token, version: d.version, savedAt: savedAtMs });
+            setServerSavedAt(savedAtMs);
+            setSavedKey(key);
+            setServerSave("saved");
+            backgroundSave.current = null;
+          }
+        }).catch(() => { /* not confirmed: confirmed later on return, or saved by the user */ });
+        return;
+      }
+
+      // Shown again: confirm a background save that finished while the page was away
+      const pending = backgroundSave.current;
+      if (!pending) return;
+      fetch(`/api/it-run/drafts?t=${encodeURIComponent(pending.token)}`, { cache: "no-store" })
+        .then(async res => {
+          if (!res.ok) return;
+          const d = await res.json().catch(() => ({})) as { version?: number; savedAt?: string };
+          if (typeof d.version !== "number" || !d.savedAt) return;
+          if (d.version === pending.version) {
+            const savedAtMs = new Date(d.savedAt).getTime();
+            setServerDraft({ token: pending.token, version: d.version, savedAt: savedAtMs });
+            setServerSavedAt(savedAtMs);
+            setSavedKey(pending.key);
+            setServerSave("saved");
+            backgroundSave.current = null;
+          } else {
+            // The background save did not land, or another save moved the version. The normal save path handles it.
+            backgroundSave.current = null;
+          }
+        })
+        .catch(() => { /* try again on the next show */ });
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, []);
+
   // ── Save, then move ─────────────────────────────────────────────────────────
   // Every step change goes through here: the details are saved first, and the step changes only after the
   // server confirms. A failed save keeps the participant on the current step and remembers the move, so

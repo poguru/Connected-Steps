@@ -34,6 +34,28 @@ describe("BIB Name input", () => {
   });
 });
 
+describe("saving when the page is hidden", () => {
+  it("listens for the page being hidden and shown again", () => {
+    expect(page).toMatch(/document\.addEventListener\("visibilitychange", onVisibilityChange\)/);
+    expect(page).toMatch(/document\.visibilityState === "hidden"/);
+  });
+
+  it("sends the unsent details with keepalive, using the current server version", () => {
+    expect(page).toMatch(/keepalive: true/);
+    expect(page).toMatch(/expectedVersion = now\.serverDraft\.version;/);
+    expect(page).toMatch(/if \(key === now\.savedKey\) return;/);
+  });
+
+  it("confirms a background save only when the version moved by exactly one", () => {
+    expect(page).toMatch(/d\.version === expectedVersion \+ 1/);
+    expect(page).toMatch(/if \(d\.version === pending\.version\)/);
+  });
+
+  it("asks the server for the version when the page is shown again", () => {
+    expect(page).toMatch(/fetch\(`\/api\/it-run\/drafts\?t=\$\{encodeURIComponent\(pending\.token\)\}`/);
+  });
+});
+
 describe("resume: the newer copy wins, and is shown as unsaved until saved", () => {
   it("compares the browser copy's save time with the server copy's", () => {
     expect(page).toMatch(/local\.savedAt > serverSavedMs/);
