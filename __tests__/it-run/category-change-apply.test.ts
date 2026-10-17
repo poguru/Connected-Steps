@@ -37,7 +37,7 @@ function fakeDb(opts: { change?: any; regCategory?: string; moveSucceeds?: boole
         }
         if (table === "it_run_registrations") {
           if (b.op === "update") return { data: opts.moveSucceeds === false ? null : { id: "reg-1" }, error: null };
-          return { data: { registration_code: "ITR-0001", participant_count: 1 }, error: null };
+          return { data: { registration_code: "ITR-0001", participant_count: 1, base_price: 649, final_price: 649, amount_paid_paise: 64900 }, error: null };
         }
         return { data: null, error: null };
       }
@@ -55,8 +55,21 @@ describe("applyPaidCategoryChange", () => {
     const db = fakeDb();
     const r = await applyPaidCategoryChange(db, INPUT);
     expect(r).toEqual({ kind: "applied", registrationCode: "ITR-0001" });
-    expect(db.updates.find((u: any) => u.table === "it_run_registrations").payload).toEqual({ category_id: "cat-premium" });
+    // The amount is Rs. 500 (50000 paise): the new price is 649 + 500, and the amount paid is 649 + 500 too
+    expect(db.updates.find((u: any) => u.table === "it_run_registrations").payload).toEqual({
+      category_id: "cat-premium", base_price: 1149, final_price: 1149, amount_paid_paise: 114900,
+    });
     expect(db.rpcs).toEqual([{ name: "itr_release_capacity", args: { p_category_id: "cat-10k", p_count: 1 } }]);
+  });
+
+  it("the price on the registration rises by the difference paid (Fun Run 649 to Timed 5K 799: Rs. 150)", async () => {
+    const db = fakeDb({ change: {
+      id: CHANGE_ID, registration_id: "reg-1", from_category_id: "cat-10k", to_category_id: "cat-premium",
+      amount_paise: 15000, razorpay_order_id: ORDER, status: "pending",
+    } });
+    await applyPaidCategoryChange(db, { ...INPUT, amountPaise: 15000 });
+    const payload = db.updates.find((u: any) => u.table === "it_run_registrations").payload;
+    expect(payload).toMatchObject({ base_price: 799, final_price: 799, amount_paid_paise: 79900 });
   });
 
   it("is idempotent: a second call (verify plus webhook) changes nothing", async () => {

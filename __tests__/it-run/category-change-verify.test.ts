@@ -46,7 +46,7 @@ function fakeDb(change: any = { id: "chg1", registration_id: REG_ID, from_catego
       function run(): any {
         if (table === "it_run_registrations") {
           if (b.op === "update") return { data: { id: REG_ID }, error: null };
-          return { data: { id: REG_ID, registration_code: "ITR-0001", category_id: FROM, participant_count: 1, linked_user_email: OWNER, payment_status: "paid" }, error: null };
+          return { data: { id: REG_ID, registration_code: "ITR-0001", category_id: FROM, participant_count: 1, linked_user_email: OWNER, payment_status: "paid", base_price: 649, final_price: 649, amount_paid_paise: 64900 }, error: null };
         }
         if (table === "it_run_category_changes") {
           if (b.op === "update") return { data: { id: "chg1" }, error: null };
@@ -134,7 +134,8 @@ describe("a verified payment", () => {
 
     expect(res.status).toBe(200);
     const regUpdate = db.updates.find(u => u.table === "it_run_registrations");
-    expect(regUpdate?.payload).toEqual({ category_id: TO });
+    // ₹500 difference: the price and the amount paid rise by it (649 + 500 = 1149)
+    expect(regUpdate?.payload).toEqual({ category_id: TO, base_price: 1149, final_price: 1149, amount_paid_paise: 114900 });
     expect(db.rpcs).toEqual([{ name: "itr_release_capacity", args: { p_category_id: FROM, p_count: 1 } }]);
     // The QR and participant rows are never written by a category change
     expect(db.updates.some(u => u.table === "it_run_participants")).toBe(false);

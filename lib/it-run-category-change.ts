@@ -34,17 +34,33 @@ export async function applyPaidCategoryChange(
 
   const { data: reg } = await db
     .from("it_run_registrations")
-    .select("registration_code, participant_count")
+    .select("registration_code, participant_count, base_price, final_price, amount_paid_paise")
     .eq("id", change.registration_id)
-    .maybeSingle<{ registration_code: string; participant_count: number }>();
+    .maybeSingle<{
+      registration_code: string; participant_count: number; base_price: number; final_price: number;
+      amount_paid_paise: number | null;
+    }>();
   if (!reg) return { kind: "needs_review", reason: "Registration not found" };
 
-  // Move only if the registration is still on the original category
+  // The difference is paid in whole rupees. Anything else is not a price this booking can hold, so it is not applied.
+  if (change.amount_paise % 100 !== 0) return { kind: "needs_review", reason: "The difference is not a whole rupee amount" };
+  const differenceRupees = change.amount_paise / 100;
+  // The price the participant now pays and the amount actually paid, so the admin view, My Registrations and any
+  // refund (which is limited to the amount paid) all show the upgraded price.
+  const paidBeforePaise = reg.amount_paid_paise ?? reg.final_price * 100;
+
+  // Move only if the registration is still on the original category and still at the price it was read at
   const { data: moved } = await db
     .from("it_run_registrations")
-    .update({ category_id: change.to_category_id })
+    .update({
+      category_id: change.to_category_id,
+      base_price: reg.base_price + differenceRupees,
+      final_price: reg.final_price + differenceRupees,
+      amount_paid_paise: paidBeforePaise + change.amount_paise,
+    })
     .eq("id", change.registration_id)
     .eq("category_id", change.from_category_id)
+    .eq("final_price", reg.final_price)
     .select("id")
     .maybeSingle<{ id: string }>();
   if (!moved) {
