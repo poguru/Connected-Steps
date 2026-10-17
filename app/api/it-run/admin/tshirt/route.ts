@@ -37,7 +37,17 @@ type PRow = {
 //   page         – for participant list (default 0)
 //   limit        – for participant list (default 50)
 //   format=csv   – returns CSV download instead of JSON
+// Any failure is answered with a JSON message, so the page can show it instead of a blank screen
 export async function GET(req: NextRequest) {
+  try {
+    return await loadTshirtList(req);
+  } catch (e) {
+    console.error("[it-run/admin/tshirt] load failed:", e instanceof Error ? e.message : e);
+    return NextResponse.json({ error: "The T-shirt list could not be loaded. Try again. If it keeps failing, tell the tech team." }, { status: 500 });
+  }
+}
+
+async function loadTshirtList(req: NextRequest) {
   const session = requireRole(req, ["event_admin", "support_desk"]);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -87,7 +97,12 @@ export async function GET(req: NextRequest) {
   };
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const rows = allParts ?? [];
+  // PostgREST returns null (not []) for a runner with no issuance rows. Normalise it, so no later check reads null.
+  const rows = (allParts ?? []).map(p => ({
+    ...p,
+    it_run_tshirt_issuances: p.it_run_tshirt_issuances ?? [],
+    mobile: p.mobile ?? "",
+  }));
 
   // ── Apply remaining filters in JS ────────────────────────────────────────────
   let filtered = rows;
