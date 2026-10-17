@@ -132,16 +132,20 @@ function BibSlotBooker({ participantId, registrationCode, slots, existingBooking
   const [booking,   setBooking]   = useState(false);
   const [error,     setError]     = useState("");
   const [success,   setSuccess]   = useState(false);
+  const [successText, setSuccessText] = useState("");
 
   if (existingBooking?.status === "confirmed" && existingBooking.it_run_bib_slots) {
     const slot = existingBooking.it_run_bib_slots;
     const date = new Date(slot.slot_date + "T12:00:00Z").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
     return (
       <div style={{ background: "rgba(16,185,129,0.05)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: 12, padding: 16 }}>
-        <div style={{ fontSize: 12, color: "#10b981", fontWeight: 700, marginBottom: 6 }}>BIB Collection Slot Booked</div>
+        <div style={{ fontSize: 12, color: "#10b981", fontWeight: 700, marginBottom: 6 }}>Slot Confirmed</div>
         <div style={{ fontSize: 14, color: "#fff", fontWeight: 600 }}>{slot.location_name}</div>
         <div style={{ fontSize: 13, color: "#ccc" }}>{date} | {slot.start_time} - {slot.end_time}</div>
         {slot.location_address && <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{slot.location_address}</div>}
+        <div style={{ fontSize: 12, color: "#888", marginTop: 8, lineHeight: 1.5 }}>
+          Your BIB collection slot is confirmed and cannot be changed.
+        </div>
       </div>
     );
   }
@@ -157,7 +161,15 @@ function BibSlotBooker({ participantId, registrationCode, slots, existingBooking
         body:    JSON.stringify({ participantId, slotId: selected, registrationCode }),
       });
       const data = await res.json();
+      if (res.status === 409 && data.code === "SLOT_ALREADY_CONFIRMED") {
+        // A confirmed slot cannot be changed. Nothing was booked: show the confirmed slot instead of this selection.
+        setError(data.error ?? "Your slot is already confirmed and cannot be changed.");
+        onBooked();
+        return;
+      }
       if (!res.ok) { setError(data.error ?? "Booking failed"); return; }
+      // The same slot again (a retry) is confirmed, but nothing new was booked, so no new email is claimed
+      setSuccessText(data.already ? "Your BIB collection slot is confirmed." : "Slot booked successfully! Confirmation sent to your email.");
       setSuccess(true);
       setTimeout(onBooked, 1500);
     } catch {
@@ -170,7 +182,7 @@ function BibSlotBooker({ participantId, registrationCode, slots, existingBooking
   if (success) {
     return (
       <div style={{ textAlign: "center", padding: 20, color: "#10b981", fontWeight: 700 }}>
-        Slot booked successfully! Confirmation sent to your email.
+        {successText}
       </div>
     );
   }

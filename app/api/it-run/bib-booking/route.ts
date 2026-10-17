@@ -79,8 +79,9 @@ export async function POST(req: NextRequest) {
 
   if (result === "full") return fail(409, { error: "This slot is fully booked. Please choose another slot." }, "full", { slotId });
   if (result === "slot_not_found") return fail(404, { error: "Slot not found" }, "slot_not_found", { slotId });
+  if (result === "participant_not_found") return fail(404, { error: "Participant not found" }, "participant_not_found");
 
-  // Slot details for the response and the confirmation email. For a retry, the slot the participant already holds.
+  // Slot details for the response and the confirmation email. For a runner who already holds a booking, that slot.
   let bookedSlotId = slotId;
   if (result === "already_booked") {
     const { data: existing } = await db
@@ -90,6 +91,20 @@ export async function POST(req: NextRequest) {
       .eq("status", "confirmed")
       .maybeSingle<{ slot_id: string }>();
     bookedSlotId = existing?.slot_id ?? slotId;
+
+    // A confirmed slot is never moved. Asking for a different one is refused, and the confirmed slot is returned.
+    if (bookedSlotId !== slotId) {
+      const { data: held } = await db
+        .from("it_run_bib_slots")
+        .select(SLOT_COLUMNS)
+        .eq("id", bookedSlotId)
+        .maybeSingle<{ location_name: string; location_address: string | null; slot_date: string; start_time: string; end_time: string }>();
+      return fail(409, {
+        error: "Your BIB collection slot is already confirmed and cannot be changed.",
+        code: "SLOT_ALREADY_CONFIRMED",
+        slot: held ?? null,
+      }, "slot_already_confirmed", { slotId, heldSlotId: bookedSlotId });
+    }
   }
   const { data: slot, error: slotErr } = await db
     .from("it_run_bib_slots")
@@ -100,7 +115,7 @@ export async function POST(req: NextRequest) {
 
   if (result === "already_booked") {
     log("already_booked", { slotId: bookedSlotId });
-    return NextResponse.json({ ok: true, already: true, message: "Already booked a slot", slot: slot ?? null, requestId: rid }, { headers: { "x-request-id": rid } });
+    return NextResponse.json({ ok: true, already: true, message: "Your slot is already confirmed.", slot: slot ?? null, requestId: rid }, { headers: { "x-request-id": rid } });
   }
 
   log("booked", { slotId: bookedSlotId });
