@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { FEATURED_EVENT } from "@/lib/it-run-featured";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -215,6 +216,23 @@ export default function MyEventsPage() {
               </button>
             ))}
           </div>
+        )}
+
+        {/* The flagship event, offered to every signed-in account until it has a registration of its own */}
+        {!loading && !error && !events.some(e => e.type === "it-run") && (filter === "all" || filter === "upcoming") && (
+          <Link href={FEATURED_EVENT.href} style={{
+            display: "block", textDecoration: "none", color: "#fff", marginBottom: 16,
+            background: "linear-gradient(135deg, rgba(249,115,22,0.14), rgba(0,0,0,0) 60%), #0b0b0b",
+            border: "1px solid rgba(249,115,22,0.35)", borderRadius: 14, padding: "18px 20px",
+          }}>
+            <div style={{ fontSize: 11, color: "#f97316", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase" }}>
+              Upcoming · Flagship event
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 800, margin: "6px 0 4px" }}>
+              {FEATURED_EVENT.name} {FEATURED_EVENT.edition}
+            </div>
+            <div style={{ fontSize: 13, color: "#a3a3a3" }}>{FEATURED_EVENT.dateLabel} · Register now →</div>
+          </Link>
         )}
 
         {/* Event list */}
