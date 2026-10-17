@@ -93,6 +93,31 @@ describe("the link keeps a confirmed slot", () => {
     expect(db.rpcs).toEqual([{ name: "itr_book_bib_slot", args: { p_participant_id: PART, p_slot_id: SLOT_A } }]);
   });
 
+  it("a cancelled runner cannot book through the link, and no booking is attempted", async () => {
+    const db = fakeDb({ rpc: "confirmed" });
+    db.from = (table: string) => {
+      const b: any = {};
+      for (const m of ["select", "eq", "is"]) b[m] = () => b;
+      b.maybeSingle = () => {
+        if (table === "it_run_participants") return Promise.resolve({ data: { id: PART, first_name: "Asha", last_name: "Rao", email: null, cancelled_at: "2026-10-17T04:31:33Z" }, error: null });
+        if (table === "it_run_registrations") return Promise.resolve({ data: { id: "r1", payment_status: "paid", registration_status: "active", registration_code: "ITRUN2-AAAA", lead_email: "a@x", participant_count: 1, it_run_categories: null, it_run_events: null }, error: null });
+        return Promise.resolve({ data: null, error: null });
+      };
+      return b;
+    };
+    mockDb.mockReturnValue(db);
+    const res = await POST(req(SLOT_A), params);
+    const body = await res.json();
+    expect(res.status).toBe(409);
+    expect(body.code).toBe("RUNNER_CANCELLED");
+    expect(db.rpcs).toEqual([]);
+  });
+
+  it("the link lists only runners who are still on the registration", () => {
+    const route = read("app/api/events/it-run-sprint-2/bib-collection/[token]/route.ts");
+    expect(route).toMatch(/\.eq\("registration_id", reg\.id\)\s*\.is\("cancelled_at", null\)/);
+  });
+
   it("an invalid token is still refused as an invalid link, not as booked", async () => {
     const db = {
       rpcs: [] as any[],

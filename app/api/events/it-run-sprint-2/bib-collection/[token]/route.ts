@@ -64,6 +64,7 @@ export async function GET(
       )
     `)
     .eq("registration_id", reg.id)
+    .is("cancelled_at", null)
     .order("created_at");
 
   // ── Available slots with live capacity ───────────────────────────────────────
@@ -162,13 +163,17 @@ export async function POST(
     // IDOR guard: verify participantId belongs to this registration
     const { data: part } = await db
       .from("it_run_participants")
-      .select("id, first_name, last_name, email")
+      .select("id, first_name, last_name, email, cancelled_at")
       .eq("id", participantId)
       .eq("registration_id", reg.id)
-      .maybeSingle<{ id: string; first_name: string; last_name: string; email: string | null }>();
+      .maybeSingle<{ id: string; first_name: string; last_name: string; email: string | null; cancelled_at: string | null }>();
 
     if (!part) {
       return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+    }
+    // A cancelled runner (ID rejected) has no slot to book, the same as on the dashboard booking route
+    if (part.cancelled_at) {
+      return NextResponse.json({ error: "This runner's category was cancelled.", code: "RUNNER_CANCELLED" }, { status: 409 });
     }
 
     // Atomic booking via RPC (same as /api/it-run/bib-booking)
