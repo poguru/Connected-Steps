@@ -1,3 +1,4 @@
+import { FEATURED_EVENT } from "@/lib/it-run-featured";
 import Link from "next/link";
 import Image from "next/image";
 import { Mail, MapPin } from "lucide-react";
@@ -56,6 +57,7 @@ export default function Footer() {
               {[
                 { href: "/running-club-hyderabad", label: "Training programs" },
                 { href: "/#upcoming-sessions",    label: "Upcoming events"   },
+                { href: FEATURED_EVENT.href,        label: "The IT Run Sprint-2" },
                 { href: "/pricing",               label: "Pricing"           },
                 { href: "/quiz",                  label: "Find my plan"      },
                 { href: "/blog",                  label: "Blog"              },

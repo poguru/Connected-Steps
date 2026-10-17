@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import Navbar               from "@/components/layout/Navbar";
 import Footer               from "@/components/layout/Footer";
 import FloatingContact      from "@/components/layout/FloatingContact";
+import FlagshipEvent         from "@/components/FlagshipEvent";
 import Hero                 from "@/components/home/Hero";
 import RunningJourney       from "@/components/home/RunningJourney";
 import Features             from "@/components/home/Features";
@@ -33,6 +34,11 @@ export default function HomePage() {
 
       {/* 1 · Hero — full-viewport entry point */}
       <Hero />
+
+      {/* 1b · The IT Run Sprint-2: the flagship event, promoted from the hero down */}
+      <SectionReveal>
+        <FlagshipEvent />
+      </SectionReveal>
 
       {/* 2 · Upcoming Sessions & Events — highest-priority engagement section */}
       <SectionReveal>

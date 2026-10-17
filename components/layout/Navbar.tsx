@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { FEATURED_EVENT } from "@/lib/it-run-featured";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 
-const nav = [
+const nav: { href: string; label: string; accent?: boolean }[] = [
   { href: "/running-club-hyderabad", label: "Programs"    },
   { href: "/#upcoming-sessions",     label: "Events"      },
+  { href: FEATURED_EVENT.href,          label: "IT Run Sprint-2", accent: true },
   { href: "/leaderboard",            label: "Leaderboard" },
   { href: "/community",              label: "Community"   },
   { href: "/pricing",                label: "Pricing"     },
@@ -57,7 +59,7 @@ export default function Navbar() {
                 padding: "8px 16px", borderRadius: 999,
                 fontSize: "0.875rem", fontWeight: 500, textDecoration: "none",
                 transition: "background 0.2s, color 0.2s",
-                color: active ? "var(--primary)" : "var(--muted-foreground)",
+                color: active ? "var(--primary)" : n.accent ? "#f97316" : "var(--muted-foreground)",
                 background: active ? "oklch(0.72 0.19 49 / 8%)" : "transparent",
               }}
                 onMouseEnter={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = "var(--surface-elevated)"; (e.currentTarget as HTMLElement).style.color = "var(--foreground)"; }}}
