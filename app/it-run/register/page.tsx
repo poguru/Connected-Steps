@@ -67,6 +67,8 @@ interface DraftRecord {
   finalPrice?:       number;
   savedAt:           number;
   expiresAt?:        number;
+  /** Set on resume when the browser copy is newer than the server copy. Its details are not saved yet. */
+  unsavedLocal?:     boolean;
 }
 
 interface ProfileAutoFill {
@@ -413,8 +415,9 @@ function ParticipantForm({
       <div style={{ marginBottom: 14 }}>
         <Field label="BIB Name" error={errors.bibName} required
           hint={bibNameHint(data.bibName).tone === "ok" ? bibNameHint(data.bibName).text : "This name will be printed on your race BIB. Letters, spaces, hyphens and apostrophes only."}>
-          <input style={inp("bibName", !!errors.bibName)} value={data.bibName}
-            onChange={e => onChange("bibName", e.target.value.toUpperCase())} onBlur={() => onNameBlur?.("bibName")}
+          {/* Stored as typed. Capitals are shown with CSS: rewriting the value on each keystroke breaks Android keyboard input. The server uppercases it on save. */}
+          <input style={{ ...inp("bibName", !!errors.bibName), textTransform: "uppercase" }} value={data.bibName}
+            onChange={e => onChange("bibName", e.target.value)} onBlur={() => onNameBlur?.("bibName")}
             placeholder="Name for BIB (e.g., PAVAN or P.KALYAN)" />
         </Field>
       </div>
@@ -1816,8 +1819,9 @@ function RegisterPageContent() {
       const cat = config.categories.find(c => c.id === d.selectedCatId);
       if (!cat || cat.is_soldout) return;
 
-      // Store the draft — user will decide via the resume banner
-      setDraftToResume(d);
+      // Store the draft — user will decide via the resume banner. A browser-only draft is not on the server, so it is
+      // unsaved until the next save. The server copy (if any) replaces it below.
+      setDraftToResume({ ...d, unsavedLocal: true });
     } catch { /* corrupted draft — ignore */ }
   }, [config]);
 
@@ -2032,8 +2036,9 @@ function RegisterPageContent() {
       .map(p => ({ ...p, altEmail: p.altEmail ?? "", categoryId: p.categoryId || d.selectedCatId, companyIdFile: null }));
     setParticipants(restored);
     setCounts(countsFromCategoryIds(restored.map(p => p.categoryId)));
-    // What was restored is exactly what the server holds, so it is "Saved", not "Unsaved changes"
-    setSavedKey(draftKeyOf(cat.id, d.couponCode ?? "", restored));
+    // What was restored is exactly what the server holds, so it is "Saved", not "Unsaved changes".
+    // A newer browser copy is not on the server yet, so it stays "Unsaved changes" until the next save.
+    setSavedKey(d.unsavedLocal ? "" : draftKeyOf(cat.id, d.couponCode ?? "", restored));
     setPErrors(Array.from({ length: d.participants?.length ?? 1 }, () => ({})));
     setParticipantSubIdx(0);
     setCouponCode(d.couponCode ?? "");
@@ -2220,13 +2225,30 @@ function RegisterPageContent() {
       // Revalidate on resume: category must still exist and not be sold out
       if (!cat || cat.is_soldout) return;
 
+      // The browser copy is newer when the last edits were never sent to the server (the server copy only changes on
+      // Next or Save). In that case the newer browser copy is offered, and the server version is kept, so the next save
+      // sends those edits. The browser copy counts only when it is the same draft (same token) and the same category.
+      const serverSavedMs = new Date(found.savedAt).getTime();
+      let newerLocal: DraftRecord | null = null;
+      try {
+        const rawLocal = localStorage.getItem(DRAFT_KEY);
+        const sameDraft = localStorage.getItem(DRAFT_TOKEN_KEY) === found.token;
+        if (rawLocal && sameDraft) {
+          const local = JSON.parse(rawLocal) as DraftRecord;
+          if (local.selectedCatId === d.selectedCatId && typeof local.savedAt === "number" && local.savedAt > serverSavedMs) {
+            newerLocal = local;
+          }
+        }
+      } catch { /* unreadable browser copy: the server copy is used */ }
+
       try { localStorage.setItem(DRAFT_TOKEN_KEY, found.token); } catch {}
-      setServerDraft({ token: found.token, version: found.version, savedAt: new Date(found.savedAt).getTime() });
-      setServerSavedAt(new Date(found.savedAt).getTime());
+      setServerDraft({ token: found.token, version: found.version, savedAt: serverSavedMs });
+      setServerSavedAt(serverSavedMs);
       setDraftToResume({
-        ...d,
-        savedAt: new Date(found.savedAt).getTime(),
+        ...(newerLocal ?? d),
+        savedAt: serverSavedMs,
         expiresAt: new Date(found.expiresAt).getTime(),
+        unsavedLocal: newerLocal !== null,
       });
     })();
     return () => { active = false; };

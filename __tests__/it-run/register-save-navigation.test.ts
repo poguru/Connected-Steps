@@ -189,7 +189,7 @@ describe("registration wizard wiring", () => {
     expect(page).not.toContain("Not saved to server yet");
   });
 
-  it("a restored draft is recorded as saved, so it does not show Unsaved changes", () => {
-    expect(page).toMatch(/setSavedKey\(draftKeyOf\(cat\.id, d\.couponCode \?\? "", restored\)\)/);
+  it("a restored draft is recorded as saved, unless it is a newer browser copy that is not on the server", () => {
+    expect(page).toMatch(/setSavedKey\(d\.unsavedLocal \? "" : draftKeyOf\(cat\.id, d\.couponCode \?\? "", restored\)\)/);
   });
 });
