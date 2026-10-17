@@ -3,6 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyUserToken, USER_SESSION_COOKIE } from "@/lib/admin-auth";
 import { verifyDashboardToken } from "@/lib/it-run-dashboard-link";
 import { participantCategoryMap, categoryOfParticipant } from "@/lib/it-run-participant-category";
+import { paymentWindowOpen } from "@/lib/it-run-checkout";
 import { randomUUID } from "crypto";
 
 // A transient database error (a dropped connection, a timeout) is retried once before the dashboard reports a failure.
@@ -186,7 +187,16 @@ async function handleDashboard(
   }));
 
   return NextResponse.json(
-    { reg: { ...regPublic, discount_label: discountLabel }, participants: normalizedParticipants, bibSlots },
+    {
+      reg: {
+        ...regPublic,
+        discount_label: discountLabel,
+        // Decided here, from the stored state and time: the page offers payment only when this is true
+        payment_window_open: reg.payment_status === "pending" && paymentWindowOpen(reg.created_at, Date.now()),
+      },
+      participants: normalizedParticipants,
+      bibSlots,
+    },
     { headers: { "Cache-Control": "private, no-store" } },
   );
 }

@@ -14,9 +14,25 @@ export interface CheckoutRegistration {
   final_price: number;
   payment_status: string;
   razorpay_order_id: string | null;
+  /** When the registration was made. Optional here; a pending registration without it is not refused on time. */
+  created_at?: string | null;
 }
 
 export const MAX_CHECKOUT_REGISTRATIONS = 10;
+
+/**
+ * The payment window for a pending registration. The seats it holds are released when the window closes and another
+ * registration in the same category reserves seats (the sweep in itr_reserve_capacity). Matches the reservation length.
+ */
+export const PAYMENT_WINDOW_MINUTES = 15;
+
+/** True while a pending registration is still inside its payment window: created_at <= now < created_at + window. */
+export function paymentWindowOpen(createdAt: string | null | undefined, nowMs: number): boolean {
+  if (!createdAt) return false;
+  const created = Date.parse(createdAt);
+  if (!Number.isFinite(created)) return false;
+  return nowMs < created + PAYMENT_WINDOW_MINUTES * 60_000;
+}
 
 export type CheckoutCheck =
   | { ok: true; totalPaise: number; existingOrderId: string | null }
@@ -53,6 +69,10 @@ export function checkCheckoutGroup(
     }
     if (r.final_price <= 0) {
       return { ok: false, status: 400, error: `${r.registration_code} is free and does not need payment.` };
+    }
+    // A lapsed pending registration has released its seats: it is not paid. Never take money for seats it no longer holds.
+    if (r.payment_status === "pending" && r.created_at && !paymentWindowOpen(r.created_at, Date.now())) {
+      return { ok: false, status: 409, error: `${r.registration_code}'s payment window has closed and its seats were released, so it cannot be paid.` };
     }
   }
 

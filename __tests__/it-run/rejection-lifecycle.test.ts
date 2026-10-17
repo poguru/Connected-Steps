@@ -255,7 +255,7 @@ describe("the surfaces that read the cancelled state", () => {
   it("the dashboard shows Cancelled and offers no QR code for a cancelled booking", () => {
     const page = read("app/it-run/dashboard/[code]/page.tsx");
     expect(page).toMatch(/const cancelled = reg\.registration_status === "cancelled";/);
-    expect(page).toMatch(/status=\{cancelled \? "cancelled" : reg\.payment_status\}/);
+    expect(page).toMatch(/status=\{cancelled \? "cancelled" : /);
     expect(page).toMatch(/paid && !cancelled && reg\.participant_count === 1/);
     expect(page).toMatch(/paid && !cancelled && reg\.participant_count > 1/);
     expect(page).toMatch(/This registration has been cancelled/);

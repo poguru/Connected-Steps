@@ -13,6 +13,8 @@ interface DashboardData {
     id: string; registration_code: string; lead_email: string;
     participant_count: number; base_price: number; discount_amount: number;
     discount_label: string | null;
+    /** Decided by the server: a pending registration can still be paid only while this is true */
+    payment_window_open: boolean;
     final_price: number; payment_status: string; registration_status: string; qr_token: string | null;
     it_run_categories: {
       id: string; slug: string; name: string; distance_km: number;
@@ -60,6 +62,98 @@ const ACCENT = "#e8620a";
 
 // ── Status badge ───────────────────────────────────────────────────────────────
 
+// The Razorpay checkout script, loaded once. Same script the registration wizard uses.
+function loadRazorpayScript(): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    if (typeof window !== "undefined" && (window as unknown as { Razorpay?: unknown }).Razorpay) { resolve(); return; }
+    const s = document.createElement("script");
+    s.src = "https://checkout.razorpay.com/v1/checkout.js";
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Could not load the payment form"));
+    document.head.appendChild(s);
+  });
+}
+
+// Pays for a pending registration: asks the server for an order (which refuses a closed window), opens Razorpay, then
+// verifies the payment on the server. The browser's success is never treated as proof: only the verify call confirms.
+function CompletePaymentButton({ registrationId, eventTitle, onPaid }: {
+  registrationId: string;
+  eventTitle: string;
+  onPaid: () => void;
+}) {
+  const [busy,  setBusy]  = useState(false);
+  const [error, setError] = useState("");
+
+  async function pay() {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await loadRazorpayScript();
+      const res  = await fetch("/api/it-run/payment/create-order", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ registrationId }),
+      });
+      const data = await res.json().catch(() => ({})) as { error?: string; key?: string; amount?: number; orderId?: string };
+      if (!res.ok || !data.orderId || !data.key) {
+        setError(data.error ?? "We couldn't start payment. Please try again.");
+        setBusy(false);
+        return;
+      }
+      const RZ = (window as unknown as { Razorpay: new (o: Record<string, unknown>) => { open(): void } }).Razorpay;
+      const rz = new RZ({
+        key:         data.key,
+        amount:      data.amount,
+        currency:    "INR",
+        order_id:    data.orderId,
+        name:        "Connected Steps",
+        description: eventTitle,
+        image:       "/logo.png",
+        theme:       { color: ACCENT },
+        handler: async (response: Record<string, string>) => {
+          const v  = await fetch("/api/it-run/payment/verify", {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({
+              registrationId,
+              paymentId: response.razorpay_payment_id,
+              orderId:   response.razorpay_order_id,
+              signature: response.razorpay_signature,
+            }),
+          });
+          const vd = await v.json().catch(() => ({})) as { error?: string };
+          if (!v.ok) {
+            setError(vd.error ?? "Payment verification failed. Contact support if payment was deducted.");
+            setBusy(false);
+            return;
+          }
+          onPaid();
+        },
+        modal: { ondismiss: () => setBusy(false) },
+      });
+      rz.open();
+    } catch {
+      setError("Payment setup failed. Please try again.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => void pay()}
+        disabled={busy}
+        style={{ ...S.btn, background: ACCENT, color: "#fff", opacity: busy ? 0.6 : 1, width: "100%", maxWidth: 320 }}
+      >
+        {busy ? "Opening payment…" : "Complete Payment"}
+      </button>
+      {error && <div role="alert" style={{ fontSize: 13, color: "#fca5a5", marginTop: 8, lineHeight: 1.5 }}>{error}</div>}
+    </div>
+  );
+}
+
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; color: string; bg: string }> = {
     paid:               { label: "Payment Confirmed", color: "#10b981", bg: "rgba(16,185,129,0.1)" },
@@ -67,7 +161,7 @@ function StatusBadge({ status }: { status: string }) {
     pending:            { label: "Payment Pending", color: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
     payment_attempted:  { label: "Payment In Progress", color: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
     failed:             { label: "Payment Failed", color: "#ef4444", bg: "rgba(239,68,68,0.1)" },
-    expired:            { label: "Registration Expired", color: "#ef4444", bg: "rgba(239,68,68,0.1)" },
+    expired:            { label: "Reservation Expired", color: "#ef4444", bg: "rgba(239,68,68,0.1)" },
     verified:          { label: "Verified", color: "#10b981", bg: "rgba(16,185,129,0.1)" },
     rejected:          { label: "Rejected", color: "#ef4444", bg: "rgba(239,68,68,0.1)" },
     need_clarification:{ label: "Clarification Needed", color: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
@@ -364,7 +458,7 @@ export default function DashboardPage() {
           </h1>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <span style={{ fontSize: 13, color: "#888" }}>Registration Code: <strong style={{ color: "#fff", letterSpacing: "0.05em" }}>{reg.registration_code}</strong></span>
-            <StatusBadge status={cancelled ? "cancelled" : reg.payment_status} />
+            <StatusBadge status={cancelled ? "cancelled" : (reg.payment_status === "pending" && !reg.payment_window_open ? "expired" : reg.payment_status)} />
           </div>
         </div>
 
@@ -397,8 +491,44 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Payment required warning */}
-        {!paid && (
+        {/* Unpaid: the payment window is open (pay now), or it has closed (no payment), or the payment failed or is in progress */}
+        {!paid && !cancelled && reg.payment_status === "pending" && reg.payment_window_open && (
+          <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
+            <div style={{ fontSize: 14, color: "#f59e0b", fontWeight: 700 }}>Payment Pending</div>
+            <div style={{ fontSize: 13, color: "#ccc", marginTop: 4, lineHeight: 1.5 }}>
+              Your registration has been saved. Complete payment to confirm your participation.
+            </div>
+            <div style={{ fontSize: 12, color: "#888", marginTop: 6, lineHeight: 1.5 }}>
+              Your seats are held for a short time. Pay now to keep them.
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <CompletePaymentButton
+                registrationId={reg.id}
+                eventTitle={reg.it_run_events?.title ?? "The IT Run Sprint-2"}
+                onPaid={retry}
+              />
+            </div>
+          </div>
+        )}
+        {!paid && !cancelled && reg.payment_status === "pending" && !reg.payment_window_open && (
+          <div role="status" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
+            <div style={{ fontSize: 14, color: "#f87171", fontWeight: 700 }}>Reservation Expired</div>
+            <div style={{ fontSize: 13, color: "#ccc", marginTop: 4, lineHeight: 1.5 }}>
+              The 15-minute payment window for this registration closed before payment was completed. It can no longer be paid.
+              To take part, email info@connectedsteps.in.
+            </div>
+          </div>
+        )}
+        {!paid && !cancelled && (reg.payment_status === "expired") && (
+          <div role="status" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
+            <div style={{ fontSize: 14, color: "#f87171", fontWeight: 700 }}>Reservation Expired</div>
+            <div style={{ fontSize: 13, color: "#ccc", marginTop: 4, lineHeight: 1.5 }}>
+              The payment window for this registration closed before payment was completed. It can no longer be paid.
+              To take part, email info@connectedsteps.in.
+            </div>
+          </div>
+        )}
+        {!paid && !cancelled && reg.payment_status !== "pending" && reg.payment_status !== "expired" && (
           <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 12, padding: 16, marginBottom: 20, display: "flex", gap: 12, alignItems: "center" }}>
             <span style={{ color: "#f59e0b", fontSize: 20 }}>!</span>
             <div>
