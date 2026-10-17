@@ -46,17 +46,14 @@ export default function FlagshipPopup() {
     return () => window.clearTimeout(timer);
   }, [pathname]);
 
-  // Scroll lock, Escape to close, and focus handling while open
+  // Scroll lock and focus handling while open. It stays open until Register Now or Cancel is tapped.
   useEffect(() => {
     if (!open) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     closeRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
-    document.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", onKey);
       returnFocusTo.current?.focus?.();
     };
     // close is stable for this component's purpose
@@ -77,7 +74,6 @@ export default function FlagshipPopup() {
         @media (prefers-reduced-motion: reduce) { .cs-flagship-card { animation: none; } }
       `}</style>
       <div
-        onClick={close}
         style={{
           position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.78)",
           display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
@@ -87,7 +83,6 @@ export default function FlagshipPopup() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="flagship-popup-title"
-          onClick={e => e.stopPropagation()}
           className="cs-flagship-card"
           style={{
             position: "relative", width: "100%", maxWidth: 440, maxHeight: "calc(100vh - 32px)", overflowY: "auto",
@@ -96,20 +91,6 @@ export default function FlagshipPopup() {
             boxSizing: "border-box",
           }}
         >
-          <button
-            ref={closeRef}
-            type="button"
-            aria-label="Close announcement"
-            onClick={close}
-            style={{
-              position: "absolute", top: 10, right: 10, width: 36, height: 36, borderRadius: 999,
-              border: "1px solid rgba(255,255,255,0.2)", background: "rgba(0,0,0,0.5)", color: "#fff",
-              fontSize: 18, lineHeight: 1, cursor: "pointer",
-            }}
-          >
-            ×
-          </button>
-
           <div style={{ textAlign: "center" }}>
             <Image src={FEATURED_EVENT.logo} alt="" width={240} height={135}
               style={{ width: "70%", maxWidth: 240, height: "auto", margin: "0 auto 12px" }} />
@@ -133,17 +114,11 @@ export default function FlagshipPopup() {
             }}>
               Register Now →
             </Link>
-            <Link href={FEATURED_EVENT.href} onClick={close} style={{
-              border: "1px solid rgba(255,255,255,0.2)", color: "#fff", fontWeight: 600, fontSize: 14, textAlign: "center",
-              padding: "12px 18px", borderRadius: 10, textDecoration: "none",
-            }}>
-              Explore Event Details
-            </Link>
-            <button type="button" onClick={close} style={{
+            <button ref={closeRef} type="button" onClick={close} style={{
               background: "transparent", border: "none", color: "#a3a3a3", fontSize: 14, padding: "8px",
               cursor: "pointer", fontFamily: "inherit",
             }}>
-              Maybe Later
+              Cancel
             </button>
           </div>
         </div>

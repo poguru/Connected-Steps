@@ -37,16 +37,18 @@ describe("which pages show the popup", () => {
 describe("the popup's behaviour", () => {
   const popup = read("components/FlagshipPopup.tsx");
 
-  it("is a modal dialog with a labelled close button", () => {
+  it("is a modal dialog", () => {
     expect(popup).toMatch(/role="dialog"/);
     expect(popup).toMatch(/aria-modal="true"/);
-    expect(popup).toMatch(/aria-label="Close announcement"/);
   });
 
-  it("closes on Escape and on the backdrop, and the backdrop click does not reach the card", () => {
-    expect(popup).toMatch(/e\.key === "Escape"/);
-    expect(popup).toMatch(/onClick=\{close\}/);
-    expect(popup).toMatch(/onClick=\{e => e\.stopPropagation\(\)\}/);
+  it("stays open until Register Now or Cancel is tapped: no Escape, backdrop, or close-icon exit", () => {
+    expect(popup).not.toMatch(/Escape/);
+    expect(popup).not.toMatch(/aria-label="Close announcement"/);
+    expect(popup).not.toMatch(/Explore Event Details/);
+    expect(popup).not.toMatch(/Maybe Later/);
+    expect(popup).toMatch(/Cancel/);
+    expect(popup).toMatch(/Register Now/);
   });
 
   it("locks background scrolling while open and restores it", () => {
