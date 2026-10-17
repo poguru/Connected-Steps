@@ -727,10 +727,11 @@ function StepCounts({
                 </div>
               </div>
 
-              <div role="group" aria-label={`Runners in ${cat.name}`} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {/* Pair categories count pairs (the price is per pair). The state still holds runners: one pair = team runners. */}
+              <div role="group" aria-label={`${team > 1 ? "Pairs" : "Runners"} in ${cat.name}`} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <button
                   type="button"
-                  aria-label={`Remove ${team} from ${cat.name}`}
+                  aria-label={team > 1 ? `Remove one pair from ${cat.name}` : `Remove ${team} from ${cat.name}`}
                   disabled={disabled || count <= 0}
                   onClick={() => onChange(cat.id, Math.max(0, count - team))}
                   style={{ ...stepButton, opacity: disabled || count <= 0 ? 0.35 : 1 }}
@@ -738,11 +739,11 @@ function StepCounts({
                   −
                 </button>
                 <span aria-live="polite" style={{ minWidth: 28, textAlign: "center" as const, fontSize: 18, fontWeight: 800, color: "#fff" }}>
-                  {count}
+                  {team > 1 ? Math.round(count / team) : count}
                 </span>
                 <button
                   type="button"
-                  aria-label={`Add ${team} to ${cat.name}`}
+                  aria-label={team > 1 ? `Add one pair to ${cat.name}` : `Add ${team} to ${cat.name}`}
                   disabled={disabled || count + team > max}
                   onClick={() => onChange(cat.id, count + team)}
                   style={{ ...stepButton, opacity: disabled || count + team > max ? 0.35 : 1 }}
