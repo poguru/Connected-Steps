@@ -71,6 +71,16 @@ describe("planBibNumbers: teams", () => {
     expect(bibs).toEqual({ p1: "001P", c1: "001C" });
   });
 
+  it("numbers a parent and child pair in the live category (slug parent-child-duo), not reported as having no series", () => {
+    const plan = planBibNumbers([
+      member("p1", "parent-child-duo", "parent", "pair-1"),
+      member("c1", "parent-child-duo", "child", "pair-1"),
+    ], []);
+    expect(plan.problems).toEqual([]);
+    const bibs = Object.fromEntries(plan.assignments.map(a => [a.participantId, a.bib]));
+    expect(bibs).toEqual({ p1: "001P", c1: "001C" });
+  });
+
   it("reports a team with a missing member and numbers nothing for it", () => {
     const plan = planBibNumbers([member("r1", "5k-duo", "primary", "team-x")], []);
     expect(plan.assignments).toEqual([]);

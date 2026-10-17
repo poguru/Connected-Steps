@@ -30,6 +30,8 @@ export const BIB_SERIES: Record<string, BibSeries> = {
   "5k-fun-run": { prefix: "5F", width: 3 },
   "5k-duo":     { prefix: "5D", width: 3, team: { roles: ["primary", "secondary"], letters: ["A", "B"] } },
   "2k-kid":     { prefix: "",   width: 3, team: { roles: ["parent", "child"], letters: ["P", "C"] } },
+  // The live category slug (renamed from 2k-kid). Without this key every Parent & Child team is reported as having no series.
+  "parent-child-duo": { prefix: "", width: 3, team: { roles: ["parent", "child"], letters: ["P", "C"] } },
 };
 
 /** The BIB for a serial, with the team letter when the series has one. */
