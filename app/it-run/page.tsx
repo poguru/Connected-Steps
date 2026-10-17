@@ -38,18 +38,6 @@ const FAQS = [
   { q: "Can I upgrade my category after registration?", a: "You can change your category online from My Registrations until January 15, 2027, subject to category availability. An upgrade (e.g. 5K to 10K) requires paying the price difference before the change is confirmed. A downgrade needs no approval, but the price difference is not refunded." },
 ];
 
-const SCHEDULE = [
-  { time: "05:00 AM", event: "Gates Open", desc: "Entry gates open at the venue" },
-  { time: "05:30 AM", event: "Report Time", desc: "All participants must report to their designated wave areas" },
-  { time: "06:00 AM", event: "10K Flag Off", desc: "10K Timed Run begins - Wave A" },
-  { time: "06:05 AM", event: "10K Wave B",   desc: "10K Timed Run - Wave B" },
-  { time: "06:30 AM", event: "5K Flag Off",  desc: "5K Timed Run + 5K Fun Run begin" },
-  { time: "06:35 AM", event: "Duo & Family",  desc: "5K Duo Challenge + Parent & Child Duo" },
-  { time: "08:00 AM", event: "10K Cutoff",   desc: "10K route closes" },
-  { time: "08:30 AM", event: "Award Ceremony", desc: "Top finishers award ceremony + group photos" },
-  { time: "09:30 AM", event: "Event Close",  desc: "Official event wrap-up" },
-];
-
 const WHY_ITEMS = [
   { icon: "laptop", title: "Network with Tech Peers", desc: "Connect with engineers, developers and tech leaders from 200+ companies" },
   { icon: "heart", title: "Build a Healthy Habit", desc: "Running is the most powerful productivity tool. No meetings, pure clarity" },
@@ -199,7 +187,6 @@ export default function ItRunLandingPage() {
   const [contactEmail,  setContactEmail]  = useState("info@connectedsteps.in");
   const [contactPhone,  setContactPhone]  = useState("+91 97036 20571");
   const [bibInfo,       setBibInfo]       = useState<string>("");
-  const [raceDayInfo,   setRaceDayInfo]   = useState<string>("");
 
   const [reportTime,  setReportTime]  = useState<string>("");
   const countdown    = useCountdown(eventDate);
@@ -216,7 +203,7 @@ export default function ItRunLandingPage() {
     setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
   }
   useEffect(() => {
-    // A direct link to a folded section (#faq, #schedule, #categories) opens it
+    // A direct link to a folded section (#faq, #categories) opens it
     const id = window.location.hash.slice(1);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- a direct link is the source of truth for which section opens
     if (id) revealSection(id);
@@ -279,7 +266,6 @@ export default function ItRunLandingPage() {
           if (event.contact_email)            setContactEmail(event.contact_email);
           if (event.contact_phone)            setContactPhone(event.contact_phone);
           if (event.bib_collection_info)      setBibInfo(event.bib_collection_info);
-          if (event.race_day_info)            setRaceDayInfo(event.race_day_info);
         }
         if (Array.isArray(data)) {
           setLiveCategories(data.map(categoryCard));
@@ -307,7 +293,6 @@ export default function ItRunLandingPage() {
         </Link>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <a href="#categories" style={{ color: "#888", fontSize: 13, textDecoration: "none", padding: "0 8px", display: "none" }}>Categories</a>
-          <a href="#schedule" className="it-run-nav-secondary" onClick={e => { e.preventDefault(); revealSection("schedule"); }} style={{ color: "#888", fontSize: 13, textDecoration: "none", padding: "0 12px" }}>Schedule</a>
           <a href="#faq" className="it-run-nav-secondary" onClick={e => { e.preventDefault(); revealSection("faq"); }} style={{ color: "#888", fontSize: 13, textDecoration: "none", padding: "0 12px" }}>FAQ</a>
           <Link href="/it-run/my-registrations" style={{ color: "#ccc", fontSize: 13, textDecoration: "none", padding: "0 12px", fontWeight: 600 }}>My Registrations</Link>
           <Link href="/it-run/register" style={{ ...S.cta, padding: "10px 20px", fontSize: 13 }}>Register</Link>
@@ -620,42 +605,6 @@ export default function ItRunLandingPage() {
         </div>
       </section>
 
-      {/* ── Schedule ── */}
-      <Fold id="schedule" open={isOpen("schedule")} onToggle={v => setSection("schedule", v)} style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}
-        header={<><div style={S.tag}>Event Day</div><h2 style={{ ...S.h2, marginTop: 16 }}>Race Day Schedule</h2><p style={S.sub}>{eventLabel} · {venueName}</p></>}>
-        <div style={{ marginBottom: 40 }}>
-          {raceDayInfo && (
-            <div style={{ marginTop: 16, padding: "14px 18px", background: "rgba(232,98,10,0.06)", border: "1px solid rgba(232,98,10,0.15)", borderRadius: 10, fontSize: 14, color: "#ccc", lineHeight: 1.7, whiteSpace: "pre-line", maxWidth: 620 }}>
-              {raceDayInfo}
-            </div>
-          )}
-        </div>
-        <div style={{ position: "relative" }}>
-          <div style={{ position: "absolute", left: "clamp(48px,8vw,60px)", top: 0, bottom: 0, width: 2, background: "rgba(255,255,255,0.06)" }} />
-          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-            {SCHEDULE.map((item, i) => (
-              <div key={i} style={{ display: "flex", gap: 20, paddingLeft: "clamp(96px,16vw,120px)", paddingBottom: 24, position: "relative" }}>
-                <div style={{
-                  position: "absolute",
-                  left: "clamp(40px,7vw,52px)",
-                  top: 2, width: 18, height: 18,
-                  background: i === 0 ? "#e8620a" : "rgba(255,255,255,0.08)",
-                  border: `2px solid ${i === 0 ? "#e8620a" : "rgba(255,255,255,0.15)"}`,
-                  borderRadius: "50%",
-                  zIndex: 1,
-                }} />
-                <div style={{ position: "absolute", left: 0, top: 0, width: "clamp(80px,12vw,100px)", textAlign: "right" }}>
-                  <span style={{ fontSize: 12, color: "#e8620a", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{item.time}</span>
-                </div>
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 2 }}>{item.event}</div>
-                  <div style={{ fontSize: 13, color: "#888" }}>{item.desc}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </Fold>
 
       {/* ── Testimonials ── */}
       <Fold id="runners" open={isOpen("runners")} onToggle={v => setSection("runners", v)} style={{ ...S.section, borderBottom: "1px solid rgba(255,255,255,0.05)" }}

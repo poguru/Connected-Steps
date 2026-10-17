@@ -35,3 +35,14 @@ describe("registration access from the landing page", () => {
     expect(page).toMatch(/Sign in to view or manage your registration/);
   });
 });
+
+describe("the race day schedule section is removed from the landing page", () => {
+  const landing = fs.readFileSync(path.resolve(__dirname, "../../app/it-run/page.tsx"), "utf8");
+
+  it("has no schedule section, menu link or timeline", () => {
+    expect(landing).not.toMatch(/Race Day Schedule/);
+    expect(landing).not.toMatch(/href="#schedule"/);
+    expect(landing).not.toMatch(/const SCHEDULE/);
+    expect(landing).not.toMatch(/Race Day Information/);
+  });
+});
