@@ -1669,6 +1669,8 @@ function RegisterPageContent() {
 
   // Draft resume — holds a found draft until the user chooses Continue or Start New
   const [draftToResume, setDraftToResume] = useState<DraftRecord | null>(null);
+  // "Start New Registration" asks for a second, explicit tap on the page (not a browser dialog, which some phone browsers suppress)
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   // Server draft: "saved" only when the server confirms. The version stops a stale tab overwriting newer progress.
   const [serverDraft, setServerDraft] = useState<{ token: string; version: number; savedAt: number } | null>(null);
   const [serverSave, setServerSave] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -3122,31 +3124,53 @@ function RegisterPageContent() {
               <div style={{ fontSize: 12, color: "#555", marginBottom: 20 }}>
                 Last saved: {timeAgo(draftToResume.savedAt)}
               </div>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button
-                  onClick={() => applyDraft(draftToResume)}
-                  style={{
-                    padding: "11px 22px", background: ACCENT, border: "none",
-                    borderRadius: 10, color: "#fff", fontSize: 14, fontWeight: 700,
-                    cursor: "pointer", fontFamily: "inherit",
-                  }}>
-                  Continue Registration
-                </button>
-                <button
-                  onClick={() => {
-                    if (confirm("Start a new registration? Your saved progress will be lost.")) {
-                      discardDraft();
-                    }
-                  }}
-                  style={{
-                    padding: "11px 22px", background: "transparent",
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    borderRadius: 10, color: "#888", fontSize: 14,
-                    cursor: "pointer", fontFamily: "inherit",
-                  }}>
-                  Start New Registration
-                </button>
-              </div>
+              {confirmingDiscard ? (() => {
+                const runners = draftToResume.participants?.length ?? 0;
+                return (
+                  <div role="alertdialog" aria-label="Delete saved registration" style={{ background: "rgba(248,113,113,0.06)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 10, padding: 14 }}>
+                    <div style={{ fontSize: 14, color: "#fca5a5", fontWeight: 700, marginBottom: 6 }}>
+                      Delete your saved registration?
+                    </div>
+                    <div style={{ fontSize: 13, color: "#ccc", lineHeight: 1.5, marginBottom: 12 }}>
+                      This deletes the saved details for {runners} runner{runners === 1 ? "" : "s"}. You cannot get them back.
+                    </div>
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      <button
+                        onClick={() => { setConfirmingDiscard(false); discardDraft(); }}
+                        style={{ padding: "11px 22px", background: "#b91c1c", border: "none", borderRadius: 10, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                        Yes, delete it
+                      </button>
+                      <button
+                        onClick={() => setConfirmingDiscard(false)}
+                        style={{ padding: "11px 22px", background: ACCENT, border: "none", borderRadius: 10, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                        Keep my registration
+                      </button>
+                    </div>
+                  </div>
+                );
+              })() : (
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button
+                    onClick={() => applyDraft(draftToResume)}
+                    style={{
+                      padding: "11px 22px", background: ACCENT, border: "none",
+                      borderRadius: 10, color: "#fff", fontSize: 14, fontWeight: 700,
+                      cursor: "pointer", fontFamily: "inherit",
+                    }}>
+                    Continue Registration
+                  </button>
+                  <button
+                    onClick={() => setConfirmingDiscard(true)}
+                    style={{
+                      padding: "11px 22px", background: "transparent",
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      borderRadius: 10, color: "#888", fontSize: 14,
+                      cursor: "pointer", fontFamily: "inherit",
+                    }}>
+                    Start New Registration
+                  </button>
+                </div>
+              )}
             </div>
           );
         })()}
