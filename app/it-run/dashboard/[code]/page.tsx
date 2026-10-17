@@ -154,6 +154,42 @@ function CompletePaymentButton({ registrationId, eventTitle, onPaid }: {
   );
 }
 
+// Renews an expired, unpaid registration whose seats are still free. The server decides, and it refuses a signed-out
+// viewer, a discounted registration and a registration with a payment already recorded.
+function RenewButton({ registrationId, onRenewed }: { registrationId: string; onRenewed: () => void }) {
+  const [busy,  setBusy]  = useState(false);
+  const [error, setError] = useState("");
+
+  async function renew() {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const res  = await fetch(`/api/it-run/registrations/${registrationId}/renew`, { method: "POST" });
+      const data = await res.json().catch(() => ({})) as { error?: string };
+      if (!res.ok) { setError(data.error ?? "We couldn't renew this registration. Please try again."); setBusy(false); return; }
+      onRenewed();
+    } catch {
+      setError("Network error. Please try again.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => void renew()}
+        disabled={busy}
+        style={{ ...S.btn, background: "transparent", color: ACCENT, border: `1px solid ${ACCENT}`, opacity: busy ? 0.6 : 1, width: "100%", maxWidth: 320 }}
+      >
+        {busy ? "Renewing…" : "Renew my place"}
+      </button>
+      {error && <div role="alert" style={{ fontSize: 13, color: "#fca5a5", marginTop: 8, lineHeight: 1.5 }}>{error}</div>}
+    </div>
+  );
+}
+
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; color: string; bg: string }> = {
     paid:               { label: "Payment Confirmed", color: "#10b981", bg: "rgba(16,185,129,0.1)" },
@@ -514,18 +550,32 @@ export default function DashboardPage() {
           <div role="status" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
             <div style={{ fontSize: 14, color: "#f87171", fontWeight: 700 }}>Reservation Expired</div>
             <div style={{ fontSize: 13, color: "#ccc", marginTop: 4, lineHeight: 1.5 }}>
-              The 15-minute payment window for this registration closed before payment was completed. It can no longer be paid.
-              To take part, email info@connectedsteps.in.
+              The 15-minute payment window for this registration closed before payment was completed, so it can no longer be paid.
+              {reg.discount_amount > 0
+                ? " This registration used a discount, so it can't be renewed online. Email info@connectedsteps.in."
+                : " If seats are still free, you can renew your place and pay within a new 15-minute window."}
             </div>
+            {reg.discount_amount === 0 && (
+              <div style={{ marginTop: 12 }}>
+                <RenewButton registrationId={reg.id} onRenewed={retry} />
+              </div>
+            )}
           </div>
         )}
         {!paid && !cancelled && (reg.payment_status === "expired") && (
           <div role="status" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
             <div style={{ fontSize: 14, color: "#f87171", fontWeight: 700 }}>Reservation Expired</div>
             <div style={{ fontSize: 13, color: "#ccc", marginTop: 4, lineHeight: 1.5 }}>
-              The payment window for this registration closed before payment was completed. It can no longer be paid.
-              To take part, email info@connectedsteps.in.
+              The payment window for this registration closed before payment was completed, so its seats were released.
+              {reg.discount_amount > 0
+                ? " This registration used a discount, so it can't be renewed online. Email info@connectedsteps.in."
+                : " If seats are still free, you can renew your place and pay within a new 15-minute window."}
             </div>
+            {reg.discount_amount === 0 && (
+              <div style={{ marginTop: 12 }}>
+                <RenewButton registrationId={reg.id} onRenewed={retry} />
+              </div>
+            )}
           </div>
         )}
         {!paid && !cancelled && reg.payment_status !== "pending" && reg.payment_status !== "expired" && (

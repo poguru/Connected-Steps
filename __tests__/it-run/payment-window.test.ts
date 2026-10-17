@@ -69,12 +69,12 @@ describe("the server enforces the window on both payment paths", () => {
   const route = read("app/api/it-run/payment/create-order/route.ts");
 
   it("the single-registration path refuses a closed window with PAYMENT_WINDOW_CLOSED", () => {
-    expect(route).toMatch(/payment_status === "pending" && !paymentWindowOpen\(reg\.created_at, Date\.now\(\)\)/);
+    expect(route).toMatch(/payment_status === "pending" && !paymentWindowOpen\(reg\.reserved_at \?\? reg\.created_at, Date\.now\(\)\)/);
     expect(route).toMatch(/code: "PAYMENT_WINDOW_CLOSED"/);
   });
 
   it("the group path reads created_at, so checkCheckoutGroup can enforce the window", () => {
-    expect(route).toMatch(/razorpay_order_id, created_at"\)/);
+    expect(route).toMatch(/razorpay_order_id, created_at, reserved_at"\)/);
   });
 });
 
@@ -83,7 +83,7 @@ describe("the dashboard offers payment only when the server says the window is o
   const page = read("app/it-run/dashboard/[code]/page.tsx");
 
   it("the dashboard API computes payment_window_open on the server", () => {
-    expect(api).toMatch(/payment_window_open: reg\.payment_status === "pending" && paymentWindowOpen\(reg\.created_at, Date\.now\(\)\)/);
+    expect(api).toMatch(/payment_window_open: reg\.payment_status === "pending" && paymentWindowOpen\(reg\.reserved_at \?\? reg\.created_at, Date\.now\(\)\)/);
   });
 
   it("the Complete Payment button appears only inside the open window", () => {

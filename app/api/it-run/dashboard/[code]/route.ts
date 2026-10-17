@@ -68,7 +68,7 @@ async function handleDashboard(
     .select(`
       id, registration_code, lead_email, participant_count,
       base_price, discount_amount, final_price, payment_status, registration_status,
-      cancelled_reason, cancelled_at, coupon_id, early_bird_offer_id, created_at, qr_token, linked_user_email,
+      cancelled_reason, cancelled_at, coupon_id, early_bird_offer_id, created_at, reserved_at, qr_token, linked_user_email,
       it_run_categories ( id, slug, name, distance_km, category_type, color, includes_timing, includes_medal ),
       it_run_events ( id, title, event_date, report_time, flag_off_time, venue_name, venue_address, city )
     `)
@@ -78,7 +78,7 @@ async function handleDashboard(
       participant_count: number; base_price: number; discount_amount: number;
       final_price: number; payment_status: string; registration_status: string;
       cancelled_reason: string | null; cancelled_at: string | null;
-      coupon_id: string | null; early_bird_offer_id: string | null; created_at: string; qr_token: string | null;
+      coupon_id: string | null; early_bird_offer_id: string | null; created_at: string; reserved_at: string | null; qr_token: string | null;
       linked_user_email: string | null;
       it_run_categories: { id: string; slug: string; name: string; distance_km: number; category_type: string; color: string; includes_timing: boolean; includes_medal: boolean } | null;
       it_run_events: { id: string; title: string; event_date: string; report_time: string | null; flag_off_time: string | null; venue_name: string | null; venue_address: string | null; city: string | null } | null;
@@ -192,7 +192,7 @@ async function handleDashboard(
         ...regPublic,
         discount_label: discountLabel,
         // Decided here, from the stored state and time: the page offers payment only when this is true
-        payment_window_open: reg.payment_status === "pending" && paymentWindowOpen(reg.created_at, Date.now()),
+        payment_window_open: reg.payment_status === "pending" && paymentWindowOpen(reg.reserved_at ?? reg.created_at, Date.now()),
       },
       participants: normalizedParticipants,
       bibSlots,

@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
     const { data: reg } = await db
       .from("it_run_registrations")
-      .select("id,registration_code,lead_email,final_price,base_price,payment_status,razorpay_order_id,category_id,participant_count,coupon_id,discount_amount,event_id,created_at")
+      .select("id,registration_code,lead_email,final_price,base_price,payment_status,razorpay_order_id,category_id,participant_count,coupon_id,discount_amount,event_id,created_at,reserved_at")
       .eq("id", registrationId)
       .single<{
         id: string; registration_code: string; lead_email: string;
@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
         category_id: string; participant_count: number;
         coupon_id: string | null; discount_amount: number; event_id: string;
         created_at: string | null;
+        reserved_at: string | null;
       }>();
 
     if (!reg) return NextResponse.json({ error: "Registration not found" }, { status: 404 });
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Registration expired. Please register again." }, { status: 409 });
     }
     // A pending registration whose window has closed has released its seats. It is not paid.
-    if (reg.payment_status === "pending" && !paymentWindowOpen(reg.created_at, Date.now())) {
+    if (reg.payment_status === "pending" && !paymentWindowOpen(reg.reserved_at ?? reg.created_at, Date.now())) {
       return NextResponse.json({
         error: "The payment window for this registration has closed and its seats were released. It cannot be paid now.",
         code: "PAYMENT_WINDOW_CLOSED",
@@ -183,7 +184,7 @@ async function createCheckoutGroupOrder(ids: string[]): Promise<NextResponse> {
   const db = getSupabaseServer();
   const { data: regs, error } = await db
     .from("it_run_registrations")
-    .select("id, registration_code, event_id, lead_email, final_price, payment_status, razorpay_order_id, created_at")
+    .select("id, registration_code, event_id, lead_email, final_price, payment_status, razorpay_order_id, created_at, reserved_at")
     .in("id", ids)
     .returns<CheckoutRegistration[]>();
   if (error) return NextResponse.json({ error: "Server error" }, { status: 500 });
