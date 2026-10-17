@@ -167,14 +167,14 @@ function parseRefundAmount(text: string, remaining: number): { ok: true; paise: 
   return { ok: true, paise };
 }
 
-// What executing this request refunds. An ID-failure request has a fixed amount set by the rule, which the server
-// enforces. Any other request refunds the amount the admin enters, or the full amount still refundable if left blank.
+// What executing this request refunds. An ID-failure or category-cancel request has a fixed amount set by the rule
+// (the server enforces it). Any other request refunds the amount the admin enters, or the full amount still refundable if left blank.
 function planFor(
   item: { request_kind?: string; requested_amount_paise?: number | null },
   remaining: number,
   text: string,
 ): { ok: true; paise: number; fixed: boolean } | { ok: false; message: string; fixed: boolean } {
-  if (item.request_kind === "id_failure" && item.requested_amount_paise) {
+  if ((item.request_kind === "id_failure" || item.request_kind === "category_cancel") && item.requested_amount_paise) {
     if (item.requested_amount_paise > remaining) {
       return { ok: false, fixed: true, message: `Only ${inr(remaining)} can still be refunded on this booking.` };
     }
