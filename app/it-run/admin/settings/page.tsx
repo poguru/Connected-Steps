@@ -348,10 +348,7 @@ export default function EventSettingsPage() {
         </Section>
 
         {/* ── Race Day ── */}
-        <Section title="Race Day" desc="Details shown in the race day section of the landing page">
-          <Textarea label="Race Day Information"
-            name="race_day_info" value={f.race_day_info ?? ""} onChange={update} rows={6}
-            hint="Gates open time, parking, facilities, schedule notes, etc." />
+        <Section title="BIB collection" desc="Details for the BIB collection page">
           <Textarea label="BIB Collection Information"
             name="bib_collection_info" value={f.bib_collection_info ?? ""} onChange={update} rows={5}
             hint="Where, when, and how to collect race BIBs. Also shown in confirmation emails." />
