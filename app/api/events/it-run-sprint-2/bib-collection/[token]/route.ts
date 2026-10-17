@@ -105,7 +105,13 @@ export async function GET(
       venue_name:       reg.it_run_events?.venue_name ?? "",
     },
     participants: (parts ?? []).map(p => {
-      const confirmedBooking = (p.it_run_bib_bookings ?? []).find(
+      // A runner has at most one booking (UNIQUE participant_id), so PostgREST returns one object, or null when there is none.
+      // Only a list has .find, so a single object is read as a one-item list (a null read as empty). Without this the
+      // request throws once a runner has booked, and the page shows "Failed to load".
+      const bookingRows = Array.isArray(p.it_run_bib_bookings)
+        ? p.it_run_bib_bookings
+        : p.it_run_bib_bookings ? [p.it_run_bib_bookings] : [];
+      const confirmedBooking = bookingRows.find(
         (b: { status: string }) => b.status === "confirmed"
       ) as { id: string; status: string; it_run_bib_slots: { id: string; location_name: string; location_address: string | null; slot_date: string; start_time: string; end_time: string } | null } | undefined;
       return {
