@@ -860,6 +860,7 @@ function StepParticipants({
       )}
 
       <ParticipantForm
+        key={participantSubIdx}
         participantLabel={slot?.label ?? `Participant ${participantSubIdx + 1}`}
         roleLabel={
           total === 1 ? "Your personal details — printed on BIB and certificate" :
