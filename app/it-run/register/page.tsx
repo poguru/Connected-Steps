@@ -414,7 +414,7 @@ function ParticipantForm({
 
       <div style={{ marginBottom: 14 }}>
         <Field label="BIB Name" error={errors.bibName} required
-          hint={bibNameHint(data.bibName).tone === "ok" ? bibNameHint(data.bibName).text : "This name will be printed on your race BIB. Letters, spaces, hyphens and apostrophes only."}>
+          hint={bibNameHint(data.bibName).tone === "ok" ? bibNameHint(data.bibName).text : "This name will be printed on your race BIB. Letters, spaces, hyphens, apostrophes and full stops only."}>
           {/* Stored as typed. Capitals are shown with CSS: rewriting the value on each keystroke breaks Android keyboard input. The server uppercases it on save. */}
           <input style={{ ...inp("bibName", !!errors.bibName), textTransform: "uppercase" }} value={data.bibName}
             onChange={e => onChange("bibName", e.target.value)} onBlur={() => onNameBlur?.("bibName")}

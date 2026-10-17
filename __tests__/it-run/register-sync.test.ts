@@ -9,7 +9,7 @@
 
 import fs from "fs";
 import path from "path";
-import { checkBibName } from "@/lib/it-run-name-validation";
+import { checkBibName, checkPersonName } from "@/lib/it-run-name-validation";
 
 const page = fs.readFileSync(path.resolve(__dirname, "../../app/it-run/register/page.tsx"), "utf8");
 const route = fs.readFileSync(path.resolve(__dirname, "../../app/api/it-run/register/route.ts"), "utf8");
@@ -31,6 +31,27 @@ describe("BIB Name input", () => {
   it("lower-case names are accepted by the validation", () => {
     expect(checkBibName("pavan kumar").ok).toBe(true);
     expect(checkBibName("p-kalyan").ok).toBe(true);
+  });
+
+  it("full stops are accepted for initials, as on the placeholder", () => {
+    expect(checkBibName("P.KALYAN").ok).toBe(true);
+    expect(checkBibName("P. KALYAN").ok).toBe(true);
+  });
+
+  it("full stops follow the same separator rules: one at a time, not at the ends, not doubled", () => {
+    expect(checkBibName("P..KALYAN").ok).toBe(false);
+    expect(checkBibName("P.-KALYAN").ok).toBe(false);
+    expect(checkBibName("KALYAN.").ok).toBe(false);
+    expect(checkBibName("KALYAN .P").ok).toBe(false);
+  });
+
+  it("digits and other symbols are still refused in BIB names", () => {
+    expect(checkBibName("P1KALYAN").ok).toBe(false);
+    expect(checkBibName("P@KALYAN").ok).toBe(false);
+  });
+
+  it("person names do not allow full stops", () => {
+    expect(checkPersonName("P.Kalyan").ok).toBe(false);
   });
 });
 

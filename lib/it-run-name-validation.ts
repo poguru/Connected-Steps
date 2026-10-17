@@ -34,6 +34,13 @@ function codePointLength(value: string): number {
 const CHARACTER_MESSAGE =
   "Use letters only. Spaces, hyphens (-) and apostrophes (') are allowed. Numbers, symbols and emojis are not.";
 
+// BIB names only: a full stop is allowed too, for initials such as P.KALYAN or P. KALYAN. Person names do not allow it.
+const BIB_NAME_CHARS = /^[\p{L}\p{M} .\-'’]+$/u;
+const BIB_DOUBLE_SEPARATOR = /[\-'’.]{2}/;
+const BIB_SEPARATOR_AFTER_SPACE = /\s[\-'’.]/;
+const BIB_CHARACTER_MESSAGE =
+  "Use letters only. Spaces, hyphens (-), apostrophes (') and full stops (.) are allowed. Numbers, symbols and emojis are not.";
+
 /** Checks a person's name (first name, last name, emergency contact). */
 export function checkPersonName(input: unknown, label = "name"): NameCheck {
   if (typeof input !== "string") return { ok: false, message: `Enter your ${label}.` };
@@ -63,14 +70,14 @@ export function checkBibName(input: unknown): NameCheck {
   if (codePointLength(value) > BIB_NAME_MAX) {
     return { ok: false, message: `The BIB name must be ${BIB_NAME_MAX} characters or fewer.` };
   }
-  if (!NAME_CHARS.test(value)) {
-    return { ok: false, message: `This name is printed on your BIB. ${CHARACTER_MESSAGE}` };
+  if (!BIB_NAME_CHARS.test(value)) {
+    return { ok: false, message: `This name is printed on your BIB. ${BIB_CHARACTER_MESSAGE}` };
   }
   if (!EDGE_IS_LETTER.test(value)) {
     return { ok: false, message: "A BIB name must start and end with a letter." };
   }
-  if (DOUBLE_SEPARATOR.test(value) || SEPARATOR_NEXT_TO_SPACE.test(value)) {
-    return { ok: false, message: "Use one hyphen or apostrophe at a time, with no space next to it." };
+  if (BIB_DOUBLE_SEPARATOR.test(value) || BIB_SEPARATOR_AFTER_SPACE.test(value)) {
+    return { ok: false, message: "Use one hyphen, apostrophe or full stop at a time, with no space before it." };
   }
   return { ok: true, value };
 }
