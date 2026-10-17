@@ -311,6 +311,11 @@ async function handleItRunPaymentCaptured(
 
   if (result.kind === "not_found") { console.warn(`${label} Order not found — skipping`); return; }
   if (result.kind === "already") { console.log(`${label} Already confirmed — skipping`); return; }
+  if (result.kind === "lapsed") {
+    // Captured for a registration whose window closed: logged for review (see the audit log), nothing confirmed here
+    console.error(JSON.stringify({ src: "it-run-webhook", outcome: "payment_for_lapsed_registration", order: orderId, registrations: result.registrationCodes }));
+    return;
+  }
   if (result.kind === "amount_mismatch") {
     console.error(JSON.stringify({ src: "it-run-webhook", outcome: "amount_mismatch", order: orderId }));
     return;

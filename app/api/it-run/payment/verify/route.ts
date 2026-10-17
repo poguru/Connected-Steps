@@ -62,6 +62,13 @@ export async function POST(req: NextRequest) {
     if (result.kind === "not_found") return NextResponse.json({ error: "Registration not found" }, { status: 404 });
     if (result.kind === "amount_mismatch") return NextResponse.json({ error: "Payment amount does not match" }, { status: 400 });
     if (result.kind === "already") return NextResponse.json({ ok: true, already: true });
+    if (result.kind === "lapsed") {
+      // Money was taken, but the registration's window closed and its seats were released. Say so; do not say it is confirmed.
+      return NextResponse.json({
+        error: "Your payment was received, but this registration's payment window had closed, so it could not be confirmed. Email info@connectedsteps.in with your registration code and we will sort it out.",
+        code: "PAYMENT_NEEDS_REVIEW",
+      }, { status: 409 });
+    }
 
     // Each registration is confirmed (with its confirmation email and BIB invite) once its IDs are verified.
     // Until then it gets the payment-received notice. Runs after the response.

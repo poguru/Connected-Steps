@@ -25,6 +25,8 @@ export type ConfirmResult =
   | { kind: "already" }
   | { kind: "not_found" }
   | { kind: "amount_mismatch" }
+  /** Money was captured, but the payment window had closed and the seats were released. Nothing is confirmed. */
+  | { kind: "lapsed"; registrationCodes: string[] }
 
 
 type Db = ReturnType<typeof getSupabaseServer>;
@@ -35,9 +37,9 @@ export async function confirmCheckoutPayment(
 ): Promise<ConfirmResult> {
   const { data: regs, error } = await db
     .from("it_run_registrations")
-    .select("id, registration_code, lead_email, final_price, payment_status, razorpay_payment_id, qr_token")
+    .select("id, registration_code, lead_email, final_price, payment_status, razorpay_payment_id, qr_token, event_id")
     .eq("razorpay_order_id", args.orderId)
-    .returns<Array<ConfirmedRegistration & { final_price: number; payment_status: string; razorpay_payment_id: string | null }>>();
+    .returns<Array<ConfirmedRegistration & { final_price: number; payment_status: string; razorpay_payment_id: string | null; event_id: string }>>();
   if (error) throw new Error(`Failed to read registrations for order: ${error.message}`);
   if (!regs || regs.length === 0) return { kind: "not_found" };
 
@@ -54,6 +56,19 @@ export async function confirmCheckoutPayment(
   }
 
   const payable = regs.filter(r => ["pending", "payment_attempted", "failed"].includes(r.payment_status));
+  // An expired registration has released its seats. Money was captured for it, so it is never reported as success:
+  // it is logged for review (refund or renewal by an admin), and nothing is confirmed here.
+  const lapsed = regs.filter(r => r.payment_status === "expired");
+  if (payable.length === 0 && lapsed.length > 0) {
+    await db.from("it_run_audit_logs").insert({
+      event_id: lapsed[0].event_id,
+      actor_email: args.actor, actor_role: "system",
+      action: "payment_for_lapsed_registration",
+      entity_type: "registration", entity_id: lapsed[0].id,
+      detail: { payment_id: args.paymentId, order_id: args.orderId, registration_codes: lapsed.map(r => r.registration_code) },
+    }).then(() => {}, () => {});
+    return { kind: "lapsed", registrationCodes: lapsed.map(r => r.registration_code) };
+  }
   if (payable.length === 0) return { kind: "already" };
 
   // Move the payable registrations to paid. The status guard makes this a single transition per registration.
