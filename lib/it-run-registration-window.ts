@@ -25,3 +25,15 @@ export function formatIst(instant: string): string {
   const time = d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" });
   return `${date}, ${time} IST`;
 }
+
+const LOCAL_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
+
+/**
+ * A time typed in an admin form (datetime-local, no zone) is Indian time. Stored as-is, the database reads it as UTC.
+ * This adds the IST offset so the instant is the time the admin typed. Values that already carry a zone are unchanged.
+ */
+export function istLocalToInstant(value: string): string {
+  const v = value.trim();
+  if (!LOCAL_DATETIME.test(v)) return v;
+  return `${v.length === 16 ? `${v}:00` : v}+05:30`;
+}

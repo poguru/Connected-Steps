@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireRole, getClientIp } from "@/lib/it-run-auth";
+import { istLocalToInstant } from "@/lib/it-run-registration-window";
 
 // Fields the admin is never allowed to change
 const IMMUTABLE = new Set(["id", "slug", "created_at"]);
 
 // Fields that require explicit confirm:true in the request body
 const CRITICAL = new Set(["event_date", "registration_closes_at"]);
+// Admin times typed in Indian time: stored with the IST offset
+const IST_TIME_FIELDS = new Set(["registration_opens_at", "registration_closes_at"]);
 
 // Strip HTML/script tags and trim. Stored text must be plain text only.
 function sanitize(val: unknown): unknown {
@@ -64,6 +67,10 @@ export async function PATCH(req: NextRequest) {
 
   // Sanitize all text — no HTML or script tags allowed
   const editable = sanitizeBody(stripped);
+  // Times typed in the form are Indian time: store them with the IST offset, not as UTC
+  for (const k of IST_TIME_FIELDS) {
+    if (typeof editable[k] === "string" && editable[k] !== "") editable[k] = istLocalToInstant(editable[k] as string);
+  }
 
   // Identify which critical fields are changing
   const criticalChanged = Object.keys(editable).filter(k => CRITICAL.has(k));
