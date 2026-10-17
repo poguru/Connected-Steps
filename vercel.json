@@ -23,6 +23,10 @@
       "schedule": "0 1 * * *"
     },
     {
+      "path": "/api/cron/it-run-reservations",
+      "schedule": "0 3 * * *"
+    },
+    {
       "path": "/api/cron/daily-attendance-qr",
       "schedule": "30 23 * * *"
     },
