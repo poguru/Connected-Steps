@@ -6,6 +6,24 @@
 
 export const FEATURED_EVENT_VISIBLE = true;
 
+/** sessionStorage key: set once the popup has been shown or dismissed in this browsing session. */
+export const POPUP_SEEN_KEY = "cs_flagship_popup_seen";
+
+/**
+ * Routes where the popup must never appear: sign-in, registration, dashboards, checkout and payment, and any page where
+ * a person is mid-task. A path is excluded when it equals a prefix or starts with it followed by "/".
+ */
+export const POPUP_EXCLUDED_PREFIXES = [
+  "/auth", "/dashboard", "/admin", "/it-run", "/events/it-run-sprint-2",
+  "/checkout", "/payment", "/pricing", "/join", "/invite", "/my-events", "/ops",
+  "/event-checkin", "/event-tshirt", "/delete-account", "/invoices", "/messages",
+] as const;
+
+export function popupAllowedOnPath(pathname: string | null | undefined): boolean {
+  if (!pathname) return false;
+  return !POPUP_EXCLUDED_PREFIXES.some(p => pathname === p || pathname.startsWith(`${p}/`));
+}
+
 export const FEATURED_EVENT = {
   name: "The IT Run",
   edition: "Sprint-2",

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import EventsClient from "@/components/events/EventsClient";
+import FlagshipEvent from "@/components/FlagshipEvent";
 
 export const metadata: Metadata = {
   title: "Events | Connected Steps",
@@ -64,5 +65,11 @@ async function getEvents(): Promise<Event[]> {
 
 export default async function EventsPage() {
   const events = await getEvents();
-  return <EventsClient events={events} />;
+  // The flagship event is not in the events table, so it is never listed twice. It is featured above the list.
+  return (
+    <>
+      <FlagshipEvent />
+      <EventsClient events={events} />
+    </>
+  );
 }

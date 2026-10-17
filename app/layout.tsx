@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import CookieBanner from "@/components/ui/CookieBanner";
+import FlagshipPopup from "@/components/FlagshipPopup";
 import NativeShell from "@/components/mobile/NativeShell";
 import BugReportFab from "@/components/ui/BugReportFab";
 import SupportWhatsApp from "@/components/ui/SupportWhatsApp";
@@ -76,6 +77,7 @@ export default function RootLayout({
             {children}
           </NativeShell>
           <CookieBanner />
+          <FlagshipPopup />
           <BugReportFab />
           <SupportWhatsApp />
         </ToastProvider>
