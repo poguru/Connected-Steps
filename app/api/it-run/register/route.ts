@@ -16,6 +16,7 @@ import {
 import { reserveSeats, releaseSeats, type SeatLine } from "@/lib/it-run-seats";
 import { couponUncoveredCategories, claimRunners, releaseRunnerClaim } from "@/lib/it-run-registration-guards";
 import { initialVerificationStatus, isStoredDocumentPath, idDocumentTypeFor, idUploadError } from "@/lib/it-run-id-verification";
+import { registrationWindow, formatIst } from "@/lib/it-run-registration-window";
 import { checkPersonName, checkBibName, normalizeName } from "@/lib/it-run-name-validation";
 import { normalizeAltEmail, altEmailOrNull } from "@/lib/it-run-alt-email";
 import {
@@ -213,11 +214,20 @@ export async function POST(req: NextRequest) {
     // Check registration window; also fetch event_date for child age validation
     const { data: evStatus } = await db
       .from("it_run_events")
-      .select("registration_closes_at,event_date")
+      .select("registration_opens_at,registration_closes_at,event_date")
       .eq("id", primary.event_id)
-      .single<{ registration_closes_at: string | null; event_date: string }>();
+      .single<{ registration_opens_at: string | null; registration_closes_at: string | null; event_date: string }>();
 
-    if (evStatus?.registration_closes_at && new Date(evStatus.registration_closes_at) < new Date()) {
+    // Registration opens at registration_opens_at and closes at registration_closes_at (server clock)
+    const window = registrationWindow(evStatus?.registration_opens_at, evStatus?.registration_closes_at, Date.now());
+    if (window === "not_open") {
+      const opensLabel = evStatus?.registration_opens_at ? formatIst(evStatus.registration_opens_at) : "soon";
+      return NextResponse.json({
+        error: `Registration for this event opens on ${opensLabel}.`,
+        code: "REGISTRATION_NOT_OPEN",
+      }, { status: 409 });
+    }
+    if (window === "closed") {
       return NextResponse.json({ error: "Registration for this event is now closed" }, { status: 409 });
     }
 

@@ -11,6 +11,7 @@ import {
 } from "@/lib/it-run-validation";
 import { decideUrlCategory, startsNewRegistration } from "@/lib/it-run-category-selection";
 import { idUploadError, isStoredDocumentPath } from "@/lib/it-run-id-verification";
+import { formatIst } from "@/lib/it-run-registration-window";
 import { IssueReportButton } from "@/components/ui/BugReportFab";
 import { checkPersonName, checkBibName, bibNameHint, firstBibNameProblem, labelParticipantMessage } from "@/lib/it-run-name-validation";
 import { normalizeAltEmail } from "@/lib/it-run-alt-email";
@@ -2028,6 +2029,8 @@ function RegisterPageContent() {
   function continueFromCounts() {
     // Once the registration exists the runners are fixed; the form only edits details
     if (regId) { setStep(2); return; }
+    // Not open yet: nothing can be registered. The server refuses too; this stops the wizard at the first step.
+    if (regNotYetOpen) return;
     const categories = config?.categories ?? [];
     const next = rebuildParticipants(counts, categories, participants, id => emptyParticipant(id));
     const primary = primaryCategory(next.map(p => p.categoryId), categories);
@@ -2802,6 +2805,9 @@ function RegisterPageContent() {
   const regClosed = config?.event.registration_closes_at
     ? Date.now() > new Date(config.event.registration_closes_at).getTime()
     : false;
+  // Registration opens at the configured time (IST). Before it, the form can be looked at but nothing can be submitted.
+  const regOpensAt = config?.event.registration_opens_at ?? null;
+  const regNotYetOpen = !!regOpensAt && Date.now() < new Date(regOpensAt).getTime();
   const eventTitle = config?.event.title ?? "The IT Run Sprint-2";
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -2873,6 +2879,17 @@ function RegisterPageContent() {
           padding: "8px clamp(1rem,4vw,2rem)", fontSize: 13, color: "#f59e0b", textAlign: "center" as const,
         }}>
           You&rsquo;re offline. Your registration details are saved on this device and will be restored when you reconnect.
+        </div>
+      )}
+
+      {/* Registration not yet open banner */}
+      {regNotYetOpen && step === 1 && (
+        <div role="status" style={{
+          position: "fixed", top: "var(--reg-header-h, 52px)", left: 0, right: 0, zIndex: 99,
+          background: "rgba(251,191,36,0.08)", borderBottom: "1px solid rgba(251,191,36,0.2)",
+          padding: "8px clamp(1rem,4vw,2rem)", fontSize: 13, color: "#fbbf24", textAlign: "center" as const,
+        }}>
+          Registration opens on {formatIst(regOpensAt!)}.
         </div>
       )}
 
