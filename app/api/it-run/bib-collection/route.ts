@@ -5,18 +5,28 @@ import { collectionReadiness } from "@/lib/it-run-bib-desk";
 
 // Each result carries its readiness, worked out here on the server from the recorded facts
 /* eslint-disable @typescript-eslint/no-explicit-any -- the query shape is loose; readiness reads only what it needs */
+// PostgREST returns null (or a single object, for a unique embed) instead of a list when a participant has no related
+// rows. The staff page reads these as lists, so every nested relation is normalised to an array here.
+const toList = (v: unknown): any[] => (Array.isArray(v) ? v : v ? [v] : []);
+
 function withReadiness(rows: any[]) {
-  return rows.map(p => ({
-    ...p,
-    readiness: collectionReadiness({
-      cancelled: !!p.cancelled_at,
-      paymentStatus: p.it_run_registrations?.payment_status ?? "",
-      participantType: p.participant_type ?? "",
-      verificationOutcome: p.verification_outcome ?? null,
-      bibNumber: p.bib_number ?? null,
-      bibCollected: (p.it_run_bib_collections ?? []).length > 0,
-    }),
-  }));
+  return rows.map(p => {
+    const bibCollections = toList(p.it_run_bib_collections);
+    return {
+      ...p,
+      it_run_bib_collections: bibCollections,
+      it_run_bib_bookings: toList(p.it_run_bib_bookings),
+      it_run_checkins: toList(p.it_run_checkins),
+      readiness: collectionReadiness({
+        cancelled: !!p.cancelled_at,
+        paymentStatus: p.it_run_registrations?.payment_status ?? "",
+        participantType: p.participant_type ?? "",
+        verificationOutcome: p.verification_outcome ?? null,
+        bibNumber: p.bib_number ?? null,
+        bibCollected: bibCollections.length > 0,
+      }),
+    };
+  });
 }
 
 // GET /api/it-run/bib-collection?q=<search_or_qr>
