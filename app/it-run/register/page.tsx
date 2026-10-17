@@ -701,11 +701,28 @@ function StepCounts({
               </div>
 
               <div style={{ textAlign: "right" as const, flexShrink: 0 }}>
+                {/* With an early bird: the normal price is struck through, the early-bird price is the one to notice,
+                    and the saving is shown. The server decides the offer and its price; the window has already been checked there. */}
+                {cat.early_bird && (
+                  <div style={{ fontSize: 13, color: "#888", textDecoration: "line-through" }}>
+                    ₹{cat.price_rupees.toLocaleString("en-IN")}
+                  </div>
+                )}
                 <div style={{ fontSize: 18, fontWeight: 900, color: cat.color }}>
                   ₹{price.toLocaleString("en-IN")}
                 </div>
-                <div style={{ fontSize: 10, color: "#555" }}>
-                  {cat.early_bird ? "early bird · " : ""}{cat.category_type === "solo" ? "per runner" : "per pair"}
+                {cat.early_bird && (
+                  <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 6, flexWrap: "wrap" as const, marginTop: 4 }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, color: "#052e1a", background: "#34d399", padding: "2px 6px", borderRadius: 4, letterSpacing: "0.06em" }}>
+                      EARLY BIRD
+                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#34d399" }}>
+                      Save ₹{Math.max(0, cat.price_rupees - price).toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                )}
+                <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>
+                  {cat.category_type === "solo" ? "per runner" : "per pair"}
                 </div>
               </div>
 
