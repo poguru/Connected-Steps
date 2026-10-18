@@ -1213,11 +1213,11 @@ function StepReview({
             />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: "10px 16px" }}>
               {fields.filter(([, v]) => v?.trim()).map(([lbl, val]) => (
-                <div key={lbl}>
+                <div key={lbl} style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 9, color: "#3a3a3a", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 2 }}>
                     {lbl}
                   </div>
-                  <div style={{ fontSize: 12, color: "#bbb" }}>{val}</div>
+                  <div style={{ fontSize: 12, color: "#bbb", overflowWrap: "anywhere" as const }}>{val}</div>
                 </div>
               ))}
             </div>
