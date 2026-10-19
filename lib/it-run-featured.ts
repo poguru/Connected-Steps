@@ -27,7 +27,7 @@ export function popupAllowedOnPath(pathname: string | null | undefined): boolean
 export const FEATURED_EVENT = {
   name: "The IT Run",
   edition: "Sprint-2",
-  tagline: "Run Beyond the Screen. Break the Loop.",
+  tagline: "DEBUG YOUR ROUTINE. RUN YOUR RACE. Break the Loop",
   /** Calendar date of the event, in Indian time. */
   dateLabel: "7 February 2027",
   /** The one canonical route every link uses. */

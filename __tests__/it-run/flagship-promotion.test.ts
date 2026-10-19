@@ -17,7 +17,7 @@ describe("the flagship event configuration", () => {
 
   it("uses the event's real logo file and tagline", () => {
     expect(fs.existsSync(path.resolve(__dirname, "../../public", FEATURED_EVENT.logo.replace(/^\//, "")))).toBe(true);
-    expect(FEATURED_EVENT.tagline).toBe("Run Beyond the Screen. Break the Loop.");
+    expect(FEATURED_EVENT.tagline).toBe("DEBUG YOUR ROUTINE. RUN YOUR RACE. Break the Loop");
   });
 
   it("is visible by default", () => {
