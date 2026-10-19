@@ -9,7 +9,8 @@ import { sendMsg91Template, whatsAppProvider, type Msg91SendResult } from "@/lib
 /** The approved template names and their variables, in the order the body uses them. */
 export const IT_RUN_WHATSAPP_TEMPLATES = {
   registration_confirmed: { name: "it_run_registration_confirmed", variables: ["name", "code", "event"] },
-  bib_collection: { name: "it_run_bib_collection", variables: ["name", "bib", "link"] },
+  // The booking link is the button on this template, not a body variable, so the body has two variables
+  bib_collection: { name: "it_run_bib_collection_v2", variables: ["name", "bib"] },
   race_details: { name: "it_run_race_details", variables: ["name", "event", "venue", "report", "flag_off"] },
   id_cancelled_refund: { name: "it_run_id_cancelled_refund", variables: ["name", "event", "category", "amount", "percent"] },
   id_clarification: { name: "it_run_id_clarification_v2", variables: ["name", "event"] },

@@ -24,7 +24,8 @@ describe("the default provider", () => {
 describe("the approved templates", () => {
   it("keep the approved names", () => {
     expect(IT_RUN_WHATSAPP_TEMPLATES.registration_confirmed.name).toBe("it_run_registration_confirmed");
-    expect(IT_RUN_WHATSAPP_TEMPLATES.bib_collection.name).toBe("it_run_bib_collection");
+    expect(IT_RUN_WHATSAPP_TEMPLATES.bib_collection.name).toBe("it_run_bib_collection_v2");
+    expect(IT_RUN_WHATSAPP_TEMPLATES.bib_collection.variables).toEqual(["name", "bib"]);
     expect(IT_RUN_WHATSAPP_TEMPLATES.id_clarification.name).toBe("it_run_id_clarification_v2");
     expect(IT_RUN_WHATSAPP_TEMPLATES.id_cancelled_refund.name).toBe("it_run_id_cancelled_refund");
   });
