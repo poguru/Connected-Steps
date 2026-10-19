@@ -181,7 +181,7 @@ export default function ItRunLandingPage() {
   const [eventLabel,  setEventLabel]  = useState("February 7, 2027");
   const [regCloseLabel, setRegCloseLabel] = useState<string>("–");
   const [description,   setDescription]   = useState<string>("");
-  const [heroContent,   setHeroContent]   = useState<string>("DEBUG YOUR ROUTINE. RUN YOUR RACE. Break the Loop");
+  const [heroContent,   setHeroContent]   = useState<string>("Debug the routine. Run the race. Break the loop.");
   const [highlights,    setHighlights]    = useState<string[]>([]);
   const [instructions,  setInstructions]  = useState<string>("");
   const [contactEmail,  setContactEmail]  = useState("info@connectedsteps.in");
