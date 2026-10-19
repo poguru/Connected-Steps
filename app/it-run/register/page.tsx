@@ -725,6 +725,11 @@ function StepCounts({
                 <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>
                   {cat.category_type === "solo" ? "per runner" : "per pair"}
                 </div>
+                {cat.early_bird?.endsAt && (
+                  <div style={{ fontSize: 11, color: "#fbbf24", marginTop: 4, lineHeight: 1.4 }}>
+                    Offer ends {formatIst(cat.early_bird.endsAt)}
+                  </div>
+                )}
               </div>
 
               {/* Pair categories count pairs (the price is per pair). The state still holds runners: one pair = team runners. */}
