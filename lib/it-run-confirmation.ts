@@ -12,6 +12,8 @@
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { sendItRunConfirmationEmail, sendItRunBibInviteEmail, sendItRunPaymentReceivedEmail } from "@/lib/it-run-email";
 import { runAfterResponse } from "@/lib/after-response";
+import { sendItRunWhatsApp } from "@/lib/it-run-whatsapp";
+import { FEATURED_EVENT } from "@/lib/it-run-featured";
 
 export const PENDING_VERIFICATION = "pending_verification";
 export const CONFIRMED = "active";
@@ -79,6 +81,22 @@ export async function sendConfirmedNotices(registrationId: string): Promise<void
   if (!reg) return;
   await sendItRunConfirmationEmail(registrationId, reg.registration_code, reg.lead_email, "");
   await sendItRunBibInviteEmail(registrationId, reg.lead_email);
+
+  // WhatsApp, only when the MSG91 provider is on. The message points to email for the QR code and details.
+  const { data: lead } = await db
+    .from("it_run_participants")
+    .select("first_name, mobile")
+    .eq("registration_id", registrationId)
+    .order("created_at")
+    .limit(1)
+    .maybeSingle<{ first_name: string; mobile: string | null }>();
+  if (lead?.mobile) {
+    await sendItRunWhatsApp("registration_confirmed", lead.mobile, {
+      name: lead.first_name,
+      code: reg.registration_code,
+      event: `${FEATURED_EVENT.name} ${FEATURED_EVENT.edition}`,
+    });
+  }
 }
 
 /**
