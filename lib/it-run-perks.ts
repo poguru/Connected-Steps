@@ -4,7 +4,7 @@
  * perk is shown that the category does not actually include.
  */
 
-export type PerkKey = "bib" | "timing" | "medal" | "tshirt" | "certificate" | "breakfast";
+export type PerkKey = "bib" | "timing" | "medal" | "tshirt" | "certificate" | "breakfast" | "photos";
 
 export interface Perk {
   key: PerkKey;
@@ -18,6 +18,7 @@ const PERK_BY_INCLUSION: Record<string, Perk> = {
   "Dry-fit T-Shirt": { key: "tshirt", label: "T-shirt" },
   "Digital Certificate": { key: "certificate", label: "Certificate" },
   "Breakfast": { key: "breakfast", label: "Breakfast" },
+  "Photos": { key: "photos", label: "Photos" },
 };
 
 /** The perks for these inclusions, in the order given, each shown once. */
