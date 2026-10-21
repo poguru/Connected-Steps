@@ -28,16 +28,28 @@ export function getJourneyKey(): string {
   }
 }
 
-/** Reports that this journey reached a stage. Fire and forget. */
-export function reportStage(stage: FunnelStage): void {
+function send(payload: Record<string, unknown>): void {
   try {
     void fetch("/api/it-run/monitoring/event", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ journeyKey: getJourneyKey(), stage }),
+      body: JSON.stringify({ journeyKey: getJourneyKey(), ...payload }),
       keepalive: true,
     }).catch(() => { /* monitoring must never affect the page */ });
   } catch {
     /* ignore */
   }
+}
+
+/** Reports that this journey reached a stage. Fire and forget. */
+export function reportStage(stage: FunnelStage): void {
+  send({ stage });
+}
+
+/**
+ * Reports that a request failed: the endpoint and the HTTP status (0 when there was no response). Fire and forget.
+ * The response body is never sent, so no message or personal detail leaves the page.
+ */
+export function reportFailure(endpoint: string, httpStatus: number): void {
+  send({ kind: "error", endpoint, httpStatus });
 }

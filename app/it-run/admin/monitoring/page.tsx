@@ -13,13 +13,22 @@ interface Summary {
   conversionPercent: number | null;
   byStage: Record<string, number>;
 }
+interface FailureRow { endpoint: string; httpStatus: number; count: number }
+interface Failures {
+  total: number;
+  lastHour: number;
+  byEndpoint: FailureRow[];
+  alert: boolean;
+}
 interface MonitoringResponse {
   periodDays: number;
   activeWindowMinutes: number;
   abandonAfterMinutes: number;
+  alertThreshold: number;
   stages: string[];
   generatedAt: string;
   summary: Summary;
+  errors: Failures;
 }
 
 const STAGE_LABEL: Record<string, string> = {
@@ -33,6 +42,19 @@ const STAGE_LABEL: Record<string, string> = {
   payment_succeeded: "Payment received",
   confirmed: "Registration confirmed",
 };
+
+const ENDPOINT_LABEL: Record<string, string> = {
+  "/api/auth/send-otp": "Sending the sign-in code",
+  "/api/auth/complete-event-verify": "Checking the sign-in code",
+  "/api/it-run/register": "Saving the registration",
+  "/api/it-run/payment/create-order": "Starting payment",
+  "/api/it-run/payment/verify": "Confirming payment",
+};
+
+// 0 means no response reached the browser (a network failure)
+function statusLabel(status: number): string {
+  return status === 0 ? "No response" : String(status);
+}
 
 const PERIODS = [
   { days: 1, label: "Last 24 hours" },
@@ -123,6 +145,43 @@ export default function MonitoringPage() {
             <div style={S.card}><div style={S.label}>Conversion</div>
               <div style={S.value}>{s.conversionPercent === null ? "—" : `${s.conversionPercent}%`}</div></div>
           </div>
+
+          {data && (
+            <div style={{ ...S.card, marginBottom: 22, borderColor: data.errors.alert ? "rgba(239,68,68,0.6)" : S.card.border }}>
+              <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 12, alignItems: "baseline" }}>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>Failed requests</div>
+                <div style={{ fontSize: 12, color: data.errors.alert ? "#fca5a5" : "#888" }}>
+                  {data.errors.alert
+                    ? `Alert: ${data.errors.lastHour} failures in the last hour (threshold ${data.alertThreshold})`
+                    : `${data.errors.lastHour} in the last hour · threshold ${data.alertThreshold}`}
+                </div>
+              </div>
+              {data.errors.total === 0 ? (
+                <div style={{ color: "#888", fontSize: 14, marginTop: 12 }}>No failed requests in this period.</div>
+              ) : (
+                <div style={{ overflowX: "auto", marginTop: 12 }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                    <thead>
+                      <tr style={{ textAlign: "left", color: "#888", fontSize: 12 }}>
+                        <th style={{ padding: "8px 6px" }}>Step</th>
+                        <th style={{ padding: "8px 6px" }}>Response</th>
+                        <th style={{ padding: "8px 6px" }}>Failures</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.errors.byEndpoint.map(row => (
+                        <tr key={`${row.endpoint} ${row.httpStatus}`} style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                          <td style={{ padding: "10px 6px" }}>{ENDPOINT_LABEL[row.endpoint] ?? row.endpoint}</td>
+                          <td style={{ padding: "10px 6px" }}>{statusLabel(row.httpStatus)}</td>
+                          <td style={{ padding: "10px 6px", fontWeight: 700 }}>{row.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
 
           <div style={S.card}>
             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Where journeys are now</div>

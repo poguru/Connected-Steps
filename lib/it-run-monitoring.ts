@@ -40,6 +40,49 @@ export function journeyStatus(
   return minutes > ABANDON_AFTER_MINUTES ? "abandoned" : minutes <= ACTIVE_WINDOW_MINUTES ? "active" : "abandoned";
 }
 
+/** The requests whose failures are reported. Only these paths are accepted, so a page cannot write arbitrary names. */
+export const MONITORED_ENDPOINTS = [
+  "/api/auth/send-otp",
+  "/api/auth/complete-event-verify",
+  "/api/it-run/register",
+  "/api/it-run/payment/create-order",
+  "/api/it-run/payment/verify",
+] as const;
+export type MonitoredEndpoint = (typeof MONITORED_ENDPOINTS)[number];
+
+/** Failures in the last hour at or above this count raise an alert on the admin dashboard. */
+export const ERROR_ALERT_THRESHOLD = 10;
+const HOUR_MS = 60 * 60 * 1000;
+
+export function isMonitoredEndpoint(v: unknown): v is MonitoredEndpoint {
+  return typeof v === "string" && (MONITORED_ENDPOINTS as readonly string[]).includes(v);
+}
+
+/** An HTTP status from a failed request. 0 means no response at all (a network failure). */
+export function isReportableStatus(v: unknown): v is number {
+  return typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 599;
+}
+
+/** A failure count per endpoint and status, plus whether the last hour has crossed the alert threshold. Pure. */
+export function summarizeErrors(
+  rows: Array<{ endpoint: string; httpStatus: number | null; createdAt: string }>,
+  nowMs: number,
+) {
+  const groups = new Map<string, { endpoint: string; httpStatus: number; count: number }>();
+  let lastHour = 0;
+  for (const r of rows) {
+    const status = r.httpStatus ?? 0;
+    const key = `${r.endpoint} ${status}`;
+    const g = groups.get(key) ?? { endpoint: r.endpoint, httpStatus: status, count: 0 };
+    g.count++;
+    groups.set(key, g);
+    const created = Date.parse(r.createdAt);
+    if (Number.isFinite(created) && nowMs - created <= HOUR_MS) lastHour++;
+  }
+  const byEndpoint = [...groups.values()].sort((a, b) => b.count - a.count);
+  return { total: rows.length, lastHour, byEndpoint, alert: lastHour >= ERROR_ALERT_THRESHOLD };
+}
+
 /** A browser-made key: 16 to 64 letters and digits, with nothing that identifies a person. */
 export function isValidJourneyKey(key: unknown): key is string {
   return typeof key === "string" && /^[A-Za-z0-9_-]{16,64}$/.test(key);

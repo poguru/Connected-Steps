@@ -12,7 +12,7 @@ import {
 import { decideUrlCategory, startsNewRegistration } from "@/lib/it-run-category-selection";
 import { idUploadError, isStoredDocumentPath } from "@/lib/it-run-id-verification";
 import { formatIst } from "@/lib/it-run-registration-window";
-import { reportStage } from "@/lib/it-run-monitoring-client";
+import { reportStage, reportFailure } from "@/lib/it-run-monitoring-client";
 import type { FunnelStage } from "@/lib/it-run-monitoring";
 import { IssueReportButton } from "@/components/ui/BugReportFab";
 import { checkPersonName, checkBibName, bibNameHint, firstBibNameProblem, labelParticipantMessage } from "@/lib/it-run-name-validation";
@@ -1988,12 +1988,13 @@ function RegisterPageContent() {
         body: JSON.stringify({ type: "email", value: em, purpose: "event_register" }),
       });
       const d = await res.json();
-      if (!res.ok) { setOtpError(d.error ?? "Failed to send code"); return; }
+      if (!res.ok) { reportFailure("/api/auth/send-otp", res.status); setOtpError(d.error ?? "Failed to send code"); return; }
       setOtpSent(true);
       setOtpInput("");
       setNeedsName(false);
       setResendAt(Date.now() + 60_000);
     } catch {
+      reportFailure("/api/auth/send-otp", 0);
       setOtpError("Network error. Please try again.");
     } finally {
       setSendingOtp(false);
@@ -2016,7 +2017,7 @@ function RegisterPageContent() {
         body: JSON.stringify(body),
       });
       const d = await res.json();
-      if (!res.ok) { setOtpError(d.error ?? "Verification failed"); return; }
+      if (!res.ok) { reportFailure("/api/auth/complete-event-verify", res.status); setOtpError(d.error ?? "Verification failed"); return; }
 
       if (d.needs_profile) {
         // New user — collect name before account creation
@@ -2034,6 +2035,7 @@ function RegisterPageContent() {
         .then((p: ProfileAutoFill | null) => { if (p) setProfileData(p); })
         .catch(() => {});
     } catch {
+      reportFailure("/api/auth/complete-event-verify", 0);
       setOtpError("Network error. Please try again.");
     } finally {
       setVerifyingOtp(false);
@@ -2685,6 +2687,7 @@ function RegisterPageContent() {
         });
         const editData = await editRes.json().catch(() => ({})) as { error?: string; field?: string; participant_index?: number };
         if (!editRes.ok) {
+          reportFailure("/api/it-run/register", editRes.status);
           if (editData.field && typeof editData.participant_index === "number") {
             returnToParticipantError(editData.participant_index, editData.field, editData.error ?? "Please check this field.");
           } else {
@@ -2730,6 +2733,7 @@ function RegisterPageContent() {
       });
       const data = await res.json();
       if (!res.ok) {
+        reportFailure("/api/it-run/register", res.status);
         if (data.field && typeof data.participant_index === "number") {
           returnToParticipantError(data.participant_index, data.field, data.error ?? "Please check this field.");
         } else {
@@ -2747,6 +2751,7 @@ function RegisterPageContent() {
       if (data.finalPrice === 0 && sessionRegs.length === 0) { setStep(7); return; }
       setStep(6);
     } catch {
+      reportFailure("/api/it-run/register", 0);
       setSubmitError("Network error. Your information is saved — check your connection and try again.");
     } finally {
       setSubmitting(false);
@@ -2770,7 +2775,7 @@ function RegisterPageContent() {
         body: JSON.stringify(payRegs ? { registrationIds: payRegs.map(r => r.id) } : { registrationId: regId }),
       });
       const data = await res.json();
-      if (!res.ok) { setSubmitError(data.error ?? "Could not create payment"); return; }
+      if (!res.ok) { reportFailure("/api/it-run/payment/create-order", res.status); setSubmitError(data.error ?? "Could not create payment"); return; }
 
       const rz = new window.Razorpay({
         key:         data.key,
@@ -2793,6 +2798,7 @@ function RegisterPageContent() {
       });
       rz.open();
     } catch {
+      reportFailure("/api/it-run/payment/create-order", 0);
       setSubmitError("Payment setup failed. Please try again.");
       setSubmitting(false);
     }
@@ -2807,10 +2813,11 @@ function RegisterPageContent() {
           : { registrationId: regId, paymentId, orderId, signature }),
       });
       const data = await res.json();
-      if (!res.ok) { setSubmitError(data.error ?? "Payment verification failed"); return; }
+      if (!res.ok) { reportFailure("/api/it-run/payment/verify", res.status); setSubmitError(data.error ?? "Payment verification failed"); return; }
       setPaymentDone(true);
       setStep(7);
     } catch {
+      reportFailure("/api/it-run/payment/verify", 0);
       setSubmitError("Verification failed. Contact support if payment was deducted.");
     } finally {
       setSubmitting(false);
