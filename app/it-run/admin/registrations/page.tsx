@@ -38,6 +38,8 @@ type Registration = {
   early_bird_name: string | null;
   payment_status: string; registration_status: string;
   cancelled_reason: string | null; cancelled_at: string | null; admin_notes: string | null;
+  registration_source: "public" | "admin_manual" | null;
+  created_by_admin: string | null; waiver_reason: string | null; waiver_approved_by: string | null;
   created_at: string; updated_at: string;
   it_run_categories: { id: string; name: string; distance_km: number | null; category_type: string; color: string } | null;
   it_run_coupons: { code: string; discount_type: string; discount_value: number } | null;
@@ -678,6 +680,9 @@ export default function RegistrationsPage() {
                         {reg.registration_code}
                       </code>
                       <StatusChip label={reg.payment_status} color={pc} />
+                      {reg.registration_source === "admin_manual" && (
+                        <StatusChip label={reg.waiver_approved_by ? "admin · complimentary" : "admin-created"} color="#60a5fa" />
+                      )}
                       {isCancelled && <StatusChip label="cancelled" color={rc} />}
                       {reg.registration_status === "pending_verification" && <StatusChip label="awaiting ID" color={rc} />}
                       <span style={{ fontSize: 12, color: reg.it_run_categories?.color ?? "#888", fontWeight: 600 }}>

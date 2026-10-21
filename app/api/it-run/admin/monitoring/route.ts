@@ -50,6 +50,22 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Could not load monitoring data" }, { status: 500, headers: NO_STORE });
   }
 
+  // Admin-created registrations are counted from the registrations themselves, not from the public funnel: they never
+  // start a journey, so they cannot inflate visits, OTP conversion or registration starts.
+  const { count: manualCreated } = await db
+    .from("it_run_registrations")
+    .select("id", { count: "exact", head: true })
+    .eq("event_id", event.id)
+    .eq("registration_source", "admin_manual")
+    .gte("created_at", since);
+  const { count: manualComplimentary } = await db
+    .from("it_run_registrations")
+    .select("id", { count: "exact", head: true })
+    .eq("event_id", event.id)
+    .eq("registration_source", "admin_manual")
+    .not("waiver_approved_by", "is", null)
+    .gte("created_at", since);
+
   const nowMs = Date.now();
   const summary = summarizeJourneys(
     (rows ?? []).map(r => ({ completedAt: r.completed_at, lastActivityAt: r.last_activity_at, currentStage: r.current_stage })),
@@ -68,5 +84,6 @@ export async function GET(req: NextRequest) {
     generatedAt: new Date().toISOString(),
     summary,
     errors,
+    manual: { created: manualCreated ?? 0, complimentary: manualComplimentary ?? 0 },
   }, { headers: NO_STORE });
 }

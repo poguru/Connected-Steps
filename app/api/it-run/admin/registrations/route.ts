@@ -105,6 +105,7 @@ export async function GET(req: NextRequest) {
       id, registration_code, lead_email, participant_count,
       base_price, discount_amount, final_price, payment_status, early_bird_offer_id,
       registration_status, cancelled_reason, cancelled_at, admin_notes,
+      registration_source, created_by_admin, waiver_reason, waiver_approved_by,
       created_at, updated_at,
       it_run_categories ( id, name, distance_km, category_type, color ),
       it_run_coupons ( code, discount_type, discount_value ),

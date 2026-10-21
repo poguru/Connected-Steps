@@ -30,6 +30,7 @@ interface MonitoringResponse {
   generatedAt: string;
   summary: Summary;
   errors: Failures;
+  manual: { created: number; complimentary: number };
 }
 
 const STAGE_LABEL: Record<string, string> = {
@@ -148,6 +149,16 @@ export default function MonitoringPage() {
             <div style={S.card}><div style={S.label}>Conversion</div>
               <div style={S.value}>{s.conversionPercent === null ? "—" : `${s.conversionPercent}%`}</div></div>
           </div>
+
+          {data && (
+            <div style={{ ...S.card, marginBottom: 22 }}>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>Admin-created registrations</div>
+              <div style={{ fontSize: 13, color: "#888", marginTop: 6 }}>
+                {data.manual.created} created by admins in this period · {data.manual.complimentary} complimentary.
+                These are counted separately from the public registration funnel above.
+              </div>
+            </div>
+          )}
 
           {data && (
             <div style={{ ...S.card, marginBottom: 22, borderColor: data.errors.alert ? "rgba(239,68,68,0.6)" : S.card.border }}>
