@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/it-run-auth";
-import { summarizeJourneys, ACTIVE_WINDOW_MINUTES, ABANDON_AFTER_MINUTES } from "@/lib/it-run-monitoring";
+import { summarizeJourneys, ACTIVE_WINDOW_MINUTES, ABANDON_AFTER_MINUTES, FUNNEL_STAGES } from "@/lib/it-run-monitoring";
 
 // GET /api/it-run/admin/monitoring?days=7
 // Registration journey counts for the IT Run event. Event admins only. Holds no personal data.
@@ -38,6 +38,7 @@ export async function GET(req: NextRequest) {
     periodDays: days,
     activeWindowMinutes: ACTIVE_WINDOW_MINUTES,
     abandonAfterMinutes: ABANDON_AFTER_MINUTES,
+    stages: FUNNEL_STAGES,
     generatedAt: new Date().toISOString(),
     summary,
   }, { headers: NO_STORE });

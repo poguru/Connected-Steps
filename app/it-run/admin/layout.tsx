@@ -22,6 +22,7 @@ const NAV_ITEMS: Array<{ href: string; label: string; icon: string; section: str
   // Registrations
   { section: "Registrations", href: "/it-run/admin/registrations", label: "Registrations", icon: "&#9679;", roles: ["super_admin", "event_admin", "support_desk", "verification_team", "bib_collection", "checkin_team"] },
   { section: "Registrations", href: "/it-run/admin/participants", label: "Participants", icon: "&#128100;", roles: ["super_admin", "event_admin", "support_desk", "verification_team"] },
+  { section: "Registrations", href: "/it-run/admin/monitoring", label: "Registration Monitoring", icon: "&#128202;", roles: ["super_admin", "event_admin"] },
   { section: "Registrations", href: "/it-run/admin/user-linking", label: "Link Accounts", icon: "&#128279;", roles: ["super_admin", "event_admin"] },
 
   // Verification & BIB
