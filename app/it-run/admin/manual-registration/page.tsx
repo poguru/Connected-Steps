@@ -30,6 +30,8 @@ interface Person {
   tshirtSize: string; medicalConditions: string; foodPreference: string;
 }
 
+interface AppliedCoupon { id: string; code: string; discount: number; label: string }
+
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const FOOD = [{ value: "veg", label: "Vegetarian" }, { value: "non-veg", label: "Non-vegetarian" }, { value: "vegan", label: "Vegan" }];
 const WAIVER_MIN = 10;
@@ -64,6 +66,10 @@ export default function ManualRegistrationPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<{ registrationCode: string; dashboardUrl: string; finalPrice: number } | null>(null);
+  const [couponCode, setCouponCode] = useState("");
+  const [coupon, setCoupon] = useState<AppliedCoupon | null>(null);
+  const [couponError, setCouponError] = useState("");
+  const [couponBusy, setCouponBusy] = useState(false);
   // One key per form: a retried submit returns the registration it already made instead of creating another
   const keyRef = useRef(newKey());
 
@@ -81,6 +87,9 @@ export default function ManualRegistrationPage() {
     setCategoryId(id);
     setResult(null);
     setError("");
+    setCoupon(null);
+    setCouponError("");
+    setCouponCode("");
     setPeople(cat ? cat.participant_labels.map(() => emptyPerson()) : []);
   }
 
@@ -88,9 +97,52 @@ export default function ManualRegistrationPage() {
     setPeople(prev => prev.map((p, i) => (i === idx ? { ...p, [field]: value } : p)));
   }
 
+  // The price the coupon is checked against: one price per runner when solo, one price for a whole pair or team
+  function bookingAmount(): number {
+    if (!category) return 0;
+    return category.category_type === "solo" ? category.price_rupees * people.length : category.price_rupees;
+  }
+
+  async function applyCoupon() {
+    if (!category || couponBusy) return;
+    const code = couponCode.trim().toUpperCase();
+    if (!code) { setCouponError("Enter a discount code."); return; }
+    setCouponBusy(true);
+    setCouponError("");
+    try {
+      const res = await fetch("/api/it-run/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, categoryId: category.id, amount: bookingAmount() }),
+      });
+      const data = await res.json().catch(() => ({})) as Partial<AppliedCoupon> & { error?: string };
+      if (!res.ok || !data.id) {
+        setCoupon(null);
+        setCouponError(data.error ?? "That code can't be used for this registration.");
+        return;
+      }
+      setCoupon({ id: data.id, code: data.code ?? code, discount: data.discount ?? 0, label: data.label ?? "" });
+      setComplimentary(false);
+    } catch {
+      setCouponError("Couldn't check the code. Try again.");
+    } finally {
+      setCouponBusy(false);
+    }
+  }
+
+  function removeCoupon() {
+    setCoupon(null);
+    setCouponCode("");
+    setCouponError("");
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!category || submitting) return;
+    if (complimentary && coupon) {
+      setError("A complimentary registration can't also use a discount code. Remove the code to continue.");
+      return;
+    }
     if (complimentary && (waiverReason.trim().length < WAIVER_MIN || waiverReason.trim().length > WAIVER_MAX)) {
       setError(`Give the reason for the complimentary registration (${WAIVER_MIN} to ${WAIVER_MAX} characters).`);
       return;
@@ -116,6 +168,7 @@ export default function ManualRegistrationPage() {
           participants,
           idempotencyKey: keyRef.current,
           complimentary,
+          couponId: complimentary ? null : (coupon?.id ?? null),
           waiverReason: complimentary ? waiverReason.trim() : undefined,
         }),
       });
@@ -144,6 +197,9 @@ export default function ManualRegistrationPage() {
     setComplimentary(false);
     setWaiverReason("");
     setError("");
+    setCoupon(null);
+    setCouponCode("");
+    setCouponError("");
   }
 
   return (
@@ -265,8 +321,32 @@ export default function ManualRegistrationPage() {
                 <input type="radio" name="pay" checked={!complimentary} onChange={() => setComplimentary(false)} style={{ marginTop: 3 }} />
                 <span>Payment pending. The participant pays through their dashboard link.</span>
               </label>
-              <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 14, cursor: "pointer" }}>
-                <input type="radio" name="pay" checked={complimentary} onChange={() => setComplimentary(true)} style={{ marginTop: 3 }} />
+              <div style={{ marginBottom: 12 }}>
+                <span style={{ display: "block", fontSize: 12, color: "#aaa", marginBottom: 6 }}>Discount code (optional)</span>
+                {coupon ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const, fontSize: 14 }}>
+                    <strong>{coupon.code}</strong>
+                    <span style={{ color: "#34d399" }}>−₹{coupon.discount.toLocaleString("en-IN")}</span>
+                    <button type="button" onClick={removeCoupon} style={{ background: "transparent", border: "none", color: "#aaa", textDecoration: "underline", cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>Remove</button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
+                    <input
+                      style={{ ...S.input, width: "auto", flex: "1 1 160px" }}
+                      value={couponCode}
+                      onChange={e => setCouponCode(e.target.value.toUpperCase())}
+                      placeholder="Code"
+                      aria-label="Discount code"
+                    />
+                    <button type="button" onClick={applyCoupon} disabled={couponBusy} style={{ padding: "9px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.2)", background: "transparent", color: "#fff", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
+                      {couponBusy ? "Checking…" : "Apply"}
+                    </button>
+                  </div>
+                )}
+                {couponError && <div role="alert" style={{ color: "#fca5a5", fontSize: 13, marginTop: 6 }}>{couponError}</div>}
+              </div>
+              <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 14, cursor: coupon ? "not-allowed" : "pointer", opacity: coupon ? 0.5 : 1 }}>
+                <input type="radio" name="pay" checked={complimentary} disabled={!!coupon} onChange={() => setComplimentary(true)} style={{ marginTop: 3 }} />
                 <span>Complimentary: no payment. This needs a reason, and it is recorded with your name.</span>
               </label>
               {complimentary && (

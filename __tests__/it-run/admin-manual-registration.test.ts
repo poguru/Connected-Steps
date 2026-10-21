@@ -146,6 +146,16 @@ describe("the admin form", () => {
     expect(page).toMatch(/idempotencyKey: keyRef\.current/);
   });
 
+  it("applies a discount code through the same validation as the public form", () => {
+    expect(page).toMatch(/fetch\("\/api\/it-run\/coupons\/validate"/);
+    expect(page).toMatch(/couponId: complimentary \? null : \(coupon\?\.id \?\? null\)/);
+  });
+
+  it("a complimentary registration and a discount code are never sent together", () => {
+    expect(page).toMatch(/if \(complimentary && coupon\)/);
+    expect(page).toMatch(/disabled=\{!!coupon\}/);
+  });
+
   it("lets an admin reach the form from the admin menu", () => {
     const layout = read("app/it-run/admin/layout.tsx");
     expect(layout).toMatch(/href: "\/it-run\/admin\/manual-registration"[\s\S]*?roles: \["super_admin", "event_admin"\]/);
