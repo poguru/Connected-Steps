@@ -1,3 +1,4 @@
+import { registrationSource } from "../helpers/registration-source";
 /**
  * Registration opens at registration_opens_at and closes at registration_closes_at. Nothing can be registered before
  * the opening time, on the page or on the server.
@@ -37,7 +38,7 @@ describe("formatIst", () => {
 
 describe("the server and the page refuse registration before it opens", () => {
   it("the register route refuses with REGISTRATION_NOT_OPEN before the closing check", () => {
-    const route = read("app/api/it-run/register/route.ts");
+    const route = registrationSource();
     expect(route).toMatch(/window === "not_open"/);
     expect(route).toMatch(/code: "REGISTRATION_NOT_OPEN"/);
     expect(route).toMatch(/registration_opens_at,registration_closes_at,event_date/);

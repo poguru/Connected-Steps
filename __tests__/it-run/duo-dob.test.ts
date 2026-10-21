@@ -1,3 +1,4 @@
+import { registrationSource } from "../helpers/registration-source";
 /**
  * Date of birth is checked for each person on their own. Two people in one duo may share a date of birth, and each must
  * meet the age rule that applies to them. Nothing compares one participant's DOB with another's.
@@ -29,7 +30,7 @@ describe("duo participants' dates of birth", () => {
   });
 
   it("the registration route validates each participant's date of birth separately", () => {
-    const route = fs.readFileSync(path.resolve(__dirname, "../../app/api/it-run/register/route.ts"), "utf8");
+    const route = registrationSource();
     expect(route).toMatch(/validateDateOfBirth\(p\.dob, \{ isChild: m\.is_child, eventDate, today \}\)/);
     expect(route).not.toMatch(/dob\s*===?\s*participants/);
   });

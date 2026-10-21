@@ -1,3 +1,4 @@
+import { registrationSource } from "../helpers/registration-source";
 /**
  * BIB Name is required at the participant-details step, for every participant, before verification, review or payment.
  */
@@ -78,7 +79,7 @@ describe("the BIB name is enforced before payment, in the page and the API", () 
   });
 
   it("the API still rejects a missing BIB name", () => {
-    const route = fs.readFileSync(path.join(ROOT, "app/api/it-run/register/route.ts"), "utf8");
+    const route = registrationSource();
     expect(route).toMatch(/checkBibName\(p\.bibName\)/);
     expect(route).toMatch(/err\("bibName", bib\.message\)/);
   });

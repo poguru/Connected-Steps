@@ -1,3 +1,4 @@
+import { registrationSource } from "../helpers/registration-source";
 /**
  * The alternative email is wired through the form, the server's validation and saves, the migration, and every booking
  * email's recipient list. Each booking reads only its own participants.
@@ -18,7 +19,7 @@ describe("alternative email is wired end to end", () => {
   });
 
   it("the server validates it, and saves it per participant on create and on edit", () => {
-    const route = read("app/api/it-run/register/route.ts");
+    const route = registrationSource();
     expect(route).toMatch(/normalizeAltEmail\(p\.altEmail\)/);
     expect(route).toMatch(/alt_email:\s+altEmailOrNull\(p\.altEmail\)/);
     expect((route.match(/alt_email:\s+altEmailOrNull\(p\.altEmail\)/g) ?? []).length).toBe(2);

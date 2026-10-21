@@ -1,3 +1,4 @@
+import { registrationSource } from "../helpers/registration-source";
 /**
  * Two-stage confirmation: a registration is confirmed only when it is paid (or free) AND every adult's ID is verified.
  * Until then it stays pending_verification, keeps its seats, and gets the payment-received notice, not the confirmation.
@@ -112,7 +113,7 @@ describe("confirmIfVerified", () => {
 describe("registration insert", () => {
   // The guarded update in confirmIfVerified is the only path to 'active'; the insert holds a new registration pending.
   it("is inserted as pending_verification (see app/api/it-run/register/route.ts)", () => {
-    const source = fs.readFileSync(path.join(process.cwd(), "app/api/it-run/register/route.ts"), "utf8");
+    const source = registrationSource();
     expect(source).toMatch(/registration_status:\s*"pending_verification"/);
   });
 });

@@ -1,3 +1,4 @@
+import { registrationSource } from "../helpers/registration-source";
 jest.mock("@/lib/it-run-category-cancel", () => ({
   cancelRunnerCategory: jest.fn().mockResolvedValue({ status: "cancelled", refundRequestId: "rr-1", refundPaise: 9000, runners: 1, categoryName: "5K Fun Run" }),
   CATEGORY_REFUND_PERCENT: 90,
@@ -114,7 +115,7 @@ describe("registration ID is stable through verification", () => {
 
 describe("the registration ID is assigned at creation, whatever the ID status", () => {
   it("the register route stores one code on the registration row and does not regenerate it", () => {
-    const source = fs.readFileSync(path.join(process.cwd(), "app/api/it-run/register/route.ts"), "utf8");
+    const source = registrationSource();
     // Created once per registration, and written into the registration row
     expect(source.match(/generateRegistrationCode\(\)/g)?.length).toBe(1);
     expect(source).toMatch(/registration_code:\s*regCode/);

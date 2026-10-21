@@ -1,3 +1,4 @@
+import { registrationSource } from "../helpers/registration-source";
 /**
  * Participant name validation: one policy for the form, the registration API, and the admin editor.
  */
@@ -254,7 +255,7 @@ describe("the policy is used everywhere names are checked", () => {
   });
 
   it("the registration API uses the shared policy", () => {
-    const route = fs.readFileSync(path.join(ROOT, "app/api/it-run/register/route.ts"), "utf8");
+    const route = registrationSource();
     expect(route).toMatch(/checkPersonName\(p\.firstName/);
     expect(route).toMatch(/checkBibName\(p\.bibName\)/);
   });
