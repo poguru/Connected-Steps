@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import CategoryChangeButton from "./CategoryChangeButton";
 import AddIdControl from "./AddIdControl";
 import { CUTOFF_CLOSED_MESSAGE } from "@/lib/it-run-participant-cutoff";
@@ -86,6 +87,7 @@ const PARTICIPANT_TYPE_LABEL: Record<string, string> = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function MyRegistrationsPage() {
+  const router = useRouter();
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -140,6 +142,21 @@ export default function MyRegistrationsPage() {
     }
   }
 
+  // Same sign-out as the account menu: clear this browser's session, then the server cookie, then go to sign in
+  const signOut = () => {
+    let email: string | null = null;
+    try { email = (JSON.parse(localStorage.getItem("cs_user") ?? "null") as { email?: string } | null)?.email ?? null; } catch { /* ignore */ }
+    try {
+      localStorage.removeItem("cs_user");
+      localStorage.removeItem("cs_user_token");
+      localStorage.removeItem("cs_strava");
+      if (email) localStorage.removeItem(`cs_member_${email}`);
+    } catch { /* storage blocked: the server cookie is still cleared below */ }
+    fetch("/api/auth/logout", { method: "POST" })
+      .catch(() => {})
+      .finally(() => router.push("/auth?tab=signin"));
+  };
+
   return (
     <div style={{ background: BG, color: "#fff", fontFamily: "'Inter',system-ui,sans-serif", minHeight: "100vh" }}>
 
@@ -158,12 +175,21 @@ export default function MyRegistrationsPage() {
             <div style={{ fontSize: 10, color: "#444" }}>My Registrations</div>
           </div>
         </Link>
-        <Link href="/it-run/register" style={{
-          fontSize: 13, fontWeight: 600, color: "#fff",
-          background: ACCENT, borderRadius: 8, padding: "6px 14px", textDecoration: "none",
-        }}>
-          Register
-        </Link>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button type="button" onClick={signOut} style={{
+            fontSize: 13, fontWeight: 600, color: "#aaa", background: "transparent",
+            border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, padding: "6px 12px",
+            cursor: "pointer", fontFamily: "inherit",
+          }}>
+            Sign out
+          </button>
+          <Link href="/it-run/register" style={{
+            fontSize: 13, fontWeight: 600, color: "#fff",
+            background: ACCENT, borderRadius: 8, padding: "6px 14px", textDecoration: "none",
+          }}>
+            Register
+          </Link>
+        </div>
       </nav>
 
       {/* Content */}
