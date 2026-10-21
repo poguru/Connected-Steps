@@ -13,6 +13,8 @@ import { decideUrlCategory, startsNewRegistration } from "@/lib/it-run-category-
 import { idUploadError, isStoredDocumentPath } from "@/lib/it-run-id-verification";
 import { formatIst } from "@/lib/it-run-registration-window";
 import { reportStage, reportFailure } from "@/lib/it-run-monitoring-client";
+import { perksFor } from "@/lib/it-run-perks";
+import ItRunPerkIcons from "@/components/ItRunPerkIcons";
 import type { FunnelStage } from "@/lib/it-run-monitoring";
 import { IssueReportButton } from "@/components/ui/BugReportFab";
 import { checkPersonName, checkBibName, bibNameHint, firstBibNameProblem, labelParticipantMessage } from "@/lib/it-run-name-validation";
@@ -698,6 +700,7 @@ function StepCounts({
                   {cat.distance_km} KM · {cat.is_timed ? "Timed" : "Non-Timed"}
                   {cat.category_type !== "solo" && ` · Pairs: ${cat.participant_labels.map(l => l.label).join(" + ")}`}
                 </div>
+                <ItRunPerkIcons perks={perksFor(cat.inclusions)} color={cat.color} />
                 {left !== null && !cat.is_soldout && left <= 20 && (
                   <div style={{ fontSize: 11, color: "#fbbf24", marginTop: 4 }}>Only {left} spots left</div>
                 )}
