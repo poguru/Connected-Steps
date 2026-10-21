@@ -12,6 +12,8 @@ import {
 import { decideUrlCategory, startsNewRegistration } from "@/lib/it-run-category-selection";
 import { idUploadError, isStoredDocumentPath } from "@/lib/it-run-id-verification";
 import { formatIst } from "@/lib/it-run-registration-window";
+import { reportStage } from "@/lib/it-run-monitoring-client";
+import type { FunnelStage } from "@/lib/it-run-monitoring";
 import { IssueReportButton } from "@/components/ui/BugReportFab";
 import { checkPersonName, checkBibName, bibNameHint, firstBibNameProblem, labelParticipantMessage } from "@/lib/it-run-name-validation";
 import { normalizeAltEmail } from "@/lib/it-run-alt-email";
@@ -1792,6 +1794,15 @@ function RegisterPageContent() {
     // "keep-draft": the resume banner restores the saved draft. "none": the category list is shown.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, config]);
+
+  // ── Funnel monitoring: report the stage each time the wizard moves to a step (best effort, never blocks)
+  useEffect(() => {
+    const stageByStep: Partial<Record<number, FunnelStage>> = {
+      1: "landing", 2: "category_selected", 3: "details_submitted", 4: "validation_passed", 6: "payment_initiated", 7: "confirmed",
+    };
+    const stage = stageByStep[step];
+    if (stage) reportStage(stage);
+  }, [step]);
 
   // ── Draft auto-save (v4 — event-scoped key, added version + eventSlug) ──────
   useEffect(() => {
