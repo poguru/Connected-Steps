@@ -17,6 +17,7 @@ interface FailureRow { endpoint: string; httpStatus: number; count: number }
 interface Failures {
   total: number;
   lastHour: number;
+  alertable: number;
   byEndpoint: FailureRow[];
   alert: boolean;
 }
@@ -47,6 +48,8 @@ const ENDPOINT_LABEL: Record<string, string> = {
   "/api/auth/send-otp": "Sending the sign-in code",
   "/api/auth/complete-event-verify": "Checking the sign-in code",
   "/api/it-run/register": "Saving the registration",
+  "/api/it-run/coupons/validate": "Checking a discount code",
+  "/api/it-run/upload/company-id": "Uploading a company ID",
   "/api/it-run/payment/create-order": "Starting payment",
   "/api/it-run/payment/verify": "Confirming payment",
 };
@@ -152,8 +155,8 @@ export default function MonitoringPage() {
                 <div style={{ fontSize: 14, fontWeight: 700 }}>Failed requests</div>
                 <div style={{ fontSize: 12, color: data.errors.alert ? "#fca5a5" : "#888" }}>
                   {data.errors.alert
-                    ? `Alert: ${data.errors.lastHour} failures in the last hour (threshold ${data.alertThreshold})`
-                    : `${data.errors.lastHour} in the last hour · threshold ${data.alertThreshold}`}
+                    ? `Over the alert threshold: ${data.errors.alertable} server, network or rate-limit failures in the last hour (threshold ${data.alertThreshold})`
+                    : `${data.errors.alertable} server, network or rate-limit failures in the last hour · alert at ${data.alertThreshold}`}
                 </div>
               </div>
               {data.errors.total === 0 ? (

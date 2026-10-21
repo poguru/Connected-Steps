@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { dashboardScreen, isDashboardPayload, classifyDashboardFailure, DASHBOARD_FAILURE_MESSAGES, type DashboardFailureKind } from "@/lib/it-run-dashboard";
+import { reportFailure } from "@/lib/it-run-monitoring-client";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -97,6 +98,7 @@ function CompletePaymentButton({ registrationId, eventTitle, onPaid }: {
       });
       const data = await res.json().catch(() => ({})) as { error?: string; key?: string; amount?: number; orderId?: string };
       if (!res.ok || !data.orderId || !data.key) {
+        if (!res.ok) reportFailure("/api/it-run/payment/create-order", res.status);
         setError(data.error ?? "We couldn't start payment. Please try again.");
         setBusy(false);
         return;
@@ -124,6 +126,7 @@ function CompletePaymentButton({ registrationId, eventTitle, onPaid }: {
           });
           const vd = await v.json().catch(() => ({})) as { error?: string };
           if (!v.ok) {
+            reportFailure("/api/it-run/payment/verify", v.status);
             setError(vd.error ?? "Payment verification failed. Contact support if payment was deducted.");
             setBusy(false);
             return;
@@ -134,6 +137,7 @@ function CompletePaymentButton({ registrationId, eventTitle, onPaid }: {
       });
       rz.open();
     } catch {
+      reportFailure("/api/it-run/payment/create-order", 0);
       setError("Payment setup failed. Please try again.");
       setBusy(false);
     }

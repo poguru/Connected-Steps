@@ -2391,8 +2391,10 @@ function RegisterPageContent() {
       form.append("participantIdx", String(idx));
       const res  = await fetch("/api/it-run/upload/company-id", { method: "POST", body: form });
       const data = await res.json();
+      if (!res.ok) reportFailure("/api/it-run/upload/company-id", res.status);
       updateParticipant(idx, "companyIdUrl", data.url ?? "error");
     } catch {
+      reportFailure("/api/it-run/upload/company-id", 0);
       updateParticipant(idx, "companyIdUrl", "error");
     } finally {
       setUploading(prev => prev.filter(i => i !== idx));
@@ -2609,9 +2611,10 @@ function RegisterPageContent() {
         body: JSON.stringify({ code: couponCode.trim().toUpperCase(), categoryId: selectedCat.id, amount: finalPrice }),
       });
       const data = await res.json();
-      if (!res.ok) { setCouponError(data.error ?? "Invalid coupon"); return; }
+      if (!res.ok) { reportFailure("/api/it-run/coupons/validate", res.status); setCouponError(data.error ?? "Invalid coupon"); return; }
       setCoupon(data);
     } catch {
+      reportFailure("/api/it-run/coupons/validate", 0);
       setCouponError("Failed to validate coupon");
     } finally {
       setCouponLoading(false);

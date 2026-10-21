@@ -6,6 +6,7 @@
  */
 
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { fireAlert } from "@/lib/alerting";
 
 /** A journey with no activity for this long, and no completion, is abandoned. */
 export const ABANDON_AFTER_MINUTES = 30;
@@ -45,13 +46,17 @@ export const MONITORED_ENDPOINTS = [
   "/api/auth/send-otp",
   "/api/auth/complete-event-verify",
   "/api/it-run/register",
+  "/api/it-run/coupons/validate",
+  "/api/it-run/upload/company-id",
   "/api/it-run/payment/create-order",
   "/api/it-run/payment/verify",
 ] as const;
 export type MonitoredEndpoint = (typeof MONITORED_ENDPOINTS)[number];
 
-/** Failures in the last hour at or above this count raise an alert on the admin dashboard. */
+/** Failures in the last hour at or above this count send an alert. */
 export const ERROR_ALERT_THRESHOLD = 10;
+/** An alert is sent at most once per this long, however many failures follow. */
+export const ERROR_ALERT_COOLDOWN_MS = 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
 
 export function isMonitoredEndpoint(v: unknown): v is MonitoredEndpoint {
@@ -63,13 +68,22 @@ export function isReportableStatus(v: unknown): v is number {
   return typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 599;
 }
 
-/** A failure count per endpoint and status, plus whether the last hour has crossed the alert threshold. Pure. */
+/**
+ * Whether a failure counts toward an alert: no response, a server error, or a rate limit. A 4xx such as a wrong code
+ * or an invalid coupon is the visitor's mistake, so it is listed on the dashboard but never alerts.
+ */
+export function isAlertableFailure(httpStatus: number): boolean {
+  return httpStatus === 0 || httpStatus === 429 || httpStatus >= 500;
+}
+
+/** Failures per step and status, plus the last hour's total and alertable count. Pure. */
 export function summarizeErrors(
   rows: Array<{ endpoint: string; httpStatus: number | null; createdAt: string }>,
   nowMs: number,
 ) {
   const groups = new Map<string, { endpoint: string; httpStatus: number; count: number }>();
   let lastHour = 0;
+  let alertable = 0;
   for (const r of rows) {
     const status = r.httpStatus ?? 0;
     const key = `${r.endpoint} ${status}`;
@@ -77,10 +91,42 @@ export function summarizeErrors(
     g.count++;
     groups.set(key, g);
     const created = Date.parse(r.createdAt);
-    if (Number.isFinite(created) && nowMs - created <= HOUR_MS) lastHour++;
+    if (Number.isFinite(created) && nowMs - created <= HOUR_MS) {
+      lastHour++;
+      if (isAlertableFailure(status)) alertable++;
+    }
   }
   const byEndpoint = [...groups.values()].sort((a, b) => b.count - a.count);
-  return { total: rows.length, lastHour, byEndpoint, alert: lastHour >= ERROR_ALERT_THRESHOLD };
+  return { total: rows.length, lastHour, alertable, byEndpoint, alert: alertable >= ERROR_ALERT_THRESHOLD };
+}
+
+/**
+ * Counts this event's alertable failures in the last hour and sends an alert when they reach the threshold. The
+ * alert names the count only, never a message or a person. Never throws.
+ */
+export async function checkFailureAlert(eventId: string | null): Promise<void> {
+  try {
+    if (!eventId) return;
+    const since = new Date(Date.now() - HOUR_MS).toISOString();
+    const { count, error } = await getSupabaseServer()
+      .from("registration_journey_events")
+      .select("id, registration_journeys!inner(event_id)", { count: "exact", head: true })
+      .eq("event_type", "error")
+      .eq("registration_journeys.event_id", eventId)
+      .gte("created_at", since)
+      .or("http_status.eq.0,http_status.eq.429,http_status.gte.500");
+    if (error || count === null || count < ERROR_ALERT_THRESHOLD) return;
+
+    await fireAlert({
+      level: "warning",
+      key: "it_run_registration_failures",
+      title: `${count} registration request failures in the last hour`,
+      body: "Requests failed with no response, a server error or a rate limit. Failed steps are listed on the IT Run admin monitoring page.",
+      cooldownMs: ERROR_ALERT_COOLDOWN_MS,
+    });
+  } catch {
+    /* alerting must never affect the registration request */
+  }
 }
 
 /** A browser-made key: 16 to 64 letters and digits, with nothing that identifies a person. */

@@ -7,6 +7,8 @@ import {
   isValidJourneyKey,
   isMonitoredEndpoint,
   isReportableStatus,
+  isAlertableFailure,
+  checkFailureAlert,
   type FunnelStage,
 } from "@/lib/it-run-monitoring";
 
@@ -33,13 +35,14 @@ export async function POST(req: NextRequest) {
 
     if (body.kind === "error") {
       if (!isMonitoredEndpoint(body.endpoint) || !isReportableStatus(body.httpStatus)) return new NextResponse(null, { status: 204 });
-      await recordJourneyEvent({
+      const stored = await recordJourneyEvent({
         journeyKey: body.journeyKey,
         eventId: event?.id ?? null,
         eventType: "error",
         endpoint: body.endpoint,
         httpStatus: body.httpStatus,
       });
+      if (stored && isAlertableFailure(body.httpStatus)) await checkFailureAlert(event?.id ?? null);
       return new NextResponse(null, { status: 204 });
     }
 
