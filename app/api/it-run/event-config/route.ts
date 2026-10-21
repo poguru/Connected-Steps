@@ -90,6 +90,8 @@ export async function GET() {
     if (c.includes_tshirt)      inclusions.push("Dry-fit T-Shirt");
     if (c.includes_certificate) inclusions.push("Digital Certificate");
     inclusions.push("Race BIB");
+    // Breakfast is part of every category
+    inclusions.push("Breakfast");
 
     // Derive participant labels from category_type — UI reads labels, not category_type.
     // tshirt_sizes per participant ensures the UI never shows wrong sizes to the wrong participant.

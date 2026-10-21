@@ -11,8 +11,8 @@ const read = (p: string) => fs.readFileSync(path.resolve(__dirname, "../..", p),
 
 describe("perksFor", () => {
   it("maps each known inclusion to its perk", () => {
-    expect(perksFor(["Race BIB", "Chip Timing", "Finisher Medal", "Dry-fit T-Shirt", "Digital Certificate"]).map(p => p.key))
-      .toEqual(["bib", "timing", "medal", "tshirt", "certificate"]);
+    expect(perksFor(["Race BIB", "Chip Timing", "Finisher Medal", "Dry-fit T-Shirt", "Digital Certificate", "Breakfast"]).map(p => p.key))
+      .toEqual(["bib", "timing", "medal", "tshirt", "certificate", "breakfast"]);
   });
 
   it("keeps only what the category includes, in the order given", () => {
@@ -26,6 +26,13 @@ describe("perksFor", () => {
   it("returns nothing for an empty or unknown list", () => {
     expect(perksFor([])).toEqual([]);
     expect(perksFor(["First aid kit"])).toEqual([]);
+  });
+});
+
+describe("breakfast is part of every category", () => {
+  it("the event config adds Breakfast to each category's inclusions", () => {
+    const route = read("app/api/it-run/event-config/route.ts");
+    expect(route).toMatch(/inclusions\.push\("Breakfast"\)/);
   });
 });
 

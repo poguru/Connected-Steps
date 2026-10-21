@@ -31,6 +31,13 @@ const ICON_PATHS: Record<PerkKey, ReactNode> = {
       <path d="M7 9h10M7 12h6M9 17l-1 4 4-2 4 2-1-4" />
     </>
   ),
+  breakfast: (
+    <>
+      <path d="M4 9h12v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z" />
+      <path d="M16 11h2a2 2 0 0 1 0 4h-2" />
+      <path d="M8 3c0 1.5 1 1.5 1 3M12 3c0 1.5 1 1.5 1 3" />
+    </>
+  ),
 };
 
 /** The icons for a category's perks, each with its label. Renders nothing when there are no perks. */
