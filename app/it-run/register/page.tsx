@@ -2846,7 +2846,7 @@ function RegisterPageContent() {
           </div>
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>THE IT RUN</div>
-            <div style={{ fontSize: 9, color: "#e8620a", fontWeight: 600 }}>SPIRIT-2</div>
+            <div style={{ fontSize: 9, color: "#e8620a", fontWeight: 600 }}>SPRINT-2</div>
           </div>
         </Link>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
