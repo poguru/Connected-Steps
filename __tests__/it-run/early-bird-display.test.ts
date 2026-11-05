@@ -12,7 +12,7 @@ const page = fs.readFileSync(path.resolve(__dirname, "../../app/it-run/register/
 
 describe("category card: early-bird pricing", () => {
   it("shows the normal price struck through only when an early bird applies", () => {
-    expect(page).toMatch(/\{cat\.early_bird && \(\s*<div style=\{\{ fontSize: 13, color: "#888", textDecoration: "line-through" \}\}>/);
+    expect(page).toMatch(/\{cat\.early_bird && \(\s*<div style=\{\{ fontSize: 13, color: "#64748B", textDecoration: "line-through" \}\}>/);
   });
 
   it("shows an EARLY BIRD badge and the saving only when an early bird applies", () => {

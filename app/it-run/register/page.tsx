@@ -138,31 +138,32 @@ const emptyParticipant = (categoryId = ""): Participant => ({
 // Design tokens
 // ─────────────────────────────────────────────────────────────────────────────
 
-const BG     = "#080808";
+const BG     = "#FFFFFF";
 const ACCENT = "#e8620a";
 
 const CARD_BASE: React.CSSProperties = {
-  background: "rgba(255,255,255,0.03)",
-  border: "1px solid rgba(255,255,255,0.08)",
+  background: "#FFFFFF",
+  border: "1px solid #E2E8F0",
   borderRadius: 16,
 };
 
 // 16px minimum prevents iOS Safari auto-zoom on focus
 const INPUT_S: React.CSSProperties = {
   width: "100%", padding: "13px 14px", borderRadius: 10,
-  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-  color: "#fff", fontSize: 16, fontFamily: "inherit", outline: "none",
+  background: "#F8FAFC", border: "1px solid #CBD5E1",
+  color: "#0F172A", fontSize: 16, fontFamily: "inherit", outline: "none",
   boxSizing: "border-box" as const, transition: "border-color 0.2s",
   WebkitAppearance: "none" as const,
 };
 
 const INPUT_ERR: React.CSSProperties = {
-  ...INPUT_S, borderColor: "rgba(248,113,113,0.5)", background: "rgba(248,113,113,0.04)",
+  ...INPUT_S, borderColor: "rgba(220,38,38,0.5)", background: "rgba(220,38,38,0.04)",
 };
 
+// Field labels: navy and semibold, so every field name is readable at a glance
 const LABEL_S: React.CSSProperties = {
-  display: "block", fontSize: 11, color: "rgba(255,255,255,0.4)",
-  letterSpacing: "0.08em", textTransform: "uppercase" as const, marginBottom: 5,
+  display: "block", fontSize: 12, fontWeight: 600, color: "#0F172A",
+  letterSpacing: "0.04em", textTransform: "uppercase" as const, marginBottom: 6,
 };
 
 // 50px min-height = comfortable touch target
@@ -174,14 +175,14 @@ const BTN: React.CSSProperties = {
 };
 const BTN_PRIMARY: React.CSSProperties = { ...BTN, background: ACCENT, color: "#fff" };
 const BTN_GHOST: React.CSSProperties   = {
-  ...BTN, background: "transparent", color: "#aaa",
-  border: "1px solid rgba(255,255,255,0.13)",
+  ...BTN, background: "transparent", color: "#64748B",
+  border: "1px solid #CBD5E1",
 };
 
 const BTN_EDIT: React.CSSProperties = {
   padding: "5px 12px", borderRadius: 7, fontWeight: 600, fontSize: 11,
-  cursor: "pointer", border: "1px solid rgba(255,255,255,0.1)",
-  background: "transparent", color: "#666",
+  cursor: "pointer", border: "1px solid #CBD5E1",
+  background: "transparent", color: "#64748B",
   fontFamily: "inherit", letterSpacing: "0.05em", textTransform: "uppercase" as const,
   transition: "all 0.15s", flexShrink: 0,
 };
@@ -225,7 +226,7 @@ function ProgressStepper({
     <div style={{ marginBottom: 28 }}>
       {/* Track */}
       <div style={{
-        height: 3, background: "rgba(255,255,255,0.07)",
+        height: 3, background: "#E2E8F0",
         borderRadius: 2, marginBottom: 10, overflow: "hidden",
       }}>
         <div style={{
@@ -238,17 +239,17 @@ function ProgressStepper({
       {/* Label row */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <span style={{ fontSize: 11, color: "#444", fontWeight: 600 }}>
+          <span style={{ fontSize: 11, color: "#64748B", fontWeight: 600 }}>
             Step {capped} of {total}
           </span>
-          <span style={{ color: "#333", fontSize: 11 }}>·</span>
-          <span style={{ fontSize: 11, color: "#ccc", fontWeight: 700, letterSpacing: "0.04em" }}>
+          <span style={{ color: "#64748B", fontSize: 11 }}>·</span>
+          <span style={{ fontSize: 11, color: "#64748B", fontWeight: 700, letterSpacing: "0.04em" }}>
             {label}
           </span>
           {showSub && (
             <span style={{
               fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20,
-              background: `${ACCENT}18`, color: ACCENT, letterSpacing: "0.04em", marginLeft: 4,
+              background: `${ACCENT}18`, color: "#C2410C", letterSpacing: "0.04em", marginLeft: 4,
             }}>
               {(participantSubIdx ?? 0) + 1} of {participantCount}
             </span>
@@ -261,7 +262,7 @@ function ProgressStepper({
             <div key={s.id} style={{
               width: s.id === capped ? 20 : 6,
               height: 6, borderRadius: 3,
-              background: s.id < capped ? ACCENT : s.id === capped ? ACCENT : "rgba(255,255,255,0.08)",
+              background: s.id < capped ? ACCENT : s.id === capped ? ACCENT : "#E2E8F0",
               transition: "all 0.3s",
             }} />
           ))}
@@ -285,12 +286,12 @@ function Field({
     <div data-field-error={error ? "true" : undefined} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
       <label style={LABEL_S}>
         {label}
-        {required && <span style={{ color: ACCENT, marginLeft: 3 }}>*</span>}
-        {optional && <span style={{ color: "#383838", marginLeft: 4, fontWeight: 400 }}>optional</span>}
+        {required && <span style={{ color: "#C2410C", marginLeft: 3 }}>*</span>}
+        {optional && <span style={{ color: "#64748B", marginLeft: 4, fontWeight: 400 }}>optional</span>}
       </label>
       {children}
-      {hint  && !error && <span style={{ fontSize: 11, color: "#444", lineHeight: 1.4 }}>{hint}</span>}
-      {error && <span style={{ fontSize: 11, color: "#f87171", lineHeight: 1.4 }}>{error}</span>}
+      {hint  && !error && <span style={{ fontSize: 11, color: "#64748B", lineHeight: 1.4 }}>{hint}</span>}
+      {error && <span style={{ fontSize: 11, color: "#DC2626", lineHeight: 1.4 }}>{error}</span>}
     </div>
   );
 }
@@ -302,9 +303,9 @@ function Field({
 function SectionHeader({ label }: { label: string }) {
   return (
     <div style={{
-      fontSize: 10, color: "#3a3a3a", fontWeight: 700,
+      fontSize: 10, color: "#64748B", fontWeight: 700,
       textTransform: "uppercase" as const, letterSpacing: "0.12em",
-      borderBottom: "1px solid rgba(255,255,255,0.04)",
+      borderBottom: "1px solid #F8FAFC",
       paddingBottom: 7, marginBottom: 14, marginTop: 2,
     }}>
       {label}
@@ -381,21 +382,21 @@ function ParticipantForm({
       <div style={{
         display: "flex", alignItems: "center", gap: 10,
         marginBottom: 24, paddingBottom: 16,
-        borderBottom: "1px solid rgba(255,255,255,0.05)",
+        borderBottom: "1px solid #F8FAFC",
       }}>
         <div style={{
           width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
           background: `${ACCENT}18`, border: `1.5px solid ${ACCENT}50`,
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 12, fontWeight: 800, color: ACCENT,
+          fontSize: 12, fontWeight: 800, color: "#C2410C",
         }}>
           {indexOfTotal.split(" ")[0]}
         </div>
         <div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#0F172A", lineHeight: 1.2 }}>
             {participantLabel}
           </div>
-          <div style={{ fontSize: 11, color: "#444", marginTop: 2, letterSpacing: "0.04em" }}>
+          <div style={{ fontSize: 11, color: "#64748B", marginTop: 2, letterSpacing: "0.04em" }}>
             {roleLabel}
           </div>
         </div>
@@ -543,22 +544,22 @@ function PriceBar({
   return (
     <div style={{
       position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 90,
-      background: "rgba(8,8,8,0.97)", backdropFilter: "blur(20px)",
-      borderTop: "1px solid rgba(255,255,255,0.06)",
+      background: "rgba(255,255,255,0.97)", backdropFilter: "blur(20px)",
+      borderTop: "1px solid #E2E8F0",
       padding: `12px clamp(1rem,4vw,2rem) calc(12px + env(safe-area-inset-bottom, 0px))`,
       display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
         <div style={{ width: 7, height: 7, borderRadius: "50%", background: color, flexShrink: 0 }} />
         <span style={{
-          fontSize: 13, color: "#999", fontWeight: 600,
+          fontSize: 13, color: "#64748B", fontWeight: 600,
           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const,
         }}>
           {categoryName}
         </span>
         {showSubStep && (
           <span style={{
-            fontSize: 10, color: ACCENT, fontWeight: 700, flexShrink: 0,
+            fontSize: 10, color: "#C2410C", fontWeight: 700, flexShrink: 0,
             background: `${ACCENT}15`, padding: "2px 7px", borderRadius: 10,
           }}>
             {participantSubIdx + 1} / {participantCount}
@@ -570,14 +571,14 @@ function PriceBar({
         <IssueReportButton />
         {couponApplied && (
           <span style={{
-            fontSize: 10, color: "#10b981", background: "rgba(16,185,129,0.08)",
-            border: "1px solid rgba(16,185,129,0.2)",
+            fontSize: 10, color: "#059669", background: "rgba(5,150,105,0.08)",
+            border: "1px solid rgba(5,150,105,0.2)",
             padding: "2px 8px", borderRadius: 6,
           }}>
             Coupon applied
           </span>
         )}
-        <span style={{ fontSize: 18, fontWeight: 900, color: ACCENT }}>
+        <span style={{ fontSize: 18, fontWeight: 900, color: "#C2410C" }}>
           ₹{finalPrice.toLocaleString("en-IN")}
         </span>
       </div>
@@ -608,7 +609,7 @@ function StepCounts({
 
   if (loading) {
     return (
-      <div style={{ textAlign: "center" as const, padding: "80px 0", color: "#444" }}>
+      <div style={{ textAlign: "center" as const, padding: "80px 0", color: "#64748B" }}>
         <div style={{
           width: 40, height: 40, margin: "0 auto 16px",
           border: `2px solid rgba(232,98,10,0.3)`, borderTopColor: ACCENT,
@@ -626,7 +627,7 @@ function StepCounts({
   const stepButton = {
     width: 44, height: 44, borderRadius: 10, flexShrink: 0,
     border: "1px solid rgba(232,98,10,0.4)", background: "transparent",
-    color: ACCENT, fontSize: 22, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+    color: "#C2410C", fontSize: 22, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
   };
 
   return (
@@ -638,22 +639,22 @@ function StepCounts({
           borderRadius: 100, padding: "4px 12px", marginBottom: 14,
         }}>
           <span style={{
-            fontSize: 9, color: ACCENT, fontWeight: 700,
+            fontSize: 9, color: "#C2410C", fontWeight: 700,
             letterSpacing: "0.14em", textTransform: "uppercase" as const,
           }}>
             {config?.event.subtitle ?? "IT Professionals Only"}
           </span>
         </div>
         <h1 style={{
-          fontSize: "clamp(22px,4vw,30px)", fontWeight: 900, color: "#fff",
+          fontSize: "clamp(22px,4vw,30px)", fontWeight: 900, color: "#0F172A",
           margin: "0 0 6px", lineHeight: 1.2,
         }}>
           How many runners?
         </h1>
-        <p style={{ fontSize: 13, color: "#555", margin: "0 0 12px" }}>
+        <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 12px" }}>
           {config?.event.venue_name && `${config.event.venue_name} · `}{eventDate}
         </p>
-        <p style={{ fontSize: 13, color: "#888", margin: 0, lineHeight: 1.6 }}>
+        <p style={{ fontSize: 13, color: "#64748B", margin: 0, lineHeight: 1.6 }}>
           Choose how many people you are registering in each category. Each person gets their own QR, BIB and race-day details.
           Duo and Parent &amp; Child categories are sold in pairs, and each pair pays once.
         </p>
@@ -661,8 +662,8 @@ function StepCounts({
 
       {locked && (
         <div role="note" style={{
-          fontSize: 13, color: "#fbbf24", background: "rgba(251,191,36,0.06)",
-          border: "1px solid rgba(251,191,36,0.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, lineHeight: 1.5,
+          fontSize: 13, color: "#B45309", background: "rgba(217,119,6,0.06)",
+          border: "1px solid rgba(217,119,6,0.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, lineHeight: 1.5,
         }}>
           Your runners are fixed once registration has started. To change them, email info@connectedsteps.in.
         </div>
@@ -685,24 +686,24 @@ function StepCounts({
               display: "flex", flexWrap: "wrap" as const, alignItems: "center", gap: 14,
             }}>
               <div style={{ flex: "1 1 180px", minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#0F172A" }}>
                   {cat.name}
                   {cat.is_soldout && (
                     <span style={{
-                      marginLeft: 8, fontSize: 10, color: "#f87171",
-                      background: "rgba(248,113,113,0.1)", padding: "1px 6px", borderRadius: 4,
+                      marginLeft: 8, fontSize: 10, color: "#DC2626",
+                      background: "rgba(220,38,38,0.1)", padding: "1px 6px", borderRadius: 4,
                     }}>
                       SOLD OUT
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: 12, color: "#666", marginTop: 3, lineHeight: 1.5 }}>
+                <div style={{ fontSize: 12, color: "#64748B", marginTop: 3, lineHeight: 1.5 }}>
                   {cat.distance_km} KM · {cat.is_timed ? "Timed" : "Non-Timed"}
                   {cat.category_type !== "solo" && ` · Pairs: ${cat.participant_labels.map(l => l.label).join(" + ")}`}
                 </div>
                 <ItRunPerkIcons perks={perksFor(cat.inclusions)} color={cat.color} />
                 {left !== null && !cat.is_soldout && left <= 20 && (
-                  <div style={{ fontSize: 11, color: "#fbbf24", marginTop: 4 }}>Only {left} spots left</div>
+                  <div style={{ fontSize: 11, color: "#B45309", marginTop: 4 }}>Only {left} spots left</div>
                 )}
               </div>
 
@@ -710,7 +711,7 @@ function StepCounts({
                 {/* With an early bird: the normal price is struck through, the early-bird price is the one to notice,
                     and the saving is shown. The server decides the offer and its price; the window has already been checked there. */}
                 {cat.early_bird && (
-                  <div style={{ fontSize: 13, color: "#888", textDecoration: "line-through" }}>
+                  <div style={{ fontSize: 13, color: "#64748B", textDecoration: "line-through" }}>
                     ₹{cat.price_rupees.toLocaleString("en-IN")}
                   </div>
                 )}
@@ -719,19 +720,19 @@ function StepCounts({
                 </div>
                 {cat.early_bird && (
                   <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 6, flexWrap: "wrap" as const, marginTop: 4 }}>
-                    <span style={{ fontSize: 10, fontWeight: 800, color: "#052e1a", background: "#34d399", padding: "2px 6px", borderRadius: 4, letterSpacing: "0.06em" }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, color: "#FFFFFF", background: "#059669", padding: "2px 6px", borderRadius: 4, letterSpacing: "0.06em" }}>
                       EARLY BIRD
                     </span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#34d399" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#059669" }}>
                       Save ₹{Math.max(0, cat.price_rupees - price).toLocaleString("en-IN")}
                     </span>
                   </div>
                 )}
-                <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
                   {cat.category_type === "solo" ? "per runner" : "per pair"}
                 </div>
                 {cat.early_bird?.endsAt && (
-                  <div style={{ fontSize: 11, color: "#fbbf24", marginTop: 4, lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 11, color: "#B45309", marginTop: 4, lineHeight: 1.4 }}>
                     Offer ends {formatIst(cat.early_bird.endsAt)}
                   </div>
                 )}
@@ -748,7 +749,7 @@ function StepCounts({
                 >
                   −
                 </button>
-                <span aria-live="polite" style={{ minWidth: 28, textAlign: "center" as const, fontSize: 18, fontWeight: 800, color: "#fff" }}>
+                <span aria-live="polite" style={{ minWidth: 28, textAlign: "center" as const, fontSize: 18, fontWeight: 800, color: "#0F172A" }}>
                   {team > 1 ? Math.round(count / team) : count}
                 </span>
                 <button
@@ -767,15 +768,15 @@ function StepCounts({
       </div>
 
       <div style={{ ...CARD_BASE, padding: 16, marginTop: 20, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" as const }}>
-        <div style={{ fontSize: 13, color: "#888" }}>
+        <div style={{ fontSize: 13, color: "#64748B" }}>
           {runners} {runners === 1 ? "runner" : "runners"}
           {lines.length > 0 && ` in ${lines.length} ${lines.length === 1 ? "category" : "categories"}`}
         </div>
-        <div style={{ fontSize: 20, fontWeight: 900, color: ACCENT }}>
+        <div style={{ fontSize: 20, fontWeight: 900, color: "#C2410C" }}>
           ₹{totals.total.toLocaleString("en-IN")}
         </div>
       </div>
-      <p style={{ fontSize: 11, color: "#555", margin: "8px 0 0", lineHeight: 1.5 }}>
+      <p style={{ fontSize: 11, color: "#64748B", margin: "8px 0 0", lineHeight: 1.5 }}>
         Shown before any coupon. The amount is confirmed by the server when you register.
       </p>
 
@@ -789,10 +790,10 @@ function StepCounts({
       </button>
 
       {config && (
-        <div style={{ marginTop: 24, fontSize: 12, color: "#3a3a3a", lineHeight: 1.7 }}>
+        <div style={{ marginTop: 24, fontSize: 12, color: "#64748B", lineHeight: 1.7 }}>
           By registering you agree to the event terms. Questions? Email{" "}
           <a href={`mailto:${config.registration.contact_email}`}
-            style={{ color: ACCENT, textDecoration: "none" }}>
+            style={{ color: "#C2410C", textDecoration: "none" }}>
             {config.registration.contact_email}
           </a>
         </div>
@@ -843,9 +844,9 @@ function StepParticipants({
           borderRadius: 10,
         }}>
           <div style={{ width: 6, height: 6, borderRadius: "50%", background: category.color, flexShrink: 0 }} />
-          <span style={{ fontSize: 12, color: "#888", flex: 1, minWidth: 0 }}>
+          <span style={{ fontSize: 12, color: "#64748B", flex: 1, minWidth: 0 }}>
             {category.name}
-            <span style={{ color: "#555", marginLeft: 6 }}>
+            <span style={{ color: "#64748B", marginLeft: 6 }}>
               {category.distance_km} KM
               {category.is_timed ? " · Timed" : " · Non-Timed"}
             </span>
@@ -861,7 +862,7 @@ function StepParticipants({
         <div style={{ marginBottom: 24 }}>
           <div style={{
             display: "flex", alignItems: "stretch", gap: 8, flexWrap: "wrap" as const,
-            paddingBottom: 12, borderBottom: "1px solid rgba(255,255,255,0.05)",
+            paddingBottom: 12, borderBottom: "1px solid #F8FAFC",
           }}>
             {participants.map((_, idx) => {
               const active = idx === participantSubIdx;
@@ -872,9 +873,9 @@ function StepParticipants({
                   onClick={() => setParticipantSubIdx(idx)}
                   style={{
                     padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-                    cursor: "pointer", border: "1px solid rgba(255,255,255,0.1)",
+                    cursor: "pointer", border: "1px solid #CBD5E1",
                     background: active ? ACCENT : "transparent",
-                    color: active ? "#000" : "#888",
+                    color: active ? "#000" : "#64748B",
                     transition: "all 0.15s", textAlign: "left" as const, fontFamily: "inherit",
                   }}
                 >
@@ -912,9 +913,9 @@ function StepParticipants({
 
       {submitError && (
         <div style={{
-          color: "#f87171", fontSize: 13, marginTop: 16, marginBottom: 4,
-          padding: "10px 14px", background: "rgba(248,113,113,0.06)",
-          border: "1px solid rgba(248,113,113,0.2)", borderRadius: 8,
+          color: "#DC2626", fontSize: 13, marginTop: 16, marginBottom: 4,
+          padding: "10px 14px", background: "rgba(220,38,38,0.06)",
+          border: "1px solid rgba(220,38,38,0.2)", borderRadius: 8,
         }}>
           {submitError}
         </div>
@@ -958,10 +959,10 @@ function StepCompany({
   return (
     <div>
       <ProgressStepper step={3} />
-      <h2 style={{ fontSize: "clamp(20px,3vw,24px)", fontWeight: 800, color: "#fff", marginBottom: 6 }}>
+      <h2 style={{ fontSize: "clamp(20px,3vw,24px)", fontWeight: 800, color: "#0F172A", marginBottom: 6 }}>
         Company Verification
       </h2>
-      <p style={{ fontSize: 13, color: "#555", marginBottom: 20 }}>
+      <p style={{ fontSize: 13, color: "#64748B", marginBottom: 20 }}>
         Upload a company ID or a government-issued photo ID for each adult. This is required to complete your registration.
       </p>
 
@@ -969,8 +970,8 @@ function StepCompany({
         ...CARD_BASE, padding: 14, marginBottom: 20,
         border: "1px solid rgba(232,98,10,0.15)", background: "rgba(232,98,10,0.03)",
       }}>
-        <div style={{ fontSize: 12, color: ACCENT, fontWeight: 600, marginBottom: 2 }}>Accepted documents</div>
-        <div style={{ fontSize: 12, color: "#666", lineHeight: 1.6 }}>
+        <div style={{ fontSize: 12, color: "#C2410C", fontWeight: 600, marginBottom: 2 }}>Accepted documents</div>
+        <div style={{ fontSize: 12, color: "#64748B", lineHeight: 1.6 }}>
           Company ID card, Employee card, or Offer Letter showing company name.
           A photo of yourself holding the ID is also acceptable.
         </div>
@@ -984,7 +985,7 @@ function StepCompany({
 
         return (
           <div key={idx} style={{ ...CARD_BASE, padding: 20, marginBottom: 14 }}>
-            <div style={{ fontSize: 11, color: ACCENT, fontWeight: 700, letterSpacing: "0.06em", marginBottom: 14, textTransform: "uppercase" as const }}>
+            <div style={{ fontSize: 11, color: "#C2410C", fontWeight: 700, letterSpacing: "0.06em", marginBottom: 14, textTransform: "uppercase" as const }}>
               {label} — {p.companyName || "Company not specified"}
             </div>
 
@@ -1006,8 +1007,8 @@ function StepCompany({
                             onClick={() => onChange(idx, "idDocType", opt.value)}
                             style={{
                               padding: "8px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 600,
-                              color: "#fff", background: active ? `${ACCENT}14` : "rgba(255,255,255,0.02)",
-                              border: `1px solid ${active ? ACCENT : "rgba(255,255,255,0.1)"}`,
+                              color: "#0F172A", background: active ? `${ACCENT}14` : "#F8FAFC",
+                              border: `1px solid ${active ? ACCENT : "#CBD5E1"}`,
                             }}>
                             {active ? "✓ " : ""}{opt.text}
                           </button>
@@ -1019,15 +1020,15 @@ function StepCompany({
                   {choice === "upload" && (uploaded ? (
                     <div style={{
                       display: "flex", alignItems: "center", gap: 12, padding: "12px 16px",
-                      background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.18)",
+                      background: "rgba(5,150,105,0.06)", border: "1px solid rgba(5,150,105,0.18)",
                       borderRadius: 10,
                     }}>
-                      <span style={{ color: "#10b981", fontSize: 18, flexShrink: 0 }}>✓</span>
+                      <span style={{ color: "#059669", fontSize: 18, flexShrink: 0 }}>✓</span>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, color: "#10b981", fontWeight: 600 }}>ID uploaded. Admin review is pending.</div>
+                        <div style={{ fontSize: 13, color: "#059669", fontWeight: 600 }}>ID uploaded. Admin review is pending.</div>
                         <button onClick={() => onChange(idx, "companyIdUrl", "")}
                           style={{
-                            background: "none", border: "none", color: "#777", fontSize: 11,
+                            background: "none", border: "none", color: "#64748B", fontSize: 11,
                             cursor: "pointer", padding: 0, marginTop: 2, fontFamily: "inherit",
                           }}>
                           Upload a different file
@@ -1038,20 +1039,20 @@ function StepCompany({
                     <label style={{
                       display: "flex", flexDirection: "column" as const, alignItems: "center",
                       padding: "28px 20px",
-                      border: `2px dashed ${errored ? "rgba(248,113,113,0.4)" : "rgba(255,255,255,0.09)"}`,
+                      border: `2px dashed ${errored ? "rgba(220,38,38,0.4)" : "#CBD5E1"}`,
                       borderRadius: 12, cursor: uploading.includes(idx) ? "wait" : "pointer", gap: 6,
                       textAlign: "center" as const,
-                      background: "rgba(255,255,255,0.015)", transition: "border-color 0.2s",
+                      background: "#F8FAFC", transition: "border-color 0.2s",
                     }}>
                       {uploading.includes(idx) ? (
-                        <div style={{ fontSize: 13, color: "#999" }} role="status">Uploading… please keep this page open.</div>
+                        <div style={{ fontSize: 13, color: "#64748B" }} role="status">Uploading… please keep this page open.</div>
                       ) : (
                         <>
-                          <div style={{ fontSize: 24, color: "#333" }}>↑</div>
-                          <div style={{ fontSize: 14, color: "#ccc", fontWeight: 600 }}>Choose your company ID file</div>
-                          <div style={{ fontSize: 11, color: "#666" }}>JPG, PNG, WEBP or PDF · max 5 MB</div>
+                          <div style={{ fontSize: 24, color: "#64748B" }}>↑</div>
+                          <div style={{ fontSize: 14, color: "#64748B", fontWeight: 600 }}>Choose your company ID file</div>
+                          <div style={{ fontSize: 11, color: "#64748B" }}>JPG, PNG, WEBP or PDF · max 5 MB</div>
                           {errored && (
-                            <div role="alert" style={{ fontSize: 12, color: "#f87171", marginTop: 4 }}>Upload failed. Please try again.</div>
+                            <div role="alert" style={{ fontSize: 12, color: "#DC2626", marginTop: 4 }}>Upload failed. Please try again.</div>
                           )}
                         </>
                       )}
@@ -1073,13 +1074,13 @@ function StepCompany({
 
       <div style={{
         ...CARD_BASE, padding: 14, marginBottom: 24,
-        fontSize: 12, color: "#777", lineHeight: 1.7,
+        fontSize: 12, color: "#64748B", lineHeight: 1.7,
       }}>
         Your ID is checked by an admin. Your registration is confirmed once the ID is verified.
       </div>
 
       {idError && (
-        <div role="alert" style={{ fontSize: 13, color: "#f87171", marginBottom: 12, lineHeight: 1.5 }}>{idError}</div>
+        <div role="alert" style={{ fontSize: 13, color: "#DC2626", marginBottom: 12, lineHeight: 1.5 }}>{idError}</div>
       )}
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
@@ -1105,7 +1106,7 @@ function ReviewSectionHeader({
       marginBottom: 14,
     }}>
       <div style={{
-        fontSize: 10, color: ACCENT, fontWeight: 700,
+        fontSize: 10, color: "#C2410C", fontWeight: 700,
         textTransform: "uppercase" as const, letterSpacing: "0.1em",
       }}>
         {label}
@@ -1114,12 +1115,12 @@ function ReviewSectionHeader({
         onClick={onEdit}
         style={BTN_EDIT}
         onMouseEnter={e => {
-          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.25)";
-          (e.currentTarget as HTMLButtonElement).style.color = "#ccc";
+          (e.currentTarget as HTMLButtonElement).style.borderColor = "#94A3B8";
+          (e.currentTarget as HTMLButtonElement).style.color = "#64748B";
         }}
         onMouseLeave={e => {
-          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.1)";
-          (e.currentTarget as HTMLButtonElement).style.color = "#666";
+          (e.currentTarget as HTMLButtonElement).style.borderColor = "#CBD5E1";
+          (e.currentTarget as HTMLButtonElement).style.color = "#64748B";
         }}
       >
         {editLabel}
@@ -1154,10 +1155,10 @@ function StepReview({
   return (
     <div>
       <ProgressStepper step={4} />
-      <h2 style={{ fontSize: "clamp(20px,3vw,24px)", fontWeight: 800, color: "#fff", marginBottom: 6 }}>
+      <h2 style={{ fontSize: "clamp(20px,3vw,24px)", fontWeight: 800, color: "#0F172A", marginBottom: 6 }}>
         Review Your Registration
       </h2>
-      <p style={{ fontSize: 13, color: "#555", marginBottom: 20 }}>
+      <p style={{ fontSize: 13, color: "#64748B", marginBottom: 20 }}>
         Everything look right? You can edit any section below before paying.
       </p>
 
@@ -1168,17 +1169,17 @@ function StepReview({
           {lines.map(line => (
             <div key={line.category.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#0F172A" }}>
                   {line.category.name}
-                  {line.count > 1 && <span style={{ fontSize: 12, color: "#888", fontWeight: 500 }}>{` × ${line.count} runners`}</span>}
+                  {line.count > 1 && <span style={{ fontSize: 12, color: "#64748B", fontWeight: 500 }}>{` × ${line.count} runners`}</span>}
                 </div>
-                <div style={{ fontSize: 12, color: "#555", marginTop: 3, display: "flex", gap: 8, flexWrap: "wrap" as const }}>
+                <div style={{ fontSize: 12, color: "#64748B", marginTop: 3, display: "flex", gap: 8, flexWrap: "wrap" as const }}>
                   <span>{`${line.category.distance_km} KM`}</span>
-                  <span style={{ color: "#333" }}>·</span>
+                  <span style={{ color: "#64748B" }}>·</span>
                   <span>{line.category.is_timed ? "Timed" : "Non-Timed"}</span>
                   {line.category.category_type !== "solo" && (
                     <>
-                      <span style={{ color: "#333" }}>·</span>
+                      <span style={{ color: "#64748B" }}>·</span>
                       <span>{`${line.count / teamSize(line.category)} ${line.count / teamSize(line.category) === 1 ? "pair" : "pairs"}`}</span>
                     </>
                   )}
@@ -1189,7 +1190,7 @@ function StepReview({
                   ₹{line.total.toLocaleString("en-IN")}
                 </div>
                 {line.discount > 0 && (
-                  <div style={{ fontSize: 10, color: "#10b981" }}>early bird applied</div>
+                  <div style={{ fontSize: 10, color: "#059669" }}>early bird applied</div>
                 )}
               </div>
             </div>
@@ -1224,10 +1225,10 @@ function StepReview({
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: "10px 16px" }}>
               {fields.filter(([, v]) => v?.trim()).map(([lbl, val]) => (
                 <div key={lbl} style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 9, color: "#3a3a3a", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 2 }}>
+                  <div style={{ fontSize: 9, color: "#64748B", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 2 }}>
                     {lbl}
                   </div>
-                  <div style={{ fontSize: 12, color: "#bbb", overflowWrap: "anywhere" as const }}>{val}</div>
+                  <div style={{ fontSize: 12, color: "#64748B", overflowWrap: "anywhere" as const }}>{val}</div>
                 </div>
               ))}
             </div>
@@ -1248,18 +1249,18 @@ function StepReview({
                 <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{
                     width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
-                    background: ok ? "#10b981" : "#444",
+                    background: ok ? "#059669" : "#64748B",
                   }} />
                   <div style={{ flex: 1 }}>
-                    <span style={{ fontSize: 12, color: "#bbb" }}>{label}</span>
-                    <span style={{ fontSize: 11, color: "#444", marginLeft: 8 }}>
+                    <span style={{ fontSize: 12, color: "#64748B" }}>{label}</span>
+                    <span style={{ fontSize: 11, color: "#64748B", marginLeft: 8 }}>
                       {p.companyName || "No company"}
                     </span>
                   </div>
                   <span style={{
                     fontSize: 10, fontWeight: 600,
-                    color:      ok ? "#10b981" : "#555",
-                    background: ok ? "rgba(16,185,129,0.07)" : "rgba(255,255,255,0.03)",
+                    color:      ok ? "#059669" : "#64748B",
+                    background: ok ? "rgba(5,150,105,0.07)" : "#FFFFFF",
                     padding: "2px 8px", borderRadius: 5,
                   }}>
                     {ok ? "ID Uploaded" : "Bring on day"}
@@ -1275,17 +1276,17 @@ function StepReview({
       <div style={{ ...CARD_BASE, padding: 18, marginBottom: 24 }}>
         <ReviewSectionHeader label="Order Summary" onEdit={onEditCoupon} editLabel={coupon ? "Edit Coupon" : "Add Coupon"} />
 
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#888", marginBottom: 8 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#64748B", marginBottom: 8 }}>
           <span>{bookingSummary(lines)}</span>
           <span>₹{basePrice.toLocaleString("en-IN")}</span>
         </div>
 
         {coupon && (
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#10b981", marginBottom: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#059669", marginBottom: 8 }}>
             <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{
                 fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", padding: "1px 6px",
-                background: "rgba(16,185,129,0.1)", borderRadius: 4, color: "#10b981",
+                background: "rgba(5,150,105,0.1)", borderRadius: 4, color: "#059669",
               }}>
                 {coupon.code}
               </span>
@@ -1295,13 +1296,13 @@ function StepReview({
           </div>
         )}
 
-        <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "10px 0 12px" }} />
+        <div style={{ height: 1, background: "#F8FAFC", margin: "10px 0 12px" }} />
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 13, color: "#555" }}>
+          <span style={{ fontSize: 13, color: "#64748B" }}>
             Total{coupon ? " (after discount)" : ""}
           </span>
-          <span style={{ fontSize: 22, fontWeight: 900, color: ACCENT }}>
+          <span style={{ fontSize: 22, fontWeight: 900, color: "#C2410C" }}>
             ₹{finalPrice.toLocaleString("en-IN")}
           </span>
         </div>
@@ -1350,10 +1351,10 @@ function StepCoupon({
   return (
     <div>
       <ProgressStepper step={5} />
-      <h2 style={{ fontSize: "clamp(20px,3vw,24px)", fontWeight: 800, color: "#fff", marginBottom: 6 }}>
+      <h2 style={{ fontSize: "clamp(20px,3vw,24px)", fontWeight: 800, color: "#0F172A", marginBottom: 6 }}>
         {couponEnabled ? "Have a Coupon Code?" : "Order Summary"}
       </h2>
-      <p style={{ fontSize: 13, color: "#555", marginBottom: 20 }}>
+      <p style={{ fontSize: 13, color: "#64748B", marginBottom: 20 }}>
         {couponEnabled
           ? "Apply a discount code, or skip and proceed to payment."
           : "Review your order total before payment."}
@@ -1382,25 +1383,25 @@ function StepCoupon({
                 </button>
               </div>
               {couponError && (
-                <div style={{ fontSize: 12, color: "#f87171" }}>{couponError}</div>
+                <div style={{ fontSize: 12, color: "#DC2626" }}>{couponError}</div>
               )}
             </>
           ) : (
             <div style={{
               display: "flex", alignItems: "center", gap: 12, padding: "12px 16px",
-              background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.18)",
+              background: "rgba(5,150,105,0.06)", border: "1px solid rgba(5,150,105,0.18)",
               borderRadius: 10,
             }}>
-              <div style={{ fontSize: 16, fontWeight: 800, color: "#10b981" }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "#059669" }}>
                 −₹{coupon.discount.toLocaleString("en-IN")}
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, color: "#10b981", fontWeight: 600 }}>{coupon.label}</div>
-                <div style={{ fontSize: 11, color: "#444" }}>Code: {coupon.code}</div>
+                <div style={{ fontSize: 13, color: "#059669", fontWeight: 600 }}>{coupon.label}</div>
+                <div style={{ fontSize: 11, color: "#64748B" }}>Code: {coupon.code}</div>
               </div>
               <button onClick={onClearCoupon}
                 style={{
-                  background: "none", border: "none", color: "#444", cursor: "pointer",
+                  background: "none", border: "none", color: "#64748B", cursor: "pointer",
                   fontSize: 18, fontFamily: "inherit", padding: "2px 6px", lineHeight: 1,
                 }}>
                 ×
@@ -1412,23 +1413,23 @@ function StepCoupon({
 
       {/* Order summary */}
       <div style={{ ...CARD_BASE, padding: 20, marginBottom: 24 }}>
-        <div style={{ fontSize: 10, color: ACCENT, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 14 }}>
+        <div style={{ fontSize: 10, color: "#C2410C", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 14 }}>
           Order Summary
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: "#aaa", marginBottom: 8 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: "#64748B", marginBottom: 8 }}>
           <span>{categoryName}</span>
           <span>₹{basePrice.toLocaleString("en-IN")}</span>
         </div>
         {coupon && (
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: "#10b981", marginBottom: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: "#059669", marginBottom: 8 }}>
             <span>Coupon ({coupon.code})</span>
             <span>−₹{discount.toLocaleString("en-IN")}</span>
           </div>
         )}
-        <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "12px 0" }} />
+        <div style={{ height: 1, background: "#E2E8F0", margin: "12px 0" }} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 14, color: "#555" }}>Total</span>
-          <span style={{ fontSize: 24, fontWeight: 900, color: ACCENT }}>
+          <span style={{ fontSize: 14, color: "#64748B" }}>Total</span>
+          <span style={{ fontSize: 24, fontWeight: 900, color: "#C2410C" }}>
             ₹{finalPrice.toLocaleString("en-IN")}
           </span>
         </div>
@@ -1436,9 +1437,9 @@ function StepCoupon({
 
       {submitError && (
         <div style={{
-          color: "#f87171", fontSize: 13, marginBottom: 16,
-          padding: "10px 14px", background: "rgba(248,113,113,0.06)",
-          border: "1px solid rgba(248,113,113,0.2)", borderRadius: 8,
+          color: "#DC2626", fontSize: 13, marginBottom: 16,
+          padding: "10px 14px", background: "rgba(220,38,38,0.06)",
+          border: "1px solid rgba(220,38,38,0.2)", borderRadius: 8,
         }}>
           {submitError}
         </div>
@@ -1486,36 +1487,36 @@ function StepPayment({
   return (
     <div>
       <ProgressStepper step={6} />
-      <h2 style={{ fontSize: "clamp(20px,3vw,24px)", fontWeight: 800, color: "#fff", marginBottom: 6 }}>
+      <h2 style={{ fontSize: "clamp(20px,3vw,24px)", fontWeight: 800, color: "#0F172A", marginBottom: 6 }}>
         Complete Payment
       </h2>
-      <p style={{ fontSize: 13, color: "#555", marginBottom: 20 }}>
+      <p style={{ fontSize: 13, color: "#64748B", marginBottom: 20 }}>
         Your registration is saved. Complete payment now to confirm your spot.
       </p>
 
       <div style={{ ...CARD_BASE, padding: 24, marginBottom: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" as const, gap: 16 }}>
           <div>
-            <div style={{ fontSize: 10, color: "#444", textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 6 }}>
+            <div style={{ fontSize: 10, color: "#64748B", textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 6 }}>
               Registration Saved
             </div>
-            <div style={{ fontSize: 22, fontWeight: 900, color: "#fff", letterSpacing: "0.06em" }}>{regCode}</div>
-            <div style={{ fontSize: 11, color: "#444", marginTop: 3 }}>Your registration code</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: "#0F172A", letterSpacing: "0.06em" }}>{regCode}</div>
+            <div style={{ fontSize: 11, color: "#64748B", marginTop: 3 }}>Your registration code</div>
           </div>
           <div style={{ textAlign: "right" as const }}>
-            <div style={{ fontSize: 11, color: "#444", marginBottom: 2 }}>Amount Due</div>
-            <div style={{ fontSize: 32, fontWeight: 900, color: ACCENT }}>₹{finalPrice.toLocaleString("en-IN")}</div>
+            <div style={{ fontSize: 11, color: "#64748B", marginBottom: 2 }}>Amount Due</div>
+            <div style={{ fontSize: 32, fontWeight: 900, color: "#C2410C" }}>₹{finalPrice.toLocaleString("en-IN")}</div>
           </div>
         </div>
       </div>
 
-      <div style={{ ...CARD_BASE, padding: 14, marginBottom: 24, fontSize: 12, color: "#444", lineHeight: 1.7 }}>
-        Your spot is reserved for <strong style={{ color: "#666" }}>15 minutes</strong>. Complete payment now to avoid losing it.
+      <div style={{ ...CARD_BASE, padding: 14, marginBottom: 24, fontSize: 12, color: "#64748B", lineHeight: 1.7 }}>
+        Your spot is reserved for <strong style={{ color: "#64748B" }}>15 minutes</strong>. Complete payment now to avoid losing it.
         We accept UPI, Cards, Net Banking, and Wallets.
       </div>
 
       {checkoutCount > 1 && (
-        <div style={{ fontSize: 12, color: "#888", marginBottom: 12 }}>
+        <div style={{ fontSize: 12, color: "#64748B", marginBottom: 12 }}>
           {checkoutCount} registrations are paid together in this payment.
         </div>
       )}
@@ -1540,9 +1541,9 @@ function StepPayment({
 
       {submitError && (
         <div style={{
-          color: "#f87171", fontSize: 13, marginTop: 12,
-          padding: "10px 14px", background: "rgba(248,113,113,0.06)",
-          border: "1px solid rgba(248,113,113,0.2)", borderRadius: 8,
+          color: "#DC2626", fontSize: 13, marginTop: 12,
+          padding: "10px 14px", background: "rgba(220,38,38,0.06)",
+          border: "1px solid rgba(220,38,38,0.2)", borderRadius: 8,
         }}>
           {submitError}
         </div>
@@ -1562,31 +1563,31 @@ function StepSuccess({ regCode, paymentDone, eventTitle }: {
     <div style={{ textAlign: "center" as const, paddingTop: 32 }}>
       <div style={{
         width: 72, height: 72, margin: "0 auto 20px",
-        background: "rgba(16,185,129,0.07)", border: "2px solid rgba(16,185,129,0.2)",
+        background: "rgba(5,150,105,0.07)", border: "2px solid rgba(5,150,105,0.2)",
         borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 28, color: "#10b981", animation: "popIn 0.5s ease",
+        fontSize: 28, color: "#059669", animation: "popIn 0.5s ease",
       }}>
         ✓
       </div>
 
-      <h1 style={{ fontSize: "clamp(22px,4vw,30px)", fontWeight: 900, color: "#fff", marginBottom: 8 }}>
+      <h1 style={{ fontSize: "clamp(22px,4vw,30px)", fontWeight: 900, color: "#0F172A", marginBottom: 8 }}>
         {paymentDone ? "Payment Confirmed!" : "Registration Complete!"}
       </h1>
-      <p style={{ fontSize: 15, color: "#777", marginBottom: 4 }}>
-        You are registered for <strong style={{ color: "#ddd" }}>{eventTitle}</strong>
+      <p style={{ fontSize: 15, color: "#64748B", marginBottom: 4 }}>
+        You are registered for <strong style={{ color: "#64748B" }}>{eventTitle}</strong>
       </p>
-      <p style={{ fontSize: 13, color: "#444", marginBottom: 32 }}>
+      <p style={{ fontSize: 13, color: "#64748B", marginBottom: 32 }}>
         Check your email for the confirmation, QR code, and invoice.
       </p>
 
       <div style={{ ...CARD_BASE, padding: 24, marginBottom: 20, maxWidth: 380, margin: "0 auto 20px" }}>
-        <div style={{ fontSize: 10, color: "#444", textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 6 }}>
+        <div style={{ fontSize: 10, color: "#64748B", textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 6 }}>
           Registration Code
         </div>
-        <div style={{ fontSize: 30, fontWeight: 900, color: ACCENT, letterSpacing: "0.1em", marginBottom: 6 }}>
+        <div style={{ fontSize: 30, fontWeight: 900, color: "#C2410C", letterSpacing: "0.1em", marginBottom: 6 }}>
           {regCode}
         </div>
-        <div style={{ fontSize: 11, color: "#444", lineHeight: 1.6 }}>
+        <div style={{ fontSize: 11, color: "#64748B", lineHeight: 1.6 }}>
           Save this code. Use it to access your participant dashboard and book your BIB collection slot.
         </div>
       </div>
@@ -1602,8 +1603,8 @@ function StepSuccess({ regCode, paymentDone, eventTitle }: {
         ].map(item => (
           <div key={item.label} style={{ ...CARD_BASE, padding: 14, textAlign: "center" as const }}>
             <div style={{ fontSize: 20, marginBottom: 5 }}>{item.icon}</div>
-            <div style={{ fontSize: 11, color: "#ccc", fontWeight: 600, marginBottom: 2 }}>{item.label}</div>
-            <div style={{ fontSize: 10, color: "#444" }}>{item.note}</div>
+            <div style={{ fontSize: 11, color: "#64748B", fontWeight: 600, marginBottom: 2 }}>{item.label}</div>
+            <div style={{ fontSize: 10, color: "#64748B" }}>{item.note}</div>
           </div>
         ))}
       </div>
@@ -2800,7 +2801,7 @@ function RegisterPageContent() {
           contact: participants[0]?.mobile,
           name:    `${participants[0]?.firstName ?? ""} ${participants[0]?.lastName ?? ""}`.trim(),
         },
-        theme: { color: ACCENT },
+        theme: { color: "#C2410C" },
         handler: async (response: Record<string, string>) => {
           await verifyPayment(response.razorpay_payment_id, response.razorpay_order_id, response.razorpay_signature);
         },
@@ -2857,13 +2858,13 @@ function RegisterPageContent() {
   }, ms => new Date(ms).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }));
 
   return (
-    <div style={{ background: BG, color: "#fff", fontFamily: "'Inter',system-ui,sans-serif", minHeight: "100vh" }}>
+    <div style={{ background: BG, color: "#0F172A", fontFamily: "'Inter',system-ui,sans-serif", minHeight: "100vh" }}>
       <EventWatermark />
 
       {/* Nav */}
       <nav ref={headerRef} style={{
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
-        background: "rgba(8,8,8,0.97)", backdropFilter: "blur(20px)",
+        background: "rgba(255,255,255,0.97)", backdropFilter: "blur(20px)",
         borderBottom: "1px solid rgba(232, 98, 10, 0.15)",
         // Grows with its content (the save status can wrap on narrow screens); content offsets follow --reg-header-h
         minHeight: 52, display: "flex", alignItems: "center", flexWrap: "wrap", rowGap: 6,
@@ -2874,13 +2875,13 @@ function RegisterPageContent() {
             <Image src="/events/it-run-sprint-2/IT Run Sprint-2 Logo.png" alt="The IT Run Sprint-2" width={28} height={28} style={{ objectFit: "contain" }} />
           </div>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>THE IT RUN</div>
-            <div style={{ fontSize: 9, color: "#e8620a", fontWeight: 600 }}>SPRINT-2</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A", lineHeight: 1.2 }}>THE IT RUN</div>
+            <div style={{ fontSize: 9, color: "#C2410C", fontWeight: 600 }}>SPRINT-2</div>
           </div>
         </Link>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {step > 1 && step < 7 && (
-            <span role="status" aria-live="polite" style={{ fontSize: 11, color: status.tone === "error" ? "#f87171" : status.tone === "ok" ? "#10b981" : "#8a8a8a", maxWidth: 220, textAlign: "right" }}>
+            <span role="status" aria-live="polite" style={{ fontSize: 11, color: status.tone === "error" ? "#DC2626" : status.tone === "ok" ? "#059669" : "#64748B", maxWidth: 220, textAlign: "right" }}>
               {status.text}
             </span>
           )}
@@ -2891,7 +2892,7 @@ function RegisterPageContent() {
               style={{
                 fontSize: 12, fontWeight: 700, padding: "7px 12px", borderRadius: 8, fontFamily: "inherit",
                 background: serverSave === "saving" ? "rgba(232,98,10,0.08)" : "rgba(232,98,10,0.15)",
-                border: "1px solid rgba(232,98,10,0.4)", color: "#e8620a",
+                border: "1px solid rgba(232,98,10,0.4)", color: "#C2410C",
                 cursor: serverSave === "saving" ? "wait" : "pointer", whiteSpace: "nowrap",
               }}
             >
@@ -2899,7 +2900,7 @@ function RegisterPageContent() {
             </button>
           )}
           {step < 7 && (
-            <Link href="/it-run" style={{ fontSize: 12, color: "#3a3a3a", textDecoration: "none" }}>
+            <Link href="/it-run" style={{ fontSize: 12, color: "#64748B", textDecoration: "none" }}>
               Cancel
             </Link>
           )}
@@ -2910,8 +2911,8 @@ function RegisterPageContent() {
       {isOffline && step < 7 && (
         <div style={{
           position: "fixed", top: "var(--reg-header-h, 52px)", left: 0, right: 0, zIndex: 99,
-          background: "rgba(245,158,11,0.08)", borderBottom: "1px solid rgba(245,158,11,0.18)",
-          padding: "8px clamp(1rem,4vw,2rem)", fontSize: 13, color: "#f59e0b", textAlign: "center" as const,
+          background: "rgba(217,119,6,0.08)", borderBottom: "1px solid rgba(217,119,6,0.18)",
+          padding: "8px clamp(1rem,4vw,2rem)", fontSize: 13, color: "#B45309", textAlign: "center" as const,
         }}>
           You&rsquo;re offline. Your registration details are saved on this device and will be restored when you reconnect.
         </div>
@@ -2921,8 +2922,8 @@ function RegisterPageContent() {
       {regNotYetOpen && step === 1 && (
         <div role="status" style={{
           position: "fixed", top: "var(--reg-header-h, 52px)", left: 0, right: 0, zIndex: 99,
-          background: "rgba(251,191,36,0.08)", borderBottom: "1px solid rgba(251,191,36,0.2)",
-          padding: "8px clamp(1rem,4vw,2rem)", fontSize: 13, color: "#fbbf24", textAlign: "center" as const,
+          background: "rgba(217,119,6,0.08)", borderBottom: "1px solid rgba(217,119,6,0.2)",
+          padding: "8px clamp(1rem,4vw,2rem)", fontSize: 13, color: "#B45309", textAlign: "center" as const,
         }}>
           Registration opens on {formatIst(regOpensAt!)}.
         </div>
@@ -2932,8 +2933,8 @@ function RegisterPageContent() {
       {regClosed && step === 1 && (
         <div style={{
           position: "fixed", top: "var(--reg-header-h, 52px)", left: 0, right: 0, zIndex: 99,
-          background: "rgba(248,113,113,0.08)", borderBottom: "1px solid rgba(248,113,113,0.18)",
-          padding: "8px clamp(1rem,4vw,2rem)", fontSize: 13, color: "#f87171", textAlign: "center" as const,
+          background: "rgba(220,38,38,0.08)", borderBottom: "1px solid rgba(220,38,38,0.18)",
+          padding: "8px clamp(1rem,4vw,2rem)", fontSize: 13, color: "#DC2626", textAlign: "center" as const,
         }}>
           Registration for this event is now closed.
         </div>
@@ -2943,8 +2944,8 @@ function RegisterPageContent() {
       {!sessionChecked && (
         <div style={{ maxWidth: 640, margin: "0 auto", padding: "calc(var(--reg-header-h, 52px) + 2rem) clamp(1rem,5vw,2rem)", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ textAlign: "center" as const }}>
-            <div style={{ width: 32, height: 32, border: "3px solid rgba(255,255,255,0.08)", borderTopColor: ACCENT, borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
-            <div style={{ fontSize: 14, color: "#555" }}>Loading…</div>
+            <div style={{ width: 32, height: 32, border: "3px solid #E2E8F0", borderTopColor: ACCENT, borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
+            <div style={{ fontSize: 14, color: "#64748B" }}>Loading…</div>
           </div>
         </div>
       )}
@@ -2957,32 +2958,38 @@ function RegisterPageContent() {
           {!otpSent && (
             <div>
               <div style={{ marginBottom: 32, textAlign: "center" as const }}>
-                <div style={{ fontSize: 11, color: ACCENT, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 12 }}>
+                <div style={{ fontSize: 11, color: "#C2410C", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 12 }}>
                   Email Verification
                 </div>
-                <h1 style={{ fontSize: "clamp(1.4rem,4vw,1.8rem)", fontWeight: 800, color: "#fff", margin: "0 0 10px" }}>
+                <h1 style={{ fontSize: "clamp(1.4rem,4vw,1.8rem)", fontWeight: 800, color: "#0F172A", margin: "0 0 10px" }}>
                   Verify your email to register
                 </h1>
-                <p style={{ fontSize: 14, color: "#888", margin: 0, lineHeight: 1.6 }}>
+                <p style={{ fontSize: 14, color: "#64748B", margin: 0, lineHeight: 1.6 }}>
                   Enter your email to receive a one-time code. Existing accounts will have their details pre-filled.
                 </p>
               </div>
               <div style={{ display: "flex", flexDirection: "column" as const, gap: 12 }}>
+                <label htmlFor="gate-email" style={{ ...LABEL_S, marginBottom: 0 }}>
+                  Email <span style={{ color: ACCENT, marginLeft: 3 }}>*</span>
+                </label>
                 <input
+                  id="gate-email"
                   type="email"
+                  inputMode="email"
+                  autoComplete="email"
                   placeholder="your@email.com"
                   value={gateEmail}
                   onChange={e => { setGateEmail(e.target.value); setOtpError(""); }}
                   onKeyDown={e => { if (e.key === "Enter") void sendOtp(); }}
                   autoFocus
                   style={{
-                    width: "100%", padding: "14px 16px", background: "rgba(255,255,255,0.04)",
-                    border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12,
-                    color: "#fff", fontSize: 16, fontFamily: "inherit", outline: "none",
+                    width: "100%", padding: "14px 16px", background: "#F8FAFC",
+                    border: "1px solid #CBD5E1", borderRadius: 12,
+                    color: "#0F172A", fontSize: 16, fontFamily: "inherit", outline: "none",
                     boxSizing: "border-box" as const,
                   }}
                 />
-                {otpError && <div style={{ fontSize: 13, color: "#f87171" }}>{otpError}</div>}
+                {otpError && <div style={{ fontSize: 13, color: "#DC2626" }}>{otpError}</div>}
                 <button
                   onClick={() => void sendOtp()}
                   disabled={sendingOtp}
@@ -3003,14 +3010,14 @@ function RegisterPageContent() {
           {otpSent && !needsName && (
             <div>
               <div style={{ marginBottom: 32, textAlign: "center" as const }}>
-                <div style={{ fontSize: 11, color: ACCENT, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 12 }}>
+                <div style={{ fontSize: 11, color: "#C2410C", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 12 }}>
                   Check Your Inbox
                 </div>
-                <h1 style={{ fontSize: "clamp(1.4rem,4vw,1.8rem)", fontWeight: 800, color: "#fff", margin: "0 0 10px" }}>
+                <h1 style={{ fontSize: "clamp(1.4rem,4vw,1.8rem)", fontWeight: 800, color: "#0F172A", margin: "0 0 10px" }}>
                   Enter the 6-digit code
                 </h1>
-                <p style={{ fontSize: 14, color: "#888", margin: 0, lineHeight: 1.6 }}>
-                  Sent to <strong style={{ color: "#ccc" }}>{maskEmail(gateEmail)}</strong>. Check your spam folder if you don&apos;t see it.
+                <p style={{ fontSize: 14, color: "#64748B", margin: 0, lineHeight: 1.6 }}>
+                  Sent to <strong style={{ color: "#64748B" }}>{maskEmail(gateEmail)}</strong>. Check your spam folder if you don&apos;t see it.
                 </p>
               </div>
               <div style={{ display: "flex", flexDirection: "column" as const, gap: 12 }}>
@@ -3024,14 +3031,14 @@ function RegisterPageContent() {
                   onKeyDown={e => { if (e.key === "Enter") void verifyOtp(); }}
                   autoFocus
                   style={{
-                    width: "100%", padding: "14px 16px", background: "rgba(255,255,255,0.04)",
-                    border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12,
-                    color: "#fff", fontSize: 24, fontWeight: 700, textAlign: "center" as const,
+                    width: "100%", padding: "14px 16px", background: "#F8FAFC",
+                    border: "1px solid #CBD5E1", borderRadius: 12,
+                    color: "#0F172A", fontSize: 24, fontWeight: 700, textAlign: "center" as const,
                     letterSpacing: "0.3em", fontFamily: "monospace", outline: "none",
                     boxSizing: "border-box" as const,
                   }}
                 />
-                {otpError && <div style={{ fontSize: 13, color: "#f87171" }}>{otpError}</div>}
+                {otpError && <div style={{ fontSize: 13, color: "#DC2626" }}>{otpError}</div>}
                 <button
                   onClick={() => void verifyOtp()}
                   disabled={verifyingOtp || otpInput.length !== 6}
@@ -3048,17 +3055,17 @@ function RegisterPageContent() {
                 </button>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" as const, gap: 8 }}>
                   {resendSecs > 0 ? (
-                    <span style={{ fontSize: 13, color: "#555" }}>Resend in {resendSecs}s</span>
+                    <span style={{ fontSize: 13, color: "#64748B" }}>Resend in {resendSecs}s</span>
                   ) : (
                     <button
                       onClick={() => void sendOtp()}
-                      style={{ fontSize: 13, color: ACCENT, background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+                      style={{ fontSize: 13, color: "#C2410C", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
                       Resend code
                     </button>
                   )}
                   <button
                     onClick={() => { setOtpSent(false); setOtpInput(""); setOtpError(""); }}
-                    style={{ fontSize: 13, color: "#555", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+                    style={{ fontSize: 13, color: "#64748B", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
                     Change email
                   </button>
                 </div>
@@ -3070,13 +3077,13 @@ function RegisterPageContent() {
           {needsName && (
             <div>
               <div style={{ marginBottom: 32, textAlign: "center" as const }}>
-                <div style={{ fontSize: 11, color: ACCENT, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 12 }}>
+                <div style={{ fontSize: 11, color: "#C2410C", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 12 }}>
                   One More Step
                 </div>
-                <h1 style={{ fontSize: "clamp(1.4rem,4vw,1.8rem)", fontWeight: 800, color: "#fff", margin: "0 0 10px" }}>
+                <h1 style={{ fontSize: "clamp(1.4rem,4vw,1.8rem)", fontWeight: 800, color: "#0F172A", margin: "0 0 10px" }}>
                   Complete your details
                 </h1>
-                <p style={{ fontSize: 14, color: "#888", margin: 0, lineHeight: 1.6 }}>
+                <p style={{ fontSize: 14, color: "#64748B", margin: 0, lineHeight: 1.6 }}>
                   We'll use this to confirm your registration.
                 </p>
               </div>
@@ -3088,9 +3095,9 @@ function RegisterPageContent() {
                     value={nameFirst}
                     onChange={e => { setNameFirst(e.target.value); setOtpError(""); }}
                     style={{
-                      padding: "14px 16px", background: "rgba(255,255,255,0.04)",
-                      border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12,
-                      color: "#fff", fontSize: 15, fontFamily: "inherit", outline: "none",
+                      padding: "14px 16px", background: "#F8FAFC",
+                      border: "1px solid #CBD5E1", borderRadius: 12,
+                      color: "#0F172A", fontSize: 15, fontFamily: "inherit", outline: "none",
                       boxSizing: "border-box" as const,
                     }}
                   />
@@ -3100,9 +3107,9 @@ function RegisterPageContent() {
                     value={nameLast}
                     onChange={e => { setNameLast(e.target.value); setOtpError(""); }}
                     style={{
-                      padding: "14px 16px", background: "rgba(255,255,255,0.04)",
-                      border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12,
-                      color: "#fff", fontSize: 15, fontFamily: "inherit", outline: "none",
+                      padding: "14px 16px", background: "#F8FAFC",
+                      border: "1px solid #CBD5E1", borderRadius: 12,
+                      color: "#0F172A", fontSize: 15, fontFamily: "inherit", outline: "none",
                       boxSizing: "border-box" as const,
                     }}
                   />
@@ -3113,13 +3120,13 @@ function RegisterPageContent() {
                   value={nameMobile}
                   onChange={e => { setNameMobile(e.target.value); setOtpError(""); }}
                   style={{
-                    padding: "14px 16px", background: "rgba(255,255,255,0.04)",
-                    border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12,
-                    color: "#fff", fontSize: 15, fontFamily: "inherit", outline: "none",
+                    padding: "14px 16px", background: "#F8FAFC",
+                    border: "1px solid #CBD5E1", borderRadius: 12,
+                    color: "#0F172A", fontSize: 15, fontFamily: "inherit", outline: "none",
                     boxSizing: "border-box" as const, width: "100%",
                   }}
                 />
-                {otpError && <div style={{ fontSize: 13, color: "#f87171" }}>{otpError}</div>}
+                {otpError && <div style={{ fontSize: 13, color: "#DC2626" }}>{otpError}</div>}
                 <button
                   onClick={() => {
                     const fn = nameFirst.trim(), ln = nameLast.trim();
@@ -3159,31 +3166,31 @@ function RegisterPageContent() {
               background: "rgba(232,98,10,0.05)",
               padding: "20px 24px", marginBottom: 24,
             }}>
-              <div style={{ fontSize: 11, color: ACCENT, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>
+              <div style={{ fontSize: 11, color: "#C2410C", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>
                 Registration in Progress
               </div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#0F172A", marginBottom: 4 }}>
                 You have an incomplete IT Run Sprint-2 registration
               </div>
               {cat && (
-                <div style={{ fontSize: 13, color: "#aaa", marginBottom: 4 }}>
-                  Category: <strong style={{ color: "#fff" }}>{cat.name}</strong>
+                <div style={{ fontSize: 13, color: "#64748B", marginBottom: 4 }}>
+                  Category: <strong style={{ color: "#0F172A" }}>{cat.name}</strong>
                 </div>
               )}
-              <div style={{ fontSize: 13, color: "#aaa", marginBottom: 4 }}>
-                You were on: <strong style={{ color: "#fff" }}>{stepLabel(draftToResume.step)}</strong>
+              <div style={{ fontSize: 13, color: "#64748B", marginBottom: 4 }}>
+                You were on: <strong style={{ color: "#0F172A" }}>{stepLabel(draftToResume.step)}</strong>
               </div>
-              <div style={{ fontSize: 12, color: "#555", marginBottom: 20 }}>
+              <div style={{ fontSize: 12, color: "#64748B", marginBottom: 20 }}>
                 Last saved: {timeAgo(draftToResume.savedAt)}
               </div>
               {confirmingDiscard ? (() => {
                 const runners = draftToResume.participants?.length ?? 0;
                 return (
-                  <div role="alertdialog" aria-label="Delete saved registration" style={{ background: "rgba(248,113,113,0.06)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 10, padding: 14 }}>
+                  <div role="alertdialog" aria-label="Delete saved registration" style={{ background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.3)", borderRadius: 10, padding: 14 }}>
                     <div style={{ fontSize: 14, color: "#fca5a5", fontWeight: 700, marginBottom: 6 }}>
                       Delete your saved registration?
                     </div>
-                    <div style={{ fontSize: 13, color: "#ccc", lineHeight: 1.5, marginBottom: 12 }}>
+                    <div style={{ fontSize: 13, color: "#64748B", lineHeight: 1.5, marginBottom: 12 }}>
                       This deletes the saved details for {runners} runner{runners === 1 ? "" : "s"}. You cannot get them back.
                     </div>
                     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -3215,8 +3222,8 @@ function RegisterPageContent() {
                     onClick={() => setConfirmingDiscard(true)}
                     style={{
                       padding: "11px 22px", background: "transparent",
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      borderRadius: 10, color: "#888", fontSize: 14,
+                      border: "1px solid #CBD5E1",
+                      borderRadius: 10, color: "#64748B", fontSize: 14,
                       cursor: "pointer", fontFamily: "inherit",
                     }}>
                     Start New Registration
@@ -3234,11 +3241,11 @@ function RegisterPageContent() {
             background: "rgba(74,222,128,0.04)",
             padding: "16px 20px", marginBottom: 24,
           }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#4ade80", marginBottom: 4 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#16A34A", marginBottom: 4 }}>
               Welcome back{verifiedFirstName ? `, ${verifiedFirstName}` : ""}!
             </div>
-            <div style={{ fontSize: 13, color: "#aaa", lineHeight: 1.5 }}>
-              Signed in as <strong style={{ color: "#888" }}>{verifiedEmail}</strong>.{" "}
+            <div style={{ fontSize: 13, color: "#64748B", lineHeight: 1.5 }}>
+              Signed in as <strong style={{ color: "#64748B" }}>{verifiedEmail}</strong>.{" "}
               Your details will be pre-filled.
             </div>
           </div>
@@ -3254,7 +3261,7 @@ function RegisterPageContent() {
               <IssueReportButton />
             </div>
             {categoryNotice && (
-              <p role="alert" style={{ fontSize: 13, color: "#f87171", margin: "0 0 12px", lineHeight: 1.5 }}>{categoryNotice}</p>
+              <p role="alert" style={{ fontSize: 13, color: "#DC2626", margin: "0 0 12px", lineHeight: 1.5 }}>{categoryNotice}</p>
             )}
             <StepCounts
               config={config}
@@ -3284,7 +3291,7 @@ function RegisterPageContent() {
             background: "rgba(74,222,128,0.05)",
             border: "1px solid rgba(74,222,128,0.15)",
             borderRadius: 12, padding: "12px 16px", marginBottom: 16,
-            fontSize: 13, color: "#4ade80",
+            fontSize: 13, color: "#16A34A",
           }}>
             Some fields have been pre-filled from your Connected Steps account.
           </div>
@@ -3442,12 +3449,13 @@ function RegisterPageContent() {
         }
         @keyframes spin { to { transform: rotate(360deg); } }
         * { box-sizing: border-box; }
+        input::placeholder, textarea::placeholder { color: #94A3B8; opacity: 1; }
         input:focus, select:focus, textarea:focus {
           border-color: rgba(232,98,10,0.6) !important;
           background: rgba(232,98,10,0.04) !important;
         }
         button:focus-visible { outline: 2px solid ${ACCENT}; outline-offset: 2px; }
-        select option { background: #1a1a1a; color: #fff; }
+        select option { background: #FFFFFF; color: #0F172A; }
       `}</style>
     </div>
   );
