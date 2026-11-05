@@ -51,7 +51,7 @@ export default function AddIdControl({ participantId, participantName, onAdded }
       marginTop: 8, padding: "10px 12px", borderRadius: 10,
       background: "rgba(232,98,10,0.05)", border: "1px solid rgba(232,98,10,0.2)",
     }}>
-      <div style={{ fontSize: 12, color: "#ccc", marginBottom: 8, lineHeight: 1.5 }}>
+      <div style={{ fontSize: 12, color: "#64748B", marginBottom: 8, lineHeight: 1.5 }}>
         {participantName} continued without an ID. Add one now for a faster BIB collection.
       </div>
       <div role="radiogroup" aria-label={`Type of ID for ${participantName}`} style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
@@ -63,8 +63,8 @@ export default function AddIdControl({ participantId, participantName, onAdded }
             onClick={() => setDocumentType(opt.value)}
             style={{
               padding: "6px 10px", borderRadius: 8, fontSize: 12, fontWeight: 600, fontFamily: "inherit", cursor: "pointer",
-              color: "#fff", background: documentType === opt.value ? `${ACCENT}14` : "rgba(255,255,255,0.02)",
-              border: `1px solid ${documentType === opt.value ? ACCENT : "rgba(255,255,255,0.1)"}`,
+              color: "#0F172A", background: documentType === opt.value ? `${ACCENT}14` : "#F8FAFC",
+              border: `1px solid ${documentType === opt.value ? ACCENT : "#CBD5E1"}`,
             }}>
             {documentType === opt.value ? "✓ " : ""}{opt.text}
           </button>
@@ -72,15 +72,15 @@ export default function AddIdControl({ participantId, participantName, onAdded }
       </div>
       <label style={{
         display: "inline-block", minHeight: 40, padding: "9px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700,
-        background: busy ? "rgba(232,98,10,0.08)" : `${ACCENT}`, color: "#fff", cursor: busy ? "wait" : "pointer",
+        background: busy ? "rgba(232,98,10,0.08)" : `${ACCENT}`, color: "#0F172A", cursor: busy ? "wait" : "pointer",
       }}>
         {busy ? "Uploading…" : "Choose file to upload"}
         <input type="file" accept={ACCEPT} disabled={busy} style={{ display: "none" }}
           onChange={e => { void onFile(e.target.files?.[0]); e.target.value = ""; }} />
       </label>
-      <div style={{ fontSize: 11, color: "#777", marginTop: 6 }}>JPG, PNG, WEBP or PDF, up to 5 MB.</div>
+      <div style={{ fontSize: 11, color: "#64748B", marginTop: 6 }}>JPG, PNG, WEBP or PDF, up to 5 MB.</div>
       {msg && (
-        <div role={msg.ok ? "status" : "alert"} style={{ fontSize: 12, marginTop: 6, color: msg.ok ? "#10b981" : "#f87171" }}>
+        <div role={msg.ok ? "status" : "alert"} style={{ fontSize: 12, marginTop: 6, color: msg.ok ? "#059669" : "#DC2626" }}>
           {msg.text}
         </div>
       )}

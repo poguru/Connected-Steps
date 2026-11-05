@@ -144,33 +144,33 @@ export default function CategoryChangeButton({ registrationId, onChanged }: { re
 
   return (
     <div style={{ marginTop: 10 }}>
-      {done && <div role="status" style={{ fontSize: 13, color: "#10b981", marginBottom: 8, lineHeight: 1.5 }}>{done}</div>}
+      {done && <div role="status" style={{ fontSize: 13, color: "#059669", marginBottom: 8, lineHeight: 1.5 }}>{done}</div>}
       <button type="button" onClick={toggle} aria-expanded={open}
-        style={{ minHeight: 40, padding: "8px 14px", borderRadius: 8, background: "transparent", border: `1px solid ${ACCENT}`, color: ACCENT, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+        style={{ minHeight: 40, padding: "8px 14px", borderRadius: 8, background: "transparent", border: `1px solid ${ACCENT}`, color: "#C2410C", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
         {open ? "Hide category options" : "Change category"}
       </button>
 
       {open && (
-        <div style={{ marginTop: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: 14 }}>
-          {loading && <div style={{ fontSize: 13, color: "#888" }}>Loading categories…</div>}
-          {error && <div role="alert" style={{ fontSize: 13, color: "#f87171", marginBottom: 8, lineHeight: 1.5 }}>{error}</div>}
+        <div style={{ marginTop: 10, background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 12, padding: 14 }}>
+          {loading && <div style={{ fontSize: 13, color: "#64748B" }}>Loading categories…</div>}
+          {error && <div role="alert" style={{ fontSize: 13, color: "#DC2626", marginBottom: 8, lineHeight: 1.5 }}>{error}</div>}
           {data && (
             <>
               {data.current && (
-                <div style={{ fontSize: 13, color: "#ccc", marginBottom: 10 }}>
-                  Current: <strong style={{ color: "#fff" }}>{data.current.name}</strong> · ₹{data.current.priceRupees}
+                <div style={{ fontSize: 13, color: "#64748B", marginBottom: 10 }}>
+                  Current: <strong style={{ color: "#0F172A" }}>{data.current.name}</strong> · ₹{data.current.priceRupees}
                 </div>
               )}
               {data.options.length === 0 && (
-                <div style={{ fontSize: 13, color: "#888" }}>No other categories are available for this registration.</div>
+                <div style={{ fontSize: 13, color: "#64748B" }}>No other categories are available for this registration.</div>
               )}
               <div style={{ display: "grid", gap: 8 }}>
                 {data.options.map(opt => (
                   <div key={opt.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", background: "#161616", borderRadius: 10, padding: 10 }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 14, color: "#fff", fontWeight: 600 }}>{opt.name}</div>
-                      <div style={{ fontSize: 12, color: "#888" }}>{opt.distanceKm} km · ₹{opt.priceRupees}</div>
-                      {opt.note && <div style={{ fontSize: 12, color: "#f59e0b", marginTop: 4, lineHeight: 1.5 }}>{opt.note}</div>}
+                      <div style={{ fontSize: 14, color: "#0F172A", fontWeight: 600 }}>{opt.name}</div>
+                      <div style={{ fontSize: 12, color: "#64748B" }}>{opt.distanceKm} km · ₹{opt.priceRupees}</div>
+                      {opt.note && <div style={{ fontSize: 12, color: "#B45309", marginTop: 4, lineHeight: 1.5 }}>{opt.note}</div>}
                     </div>
                     {opt.allowed ? (
                       <button type="button" disabled={busy} onClick={() => choose(opt)}
@@ -178,7 +178,7 @@ export default function CategoryChangeButton({ registrationId, onChanged }: { re
                         {busy ? "Please wait…" : opt.change === "upgrade" ? "Pay difference" : "Switch to this"}
                       </button>
                     ) : (
-                      <span style={{ fontSize: 12, color: "#666" }}>{opt.availability === "full" ? "Full" : "Not available online"}</span>
+                      <span style={{ fontSize: 12, color: "#64748B" }}>{opt.availability === "full" ? "Full" : "Not available online"}</span>
                     )}
                   </div>
                 ))}

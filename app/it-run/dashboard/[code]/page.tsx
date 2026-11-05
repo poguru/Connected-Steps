@@ -52,10 +52,10 @@ interface BibSlot {
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
 const S = {
-  page:  { background: "#080808", color: "#fff", fontFamily: "'Inter',system-ui,sans-serif", minHeight: "100vh" } as React.CSSProperties,
-  card:  { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 20 } as React.CSSProperties,
-  label: { fontSize: 10, color: "#888", textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 4 },
-  value: { fontSize: 14, color: "#fff", fontWeight: 600 },
+  page:  { background: "#FFFFFF", color: "#0F172A", fontFamily: "'Inter',system-ui,sans-serif", minHeight: "100vh" } as React.CSSProperties,
+  card:  { background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 16, padding: 20 } as React.CSSProperties,
+  label: { fontSize: 10, color: "#64748B", textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 4 },
+  value: { fontSize: 14, color: "#0F172A", fontWeight: 600 },
   btn:   { padding: "11px 20px", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer", border: "none", fontFamily: "inherit" } as React.CSSProperties,
 };
 
@@ -112,7 +112,7 @@ function CompletePaymentButton({ registrationId, eventTitle, onPaid }: {
         name:        "Connected Steps",
         description: eventTitle,
         image:       "/logo.png",
-        theme:       { color: ACCENT },
+        theme:       { color: "#C2410C" },
         handler: async (response: Record<string, string>) => {
           const v  = await fetch("/api/it-run/payment/verify", {
             method:  "POST",
@@ -185,7 +185,7 @@ function RenewButton({ registrationId, onRenewed }: { registrationId: string; on
         type="button"
         onClick={() => void renew()}
         disabled={busy}
-        style={{ ...S.btn, background: "transparent", color: ACCENT, border: `1px solid ${ACCENT}`, opacity: busy ? 0.6 : 1, width: "100%", maxWidth: 320 }}
+        style={{ ...S.btn, background: "transparent", color: "#C2410C", border: `1px solid ${ACCENT}`, opacity: busy ? 0.6 : 1, width: "100%", maxWidth: 320 }}
       >
         {busy ? "Renewing…" : "Renew my place"}
       </button>
@@ -196,20 +196,20 @@ function RenewButton({ registrationId, onRenewed }: { registrationId: string; on
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; color: string; bg: string }> = {
-    paid:               { label: "Payment Confirmed", color: "#10b981", bg: "rgba(16,185,129,0.1)" },
-    free:               { label: "Registration Confirmed", color: "#10b981", bg: "rgba(16,185,129,0.1)" },
-    pending:            { label: "Payment Pending", color: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
-    payment_attempted:  { label: "Payment In Progress", color: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
+    paid:               { label: "Payment Confirmed", color: "#059669", bg: "rgba(5,150,105,0.1)" },
+    free:               { label: "Registration Confirmed", color: "#059669", bg: "rgba(5,150,105,0.1)" },
+    pending:            { label: "Payment Pending", color: "#B45309", bg: "rgba(217,119,6,0.1)" },
+    payment_attempted:  { label: "Payment In Progress", color: "#B45309", bg: "rgba(217,119,6,0.1)" },
     failed:             { label: "Payment Failed", color: "#ef4444", bg: "rgba(239,68,68,0.1)" },
     expired:            { label: "Reservation Expired", color: "#ef4444", bg: "rgba(239,68,68,0.1)" },
-    verified:          { label: "Verified", color: "#10b981", bg: "rgba(16,185,129,0.1)" },
+    verified:          { label: "Verified", color: "#059669", bg: "rgba(5,150,105,0.1)" },
     rejected:          { label: "Rejected", color: "#ef4444", bg: "rgba(239,68,68,0.1)" },
-    need_clarification:{ label: "Clarification Needed", color: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
+    need_clarification:{ label: "Clarification Needed", color: "#B45309", bg: "rgba(217,119,6,0.1)" },
     pending_verification:{ label: "Verification Pending", color: "#6366f1", bg: "rgba(99,102,241,0.1)" },
-    not_provided:       { label: "ID Not Provided", color: "#888", bg: "rgba(255,255,255,0.06)" },
-    cancelled:          { label: "Cancelled", color: "#888", bg: "rgba(136,136,136,0.12)" },
+    not_provided:       { label: "ID Not Provided", color: "#64748B", bg: "#E2E8F0" },
+    cancelled:          { label: "Cancelled", color: "#64748B", bg: "rgba(136,136,136,0.12)" },
   };
-  const s = map[status] ?? { label: status, color: "#888", bg: "rgba(255,255,255,0.06)" };
+  const s = map[status] ?? { label: status, color: "#64748B", bg: "#E2E8F0" };
   return (
     <span style={{ background: s.bg, color: s.color, border: `1px solid ${s.color}33`, borderRadius: 8, padding: "4px 10px", fontSize: 12, fontWeight: 600 }}>
       {s.label}
@@ -248,7 +248,7 @@ function QRDisplay({ code, token }: { code: string; token: string | null }) {
           <div style={{ width: 180, height: 180, background: "rgba(255,255,255,0.03)", borderRadius: 4 }} />
         )}
       </div>
-      <div style={{ fontSize: 12, color: "#888", marginTop: 8 }}>Scan at BIB collection + race day</div>
+      <div style={{ fontSize: 12, color: "#64748B", marginTop: 8 }}>Scan at BIB collection + race day</div>
     </div>
   );
 }
@@ -272,12 +272,12 @@ function BibSlotBooker({ participantId, registrationCode, slots, existingBooking
     const slot = existingBooking.it_run_bib_slots;
     const date = new Date(slot.slot_date + "T12:00:00Z").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
     return (
-      <div style={{ background: "rgba(16,185,129,0.05)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: 12, padding: 16 }}>
-        <div style={{ fontSize: 12, color: "#10b981", fontWeight: 700, marginBottom: 6 }}>Slot Confirmed</div>
-        <div style={{ fontSize: 14, color: "#fff", fontWeight: 600 }}>{slot.location_name}</div>
-        <div style={{ fontSize: 13, color: "#ccc" }}>{date} | {slot.start_time} - {slot.end_time}</div>
-        {slot.location_address && <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{slot.location_address}</div>}
-        <div style={{ fontSize: 12, color: "#888", marginTop: 8, lineHeight: 1.5 }}>
+      <div style={{ background: "rgba(5,150,105,0.05)", border: "1px solid rgba(5,150,105,0.2)", borderRadius: 12, padding: 16 }}>
+        <div style={{ fontSize: 12, color: "#059669", fontWeight: 700, marginBottom: 6 }}>Slot Confirmed</div>
+        <div style={{ fontSize: 14, color: "#0F172A", fontWeight: 600 }}>{slot.location_name}</div>
+        <div style={{ fontSize: 13, color: "#64748B" }}>{date} | {slot.start_time} - {slot.end_time}</div>
+        {slot.location_address && <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>{slot.location_address}</div>}
+        <div style={{ fontSize: 12, color: "#64748B", marginTop: 8, lineHeight: 1.5 }}>
           Your BIB collection slot is confirmed and cannot be changed.
         </div>
       </div>
@@ -315,7 +315,7 @@ function BibSlotBooker({ participantId, registrationCode, slots, existingBooking
 
   if (success) {
     return (
-      <div style={{ textAlign: "center", padding: 20, color: "#10b981", fontWeight: 700 }}>
+      <div style={{ textAlign: "center", padding: 20, color: "#059669", fontWeight: 700 }}>
         {successText}
       </div>
     );
@@ -330,12 +330,12 @@ function BibSlotBooker({ participantId, registrationCode, slots, existingBooking
 
   return (
     <div>
-      <div style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>Select a convenient time to collect your race BIB and T-shirt.</div>
+      <div style={{ fontSize: 13, color: "#64748B", marginBottom: 16 }}>Select a convenient time to collect your race BIB and T-shirt.</div>
       {Object.entries(grouped).map(([date, daySlots]) => {
         const d = new Date(date + "T12:00:00Z").toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
         return (
           <div key={date} style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 12, color: "#e8620a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>{d}</div>
+            <div style={{ fontSize: 12, color: "#C2410C", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>{d}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {daySlots.map(slot => {
                 const full     = slot.booked_count >= slot.capacity;
@@ -344,8 +344,8 @@ function BibSlotBooker({ participantId, registrationCode, slots, existingBooking
                   <button key={slot.id} disabled={full}
                     onClick={() => setSelected(slot.id)}
                     style={{
-                      background:   selected_ ? "rgba(232,98,10,0.1)" : "rgba(255,255,255,0.03)",
-                      border:       `1px solid ${selected_ ? ACCENT : "rgba(255,255,255,0.08)"}`,
+                      background:   selected_ ? "rgba(232,98,10,0.1)" : "#FFFFFF",
+                      border:       `1px solid ${selected_ ? ACCENT : "#E2E8F0"}`,
                       borderRadius: 10, padding: "12px 16px",
                       cursor:       full ? "not-allowed" : "pointer",
                       opacity:      full ? 0.5 : 1,
@@ -354,14 +354,14 @@ function BibSlotBooker({ participantId, registrationCode, slots, existingBooking
                       display:      "flex", justifyContent: "space-between", alignItems: "center",
                     }}>
                     <div>
-                      <div style={{ fontSize: 14, color: "#fff", fontWeight: 600 }}>{slot.location_name}</div>
-                      <div style={{ fontSize: 12, color: "#ccc" }}>{slot.start_time} - {slot.end_time}</div>
+                      <div style={{ fontSize: 14, color: "#0F172A", fontWeight: 600 }}>{slot.location_name}</div>
+                      <div style={{ fontSize: 12, color: "#64748B" }}>{slot.start_time} - {slot.end_time}</div>
                     </div>
                     <div style={{ textAlign: "right", flexShrink: 0 }}>
                       {full ? (
                         <span style={{ fontSize: 11, color: "#ef4444" }}>Full</span>
                       ) : (
-                        <span style={{ fontSize: 11, color: "#888" }}>{slot.capacity - slot.booked_count} left</span>
+                        <span style={{ fontSize: 11, color: "#64748B" }}>{slot.capacity - slot.booked_count} left</span>
                       )}
                     </div>
                   </button>
@@ -372,7 +372,7 @@ function BibSlotBooker({ participantId, registrationCode, slots, existingBooking
         );
       })}
 
-      {error && <div style={{ fontSize: 13, color: "#f87171", marginBottom: 12 }}>{error}</div>}
+      {error && <div style={{ fontSize: 13, color: "#DC2626", marginBottom: 12 }}>{error}</div>}
       <button
         onClick={book}
         disabled={!selected || booking}
@@ -433,7 +433,7 @@ export default function DashboardPage() {
 
   if (screen === "loading") return (
     <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ textAlign: "center", color: "#888" }}>
+      <div style={{ textAlign: "center", color: "#64748B" }}>
         <div style={{ fontSize: 24, marginBottom: 8 }}>...</div>
         Loading your dashboard
       </div>
@@ -443,11 +443,11 @@ export default function DashboardPage() {
   if (screen === "error_page" || !data) return (
     <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div role="alert" style={{ textAlign: "center", maxWidth: 420 }}>
-        <div style={{ fontSize: 15, color: "#f87171", marginBottom: 20, lineHeight: 1.6 }}>
+        <div style={{ fontSize: 15, color: "#DC2626", marginBottom: 20, lineHeight: 1.6 }}>
           {DASHBOARD_FAILURE_MESSAGES[failure ?? "NOT_FOUND"]}
         </div>
         {requestId && (
-          <div style={{ fontSize: 11, color: "#666", marginBottom: 16, fontFamily: "monospace" }}>Reference: {requestId}</div>
+          <div style={{ fontSize: 11, color: "#64748B", marginBottom: 16, fontFamily: "monospace" }}>Reference: {requestId}</div>
         )}
         <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
           {(failure === "SERVER_ERROR" || failure === "NETWORK" || failure === "INVALID_RESPONSE") && (
@@ -457,13 +457,13 @@ export default function DashboardPage() {
             href="/auth"
             style={{
               ...S.btn,
-              background: failure === "AUTH_REQUIRED" || failure === "EXPIRED_LINK" || failure === "INVALID_LINK" ? ACCENT : "rgba(255,255,255,0.08)",
-              color: "#fff", textDecoration: "none", display: "inline-block",
+              background: failure === "AUTH_REQUIRED" || failure === "EXPIRED_LINK" || failure === "INVALID_LINK" ? ACCENT : "#E2E8F0",
+              color: "#0F172A", textDecoration: "none", display: "inline-block",
             }}
           >
             Sign in
           </Link>
-          <Link href="/it-run" style={{ ...S.btn, background: "transparent", border: `1px solid ${ACCENT}`, color: ACCENT, textDecoration: "none", display: "inline-block" }}>IT Run event page</Link>
+          <Link href="/it-run" style={{ ...S.btn, background: "transparent", border: `1px solid ${ACCENT}`, color: "#C2410C", textDecoration: "none", display: "inline-block" }}>IT Run event page</Link>
         </div>
       </div>
     </div>
@@ -480,30 +480,30 @@ export default function DashboardPage() {
   return (
     <div style={S.page}>
       {/* Nav */}
-      <nav style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(8,8,8,0.97)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.06)", height: 60, display: "flex", alignItems: "center", padding: "0 clamp(1rem,4vw,2rem)", gap: 12 }}>
+      <nav style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(255,255,255,0.97)", backdropFilter: "blur(20px)", borderBottom: "1px solid #E2E8F0", height: 60, display: "flex", alignItems: "center", padding: "0 clamp(1rem,4vw,2rem)", gap: 12 }}>
         <Link href="/it-run" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
           <Image src="/logo.png" alt="" width={26} height={26} style={{ borderRadius: "50%" }} />
-          <span style={{ fontSize: 12, color: "#888" }}>The IT Run Sprint-2</span>
+          <span style={{ fontSize: 12, color: "#64748B" }}>The IT Run Sprint-2</span>
         </Link>
-        <span style={{ color: "#555" }}>/</span>
-        <span style={{ fontSize: 12, color: "#fff" }}>Participant Dashboard</span>
+        <span style={{ color: "#64748B" }}>/</span>
+        <span style={{ fontSize: 12, color: "#0F172A" }}>Participant Dashboard</span>
       </nav>
 
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "clamp(1.5rem,4vw,2.5rem) clamp(1rem,4vw,2rem)" }}>
 
         {/* Header */}
         <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontSize: "clamp(20px,3vw,28px)", fontWeight: 900, color: "#fff", margin: "0 0 4px" }}>
+          <h1 style={{ fontSize: "clamp(20px,3vw,28px)", fontWeight: 900, color: "#0F172A", margin: "0 0 4px" }}>
             Participant Dashboard
           </h1>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 13, color: "#888" }}>Registration Code: <strong style={{ color: "#fff", letterSpacing: "0.05em" }}>{reg.registration_code}</strong></span>
+            <span style={{ fontSize: 13, color: "#64748B" }}>Registration Code: <strong style={{ color: "#0F172A", letterSpacing: "0.05em" }}>{reg.registration_code}</strong></span>
             <StatusBadge status={cancelled ? "cancelled" : (reg.payment_status === "pending" && !reg.payment_window_open ? "expired" : reg.payment_status)} />
           </div>
         </div>
 
         {screen === "content_with_refresh_error" && (
-          <div role="alert" style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 12, padding: 14, marginBottom: 20, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <div role="alert" style={{ background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.3)", borderRadius: 12, padding: 14, marginBottom: 20, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 200, fontSize: 13, color: "#fca5a5", lineHeight: 1.5 }}>
               {DASHBOARD_FAILURE_MESSAGES[failure ?? "SERVER_ERROR"]}
             </div>
@@ -515,7 +515,7 @@ export default function DashboardPage() {
         {paid && reg.registration_status === "pending_verification" && (
           <div role="status" style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
             <div style={{ fontSize: 14, color: "#a5b4fc", fontWeight: 700 }}>Awaiting ID verification</div>
-            <div style={{ fontSize: 13, color: "#ccc", lineHeight: 1.6 }}>
+            <div style={{ fontSize: 13, color: "#64748B", lineHeight: 1.6 }}>
               Your payment is received. Your registration is confirmed once an admin has verified an ID for every adult participant.
               You will get a confirmation email then.
             </div>
@@ -524,8 +524,8 @@ export default function DashboardPage() {
 
         {cancelled && (
           <div role="status" style={{ background: "rgba(136,136,136,0.08)", border: "1px solid rgba(136,136,136,0.3)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
-            <div style={{ fontSize: 14, color: "#ccc", fontWeight: 700 }}>This registration has been cancelled</div>
-            <div style={{ fontSize: 13, color: "#ccc", lineHeight: 1.6 }}>
+            <div style={{ fontSize: 14, color: "#64748B", fontWeight: 700 }}>This registration has been cancelled</div>
+            <div style={{ fontSize: 13, color: "#64748B", lineHeight: 1.6 }}>
               Your QR code is no longer valid for BIB collection or race-day check-in. If a refund is owed, it is shown in your confirmation email once it has been processed.
             </div>
           </div>
@@ -533,12 +533,12 @@ export default function DashboardPage() {
 
         {/* Unpaid: the payment window is open (pay now), or it has closed (no payment), or the payment failed or is in progress */}
         {!paid && !cancelled && reg.payment_status === "pending" && reg.payment_window_open && (
-          <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
-            <div style={{ fontSize: 14, color: "#f59e0b", fontWeight: 700 }}>Payment Pending</div>
-            <div style={{ fontSize: 13, color: "#ccc", marginTop: 4, lineHeight: 1.5 }}>
+          <div style={{ background: "rgba(217,119,6,0.08)", border: "1px solid rgba(217,119,6,0.3)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
+            <div style={{ fontSize: 14, color: "#B45309", fontWeight: 700 }}>Payment Pending</div>
+            <div style={{ fontSize: 13, color: "#64748B", marginTop: 4, lineHeight: 1.5 }}>
               Your registration has been saved. Complete payment to confirm your participation.
             </div>
-            <div style={{ fontSize: 12, color: "#888", marginTop: 6, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 12, color: "#64748B", marginTop: 6, lineHeight: 1.5 }}>
               Your seats are held for a short time. Pay now to keep them.
             </div>
             <div style={{ marginTop: 12 }}>
@@ -552,8 +552,8 @@ export default function DashboardPage() {
         )}
         {!paid && !cancelled && reg.payment_status === "pending" && !reg.payment_window_open && (
           <div role="status" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
-            <div style={{ fontSize: 14, color: "#f87171", fontWeight: 700 }}>Reservation Expired</div>
-            <div style={{ fontSize: 13, color: "#ccc", marginTop: 4, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 14, color: "#DC2626", fontWeight: 700 }}>Reservation Expired</div>
+            <div style={{ fontSize: 13, color: "#64748B", marginTop: 4, lineHeight: 1.5 }}>
               The 15-minute payment window for this registration closed before payment was completed, so it can no longer be paid.
               {reg.discount_amount > 0
                 ? " This registration used a discount, so it can't be renewed online. Email info@connectedsteps.in."
@@ -568,8 +568,8 @@ export default function DashboardPage() {
         )}
         {!paid && !cancelled && (reg.payment_status === "expired") && (
           <div role="status" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
-            <div style={{ fontSize: 14, color: "#f87171", fontWeight: 700 }}>Reservation Expired</div>
-            <div style={{ fontSize: 13, color: "#ccc", marginTop: 4, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 14, color: "#DC2626", fontWeight: 700 }}>Reservation Expired</div>
+            <div style={{ fontSize: 13, color: "#64748B", marginTop: 4, lineHeight: 1.5 }}>
               The payment window for this registration closed before payment was completed, so its seats were released.
               {reg.discount_amount > 0
                 ? " This registration used a discount, so it can't be renewed online. Email info@connectedsteps.in."
@@ -583,11 +583,11 @@ export default function DashboardPage() {
           </div>
         )}
         {!paid && !cancelled && reg.payment_status !== "pending" && reg.payment_status !== "expired" && (
-          <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 12, padding: 16, marginBottom: 20, display: "flex", gap: 12, alignItems: "center" }}>
-            <span style={{ color: "#f59e0b", fontSize: 20 }}>!</span>
+          <div style={{ background: "rgba(217,119,6,0.08)", border: "1px solid rgba(217,119,6,0.3)", borderRadius: 12, padding: 16, marginBottom: 20, display: "flex", gap: 12, alignItems: "center" }}>
+            <span style={{ color: "#B45309", fontSize: 20 }}>!</span>
             <div>
-              <div style={{ fontSize: 14, color: "#f59e0b", fontWeight: 700 }}>Payment Required</div>
-              <div style={{ fontSize: 13, color: "#ccc" }}>Your registration is saved but not confirmed. Complete payment to secure your spot.</div>
+              <div style={{ fontSize: 14, color: "#B45309", fontWeight: 700 }}>Payment Required</div>
+              <div style={{ fontSize: 13, color: "#64748B" }}>Your registration is saved but not confirmed. Complete payment to secure your spot.</div>
             </div>
           </div>
         )}
@@ -596,7 +596,7 @@ export default function DashboardPage() {
 
           {/* Event Info */}
           <div style={S.card}>
-            <div style={{ fontSize: 11, color: ACCENT, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 16 }}>Event Details</div>
+            <div style={{ fontSize: 11, color: "#C2410C", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 16 }}>Event Details</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div>
                 <div style={S.label}>Category</div>
@@ -617,7 +617,7 @@ export default function DashboardPage() {
               {reg.final_price > 0 && (
                 <div>
                   <div style={S.label}>Amount Paid</div>
-                  <div style={{ fontSize: 20, fontWeight: 900, color: "#10b981" }}>Rs. {reg.final_price.toLocaleString("en-IN")}</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: "#059669" }}>Rs. {reg.final_price.toLocaleString("en-IN")}</div>
                   {reg.discount_label && (
                     <div style={{ fontSize: 12, color: "#60a5fa", marginTop: 4 }}>
                       Base Rs. {reg.base_price.toLocaleString("en-IN")} &minus; {reg.discount_label} Rs. {reg.discount_amount.toLocaleString("en-IN")}
@@ -631,9 +631,9 @@ export default function DashboardPage() {
           {/* QR Code — solo only; for multi-participant registrations QR appears inside each participant card */}
           {paid && !cancelled && reg.participant_count === 1 && (
             <div style={{ ...S.card, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
-              <div style={{ fontSize: 11, color: ACCENT, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Your QR Code</div>
+              <div style={{ fontSize: 11, color: "#C2410C", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Your QR Code</div>
               <QRDisplay code={reg.registration_code} token={participants[0]?.qr_token ?? reg.qr_token} />
-              <div style={{ fontSize: 12, color: "#666", textAlign: "center" }}>
+              <div style={{ fontSize: 12, color: "#64748B", textAlign: "center" }}>
                 Show this QR at BIB collection and race-day check-in
               </div>
             </div>
@@ -643,7 +643,7 @@ export default function DashboardPage() {
 
         {/* Participants */}
         <div style={{ marginTop: 24 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#0F172A", marginBottom: 16 }}>
             Participant{participants.length > 1 ? "s" : ""} ({participants.length})
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 16 }}>
@@ -660,19 +660,19 @@ export default function DashboardPage() {
                 <div key={p.id} style={S.card}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
                     <div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#0F172A" }}>
                         {p.first_name} {p.last_name}
                       </div>
-                      <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{p.company_name ?? "IT Professional"}</div>
+                      <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>{p.company_name ?? "IT Professional"}</div>
                       {p.category && (
                         <div style={{ fontSize: 12, color: p.category.color ?? "#e8620a", marginTop: 2, fontWeight: 600 }}>{p.category.name}</div>
                       )}
                     </div>
                     {hasBib && (
                       <div style={{ background: "rgba(232,98,10,0.1)", border: "1px solid rgba(232,98,10,0.3)", borderRadius: 8, padding: "6px 12px", textAlign: "center" }}>
-                        <div style={{ fontSize: 10, color: "#e8620a", textTransform: "uppercase", letterSpacing: "0.1em" }}>BIB</div>
-                        <div style={{ fontSize: 22, fontWeight: 900, color: "#e8620a" }}>{p.bib_number}</div>
-                        {p.wave && <div style={{ fontSize: 10, color: "#888" }}>Wave {p.wave}</div>}
+                        <div style={{ fontSize: 10, color: "#C2410C", textTransform: "uppercase", letterSpacing: "0.1em" }}>BIB</div>
+                        <div style={{ fontSize: 22, fontWeight: 900, color: "#C2410C" }}>{p.bib_number}</div>
+                        {p.wave && <div style={{ fontSize: 10, color: "#64748B" }}>Wave {p.wave}</div>}
                       </div>
                     )}
                   </div>
@@ -707,25 +707,25 @@ export default function DashboardPage() {
                       <div key={step.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
                         <div style={{
                           width:  10, height: 10, borderRadius: "50%",
-                          background: step.done ? "#10b981" : "rgba(255,255,255,0.1)",
-                          border:    `1px solid ${step.done ? "#10b981" : "rgba(255,255,255,0.15)"}`,
+                          background: step.done ? "#059669" : "#CBD5E1",
+                          border:    `1px solid ${step.done ? "#059669" : "#CBD5E1"}`,
                           position:  "relative",
                         }}>
-                          {i < 4 && <div style={{ position: "absolute", top: 4, left: 10, width: "calc(100% + 10px)", height: 1, background: step.done ? "rgba(16,185,129,0.3)" : "rgba(255,255,255,0.06)" }} />}
+                          {i < 4 && <div style={{ position: "absolute", top: 4, left: 10, width: "calc(100% + 10px)", height: 1, background: step.done ? "rgba(5,150,105,0.3)" : "#E2E8F0" }} />}
                         </div>
-                        <span style={{ fontSize: 8, color: step.done ? "#10b981" : "#555", textAlign: "center", lineHeight: 1.2 }}>{step.label}</span>
+                        <span style={{ fontSize: 8, color: step.done ? "#059669" : "#64748B", textAlign: "center", lineHeight: 1.2 }}>{step.label}</span>
                       </div>
                     ))}
                   </div>
 
                   {/* Per-participant QR — shown for multi-participant registrations (duo, parent-child) */}
                   {paid && !cancelled && reg.participant_count > 1 && (
-                    <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 16, marginTop: 4 }}>
-                      <div style={{ fontSize: 11, color: ACCENT, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 10 }}>
+                    <div style={{ borderTop: "1px solid #E2E8F0", paddingTop: 16, marginTop: 4 }}>
+                      <div style={{ fontSize: 11, color: "#C2410C", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 10 }}>
                         {p.first_name}&apos;s QR Code
                       </div>
                       <QRDisplay code={reg.registration_code} token={p.qr_token ?? reg.qr_token} />
-                      <div style={{ fontSize: 11, color: "#555", textAlign: "center", marginTop: 6 }}>
+                      <div style={{ fontSize: 11, color: "#64748B", textAlign: "center", marginTop: 6 }}>
                         Show at BIB collection and race-day check-in
                       </div>
                     </div>
@@ -733,8 +733,8 @@ export default function DashboardPage() {
 
                   {/* BIB slot booking */}
                   {paid && reg.registration_status === "active" && !isCollected && bibSlots.length > 0 && (
-                    <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 16 }}>
-                      <div style={{ fontSize: 12, color: "#fff", fontWeight: 700, marginBottom: 12 }}>BIB Collection Slot</div>
+                    <div style={{ borderTop: "1px solid #E2E8F0", paddingTop: 16 }}>
+                      <div style={{ fontSize: 12, color: "#0F172A", fontWeight: 700, marginBottom: 12 }}>BIB Collection Slot</div>
                       <BibSlotBooker
                         participantId={p.id}
                         registrationCode={reg.registration_code}
@@ -746,8 +746,8 @@ export default function DashboardPage() {
                   )}
 
                   {isCollected && bibCols[0] && (
-                    <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12, marginTop: 4 }}>
-                      <div style={{ fontSize: 12, color: "#10b981", fontWeight: 600 }}>
+                    <div style={{ borderTop: "1px solid #E2E8F0", paddingTop: 12, marginTop: 4 }}>
+                      <div style={{ fontSize: 12, color: "#059669", fontWeight: 600 }}>
                         BIB Collected on {new Date(bibCols[0].collected_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
                       </div>
                     </div>
@@ -768,22 +768,22 @@ export default function DashboardPage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginTop: 24 }}>
           <Link href="/it-run" style={{ ...S.card, textDecoration: "none", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 8, transition: "border-color 0.2s" }}
             onMouseEnter={e => (e.currentTarget.style.borderColor = "rgba(232,98,10,0.3)")}
-            onMouseLeave={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)")}>
+            onMouseLeave={e => (e.currentTarget.style.borderColor = "#E2E8F0")}>
             <div style={{ fontSize: 20 }}>&#127939;</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>Event Info</div>
-            <div style={{ fontSize: 11, color: "#888" }}>Schedule, venue, FAQs</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>Event Info</div>
+            <div style={{ fontSize: 11, color: "#64748B" }}>Schedule, venue, FAQs</div>
           </Link>
           <a href={`mailto:info@connectedsteps.in?subject=IT Run Sprint-2 Query - ${reg.registration_code}`}
             style={{ ...S.card, textDecoration: "none", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 8, transition: "border-color 0.2s" }}
             onMouseEnter={e => (e.currentTarget.style.borderColor = "rgba(232,98,10,0.3)")}
-            onMouseLeave={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)")}>
+            onMouseLeave={e => (e.currentTarget.style.borderColor = "#E2E8F0")}>
             <div style={{ fontSize: 20 }}>&#128231;</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>Contact Support</div>
-            <div style={{ fontSize: 11, color: "#888" }}>Email our team</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>Contact Support</div>
+            <div style={{ fontSize: 11, color: "#64748B" }}>Email our team</div>
           </a>
         </div>
 
-        <div style={{ marginTop: 32, textAlign: "center", fontSize: 12, color: "#555" }}>
+        <div style={{ marginTop: 32, textAlign: "center", fontSize: 12, color: "#64748B" }}>
           Registration Code: {reg.registration_code} &nbsp;|&nbsp; Event: The IT Run Sprint-2 &nbsp;|&nbsp; {reg.it_run_events?.event_date ? new Date(reg.it_run_events.event_date + "T12:00:00Z").toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : ""}
         </div>
       </div>

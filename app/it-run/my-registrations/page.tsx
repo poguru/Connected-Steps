@@ -22,7 +22,7 @@ import {
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-const BG     = "#080808";
+const BG     = "#FFFFFF";
 const ACCENT = "#e8620a";
 const SIGN_IN_HREF = "/auth?redirect=%2Fit-run%2Fmy-registrations";
 
@@ -158,31 +158,33 @@ export default function MyRegistrationsPage() {
   };
 
   return (
-    <div style={{ background: BG, color: "#fff", fontFamily: "'Inter',system-ui,sans-serif", minHeight: "100vh" }}>
+    <div style={{ background: BG, color: "#0F172A", fontFamily: "'Inter',system-ui,sans-serif", minHeight: "100vh" }}>
 
       {/* Nav */}
       <nav style={{
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
-        background: "rgba(8,8,8,0.97)", backdropFilter: "blur(20px)",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        background: "rgba(255,255,255,0.97)", backdropFilter: "blur(20px)",
+        borderBottom: "1px solid #E2E8F0",
         height: 52, display: "flex", alignItems: "center",
         padding: "0 clamp(1rem,4vw,2rem)", justifyContent: "space-between",
       }}>
         <Link href="/it-run" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
           <Image src="/logo.png" alt="" width={22} height={22} style={{ borderRadius: "50%" }} />
           <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>IT Run Sprint-2</div>
-            <div style={{ fontSize: 10, color: "#444" }}>My Registrations</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A", lineHeight: 1.2 }}>IT Run Sprint-2</div>
+            <div style={{ fontSize: 10, color: "#64748B" }}>My Registrations</div>
           </div>
         </Link>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <button type="button" onClick={signOut} style={{
-            fontSize: 13, fontWeight: 600, color: "#aaa", background: "transparent",
-            border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, padding: "6px 12px",
-            cursor: "pointer", fontFamily: "inherit",
-          }}>
-            Sign out
-          </button>
+          {state.status === "ready" && (
+            <button type="button" onClick={signOut} style={{
+              fontSize: 13, fontWeight: 600, color: "#64748B", background: "transparent",
+              border: "1px solid #CBD5E1", borderRadius: 8, padding: "6px 12px",
+              cursor: "pointer", fontFamily: "inherit",
+            }}>
+              Sign out
+            </button>
+          )}
           <Link href="/it-run/register" style={{
             fontSize: 13, fontWeight: 600, color: "#fff",
             background: ACCENT, borderRadius: 8, padding: "6px 14px", textDecoration: "none",
@@ -202,7 +204,7 @@ export default function MyRegistrationsPage() {
         {/* Loading */}
         {state.status === "loading" && (
           <div role="status" aria-label="Loading your registrations" style={{ display: "flex", alignItems: "center", justifyContent: "center", paddingTop: 60 }}>
-            <div style={{ width: 32, height: 32, border: "3px solid rgba(255,255,255,0.08)", borderTopColor: ACCENT, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+            <div style={{ width: 32, height: 32, border: "3px solid #E2E8F0", borderTopColor: ACCENT, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
           </div>
         )}
 
@@ -210,15 +212,15 @@ export default function MyRegistrationsPage() {
         {state.status === "signed_out" && (
           <div style={{ textAlign: "center", paddingTop: 40 }}>
             <div style={{ fontSize: 40, marginBottom: 16 }}>
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5" style={{ display: "inline-block" }}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="1.5" style={{ display: "inline-block" }}>
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                 <circle cx="12" cy="7" r="4" />
               </svg>
             </div>
-            <h1 style={{ fontSize: "1.4rem", fontWeight: 800, color: "#fff", margin: "0 0 10px" }}>
+            <h1 style={{ fontSize: "1.4rem", fontWeight: 800, color: "#0F172A", margin: "0 0 10px" }}>
               Sign in to view your registrations
             </h1>
-            <p style={{ fontSize: 14, color: "#666", margin: "0 0 28px", lineHeight: 1.6 }}>
+            <p style={{ fontSize: 14, color: "#64748B", margin: "0 0 28px", lineHeight: 1.6 }}>
               Registrations linked to your Connected Steps account will appear here.
             </p>
             <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
@@ -231,7 +233,7 @@ export default function MyRegistrationsPage() {
               </Link>
               <Link href="/it-run/register" style={{
                 display: "inline-block", padding: "13px 28px",
-                border: "1px solid rgba(255,255,255,0.15)", borderRadius: 12, color: "#fff",
+                border: "1px solid #CBD5E1", borderRadius: 12, color: "#0F172A",
                 fontSize: 15, fontWeight: 700, textDecoration: "none",
               }}>
                 Register &amp; Verify Email
@@ -243,17 +245,17 @@ export default function MyRegistrationsPage() {
         {/* Load error: never shown as an empty list */}
         {state.status === "error" && (
           <div role="alert" style={{
-            background: "rgba(248,113,113,0.06)", border: "1px solid rgba(248,113,113,0.15)",
-            borderRadius: 12, padding: "16px 20px", fontSize: 14, color: "#f87171",
+            background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.15)",
+            borderRadius: 12, padding: "16px 20px", fontSize: 14, color: "#DC2626",
           }}>
             <div style={{ marginBottom: 12, lineHeight: 1.6 }}>{loadFailureMessage(state.kind)}</div>
             {state.kind === "session" ? (
-              <Link href={SIGN_IN_HREF} style={{ color: "#fff", fontWeight: 700, textDecoration: "underline" }}>Sign in again</Link>
+              <Link href={SIGN_IN_HREF} style={{ color: "#0F172A", fontWeight: 700, textDecoration: "underline" }}>Sign in again</Link>
             ) : (
               <button type="button" onClick={refresh} style={{
                 minHeight: 44, padding: "10px 18px", borderRadius: 10, cursor: "pointer",
-                background: "rgba(248,113,113,0.12)", border: "1px solid rgba(248,113,113,0.35)",
-                color: "#fff", fontSize: 14, fontWeight: 700, fontFamily: "inherit",
+                background: "rgba(220,38,38,0.12)", border: "1px solid rgba(220,38,38,0.35)",
+                color: "#0F172A", fontSize: 14, fontWeight: 700, fontFamily: "inherit",
               }}>
                 Try again
               </button>
@@ -264,8 +266,8 @@ export default function MyRegistrationsPage() {
         {/* Cutoff notice: open until 15 January 2027, closed after it */}
         {state.status === "ready" && (
           <div role="note" style={{
-            background: state.changesOpen ? "rgba(96,165,250,0.06)" : "rgba(255,255,255,0.03)",
-            border: `1px solid ${state.changesOpen ? "rgba(96,165,250,0.2)" : "rgba(255,255,255,0.1)"}`,
+            background: state.changesOpen ? "rgba(96,165,250,0.06)" : "#FFFFFF",
+            border: `1px solid ${state.changesOpen ? "rgba(96,165,250,0.2)" : "#CBD5E1"}`,
             borderRadius: 12, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#cbd5e1", lineHeight: 1.6,
           }}>
             {state.changesOpen
@@ -283,7 +285,7 @@ export default function MyRegistrationsPage() {
             {state.claimable > 0 && (
               <>
                 <div style={{ marginBottom: 10 }}>
-                  We found {state.claimable} registration{state.claimable === 1 ? "" : "s"} made with <strong style={{ color: "#fff" }}>{state.email}</strong> that {state.claimable === 1 ? "is" : "are"} not on any account yet.
+                  We found {state.claimable} registration{state.claimable === 1 ? "" : "s"} made with <strong style={{ color: "#0F172A" }}>{state.email}</strong> that {state.claimable === 1 ? "is" : "are"} not on any account yet.
                 </div>
                 <button type="button" onClick={claimRegistrations} disabled={claiming} style={{
                   minHeight: 44, padding: "10px 18px", borderRadius: 10, cursor: claiming ? "wait" : "pointer",
@@ -295,7 +297,7 @@ export default function MyRegistrationsPage() {
               </>
             )}
             {claimMsg && (
-              <div role="status" style={{ marginTop: state.claimable > 0 ? 10 : 0, color: claimMsg.ok ? "#10b981" : "#f87171" }}>
+              <div role="status" style={{ marginTop: state.claimable > 0 ? 10 : 0, color: claimMsg.ok ? "#059669" : "#DC2626" }}>
                 {claimMsg.text}
               </div>
             )}
@@ -305,11 +307,11 @@ export default function MyRegistrationsPage() {
         {/* No registrations (only after a successful response) */}
         {state.status === "ready" && registrations.length === 0 && (
           <div style={{ textAlign: "center", paddingTop: 40 }}>
-            <h1 style={{ fontSize: "1.4rem", fontWeight: 800, color: "#fff", margin: "0 0 10px" }}>
+            <h1 style={{ fontSize: "1.4rem", fontWeight: 800, color: "#0F172A", margin: "0 0 10px" }}>
               No registrations yet
             </h1>
-            <p style={{ fontSize: 14, color: "#666", margin: "0 0 28px", lineHeight: 1.6 }}>
-              Registrations made while signed in as <strong style={{ color: "#888" }}>{state.email}</strong> will appear here.
+            <p style={{ fontSize: 14, color: "#64748B", margin: "0 0 28px", lineHeight: 1.6 }}>
+              Registrations made while signed in as <strong style={{ color: "#64748B" }}>{state.email}</strong> will appear here.
             </p>
             <Link href="/it-run/register" style={{
               display: "inline-block", padding: "13px 28px",
@@ -325,10 +327,10 @@ export default function MyRegistrationsPage() {
         {state.status === "ready" && registrations.length > 0 && (
           <div>
             <div style={{ marginBottom: 28 }}>
-              <h1 style={{ fontSize: "clamp(1.3rem,4vw,1.6rem)", fontWeight: 800, color: "#fff", margin: "0 0 6px" }}>
+              <h1 style={{ fontSize: "clamp(1.3rem,4vw,1.6rem)", fontWeight: 800, color: "#0F172A", margin: "0 0 6px" }}>
                 My Registrations
               </h1>
-              <div style={{ fontSize: 13, color: "#555" }}>
+              <div style={{ fontSize: 13, color: "#64748B" }}>
                 {registrations.length} registration{registrations.length !== 1 ? "s" : ""} for {state.email}
               </div>
             </div>
@@ -343,13 +345,13 @@ export default function MyRegistrationsPage() {
 
                 return (
                   <div key={reg.id} style={{
-                    background: "rgba(255,255,255,0.03)",
-                    border: "1px solid rgba(255,255,255,0.08)",
+                    background: "#FFFFFF",
+                    border: "1px solid #E2E8F0",
                     borderRadius: 16, padding: "20px 22px",
                   }}>
                     {/* Signed-in owner opens the dashboard by code; the API checks ownership */}
                     <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-                      <Link href={`/it-run/dashboard/${reg.registration_code}`} style={{ fontSize: 13, color: ACCENT, fontWeight: 700, textDecoration: "none" }}>
+                      <Link href={`/it-run/dashboard/${reg.registration_code}`} style={{ fontSize: 13, color: "#C2410C", fontWeight: 700, textDecoration: "none" }}>
                         View dashboard &rarr;
                       </Link>
                     </div>
@@ -360,14 +362,14 @@ export default function MyRegistrationsPage() {
                         {cat && (
                           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
                             <div style={{ width: 10, height: 10, borderRadius: "50%", background: cat.color || ACCENT, flexShrink: 0 }} />
-                            <span style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>{cat.name}</span>
+                            <span style={{ fontSize: 15, fontWeight: 700, color: "#0F172A" }}>{cat.name}</span>
                             {cat.distance_km != null && (
-                              <span style={{ fontSize: 12, color: "#555" }}>{cat.distance_km} km</span>
+                              <span style={{ fontSize: 12, color: "#64748B" }}>{cat.distance_km} km</span>
                             )}
                           </div>
                         )}
                         {event && (
-                          <div style={{ fontSize: 13, color: "#666" }}>
+                          <div style={{ fontSize: 13, color: "#64748B" }}>
                             {event.title} &bull; {formatDate(event.event_date)}
                           </div>
                         )}
@@ -382,29 +384,29 @@ export default function MyRegistrationsPage() {
                     </div>
 
                     {note && (
-                      <div style={{ fontSize: 13, color: "#fbbf24", marginBottom: 14, lineHeight: 1.5 }}>{note}</div>
+                      <div style={{ fontSize: 13, color: "#B45309", marginBottom: 14, lineHeight: 1.5 }}>{note}</div>
                     )}
 
                     {/* Registration code */}
                     <div style={{
-                      background: "rgba(255,255,255,0.03)", borderRadius: 10,
+                      background: "#FFFFFF", borderRadius: 10,
                       padding: "10px 14px", marginBottom: 14,
                       display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8,
                     }}>
                       <div>
-                        <div style={{ fontSize: 10, color: "#444", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>
+                        <div style={{ fontSize: 10, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>
                           Registration Code
                         </div>
-                        <div style={{ fontSize: 15, fontWeight: 800, color: "#fff", letterSpacing: "0.08em", fontFamily: "monospace", overflowWrap: "anywhere" }}>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: "#0F172A", letterSpacing: "0.08em", fontFamily: "monospace", overflowWrap: "anywhere" }}>
                           {reg.registration_code}
                         </div>
                       </div>
                       {bibs.length > 0 && (
                         <div>
-                          <div style={{ fontSize: 10, color: "#444", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>
+                          <div style={{ fontSize: 10, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>
                             BIB{bibs.length > 1 ? "s" : ""}
                           </div>
-                          <div style={{ fontSize: 15, fontWeight: 800, color: ACCENT, fontFamily: "monospace" }}>
+                          <div style={{ fontSize: 15, fontWeight: 800, color: "#C2410C", fontFamily: "monospace" }}>
                             {bibs.join(", ")}
                           </div>
                         </div>
@@ -416,16 +418,16 @@ export default function MyRegistrationsPage() {
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                         {reg.participants.map(p => (
                           <div key={p.id} style={{
-                            fontSize: 12, color: "#aaa",
-                            background: "rgba(255,255,255,0.04)",
-                            border: "1px solid rgba(255,255,255,0.06)",
+                            fontSize: 12, color: "#64748B",
+                            background: "#F8FAFC",
+                            border: "1px solid #E2E8F0",
                             borderRadius: 8, padding: "5px 12px",
                           }}>
                             {p.first_name} {p.last_name}
                             {p.category && (
-                              <div style={{ fontSize: 11, color: p.category.color ?? "#888", marginTop: 2 }}>{p.category.name}</div>
+                              <div style={{ fontSize: 11, color: p.category.color ?? "#64748B", marginTop: 2 }}>{p.category.name}</div>
                             )}
-                            <span style={{ color: "#555", marginLeft: 6 }}>
+                            <span style={{ color: "#64748B", marginLeft: 6 }}>
                               {PARTICIPANT_TYPE_LABEL[p.participant_type] ?? ""}
                               {p.collected_at ? " · BIB collected" : ""}
                             </span>
@@ -453,7 +455,7 @@ export default function MyRegistrationsPage() {
                         Base &#8377;{reg.pricing.base_price.toLocaleString("en-IN")} &minus; {reg.pricing.discount_label} &#8377;{reg.pricing.discount_amount.toLocaleString("en-IN")}
                       </div>
                     )}
-                    <div style={{ marginTop: 6, fontSize: 12, color: "#333", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 4 }}>
+                    <div style={{ marginTop: 6, fontSize: 12, color: "#64748B", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 4 }}>
                       <span>Registered {formatDate(reg.created_at)}</span>
                       {reg.final_price > 0 && (
                         <span>&#8377;{reg.final_price.toLocaleString("en-IN")}</span>
