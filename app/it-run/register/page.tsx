@@ -1990,8 +1990,9 @@ function RegisterPageContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "email", value: em, purpose: "event_register" }),
       });
+      if (!res.ok) reportFailure("/api/auth/send-otp", res.status);
       const d = await res.json();
-      if (!res.ok) { reportFailure("/api/auth/send-otp", res.status); setOtpError(d.error ?? "Failed to send code"); return; }
+      if (!res.ok) { setOtpError(d.error ?? "Failed to send code"); return; }
       setOtpSent(true);
       setOtpInput("");
       setNeedsName(false);
@@ -2019,8 +2020,9 @@ function RegisterPageContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      if (!res.ok) reportFailure("/api/auth/complete-event-verify", res.status);
       const d = await res.json();
-      if (!res.ok) { reportFailure("/api/auth/complete-event-verify", res.status); setOtpError(d.error ?? "Verification failed"); return; }
+      if (!res.ok) { setOtpError(d.error ?? "Verification failed"); return; }
 
       if (d.needs_profile) {
         // New user — collect name before account creation
@@ -2393,8 +2395,8 @@ function RegisterPageContent() {
       form.append("file", file);
       form.append("participantIdx", String(idx));
       const res  = await fetch("/api/it-run/upload/company-id", { method: "POST", body: form });
-      const data = await res.json();
       if (!res.ok) reportFailure("/api/it-run/upload/company-id", res.status);
+      const data = await res.json();
       updateParticipant(idx, "companyIdUrl", data.url ?? "error");
     } catch {
       reportFailure("/api/it-run/upload/company-id", 0);
@@ -2613,8 +2615,9 @@ function RegisterPageContent() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code: couponCode.trim().toUpperCase(), categoryId: selectedCat.id, amount: finalPrice }),
       });
+      if (!res.ok) reportFailure("/api/it-run/coupons/validate", res.status);
       const data = await res.json();
-      if (!res.ok) { reportFailure("/api/it-run/coupons/validate", res.status); setCouponError(data.error ?? "Invalid coupon"); return; }
+      if (!res.ok) { setCouponError(data.error ?? "Invalid coupon"); return; }
       setCoupon(data);
     } catch {
       reportFailure("/api/it-run/coupons/validate", 0);
@@ -2737,9 +2740,9 @@ function RegisterPageContent() {
           })),
         }),
       });
+      if (!res.ok) reportFailure("/api/it-run/register", res.status);
       const data = await res.json();
       if (!res.ok) {
-        reportFailure("/api/it-run/register", res.status);
         if (data.field && typeof data.participant_index === "number") {
           returnToParticipantError(data.participant_index, data.field, data.error ?? "Please check this field.");
         } else {
@@ -2780,8 +2783,9 @@ function RegisterPageContent() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payRegs ? { registrationIds: payRegs.map(r => r.id) } : { registrationId: regId }),
       });
+      if (!res.ok) reportFailure("/api/it-run/payment/create-order", res.status);
       const data = await res.json();
-      if (!res.ok) { reportFailure("/api/it-run/payment/create-order", res.status); setSubmitError(data.error ?? "Could not create payment"); return; }
+      if (!res.ok) { setSubmitError(data.error ?? "Could not create payment"); return; }
 
       const rz = new window.Razorpay({
         key:         data.key,
@@ -2818,8 +2822,9 @@ function RegisterPageContent() {
           ? { registrationIds: payRegs.map(r => r.id), paymentId, orderId, signature }
           : { registrationId: regId, paymentId, orderId, signature }),
       });
+      if (!res.ok) reportFailure("/api/it-run/payment/verify", res.status);
       const data = await res.json();
-      if (!res.ok) { reportFailure("/api/it-run/payment/verify", res.status); setSubmitError(data.error ?? "Payment verification failed"); return; }
+      if (!res.ok) { setSubmitError(data.error ?? "Payment verification failed"); return; }
       setPaymentDone(true);
       setStep(7);
     } catch {
