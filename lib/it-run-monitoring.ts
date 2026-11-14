@@ -201,11 +201,22 @@ export function summarizeJourneys(
   nowMs: number,
 ) {
   const counts = { total: journeys.length, active: 0, abandoned: 0, completed: 0 };
+  // Abandoned journeys split by how far they got: a visitor who only opened the page is not the same as one who
+  // entered details and stopped. Derived from the stage each journey reached, so no personal data is needed.
+  let abandonedOnFirstStep = 0;
   const byStage: Record<string, number> = {};
   for (const j of journeys) {
-    counts[journeyStatus({ completedAt: j.completedAt, lastActivityAt: j.lastActivityAt }, nowMs)]++;
+    const status = journeyStatus({ completedAt: j.completedAt, lastActivityAt: j.lastActivityAt }, nowMs);
+    counts[status]++;
+    if (status === "abandoned" && (j.currentStage === "landing" || j.currentStage === "")) abandonedOnFirstStep++;
     byStage[j.currentStage] = (byStage[j.currentStage] ?? 0) + 1;
   }
   const conversion = counts.total === 0 ? null : Math.round((counts.completed / counts.total) * 1000) / 10;
-  return { ...counts, conversionPercent: conversion, byStage };
+  return {
+    ...counts,
+    abandonedOnFirstStep,
+    abandonedAfterStarting: counts.abandoned - abandonedOnFirstStep,
+    conversionPercent: conversion,
+    byStage,
+  };
 }

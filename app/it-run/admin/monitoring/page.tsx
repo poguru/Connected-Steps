@@ -10,6 +10,8 @@ interface Summary {
   active: number;
   abandoned: number;
   completed: number;
+  abandonedOnFirstStep: number;
+  abandonedAfterStarting: number;
   conversionPercent: number | null;
   byStage: Record<string, number>;
 }
@@ -144,7 +146,9 @@ export default function MonitoringPage() {
             <div style={S.card}><div style={S.label}>Active now</div><div style={S.value}>{s.active}</div>
               <div style={{ fontSize: 11, color: "#666", marginTop: 4 }}>Activity in the last {data?.activeWindowMinutes} min</div></div>
             <div style={S.card}><div style={S.label}>Abandoned</div><div style={S.value}>{s.abandoned}</div>
-              <div style={{ fontSize: 11, color: "#666", marginTop: 4 }}>Inactive over {data?.abandonAfterMinutes} min</div></div>
+              <div style={{ fontSize: 11, color: "#666", marginTop: 4 }}>
+                Inactive over {data?.abandonAfterMinutes} min · {s.abandonedOnFirstStep} left on the first step · {s.abandonedAfterStarting} after starting
+              </div></div>
             <div style={S.card}><div style={S.label}>Completed</div><div style={S.value}>{s.completed}</div></div>
             <div style={S.card}><div style={S.label}>Conversion</div>
               <div style={S.value}>{s.conversionPercent === null ? "—" : `${s.conversionPercent}%`}</div></div>
