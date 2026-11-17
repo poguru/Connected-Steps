@@ -21,8 +21,10 @@ export async function POST(req: NextRequest, { params }: Params) {
   const src = invRes.data;
 
   // Create new invoice (new number, reset payment status to draft)
+  // The source quotation and revision links belong to the original only; a duplicate is a fresh, independent invoice
   const { id: _id, invoice_number: _inv, created_at: _ca, updated_at: _ua,
-          payment_status: _ps, linked_invoice_id: _li, ...copyFields } = src;
+          payment_status: _ps, linked_invoice_id: _li, source_quotation_id: _sq,
+          amends_invoice_id: _am, revision_no: _rv, ...copyFields } = src;
 
   const { data: newInv, error } = await db.from("manual_invoices").insert({
     ...copyFields,

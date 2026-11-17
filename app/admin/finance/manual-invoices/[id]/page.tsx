@@ -262,6 +262,19 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     else setAlert({ type: "error", msg: data.error ?? "Duplicate failed" });
   }
 
+  // Revisions are started from a sent invoice; the original is left as it is
+  async function amend() {
+    if (!window.confirm("Start a revision of this invoice? The original stays as it is.")) return;
+    setActing("amend");
+    const res  = await fetch(`/api/admin/manual-invoices/${id}/amend`, { method: "POST" });
+    const data = await res.json().catch(() => ({})) as { invoice?: { id: string }; error?: string; invoice_id?: string };
+    setActing(null);
+    const target = data.invoice?.id ?? data.invoice_id;
+    if (res.ok && data.invoice) router.push(`/admin/finance/manual-invoices/${data.invoice.id}`);
+    else if (res.status === 409 && target) router.push(`/admin/finance/manual-invoices/${target}`);
+    else setAlert({ type: "error", msg: data.error ?? "Could not start the revision" });
+  }
+
   if (loading) return <div style={{ padding: "4rem", textAlign: "center" }}><Spinner /></div>;
   if (!invoice) return <div style={{ padding: "2rem", color: "#f87171" }}>Invoice not found.</div>;
 
@@ -312,6 +325,9 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           {canSend && <Button size="sm" variant="outline" onClick={() => setShowSend(true)}>📤 Send</Button>}
           {canMarkPaid && <Button size="sm" variant="primary" onClick={() => setShowMarkPaid(true)}>💰 Mark Paid</Button>}
           <Button size="sm" variant="ghost" onClick={duplicate} loading={acting === "dup"}>⧉ Duplicate</Button>
+          {["sent", "viewed", "partially_paid", "overdue"].includes(invoice.payment_status) && (
+            <Button size="sm" variant="outline" onClick={amend} loading={acting === "amend"}>✎ Revise</Button>
+          )}
           {!isCancelled && <Button size="sm" variant="ghost" onClick={cancel} loading={acting === "cancel"} style={{ color: "#f87171" }}>✕ Cancel</Button>}
         </div>
       </div>
