@@ -79,7 +79,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     .insert(invoicePayload).select().single();
   if (ie || !invoice) {
     await release();
-    return NextResponse.json({ error: "Could not create the invoice. The quotation was not changed." }, { status: 500 });
+    // Admin-only route: the database reason is shown so the failure can be fixed, and it is logged
+    console.error("[quotation-convert] invoice insert failed:", ie?.code, ie?.message, ie?.details, ie?.hint);
+    return NextResponse.json({ error: `Could not create the invoice: ${ie?.message ?? "no row returned"}. The quotation was not changed.` }, { status: 500 });
   }
   invoiceId = invoice.id;
 
@@ -98,7 +100,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { error: iie } = await db.from("manual_invoice_items").insert(invoiceItems);
     if (iie) {
       await release();
-      return NextResponse.json({ error: "Could not copy the items. The quotation was not changed." }, { status: 500 });
+      console.error("[quotation-convert] item insert failed:", iie.code, iie.message, iie.details);
+      return NextResponse.json({ error: `Could not copy the items: ${iie.message}. The quotation was not changed.` }, { status: 500 });
     }
   }
 
