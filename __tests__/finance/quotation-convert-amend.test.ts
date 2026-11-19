@@ -110,6 +110,16 @@ describe("converting a quotation", () => {
     expect(invoice.grand_total).toBe(1180);
   });
 
+  it("writes only column names that exist on the invoice table", () => {
+    setup({ claimed: quotation, items: [] });
+    return convert(req("http://t/x"), ctx("q1")).then(() => {
+      const invoice = ops.find(o => o.table === "manual_invoices" && o.op === "insert")!.payload!;
+      expect(invoice).not.toHaveProperty("notes");
+      expect(invoice).toHaveProperty("customer_notes");
+      expect(invoice).toHaveProperty("internal_notes");
+    });
+  });
+
   it("if the invoice cannot be created, the quotation goes back to accepted and nothing is left behind", async () => {
     setup({ claimed: quotation, invoiceError: { message: "boom" } });
     const res = await convert(req("http://t/x"), ctx("q1"));
